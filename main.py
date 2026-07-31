@@ -8,12 +8,18 @@ from scanner import run_scan, get_settings, save_settings, load_ratings, save_ra
 
 OUTPUT_JSON_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "installed_airports.json")
 
+AIRPORTS_DB_CACHE = None
+
 def resolve_package_icaos(pkg_name):
-    airports, _, _ = load_airport_database()
+    global AIRPORTS_DB_CACHE
+    if AIRPORTS_DB_CACHE is None:
+        AIRPORTS_DB_CACHE, _, _ = load_airport_database()
+    airports = AIRPORTS_DB_CACHE
+
     clean_fn = pkg_name.lower()
     if clean_fn.endswith('.disabled'):
         clean_fn = clean_fn[:-9]
-    for prefix in ['communityfs20-', 'communityfs24-', 'fs20-', 'fs24-']:
+    for prefix in ['communityfs20-', 'communityfs24-', 'officialfs20-', 'officialfs24-', 'fs20-', 'fs24-']:
         if clean_fn.startswith(prefix):
             clean_fn = clean_fn[len(prefix):]
             break
