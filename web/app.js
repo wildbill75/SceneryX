@@ -2282,8 +2282,12 @@ function autoSyncSimBrief(changedField) {
         try {
             const res = JSON.parse(resStr);
             if (res.status === 'success') {
-                if (res.username) document.getElementById('sb-username-input').value = res.username;
-                if (res.userid) document.getElementById('sb-userid-input').value = res.userid;
+                if (changedField === 'userid' && res.username) {
+                    document.getElementById('sb-username-input').value = res.username;
+                }
+                if (changedField === 'username' && res.userid) {
+                    document.getElementById('sb-userid-input').value = res.userid;
+                }
             }
         } catch(e){}
     });
