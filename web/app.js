@@ -1501,6 +1501,38 @@ function resetMinRatingFilter() {
     filterAirports();
 }
 
+function resetFullDatabase() {
+    showCustomModal({
+        title: 'Reset Full Database & Restore Sceneries?',
+        message: 'This will re-activate all disabled MSFS scenery packages, clear flight mode, and perform a fresh scan of your Community & Official folders.',
+        type: 'warning',
+        confirmText: 'Yes, Reset All',
+        cancelText: 'Cancel',
+        onConfirm: () => {
+            const icon = document.getElementById('reset-icon');
+            if (icon) icon.className = "fa-solid fa-spinner fa-spin text-red-400 text-xs";
+            if (!window.pywebview) return;
+            window.pywebview.api.reset_full_database().then(resStr => {
+                if (icon) icon.className = "fa-solid fa-trash-can-arrow-up text-red-400 text-xs";
+                try {
+                    const res = JSON.parse(resStr);
+                    if (res.status === 'success') {
+                        allAirportsData = res.airports || [];
+                        updateFlightModeBannerUI({ active: false, icaos: [] });
+                        filterAirports();
+                        showCustomModal({
+                            title: 'Database Reset Complete',
+                            message: 'All sceneries have been restored to Activated status and your database has been freshly scanned.',
+                            type: 'success',
+                            confirmText: 'Great!'
+                        });
+                    }
+                } catch(e){}
+            });
+        }
+    });
+}
+
 /* ================= FILTER & UI LOGIC ================= */
 
 function filterAirports() {
@@ -1519,21 +1551,6 @@ function filterAirports() {
         // Pricing Filter
         const pt = getAirportPricingType(ap);
         if (!selectedPricing.has(pt)) return false;
-
-        // Source Filter
-        let sourceMatch = false;
-        if (ap.is_asobo_official && selectedSources.has('asobo')) {
-            sourceMatch = true;
-        } else {
-            for (let src of selectedSources) {
-                if (src !== 'asobo' && ap.source_folder.toLowerCase().includes(src.toLowerCase())) {
-                    sourceMatch = true;
-                    break;
-                }
-            }
-        }
-
-        if (!sourceMatch) return false;
 
         // Type Filter
         const typeStr = ap.english_type || ap.type;

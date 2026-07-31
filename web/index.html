@@ -275,9 +275,15 @@
             </button>
 
             <!-- RESCAN BUTTON -->
-            <button onclick="rescanMSFS()" title="Rescan MSFS Packages" class="px-3.5 py-1.5 rounded-full bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-300 text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm shadow-cyan-500/10">
+            <button onclick="rescanMSFS()" title="Rescan MSFS Packages" class="px-3.5 py-1.5 rounded-full bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-300 text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm shadow-cyan-500/10 cursor-pointer">
                 <i id="rescan-icon" class="fa-solid fa-rotate text-cyan-400 text-xs"></i>
                 <span class="hidden xl:inline">Rescan</span>
+            </button>
+
+            <!-- RESET DATABASE BUTTON -->
+            <button onclick="resetFullDatabase()" title="Reset All Sceneries & Restore Database" class="px-3.5 py-1.5 rounded-full bg-red-500/20 hover:bg-red-500/30 border border-red-500/40 text-red-300 text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm shadow-red-500/10 cursor-pointer">
+                <i id="reset-icon" class="fa-solid fa-trash-can-arrow-up text-red-400 text-xs"></i>
+                <span class="hidden xl:inline">Reset Database</span>
             </button>
 
 
