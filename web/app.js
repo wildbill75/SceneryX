@@ -688,7 +688,7 @@ function createCustomIcon(ap) {
     });
 }
 
-function getAirportPopupHtml(ap, isRightClick = false) {
+function getAirportPopupHtml(ap) {
     const cat = getAirportCategory(ap);
     let badgeClass = 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40';
     let badgeLabel = 'Freeware';
@@ -716,52 +716,6 @@ function getAirportPopupHtml(ap, isRightClick = false) {
         </div>
     ` : '';
 
-    let actionButtonsHtml = '';
-    if (isRightClick) {
-        const isDep = (flightOriginAirport && flightOriginAirport.icao === ap.icao);
-        const isArr = (flightDestAirport && flightDestAirport.icao === ap.icao);
-
-        if (!flightOriginAirport) {
-            actionButtonsHtml = `
-                <div class="pt-2 mt-2 border-t border-slate-800 flex items-center gap-1.5">
-                    <button onclick="setFlightOriginByIcao('${ap.icao}')" class="w-full py-1.5 px-3 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm">
-                        <i class="fa-solid fa-plane-departure text-emerald-400"></i> Set as Departure
-                    </button>
-                </div>
-            `;
-        } else if (isDep) {
-            actionButtonsHtml = `
-                <div class="pt-2 mt-2 border-t border-slate-800 flex items-center gap-1.5">
-                    <button onclick="clearFlightOrigin()" class="w-full py-1.5 px-3 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm">
-                        <i class="fa-solid fa-xmark text-red-400"></i> Unset Departure
-                    </button>
-                </div>
-            `;
-        } else if (isArr) {
-            actionButtonsHtml = `
-                <div class="pt-2 mt-2 border-t border-slate-800 flex items-center gap-1.5">
-                    <button onclick="clearFlightDest()" class="w-full py-1.5 px-3 rounded-xl bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/40 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm">
-                        <i class="fa-solid fa-xmark text-red-400"></i> Unset Arrival
-                    </button>
-                    <button onclick="setFlightOriginByIcao('${ap.icao}')" class="w-full py-1.5 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm">
-                        <i class="fa-solid fa-plane-departure text-emerald-400"></i> Set Departure
-                    </button>
-                </div>
-            `;
-        } else {
-            actionButtonsHtml = `
-                <div class="pt-2 mt-2 border-t border-slate-800 flex items-center gap-1.5">
-                    <button onclick="setFlightDestByIcao('${ap.icao}')" class="flex-1 py-1.5 px-2.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm">
-                        <i class="fa-solid fa-plane-arrival text-cyan-400"></i> Set Arrival
-                    </button>
-                    <button onclick="setFlightOriginByIcao('${ap.icao}')" class="flex-1 py-1.5 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-sm">
-                        <i class="fa-solid fa-plane-departure text-emerald-400"></i> Set Departure
-                    </button>
-                </div>
-            `;
-        }
-    }
-
     return `
         <div class="p-1 font-['Outfit'] space-y-2">
             <div class="flex items-center justify-between gap-2">
@@ -777,7 +731,6 @@ function getAirportPopupHtml(ap, isRightClick = false) {
             <div class="text-[10px] font-semibold text-cyan-400 pt-1.5 border-t border-slate-800 flex justify-between items-center">
                 <span class="font-bold">${ap.english_type || ap.type}</span>
             </div>
-            ${actionButtonsHtml}
         </div>
     `;
 }
@@ -794,7 +747,7 @@ function renderAirportsOnMap(airports) {
         const marker = L.marker([ap.lat, ap.lon], { icon: icon });
 
         // Bind default preview popup content
-        marker.bindPopup(getAirportPopupHtml(ap, false), {
+        marker.bindPopup(getAirportPopupHtml(ap), {
             maxWidth: 340,
             minWidth: 250,
             closeButton: false,
@@ -804,7 +757,7 @@ function renderAirportsOnMap(airports) {
         // Hover events for quick popup preview
         marker.on('mouseover', function () {
             if (isSuppressingHoverPopups || this._isPinned) return;
-            this.setPopupContent(getAirportPopupHtml(ap, false));
+            this.setPopupContent(getAirportPopupHtml(ap));
             this.openPopup();
         });
 
@@ -818,7 +771,7 @@ function renderAirportsOnMap(airports) {
             showAirportDetails(ap);
         });
 
-        // Right-click event to pin Info Popup WITH Departure & Arrival action buttons
+        // Right-click event to pin Info Popup
         marker.on('contextmenu', function (e) {
             if (e.originalEvent) {
                 e.originalEvent.preventDefault();
@@ -826,7 +779,7 @@ function renderAirportsOnMap(airports) {
             }
             this._isPinned = true;
             this.unbindPopup();
-            const popup = this.bindPopup(getAirportPopupHtml(ap, true), {
+            const popup = this.bindPopup(getAirportPopupHtml(ap), {
                 maxWidth: 340,
                 minWidth: 260,
                 closeButton: true,

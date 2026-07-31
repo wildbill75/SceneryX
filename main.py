@@ -271,12 +271,21 @@ class Api:
                 root = tree.getroot()
                 changed = False
 
-                # Get physical folders to avoid activating deleted/absent packages
+                # Get physical folders across all scan paths to avoid activating deleted/absent packages
+                st_cfg = get_settings()
+                scan_paths_cfg = st_cfg.get("scan_paths", [])
+
                 physical_folders_lower = set()
-                com_dir = r'C:\Users\Bertrand\AppData\Local\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\Packages\Community'
-                if os.path.exists(com_dir):
-                    for item in os.listdir(com_dir):
-                        physical_folders_lower.add(item.lower())
+                for cfg in scan_paths_cfg:
+                    if not cfg.get('enabled', True):
+                        continue
+                    dp = cfg.get('path', '')
+                    if os.path.exists(dp):
+                        try:
+                            for item in os.listdir(dp):
+                                physical_folders_lower.add(item.lower())
+                        except Exception:
+                            pass
 
                 for p in root.findall('Package'):
                     name = p.get('name', '')
