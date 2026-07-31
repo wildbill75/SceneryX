@@ -9,10 +9,34 @@ def get_resource_file_path(filename):
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
 
 AIRPORT_DB_PATH = get_resource_file_path("airports.json")
-OUTPUT_JSON_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "installed_airports.json")
-SETTINGS_JSON_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "settings.json")
-RATINGS_JSON_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ratings.json")
-CUSTOM_PRICES_JSON_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "custom_prices.json")
+def get_user_data_dir():
+    appdata = os.environ.get('APPDATA')
+    if not appdata:
+        appdata = os.path.expanduser('~')
+    user_dir = os.path.join(appdata, 'SceneryX')
+    os.makedirs(user_dir, exist_ok=True)
+    return user_dir
+
+USER_DATA_DIR = get_user_data_dir()
+OUTPUT_JSON_PATH = os.path.join(USER_DATA_DIR, "installed_airports.json")
+SETTINGS_JSON_PATH = os.path.join(USER_DATA_DIR, "settings.json")
+RATINGS_JSON_PATH = os.path.join(USER_DATA_DIR, "ratings.json")
+CUSTOM_PRICES_JSON_PATH = os.path.join(USER_DATA_DIR, "custom_prices.json")
+
+# Auto-migrate any existing legacy config files from local executable folder to %APPDATA%/SceneryX/
+for filename, target_path in [
+    ("settings.json", SETTINGS_JSON_PATH),
+    ("ratings.json", RATINGS_JSON_PATH),
+    ("custom_prices.json", CUSTOM_PRICES_JSON_PATH),
+    ("installed_airports.json", OUTPUT_JSON_PATH)
+]:
+    local_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
+    if os.path.exists(local_path) and not os.path.exists(target_path):
+        try:
+            import shutil
+            shutil.copy2(local_path, target_path)
+        except Exception:
+            pass
 
 COMMERCIAL_PAYWARE_VENDORS = {
     # Major Publishers & Stores
@@ -277,7 +301,7 @@ KNOWN_PAYWARE_PRICES = {
     'limj': 15.99, 'eddh': 16.99
 }
 
-FOLDER_SIZE_CACHE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "folder_sizes.json")
+FOLDER_SIZE_CACHE_PATH = os.path.join(USER_DATA_DIR, "folder_sizes.json")
 
 def load_folder_size_cache():
     if os.path.exists(FOLDER_SIZE_CACHE_PATH):

@@ -4,9 +4,7 @@ import json
 import re
 import urllib.request
 import webview
-from scanner import run_scan, get_settings, save_settings, load_ratings, save_rating, save_custom_price, load_custom_prices, get_default_gsx_path, load_airport_database, SPECIAL_BUNDLE_MAP
-
-OUTPUT_JSON_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "installed_airports.json")
+from scanner import run_scan, get_settings, save_settings, load_ratings, save_rating, save_custom_price, load_custom_prices, get_default_gsx_path, load_airport_database, SPECIAL_BUNDLE_MAP, OUTPUT_JSON_PATH
 
 AIRPORTS_DB_CACHE = None
 
