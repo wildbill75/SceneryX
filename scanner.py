@@ -663,13 +663,10 @@ def run_scan():
                 pkg_name = p.get('name', '')
                 act = p.get('active', 'Activated')
                 clean_folder = pkg_name[:-9] if pkg_name.endswith('.disabled') else pkg_name
-                if clean_folder.startswith('community'):
-                    clean_folder = clean_folder[9:]
-                elif clean_folder.startswith('official'):
-                    clean_folder = clean_folder[8:]
+                folder_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_folder.lower())
 
                 is_explicitly_disabled = (act == 'UserDisabled') or pkg_name.endswith('.disabled')
-                is_absent_from_disk = (clean_folder.lower() not in physical_folders_lower and f"{clean_folder.lower()}.disabled" not in physical_folders_lower)
+                is_absent_from_disk = not any(folder_norm in f or f in folder_norm for f in physical_folders_lower)
                 is_disabled = is_explicitly_disabled or is_absent_from_disk
 
                 all_packages.append(("MSFS 2024 - Content.xml", clean_folder, "", is_disabled))

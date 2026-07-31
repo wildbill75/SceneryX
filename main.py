@@ -212,25 +212,28 @@ class Api:
                     clean_folder = name[:-9] if name.endswith('.disabled') else name
                     p_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_folder.lower())
 
+                    matched_ap = None
                     for ap in airports:
                         if ap.get('pricing_type') != 'Asobo':
-                            is_match = False
                             for src in ap.get('all_sources', []):
                                 fn = src.get('folder_name', '').lower()
                                 s_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn)
                                 if p_norm == s_norm or p_norm in s_norm or s_norm in p_norm:
-                                    is_match = True
+                                    matched_ap = ap
                                     break
-                            if is_match:
-                                if ap['icao'] in flight_set:
-                                    if p.get('active') == 'UserDisabled':
-                                        p.set('active', 'Activated')
-                                        changed = True
-                                else:
-                                    if p.get('active') != 'UserDisabled':
-                                        p.set('active', 'UserDisabled')
-                                        changed = True
-                                        disabled_count += 1
+                            if matched_ap:
+                                break
+
+                    if matched_ap:
+                        if matched_ap['icao'] in flight_set:
+                            if p.get('active') == 'UserDisabled':
+                                p.set('active', 'Activated')
+                                changed = True
+                        else:
+                            if p.get('active') != 'UserDisabled':
+                                p.set('active', 'UserDisabled')
+                                changed = True
+                                disabled_count += 1
 
                 if changed:
                     tree.write(content_xml_path, encoding='utf-8', xml_declaration=True)
@@ -261,11 +264,21 @@ class Api:
                 tree = ET.parse(content_xml_path)
                 root = tree.getroot()
                 changed = False
+
+                # Get physical folders to avoid activating deleted/absent packages
+                physical_folders_lower = set()
+                com_dir = r'C:\Users\Bertrand\AppData\Local\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\Packages\Community'
+                if os.path.exists(com_dir):
+                    for item in os.listdir(com_dir):
+                        physical_folders_lower.add(item.lower())
+
                 for p in root.findall('Package'):
                     name = p.get('name', '')
                     clean = name[:-9] if name.endswith('.disabled') else name
-                    if p.get('active') == 'UserDisabled':
-                        # Only re-enable 3rd party sceneries that exist on disk or were disabled by flight mode
+                    folder_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean.lower())
+                    
+                    exists_on_disk = any(folder_norm in f or f in folder_norm for f in physical_folders_lower)
+                    if exists_on_disk and p.get('active') == 'UserDisabled':
                         p.set('active', 'Activated')
                         changed = True
                 if changed:
