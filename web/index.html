@@ -389,6 +389,47 @@
                     </div>
                 </div>
 
+                <!-- SIMBRIEF FLIGHT OPTIMIZER FILTER (SIDEBAR) -->
+                <div class="border-t border-slate-800/80 pt-4">
+                    <div class="flex items-center justify-between mb-2.5">
+                        <label class="text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                            <i class="fa-solid fa-plane-flight text-amber-400"></i>
+                            <span>SimBrief Flight Mode</span>
+                        </label>
+                        <span id="sb-status-badge" class="text-[9px] font-bold font-mono px-2 py-0.5 rounded-full bg-slate-900 text-slate-400 border border-slate-800">INACTIVE</span>
+                    </div>
+                    
+                    <div class="space-y-2.5">
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <span class="text-[10px] text-slate-400 font-semibold block mb-1">SimBrief Username</span>
+                                <input type="text" id="sb-username-input" onchange="autoSyncSimBrief('username')" placeholder="Username" class="w-full bg-slate-900/90 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500 font-mono transition-all">
+                            </div>
+                            <div>
+                                <span class="text-[10px] text-slate-400 font-semibold block mb-1">Pilot ID</span>
+                                <input type="text" id="sb-userid-input" onchange="autoSyncSimBrief('userid')" placeholder="Pilot ID" class="w-full bg-slate-900/90 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500 font-mono transition-all">
+                            </div>
+                        </div>
+
+                        <button id="sb-import-btn" onclick="triggerSimBriefImport()" class="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 text-amber-300 font-extrabold text-xs transition-all flex items-center justify-center gap-2 shadow-sm shadow-amber-500/10 active:scale-98">
+                            <i id="sb-import-icon" class="fa-solid fa-cloud-arrow-down text-amber-400"></i>
+                            <span>Import Active SimBrief OFP</span>
+                        </button>
+
+                        <div id="sb-active-banner" class="hidden p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-2">
+                            <div class="text-[11px] text-amber-200 font-bold flex items-center justify-between">
+                                <span>⚡ FLIGHT MODE ACTIVE</span>
+                                <span id="sb-disabled-count" class="text-[10px] font-mono text-slate-400"></span>
+                            </div>
+                            <div id="sb-route-summary" class="text-xs font-mono font-black text-amber-300"></div>
+                            <button onclick="restoreAllFlightSceneriesUI()" class="w-full py-1.5 px-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-[11px] font-bold transition-all flex items-center justify-center gap-1.5">
+                                <i class="fa-solid fa-rotate-left text-amber-400"></i>
+                                <span>Restore All Sceneries</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
             </div>
         </aside>
 
@@ -717,6 +758,68 @@
                 </button>
                 <button id="custom-modal-confirm-btn" onclick="confirmCustomModal()" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-xs shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 hover:scale-[1.02] active:scale-95 transition-all">
                     OK
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SIMBRIEF FLIGHT CONFIRMATION MODAL -->
+    <div id="simbrief-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in">
+        <div class="glass-modal w-full max-w-lg rounded-2xl border border-slate-700/80 shadow-2xl overflow-hidden p-6 space-y-5">
+            <div class="flex items-center justify-between border-b border-slate-800/80 pb-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 text-lg shadow-inner">
+                        <i class="fa-solid fa-plane-departure"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-black text-slate-100">SimBrief Flight Scenery Optimizer</h3>
+                        <p id="sb-modal-flight-info" class="text-xs text-amber-400/90 font-mono font-bold"></p>
+                    </div>
+                </div>
+                <button onclick="closeSimBriefModal()" class="w-8 h-8 rounded-full bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition-all">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- ROUTE CARDS (ORIGIN & DESTINATION) -->
+            <div class="grid grid-cols-2 gap-3">
+                <!-- ORIGIN -->
+                <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800/80">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Origin (Departure)</span>
+                    <div id="sb-modal-origin-icao" class="text-xl font-black font-mono text-cyan-400"></div>
+                    <div id="sb-modal-origin-name" class="text-xs text-slate-300 font-medium truncate mt-0.5"></div>
+                </div>
+                <!-- DESTINATION -->
+                <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800/80">
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Destination (Arrival)</span>
+                    <div id="sb-modal-dest-icao" class="text-xl font-black font-mono text-emerald-400"></div>
+                    <div id="sb-modal-dest-name" class="text-xs text-slate-300 font-medium truncate mt-0.5"></div>
+                </div>
+            </div>
+
+            <!-- ALTERNATES -->
+            <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800/80 space-y-2">
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Alternate Airports (Kept Active)</span>
+                <div id="sb-modal-alternates-list" class="flex flex-wrap gap-2 text-xs"></div>
+            </div>
+
+            <!-- IMPACT SUMMARY NOTICE -->
+            <div class="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-start gap-3">
+                <i class="fa-solid fa-bolt-lightning text-amber-400 text-base mt-0.5 shrink-0"></i>
+                <div>
+                    <p class="font-extrabold text-slate-100">Scenery Isolation & Performance Boost</p>
+                    <p id="sb-modal-impact-text" class="text-amber-200/90 text-xs mt-1 leading-relaxed font-medium"></p>
+                </div>
+            </div>
+
+            <!-- MODAL ACTION BUTTONS -->
+            <div class="flex items-center justify-end gap-3 pt-2">
+                <button onclick="closeSimBriefModal()" class="px-4 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white text-xs font-bold transition-all">
+                    Cancel
+                </button>
+                <button id="sb-modal-confirm-btn" onclick="confirmSimBriefOptimization()" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs transition-all shadow-lg shadow-amber-500/25 flex items-center gap-2 active:scale-95">
+                    <i class="fa-solid fa-check"></i>
+                    <span>OK - Optimize Sceneries</span>
                 </button>
             </div>
         </div>

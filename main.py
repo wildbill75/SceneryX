@@ -108,8 +108,151 @@ class Api:
         airports = run_scan()
         return json.dumps(airports, ensure_ascii=False)
 
-    def get_settings(self):
-        return json.dumps(get_settings(), ensure_ascii=False)
+    def fetch_simbrief(self, identifier):
+        identifier = str(identifier).strip()
+        if not identifier:
+            return json.dumps({"status": "error", "message": "Identifier empty"})
+
+        param_key = "userid" if identifier.isdigit() else "username"
+        url = f"https://www.simbrief.com/api/xml.fetcher.php?{param_key}={identifier}&json=1"
+
+        try:
+            req = urllib.request.Request(url, headers={'User-Agent': 'SceneryX/1.0'})
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+                if not isinstance(data, dict) or 'origin' not in data or 'destination' not in data:
+                    return json.dumps({"status": "error", "message": "No active flight plan found for this SimBrief account."})
+
+                params = data.get('params', {})
+                user_id = str(params.get('user_id', ''))
+                username = str(params.get('static_id', identifier))
+                if not username or username == '0':
+                    username = identifier
+
+                st = get_settings()
+                st['simbrief_username'] = username
+                st['simbrief_userid'] = user_id
+                save_settings(st)
+
+                origin_icao = data.get('origin', {}).get('icao_code', '')
+                origin_name = data.get('origin', {}).get('name', origin_icao)
+
+                dest_icao = data.get('destination', {}).get('icao_code', '')
+                dest_name = data.get('destination', {}).get('name', dest_icao)
+
+                alternates = []
+                for alt_key in ['alternate', 'alternate_2', 'alternate_3', 'alternate_4']:
+                    alt_data = data.get(alt_key)
+                    if alt_data and isinstance(alt_data, dict) and alt_data.get('icao_code'):
+                        alternates.append({
+                            'icao': alt_data.get('icao_code'),
+                            'name': alt_data.get('name', alt_data.get('icao_code'))
+                        })
+
+                general = data.get('general', {})
+                flight_num = f"{general.get('icao_airline', '')}{general.get('flight_number', '')}".strip()
+                route = general.get('route', '')
+                aircraft = data.get('aircraft', {}).get('name', '')
+
+                all_flight_icaos = [origin_icao, dest_icao] + [a['icao'] for a in alternates]
+                all_flight_icaos = list(dict.fromkeys([icao.upper() for icao in all_flight_icaos if icao]))
+
+                return json.dumps({
+                    "status": "success",
+                    "username": username,
+                    "userid": user_id,
+                    "flight": {
+                        "origin": {"icao": origin_icao, "name": origin_name},
+                        "destination": {"icao": dest_icao, "name": dest_name},
+                        "alternates": alternates,
+                        "flight_number": flight_num,
+                        "aircraft": aircraft,
+                        "route": route,
+                        "flight_icaos": all_flight_icaos
+                    }
+                }, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": f"Error fetching SimBrief data: {str(e)}"})
+
+    def optimize_flight(self, flight_icaos_json):
+        try:
+            if isinstance(flight_icaos_json, str):
+                flight_icaos = json.loads(flight_icaos_json)
+            else:
+                flight_icaos = flight_icaos_json
+
+            flight_icaos = [str(x).upper() for x in flight_icaos]
+            airports = run_scan()
+
+            disabled_count = 0
+            content_xml_path = r'C:\Users\Bertrand\AppData\Local\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\ThirdBuk\Content.xml'
+            if os.path.exists(content_xml_path):
+                import xml.etree.ElementTree as ET
+                tree = ET.parse(content_xml_path)
+                root = tree.getroot()
+                changed = False
+
+                for p in root.findall('Package'):
+                    name = p.get('name', '')
+                    clean_folder = name[:-9] if name.endswith('.disabled') else name
+                    if clean_folder.startswith('community'): clean_folder = clean_folder[9:]
+                    elif clean_folder.startswith('official'): clean_folder = clean_folder[8:]
+
+                    for ap in airports:
+                        if ap.get('pricing_type') != 'Asobo':
+                            is_match = False
+                            for src in ap.get('all_sources', []):
+                                fn = src.get('folder_name', '').lower()
+                                if clean_folder.lower() in fn or fn in clean_folder.lower():
+                                    is_match = True
+                                    break
+                            if is_match:
+                                if ap['icao'] in flight_icaos:
+                                    if p.get('active') == 'UserDisabled':
+                                        p.set('active', 'Activated')
+                                        changed = True
+                                else:
+                                    if p.get('active') != 'UserDisabled':
+                                        p.set('active', 'UserDisabled')
+                                        changed = True
+                                        disabled_count += 1
+
+                if changed:
+                    tree.write(content_xml_path, encoding='utf-8', xml_declaration=True)
+
+            st = get_settings()
+            st['flight_mode'] = {
+                'active': True,
+                'icaos': flight_icaos,
+                'disabled_count': disabled_count
+            }
+            save_settings(st)
+
+            updated_airports = run_scan()
+            return json.dumps({
+                "status": "success",
+                "airports": updated_airports,
+                "disabled_count": disabled_count,
+                "flight_icaos": flight_icaos
+            }, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
+    def restore_all_flight_sceneries(self):
+        try:
+            res_str = self.restore_all_sceneries()
+            res = json.loads(res_str)
+
+            st = get_settings()
+            st['flight_mode'] = {'active': False, 'icaos': []}
+            save_settings(st)
+
+            return json.dumps({
+                "status": "success",
+                "airports": res.get("airports", [])
+            }, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
 
     def save_settings(self, settings_json):
         try:
