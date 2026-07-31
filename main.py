@@ -114,8 +114,20 @@ class Api:
         if not identifier:
             return json.dumps({"status": "error", "message": "Identifier empty"})
 
-        param_key = "userid" if identifier.isdigit() else "username"
-        url = f"https://www.simbrief.com/api/xml.fetcher.php?{param_key}={identifier}&json=1"
+        st = get_settings()
+        stored_username = st.get('simbrief_username', '')
+        stored_userid = st.get('simbrief_userid', '')
+
+        if identifier.isdigit():
+            param_str = f"userid={identifier}"
+            user_id = identifier
+            username = stored_username if (stored_username and not stored_username.startswith('vamsys-')) else ''
+        else:
+            param_str = f"username={identifier}"
+            username = identifier
+            user_id = stored_userid
+
+        url = f"https://www.simbrief.com/api/xml.fetcher.php?{param_str}&json=1"
 
         try:
             req = urllib.request.Request(url, headers={'User-Agent': 'SceneryX/1.0'})
@@ -125,12 +137,13 @@ class Api:
                     return json.dumps({"status": "error", "message": "No active flight plan found for this SimBrief account."})
 
                 params = data.get('params', {})
-                user_id = str(params.get('user_id', ''))
-                username = str(params.get('static_id', identifier))
-                if not username or username == '0':
+                fetched_uid = str(params.get('user_id', ''))
+                if fetched_uid:
+                    user_id = fetched_uid
+
+                if not username and not identifier.isdigit():
                     username = identifier
 
-                st = get_settings()
                 st['simbrief_username'] = username
                 st['simbrief_userid'] = user_id
                 save_settings(st)
