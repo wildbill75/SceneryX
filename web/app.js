@@ -648,14 +648,15 @@ function updateStats(airports) {
     updateConflictNavigator();
 }
 
+let currentFlightMode = { active: false, icaos: [] };
+
 function createCustomIcon(ap) {
     let isApDisabled = ap.is_disabled || (ap.all_sources && ap.all_sources.length > 0 && ap.all_sources.every(s => s.is_disabled));
 
-    // When Flight Optimizer is active, force every non-flight airport to render as Gray
-    if (isFlightOptimizerActive) {
-        const isDep = flightOriginAirport && ap.icao === flightOriginAirport.icao;
-        const isArr = flightDestAirport && ap.icao === flightDestAirport.icao;
-        if (!isDep && !isArr) {
+    // When SimBrief Flight Mode is active, force non-route 3rd-party airports to render as Grayed-out Disabled Stars
+    if (currentFlightMode && currentFlightMode.active && currentFlightMode.icaos && currentFlightMode.icaos.length > 0) {
+        const flightSet = new Set(currentFlightMode.icaos);
+        if (ap.pricing_type !== 'Asobo' && !flightSet.has(ap.icao)) {
             isApDisabled = true;
         }
     }
@@ -666,10 +667,10 @@ function createCustomIcon(ap) {
     else if (cat === 'PAYWARE') color = '#a855f7'; // Payware = Neon Purple
 
     if (isApDisabled) {
-        color = '#64748b'; // Temporarily Disabled = Matte Slate Gray ★
+        color = '#475569'; // Temporarily Disabled = Matte Slate Gray ★
     }
 
-    const strokeColor = ap.has_conflict ? '#ef4444' : (isApDisabled ? '#475569' : '#ffffff');
+    const strokeColor = ap.has_conflict ? '#ef4444' : (isApDisabled ? '#334155' : '#ffffff');
     const strokeWidth = ap.has_conflict ? '2' : '1.2';
 
     const svgIcon = `
@@ -681,7 +682,7 @@ function createCustomIcon(ap) {
 
     return L.divIcon({
         html: svgIcon,
-        className: `custom-map-marker ${isApDisabled ? 'opacity-50 grayscale-[0.5]' : ''}`,
+        className: `custom-map-marker ${isApDisabled ? 'opacity-40 grayscale-[0.8]' : ''}`,
         iconSize: [26, 26],
         iconAnchor: [13, 13]
     });
@@ -2408,20 +2409,21 @@ function confirmSimBriefOptimization() {
 }
 
 function updateFlightModeBannerUI(flightMode) {
+    currentFlightMode = flightMode || { active: false, icaos: [] };
     const badge = document.getElementById('sb-status-badge');
     const banner = document.getElementById('sb-active-banner');
     const disabledCount = document.getElementById('sb-disabled-count');
     const routeSummary = document.getElementById('sb-route-summary');
 
-    if (flightMode && flightMode.active) {
+    if (currentFlightMode && currentFlightMode.active) {
         if (badge) {
             badge.className = "text-[9px] font-bold font-mono px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse";
             badge.innerText = "ACTIVE";
         }
         if (banner) banner.classList.remove('hidden');
-        if (disabledCount) disabledCount.innerText = `${flightMode.disabled_count || 0} sceneries disabled`;
-        if (routeSummary && flightMode.icaos) {
-            routeSummary.innerText = flightMode.icaos.join(' ➔ ');
+        if (disabledCount) disabledCount.innerText = `${currentFlightMode.disabled_count || 0} sceneries disabled`;
+        if (routeSummary && currentFlightMode.icaos) {
+            routeSummary.innerText = currentFlightMode.icaos.join(' ➔ ');
         }
     } else {
         if (badge) {
@@ -2429,6 +2431,10 @@ function updateFlightModeBannerUI(flightMode) {
             badge.innerText = "INACTIVE";
         }
         if (banner) banner.classList.add('hidden');
+    }
+
+    if (map) {
+        renderMarkers();
     }
 }
 

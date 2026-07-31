@@ -403,11 +403,11 @@
                         <div class="grid grid-cols-2 gap-2">
                             <div>
                                 <span class="text-[10px] text-slate-400 font-semibold block mb-1">SimBrief Username</span>
-                                <input type="text" id="sb-username-input" onchange="autoSyncSimBrief('username')" placeholder="Username" class="w-full bg-slate-900/90 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500 font-mono transition-all">
+                                <input type="text" id="sb-username-input" onkeydown="if(event.key==='Enter') autoSyncSimBrief('username')" onblur="autoSyncSimBrief('username')" placeholder="Username" class="w-full bg-slate-900/90 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500 font-mono transition-all">
                             </div>
                             <div>
                                 <span class="text-[10px] text-slate-400 font-semibold block mb-1">Pilot ID</span>
-                                <input type="text" id="sb-userid-input" onchange="autoSyncSimBrief('userid')" placeholder="Pilot ID" class="w-full bg-slate-900/90 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500 font-mono transition-all">
+                                <input type="text" id="sb-userid-input" onkeydown="if(event.key==='Enter') autoSyncSimBrief('userid')" onblur="autoSyncSimBrief('userid')" placeholder="Pilot ID" class="w-full bg-slate-900/90 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500 font-mono transition-all">
                             </div>
                         </div>
 
