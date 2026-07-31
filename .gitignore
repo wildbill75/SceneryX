@@ -1,0 +1,10 @@
+# Build outputs
+build/
+__pycache__/
+*.pyc
+
+# Local runtime settings and scans
+installed_airports.json
+folder_sizes.json
+settings.json
+sceneryx_settings.json
