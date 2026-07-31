@@ -716,6 +716,13 @@ function getAirportPopupHtml(ap) {
         </div>
     ` : '';
 
+    const publisherHtml = `
+        <div class="text-[10px] font-bold text-amber-300/90 truncate pt-1 border-t border-slate-800/60 flex items-center gap-1.5">
+            <i class="fa-solid fa-building text-[10px] text-amber-400"></i>
+            <span class="truncate">${ap.vendor || 'Unknown Publisher'}</span>
+        </div>
+    `;
+
     return `
         <div class="p-1 font-['Outfit'] space-y-2">
             <div class="flex items-center justify-between gap-2">
@@ -726,6 +733,7 @@ function getAirportPopupHtml(ap) {
                 <div class="text-xs font-bold text-slate-100 leading-snug line-clamp-2">${ap.name}</div>
                 <div class="text-[11px] text-slate-400 mt-0.5 truncate">${ap.city || ''} ${ap.country ? '(' + ap.country + ')' : ''}</div>
             </div>
+            ${publisherHtml}
             ${ratingBadgeHtml}
             ${conflictBadgeHtml}
             <div class="text-[10px] font-semibold text-cyan-400 pt-1.5 border-t border-slate-800 flex justify-between items-center">
@@ -733,6 +741,30 @@ function getAirportPopupHtml(ap) {
             </div>
         </div>
     `;
+}
+
+function toggleAirportScenery(icao) {
+    if (!window.pywebview) return;
+    window.pywebview.api.toggle_airport_disabled(icao).then(resStr => {
+        try {
+            const res = JSON.parse(resStr);
+            if (res.status === 'success') {
+                allAirportsData = res.airports || [];
+                filterAirports();
+                if (selectedAirport && selectedAirport.icao === icao) {
+                    const updated = allAirportsData.find(a => a.icao === icao);
+                    if (updated) showAirportDetails(updated);
+                }
+            } else if (res.message) {
+                showCustomModal({
+                    title: 'Action Not Allowed',
+                    message: res.message,
+                    type: 'warning',
+                    confirmText: 'OK'
+                });
+            }
+        } catch(e){}
+    });
 }
 
 function renderAirportsOnMap(airports) {
@@ -754,41 +786,29 @@ function renderAirportsOnMap(airports) {
             autoClose: true
         });
 
-        // Hover events for quick popup preview
+        // Hover events for quick popup preview (shows developer/publisher)
         marker.on('mouseover', function () {
-            if (isSuppressingHoverPopups || this._isPinned) return;
+            if (isSuppressingHoverPopups) return;
             this.setPopupContent(getAirportPopupHtml(ap));
             this.openPopup();
         });
 
         marker.on('mouseout', function () {
-            if (this._isPinned) return;
             this.closePopup();
         });
 
-        // Click event for persistent detail drawer on the right
+        // Left-Click event: opens detailed drawer on right sidebar
         marker.on('click', function () {
             showAirportDetails(ap);
         });
 
-        // Right-click event to pin Info Popup
+        // Right-Click event: toggles scenery activation state directly & changes star color!
         marker.on('contextmenu', function (e) {
             if (e.originalEvent) {
                 e.originalEvent.preventDefault();
                 e.originalEvent.stopPropagation();
             }
-            this._isPinned = true;
-            this.unbindPopup();
-            const popup = this.bindPopup(getAirportPopupHtml(ap), {
-                maxWidth: 340,
-                minWidth: 260,
-                closeButton: true,
-                autoClose: true
-            }).openPopup();
-
-            popup.on('remove', () => {
-                this._isPinned = false;
-            });
+            toggleAirportScenery(ap.icao);
         });
 
         markers.push(marker);

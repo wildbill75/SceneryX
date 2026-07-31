@@ -319,6 +319,55 @@ class Api:
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
 
+    def toggle_airport_disabled(self, icao):
+        try:
+            icao_target = str(icao).strip().upper()
+            content_xml_path = r'C:\Users\Bertrand\AppData\Local\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\ThirdBuk\Content.xml'
+            if not os.path.exists(content_xml_path):
+                return json.dumps({"status": "error", "message": "Content.xml not found"})
+
+            import xml.etree.ElementTree as ET
+            tree = ET.parse(content_xml_path)
+            root = tree.getroot()
+
+            airports = run_scan()
+            ap = next((a for a in airports if a['icao'] == icao_target), None)
+            if not ap:
+                return json.dumps({"status": "error", "message": f"Airport {icao_target} not found"})
+
+            if ap.get('pricing_type') == 'Asobo':
+                return json.dumps({"status": "error", "message": "Asobo base airports cannot be disabled."})
+
+            curr_disabled = ap.get('is_disabled', False)
+            new_active_val = 'UserDisabled' if not curr_disabled else 'Activated'
+
+            changed = False
+            for p in root.findall('Package'):
+                name = p.get('name', '')
+                clean = name[:-9] if name.endswith('.disabled') else name
+                p_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean.lower())
+
+                for src in ap.get('all_sources', []):
+                    fn = src.get('folder_name', '').lower()
+                    s_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn)
+                    if p_norm == s_norm or p_norm in s_norm or s_norm in p_norm:
+                        p.set('active', new_active_val)
+                        changed = True
+                        break
+
+            if changed:
+                tree.write(content_xml_path, encoding='utf-8', xml_declaration=True)
+
+            updated_airports = run_scan()
+            return json.dumps({
+                "status": "success",
+                "icao": icao_target,
+                "is_disabled": not curr_disabled,
+                "airports": updated_airports
+            }, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
     def save_settings(self, settings_json):
         try:
             data = json.loads(settings_json)
