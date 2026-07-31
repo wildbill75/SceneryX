@@ -2391,7 +2391,6 @@ function confirmSimBriefOptimization() {
             const res = JSON.parse(resStr);
             if (res.status === 'success') {
                 allAirportsData = res.airports || [];
-                filterAirports();
 
                 updateFlightModeBannerUI({
                     active: true,
@@ -2400,6 +2399,8 @@ function confirmSimBriefOptimization() {
                     disabled_count: res.disabled_count,
                     icaos: currentSimBriefFlight.flight_icaos
                 });
+
+                filterAirports();
 
                 showCustomModal({
                     title: 'Flight Scenery Optimization Active',
@@ -2436,10 +2437,6 @@ function updateFlightModeBannerUI(flightMode) {
         }
         if (banner) banner.classList.add('hidden');
     }
-
-    if (map) {
-        renderMarkers();
-    }
 }
 
 function restoreAllFlightSceneriesUI() {
@@ -2449,8 +2446,8 @@ function restoreAllFlightSceneriesUI() {
             const res = JSON.parse(resStr);
             if (res.status === 'success') {
                 allAirportsData = res.airports || [];
+                updateFlightModeBannerUI({ active: false, icaos: [] });
                 filterAirports();
-                updateFlightModeBannerUI({ active: false });
                 showCustomModal({
                     title: 'Sceneries Restored',
                     message: 'All 3rd-party airport sceneries have been restored to their active state.',
