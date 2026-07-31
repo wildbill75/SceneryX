@@ -612,6 +612,27 @@ def run_scan():
     folder_size_cache = load_folder_size_cache()
     scan_paths_cfg = settings.get("scan_paths", [])
 
+    content_xml_status = {}
+    content_xml_path = r'C:\Users\Bertrand\AppData\Local\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\ThirdBuk\Content.xml'
+    if os.path.exists(content_xml_path):
+        try:
+            import xml.etree.ElementTree as ET
+            tree = ET.parse(content_xml_path)
+            root = tree.getroot()
+            for p in root.findall('Package'):
+                pkg_name = p.get('name', '')
+                act = p.get('active', 'Activated')
+                clean_folder = pkg_name[:-9] if pkg_name.endswith('.disabled') else pkg_name
+                folder_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_folder.lower())
+                is_active = (act == 'Activated') and not pkg_name.endswith('.disabled')
+
+                if folder_norm not in content_xml_status:
+                    content_xml_status[folder_norm] = is_active
+                else:
+                    content_xml_status[folder_norm] = content_xml_status[folder_norm] or is_active
+        except Exception:
+            pass
+
     all_packages = []
 
     for cfg in scan_paths_cfg:
@@ -631,47 +652,12 @@ def run_scan():
                 for item in items:
                     ipath = os.path.join(td, item)
                     if os.path.isdir(ipath) and item != 'OneStore':
-                        is_disabled = item.endswith('.disabled')
+                        clean_folder = item[:-9] if item.endswith('.disabled') else item
+                        folder_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_folder.lower())
+                        is_disabled = item.endswith('.disabled') or not content_xml_status.get(folder_norm, True)
                         all_packages.append((category_label, item, ipath, is_disabled))
             except Exception:
                 pass
-
-    # Collect all physical folder names on disk across all scan paths
-    physical_folders_lower = set()
-    for cfg in scan_paths_cfg:
-        if not cfg.get('enabled', True):
-            continue
-        dp = cfg.get('path', '')
-        if not os.path.exists(dp):
-            continue
-        onestore = os.path.join(dp, 'OneStore')
-        target_dirs = [onestore] if os.path.exists(onestore) else [dp]
-        for td in target_dirs:
-            try:
-                for item in os.listdir(td):
-                    physical_folders_lower.add(item.lower())
-            except Exception:
-                pass
-
-    content_xml_path = r'C:\Users\Bertrand\AppData\Local\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\ThirdBuk\Content.xml'
-    if os.path.exists(content_xml_path):
-        try:
-            import xml.etree.ElementTree as ET
-            tree = ET.parse(content_xml_path)
-            root = tree.getroot()
-            for p in root.findall('Package'):
-                pkg_name = p.get('name', '')
-                act = p.get('active', 'Activated')
-                clean_folder = pkg_name[:-9] if pkg_name.endswith('.disabled') else pkg_name
-                folder_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_folder.lower())
-
-                is_explicitly_disabled = (act == 'UserDisabled') or pkg_name.endswith('.disabled')
-                is_absent_from_disk = not any(folder_norm in f or f in folder_norm for f in physical_folders_lower)
-                is_disabled = is_explicitly_disabled or is_absent_from_disk
-
-                all_packages.append(("MSFS 2024 - Content.xml", clean_folder, "", is_disabled))
-        except Exception:
-            pass
 
     detected_map = {}
 
