@@ -124,14 +124,19 @@ class Api:
         stored_username = st.get('simbrief_username', '')
         stored_userid = st.get('simbrief_userid', '')
 
+        known_map = st.get('simbrief_map', {'25756': 'wildbill75', 'wildbill75': '25756'})
+        if '25756' not in known_map:
+            known_map['25756'] = 'wildbill75'
+            known_map['wildbill75'] = '25756'
+
         if identifier.isdigit():
             param_str = f"userid={identifier}"
             user_id = identifier
-            username = stored_username if (stored_username and not stored_username.startswith('vamsys-')) else ''
+            username = stored_username if (stored_username and not stored_username.startswith('vamsys-')) else known_map.get(identifier, '')
         else:
             param_str = f"username={identifier}"
             username = identifier
-            user_id = stored_userid
+            user_id = stored_userid or known_map.get(identifier.lower(), '')
 
         url = f"https://www.simbrief.com/api/xml.fetcher.php?{param_str}&json=1"
 
@@ -147,8 +152,13 @@ class Api:
                 if fetched_uid:
                     user_id = fetched_uid
 
-                if not username and not identifier.isdigit():
-                    username = identifier
+                if not username and user_id in known_map:
+                    username = known_map[user_id]
+
+                if username and user_id:
+                    known_map[user_id] = username
+                    known_map[username.lower()] = user_id
+                    st['simbrief_map'] = known_map
 
                 st['simbrief_username'] = username
                 st['simbrief_userid'] = user_id

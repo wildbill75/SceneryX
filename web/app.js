@@ -2235,10 +2235,10 @@ function autoSyncSimBrief(changedField) {
         try {
             const res = JSON.parse(resStr);
             if (res.status === 'success') {
-                if (changedField === 'userid' && res.username) {
+                if (res.username && document.getElementById('sb-username-input')) {
                     document.getElementById('sb-username-input').value = res.username;
                 }
-                if (changedField === 'username' && res.userid) {
+                if (res.userid && document.getElementById('sb-userid-input')) {
                     document.getElementById('sb-userid-input').value = res.userid;
                 }
             }
