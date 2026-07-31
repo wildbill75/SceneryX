@@ -666,15 +666,17 @@ function createCustomIcon(ap) {
     if (cat === 'ASOBO') color = '#f59e0b'; // Asobo Handcrafted = Amber/Gold
     else if (cat === 'PAYWARE') color = '#a855f7'; // Payware = Neon Purple
 
+    let strokeColor = ap.has_conflict ? '#ef4444' : '#ffffff';
+    let strokeWidth = ap.has_conflict ? '2' : '1.2';
+
     if (isApDisabled) {
-        color = '#475569'; // Temporarily Disabled = Matte Slate Gray ★
+        color = '#475569'; // Slate 600 Matte Gray fill
+        strokeColor = '#cbd5e1'; // Crisp Silver/Slate 300 Outline
+        strokeWidth = '1.5';
     }
 
-    const strokeColor = ap.has_conflict ? '#ef4444' : (isApDisabled ? '#334155' : '#ffffff');
-    const strokeWidth = ap.has_conflict ? '2' : '1.2';
-
     const svgIcon = `
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="drop-shadow-sm">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="drop-shadow-md">
             <path d="M12 2l2.9 6.26 6.9.83-5.2 4.7 1.4 6.84L12 17.1 5.9 20.63l1.4-6.84-5.2-4.7 6.9-.83L12 2z" 
                   fill="${color}" stroke="${strokeColor}" stroke-width="${strokeWidth}" stroke-linejoin="round"/>
         </svg>
@@ -682,7 +684,7 @@ function createCustomIcon(ap) {
 
     return L.divIcon({
         html: svgIcon,
-        className: `custom-map-marker ${isApDisabled ? 'opacity-40 grayscale-[0.8]' : ''}`,
+        className: `custom-map-marker ${isApDisabled ? 'grayscale-[0.5]' : ''}`,
         iconSize: [26, 26],
         iconAnchor: [13, 13]
     });
@@ -765,6 +767,11 @@ function toggleAirportScenery(icao) {
             }
         } catch(e){}
     });
+}
+
+function toggleSelectedAirportScenery() {
+    if (!selectedAirport) return;
+    toggleAirportScenery(selectedAirport.icao);
 }
 
 function renderAirportsOnMap(airports) {
@@ -965,6 +972,35 @@ function showAirportDetails(ap) {
     }
 
     if (typeBadge) typeBadge.innerText = ap.english_type || ap.type;
+
+    // Update Activation Status Card in Drawer
+    const actBadge = document.getElementById('drawer-activation-badge');
+    const actBtn = document.getElementById('drawer-toggle-activation-btn');
+    const actIcon = document.getElementById('drawer-toggle-icon');
+    const actText = document.getElementById('drawer-toggle-text');
+
+    if (actBadge && actBtn) {
+        if (cat === 'ASOBO') {
+            actBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40";
+            actBadge.innerText = "🟢 Core MSFS Base";
+            actBtn.classList.add('hidden');
+        } else {
+            actBtn.classList.remove('hidden');
+            if (ap.is_disabled) {
+                actBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-red-500/20 text-red-400 border border-red-500/40 animate-pulse";
+                actBadge.innerText = "🔴 Disabled in MSFS";
+                actBtn.className = "px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40";
+                if (actIcon) actIcon.className = "fa-solid fa-power-off text-emerald-400";
+                if (actText) actText.innerText = "Activate Scenery";
+            } else {
+                actBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40";
+                actBadge.innerText = "🟢 Activated in MSFS";
+                actBtn.className = "px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer bg-slate-800 hover:bg-red-500/20 text-slate-200 hover:text-red-300 border border-slate-700 hover:border-red-500/40";
+                if (actIcon) actIcon.className = "fa-solid fa-power-off text-red-400";
+                if (actText) actText.innerText = "Disable Scenery";
+            }
+        }
+    }
 
     // Price override card logic
     const priceCard = document.getElementById('drawer-price-card');

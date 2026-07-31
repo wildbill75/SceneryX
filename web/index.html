@@ -484,6 +484,16 @@
                     <h3 id="drawer-name" class="text-base font-bold text-white leading-snug">Airport Full Name</h3>
                     <p id="drawer-city-country" class="text-xs text-slate-400">City, Country</p>
                     
+                    <!-- ACTIVATION STATUS CARD -->
+                    <div id="drawer-activation-card" class="p-3 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-3 shadow-sm mt-2">
+                        <div class="flex items-center gap-2">
+                            <span id="drawer-activation-badge" class="px-2.5 py-1 rounded-full text-xs font-mono font-extrabold">Active</span>
+                        </div>
+                        <button id="drawer-toggle-activation-btn" onclick="toggleSelectedAirportScenery()" class="px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer">
+                            <i id="drawer-toggle-icon" class="fa-solid fa-power-off"></i>
+                            <span id="drawer-toggle-text">Disable Scenery</span>
+                        </button>
+                    </div>
                 </div>
 
                 <!-- CONFLICT ALERT BANNER -->
