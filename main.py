@@ -37,7 +37,29 @@ def resolve_package_icaos(pkg_name):
 
     return found
 
-def update_msfs_content_xml(keep_icaos=None, restore_all=False):
+def get_folder_to_icaos_map(airports=None):
+    if airports is None:
+        if os.path.exists(OUTPUT_JSON_PATH):
+            try:
+                with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
+                    airports = json.load(f)
+            except Exception:
+                airports = []
+        else:
+            airports = []
+
+    folder_to_icaos = {}
+    if airports:
+        for ap in airports:
+            icao = ap.get('icao')
+            for src in ap.get('all_sources', []):
+                fn = src.get('folder_name', '')
+                if fn:
+                    fn_clean = fn[:-9] if fn.endswith('.disabled') else fn
+                    folder_to_icaos.setdefault(fn_clean.lower(), set()).add(icao)
+    return folder_to_icaos
+
+def update_msfs_content_xml(keep_icaos=None, restore_all=False, folder_to_icaos=None):
     local_appdata = os.getenv('LOCALAPPDATA', '')
     appdata = os.getenv('APPDATA', '')
 
@@ -47,6 +69,9 @@ def update_msfs_content_xml(keep_icaos=None, restore_all=False):
         os.path.join(local_appdata, r'Packages\Microsoft.FlightSimulator_8wekyb3d8bbwe\LocalCache\Content.xml'),
         os.path.join(appdata, r'Microsoft Flight Simulator\Content.xml')
     ]
+
+    if folder_to_icaos is None:
+        folder_to_icaos = get_folder_to_icaos_map()
 
     target_icaos = set(k.upper() for k in (keep_icaos or []))
 
@@ -62,14 +87,22 @@ def update_msfs_content_xml(keep_icaos=None, restore_all=False):
 
             for elem in tree.findall('Package'):
                 name = elem.get('name', '')
+                name_lower = name.lower()
+                name_clean = name[:-9] if name.endswith('.disabled') else name
+
+                # Never disable official Microsoft / Asobo core system packages in Content.xml
+                if any(k in name_lower for k in ['asobo-base', 'asobo-sim', 'microsoft-base', 'official', 'streamed', 'worldupdate', 'cityupdate']):
+                    elem.set('active', 'Activated')
+                    continue
+
                 if restore_all:
                     if elem.get('active') == 'UserDisabled':
                         elem.set('active', 'Activated')
                 else:
-                    pkg_icaos = resolve_package_icaos(name)
+                    pkg_icaos = folder_to_icaos.get(name_clean.lower()) or resolve_package_icaos(name_clean)
                     if any(k in target_icaos for k in pkg_icaos):
                         elem.set('active', 'Activated')
-                    elif pkg_icaos:
+                    else:
                         elem.set('active', 'UserDisabled')
 
             xml_str = ET.tostring(tree, encoding='unicode')
@@ -461,6 +494,9 @@ class Api:
             settings = get_settings()
             scan_paths_cfg = settings.get("scan_paths", [])
 
+            all_airports = run_scan()
+            folder_to_icaos = get_folder_to_icaos_map(all_airports)
+
             enabled_count = 0
             disabled_count = 0
 
@@ -489,9 +525,8 @@ class Api:
                             if any(k in item_lower for k in ['asobo-', 'microsoft-', 'official', 'streamed', 'worldupdate', 'cityupdate']):
                                 continue
 
-                            pkg_icaos = resolve_package_icaos(item)
-                            if not pkg_icaos:
-                                continue
+                            item_clean = item[:-9] if item.endswith('.disabled') else item
+                            pkg_icaos = folder_to_icaos.get(item_clean.lower()) or resolve_package_icaos(item_clean)
 
                             is_keep = any(k in keep_icaos for k in pkg_icaos)
 
@@ -515,7 +550,7 @@ class Api:
                         print(f"Error processing {td} during flight optimizer:", e)
 
             # Update MSFS Native Content.xml (UserDisabled / Activated)
-            update_msfs_content_xml(keep_icaos=keep_icaos, restore_all=False)
+            update_msfs_content_xml(keep_icaos=keep_icaos, restore_all=False, folder_to_icaos=folder_to_icaos)
 
             return json.dumps({
                 "status": "ok",
