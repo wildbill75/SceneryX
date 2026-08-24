@@ -379,6 +379,21 @@ class Api:
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
 
+    def exit_app(self, restore=False):
+        try:
+            if restore:
+                update_msfs_content_xml(restore_all=True)
+                st = get_settings()
+                st['flight_mode'] = {'active': False, 'icaos': []}
+                save_settings(st)
+
+            self._force_closing = True
+            if hasattr(self, '_window') and self._window:
+                self._window.destroy()
+            return json.dumps({"status": "ok"})
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
     def save_settings(self, settings_json):
         try:
             data = json.loads(settings_json)
@@ -803,6 +818,22 @@ def main():
         min_size=(1280, 800),
         background_color='#0b0f19'
     )
+    api._window = window
+
+    def on_closing():
+        if getattr(api, '_force_closing', False):
+            return True
+        st = get_settings()
+        fm = st.get('flight_mode', {})
+        if isinstance(fm, dict) and fm.get('active'):
+            try:
+                window.evaluate_js('promptClosingFlightMode()')
+                return False
+            except Exception:
+                return True
+        return True
+
+    window.events.closing += on_closing
     webview.start(debug=False)
 
 if __name__ == '__main__':

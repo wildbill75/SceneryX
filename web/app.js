@@ -2205,6 +2205,7 @@ async function triggerExportCollection(format) {
 /* ================= SYSTEM NOTIFICATION MODAL FUNCTIONS ================= */
 
 let customModalConfirmCallback = null;
+let customModalCancelCallback = null;
 
 function showCustomModal(titleOrObj, messageStr, typeStr = 'info') {
     const modal = document.getElementById('custom-modal');
@@ -2224,11 +2225,13 @@ function showCustomModal(titleOrObj, messageStr, typeStr = 'info') {
         cancelText = titleOrObj.cancelText || 'Annuler';
         showCancel = !!titleOrObj.showCancel;
         customModalConfirmCallback = titleOrObj.onConfirm || null;
+        customModalCancelCallback = titleOrObj.onCancel || null;
     } else {
         title = titleOrObj || 'Notification';
         message = messageStr || '';
         type = typeStr || 'info';
         customModalConfirmCallback = null;
+        customModalCancelCallback = null;
     }
 
     if (!modal) {
@@ -2277,6 +2280,7 @@ function closeCustomModal() {
         modal.classList.remove('flex');
     }
     customModalConfirmCallback = null;
+    customModalCancelCallback = null;
 }
 
 function confirmCustomModal() {
@@ -2285,6 +2289,35 @@ function confirmCustomModal() {
     if (cb && typeof cb === 'function') {
         cb();
     }
+}
+
+function cancelCustomModal() {
+    const cb = customModalCancelCallback;
+    closeCustomModal();
+    if (cb && typeof cb === 'function') {
+        cb();
+    }
+}
+
+function promptClosingFlightMode() {
+    showCustomModal({
+        title: 'Plan de Vol SimBrief Actif',
+        message: 'Un plan de vol SimBrief est actuellement actif dans SceneryX (les scènes hors-route sont isolées et désactivées dans MSFS pour optimiser vos performances).\n\nQue souhaitez-vous faire en quittant SceneryX ?',
+        type: 'warning',
+        confirmText: '⚡ Garder l\'isolement (En Vol)',
+        cancelText: '🔄 Rétablir toutes mes scènes',
+        showCancel: true,
+        onConfirm: () => {
+            if (window.pywebview && window.pywebview.api) {
+                window.pywebview.api.exit_app(false);
+            }
+        },
+        onCancel: () => {
+            if (window.pywebview && window.pywebview.api) {
+                window.pywebview.api.exit_app(true);
+            }
+        }
+    });
 }
 
 /* ================= SIMBRIEF FLIGHT OPTIMIZER UI ENGINE ================= */
