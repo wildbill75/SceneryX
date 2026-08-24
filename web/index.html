@@ -849,36 +849,6 @@
                 </button>
             </div>
         </div>
-    <!-- FULL-SCREEN BLURRED SCENERY OPTIMIZATION PROGRESS OVERLAY -->
-    <div id="optimization-progress-overlay" class="hidden fixed inset-0 z-[250] flex flex-col items-center justify-center bg-slate-950/85 backdrop-blur-2xl transition-all duration-300">
-        <div class="glass-modal w-full max-w-lg rounded-3xl p-8 shadow-2xl shadow-slate-950/95 border border-slate-700/80 bg-slate-900/95 flex flex-col items-center text-center space-y-6">
-            
-            <!-- Animated Glowing Icon -->
-            <div class="relative group">
-                <div class="absolute -inset-4 bg-gradient-to-r from-cyan-500 via-amber-500 to-emerald-500 rounded-full blur-xl opacity-60 animate-pulse"></div>
-                <div class="relative w-20 h-20 rounded-2xl bg-slate-950 border border-slate-700 flex items-center justify-center text-cyan-400 text-3xl shadow-2xl">
-                    <i id="opt-progress-icon" class="fa-solid fa-plane-circle-check animate-bounce"></i>
-                </div>
-            </div>
-
-            <!-- Title & Subtitle -->
-            <div class="space-y-1.5 max-w-md">
-                <h3 id="opt-progress-title" class="text-xl font-extrabold text-white tracking-wide">Optimizing Flight Sceneries...</h3>
-                <p id="opt-progress-subtitle" class="text-xs text-slate-400 font-medium">Isolating route sceneries & updating MSFS Content.xml</p>
-            </div>
-
-            <!-- Progress Bar -->
-            <div class="w-full space-y-2.5 pt-2">
-                <div class="w-full bg-slate-950 border border-slate-800 rounded-full h-3 overflow-hidden p-0.5 shadow-inner">
-                    <div id="opt-progress-bar" class="bg-gradient-to-r from-cyan-500 via-amber-400 to-emerald-400 h-full rounded-full transition-all duration-300 w-[15%] shadow-md"></div>
-                </div>
-                <div class="flex justify-between items-center text-xs font-mono text-slate-400">
-                    <span id="opt-progress-status" class="truncate max-w-[300px] text-slate-300">Renaming package directories...</span>
-                    <span id="opt-progress-percent" class="font-extrabold text-cyan-400">15%</span>
-                </div>
-            </div>
-
-        </div>
     </div>
 
     <!-- MAIN APP JS SCRIPT -->
