@@ -2575,6 +2575,9 @@ function confirmSimBriefOptimization() {
     if (!currentSimBriefFlight || !window.pywebview) return;
 
     const flightIcaos = currentSimBriefFlight.flight_icaos || [];
+    const origStr = (currentSimBriefFlight.origin && currentSimBriefFlight.origin.icao) ? currentSimBriefFlight.origin.icao : (typeof currentSimBriefFlight.origin === 'string' ? currentSimBriefFlight.origin : '');
+    const destStr = (currentSimBriefFlight.destination && currentSimBriefFlight.destination.icao) ? currentSimBriefFlight.destination.icao : (typeof currentSimBriefFlight.destination === 'string' ? currentSimBriefFlight.destination : '');
+    const routeName = (origStr && destStr) ? `${origStr} ➔ ${destStr}` : 'SimBrief Route';
 
     const apiFn = window.pywebview.api.optimize_flight_mode || window.pywebview.api.optimize_flight;
     apiFn.call(window.pywebview.api, JSON.stringify(flightIcaos)).then(resStr => {
@@ -2585,11 +2588,13 @@ function confirmSimBriefOptimization() {
                     allAirportsData = res.airports;
                 }
 
+                const disabledNum = res.disabled_count !== undefined ? res.disabled_count : (res.disabledCount !== undefined ? res.disabledCount : 0);
+
                 updateFlightModeBannerUI({
                     active: true,
-                    origin: currentSimBriefFlight.origin ? currentSimBriefFlight.origin.icao : '',
-                    destination: currentSimBriefFlight.destination ? currentSimBriefFlight.destination.icao : '',
-                    disabled_count: res.disabled_count || 0,
+                    origin: origStr,
+                    destination: destStr,
+                    disabled_count: disabledNum,
                     icaos: flightIcaos
                 });
 
@@ -2597,7 +2602,7 @@ function confirmSimBriefOptimization() {
 
                 showCustomModal(
                     'Flight Scenery Optimization Active 🚀',
-                    `Successfully optimized sceneries for flight.\n\n${res.disabled_count || 0} non-route 3rd-party sceneries disabled. MSFS Content.xml updated. Enjoy your flight!`,
+                    `Successfully isolated sceneries for flight ${routeName}.\n\nNon-route 3rd-party sceneries are disabled & MSFS Content.xml updated. Enjoy your flight!`,
                     'success'
                 );
             } else {
@@ -2639,21 +2644,30 @@ function updateFlightModeBannerUI(flightMode) {
 
 function restoreAllFlightSceneriesUI() {
     if (!window.pywebview) return;
-    window.pywebview.api.restore_all_flight_sceneries().then(resStr => {
+    const apiFn = window.pywebview.api.restore_all_sceneries || window.pywebview.api.restore_all_flight_sceneries;
+    apiFn.call(window.pywebview.api).then(resStr => {
         try {
             const res = JSON.parse(resStr);
-            if (res.status === 'success') {
-                allAirportsData = res.airports || [];
+            if (res.status === 'ok' || res.status === 'success') {
+                if (res.airports && res.airports.length > 0) {
+                    allAirportsData = res.airports;
+                }
+                isFlightOptimizerActive = false;
                 updateFlightModeBannerUI({ active: false, icaos: [] });
                 filterAirports();
-                showCustomModal({
-                    title: 'Sceneries Restored',
-                    message: 'All 3rd-party airport sceneries have been restored to their active state.',
-                    type: 'success',
-                    confirmText: 'OK'
-                });
+                showCustomModal(
+                    'Sceneries Restored 🟢',
+                    'All 3rd-party airport sceneries have been restored to their active state.',
+                    'success'
+                );
+            } else {
+                showCustomModal('Restore Error', res.message || "Failed to restore sceneries.", 'error');
             }
-        } catch(e){}
+        } catch(e){
+            console.error("Error parsing restore result:", e);
+        }
+    }).catch(err => {
+        showCustomModal('Restore Error', String(err), 'error');
     });
 }
 

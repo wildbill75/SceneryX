@@ -541,6 +541,9 @@ class Api:
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
 
+    def restore_all_flight_sceneries(self):
+        return self.restore_all_sceneries()
+
     def restore_all_sceneries(self):
         try:
             settings = get_settings()
