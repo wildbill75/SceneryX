@@ -845,9 +845,9 @@ function createBezierArcPoints(lat1, lon1, lat2, lon2, numPoints = 30) {
     const dist = Math.sqrt(dLat * dLat + dLon * dLon);
     if (dist === 0) return [[lat1, lon1]];
 
-    // Perpendicular vector for smooth curved arc
-    const normLat = -dLon / dist;
-    const normLon = dLat / dist;
+    // Perpendicular vector for smooth concave arc (standard aviation map convention)
+    const normLat = dLon / dist;
+    const normLon = -dLat / dist;
     const curvature = Math.min(dist * 0.18, 10.0);
 
     const ctrlLat = (lat1 + lat2) / 2 + normLat * curvature;
