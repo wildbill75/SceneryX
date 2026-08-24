@@ -100,10 +100,7 @@ class Api:
         stored_username = st.get('simbrief_username', '')
         stored_userid = st.get('simbrief_userid', '')
 
-        known_map = st.get('simbrief_map', {'25756': 'wildbill75', 'wildbill75': '25756'})
-        if '25756' not in known_map:
-            known_map['25756'] = 'wildbill75'
-            known_map['wildbill75'] = '25756'
+        known_map = st.get('simbrief_map', {})
 
         if identifier.isdigit():
             param_str = f"userid={identifier}"
@@ -124,9 +121,12 @@ class Api:
                     return json.dumps({"status": "error", "message": "No active flight plan found for this SimBrief account."})
 
                 params = data.get('params', {})
-                fetched_uid = str(params.get('user_id', ''))
+                fetched_uid = str(params.get('user_id', '') or params.get('userid', ''))
+                fetched_uname = str(params.get('username', '') or params.get('user_name', ''))
                 if fetched_uid:
                     user_id = fetched_uid
+                if fetched_uname:
+                    username = fetched_uname
 
                 if not username and user_id in known_map:
                     username = known_map[user_id]
