@@ -84,6 +84,14 @@ class Api:
         pass
 
     def get_airports(self):
+        if os.path.exists(OUTPUT_JSON_PATH):
+            try:
+                with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
+                    airports = json.load(f)
+                    if airports and isinstance(airports, list) and len(airports) > 0:
+                        return json.dumps(airports, ensure_ascii=False)
+            except Exception as e:
+                print("Error reading cached installed_airports.json, performing fresh scan:", e)
         airports = run_scan()
         return json.dumps(airports, ensure_ascii=False)
 

@@ -397,13 +397,25 @@ function initMap() {
 async function loadInitialAppData() {
     try {
         if (!map) initMap();
-        if (window.pywebview) {
-            const cfgStr = await window.pywebview.api.get_settings();
-            currentSettings = JSON.parse(cfgStr);
-            loadSimBriefSettingsUI();
+        if (window.pywebview && window.pywebview.api) {
+            try {
+                const cfgStr = await window.pywebview.api.get_settings();
+                if (cfgStr) {
+                    currentSettings = JSON.parse(cfgStr);
+                    loadSimBriefSettingsUI();
+                }
+            } catch(e) {
+                console.warn("Settings loading warning:", e);
+            }
 
-            const rStr = await window.pywebview.api.get_ratings();
-            userRatingsMap = JSON.parse(rStr);
+            try {
+                const rStr = await window.pywebview.api.get_ratings();
+                if (rStr) {
+                    userRatingsMap = JSON.parse(rStr);
+                }
+            } catch(e) {
+                console.warn("Ratings loading warning:", e);
+            }
         }
         await loadAirportsData();
     } catch (e) {
