@@ -2611,12 +2611,13 @@ function confirmSimBriefOptimization() {
         }
     }, 400);
 
-    window.pywebview.api.optimize_flight(JSON.stringify(currentSimBriefFlight.flight_icaos)).then(resStr => {
+    const apiFn = window.pywebview.api.optimize_flight_mode || window.pywebview.api.optimize_flight;
+    apiFn.call(window.pywebview.api, JSON.stringify(currentSimBriefFlight.flight_icaos)).then(resStr => {
         clearInterval(progressTimer);
         hideOptimizationProgressOverlay();
         try {
             const res = JSON.parse(resStr);
-            if (res.status === 'success') {
+            if (res.status === 'ok' || res.status === 'success') {
                 allAirportsData = res.airports || [];
 
                 updateFlightModeBannerUI({
@@ -2629,24 +2630,21 @@ function confirmSimBriefOptimization() {
 
                 filterAirports();
 
-                showCustomModal({
-                    title: 'Flight Scenery Optimization Active 🚀',
-                    message: `Successfully optimized sceneries for flight ${currentSimBriefFlight.origin.icao} → ${currentSimBriefFlight.destination.icao}.\n\n${res.disabled_count} non-route 3rd-party sceneries disabled. MSFS Content.xml updated. Enjoy your flight!`,
-                    type: 'success',
-                    confirmText: 'Great!'
-                });
+                showCustomModal(
+                    'Flight Scenery Optimization Active 🚀',
+                    `Successfully optimized sceneries for flight ${currentSimBriefFlight.origin.icao} → ${currentSimBriefFlight.destination.icao}.\n\n${res.disabled_count} non-route 3rd-party sceneries disabled. MSFS Content.xml updated. Enjoy your flight!`,
+                    'success'
+                );
             } else {
-                showCustomModal({
-                    title: 'Optimization Error',
-                    message: res.message || "Failed to optimize sceneries.",
-                    type: 'error'
-                });
+                showCustomModal('Optimization Error', res.message || "Failed to optimize sceneries.", 'error');
             }
-        } catch(e){}
+        } catch(e){
+            console.error("Error parsing flight optimization result:", e);
+        }
     }).catch(err => {
         clearInterval(progressTimer);
         hideOptimizationProgressOverlay();
-        showCustomModal({ title: 'Optimization Error', message: String(err), type: 'error' });
+        showCustomModal('Optimization Error', String(err), 'error');
     });
 }
 

@@ -465,9 +465,11 @@ class Api:
                 is_enabled = False
 
             airports = run_scan()
-            return json.dumps({"status": "ok", "enabled": is_enabled, "new_path": new_path, "airports": airports}, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
+
+    def optimize_flight(self, keep_icaos_json):
+        return self.optimize_flight_mode(keep_icaos_json)
 
     def optimize_flight_mode(self, keep_icaos_json):
         try:
