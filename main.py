@@ -356,18 +356,7 @@ class Api:
 
     def reset_full_database(self):
         try:
-            content_xml_path = r'C:\Users\Bertrand\AppData\Local\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\ThirdBuk\Content.xml'
-            if os.path.exists(content_xml_path):
-                import xml.etree.ElementTree as ET
-                tree = ET.parse(content_xml_path)
-                root = tree.getroot()
-                changed = False
-                for p in root.findall('Package'):
-                    if p.get('active') == 'UserDisabled':
-                        p.set('active', 'Activated')
-                        changed = True
-                if changed:
-                    tree.write(content_xml_path, encoding='utf-8', xml_declaration=True)
+            self.restore_all_sceneries()
 
             st = get_settings()
             st['flight_mode'] = {'active': False, 'icaos': []}
@@ -578,9 +567,14 @@ class Api:
             # Update MSFS Native Content.xml to restore all UserDisabled packages back to Activated
             update_msfs_content_xml(restore_all=True)
 
+            settings['flight_mode'] = {'active': False, 'icaos': []}
+            save_settings(settings)
+
+            airports = run_scan()
             return json.dumps({
                 "status": "ok",
-                "re_enabled_count": re_enabled_count
+                "re_enabled_count": re_enabled_count,
+                "airports": airports
             }, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
