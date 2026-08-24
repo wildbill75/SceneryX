@@ -648,6 +648,10 @@ function getAirportPricingType(ap) {
 }
 
 function getAirportCategory(ap) {
+    // If all installed 3rd-party/Asobo packages for this airport are disabled, it falls back to Default MSFS!
+    const allSourcesDisabled = ap.all_sources && ap.all_sources.length > 0 && ap.all_sources.every(s => s.is_disabled);
+    if (allSourcesDisabled) return 'DEFAULT';
+
     const pt = getAirportPricingType(ap);
     if (pt === 'Default') return 'DEFAULT';
     if (pt === 'Asobo') return 'ASOBO';
@@ -689,15 +693,8 @@ function updateStats(airports) {
 let currentFlightMode = { active: false, icaos: [] };
 
 function createCustomIcon(ap) {
-    let isApDisabled = ap.is_disabled || (ap.all_sources && ap.all_sources.length > 0 && ap.all_sources.every(s => s.is_disabled));
-
-    // When SimBrief Flight Mode is active, force non-route 3rd-party airports to render as Grayed-out Disabled Stars
-    if (currentFlightMode && currentFlightMode.active && currentFlightMode.icaos && currentFlightMode.icaos.length > 0) {
-        const flightSet = new Set(currentFlightMode.icaos);
-        if (ap.pricing_type !== 'Asobo' && ap.pricing_type !== 'Default' && !flightSet.has(ap.icao)) {
-            isApDisabled = true;
-        }
-    }
+    const allSourcesDisabled = ap.all_sources && ap.all_sources.length > 0 && ap.all_sources.every(s => s.is_disabled);
+    let isApDisabled = ap.is_disabled || allSourcesDisabled;
 
     const cat = getAirportCategory(ap);
     let color = '#06b6d4'; // Freeware = Neon Cyan
@@ -708,7 +705,7 @@ function createCustomIcon(ap) {
     let strokeColor = ap.has_conflict ? '#ef4444' : '#ffffff';
     let strokeWidth = ap.has_conflict ? '2' : '1.2';
 
-    if (isApDisabled) {
+    if (isApDisabled && cat !== 'DEFAULT') {
         color = '#475569'; // Slate 600 Matte Gray fill
         strokeColor = '#cbd5e1'; // Crisp Silver/Slate 300 Outline
         strokeWidth = '1.5';
@@ -1396,8 +1393,9 @@ function openSpecificPackageFolderByIndex(icao, idx) {
 
 function toggleSpecificPackageByIndex(icao, idx) {
     if (!selectedAirport || !selectedAirport.all_sources || !selectedAirport.all_sources[idx]) return;
-    const path = selectedAirport.all_sources[idx].package_path;
-    if (path) toggleSpecificPackage(path);
+    const src = selectedAirport.all_sources[idx];
+    const pathOrName = src.package_path || src.folder_name;
+    if (pathOrName) toggleSpecificPackage(pathOrName);
 }
 
 function closeDrawer() {
