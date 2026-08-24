@@ -373,6 +373,12 @@ class Api:
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
 
+    def get_settings(self):
+        try:
+            return json.dumps(get_settings(), ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
     def save_settings(self, settings_json):
         try:
             data = json.loads(settings_json)
