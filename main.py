@@ -388,10 +388,12 @@ class Api:
                 save_settings(st)
 
             self._force_closing = True
-            if hasattr(self, '_window') and self._window:
-                self._window.destroy()
+            import threading, os
+            threading.Timer(0.05, lambda: os._exit(0)).start()
             return json.dumps({"status": "ok"})
         except Exception as e:
+            import os
+            os._exit(0)
             return json.dumps({"status": "error", "message": str(e)})
 
     def save_settings(self, settings_json):
@@ -826,11 +828,9 @@ def main():
         st = get_settings()
         fm = st.get('flight_mode', {})
         if isinstance(fm, dict) and fm.get('active'):
-            try:
-                window.evaluate_js('promptClosingFlightMode()')
-                return False
-            except Exception:
-                return True
+            import threading
+            threading.Timer(0.05, lambda: window.evaluate_js('promptClosingFlightMode()')).start()
+            return False
         return True
 
     window.events.closing += on_closing
