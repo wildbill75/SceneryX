@@ -668,12 +668,12 @@ function updateStats(airports) {
     let defaultCount = 0;
 
     airports.forEach(ap => {
-        const cat = getAirportCategory(ap);
-        if (cat === 'ASOBO') {
+        const pt = getAirportPricingType(ap);
+        if (pt === 'Asobo') {
             asoboCount++;
-        } else if (cat === 'PAYWARE') {
+        } else if (pt === 'Payware') {
             paywareCount++;
-        } else if (cat === 'DEFAULT') {
+        } else if (pt === 'Default') {
             defaultCount++;
         } else {
             freewareCount++;
