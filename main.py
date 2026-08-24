@@ -377,7 +377,6 @@ class Api:
                     if p_norm == s_norm or p_norm in s_norm or s_norm in p_norm:
                         p.set('active', new_active_val)
                         changed = True
-                        break
 
             if changed:
                 tree.write(content_xml_path, encoding='utf-8', xml_declaration=True)
@@ -473,17 +472,39 @@ class Api:
 
     def toggle_package(self, package_path):
         try:
-            if not os.path.exists(package_path):
-                return json.dumps({"status": "error", "message": "Package path not found"})
+            content_xml_path = r'C:\Users\Bertrand\AppData\Local\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\ThirdBuk\Content.xml'
+            pkg_name = os.path.basename(package_path)
+            clean_pkg = pkg_name[:-9] if pkg_name.endswith('.disabled') else pkg_name
+            p_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_pkg.lower())
 
-            if package_path.endswith('.disabled'):
-                new_path = package_path[:-9]
-                os.rename(package_path, new_path)
-                is_enabled = True
+            is_enabled = True
+            if os.path.exists(content_xml_path):
+                import xml.etree.ElementTree as ET
+                tree = ET.parse(content_xml_path)
+                root = tree.getroot()
+                changed = False
+                for p in root.findall('Package'):
+                    name = p.get('name', '')
+                    clean = name[:-9] if name.endswith('.disabled') else name
+                    s_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean.lower())
+                    if clean.lower() == clean_pkg.lower() or p_norm == s_norm or p_norm in s_norm or s_norm in p_norm:
+                        curr = p.get('active', 'Activated')
+                        new_val = 'UserDisabled' if curr == 'Activated' else 'Activated'
+                        p.set('active', new_val)
+                        is_enabled = (new_val == 'Activated')
+                        changed = True
+                if changed:
+                    tree.write(content_xml_path, encoding='utf-8', xml_declaration=True)
+
+            if os.path.exists(package_path):
+                if package_path.endswith('.disabled'):
+                    new_path = package_path[:-9]
+                    os.rename(package_path, new_path)
+                else:
+                    new_path = package_path + '.disabled'
+                    os.rename(package_path, new_path)
             else:
-                new_path = package_path + '.disabled'
-                os.rename(package_path, new_path)
-                is_enabled = False
+                new_path = package_path
 
             airports = run_scan()
             return json.dumps({"status": "ok", "enabled": is_enabled, "new_path": new_path, "airports": airports}, ensure_ascii=False)
