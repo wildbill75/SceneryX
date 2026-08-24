@@ -485,6 +485,9 @@ class Api:
                 if not os.path.exists(dp):
                     continue
 
+                dp_lower = dp.lower()
+                is_community = 'community' in dp_lower
+
                 onestore = os.path.join(dp, 'OneStore')
                 target_dirs = [onestore] if os.path.exists(onestore) else [dp]
 
@@ -497,29 +500,33 @@ class Api:
                             if not os.path.isdir(item_p) or item == 'OneStore':
                                 continue
 
+                            item_lower = item.lower()
+                            # Never rename official Asobo/Microsoft packages physically
+                            if any(k in item_lower for k in ['asobo-', 'microsoft-', 'official', 'streamed', 'worldupdate', 'cityupdate']):
+                                continue
+
                             pkg_icaos = resolve_package_icaos(item)
                             if not pkg_icaos:
-                                if item.endswith('.disabled'):
-                                    orig_p = os.path.join(td, item[:-9])
-                                    if not os.path.exists(orig_p):
-                                        os.rename(item_p, orig_p)
-                                        enabled_count += 1
                                 continue
 
                             is_keep = any(k in keep_icaos for k in pkg_icaos)
 
-                            if is_keep:
-                                if item.endswith('.disabled'):
-                                    orig_p = os.path.join(td, item[:-9])
-                                    if not os.path.exists(orig_p):
-                                        os.rename(item_p, orig_p)
-                                        enabled_count += 1
-                            else:
-                                if not item.endswith('.disabled'):
-                                    dis_p = item_p + '.disabled'
-                                    if not os.path.exists(dis_p):
-                                        os.rename(item_p, dis_p)
-                                        disabled_count += 1
+                            if is_community:
+                                try:
+                                    if is_keep:
+                                        if item.endswith('.disabled'):
+                                            orig_p = os.path.join(td, item[:-9])
+                                            if not os.path.exists(orig_p):
+                                                os.rename(item_p, orig_p)
+                                                enabled_count += 1
+                                    else:
+                                        if not item.endswith('.disabled'):
+                                            dis_p = item_p + '.disabled'
+                                            if not os.path.exists(dis_p):
+                                                os.rename(item_p, dis_p)
+                                                disabled_count += 1
+                                except Exception as rename_err:
+                                    print(f"Skipping rename for {item}: {rename_err}")
                     except Exception as e:
                         print(f"Error processing {td} during flight optimizer:", e)
 
