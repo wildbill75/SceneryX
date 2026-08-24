@@ -16,11 +16,11 @@ const CURRENCY_RATES = { EUR: 1.0, USD: 1.09, GBP: 0.85 };
 let currentConflictIndex = 0;
 
 // Multi-select Sets
-const ALL_PRICING_LIST = ['Payware', 'Freeware / Flightsim.to', 'Asobo'];
+const ALL_PRICING_LIST = ['Payware', 'Freeware / Flightsim.to', 'Asobo', 'Default'];
 const ALL_SOURCES_LIST = ['asobo', 'Community', 'StreamedPackages', 'Official'];
 const ALL_TYPES_LIST = ['International', 'Regional', 'General Aviation', 'Heli / Water'];
 
-let selectedPricing = new Set(ALL_PRICING_LIST);
+let selectedPricing = new Set(['Payware', 'Freeware / Flightsim.to', 'Asobo']);
 let selectedSources = new Set(ALL_SOURCES_LIST);
 let selectedTypes = new Set(ALL_TYPES_LIST);
 let selectedMinRating = 0; // 0 = All ratings
@@ -629,6 +629,9 @@ function getAirportPricingType(ap) {
     const pt = ap.pricing_type || '';
     const v = (ap.vendor || '').toLowerCase();
     
+    if (ap.is_default || pt === 'Default') {
+        return 'Default';
+    }
     if (pt === 'Payware' || ap.is_payware) {
         return 'Payware';
     }
@@ -640,17 +643,19 @@ function getAirportPricingType(ap) {
 
 function getAirportCategory(ap) {
     const pt = getAirportPricingType(ap);
+    if (pt === 'Default') return 'DEFAULT';
     if (pt === 'Asobo') return 'ASOBO';
     if (pt === 'Payware') return 'PAYWARE';
     return 'FREEWARE';
 }
 
 function updateStats(airports) {
-    document.getElementById('stat-total').innerText = airports.length;
+    document.getElementById('stat-total').innerText = airports.length.toLocaleString();
 
     let asoboCount = 0;
     let paywareCount = 0;
     let freewareCount = 0;
+    let defaultCount = 0;
 
     airports.forEach(ap => {
         const cat = getAirportCategory(ap);
@@ -658,14 +663,18 @@ function updateStats(airports) {
             asoboCount++;
         } else if (cat === 'PAYWARE') {
             paywareCount++;
+        } else if (cat === 'DEFAULT') {
+            defaultCount++;
         } else {
             freewareCount++;
         }
     });
 
-    document.getElementById('stat-asobo').innerText = asoboCount;
-    document.getElementById('stat-payware').innerText = paywareCount;
-    document.getElementById('stat-freeware').innerText = freewareCount;
+    document.getElementById('stat-asobo').innerText = asoboCount.toLocaleString();
+    document.getElementById('stat-payware').innerText = paywareCount.toLocaleString();
+    document.getElementById('stat-freeware').innerText = freewareCount.toLocaleString();
+    const defEl = document.getElementById('stat-default');
+    if (defEl) defEl.innerText = defaultCount.toLocaleString();
 
     updateInvestmentBanner();
     updateConflictNavigator();
@@ -679,15 +688,16 @@ function createCustomIcon(ap) {
     // When SimBrief Flight Mode is active, force non-route 3rd-party airports to render as Grayed-out Disabled Stars
     if (currentFlightMode && currentFlightMode.active && currentFlightMode.icaos && currentFlightMode.icaos.length > 0) {
         const flightSet = new Set(currentFlightMode.icaos);
-        if (ap.pricing_type !== 'Asobo' && !flightSet.has(ap.icao)) {
+        if (ap.pricing_type !== 'Asobo' && ap.pricing_type !== 'Default' && !flightSet.has(ap.icao)) {
             isApDisabled = true;
         }
     }
 
-    let color = '#06b6d4'; // Freeware = Neon Cyan
     const cat = getAirportCategory(ap);
+    let color = '#06b6d4'; // Freeware = Neon Cyan
     if (cat === 'ASOBO') color = '#f59e0b'; // Asobo Handcrafted = Amber/Gold
     else if (cat === 'PAYWARE') color = '#a855f7'; // Payware = Neon Purple
+    else if (cat === 'DEFAULT') color = '#3b82f6'; // Default MSFS = Soft Royal Blue
 
     let strokeColor = ap.has_conflict ? '#ef4444' : '#ffffff';
     let strokeWidth = ap.has_conflict ? '2' : '1.2';
@@ -698,7 +708,15 @@ function createCustomIcon(ap) {
         strokeWidth = '1.5';
     }
 
-    const svgIcon = `
+    // Default MSFS procedural airports are drawn as CIRCLES / DOTS (not stars)
+    const isCircleShape = (cat === 'DEFAULT');
+
+    const svgIcon = isCircleShape ? `
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="drop-shadow-md">
+            <circle cx="12" cy="12" r="7.5" fill="${color}" stroke="${strokeColor}" stroke-width="${strokeWidth}" />
+            <circle cx="12" cy="12" r="2.5" fill="#ffffff" opacity="0.9" />
+        </svg>
+    ` : `
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="drop-shadow-md">
             <path d="M12 2l2.9 6.26 6.9.83-5.2 4.7 1.4 6.84L12 17.1 5.9 20.63l1.4-6.84-5.2-4.7 6.9-.83L12 2z" 
                   fill="${color}" stroke="${strokeColor}" stroke-width="${strokeWidth}" stroke-linejoin="round"/>
@@ -708,8 +726,8 @@ function createCustomIcon(ap) {
     return L.divIcon({
         html: svgIcon,
         className: `custom-map-marker ${isApDisabled ? 'grayscale-[0.5]' : ''}`,
-        iconSize: [26, 26],
-        iconAnchor: [13, 13]
+        iconSize: isCircleShape ? [22, 22] : [26, 26],
+        iconAnchor: isCircleShape ? [11, 11] : [13, 13]
     });
 }
 
@@ -718,7 +736,10 @@ function getAirportPopupHtml(ap) {
     let badgeClass = 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40';
     let badgeLabel = 'Freeware';
 
-    if (cat === 'ASOBO') {
+    if (cat === 'DEFAULT') {
+        badgeClass = 'bg-blue-500/20 text-blue-300 border-blue-500/40';
+        badgeLabel = 'Default MSFS';
+    } else if (cat === 'ASOBO') {
         badgeClass = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
         badgeLabel = 'Asobo';
     } else if (cat === 'PAYWARE') {
@@ -965,16 +986,23 @@ function showAirportDetails(ap) {
 
     // Clean previous category color classes
     const categoryColorClasses = [
-        'text-purple-400', 'text-cyan-400', 'text-amber-400',
+        'text-purple-400', 'text-cyan-400', 'text-amber-400', 'text-blue-400',
         'drop-shadow-[0_0_10px_rgba(192,132,252,0.3)]',
         'drop-shadow-[0_0_10px_rgba(56,189,248,0.3)]',
-        'drop-shadow-[0_0_10px_rgba(245,158,11,0.3)]'
+        'drop-shadow-[0_0_10px_rgba(245,158,11,0.3)]',
+        'drop-shadow-[0_0_10px_rgba(59,130,246,0.3)]'
     ];
     if (icaoEl) icaoEl.classList.remove(...categoryColorClasses);
     if (vendorEl) vendorEl.classList.remove(...categoryColorClasses);
     if (typeBadge) typeBadge.classList.remove(...categoryColorClasses);
 
-    if (cat === 'ASOBO') {
+    if (cat === 'DEFAULT') {
+        pricingBadge.innerText = "Default MSFS";
+        pricingBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30";
+        if (icaoEl) icaoEl.classList.add('text-blue-400', 'drop-shadow-[0_0_10px_rgba(59,130,246,0.3)]');
+        if (vendorEl) vendorEl.classList.add('text-blue-400', 'drop-shadow-[0_0_10px_rgba(59,130,246,0.3)]');
+        if (typeBadge) typeBadge.classList.add('text-blue-400');
+    } else if (cat === 'ASOBO') {
         pricingBadge.innerText = hasActiveFix ? "Asobo + Fix" : "Asobo";
         pricingBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30";
         if (icaoEl) icaoEl.classList.add('text-amber-400', 'drop-shadow-[0_0_10px_rgba(245,158,11,0.3)]');
@@ -1003,7 +1031,11 @@ function showAirportDetails(ap) {
     const actText = document.getElementById('drawer-toggle-text');
 
     if (actBadge && actBtn) {
-        if (cat === 'ASOBO') {
+        if (cat === 'DEFAULT') {
+            actBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-blue-500/20 text-blue-300 border border-blue-500/40";
+            actBadge.innerText = "🔵 Native Game Airport (Built-in)";
+            actBtn.classList.add('hidden');
+        } else if (cat === 'ASOBO') {
             actBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40";
             actBadge.innerText = "🟢 Core MSFS Base";
             actBtn.classList.add('hidden');

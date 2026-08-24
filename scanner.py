@@ -1122,6 +1122,65 @@ def run_scan():
                 "rating": ratings.get(h_u, 0.0)
             }
 
+    # Include all 4-letter ICAO default procedural MSFS airports from airports.json that are not already in detected_map
+    for d_icao, ap_info in airports.items():
+        if len(d_icao) == 4 and d_icao.isalpha() and d_icao not in detected_map:
+            raw_type = ap_info.get('type', 'airport')
+            if raw_type not in ['large_airport', 'medium_airport', 'small_airport']:
+                continue
+
+            if raw_type == 'large_airport':
+                english_type = "International"
+            elif raw_type == 'medium_airport':
+                english_type = "Regional"
+            else:
+                english_type = "General Aviation"
+
+            detected_map[d_icao] = {
+                "icao": d_icao,
+                "ident": d_icao,
+                "name": ap_info.get('name', ''),
+                "city": ap_info.get('city', ''),
+                "country": ap_info.get('country', ''),
+                "lat": ap_info.get('lat', 0.0),
+                "lon": ap_info.get('lon', 0.0),
+                "type": raw_type,
+                "english_type": english_type,
+                "vendor": "Microsoft Flight Simulator (Default)",
+                "pricing_type": "Default",
+                "is_payware": False,
+                "is_asobo_official": False,
+                "is_default": True,
+                "is_custom_price": False,
+                "price_eur": 0.0,
+                "package_name": f"msfs-default-{d_icao.lower()}",
+                "package_path": "",
+                "source_folder": "MSFS - Default Procedural",
+                "version": "",
+                "size_str": "Default",
+                "match_source": "Default MSFS Procedural",
+                "all_sources": [{
+                    "folder_name": f"msfs-default-{d_icao.lower()}",
+                    "package_path": "",
+                    "source_folder": "MSFS - Default Procedural",
+                    "match_source": "Default MSFS Procedural",
+                    "vendor": "Microsoft Flight Simulator (Default)",
+                    "pricing_type": "Default",
+                    "is_payware": False,
+                    "is_asobo_official": False,
+                    "is_default": True,
+                    "is_disabled": False,
+                    "is_addon": False,
+                    "is_fix_patch": False,
+                    "version": "",
+                    "size_str": "Default"
+                }],
+                "is_disabled": False,
+                "has_conflict": False,
+                "conflict_count": 1,
+                "rating": ratings.get(d_icao, 0.0)
+            }
+
     for icao, item in detected_map.items():
         item['operating_airlines'] = AIRLINES_DB.get(icao, [])
         item['routes'] = ROUTES_DB.get(icao, {})

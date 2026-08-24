@@ -231,6 +231,13 @@
                     <span id="stat-asobo" class="font-extrabold font-mono text-amber-300 text-base lg:text-lg leading-none">0</span>
                     <span class="text-[11px] font-black uppercase tracking-wider text-amber-200">ASOBO</span>
                 </div>
+
+                <!-- DEFAULT MSFS STAT BADGE (BLUE / CIRCLE ICON) -->
+                <div id="stat-pill-default" onclick="filterByPricingPill('Default')" title="Click to filter Default MSFS procedural airports" class="flex items-center gap-1.5 bg-blue-500/15 border border-blue-500/40 px-3.5 py-1.5 rounded-full shadow-md shadow-blue-950/20 shrink-0 cursor-pointer hover:scale-105 active:scale-95 transition-all">
+                    <i class="fa-solid fa-circle text-[10px] text-blue-400"></i>
+                    <span id="stat-default" class="font-extrabold font-mono text-blue-300 text-base lg:text-lg leading-none">0</span>
+                    <span class="text-[11px] font-black uppercase tracking-wider text-blue-200">DEFAULT MSFS</span>
+                </div>
             </div>
 
             <!-- SPENT CAROUSEL SUB-BANNER (AIRY MARGIN TOP) -->
@@ -317,6 +324,9 @@
                         </button>
                         <button id="filter-price-asobo" onclick="togglePricingFilter('Asobo')" class="py-2 px-3 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10">
                             <i class="fa-solid fa-star text-[10px] text-amber-400"></i> Asobo
+                        </button>
+                        <button id="filter-price-default" onclick="togglePricingFilter('Default')" class="col-span-2 py-2 px-3 rounded-xl border text-xs font-semibold bg-blue-500/20 text-blue-300 border-blue-500/40 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm shadow-blue-500/10">
+                            <i class="fa-solid fa-circle text-[10px] text-blue-400"></i> Default MSFS
                         </button>
                     </div>
                 </div>
