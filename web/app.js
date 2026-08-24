@@ -2561,16 +2561,59 @@ function openSimBriefModal(flight) {
     if (modal) modal.classList.remove('hidden');
 }
 
-function closeSimBriefModal() {
-    const modal = document.getElementById('simbrief-modal');
-    if (modal) modal.classList.add('hidden');
+function showOptimizationProgressOverlay(title, subtitle) {
+    const overlay = document.getElementById('optimization-progress-overlay');
+    if (!overlay) return;
+    const titleEl = document.getElementById('opt-progress-title');
+    const subEl = document.getElementById('opt-progress-subtitle');
+    if (titleEl) titleEl.innerText = title || "Optimizing Flight Sceneries...";
+    if (subEl) subEl.innerText = subtitle || "Isolating route sceneries & updating MSFS Content.xml";
+    setOptimizationProgress(15, "Renaming package directories...");
+    overlay.classList.remove('hidden');
+    overlay.classList.add('flex');
+}
+
+function setOptimizationProgress(percent, statusText) {
+    const bar = document.getElementById('opt-progress-bar');
+    const percentEl = document.getElementById('opt-progress-percent');
+    const statusEl = document.getElementById('opt-progress-status');
+    if (bar) bar.style.width = `${percent}%`;
+    if (percentEl) percentEl.innerText = `${percent}%`;
+    if (statusEl && statusText) statusEl.innerText = statusText;
+}
+
+function hideOptimizationProgressOverlay() {
+    const overlay = document.getElementById('optimization-progress-overlay');
+    if (overlay) {
+        setOptimizationProgress(100, "Scenery compilation complete!");
+        setTimeout(() => {
+            overlay.classList.add('hidden');
+            overlay.classList.remove('flex');
+        }, 350);
+    }
 }
 
 function confirmSimBriefOptimization() {
     closeSimBriefModal();
     if (!currentSimBriefFlight || !window.pywebview) return;
 
+    showOptimizationProgressOverlay(
+        `Optimizing Route (${currentSimBriefFlight.origin.icao} ➔ ${currentSimBriefFlight.destination.icao})`,
+        "Disabling non-route 3rd-party sceneries & updating MSFS Content.xml..."
+    );
+
+    let progressTimer = setInterval(() => {
+        const bar = document.getElementById('opt-progress-bar');
+        if (!bar) return;
+        const currentW = parseFloat(bar.style.width || '15');
+        if (currentW < 85) {
+            setOptimizationProgress(Math.min(85, currentW + 15), "Compiling scenery packages & updating Content.xml...");
+        }
+    }, 400);
+
     window.pywebview.api.optimize_flight(JSON.stringify(currentSimBriefFlight.flight_icaos)).then(resStr => {
+        clearInterval(progressTimer);
+        hideOptimizationProgressOverlay();
         try {
             const res = JSON.parse(resStr);
             if (res.status === 'success') {
@@ -2587,13 +2630,23 @@ function confirmSimBriefOptimization() {
                 filterAirports();
 
                 showCustomModal({
-                    title: 'Flight Scenery Optimization Active',
-                    message: `Successfully optimized sceneries for flight ${currentSimBriefFlight.origin.icao} → ${currentSimBriefFlight.destination.icao}. ${res.disabled_count} non-route sceneries disabled. Enjoy your flight!`,
+                    title: 'Flight Scenery Optimization Active 🚀',
+                    message: `Successfully optimized sceneries for flight ${currentSimBriefFlight.origin.icao} → ${currentSimBriefFlight.destination.icao}.\n\n${res.disabled_count} non-route 3rd-party sceneries disabled. MSFS Content.xml updated. Enjoy your flight!`,
                     type: 'success',
                     confirmText: 'Great!'
                 });
+            } else {
+                showCustomModal({
+                    title: 'Optimization Error',
+                    message: res.message || "Failed to optimize sceneries.",
+                    type: 'error'
+                });
             }
         } catch(e){}
+    }).catch(err => {
+        clearInterval(progressTimer);
+        hideOptimizationProgressOverlay();
+        showCustomModal({ title: 'Optimization Error', message: String(err), type: 'error' });
     });
 }
 
