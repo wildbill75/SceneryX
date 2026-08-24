@@ -589,7 +589,7 @@ class Api:
             return True
         return False
 
-    def _extract_archive_files(self, archive_path_or_bytes, ext, gsx_dir):
+    def _extract_archive_files(self, archive_path_or_bytes, ext, gsx_dir, icao=""):
         import shutil
         import tempfile
         import subprocess
@@ -614,9 +614,28 @@ class Api:
                         zip_ref.extractall(temp_dir)
                         extracted_ok = True
                 except Exception as e:
-                    print("Zipfile extraction failed, trying tar fallback:", e)
+                    print("Zipfile extraction failed, trying fallback:", e)
 
-            # 2. Universal Windows tar.exe fallback (.rar, .7z, .zip, .tar, etc.)
+            # 2. Try 7-Zip (7z.exe) if available (extracts .rar, .7z, .zip, etc.)
+            if not extracted_ok:
+                seven_zip_paths = [
+                    r"C:\Program Files\7-Zip\7z.exe",
+                    r"C:\Program Files (x86)\7-Zip\7z.exe",
+                    shutil.which("7z"),
+                    shutil.which("7za")
+                ]
+                seven_zip = next((p for p in seven_zip_paths if p and os.path.exists(p)), None)
+                if seven_zip:
+                    try:
+                        res = subprocess.run([seven_zip, "x", archive_file_path, f"-o{temp_dir}", "-y"], capture_output=True, text=True)
+                        if res.returncode == 0:
+                            extracted_ok = True
+                        else:
+                            print("7z.exe stderr:", res.stderr)
+                    except Exception as e:
+                        print("7z.exe extraction error:", e)
+
+            # 3. Universal Windows tar.exe fallback (.rar, .7z, .zip, .tar, etc.)
             if not extracted_ok:
                 tar_exe = shutil.which("tar") or r"C:\Windows\System32\tar.exe"
                 if os.path.exists(tar_exe):
@@ -629,7 +648,24 @@ class Api:
                     except Exception as e:
                         print("tar.exe extraction error:", e)
 
-            # 3. Walk temp_dir for .ini or .py files
+            # 4. Clean up old GSX files for this ICAO if target ICAO is specified
+            target_icao = (icao or '').upper()
+            if target_icao and len(target_icao) == 4:
+                try:
+                    for existing_f in os.listdir(gsx_dir):
+                        if existing_f.lower() == 'configuration.ini':
+                            continue
+                        if existing_f.upper().startswith(target_icao) and existing_f.lower().endswith(('.ini', '.py')):
+                            old_path = os.path.join(gsx_dir, existing_f)
+                            try:
+                                os.remove(old_path)
+                                print(f"Cleaned up old GSX profile for {target_icao}: {existing_f}")
+                            except Exception as e:
+                                print(f"Could not remove old GSX file {existing_f}:", e)
+                except Exception as e:
+                    print("Error during GSX profile cleanup:", e)
+
+            # 5. Walk temp_dir for .ini or .py files
             for root, dirs, files in os.walk(temp_dir):
                 for f in files:
                     f_lower = f.lower()
@@ -652,8 +688,22 @@ class Api:
             os.makedirs(gsx_dir, exist_ok=True)
             
         installed_files = []
+        target_icao = (icao or '').upper()
         
         try:
+            # Clean up existing old GSX profile files for this ICAO if installing direct single .ini or .py
+            if target_icao and len(target_icao) == 4:
+                try:
+                    for existing_f in os.listdir(gsx_dir):
+                        if existing_f.lower() == 'configuration.ini':
+                            continue
+                        if existing_f.upper().startswith(target_icao) and existing_f.lower().endswith(('.ini', '.py')):
+                            old_path = os.path.join(gsx_dir, existing_f)
+                            try:
+                                os.remove(old_path)
+                            except Exception: pass
+                except Exception: pass
+
             # 1. Base64 dropped file handling
             if base64_data and filename:
                 if "," in base64_data:
@@ -663,7 +713,7 @@ class Api:
                 ext = os.path.splitext(filename)[1].lower()
                 
                 if ext in ['.zip', '.rar', '.7z', '.tar', '.gz']:
-                    installed_files = self._extract_archive_files(file_bytes, ext, gsx_dir)
+                    installed_files = self._extract_archive_files(file_bytes, ext, gsx_dir, icao=target_icao)
                 elif ext in ['.ini', '.py']:
                     if filename and filename.lower() != 'configuration.ini':
                         target_p = os.path.join(gsx_dir, filename)
@@ -678,7 +728,7 @@ class Api:
                     
                 ext = os.path.splitext(file_path)[1].lower()
                 if ext in ['.zip', '.rar', '.7z', '.tar', '.gz']:
-                    installed_files = self._extract_archive_files(file_path, ext, gsx_dir)
+                    installed_files = self._extract_archive_files(file_path, ext, gsx_dir, icao=target_icao)
                 elif ext in ['.ini', '.py']:
                     fname = os.path.basename(file_path)
                     if fname and fname.lower() != 'configuration.ini':
