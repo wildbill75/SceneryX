@@ -442,7 +442,18 @@ async function loadAirportsData() {
         updateSplashProgress(25, "Loading airports database...", "Airports DB");
         let response;
         if (window.pywebview) {
-            updateSplashProgress(45, "Scanning MSFS packages & GSX profiles...", "Community & OneStore");
+            updateSplashProgress(35, "Loading user configuration...", "Settings & Credentials");
+            try {
+                const settingsStr = await window.pywebview.api.get_settings();
+                if (settingsStr) {
+                    currentSettings = JSON.parse(settingsStr);
+                    loadSimBriefSettingsUI();
+                }
+            } catch(e) {
+                console.warn("Could not load settings on startup:", e);
+            }
+
+            updateSplashProgress(55, "Scanning MSFS packages & GSX profiles...", "Community & OneStore");
             const dataStr = await window.pywebview.api.get_airports();
             updateSplashProgress(85, "Parsing scenery packages...", "Rendering Map");
             allAirportsData = JSON.parse(dataStr);

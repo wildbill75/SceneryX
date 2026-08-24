@@ -81,32 +81,10 @@ def update_msfs_content_xml(keep_icaos=None, restore_all=False):
 
 class Api:
     def __init__(self):
-        self._initial_restored = False
+        pass
 
     def get_airports(self):
-        airports = None
-        if not self._initial_restored:
-            self._initial_restored = True
-            try:
-                print("Auto-restoring all sceneries on initial app startup...")
-                res_str = self.restore_all_sceneries()
-                res = json.loads(res_str)
-                if isinstance(res, dict) and "airports" in res:
-                    airports = res["airports"]
-            except Exception as e:
-                print("Initial restore warning:", e)
-
-        if not airports:
-            if not os.path.exists(OUTPUT_JSON_PATH):
-                airports = run_scan()
-            else:
-                try:
-                    with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
-                        airports = json.load(f)
-                except Exception as e:
-                    print("Error reading installed_airports.json, running fresh scan:", e)
-                    airports = run_scan()
-
+        airports = run_scan()
         return json.dumps(airports, ensure_ascii=False)
 
     def rescan(self):
