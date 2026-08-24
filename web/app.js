@@ -2624,9 +2624,9 @@ function confirmSimBriefOptimization() {
 function updateFlightModeBannerUI(flightMode) {
     currentFlightMode = flightMode || { active: false, icaos: [] };
     const badge = document.getElementById('sb-status-badge');
-    const banner = document.getElementById('sb-active-banner');
-    const disabledCount = document.getElementById('sb-disabled-count');
-    const routeSummary = document.getElementById('sb-route-summary');
+    const routeInfo = document.getElementById('sb-route-info');
+    const routeText = document.getElementById('sb-route-text');
+    const disabledText = document.getElementById('sb-disabled-text');
     const importBtn = document.getElementById('sb-import-btn');
 
     if (currentFlightMode && currentFlightMode.active) {
@@ -2634,10 +2634,12 @@ function updateFlightModeBannerUI(flightMode) {
             badge.className = "text-[9px] font-bold font-mono px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse";
             badge.innerText = "ACTIVE";
         }
-        if (banner) banner.classList.remove('hidden');
-        if (disabledCount) disabledCount.innerText = `${currentFlightMode.disabled_count || 0} sceneries disabled`;
-        if (routeSummary && currentFlightMode.icaos) {
-            routeSummary.innerText = currentFlightMode.icaos.join(' ➔ ');
+        if (routeInfo) routeInfo.classList.remove('hidden');
+        if (routeText && currentFlightMode.icaos) {
+            routeText.innerText = currentFlightMode.icaos.join(' ➔ ');
+        }
+        if (disabledText) {
+            disabledText.innerText = `${currentFlightMode.disabled_count || 0} sceneries isolated`;
         }
         if (importBtn) {
             importBtn.className = "w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-red-500/30 via-amber-500/30 to-orange-500/30 hover:from-red-500/40 hover:to-orange-500/40 border border-amber-500/60 text-amber-200 font-extrabold text-xs transition-all flex items-center justify-center gap-2 shadow-md shadow-amber-500/10 active:scale-98 cursor-pointer";
@@ -2649,7 +2651,7 @@ function updateFlightModeBannerUI(flightMode) {
             badge.className = "text-[9px] font-bold font-mono px-2 py-0.5 rounded-full bg-slate-900 text-slate-400 border border-slate-800";
             badge.innerText = "INACTIVE";
         }
-        if (banner) banner.classList.add('hidden');
+        if (routeInfo) routeInfo.classList.add('hidden');
         if (importBtn) {
             importBtn.className = "w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 text-amber-300 font-extrabold text-xs transition-all flex items-center justify-center gap-2 shadow-sm shadow-amber-500/10 active:scale-98 cursor-pointer";
             importBtn.onclick = function() { triggerSimBriefImport(); };

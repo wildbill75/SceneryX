@@ -396,10 +396,10 @@ class Api:
 
     def reset_full_database(self):
         try:
-            self.restore_all_sceneries()
+            self.restore_all_sceneries(full_reset=True)
 
             st = get_settings()
-            st['flight_mode'] = {'active': False, 'icaos': []}
+            st['flight_mode'] = {'active': False, 'icaos': [], 'disabled_folders': []}
             save_settings(st)
 
             airports = run_scan()
@@ -506,6 +506,7 @@ class Api:
 
             enabled_count = 0
             disabled_count = 0
+            disabled_by_flight_mode = []
 
             for cfg in scan_paths_cfg:
                 dp = cfg.get('path', '')
@@ -551,6 +552,7 @@ class Api:
                                             if not os.path.exists(dis_p):
                                                 os.rename(item_p, dis_p)
                                                 disabled_count += 1
+                                                disabled_by_flight_mode.append(item)
                                 except Exception as rename_err:
                                     print(f"Skipping rename for {item}: {rename_err}")
                     except Exception as e:
@@ -558,6 +560,14 @@ class Api:
 
             # Update MSFS Native Content.xml (UserDisabled / Activated)
             update_msfs_content_xml(keep_icaos=keep_icaos, restore_all=False, folder_to_icaos=folder_to_icaos, third_party_airport_pkgs=third_party_airport_pkgs)
+
+            settings['flight_mode'] = {
+                'active': True,
+                'disabled_count': disabled_count,
+                'icaos': list(keep_icaos),
+                'disabled_folders': disabled_by_flight_mode
+            }
+            save_settings(settings)
 
             return json.dumps({
                 "status": "ok",
@@ -568,13 +578,16 @@ class Api:
             return json.dumps({"status": "error", "message": str(e)})
 
     def restore_all_flight_sceneries(self):
-        return self.restore_all_sceneries()
+        return self.restore_all_sceneries(full_reset=False)
 
-    def restore_all_sceneries(self):
+    def restore_all_sceneries(self, full_reset=False):
         try:
             settings = get_settings()
             scan_paths_cfg = settings.get("scan_paths", [])
             re_enabled_count = 0
+
+            flight_mode_cfg = settings.get('flight_mode', {})
+            flight_disabled_folders = set(flight_mode_cfg.get('disabled_folders', []))
 
             for cfg in scan_paths_cfg:
                 dp = cfg.get('path', '')
@@ -590,8 +603,13 @@ class Api:
                     try:
                         for item in os.listdir(td):
                             if item.endswith('.disabled'):
+                                item_clean = item[:-9]
+                                # If full_reset is False and we have flight_disabled_folders, only restore folders disabled by flight mode!
+                                if not full_reset and flight_disabled_folders and (item_clean not in flight_disabled_folders and item not in flight_disabled_folders):
+                                    continue
+
                                 dis_p = os.path.join(td, item)
-                                orig_p = os.path.join(td, item[:-9])
+                                orig_p = os.path.join(td, item_clean)
                                 if os.path.isdir(dis_p) and not os.path.exists(orig_p):
                                     try:
                                         os.rename(dis_p, orig_p)
@@ -601,10 +619,10 @@ class Api:
                     except Exception as e:
                         print(f"Error scanning {td} for restore:", e)
 
-            # Update MSFS Native Content.xml to restore all UserDisabled packages back to Activated
+            # Update MSFS Native Content.xml to restore UserDisabled packages back to Activated
             update_msfs_content_xml(restore_all=True)
 
-            settings['flight_mode'] = {'active': False, 'icaos': []}
+            settings['flight_mode'] = {'active': False, 'icaos': [], 'disabled_folders': []}
             save_settings(settings)
 
             airports = run_scan()

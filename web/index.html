@@ -432,16 +432,9 @@
                             <span>Import Active SimBrief OFP</span>
                         </button>
 
-                        <div id="sb-active-banner" class="hidden p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 space-y-2">
-                            <div class="text-[11px] text-amber-200 font-bold flex items-center justify-between">
-                                <span>⚡ FLIGHT MODE ACTIVE</span>
-                                <span id="sb-disabled-count" class="text-[10px] font-mono text-slate-400"></span>
-                            </div>
-                            <div id="sb-route-summary" class="text-xs font-mono font-black text-amber-300"></div>
-                            <button onclick="restoreAllFlightSceneriesUI()" class="w-full py-1.5 px-2 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-slate-200 text-[11px] font-bold transition-all flex items-center justify-center gap-1.5">
-                                <i class="fa-solid fa-rotate-left text-amber-400"></i>
-                                <span>Restore All Sceneries</span>
-                            </button>
+                        <div id="sb-route-info" class="hidden text-[11px] font-mono text-center p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 font-semibold space-y-0.5">
+                            <div id="sb-route-text"></div>
+                            <div id="sb-disabled-text" class="text-[10px] text-slate-400 font-normal"></div>
                         </div>
                     </div>
                 </div>
