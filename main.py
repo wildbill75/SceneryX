@@ -49,17 +49,24 @@ def get_folder_to_icaos_map(airports=None):
             airports = []
 
     folder_to_icaos = {}
+    third_party_airport_pkgs = set()
+
     if airports:
         for ap in airports:
             icao = ap.get('icao')
+            pricing = ap.get('pricing_type')
             for src in ap.get('all_sources', []):
                 fn = src.get('folder_name', '')
                 if fn:
                     fn_clean = fn[:-9] if fn.endswith('.disabled') else fn
-                    folder_to_icaos.setdefault(fn_clean.lower(), set()).add(icao)
-    return folder_to_icaos
+                    fn_clean_lower = fn_clean.lower()
+                    folder_to_icaos.setdefault(fn_clean_lower, set()).add(icao)
+                    if pricing not in ['Asobo', 'Default'] and not src.get('is_asobo_official') and not src.get('is_default'):
+                        third_party_airport_pkgs.add(fn_clean_lower)
 
-def update_msfs_content_xml(keep_icaos=None, restore_all=False, folder_to_icaos=None):
+    return folder_to_icaos, third_party_airport_pkgs
+
+def update_msfs_content_xml(keep_icaos=None, restore_all=False, folder_to_icaos=None, third_party_airport_pkgs=None):
     local_appdata = os.getenv('LOCALAPPDATA', '')
     appdata = os.getenv('APPDATA', '')
 
@@ -70,8 +77,8 @@ def update_msfs_content_xml(keep_icaos=None, restore_all=False, folder_to_icaos=
         os.path.join(appdata, r'Microsoft Flight Simulator\Content.xml')
     ]
 
-    if folder_to_icaos is None:
-        folder_to_icaos = get_folder_to_icaos_map()
+    if folder_to_icaos is None or third_party_airport_pkgs is None:
+        folder_to_icaos, third_party_airport_pkgs = get_folder_to_icaos_map()
 
     target_icaos = set(k.upper() for k in (keep_icaos or []))
 
@@ -87,23 +94,23 @@ def update_msfs_content_xml(keep_icaos=None, restore_all=False, folder_to_icaos=
 
             for elem in tree.findall('Package'):
                 name = elem.get('name', '')
-                name_lower = name.lower()
-                name_clean = name[:-9] if name.endswith('.disabled') else name
-
-                # Never disable official Microsoft / Asobo core system packages in Content.xml
-                if any(k in name_lower for k in ['asobo-base', 'asobo-sim', 'microsoft-base', 'official', 'streamed', 'worldupdate', 'cityupdate']):
-                    elem.set('active', 'Activated')
-                    continue
+                name_clean_lower = (name[:-9] if name.endswith('.disabled') else name).lower()
 
                 if restore_all:
                     if elem.get('active') == 'UserDisabled':
                         elem.set('active', 'Activated')
                 else:
-                    pkg_icaos = folder_to_icaos.get(name_clean.lower()) or resolve_package_icaos(name_clean)
-                    if any(k in target_icaos for k in pkg_icaos):
-                        elem.set('active', 'Activated')
+                    # ONLY toggle 3rd-party airport scenery packages in Content.xml
+                    # NEVER touch aircraft, navdata, GSX, liveries, or core MSFS packages!
+                    if name_clean_lower in third_party_airport_pkgs:
+                        pkg_icaos = folder_to_icaos.get(name_clean_lower, set())
+                        if any(k in target_icaos for k in pkg_icaos):
+                            elem.set('active', 'Activated')
+                        else:
+                            elem.set('active', 'UserDisabled')
                     else:
-                        elem.set('active', 'UserDisabled')
+                        # Ensure all non-airport packages (aircraft, navdata, utilities) remain 100% Activated
+                        elem.set('active', 'Activated')
 
             xml_str = ET.tostring(tree, encoding='unicode')
             with open(xml_path, 'w', encoding='utf-8') as f:
@@ -495,7 +502,7 @@ class Api:
             scan_paths_cfg = settings.get("scan_paths", [])
 
             all_airports = run_scan()
-            folder_to_icaos = get_folder_to_icaos_map(all_airports)
+            folder_to_icaos, third_party_airport_pkgs = get_folder_to_icaos_map(all_airports)
 
             enabled_count = 0
             disabled_count = 0
@@ -550,7 +557,7 @@ class Api:
                         print(f"Error processing {td} during flight optimizer:", e)
 
             # Update MSFS Native Content.xml (UserDisabled / Activated)
-            update_msfs_content_xml(keep_icaos=keep_icaos, restore_all=False, folder_to_icaos=folder_to_icaos)
+            update_msfs_content_xml(keep_icaos=keep_icaos, restore_all=False, folder_to_icaos=folder_to_icaos, third_party_airport_pkgs=third_party_airport_pkgs)
 
             return json.dumps({
                 "status": "ok",
