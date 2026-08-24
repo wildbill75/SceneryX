@@ -2546,7 +2546,12 @@ function openSimBriefModal(flight) {
     }
 
     const routeIcaos = flight.flight_icaos || [];
-    const thirdPartyAirports = allAirportsData.filter(a => a.pricing_type !== 'Asobo');
+    const thirdPartyAirports = allAirportsData.filter(a => 
+        a.pricing_type !== 'Asobo' && 
+        a.pricing_type !== 'Default' && 
+        !a.is_default && 
+        !a.is_asobo_official
+    );
     const toKeep = thirdPartyAirports.filter(a => routeIcaos.includes(a.icao));
     const toDisableCount = thirdPartyAirports.length - toKeep.length;
 
