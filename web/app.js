@@ -1168,45 +1168,62 @@ function showAirportDetails(ap) {
         const isFixPatch = !!src.is_fix_patch || (src.folder_name && (src.folder_name.toLowerCase().includes('fix') || src.folder_name.toLowerCase().includes('patch')));
         const isAddon = !!src.is_addon || isFixPatch;
 
+        const cardBgClass = isDisabled 
+            ? 'bg-slate-950/40 border-slate-800/40 opacity-60 grayscale-[0.5]' 
+            : `bg-slate-900/95 ${isAddon ? 'border-slate-800/60' : 'border-slate-700/80'} shadow-md`;
+
+        const titleClass = isDisabled 
+            ? 'text-slate-500 font-semibold' 
+            : 'text-white font-bold';
+
+        const folderBoxClass = isDisabled 
+            ? 'text-slate-500 line-through bg-slate-950/30 border-slate-800/30 font-mono text-xs p-2.5 rounded-lg border break-all' 
+            : 'text-slate-200 font-bold bg-slate-950/70 border-slate-800 font-mono text-xs p-2.5 rounded-lg border break-all';
+
         const statusBadge = isDisabled 
-            ? `<span class="text-xs font-bold px-3 py-1 rounded-full bg-red-500/20 text-red-300 border border-red-500/30 whitespace-nowrap">🔴 Disabled</span>`
-            : `<span class="text-xs font-bold px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 whitespace-nowrap">🟢 Active</span>`;
+            ? `<span class="text-xs font-mono font-bold px-3 py-1 rounded-full bg-slate-950 text-slate-400 border border-slate-800/60 whitespace-nowrap">🔴 Disabled</span>`
+            : `<span class="text-xs font-mono font-bold px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 whitespace-nowrap">🟢 Active</span>`;
 
         const toggleBtnText = isDisabled ? 'Enable' : 'Disable';
+        const toggleBtnIcon = isDisabled ? 'fa-power-off text-emerald-400' : 'fa-ban text-red-400';
         const toggleBtnClass = isDisabled 
-            ? 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border-emerald-500/40' 
-            : 'bg-red-500/20 hover:bg-red-500/30 text-red-300 border-red-500/40';
+            ? 'bg-emerald-500/25 hover:bg-emerald-500/35 text-emerald-300 border-emerald-500/50 shadow-sm shadow-emerald-500/10 font-extrabold cursor-pointer' 
+            : 'bg-slate-800 hover:bg-red-500/20 text-slate-300 hover:text-red-300 border-slate-700 cursor-pointer';
+
+        const openBtnClass = isDisabled
+            ? 'px-2.5 py-1.5 rounded-lg bg-slate-950/60 text-slate-500 border border-slate-800/40 text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 whitespace-nowrap'
+            : 'px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold border border-slate-700 flex items-center gap-1.5 transition-all shadow-sm shrink-0 whitespace-nowrap';
 
         const itemHtml = `
-            <div class="p-3.5 rounded-xl bg-slate-900/90 border ${isAddon ? 'border-slate-800/60 opacity-85' : 'border-slate-800'} space-y-2.5">
+            <div class="p-3.5 rounded-xl transition-all space-y-2.5 ${cardBgClass}">
                 <!-- Line 1: Source Folder Name, Fix Tag & Disk Size / Streamed Badge -->
-                <div class="flex items-center justify-between text-xs font-bold text-white gap-2">
+                <div class="flex items-center justify-between text-xs font-bold gap-2">
                     <div class="flex items-center gap-1.5 min-w-0 flex-1">
-                        <span class="truncate min-w-0 font-bold text-white">${src.source_folder}</span>
+                        <span class="truncate min-w-0 ${titleClass}">${src.source_folder}</span>
                         ${isFixPatch ? `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shrink-0 whitespace-nowrap">🛠️ Fix / Patch</span>` : ''}
                     </div>
                     ${src.size_str === 'Streamed' || src.source_folder.toLowerCase().includes('streamed') 
-                        ? `<span class="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-cyan-500/10 text-cyan-300 border border-cyan-500/30 shrink-0 whitespace-nowrap">Streamed</span>`
-                        : (src.size_str ? `<span class="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-slate-950 text-slate-200 border border-slate-800 shrink-0 whitespace-nowrap">${src.size_str}</span>` : '')
+                        ? `<span class="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full ${isDisabled ? 'bg-slate-950 text-slate-500 border border-slate-800/40' : 'bg-cyan-500/10 text-cyan-300 border border-cyan-500/30'} shrink-0 whitespace-nowrap">Streamed</span>`
+                        : (src.size_str ? `<span class="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full ${isDisabled ? 'bg-slate-950 text-slate-500 border border-slate-800/40' : 'bg-slate-950 text-slate-200 border border-slate-800'} shrink-0 whitespace-nowrap">${src.size_str}</span>` : '')
                     }
                 </div>
                 
                 <!-- Line 2: Package Directory Name -->
-                <div class="text-xs font-mono text-slate-200 font-bold break-all bg-slate-950/60 p-2.5 rounded-lg border border-slate-800/50">${src.folder_name}</div>
+                <div class="${folderBoxClass}">${src.folder_name}</div>
                 
                 <!-- Line 3: Action Controls in Order (Open | Active Pill | Disable) -->
                 <div class="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/60">
                     <!-- 1. Open Button -->
-                    <button onclick="openSpecificPackageFolderByIndex('${ap.icao}', ${idx})" class="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold border border-slate-700 flex items-center gap-1.5 transition-all shadow-sm shrink-0 whitespace-nowrap" title="Open Folder">
-                        <i class="fa-solid fa-folder-open text-cyan-400"></i> Open
+                    <button onclick="openSpecificPackageFolderByIndex('${ap.icao}', ${idx})" class="${openBtnClass}" title="Open Folder">
+                        <i class="fa-solid fa-folder-open ${isDisabled ? 'text-slate-500' : 'text-cyan-400'}"></i> Open
                     </button>
                     
                     <!-- 2. Active / Disabled Status Pill -->
                     ${statusBadge}
                     
                     <!-- 3. Disable / Enable Button -->
-                    <button onclick="toggleSpecificPackageByIndex('${ap.icao}', ${idx})" class="px-2.5 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm shrink-0 whitespace-nowrap ${toggleBtnClass}" title="Toggle Enable/Disable">
-                        <i class="fa-solid ${isDisabled ? 'fa-power-off' : 'fa-ban'}"></i> ${toggleBtnText}
+                    <button onclick="toggleSpecificPackageByIndex('${ap.icao}', ${idx})" class="px-2.5 py-1.5 rounded-lg border text-xs flex items-center gap-1.5 transition-all shadow-sm shrink-0 whitespace-nowrap ${toggleBtnClass}" title="Toggle Enable/Disable">
+                        <i class="fa-solid ${toggleBtnIcon}"></i> ${toggleBtnText}
                     </button>
                 </div>
             </div>
