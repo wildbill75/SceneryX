@@ -438,22 +438,17 @@ class Api:
             if not os.path.exists(package_path):
                 return json.dumps({"status": "error", "message": "Package path not found"})
 
-            pkg_name_lower = os.path.basename(package_path).lower()
-
             if package_path.endswith('.disabled'):
                 new_path = package_path[:-9]
                 os.rename(package_path, new_path)
                 is_enabled = True
             else:
-                # Protect official Asobo / Microsoft sceneries from being disabled
-                if any(k in pkg_name_lower for k in ['asobo-airport-', 'microsoft-airport-', 'worldupdate', 'cityupdate']):
-                    return json.dumps({"status": "error", "message": "Official Microsoft / Asobo sceneries cannot be disabled."})
-
                 new_path = package_path + '.disabled'
                 os.rename(package_path, new_path)
                 is_enabled = False
 
             airports = run_scan()
+            return json.dumps({"status": "ok", "enabled": is_enabled, "new_path": new_path, "airports": airports}, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
 
