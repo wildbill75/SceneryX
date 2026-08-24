@@ -2563,12 +2563,21 @@ function openSimBriefModal(flight) {
     if (modal) modal.classList.remove('hidden');
 }
 
+function closeSimBriefModal() {
+    const modal = document.getElementById('simbrief-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
+
 function confirmSimBriefOptimization() {
     closeSimBriefModal();
     if (!currentSimBriefFlight || !window.pywebview) return;
 
+    const flightIcaos = currentSimBriefFlight.flight_icaos || [];
+
     const apiFn = window.pywebview.api.optimize_flight_mode || window.pywebview.api.optimize_flight;
-    apiFn.call(window.pywebview.api, JSON.stringify(currentSimBriefFlight.flight_icaos)).then(resStr => {
+    apiFn.call(window.pywebview.api, JSON.stringify(flightIcaos)).then(resStr => {
         try {
             const res = JSON.parse(resStr);
             if (res.status === 'ok' || res.status === 'success') {
@@ -2578,17 +2587,17 @@ function confirmSimBriefOptimization() {
 
                 updateFlightModeBannerUI({
                     active: true,
-                    origin: currentSimBriefFlight.origin.icao,
-                    destination: currentSimBriefFlight.destination.icao,
-                    disabled_count: res.disabled_count,
-                    icaos: currentSimBriefFlight.flight_icaos
+                    origin: currentSimBriefFlight.origin ? currentSimBriefFlight.origin.icao : '',
+                    destination: currentSimBriefFlight.destination ? currentSimBriefFlight.destination.icao : '',
+                    disabled_count: res.disabled_count || 0,
+                    icaos: flightIcaos
                 });
 
                 filterAirports();
 
                 showCustomModal(
                     'Flight Scenery Optimization Active 🚀',
-                    `Successfully optimized sceneries for flight ${currentSimBriefFlight.origin.icao} → ${currentSimBriefFlight.destination.icao}.\n\n${res.disabled_count} non-route 3rd-party sceneries disabled. MSFS Content.xml updated. Enjoy your flight!`,
+                    `Successfully optimized sceneries for flight.\n\n${res.disabled_count || 0} non-route 3rd-party sceneries disabled. MSFS Content.xml updated. Enjoy your flight!`,
                     'success'
                 );
             } else {
