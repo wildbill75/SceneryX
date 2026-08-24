@@ -462,6 +462,10 @@ async function loadAirportsData() {
                 if (settingsStr) {
                     currentSettings = JSON.parse(settingsStr);
                     loadSimBriefSettingsUI();
+                    const st = currentSettings.settings || currentSettings;
+                    if (st && st.flight_mode) {
+                        updateFlightModeBannerUI(st.flight_mode);
+                    }
                 }
             } catch(e) {
                 console.warn("Could not load settings on startup:", e);
@@ -2623,6 +2627,7 @@ function updateFlightModeBannerUI(flightMode) {
     const banner = document.getElementById('sb-active-banner');
     const disabledCount = document.getElementById('sb-disabled-count');
     const routeSummary = document.getElementById('sb-route-summary');
+    const importBtn = document.getElementById('sb-import-btn');
 
     if (currentFlightMode && currentFlightMode.active) {
         if (badge) {
@@ -2634,12 +2639,22 @@ function updateFlightModeBannerUI(flightMode) {
         if (routeSummary && currentFlightMode.icaos) {
             routeSummary.innerText = currentFlightMode.icaos.join(' ➔ ');
         }
+        if (importBtn) {
+            importBtn.className = "w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-red-500/30 via-amber-500/30 to-orange-500/30 hover:from-red-500/40 hover:to-orange-500/40 border border-amber-500/60 text-amber-200 font-extrabold text-xs transition-all flex items-center justify-center gap-2 shadow-md shadow-amber-500/10 active:scale-98 cursor-pointer";
+            importBtn.onclick = function() { restoreAllFlightSceneriesUI(); };
+            importBtn.innerHTML = `<i class="fa-solid fa-power-off text-amber-400"></i> <span>Exit Flight Mode & Restore Sceneries</span>`;
+        }
     } else {
         if (badge) {
             badge.className = "text-[9px] font-bold font-mono px-2 py-0.5 rounded-full bg-slate-900 text-slate-400 border border-slate-800";
             badge.innerText = "INACTIVE";
         }
         if (banner) banner.classList.add('hidden');
+        if (importBtn) {
+            importBtn.className = "w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 text-amber-300 font-extrabold text-xs transition-all flex items-center justify-center gap-2 shadow-sm shadow-amber-500/10 active:scale-98 cursor-pointer";
+            importBtn.onclick = function() { triggerSimBriefImport(); };
+            importBtn.innerHTML = `<i id="sb-import-icon" class="fa-solid fa-cloud-arrow-down text-amber-400"></i> <span>Import Active SimBrief OFP</span>`;
+        }
     }
 }
 
