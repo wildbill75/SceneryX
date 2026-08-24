@@ -637,6 +637,7 @@ def run_scan():
     scan_paths_cfg = settings.get("scan_paths", [])
 
     content_xml_status = {}
+    content_xml_packages = []
     content_xml_path = r'C:\Users\Bertrand\AppData\Local\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\ThirdBuk\Content.xml'
     if os.path.exists(content_xml_path):
         try:
@@ -654,6 +655,8 @@ def run_scan():
                     content_xml_status[folder_norm] = is_active
                 else:
                     content_xml_status[folder_norm] = content_xml_status[folder_norm] or is_active
+
+                content_xml_packages.append((pkg_name, clean_folder, not is_active))
         except Exception:
             pass
 
@@ -682,6 +685,14 @@ def run_scan():
                         all_packages.append((category_label, item, ipath, is_disabled))
             except Exception:
                 pass
+
+    # Dynamic discovery of StreamedPackages & Official packages listed in Content.xml
+    existing_norms = {re.sub(r'^(community|official)?(fs20|fs24)?-?', '', (f[:-9] if f.endswith('.disabled') else f).lower()) for _, f, _, _ in all_packages}
+    for pkg_name, clean_f, is_dis in content_xml_packages:
+        fn_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_f.lower())
+        if fn_norm not in existing_norms:
+            all_packages.append(("MSFS 2024 - StreamedPackages", clean_f, "", is_dis))
+            existing_norms.add(fn_norm)
 
     detected_map = {}
 
@@ -914,10 +925,10 @@ def run_scan():
             for s in item['all_sources']
         )
 
-        # 3. Clean up all_sources: if physical local installation exists, purge StreamedPackages entries for drawer UI
-        has_physical_install = any('streamed' not in s['source_folder'].lower() for s in item['all_sources'])
+        # 3. Clean up all_sources: if physical local installation exists (non-streamed and non-default), purge StreamedPackages entries for drawer UI
+        has_physical_install = any('streamed' not in s.get('source_folder', '').lower() and 'default' not in s.get('source_folder', '').lower() for s in item['all_sources'])
         if has_physical_install:
-            item['all_sources'] = [s for s in item['all_sources'] if 'streamed' not in s['source_folder'].lower()]
+            item['all_sources'] = [s for s in item['all_sources'] if 'streamed' not in s.get('source_folder', '').lower()]
 
         if item['all_sources']:
             def get_package_score(s):
