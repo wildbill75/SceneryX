@@ -258,7 +258,9 @@ async function executeFlightOptimizer() {
             const res = JSON.parse(resRaw);
             if (res.status === 'ok') {
                 isFlightOptimizerActive = true;
-                allAirportsData = res.airports;
+                if (res.airports && res.airports.length > 0) {
+                    allAirportsData = res.airports;
+                }
                 updateStats(allAirportsData);
                 updateFlightOptimizerUI();
                 filterAirports();
@@ -2618,7 +2620,9 @@ function confirmSimBriefOptimization() {
         try {
             const res = JSON.parse(resStr);
             if (res.status === 'ok' || res.status === 'success') {
-                allAirportsData = res.airports || [];
+                if (res.airports && res.airports.length > 0) {
+                    allAirportsData = res.airports;
+                }
 
                 updateFlightModeBannerUI({
                     active: true,

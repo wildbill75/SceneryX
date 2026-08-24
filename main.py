@@ -526,12 +526,10 @@ class Api:
             # Update MSFS Native Content.xml (UserDisabled / Activated)
             update_msfs_content_xml(keep_icaos=keep_icaos, restore_all=False)
 
-            updated_airports = run_scan()
             return json.dumps({
                 "status": "ok",
                 "enabled_count": enabled_count,
-                "disabled_count": disabled_count,
-                "airports": updated_airports
+                "disabled_count": disabled_count
             }, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
@@ -570,11 +568,9 @@ class Api:
             # Update MSFS Native Content.xml to restore all UserDisabled packages back to Activated
             update_msfs_content_xml(restore_all=True)
 
-            updated_airports = run_scan()
             return json.dumps({
                 "status": "ok",
-                "re_enabled_count": re_enabled_count,
-                "airports": updated_airports
+                "re_enabled_count": re_enabled_count
             }, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
