@@ -1226,30 +1226,48 @@ function showAirportDetails(ap) {
             ? 'px-2.5 py-1.5 rounded-lg bg-slate-950/60 text-slate-500 border border-slate-800/40 text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 whitespace-nowrap'
             : 'px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold border border-slate-700 flex items-center gap-1.5 transition-all shadow-sm shrink-0 whitespace-nowrap';
 
+        const isAsoboPkg = (cat === 'ASOBO' || src.is_asobo_official || src.vendor === 'Microsoft / Asobo' || (src.folder_name && (src.folder_name.toLowerCase().includes('asobo-airport-') || src.folder_name.toLowerCase().includes('microsoft-airport-'))));
         const isDefaultPkg = (cat === 'DEFAULT' || src.pricing_type === 'Default' || (src.folder_name && src.folder_name.startsWith('msfs-default-')));
 
-        const actionControlsHtml = isDefaultPkg ? `
-            <div class="flex items-center justify-center w-full pt-1 border-t border-slate-800/60">
-                <span class="text-xs font-mono font-bold px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40">
-                    🔵 Built-in Procedural MSFS Airport
-                </span>
-            </div>
-        ` : `
-            <div class="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/60">
-                <!-- 1. Open Button -->
-                <button onclick="openSpecificPackageFolderByIndex('${ap.icao}', ${idx})" class="${openBtnClass}" title="Open Folder">
-                    <i class="fa-solid fa-folder-open ${isDisabled ? 'text-slate-500' : 'text-cyan-400'}"></i> Open
-                </button>
-                
-                <!-- 2. Active / Disabled Status Pill -->
-                ${statusBadge}
-                
-                <!-- 3. Disable / Enable Button -->
-                <button onclick="toggleSpecificPackageByIndex('${ap.icao}', ${idx})" class="px-2.5 py-1.5 rounded-lg border text-xs flex items-center gap-1.5 transition-all shadow-sm shrink-0 whitespace-nowrap ${toggleBtnClass}" title="Toggle Enable/Disable">
-                    <i class="fa-solid ${toggleBtnIcon}"></i> ${toggleBtnText}
-                </button>
-            </div>
-        `;
+        let actionControlsHtml = '';
+
+        if (isDefaultPkg) {
+            actionControlsHtml = `
+                <div class="flex items-center justify-center w-full pt-1 border-t border-slate-800/60">
+                    <span class="text-xs font-mono font-bold px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40">
+                        🔵 Built-in Procedural MSFS Airport
+                    </span>
+                </div>
+            `;
+        } else if (isAsoboPkg && !isDisabled) {
+            actionControlsHtml = `
+                <div class="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/60">
+                    <button onclick="openSpecificPackageFolderByIndex('${ap.icao}', ${idx})" class="${openBtnClass}" title="Open Folder">
+                        <i class="fa-solid fa-folder-open text-cyan-400"></i> Open
+                    </button>
+                    <span class="text-xs font-mono font-bold px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 whitespace-nowrap">
+                        🟢 Official Asobo Handcrafted
+                    </span>
+                </div>
+            `;
+        } else {
+            actionControlsHtml = `
+                <div class="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/60">
+                    <!-- 1. Open Button -->
+                    <button onclick="openSpecificPackageFolderByIndex('${ap.icao}', ${idx})" class="${openBtnClass}" title="Open Folder">
+                        <i class="fa-solid fa-folder-open ${isDisabled ? 'text-slate-500' : 'text-cyan-400'}"></i> Open
+                    </button>
+                    
+                    <!-- 2. Active / Disabled Status Pill -->
+                    ${statusBadge}
+                    
+                    <!-- 3. Disable / Enable Button -->
+                    <button onclick="toggleSpecificPackageByIndex('${ap.icao}', ${idx})" class="px-2.5 py-1.5 rounded-lg border text-xs flex items-center gap-1.5 transition-all shadow-sm shrink-0 whitespace-nowrap ${toggleBtnClass}" title="Toggle Enable/Disable">
+                        <i class="fa-solid ${toggleBtnIcon}"></i> ${toggleBtnText}
+                    </button>
+                </div>
+            `;
+        }
 
         const itemHtml = `
             <div class="p-3.5 rounded-xl transition-all space-y-2.5 ${cardBgClass}">
