@@ -894,10 +894,11 @@ def run_scan():
         
         # Check if this package is a fix/patch or a model library/interior/mesh addon rather than a main scenery
         m_title_lower = manifest_title.lower() if manifest_title else ""
+        clean_hint = pkg_order_hint.replace('bespoke_airport_patch', '').replace('bespoke_airport', '')
         is_fix_patch = (
             any(re.search(rf'\b{re.escape(k)}\b', fn_lower) for k in FIX_PATCH_KEYWORDS)
             or any(fn_lower.endswith(f"_{k}") or fn_lower.endswith(f"-{k}") for k in FIX_PATCH_KEYWORDS)
-            or any(k in pkg_order_hint for k in ['patch', 'fix', 'enhancement', 'mod', 'correction'])
+            or any(k in clean_hint for k in ['patch', 'fix', 'enhancement', 'mod', 'correction'])
             or any(k in m_title_lower for k in ['fix', 'patch', 'enhancement', 'flatten', 'correction'])
         )
         is_addon_package = is_fix_patch or any(k in fn_lower for k in ADDON_LIBRARY_KEYWORDS)
