@@ -699,8 +699,16 @@ function createCustomIcon(ap) {
     else if (cat === 'PAYWARE') color = '#a855f7'; // Payware = Neon Purple
     else if (cat === 'DEFAULT') color = '#3b82f6'; // Default MSFS = Soft Royal Blue
 
+    // Check if airport has at least one active Fix/Patch!
+    const hasActiveFix = ap.all_sources && ap.all_sources.some(s => s.is_fix_patch && !s.is_disabled);
+
     let strokeColor = ap.has_conflict ? '#ef4444' : '#ffffff';
     let strokeWidth = ap.has_conflict ? '2' : '1.2';
+
+    if (hasActiveFix) {
+        strokeColor = '#10b981'; // Emerald Green stroke outline for airports with active Fix/Patch!
+        strokeWidth = '2.2';
+    }
 
     if (isApDisabled && cat !== 'DEFAULT') {
         color = '#475569'; // Slate 600 Matte Gray fill
@@ -712,12 +720,12 @@ function createCustomIcon(ap) {
     const isCircleShape = (cat === 'DEFAULT');
 
     const svgIcon = isCircleShape ? `
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="drop-shadow-md">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="${hasActiveFix ? 'drop-shadow-[0_0_8px_rgba(16,185,129,0.9)]' : 'drop-shadow-md'}">
             <circle cx="12" cy="12" r="7.5" fill="${color}" stroke="${strokeColor}" stroke-width="${strokeWidth}" />
             <circle cx="12" cy="12" r="2.5" fill="#ffffff" opacity="0.9" />
         </svg>
     ` : `
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="drop-shadow-md">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="${hasActiveFix ? 'drop-shadow-[0_0_8px_rgba(16,185,129,0.9)]' : 'drop-shadow-md'}">
             <path d="M12 2l2.9 6.26 6.9.83-5.2 4.7 1.4 6.84L12 17.1 5.9 20.63l1.4-6.84-5.2-4.7 6.9-.83L12 2z" 
                   fill="${color}" stroke="${strokeColor}" stroke-width="${strokeWidth}" stroke-linejoin="round"/>
         </svg>
@@ -1326,12 +1334,12 @@ function showAirportDetails(ap) {
             <div class="pt-4 border-t border-slate-800/80 space-y-3">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
-                        <i class="fa-solid fa-wrench text-cyan-400 text-xs"></i>
+                        <i class="fa-solid fa-wrench text-emerald-400 text-xs"></i>
                         <span class="text-xs font-bold uppercase tracking-wider text-slate-300">Available Fixes & Overlays</span>
                     </div>
-                    <span class="text-[10px] font-mono text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/20 font-semibold">Stackable</span>
+                    <span class="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 font-semibold">Stackable</span>
                 </div>
-                <div class="space-y-2">
+                <div class="space-y-2.5">
         `;
 
         fixSources.forEach((src) => {
@@ -1339,40 +1347,49 @@ function showAirportDetails(ap) {
             const isDisabled = !!src.is_disabled;
             const isActive = !isDisabled;
             const pkgPath = src.package_path || src.folder_name;
+            const openBtnClass = 'px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold border border-slate-700 flex items-center gap-1.5 transition-all shadow-sm shrink-0 whitespace-nowrap cursor-pointer';
 
             if (isActive) {
                 html += `
-                    <div class="p-3 rounded-xl border border-cyan-500/60 bg-cyan-500/10 transition-all space-y-2">
+                    <div onclick="toggleFixPatchPackage('${pkgPath}', '${ap.icao}')" class="p-3.5 rounded-xl border-2 border-emerald-500/80 bg-emerald-500/10 shadow-lg shadow-emerald-500/10 cursor-pointer transition-all space-y-2.5 group">
                         <div class="flex items-center justify-between">
                             <div class="flex items-center gap-2 min-w-0 flex-1">
-                                <i class="fa-solid fa-puzzle-piece text-cyan-400 text-xs shrink-0"></i>
+                                <i class="fa-solid fa-circle-dot text-emerald-400 text-sm shrink-0"></i>
                                 <span class="text-xs font-bold text-white truncate min-w-0">${src.folder_name}</span>
+                                <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shrink-0 whitespace-nowrap">Fix / Overlay</span>
                             </div>
-                            <button onclick="toggleFixPatchPackage('${pkgPath}', '${ap.icao}')" class="px-3 py-1 rounded-full bg-cyan-400 text-slate-950 font-black text-xs hover:bg-cyan-300 transition-all shadow-sm cursor-pointer shrink-0">
-                                Enabled
-                            </button>
+                            <span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shrink-0 whitespace-nowrap">Active</span>
                         </div>
-                        <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 pt-0.5">
-                            <span>${src.source_folder} ${src.size_str ? `• ${src.size_str}` : ''}</span>
-                            <button onclick="openSpecificPackageFolderByIndex('${ap.icao}', ${idx})" class="text-slate-300 hover:text-white flex items-center gap-1 cursor-pointer">
-                                <i class="fa-solid fa-folder-open text-cyan-400"></i> Open
+
+                        <div class="text-[11px] font-mono text-slate-300 bg-slate-950/70 border border-slate-800 p-2 rounded-lg break-all">
+                            ${src.folder_name}
+                        </div>
+
+                        <div class="flex items-center justify-between text-xs pt-0.5">
+                            <span class="text-[11px] font-mono text-slate-400">${src.source_folder} ${src.size_str ? `• ${src.size_str}` : ''}</span>
+                            <button onclick="event.stopPropagation(); openSpecificPackageFolderByIndex('${ap.icao}', ${idx})" class="${openBtnClass}" title="Open Folder">
+                                <i class="fa-solid fa-folder-open text-cyan-400"></i> Open Folder
                             </button>
                         </div>
                     </div>
                 `;
             } else {
                 html += `
-                    <div class="p-3 rounded-xl border border-slate-800 bg-slate-900/60 transition-all space-y-2 group">
+                    <div onclick="toggleFixPatchPackage('${pkgPath}', '${ap.icao}')" class="p-3.5 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-800/80 hover:border-slate-700 cursor-pointer transition-all space-y-2 group">
                         <div class="flex items-center justify-between">
                             <div class="flex items-center gap-2 min-w-0 flex-1">
-                                <i class="fa-solid fa-puzzle-piece text-slate-500 group-hover:text-cyan-400 text-xs transition-colors shrink-0"></i>
-                                <span class="text-xs font-bold text-slate-400 group-hover:text-slate-200 truncate transition-colors min-w-0">${src.folder_name}</span>
+                                <i class="fa-regular fa-circle text-slate-500 group-hover:text-emerald-400 text-sm transition-colors shrink-0"></i>
+                                <span class="text-xs font-bold text-slate-300 group-hover:text-white truncate transition-colors min-w-0">${src.folder_name}</span>
+                                <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 shrink-0 whitespace-nowrap">Fix / Overlay</span>
                             </div>
-                            <button onclick="toggleFixPatchPackage('${pkgPath}', '${ap.icao}')" class="px-3 py-1 rounded-full bg-slate-800 text-slate-400 font-bold text-xs hover:bg-slate-700 hover:text-white border border-slate-700 transition-all cursor-pointer shrink-0">
-                                Disabled
-                            </button>
+                            <span class="text-[10px] font-mono text-slate-500 group-hover:text-slate-300 shrink-0 whitespace-nowrap">Click to Activate</span>
                         </div>
-                        <div class="flex items-center justify-between text-[11px] font-mono text-slate-500 pt-0.5">
+
+                        <div class="text-[11px] font-mono text-slate-400 group-hover:text-slate-300 bg-slate-950/40 border border-slate-800/60 p-2 rounded-lg break-all transition-colors">
+                            ${src.folder_name}
+                        </div>
+
+                        <div class="flex items-center justify-between text-xs pt-0.5 text-slate-500 font-mono text-[11px]">
                             <span>${src.source_folder} ${src.size_str ? `• ${src.size_str}` : ''}</span>
                         </div>
                     </div>
