@@ -1055,7 +1055,7 @@ function showAirportDetails(ap) {
             actBadge.innerText = "Default MSFS Airport";
         } else if (cat === 'ASOBO') {
             actBadge.className = "px-3 py-1 rounded-full text-xs font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40";
-            actBadge.innerText = "Core MSFS Base";
+            actBadge.innerText = ap.world_update_name || "Asobo Sim Update";
         } else {
             actBadge.className = "px-3 py-1 rounded-full text-xs font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40";
             actBadge.innerText = "Custom Addon Active";
@@ -1252,13 +1252,14 @@ function showAirportDetails(ap) {
                 </div>
             `;
         } else if (isAsoboPkg && !hasConflict && !isDisabled) {
+            const updateLabel = src.world_update_name || ap.world_update_name || "Asobo World Update";
             actionControlsHtml = `
                 <div class="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/60">
                     <button onclick="openSpecificPackageFolderByIndex('${ap.icao}', ${idx})" class="${openBtnClass}" title="Open Folder">
                         <i class="fa-solid fa-folder-open text-cyan-400"></i> Open
                     </button>
                     <span class="text-xs font-mono font-bold px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 whitespace-nowrap">
-                        Official Asobo Handcrafted
+                        ${updateLabel}
                     </span>
                 </div>
             `;

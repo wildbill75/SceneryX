@@ -251,6 +251,139 @@ ASOBO_DELUXE_ICAOS = {'EDHL', 'EGPR', 'LECO', 'LSZA', 'KDEN'}
 # Premium Deluxe Specific Handcrafted Airports
 ASOBO_PREMIUM_DELUXE_ICAOS = {'KSFO', 'FACT', 'HECA', 'OMAA', 'RJTH', 'EHAM', 'EGLL', 'KORD', 'LEMD', 'OMDB'}
 
+WORLD_UPDATES_MAP = {
+    # World Update I: Japan
+    'PAFR': 'World Update I: Japan', 'RJFU': 'World Update I: Japan', 'RJCK': 'World Update I: Japan',
+    'RJTH': 'World Update I: Japan', 'RJX8': 'World Update I: Japan', 'ROKR': 'World Update I: Japan',
+    'RORS': 'World Update I: Japan', 'RJTT': 'World Update I: Japan', 'RJAA': 'World Update I: Japan',
+
+    # World Update II: USA
+    'KATL': 'World Update II: USA', 'KFHR': 'World Update II: USA', 'KDFW': 'World Update II: USA',
+    'C53': 'World Update II: USA', 'KSEAT': 'World Update II: USA', 'KFRH': 'World Update II: USA',
+
+    # World Update III: UK & Ireland
+    'EGPR': 'World Update III: UK & Ireland', 'EGGP': 'World Update III: UK & Ireland',
+    'EGHC': 'World Update III: UK & Ireland', 'EGCB': 'World Update III: UK & Ireland',
+    'EG78': 'World Update III: UK & Ireland', 'EGLL': 'World Update III: UK & Ireland',
+    'EGBB': 'World Update III: UK & Ireland', 'EGJJ': 'World Update III: UK & Ireland',
+
+    # World Update IV: France & Benelux
+    'LFHM': 'World Update IV: France & Benelux', 'EHRD': 'World Update IV: France & Benelux',
+    'LFPG': 'World Update IV: France & Benelux', 'LFLB': 'World Update IV: France & Benelux',
+    'LFMN': 'World Update IV: France & Benelux', 'EHAM': 'World Update IV: France & Benelux',
+    'EBBR': 'World Update IV: France & Benelux', 'LFPO': 'World Update IV: France & Benelux',
+
+    # World Update V: Nordics
+    'EKRN': 'World Update V: Nordics', 'BIIS': 'World Update V: Nordics', 'ESSA': 'World Update V: Nordics',
+    'ENSB': 'World Update V: Nordics', 'EFVA': 'World Update V: Nordics', 'EKCH': 'World Update V: Nordics',
+    'ENGM': 'World Update V: Nordics', 'BIKF': 'World Update V: Nordics',
+
+    # World Update VI: DACH (Germany, Austria, Switzerland)
+    'LOWK': 'World Update VI: DACH', 'EDHL': 'World Update VI: DACH',
+    'LSZR': 'World Update VI: DACH', 'EDDS': 'World Update VI: DACH',
+    'EDDB': 'World Update VI: DACH', 'EDDF': 'World Update VI: DACH',
+    'LOWW': 'World Update VI: DACH', 'LSZH': 'World Update VI: DACH',
+    'LOWI': 'World Update VI: DACH', 'LSZA': 'World Update VI: DACH',
+
+    # World Update VII: Australia
+    'YMBT': 'World Update VII: Australia', 'YLRE': 'World Update VII: Australia',
+    'YPBO': 'World Update VII: Australia', 'YSHL': 'World Update VII: Australia',
+    'YSSY': 'World Update VII: Australia', 'YBBN': 'World Update VII: Australia',
+
+    # World Update VIII: Iberia (Spain & Portugal)
+    'LPMA': 'World Update VIII: Iberia (Madeira)', 'LESU': 'World Update VIII: Iberia',
+    'LPPI': 'World Update VIII: Iberia', 'LPFR': 'World Update VIII: Iberia',
+    'LECO': 'World Update VIII: Iberia', 'LEMD': 'World Update VIII: Iberia',
+    'LEBL': 'World Update VIII: Iberia', 'LPPT': 'World Update VIII: Iberia',
+    'GCXO': 'World Update VIII: Iberia', 'GCTS': 'World Update VIII: Iberia',
+
+    # World Update IX: Italy & Malta
+    'LICJ': 'World Update IX: Italy & Malta', 'LILO': 'World Update IX: Italy & Malta',
+    'LIRJ': 'World Update IX: Italy & Malta', 'LIPB': 'World Update IX: Italy & Malta',
+    'LIRF': 'World Update IX: Italy & Malta', 'LIMC': 'World Update IX: Italy & Malta',
+    'LMML': 'World Update IX: Italy & Malta',
+
+    # World Update X: USA
+    'KDEN': 'World Update X: USA', 'KSFO': 'World Update X: USA',
+
+    # World Update XI: Canada
+    'CYCG': 'World Update XI: Canada', 'CYYZ': 'World Update XI: Canada',
+    'CYVR': 'World Update XI: Canada', 'CYHU': 'World Update XI: Canada',
+
+    # World Update XII: New Zealand
+    'NZGS': 'World Update XII: New Zealand', 'NZMJ': 'World Update XII: New Zealand',
+    'NZQE': 'World Update XII: New Zealand', 'NZRO': 'World Update XII: New Zealand',
+    'NZTL': 'World Update XII: New Zealand', 'NZWR': 'World Update XII: New Zealand',
+    'NZWS': 'World Update XII: New Zealand', 'T004': 'World Update XII: New Zealand',
+    'NZQN': 'World Update XII: New Zealand', 'NZAA': 'World Update XII: New Zealand',
+
+    # World Update XIII: Oceania, Hawaii, Antarctica
+    'SCIP': 'World Update XIII: Oceania', 'PHKO': 'World Update XIII: Oceania',
+    'AGGN': 'World Update XIII: Oceania', 'NTTB': 'World Update XIII: Oceania',
+    'NTTM': 'World Update XIII: Oceania', 'NFFN': 'World Update XIII: Oceania',
+    'PLPA': 'World Update XIII: Oceania', 'AYIN': 'World Update XIII: Oceania',
+
+    # World Update XIV: Central & Eastern Europe
+    'LKKV': 'World Update XIV: Central Europe', 'LZTT': 'World Update XIV: Central Europe',
+    'LHPP': 'World Update XIV: Central Europe', 'LJZA': 'World Update XIV: Central Europe',
+    'LDRI': 'World Update XIV: Central Europe', 'LQPD': 'World Update XIV: Central Europe',
+    'EPWA': 'World Update XIV: Central Europe', 'LKPR': 'World Update XIV: Central Europe',
+
+    # World Update XV: Nordics II & Greenland
+    'BIAR': 'World Update XV: Nordics II', 'ENRA': 'World Update XV: Nordics II',
+    'ESNQ': 'World Update XV: Nordics II', 'EFIV': 'World Update XV: Nordics II',
+    'ENLK': 'World Update XV: Nordics II', 'ENBR': 'World Update XV: Nordics II',
+
+    # World Update XVI: Caribbean
+    'MUCL': 'World Update XVI: Caribbean', 'MDPP': 'World Update XVI: Caribbean',
+    'MTCA': 'World Update XVI: Caribbean', 'MKJS': 'World Update XVI: Caribbean',
+    'TTCP': 'World Update XVI: Caribbean', 'MYEH': 'World Update XVI: Caribbean',
+    'TFFS': 'World Update XVI: Caribbean', 'TNCM': 'World Update XVI: Caribbean',
+
+    # World Update XVII: UK & Ireland II
+    'EGLF': 'World Update XVII: UK & Ireland II', 'EGSS': 'World Update XVII: UK & Ireland II',
+    'EICK': 'World Update XVII: UK & Ireland II', 'EGPB': 'World Update XVII: UK & Ireland II',
+    'EGFF': 'World Update XVII: UK & Ireland II',
+
+    # World Update XVIII: DACH II
+    'LOWS': 'World Update XVIII: DACH II', 'EDDM': 'World Update XVIII: DACH II',
+    'LSZB': 'World Update XVIII: DACH II', 'EDDN': 'World Update XVIII: DACH II',
+
+    # City Updates
+    'EGLC': 'City Update I: London', 'LFPN': 'City Update II: France',
+    'EDDS': 'City Update III: Germany', 'LSGG': 'City Update IV: Switzerland',
+
+    # Base Game Edition Handcrafted
+    'KORD': 'Premium Deluxe Base', 'OMDB': 'Premium Deluxe Base',
+    'FACT': 'Premium Deluxe Base', 'HECA': 'Premium Deluxe Base',
+    'OMAA': 'Premium Deluxe Base', 'KLAX': 'Standard Edition Base',
+    'SEQM': 'Standard Edition Base', 'NZMF': 'Standard Edition Base',
+    'VQPR': 'Standard Edition Base', 'SBGL': 'Standard Edition Base',
+    'KASE': 'Standard Edition Base', 'LXGB': 'Standard Edition Base',
+    'TFFJ': 'Standard Edition Base', 'WX53': 'Standard Edition Base',
+    'SPGL': 'Standard Edition Base', 'LFLJ': 'Standard Edition Base'
+}
+
+def get_world_update_name(icao, folder_name=""):
+    if icao in WORLD_UPDATES_MAP:
+        return WORLD_UPDATES_MAP[icao]
+    fn = (folder_name or "").lower()
+    if "iberia" in fn: return "World Update VIII: Iberia"
+    if "japan" in fn: return "World Update I: Japan"
+    if "nordic" in fn: return "World Update V: Nordics"
+    if "france" in fn or "benelux" in fn: return "World Update IV: France & Benelux"
+    if "italy" in fn or "malta" in fn: return "World Update IX: Italy & Malta"
+    if "caribbean" in fn: return "World Update XVI: Caribbean"
+    if "oceania" in fn: return "World Update XIII: Oceania"
+    if "australia" in fn: return "World Update VII: Australia"
+    if "newzealand" in fn: return "World Update XII: New Zealand"
+    if "canada" in fn: return "World Update XI: Canada"
+    if "uk" in fn or "ireland" in fn: return "World Update III: UK & Ireland"
+    if "germany" in fn or "dach" in fn or "austria" in fn: return "World Update VI: DACH"
+    if "cityupdate" in fn: return "Asobo City Update"
+    if "worldupdate" in fn: return "Asobo World Update"
+    return "Asobo Sim Update"
+
 SPECIAL_BUNDLE_MAP = {
     # France VFR Paris VFR Airports (LFPB Le Bourget & LFPG are Asobo, remaining 7 are France VFR Payware)
     'francevfr-airport-pidf-parisvfrairports': ['LFPN', 'LFPV', 'LFPQ', 'LFPT', 'LFPK', 'LFPL', 'LFPM'],
@@ -880,7 +1013,8 @@ def run_scan():
                 "is_addon": is_addon_package,
                 "is_fix_patch": is_fix_patch,
                 "version": pkg_version,
-                "size_str": pkg_size_str
+                "size_str": pkg_size_str,
+                "world_update_name": get_world_update_name(icao, folder_name)
             }
 
             if icao not in detected_map:
@@ -983,7 +1117,8 @@ def run_scan():
                 "is_addon": False,
                 "is_fix_patch": False,
                 "version": "",
-                "size_str": "Streamed"
+                "size_str": "Streamed",
+                "world_update_name": get_world_update_name(h_u, f"fs24-asobo-airport-{h_icao.lower()}")
             }
             if h_u not in detected_map:
                 ap_info = airports[h_u]
@@ -1114,6 +1249,7 @@ def run_scan():
             item['match_source'] = primary['match_source']
             item['version'] = primary.get('version', '')
             item['size_str'] = primary.get('size_str', '')
+            item['world_update_name'] = primary.get('world_update_name') or get_world_update_name(icao, primary['folder_name'])
 
         # Active sources calculation
         active_sources = [s for s in item['all_sources'] if not s.get('is_disabled')]
