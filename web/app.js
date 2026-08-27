@@ -53,27 +53,24 @@ function filterByAirline(airlineName) {
         return;
     }
 
-    // Check matching installed destination sceneries for the new airline
+    // Get all real-world destination ICAOs for this airline from origin
     const destIcaos = (originAp.routes && originAp.routes[airlineName]) || [];
-    const matchingInstalledDests = allAirportsData.filter(a => a.icao !== originAp.icao && destIcaos.includes(a.icao));
 
-    if (matchingInstalledDests.length === 0) {
-        // 0 installed destinations for this airline route -> reset map, clear top filter, pop modal!
+    if (destIcaos.length === 0) {
         filterAirports();
         updateFilterUI();
         showAirportDetails(originAp);
 
-        const destText = destIcaos.length > 0 ? ` (${destIcaos.join(', ')})` : '';
         showCustomModal({
-            title: 'No Installed Destination',
-            message: `You don't have any addon airport (Payware/Freeware) in your scenery collection for ${airlineName} from ${originAp.icao}${destText}.`,
+            title: 'No Route Destinations',
+            message: `No scheduled route destination data found for ${airlineName} from ${originAp.icao}.`,
             type: 'info',
             confirmText: 'OK'
         });
         return;
     }
 
-    // Installed destination sceneries exist -> activate new airline filter!
+    // Activate airline filter!
     selectedAirline = airlineName;
     activeRouteOrigin = originAp;
     filterAirports();
@@ -920,15 +917,20 @@ function renderRouteLines(filteredAirports) {
     filteredAirports.forEach(ap => {
         if (!ap.lat || !ap.lon || ap.icao === activeRouteOrigin.icao) return;
 
+        // ONLY draw connecting arc lines to custom/handcrafted sceneries (Payware / Freeware / Asobo)!
+        // Default MSFS airports are displayed on the map as Blue Circle Dots without connecting lines.
+        const cat = getAirportCategory(ap);
+        if (cat === 'DEFAULT') return;
+
         const destLat = ap.lat;
         const destLon = ap.lon;
 
         const arcPoints = createBezierArcPoints(originLat, originLon, destLat, destLon, 30);
 
         const routeLine = L.polyline(arcPoints, {
-            color: '#64748b', // Discrete Slate Gray
-            weight: 1.2,      // Fine & thin
-            opacity: 0.5,     // Subtle / discrete
+            color: '#38bdf8', // Vibrant Sky Blue Arc
+            weight: 1.8,      // Clean & crisp
+            opacity: 0.8,     // High visibility
             smoothFactor: 1
         });
 
