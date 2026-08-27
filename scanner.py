@@ -1254,11 +1254,14 @@ def run_scan():
         # Active sources calculation
         active_sources = [s for s in item['all_sources'] if not s.get('is_disabled')]
 
-        # An airport is disabled ONLY if it has NO active sources at all
-        if has_asobo:
+        # If all installed custom/Asobo packages are disabled, fallback to Default MSFS
+        if len(active_sources) == 0:
+            item['pricing_type'] = 'Default'
+            item['vendor'] = 'Microsoft Flight Simulator (Default)'
+            item['is_addon'] = False
             item['is_disabled'] = False
         else:
-            item['is_disabled'] = (len(active_sources) == 0)
+            item['is_disabled'] = False
 
         # Detect TRUE Scenery Conflicts (multiple active PRIMARY main scenery packages)
         active_primary_installs = [s for s in item['all_sources'] if not s.get('is_disabled') and not s.get('is_addon') and not s.get('is_fix_patch')]

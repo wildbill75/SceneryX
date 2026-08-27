@@ -645,12 +645,12 @@ function getAirportPricingType(ap) {
 }
 
 function getAirportCategory(ap) {
-    // If all installed 3rd-party/Asobo packages for this airport are disabled, it falls back to Default MSFS!
-    const allSourcesDisabled = ap.all_sources && ap.all_sources.length > 0 && ap.all_sources.every(s => s.is_disabled);
-    if (allSourcesDisabled) return 'DEFAULT';
+    if (!ap) return 'DEFAULT';
+    if (ap.pricing_type === 'Default') return 'DEFAULT';
+    const nonDefaultSources = ap.all_sources ? ap.all_sources.filter(s => !(s.pricing_type === 'Default' || (s.folder_name && s.folder_name.startsWith('msfs-default-')))) : [];
+    if (nonDefaultSources.length === 0 || nonDefaultSources.every(s => s.is_disabled)) return 'DEFAULT';
 
     const pt = getAirportPricingType(ap);
-    if (pt === 'Default') return 'DEFAULT';
     if (pt === 'Asobo') return 'ASOBO';
     if (pt === 'Payware') return 'PAYWARE';
     return 'FREEWARE';
@@ -1233,8 +1233,9 @@ function showAirportDetails(ap) {
                         <i class="fa-regular fa-circle text-slate-500 group-hover:text-blue-400 text-sm transition-colors"></i>
                         <span class="text-xs font-bold text-slate-300 group-hover:text-white transition-colors">Default MSFS Base Airport</span>
                     </div>
-                    <span class="text-[10px] font-mono text-slate-500 group-hover:text-slate-400">Click to Select</span>
+                    <span class="text-[10px] font-mono text-slate-500 group-hover:text-slate-300 shrink-0 whitespace-nowrap">Click to Activate</span>
                 </div>
+
                 <p class="text-[11px] text-slate-500 pl-6">Built-in Procedural MSFS Base Scenery</p>
             </div>
         `;
@@ -1301,7 +1302,7 @@ function showAirportDetails(ap) {
                             <span class="text-xs font-bold text-slate-300 group-hover:text-white truncate transition-colors min-w-0">${titleLabel}</span>
                             ${isFixPatch ? `<span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shrink-0 whitespace-nowrap">Fix / Patch</span>` : ''}
                         </div>
-                        <span class="text-[10px] font-mono text-slate-500 group-hover:text-slate-400 shrink-0 whitespace-nowrap">Click to Select</span>
+                        <span class="text-[10px] font-mono text-slate-500 group-hover:text-slate-300 shrink-0 whitespace-nowrap">Click to Activate</span>
                     </div>
 
                     <div class="text-[11px] font-mono text-slate-400 group-hover:text-slate-300 bg-slate-950/40 border border-slate-800/60 p-2 rounded-lg break-all transition-colors">
@@ -1310,9 +1311,6 @@ function showAirportDetails(ap) {
 
                     <div class="flex items-center justify-between text-xs pt-0.5 text-slate-500 font-mono text-[11px]">
                         <span>${src.source_folder} ${src.size_str ? `• ${src.size_str}` : ''}</span>
-                        <span class="text-slate-400 group-hover:text-emerald-400 font-semibold transition-colors flex items-center gap-1">
-                            <i class="fa-solid fa-arrow-right text-[10px]"></i> Activate
-                        </span>
                     </div>
                 </div>
             `;
@@ -1447,12 +1445,14 @@ function openSpecificPackageFolderByIndex(icao, idx) {
     if (path) openSpecificPackageFolder(path);
 }
 
-function selectDefaultMSFSScenery(icao) {
+async function selectDefaultMSFSScenery(icao) {
     if (!selectedAirport || !selectedAirport.all_sources) return;
-    const activeSrc = selectedAirport.all_sources.find(s => !s.is_disabled && !(s.pricing_type === 'Default' || (s.folder_name && s.folder_name.startsWith('msfs-default-'))));
-    if (activeSrc) {
-        const pathOrName = activeSrc.package_path || activeSrc.folder_name;
-        if (pathOrName) toggleSpecificPackage(pathOrName, icao);
+    const activeSources = selectedAirport.all_sources.filter(s => !s.is_disabled && !(s.pricing_type === 'Default' || (s.folder_name && s.folder_name.startsWith('msfs-default-'))));
+    for (const src of activeSources) {
+        const pathOrName = src.package_path || src.folder_name;
+        if (pathOrName) {
+            await toggleSpecificPackage(pathOrName, icao);
+        }
     }
 }
 
