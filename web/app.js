@@ -1192,30 +1192,28 @@ function showAirportDetails(ap) {
         const isAddon = !!src.is_addon || isFixPatch;
 
         const cardBgClass = isDisabled 
-            ? 'bg-slate-950/40 border-slate-800/40 opacity-60 grayscale-[0.5]' 
+            ? 'bg-slate-900/70 border-slate-800/80 shadow-sm' 
             : `bg-slate-900/95 ${isAddon ? 'border-slate-800/60' : 'border-slate-700/80'} shadow-md`;
 
         const titleClass = isDisabled 
-            ? 'text-slate-500 font-semibold' 
+            ? 'text-slate-400 font-semibold' 
             : 'text-white font-bold';
 
         const folderBoxClass = isDisabled 
-            ? 'text-slate-500 line-through bg-slate-950/30 border-slate-800/30 font-mono text-xs p-2.5 rounded-lg border break-all' 
+            ? 'text-slate-400 line-through bg-slate-950/50 border-slate-800/50 font-mono text-xs p-2.5 rounded-lg border break-all' 
             : 'text-slate-200 font-bold bg-slate-950/70 border-slate-800 font-mono text-xs p-2.5 rounded-lg border break-all';
 
         const statusBadge = isDisabled 
-            ? `<span class="text-xs font-mono font-bold px-3 py-1 rounded-full bg-slate-950 text-slate-400 border border-slate-800/60 whitespace-nowrap">🔴 Disabled</span>`
+            ? `<span class="text-xs font-mono font-bold px-3 py-1 rounded-full bg-red-500/10 text-red-400 border border-red-500/30 whitespace-nowrap">🔴 Disabled</span>`
             : `<span class="text-xs font-mono font-bold px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 whitespace-nowrap">🟢 Active</span>`;
 
         const toggleBtnText = isDisabled ? 'Enable' : 'Disable';
         const toggleBtnIcon = isDisabled ? 'fa-power-off text-emerald-400' : 'fa-ban text-red-400';
         const toggleBtnClass = isDisabled 
-            ? 'bg-emerald-500/25 hover:bg-emerald-500/35 text-emerald-300 border-emerald-500/50 shadow-sm shadow-emerald-500/10 font-extrabold cursor-pointer' 
-            : 'bg-slate-800 hover:bg-red-500/20 text-slate-300 hover:text-red-300 border-slate-700 cursor-pointer';
+            ? 'bg-emerald-500/25 hover:bg-emerald-500/35 text-emerald-300 border-emerald-500/60 shadow-md shadow-emerald-500/20 font-extrabold cursor-pointer hover:scale-105 transition-all' 
+            : 'bg-slate-800 hover:bg-red-500/20 text-slate-300 hover:text-red-300 border-slate-700 cursor-pointer transition-all';
 
-        const openBtnClass = isDisabled
-            ? 'px-2.5 py-1.5 rounded-lg bg-slate-950/60 text-slate-500 border border-slate-800/40 text-xs font-semibold flex items-center gap-1.5 transition-all shrink-0 whitespace-nowrap'
-            : 'px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold border border-slate-700 flex items-center gap-1.5 transition-all shadow-sm shrink-0 whitespace-nowrap';
+        const openBtnClass = 'px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold border border-slate-700 flex items-center gap-1.5 transition-all shadow-sm shrink-0 whitespace-nowrap cursor-pointer';
 
         const hasConflict = ap.has_conflict || (ap.all_sources && ap.all_sources.length > 1);
         const isAsoboPkg = (src.is_asobo_official || src.vendor === 'Microsoft / Asobo' || (src.folder_name && (src.folder_name.toLowerCase().includes('asobo-airport-') || src.folder_name.toLowerCase().includes('microsoft-airport-'))));
@@ -1247,7 +1245,7 @@ function showAirportDetails(ap) {
                 <div class="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/60">
                     <!-- 1. Open Button -->
                     <button onclick="openSpecificPackageFolderByIndex('${ap.icao}', ${idx})" class="${openBtnClass}" title="Open Folder">
-                        <i class="fa-solid fa-folder-open ${isDisabled ? 'text-slate-500' : 'text-cyan-400'}"></i> Open
+                        <i class="fa-solid fa-folder-open text-cyan-400"></i> Open
                     </button>
                     
                     <!-- 2. Active / Disabled Status Pill -->
