@@ -803,6 +803,95 @@ class Api:
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
 
+    def select_scenery_option(self, icao, target_folder_name):
+        try:
+            if not icao or not target_folder_name:
+                return json.dumps({"status": "error", "message": "Missing arguments"})
+
+            content_xml_path = r'C:\Users\Bertrand\AppData\Local\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\ThirdBuk\Content.xml'
+
+            def disable_physical_package(p_path):
+                if not p_path or not os.path.exists(p_path):
+                    return
+                new_p = p_path
+                if not p_path.endswith('.disabled'):
+                    new_p = p_path + '.disabled'
+                    os.rename(p_path, new_p)
+                for mf in ['manifest.json', 'layout.json']:
+                    mf_norm = os.path.join(new_p, mf)
+                    mf_dis = os.path.join(new_p, mf + '.disabled')
+                    if os.path.exists(mf_norm):
+                        if os.path.exists(mf_dis):
+                            os.remove(mf_dis)
+                        os.rename(mf_norm, mf_dis)
+
+            def enable_physical_package(p_path):
+                if not p_path or not os.path.exists(p_path):
+                    return
+                new_p = p_path
+                if p_path.endswith('.disabled'):
+                    new_p = p_path[:-9]
+                    os.rename(p_path, new_p)
+                for mf in ['manifest.json', 'layout.json']:
+                    mf_dis = os.path.join(new_p, mf + '.disabled')
+                    mf_norm = os.path.join(new_p, mf)
+                    if os.path.exists(mf_dis):
+                        if os.path.exists(mf_norm):
+                            os.remove(mf_norm)
+                        os.rename(mf_dis, mf_norm)
+
+            target_clean = target_folder_name[:-9] if target_folder_name.lower().endswith('.disabled') else target_folder_name
+
+            if os.path.exists(content_xml_path):
+                import xml.etree.ElementTree as ET
+                tree = ET.parse(content_xml_path)
+                root = tree.getroot()
+                changed = False
+                seen = set()
+                to_remove = []
+
+                for p in list(root.findall('Package')):
+                    name = p.get('name', '')
+                    clean = name[:-9] if name.lower().endswith('.disabled') else name
+                    p.set('name', clean)
+
+                    if clean.lower() in seen:
+                        to_remove.append(p)
+                        changed = True
+                        continue
+                    seen.add(clean.lower())
+
+                    if target_clean != 'DEFAULT' and (clean.lower() == target_clean.lower() or target_clean.lower() in clean.lower()):
+                        p.set('active', 'Activated')
+                        changed = True
+                    elif icao.lower() in clean.lower():
+                        p.set('active', 'UserDisabled')
+                        changed = True
+
+                for p in to_remove:
+                    root.remove(p)
+
+                if changed:
+                    tree.write(content_xml_path, encoding='utf-8', xml_declaration=True)
+
+            scanned_airports = run_scan()
+            ap_obj = next((a for a in scanned_airports if a['icao'].upper() == icao.upper()), None)
+            if ap_obj and ap_obj.get('all_sources'):
+                for src in ap_obj['all_sources']:
+                    fn = src.get('folder_name', '')
+                    pkg_p = src.get('package_path', '')
+                    fn_clean = fn[:-9] if fn.lower().endswith('.disabled') else fn
+
+                    if target_clean != 'DEFAULT' and (fn_clean.lower() == target_clean.lower() or target_clean.lower() in fn_clean.lower()):
+                        enable_physical_package(pkg_p)
+                    else:
+                        disable_physical_package(pkg_p)
+
+            airports = run_scan()
+            return json.dumps({"status": "ok", "airports": airports}, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
     def optimize_flight(self, keep_icaos_json):
         return self.optimize_flight_mode(keep_icaos_json)
 

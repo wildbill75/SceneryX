@@ -1448,7 +1448,7 @@ async function selectDefaultMSFSScenery(icao) {
     if (!window.pywebview || isToggleInProgress || !icao) return;
     isToggleInProgress = true;
     try {
-        const resStr = await window.pywebview.api.disable_all_for_airport(icao);
+        const resStr = await window.pywebview.api.select_scenery_option(icao, 'DEFAULT');
         const res = JSON.parse(resStr);
         if (res.status === 'ok') {
             allAirportsData = res.airports;
@@ -1466,17 +1466,40 @@ async function selectDefaultMSFSScenery(icao) {
             showToast(`✓ Reverted to Default MSFS Base Airport`, 'info');
         }
     } catch (e) {
-        console.error("Failed to disable all for airport:", e);
+        console.error("Failed to select scenery option:", e);
     } finally {
         isToggleInProgress = false;
     }
 }
 
-function selectSceneryPackageByIndex(icao, idx) {
-    if (!selectedAirport || !selectedAirport.all_sources || !selectedAirport.all_sources[idx]) return;
+async function selectSceneryPackageByIndex(icao, idx) {
+    if (!selectedAirport || !selectedAirport.all_sources || !selectedAirport.all_sources[idx] || isToggleInProgress) return;
+    isToggleInProgress = true;
     const src = selectedAirport.all_sources[idx];
-    const pathOrName = src.package_path || src.folder_name;
-    if (pathOrName) toggleSpecificPackage(pathOrName, icao);
+    const targetFolder = src.folder_name;
+    try {
+        const resStr = await window.pywebview.api.select_scenery_option(icao, targetFolder);
+        const res = JSON.parse(resStr);
+        if (res.status === 'ok') {
+            allAirportsData = res.airports;
+            allAirportsData.forEach(ap => {
+                if (userRatingsMap[ap.icao] !== undefined) {
+                    ap.rating = userRatingsMap[ap.icao];
+                }
+            });
+            updateStats(allAirportsData);
+            filterAirports();
+            if (selectedAirport) {
+                const updatedAp = allAirportsData.find(a => a.icao === selectedAirport.icao);
+                if (updatedAp) showAirportDetails(updatedAp);
+            }
+            showToast(`✓ ${icao} Scenery Activated & Saved to Disk`, 'success');
+        }
+    } catch (e) {
+        console.error("Failed to select scenery option:", e);
+    } finally {
+        isToggleInProgress = false;
+    }
 }
 
 function closeDrawer() {
