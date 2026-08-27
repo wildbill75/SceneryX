@@ -1377,7 +1377,8 @@ function openSpecificPackageFolder(path) {
 
 function openSpecificPackageFolderByIndex(icao, idx) {
     if (!selectedAirport || !selectedAirport.all_sources || !selectedAirport.all_sources[idx]) return;
-    const path = selectedAirport.all_sources[idx].package_path;
+    const src = selectedAirport.all_sources[idx];
+    const path = src.package_path || src.folder_name;
     if (path) openSpecificPackageFolder(path);
 }
 

@@ -710,10 +710,41 @@ class Api:
         return ""
 
     def open_folder(self, path):
-        if path and os.path.exists(path):
-            os.startfile(path)
-            return True
-        return False
+        try:
+            if not path:
+                return False
+
+            # 1. Direct path exists
+            if os.path.exists(path):
+                os.startfile(path)
+                return True
+
+            # 2. Try with .disabled suffix if disabled
+            if not path.endswith('.disabled') and os.path.exists(path + '.disabled'):
+                os.startfile(path + '.disabled')
+                return True
+
+            # 3. Try without .disabled suffix if path ends with .disabled
+            if path.endswith('.disabled') and os.path.exists(path[:-9]):
+                os.startfile(path[:-9])
+                return True
+
+            # 4. Fallback: Open parent directory (Community or StreamedPackages)
+            parent_dir = os.path.dirname(path)
+            if parent_dir and os.path.exists(parent_dir):
+                os.startfile(parent_dir)
+                return True
+
+            # 5. Fallback for StreamedPackages
+            streamed_dir = r'C:\Users\Bertrand\AppData\Local\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalState\StreamedPackages'
+            if os.path.exists(streamed_dir):
+                os.startfile(streamed_dir)
+                return True
+
+            return False
+        except Exception as e:
+            print("Error in open_folder:", e)
+            return False
 
     def open_file_in_explorer(self, file_path):
         if file_path and os.path.exists(file_path):
