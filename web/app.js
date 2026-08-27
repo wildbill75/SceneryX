@@ -1738,6 +1738,12 @@ function filterAirports() {
             return false;
         }
 
+        // Airport Type Filter (International, Regional, General Aviation, Heli / Water)
+        const apType = ap.english_type || ap.type || 'General Aviation';
+        if (!selectedTypes.has(apType)) {
+            return false;
+        }
+
         // Operating Airline & Direct Route Filter
         if (selectedAirline) {
             if (activeRouteOrigin) {
