@@ -1446,13 +1446,30 @@ function openSpecificPackageFolderByIndex(icao, idx) {
 }
 
 async function selectDefaultMSFSScenery(icao) {
-    if (!selectedAirport || !selectedAirport.all_sources) return;
-    const activeSources = selectedAirport.all_sources.filter(s => !s.is_disabled && !(s.pricing_type === 'Default' || (s.folder_name && s.folder_name.startsWith('msfs-default-'))));
-    for (const src of activeSources) {
-        const pathOrName = src.package_path || src.folder_name;
-        if (pathOrName) {
-            await toggleSpecificPackage(pathOrName, icao);
+    if (!window.pywebview || isToggleInProgress || !icao) return;
+    isToggleInProgress = true;
+    try {
+        const resStr = await window.pywebview.api.disable_all_for_airport(icao);
+        const res = JSON.parse(resStr);
+        if (res.status === 'ok') {
+            allAirportsData = res.airports;
+            allAirportsData.forEach(ap => {
+                if (userRatingsMap[ap.icao] !== undefined) {
+                    ap.rating = userRatingsMap[ap.icao];
+                }
+            });
+            updateStats(allAirportsData);
+            filterAirports();
+            if (selectedAirport) {
+                const updatedAp = allAirportsData.find(a => a.icao === selectedAirport.icao);
+                if (updatedAp) showAirportDetails(updatedAp);
+            }
+            showToast(`✓ Reverted to Default MSFS Base Airport`, 'info');
         }
+    } catch (e) {
+        console.error("Failed to disable all for airport:", e);
+    } finally {
+        isToggleInProgress = false;
     }
 }
 
