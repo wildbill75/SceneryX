@@ -1334,7 +1334,6 @@ function showAirportDetails(ap) {
             <div class="pt-4 border-t border-slate-800/80 space-y-3">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
-                        <i class="fa-solid fa-wrench text-emerald-400 text-xs"></i>
                         <span class="text-xs font-bold uppercase tracking-wider text-slate-300">Available Fixes & Overlays</span>
                     </div>
                 </div>
