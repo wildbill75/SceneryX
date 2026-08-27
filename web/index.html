@@ -475,7 +475,7 @@
             </div>
 
             <div class="p-5 space-y-6 overflow-y-auto flex-1">
-                <!-- 1. HERO AIRPORT IDENTITY & DEVELOPER -->
+                <!-- 1. HERO AIRPORT HEADER CARD -->
                 <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-2">
@@ -489,23 +489,41 @@
                         <p id="drawer-city-country" class="text-xs text-slate-400">City, Country</p>
                     </div>
 
-                    <!-- Developer Info Row (Hidden when Default MSFS fallback is active) -->
-                    <div id="drawer-dev-block" class="pt-2.5 border-t border-slate-800/80 space-y-1">
-                        <div class="flex items-center justify-between gap-2">
-                            <div class="flex items-center gap-2 min-w-0">
-                                <span class="text-[10px] text-slate-400 uppercase tracking-wider font-bold shrink-0">Developer / Publisher</span>
-                                <span id="drawer-version" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 hidden">v1.0.0</span>
-                            </div>
-                            <button onclick="triggerCheckSceneryUpdate()" id="btn-check-update" class="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-300 border border-slate-700 hover:border-cyan-500/40 text-[10px] font-bold transition-all shadow-sm flex items-center gap-1 shrink-0" title="Check for Scenery Updates">
-                                <i class="fa-solid fa-rotate text-[9px] text-cyan-400"></i> Check Update
-                            </button>
+                    <!-- 2. AIRPORT SPECS METRICS GRID (Elevation, Category, Lat, Lon) -->
+                    <div class="grid grid-cols-2 gap-2.5 pt-2 border-t border-slate-800/80">
+                        <div class="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80">
+                            <span class="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Elevation</span>
+                            <span id="drawer-elevation" class="text-xs font-mono font-semibold text-slate-200">0 ft</span>
                         </div>
-                        
-                        <!-- Prominent Large Developer Name -->
-                        <div id="drawer-vendor" class="text-base lg:text-lg font-black tracking-wide text-cyan-300 truncate">Unknown Vendor</div>
+                        <div class="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80">
+                            <span class="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Category</span>
+                            <span id="drawer-type-badge" class="text-xs font-semibold">Type</span>
+                        </div>
+                        <div class="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80">
+                            <span class="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Latitude</span>
+                            <span id="drawer-lat" class="text-xs font-mono font-semibold text-slate-200">0.0000</span>
+                        </div>
+                        <div class="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80">
+                            <span class="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Longitude</span>
+                            <span id="drawer-lon" class="text-xs font-mono font-semibold text-slate-200">0.0000</span>
+                        </div>
                     </div>
+                </div>
 
-                    <!-- Status Pill Row -->
+                <!-- 3. ACTIVE DEVELOPER & PUBLISHER CARD -->
+                <div id="drawer-dev-block" class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2.5">
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2 min-w-0">
+                            <span class="text-[10px] text-slate-400 uppercase tracking-wider font-bold shrink-0">Active Developer / Publisher</span>
+                            <span id="drawer-version" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 hidden">v1.0.0</span>
+                        </div>
+                        <button onclick="triggerCheckSceneryUpdate()" id="btn-check-update" class="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-300 border border-slate-700 hover:border-cyan-500/40 text-[10px] font-bold transition-all shadow-sm flex items-center gap-1 shrink-0" title="Check for Scenery Updates">
+                            <i class="fa-solid fa-rotate text-[9px] text-cyan-400"></i> Check Update
+                        </button>
+                    </div>
+                    
+                    <div id="drawer-vendor" class="text-base lg:text-lg font-black tracking-wide text-cyan-300 truncate">Unknown Vendor</div>
+
                     <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between">
                         <span id="drawer-activation-badge" class="px-3 py-1 rounded-full text-xs font-mono font-extrabold shadow-sm">Custom Addon Active</span>
                     </div>
@@ -514,31 +532,10 @@
                 <!-- CONFLICT ALERT BANNER -->
                 <div id="drawer-conflict-banner" class="hidden"></div>
 
-                <!-- 2. INSTALLED SCENERY ADDONS (PRIMARY CONTROL BLOCK) -->
+                <!-- 4. AVAILABLE SCENERY OPTIONS (1-CLICK SELECTION BLOCK) -->
                 <div class="space-y-2">
-                    <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Installed Scenery Addons</label>
                     <div id="drawer-sources-list" class="space-y-2">
                         <!-- Populated by app.js -->
-                    </div>
-                </div>
-
-                <!-- 3. AIRPORT SPECS METRICS GRID -->
-                <div class="grid grid-cols-2 gap-3">
-                    <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800/80">
-                        <span class="text-[10px] text-slate-400 uppercase font-bold block mb-1">Elevation</span>
-                        <span id="drawer-elevation" class="text-xs font-mono font-semibold text-slate-200">0 ft</span>
-                    </div>
-                    <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800/80">
-                        <span class="text-[10px] text-slate-400 uppercase font-bold block mb-1">Category</span>
-                        <span id="drawer-type-badge" class="text-xs font-semibold">Type</span>
-                    </div>
-                    <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800/80">
-                        <span class="text-[10px] text-slate-400 uppercase font-bold block mb-1">Latitude</span>
-                        <span id="drawer-lat" class="text-xs font-mono font-semibold text-slate-200">0.0000</span>
-                    </div>
-                    <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800/80">
-                        <span class="text-[10px] text-slate-400 uppercase font-bold block mb-1">Longitude</span>
-                        <span id="drawer-lon" class="text-xs font-mono font-semibold text-slate-200">0.0000</span>
                     </div>
                 </div>
 
