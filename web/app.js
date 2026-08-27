@@ -1199,112 +1199,128 @@ function showAirportDetails(ap) {
     const sourcesContainer = document.getElementById('drawer-sources-list');
     sourcesContainer.innerHTML = '';
 
-    const sources = ap.all_sources || [{
-        folder_name: ap.package_name,
-        source_folder: ap.source_folder,
-        package_path: ap.package_path,
-        match_source: ap.match_source,
-        is_disabled: false,
-        is_addon: false
-    }];
+    const sources = ap.all_sources || [];
+    const nonDefaultSources = sources.filter(s => !(s.pricing_type === 'Default' || (s.folder_name && s.folder_name.startsWith('msfs-default-'))));
+    const isDefaultActive = (ap.pricing_type === 'Default') || nonDefaultSources.length === 0 || nonDefaultSources.every(s => s.is_disabled);
 
-    sources.forEach((src, idx) => {
-        const isDisabled = !!src.is_disabled;
-        const isFixPatch = !!src.is_fix_patch || (src.folder_name && (src.folder_name.toLowerCase().includes('fix') || src.folder_name.toLowerCase().includes('patch')));
-        const isAddon = !!src.is_addon || isFixPatch;
+    let html = `
+        <div class="flex items-center justify-between pb-1">
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Available Scenery Options</span>
+            <span class="text-[10px] font-mono text-slate-500 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">1-Click Selection</span>
+        </div>
+        <div class="space-y-2.5">
+    `;
 
-        const cardBgClass = isDisabled 
-            ? 'bg-slate-900/70 border-slate-800/80 shadow-sm' 
-            : `bg-slate-900/95 ${isAddon ? 'border-slate-800/60' : 'border-slate-700/80'} shadow-md`;
-
-        const titleClass = isDisabled 
-            ? 'text-slate-400 font-semibold' 
-            : 'text-white font-bold';
-
-        const folderBoxClass = isDisabled 
-            ? 'text-slate-400 line-through bg-slate-950/50 border-slate-800/50 font-mono text-xs p-2.5 rounded-lg border break-all' 
-            : 'text-slate-200 font-bold bg-slate-950/70 border-slate-800 font-mono text-xs p-2.5 rounded-lg border break-all';
-
-        const statusBadge = isDisabled 
-            ? `<span class="text-xs font-mono font-bold px-3 py-1 rounded-full bg-red-500/10 text-red-400 border border-red-500/30 whitespace-nowrap">Disabled</span>`
-            : `<span class="text-xs font-mono font-bold px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 whitespace-nowrap">Active</span>`;
-
-        const toggleBtnText = isDisabled ? 'Enable' : 'Disable';
-        const toggleBtnIcon = isDisabled ? 'fa-power-off text-emerald-400' : 'fa-ban text-red-400';
-        const toggleBtnClass = isDisabled 
-            ? 'bg-emerald-500/25 hover:bg-emerald-500/35 text-emerald-300 border-emerald-500/60 shadow-md shadow-emerald-500/20 font-extrabold cursor-pointer hover:scale-105 transition-all' 
-            : 'bg-slate-800 hover:bg-red-500/20 text-slate-300 hover:text-red-300 border-slate-700 cursor-pointer transition-all';
-
-        const openBtnClass = 'px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold border border-slate-700 flex items-center gap-1.5 transition-all shadow-sm shrink-0 whitespace-nowrap cursor-pointer';
-
-        const hasConflict = ap.has_conflict;
-        const isAsoboPkg = (src.is_asobo_official || src.vendor === 'Microsoft / Asobo' || (src.folder_name && (src.folder_name.toLowerCase().includes('asobo-airport-') || src.folder_name.toLowerCase().includes('microsoft-airport-'))));
-        const isDefaultPkg = (src.pricing_type === 'Default' || (src.folder_name && src.folder_name.startsWith('msfs-default-')));
-
-        let actionControlsHtml = '';
-
-        if (isDefaultPkg) {
-            actionControlsHtml = `
-                <div class="flex items-center justify-center w-full pt-1 border-t border-slate-800/60">
-                    <span class="text-xs font-mono font-bold px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40">
-                        Built-in Procedural MSFS Airport
-                    </span>
+    // CHOICE 1: Default MSFS Base Airport Card
+    if (isDefaultActive) {
+        html += `
+            <div class="p-3.5 rounded-xl border-2 border-blue-500/80 bg-blue-500/10 shadow-lg shadow-blue-500/10 transition-all space-y-1">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-circle-dot text-blue-400 text-sm"></i>
+                        <span class="text-xs font-bold text-blue-200">Default MSFS Base Airport</span>
+                    </div>
+                    <span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40">Active</span>
                 </div>
-            `;
-        } else if (isAsoboPkg && !hasConflict && !isDisabled) {
-            const updateLabel = src.world_update_name || ap.world_update_name || "Asobo World Update";
-            actionControlsHtml = `
-                <div class="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/60">
-                    <button onclick="openSpecificPackageFolderByIndex('${ap.icao}', ${idx})" class="${openBtnClass}" title="Open Folder">
-                        <i class="fa-solid fa-folder-open text-cyan-400"></i> Open
-                    </button>
-                    <span class="text-xs font-mono font-bold px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 whitespace-nowrap">
-                        ${updateLabel}
-                    </span>
+                <p class="text-[11px] text-slate-400 pl-6">Built-in Procedural MSFS Base Scenery</p>
+            </div>
+        `;
+    } else {
+        html += `
+            <div onclick="selectDefaultMSFSScenery('${ap.icao}')" class="p-3.5 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-800/80 hover:border-slate-700 cursor-pointer transition-all space-y-1 group">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-regular fa-circle text-slate-500 group-hover:text-blue-400 text-sm transition-colors"></i>
+                        <span class="text-xs font-bold text-slate-300 group-hover:text-white transition-colors">Default MSFS Base Airport</span>
+                    </div>
+                    <span class="text-[10px] font-mono text-slate-500 group-hover:text-slate-400">Click to Select</span>
+                </div>
+                <p class="text-[11px] text-slate-500 pl-6">Built-in Procedural MSFS Base Scenery</p>
+            </div>
+        `;
+    }
+
+    // CHOICE 2+: Installed Scenery Addons / World Updates
+    sources.forEach((src, idx) => {
+        const isDefaultPkg = (src.pricing_type === 'Default' || (src.folder_name && src.folder_name.startsWith('msfs-default-')));
+        if (isDefaultPkg) return;
+
+        const isDisabled = !!src.is_disabled;
+        const isActive = !isDisabled;
+        const isAsoboPkg = (src.is_asobo_official || src.vendor === 'Microsoft / Asobo' || (src.folder_name && (src.folder_name.toLowerCase().includes('asobo-airport-') || src.folder_name.toLowerCase().includes('microsoft-airport-'))));
+        const isFixPatch = !!src.is_fix_patch || (src.folder_name && (src.folder_name.toLowerCase().includes('fix') || src.folder_name.toLowerCase().includes('patch')));
+
+        const updateLabel = src.world_update_name || ap.world_update_name || "Asobo World Update";
+        const titleLabel = isAsoboPkg ? updateLabel : (src.vendor && src.vendor !== 'Unknown' ? src.vendor : src.folder_name);
+        const openBtnClass = 'px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold border border-slate-700 flex items-center gap-1.5 transition-all shadow-sm shrink-0 whitespace-nowrap cursor-pointer';
+
+        if (isActive) {
+            let activeBorderClass = 'border-emerald-500/80 bg-emerald-500/10 shadow-emerald-500/10';
+            let activeIconColor = 'text-emerald-400';
+            let activeBadgeClass = 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+
+            if (isAsoboPkg) {
+                activeBorderClass = 'border-amber-500/80 bg-amber-500/10 shadow-amber-500/10';
+                activeIconColor = 'text-amber-400';
+                activeBadgeClass = 'bg-amber-500/20 text-amber-300 border border-amber-500/40';
+            } else if (src.pricing_type === 'Payware') {
+                activeBorderClass = 'border-purple-500/80 bg-purple-500/10 shadow-purple-500/10';
+                activeIconColor = 'text-purple-400';
+                activeBadgeClass = 'bg-purple-500/20 text-purple-300 border border-purple-500/40';
+            }
+
+            html += `
+                <div class="p-3.5 rounded-xl border-2 ${activeBorderClass} transition-all space-y-2.5">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2 min-w-0 flex-1">
+                            <i class="fa-solid fa-circle-dot ${activeIconColor} text-sm shrink-0"></i>
+                            <span class="text-xs font-bold text-white truncate min-w-0">${titleLabel}</span>
+                            ${isFixPatch ? `<span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shrink-0 whitespace-nowrap">Fix / Patch</span>` : ''}
+                        </div>
+                        <span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full ${activeBadgeClass} shrink-0 whitespace-nowrap">Active</span>
+                    </div>
+
+                    <div class="text-[11px] font-mono text-slate-300 bg-slate-950/70 border border-slate-800 p-2 rounded-lg break-all">
+                        ${src.folder_name}
+                    </div>
+
+                    <div class="flex items-center justify-between text-xs pt-0.5">
+                        <span class="text-[11px] font-mono text-slate-400">${src.source_folder} ${src.size_str ? `• ${src.size_str}` : ''}</span>
+                        <button onclick="openSpecificPackageFolderByIndex('${ap.icao}', ${idx})" class="${openBtnClass}" title="Open Folder">
+                            <i class="fa-solid fa-folder-open text-cyan-400"></i> Open Folder
+                        </button>
+                    </div>
                 </div>
             `;
         } else {
-            actionControlsHtml = `
-                <div class="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/60">
-                    <!-- 1. Open Button -->
-                    <button onclick="openSpecificPackageFolderByIndex('${ap.icao}', ${idx})" class="${openBtnClass}" title="Open Folder">
-                        <i class="fa-solid fa-folder-open text-cyan-400"></i> Open
-                    </button>
-                    
-                    <!-- 2. Active / Disabled Status Pill -->
-                    ${statusBadge}
-                    
-                    <!-- 3. Disable / Enable Button (Always available for every installed addon) -->
-                    <button onclick="toggleSpecificPackageByIndex('${ap.icao}', ${idx})" class="px-2.5 py-1.5 rounded-lg border text-xs flex items-center gap-1.5 transition-all shadow-sm shrink-0 whitespace-nowrap ${toggleBtnClass}" title="Toggle Enable/Disable Addon">
-                        <i class="fa-solid ${toggleBtnIcon}"></i> ${toggleBtnText} Addon
-                    </button>
+            html += `
+                <div onclick="selectSceneryPackageByIndex('${ap.icao}', ${idx})" class="p-3.5 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-800/80 hover:border-slate-700 cursor-pointer transition-all space-y-2 group">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2 min-w-0 flex-1">
+                            <i class="fa-regular fa-circle text-slate-500 group-hover:text-emerald-400 text-sm transition-colors shrink-0"></i>
+                            <span class="text-xs font-bold text-slate-300 group-hover:text-white truncate transition-colors min-w-0">${titleLabel}</span>
+                            ${isFixPatch ? `<span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shrink-0 whitespace-nowrap">Fix / Patch</span>` : ''}
+                        </div>
+                        <span class="text-[10px] font-mono text-slate-500 group-hover:text-slate-400 shrink-0 whitespace-nowrap">Click to Select</span>
+                    </div>
+
+                    <div class="text-[11px] font-mono text-slate-400 group-hover:text-slate-300 bg-slate-950/40 border border-slate-800/60 p-2 rounded-lg break-all transition-colors">
+                        ${src.folder_name}
+                    </div>
+
+                    <div class="flex items-center justify-between text-xs pt-0.5 text-slate-500 font-mono text-[11px]">
+                        <span>${src.source_folder} ${src.size_str ? `• ${src.size_str}` : ''}</span>
+                        <span class="text-slate-400 group-hover:text-emerald-400 font-semibold transition-colors flex items-center gap-1">
+                            <i class="fa-solid fa-arrow-right text-[10px]"></i> Activate
+                        </span>
+                    </div>
                 </div>
             `;
         }
-
-        const itemHtml = `
-            <div class="p-3.5 rounded-xl transition-all space-y-2.5 ${cardBgClass}">
-                <!-- Line 1: Source Folder Name, Fix Tag & Disk Size / Streamed Badge -->
-                <div class="flex items-center justify-between text-xs font-bold gap-2">
-                    <div class="flex items-center gap-1.5 min-w-0 flex-1">
-                        <span class="truncate min-w-0 ${titleClass}">${src.source_folder}</span>
-                        ${isFixPatch ? `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shrink-0 whitespace-nowrap">Fix / Patch</span>` : ''}
-                    </div>
-                    ${src.size_str === 'Streamed' || src.source_folder.toLowerCase().includes('streamed') 
-                        ? `<span class="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full ${isDisabled ? 'bg-slate-950 text-slate-500 border border-slate-800/40' : 'bg-cyan-500/10 text-cyan-300 border border-cyan-500/30'} shrink-0 whitespace-nowrap">Streamed</span>`
-                        : (src.size_str ? `<span class="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full ${isDisabled ? 'bg-slate-950 text-slate-500 border border-slate-800/40' : 'bg-slate-950 text-slate-200 border border-slate-800'} shrink-0 whitespace-nowrap">${src.size_str}</span>` : '')
-                    }
-                </div>
-                
-                <!-- Line 2: Package Directory Name -->
-                <div class="${folderBoxClass}">${src.folder_name}</div>
-                
-                <!-- Line 3: Action Controls -->
-                ${actionControlsHtml}
-            </div>
-        `;
-        sourcesContainer.innerHTML += itemHtml;
     });
+
+    html += `</div>`;
+    sourcesContainer.innerHTML = html;
 
     document.getElementById('detail-drawer').classList.remove('translate-x-full');
 }
@@ -1431,7 +1447,16 @@ function openSpecificPackageFolderByIndex(icao, idx) {
     if (path) openSpecificPackageFolder(path);
 }
 
-function toggleSpecificPackageByIndex(icao, idx) {
+function selectDefaultMSFSScenery(icao) {
+    if (!selectedAirport || !selectedAirport.all_sources) return;
+    const activeSrc = selectedAirport.all_sources.find(s => !s.is_disabled && !(s.pricing_type === 'Default' || (s.folder_name && s.folder_name.startsWith('msfs-default-'))));
+    if (activeSrc) {
+        const pathOrName = activeSrc.package_path || activeSrc.folder_name;
+        if (pathOrName) toggleSpecificPackage(pathOrName, icao);
+    }
+}
+
+function selectSceneryPackageByIndex(icao, idx) {
     if (!selectedAirport || !selectedAirport.all_sources || !selectedAirport.all_sources[idx]) return;
     const src = selectedAirport.all_sources[idx];
     const pathOrName = src.package_path || src.folder_name;
