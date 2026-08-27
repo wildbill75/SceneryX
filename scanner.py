@@ -921,13 +921,14 @@ def run_scan():
 
         # Manifest Title explicit ICAO matching
         if not found_ap_list and manifest_title:
-            m_tokens = re.findall(r'\b[A-Z]{4}\b', manifest_title)
+            m_tokens = re.findall(r'([A-Za-z]{4})', manifest_title)
             for tok in m_tokens:
-                if tok in airports and tok.lower() not in EXCLUDE_WORDS:
-                    found_ap_list.append((airports[tok], f"Manifest Title ({tok})"))
+                tok_u = tok.upper()
+                if tok_u in airports and tok.lower() not in EXCLUDE_WORDS:
+                    found_ap_list.append((airports[tok_u], f"Manifest Title ({tok_u})"))
                     break
 
-        # Strict Layout BGL path matching (only BGL files starting/ending with an ICAO)
+        # Layout BGL path matching
         if not found_ap_list:
             lpath = os.path.join(full_path, 'layout.json')
             if not os.path.exists(lpath):
@@ -937,8 +938,9 @@ def run_scan():
                     with open(lpath, 'r', encoding='utf-8', errors='ignore') as f:
                         ldata = json.load(f)
                         entries = ldata.get('content', [])
-                        paths_str = ' '.join([c.get('path', '') for c in entries[:1500]])
-                        bgl_icaos = set(re.findall(r'scenery[/\\](?:airports[/\\])?(?:airport-)?([A-Za-z]{4})[._\\]', paths_str, re.IGNORECASE))
+                        paths_str = ' '.join([c.get('path', '') for c in entries[:2000]])
+                        bgl_icaos = set(re.findall(r'([a-zA-Z]{4})[-_.]?(?:airport|scenery)?\.bgl', paths_str, re.IGNORECASE))
+                        bgl_icaos.update(re.findall(r'scenery[/\\](?:airports[/\\])?(?:world[/\\]scenery[/\\])?(?:airport-)?([A-Za-z]{4})[._\\]', paths_str, re.IGNORECASE))
                         for tok in bgl_icaos:
                             tok_u = tok.upper()
                             if tok_u in airports and tok.lower() not in EXCLUDE_WORDS:
