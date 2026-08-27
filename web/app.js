@@ -1081,6 +1081,15 @@ function showAirportDetails(ap) {
         }
     }
 
+    const checkUpdateBtn = document.getElementById('btn-check-update');
+    if (checkUpdateBtn) {
+        if (cat === 'ASOBO' || isFallbackDefault || ap.is_asobo_official || (ap.vendor && (ap.vendor.includes('Asobo') || ap.vendor.includes('Microsoft')))) {
+            checkUpdateBtn.classList.add('hidden');
+        } else {
+            checkUpdateBtn.classList.remove('hidden');
+        }
+    }
+
     // Price override card logic
     const priceCard = document.getElementById('drawer-price-card');
     if (cat === 'PAYWARE') {
