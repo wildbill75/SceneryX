@@ -816,7 +816,9 @@ def run_scan():
     def _normalize_pkg(f_name):
         c = f_name[:-9] if f_name.lower().endswith('.disabled') else f_name
         n = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', c.lower())
-        return re.sub(r'-(airport|scenery|pack|project)-', '-', n)
+        n = re.sub(r'-(airport|scenery|pack|project)-', '-', n)
+        n = re.sub(r'-(munich|istanbul|london|paris|frankfurt|berlin|tokyo|chicago|newyork|barcelona|madrid|rome)-', '-', n)
+        return n
 
     existing_norms = {_normalize_pkg(f) for _, f, _, _ in all_packages}
     for pkg_name, clean_f, is_dis in content_xml_packages:
