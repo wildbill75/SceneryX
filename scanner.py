@@ -158,8 +158,8 @@ EXCLUDE_WORDS = {
 
 NON_AIRPORT_KEYWORDS = [
     'landingchallenge', 'landing-challenge', 'point-of-interest', 'pointofinterest',
-    'discovery', 'passiveaircraft', 'passive-aircraft', 'challenges', 'activities',
-    'certification', 'procedural', 'trainings', 'travelbook', 'simobjects', 'ships',
+    'discovery', 'passiveaircraft', 'passive-aircraft', 'challenges', 'activities', 'activity',
+    'certification', 'procedural', 'trainings', 'training', 'travelbook', 'simobjects', 'ships',
     'modellib', 'vertical-obstructions', 'verticalobstructions', 'crowds', 'gliders',
     'asobo-aircraft', 'fs20-asobo-aircraft', 'fs24-asobo-aircraft', 'fnx-aircraft', 'flybywire-aircraft',
     'fbw-a20n', 'fnx-livery', 'livery', 'aircraft', 'utility', 'toolbar', 'disastertracker',
@@ -168,7 +168,10 @@ NON_AIRPORT_KEYWORDS = [
     'vfr-landmarks', 'vfr_landmarks', 'vfr-city', 'poilocalisation', 'worldupdate', 'world-update',
     'north-america-mesh', 'europe-mesh', 'south-america-mesh', 'asia-mesh', 'africa-mesh', 'oceania-mesh',
     'fs-base', 'fs24-fs-base', 'fs20-fs-base', 'coverage-map', 'coverage', 'genericairports',
-    'generic-airports', 'bushtrip', 'bush-trip', 'asobo-live', 'asobo-nav', 'asobo-generic'
+    'generic-airports', 'bushtrip', 'bush-trip', 'bush', 'bushchallenge', 'bush-challenge',
+    'flight-tutorials', 'tutorials', 'tutorial', 'shortto', 'shortldg', 'waterldg', 'waterto', 'watertr',
+    'downdraft', 'career', 'career-mode', 'flight-lessons', 'lessons', 'examination', 'exam', 'emergency',
+    'asobo-live', 'asobo-nav', 'asobo-generic'
 ]
 
 ADDON_LIBRARY_KEYWORDS = [
