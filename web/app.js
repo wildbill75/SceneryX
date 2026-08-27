@@ -1064,8 +1064,11 @@ function showAirportDetails(ap) {
         } else if (cat === 'ASOBO') {
             actBadge.className = "px-3 py-1 rounded-full text-xs font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40";
             actBadge.innerText = ap.world_update_name || "Asobo Sim Update";
+        } else if (cat === 'PAYWARE') {
+            actBadge.className = "px-3 py-1 rounded-full text-xs font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40";
+            actBadge.innerText = "Payware Addon Active";
         } else {
-            actBadge.className = "px-3 py-1 rounded-full text-xs font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40";
+            actBadge.className = "px-3 py-1 rounded-full text-xs font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40";
             actBadge.innerText = "Custom Addon Active";
         }
     }
@@ -1267,9 +1270,9 @@ function showAirportDetails(ap) {
         const openBtnClass = 'px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold border border-slate-700 flex items-center gap-1.5 transition-all shadow-sm shrink-0 whitespace-nowrap cursor-pointer';
 
         if (isActive) {
-            let activeBorderClass = 'border-emerald-500/80 bg-emerald-500/10 shadow-emerald-500/10';
-            let activeIconColor = 'text-emerald-400';
-            let activeBadgeClass = 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40';
+            let activeBorderClass = 'border-cyan-500/80 bg-cyan-500/10 shadow-cyan-500/10';
+            let activeIconColor = 'text-cyan-400';
+            let activeBadgeClass = 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40';
 
             if (isAsoboPkg) {
                 activeBorderClass = 'border-amber-500/80 bg-amber-500/10 shadow-amber-500/10';
