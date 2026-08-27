@@ -612,9 +612,10 @@ class Api:
                         continue
                     onestore = os.path.join(dp, 'OneStore')
                     dirs = [onestore, dp] if os.path.exists(onestore) else [dp]
+                    cand_list = [pkg_name, clean_pkg + '.disabled', clean_pkg] if pkg_name.endswith('.disabled') else [pkg_name, clean_pkg, clean_pkg + '.disabled']
                     found = False
                     for d in dirs:
-                        for candidate_name in [pkg_name, clean_pkg, clean_pkg + '.disabled']:
+                        for candidate_name in cand_list:
                             cand = os.path.join(d, candidate_name)
                             if os.path.exists(cand):
                                 target_path = cand
@@ -624,16 +625,6 @@ class Api:
                             break
                     if found:
                         break
-
-            # Determine whether we are ENABLING or DISABLING
-            is_currently_disabled = False
-            if os.path.exists(target_path):
-                if target_path.endswith('.disabled'):
-                    is_currently_disabled = True
-                elif os.path.exists(os.path.join(target_path, 'manifest.json.disabled')):
-                    is_currently_disabled = True
-            
-            should_enable = is_currently_disabled
 
             def is_xml_match(clean_target, xml_pkg_name, target_icao=None):
                 c1 = clean_target.lower()
@@ -649,7 +640,74 @@ class Api:
                         return True
                 return False
 
-            # 1. Update Content.xml
+            # Determine whether we are ENABLING or DISABLING
+            is_currently_disabled = False
+            if os.path.exists(target_path):
+                if target_path.endswith('.disabled'):
+                    is_currently_disabled = True
+                elif os.path.exists(os.path.join(target_path, 'manifest.json.disabled')):
+                    is_currently_disabled = True
+
+            if os.path.exists(content_xml_path):
+                import xml.etree.ElementTree as ET
+                tree = ET.parse(content_xml_path)
+                root = tree.getroot()
+                for p in root.findall('Package'):
+                    name = p.get('name', '')
+                    if is_xml_match(clean_pkg, name, icao):
+                        if p.get('active') == 'UserDisabled' or name.endswith('.disabled'):
+                            is_currently_disabled = True
+
+            should_enable = is_currently_disabled
+
+            # Helper function to disable a physical package directory on disk
+            def disable_physical_package(p_path):
+                if not p_path or not os.path.exists(p_path):
+                    return p_path
+                new_p = p_path
+                if not p_path.endswith('.disabled'):
+                    new_p = p_path + '.disabled'
+                    os.rename(p_path, new_p)
+                for mf in ['manifest.json', 'layout.json']:
+                    mf_norm = os.path.join(new_p, mf)
+                    mf_dis = os.path.join(new_p, mf + '.disabled')
+                    if os.path.exists(mf_norm):
+                        if os.path.exists(mf_dis):
+                            os.remove(mf_dis)
+                        os.rename(mf_norm, mf_dis)
+                return new_p
+
+            # Helper function to enable a physical package directory on disk
+            def enable_physical_package(p_path):
+                if not p_path or not os.path.exists(p_path):
+                    return p_path
+                new_p = p_path
+                if p_path.endswith('.disabled'):
+                    new_p = p_path[:-9]
+                    os.rename(p_path, new_p)
+                for mf in ['manifest.json', 'layout.json']:
+                    mf_dis = os.path.join(new_p, mf + '.disabled')
+                    mf_norm = os.path.join(new_p, mf)
+                    if os.path.exists(mf_dis):
+                        if os.path.exists(mf_norm):
+                            os.remove(mf_norm)
+                        os.rename(mf_dis, mf_norm)
+                return new_p
+
+            # If turning ON target package, find all other packages for this ICAO to disable them (Mutual Exclusion)
+            other_packages_to_disable = []
+            if should_enable and icao:
+                scanned_airports = run_scan()
+                ap_obj = next((a for a in scanned_airports if a['icao'].upper() == icao.upper()), None)
+                if ap_obj and ap_obj.get('all_sources'):
+                    for src in ap_obj['all_sources']:
+                        fn = src.get('folder_name', '')
+                        fn_clean = fn[:-9] if fn.endswith('.disabled') else fn
+                        if fn_clean.lower() != clean_pkg.lower():
+                            pkg_p = src.get('package_path', '')
+                            other_packages_to_disable.append((fn_clean, pkg_p))
+
+            # 1. Update Content.xml for target package AND other conflicting packages for this ICAO
             if os.path.exists(content_xml_path):
                 import xml.etree.ElementTree as ET
                 tree = ET.parse(content_xml_path)
@@ -658,6 +716,7 @@ class Api:
                 for p in root.findall('Package'):
                     name = p.get('name', '')
                     clean = name[:-9] if name.endswith('.disabled') else name
+                    
                     if is_xml_match(clean_pkg, name, icao):
                         new_val = 'Activated' if should_enable else 'UserDisabled'
                         p.set('active', new_val)
@@ -666,40 +725,23 @@ class Api:
                         elif not should_enable and not name.endswith('.disabled'):
                             p.set('name', clean + '.disabled')
                         changed = True
+                    elif should_enable and icao and icao.lower() in clean.lower():
+                        # Mutual Exclusion: Disable conflicting package in Content.xml
+                        p.set('active', 'UserDisabled')
+                        if not name.endswith('.disabled'):
+                            p.set('name', clean + '.disabled')
+                        changed = True
+
                 if changed:
                     tree.write(content_xml_path, encoding='utf-8', xml_declaration=True)
 
-            # 2. Rename physical directory on disk and inner manifest.json / layout.json files
-            new_path = target_path
-            if os.path.exists(target_path):
-                if should_enable:
-                    if target_path.endswith('.disabled'):
-                        new_path = target_path[:-9]
-                        os.rename(target_path, new_path)
-                    else:
-                        new_path = target_path
-
-                    for mf in ['manifest.json', 'layout.json']:
-                        mf_dis = os.path.join(new_path, mf + '.disabled')
-                        mf_norm = os.path.join(new_path, mf)
-                        if os.path.exists(mf_dis):
-                            if os.path.exists(mf_norm):
-                                os.remove(mf_norm)
-                            os.rename(mf_dis, mf_norm)
-                else:
-                    if not target_path.endswith('.disabled'):
-                        new_path = target_path + '.disabled'
-                        os.rename(target_path, new_path)
-                    else:
-                        new_path = target_path
-
-                    for mf in ['manifest.json', 'layout.json']:
-                        mf_norm = os.path.join(new_path, mf)
-                        mf_dis = os.path.join(new_path, mf + '.disabled')
-                        if os.path.exists(mf_norm):
-                            if os.path.exists(mf_dis):
-                                os.remove(mf_dis)
-                            os.rename(mf_norm, mf_dis)
+            # 2. Update physical disk files for target package AND other conflicting packages
+            if should_enable:
+                new_path = enable_physical_package(target_path)
+                for fn_other, p_other in other_packages_to_disable:
+                    disable_physical_package(p_other)
+            else:
+                new_path = disable_physical_package(target_path)
 
             airports = run_scan()
             return json.dumps({"status": "ok", "enabled": should_enable, "new_path": new_path, "airports": airports}, ensure_ascii=False)
