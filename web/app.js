@@ -1652,6 +1652,29 @@ function resetFullDatabase() {
 
 /* ================= FILTER & UI LOGIC ================= */
 
+function airportMatchesSourceFilter(ap) {
+    if (selectedSources.size === ALL_SOURCES_LIST.length) return true;
+    if (selectedSources.size === 0) return false;
+
+    const sources = ap.all_sources || [];
+    if (sources.length === 0) {
+        const cat = getAirportCategory(ap);
+        if (cat === 'DEFAULT') {
+            return selectedSources.has('Official') || selectedSources.has('asobo');
+        }
+        return false;
+    }
+
+    return sources.some(s => {
+        const sf = (s.source_folder || '').toLowerCase();
+        if (selectedSources.has('Community') && sf.includes('community')) return true;
+        if (selectedSources.has('StreamedPackages') && (sf.includes('streamed') || sf.includes('2024'))) return true;
+        if (selectedSources.has('asobo') && (sf.includes('asobo') || s.is_asobo_official || s.vendor === 'Microsoft / Asobo')) return true;
+        if (selectedSources.has('Official') && (sf.includes('official') || sf.includes('onestore'))) return true;
+        return false;
+    });
+}
+
 function filterAirports() {
     const rawSearch = document.getElementById('search-input').value.toLowerCase();
     const search = rawSearch.trim ? rawSearch.trim() : rawSearch;
@@ -1662,6 +1685,11 @@ function filterAirports() {
         // Rating Filter
         const apRating = ap.rating || 0;
         if (selectedMinRating > 0 && apRating < selectedMinRating) {
+            return false;
+        }
+
+        // Scenery Source Filter (Community, Streamed (2024), Asobo, Official)
+        if (!airportMatchesSourceFilter(ap)) {
             return false;
         }
 
