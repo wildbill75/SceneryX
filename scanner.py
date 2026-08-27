@@ -822,6 +822,10 @@ def run_scan():
 
     existing_norms = {_normalize_pkg(f) for _, f, _, _ in all_packages}
     for pkg_name, clean_f, is_dis in content_xml_packages:
+        # Ignore uninstalled 3rd-party community packages left over in Content.xml
+        p_lower = pkg_name.lower()
+        if p_lower.startswith('community') or 'community' in p_lower:
+            continue
         fn_norm = _normalize_pkg(clean_f)
         if fn_norm not in existing_norms:
             all_packages.append(("MSFS 2024 - StreamedPackages", clean_f, "", is_dis))
