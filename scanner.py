@@ -411,31 +411,12 @@ BUNDLE_PACKAGE_PRICES = {
 }
 
 # Known Real Retail Prices Catalog in EUR (€)
+# Known Real Retail Prices Catalog in EUR (€)
 KNOWN_PAYWARE_PRICES = {
-    # Flightbeam
-    'lfbo': 19.99, 'kiad': 19.99, 'ksfo': 19.99, 'kden': 19.99, 'kpdx': 17.99, 'nzwn': 16.99, 'lfbz': 15.99,
-    # FlyTampa
-    'eham': 21.99, 'kbos': 19.99, 'klas': 19.99, 'ybbn': 18.99, 'ekch': 19.99, 'lgav': 19.99, 'cyul': 18.99,
-    # iniBuilds
-    'kdtw': 19.99, 'egll': 22.99, 'kjfk': 21.99, 'klax': 19.99, 'kord': 19.99, 'eghi': 12.99, 'omdb': 19.99, 'lddu': 14.99,
-    # Orbx
-    'lowi': 17.99, 'essa': 17.99, 'eats': 14.99, 'ksan': 16.99, 'ymml': 18.99, 'ldza': 14.99,
-    # Pyreegue
-    'egph': 18.99, 'egpf': 17.99, 'egeb': 12.99, 'eapa': 12.99,
-    # Drzewiecki Design
-    'epwa': 19.99, 'rjtt': 21.99, 'kewr': 19.99, 'kdca': 18.99, 'limc': 18.99,
-    # France VFR
+    # Specific Package Folder Patterns
     'francevfr-airport-apt1': 7.47, 'francevfr-airport-pidf': 5.00,
-    # Pilot Experience Sim
-    'lfkj': 17.99, 'lfbp': 14.99,
-    # Aerosoft
-    'eddf': 24.99, 'eddb': 18.99, 'panc': 19.99,
-    # SceneryTR Design
-    'ltfm': 21.99, 'ltai': 17.99, 'ltba': 17.99, 'scenerytr-airport-ltfm-istanbul': 21.99,
-    # SLH Sim Designs
-    'soca': 13.99, 'slh_sim_designs_soca_fs24': 13.99,
-    # JustSim
-    'limj': 15.99, 'eddh': 16.99
+    'scenerytr-airport-ltfm-istanbul': 21.99,
+    'slh_sim_designs_soca_fs24': 13.99
 }
 
 FOLDER_SIZE_CACHE_PATH = os.path.join(USER_DATA_DIR, "folder_sizes.json")
@@ -547,16 +528,12 @@ def get_estimated_price(icao, folder_name, vendor, pricing_type, english_type, i
         return 0.0, False
 
     fn_lower = folder_name.lower()
-    icao_lower = icao.lower()
 
     if fn_lower in KNOWN_PAYWARE_PRICES:
         return KNOWN_PAYWARE_PRICES[fn_lower], False
 
-    if icao_lower in KNOWN_PAYWARE_PRICES:
-        return KNOWN_PAYWARE_PRICES[icao_lower], False
-
     for key, price in KNOWN_PAYWARE_PRICES.items():
-        if key in fn_lower:
+        if len(key) > 4 and key in fn_lower:
             return price, False
 
     if english_type == "International":
@@ -755,6 +732,9 @@ def determine_pricing(source_folder, folder_name, vendor, manifest_data):
     # 3rd-Party Payware Marketplace sceneries (France VFR, Gaya, Deimos, BMW, Orbx, etc.)
     if any(p in fn_lower or p in v_lower or p in creator for p in COMMERCIAL_PAYWARE_VENDORS):
         return "Payware", True
+
+    if 'community' in fn_lower or fn_lower.startswith('community'):
+        return "Freeware / Flightsim.to", False
 
     if 'official' in s_lower or 'streamed' in s_lower:
         return "Payware", True

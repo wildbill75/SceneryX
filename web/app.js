@@ -624,17 +624,22 @@ function updateInvestmentBanner() {
     }
 }
 
+function getActiveSource(ap) {
+    if (!ap || !ap.all_sources) return null;
+    return ap.all_sources.find(s => !s.is_disabled && !(s.is_default || (s.folder_name && s.folder_name.startsWith('msfs-default-')))) || null;
+}
+
 function getAirportPricingType(ap) {
     if (!ap) return 'Default';
-    const nonDefaultSources = ap.all_sources ? ap.all_sources.filter(s => !(s.pricing_type === 'Default' || (s.folder_name && s.folder_name.startsWith('msfs-default-')))) : [];
-    if (nonDefaultSources.length === 0) {
+    const activeSrc = getActiveSource(ap);
+    if (!activeSrc) {
         return 'Default';
     }
 
-    if (nonDefaultSources.some(s => s.is_payware || s.pricing_type === 'Payware')) {
+    if (activeSrc.is_payware || activeSrc.pricing_type === 'Payware') {
         return 'Payware';
     }
-    if (nonDefaultSources.some(s => s.is_asobo_official || s.pricing_type === 'Asobo' || (s.vendor && s.vendor.toLowerCase().includes('asobo')))) {
+    if (activeSrc.is_asobo_official || activeSrc.pricing_type === 'Asobo' || (activeSrc.vendor && activeSrc.vendor.toLowerCase().includes('asobo'))) {
         return 'Asobo';
     }
     return 'Freeware / Flightsim.to';
@@ -642,8 +647,8 @@ function getAirportPricingType(ap) {
 
 function getAirportCategory(ap) {
     if (!ap) return 'DEFAULT';
-    const nonDefaultSources = ap.all_sources ? ap.all_sources.filter(s => !(s.pricing_type === 'Default' || (s.folder_name && s.folder_name.startsWith('msfs-default-')))) : [];
-    if (nonDefaultSources.length === 0) return 'DEFAULT';
+    const activeSrc = getActiveSource(ap);
+    if (!activeSrc) return 'DEFAULT';
 
     const pt = getAirportPricingType(ap);
     if (pt === 'Asobo') return 'ASOBO';
@@ -1254,7 +1259,7 @@ function showAirportDetails(ap) {
             <div onclick="selectDefaultMSFSScenery('${ap.icao}')" class="p-3.5 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-800/80 hover:border-slate-700 cursor-pointer transition-all space-y-1 group">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
-                        <i class="fa-regular fa-circle text-slate-500 group-hover:text-blue-400 text-sm transition-colors"></i>
+                        <i class="fa-regular fa-circle text-slate-500 text-sm transition-colors"></i>
                         <span class="text-xs font-bold text-slate-300 group-hover:text-white transition-colors">Default MSFS Base Airport</span>
                     </div>
                     <span class="text-[10px] font-mono text-slate-500 group-hover:text-slate-300 shrink-0 whitespace-nowrap">Click to Activate</span>
@@ -1318,7 +1323,7 @@ function showAirportDetails(ap) {
                 <div onclick="selectSceneryPackageByIndex('${ap.icao}', ${idx})" class="p-3.5 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-800/80 hover:border-slate-700 cursor-pointer transition-all space-y-2 group">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-2 min-w-0 flex-1">
-                            <i class="fa-regular fa-circle text-slate-500 group-hover:text-emerald-400 text-sm transition-colors shrink-0"></i>
+                            <i class="fa-regular fa-circle text-slate-500 text-sm transition-colors shrink-0"></i>
                             <span class="text-xs font-bold text-slate-300 group-hover:text-white truncate transition-colors min-w-0">${titleLabel}</span>
                         </div>
                         <span class="text-[10px] font-mono text-slate-500 group-hover:text-slate-300 shrink-0 whitespace-nowrap">Click to Activate</span>
@@ -1386,7 +1391,7 @@ function showAirportDetails(ap) {
                     <div onclick="toggleFixPatchPackage('${pkgPath}', '${ap.icao}')" class="p-3.5 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-800/80 hover:border-slate-700 cursor-pointer transition-all space-y-2 group">
                         <div class="flex items-center justify-between">
                             <div class="flex items-center gap-2 min-w-0 flex-1">
-                                <i class="fa-regular fa-circle text-slate-500 group-hover:text-emerald-400 text-sm transition-colors shrink-0"></i>
+                                <i class="fa-regular fa-circle text-slate-500 text-sm transition-colors shrink-0"></i>
                                 <span class="text-xs font-bold text-slate-300 group-hover:text-white truncate transition-colors min-w-0">${src.folder_name}</span>
                                 <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 shrink-0 whitespace-nowrap">Fix / Overlay</span>
                             </div>

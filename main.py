@@ -1164,7 +1164,7 @@ class Api:
                 return True
 
             # 5. Fallback for StreamedPackages
-            streamed_dir = r'C:\Users\Bertrand\AppData\Local\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalState\StreamedPackages'
+            streamed_dir = r'C:\Users\Bertrand\AppData\Local\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\Packages\StreamedPackages'
             if os.path.exists(streamed_dir):
                 os.startfile(streamed_dir)
                 return True
