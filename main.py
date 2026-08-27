@@ -1366,10 +1366,13 @@ class Api:
         import webbrowser
         import urllib.parse
         
-        v_str = f" {vendor}" if vendor and vendor.lower() not in ['unknown', 'microsoft / asobo', 'asobo', 'unknown vendor'] else ""
-        if v_str:
-            query = f"{vendor} {icao} {name} MSFS scenery update"
-            url = f"https://www.google.com/search?q={urllib.parse.quote(query)}"
+        query = f"{icao}".strip()
+        if vendor and vendor.lower() not in ['unknown', 'microsoft / asobo', 'asobo', 'unknown vendor']:
+            query = f"{icao} {vendor}".strip()
+        elif name and name.lower() not in ['unknown', 'default']:
+            query = f"{icao} {name}".strip()
+
+        url = f"https://flightsim.to/search?q={urllib.parse.quote(query)}"
         webbrowser.open(url)
         return json.dumps({"status": "ok", "url": url})
 
