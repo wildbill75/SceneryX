@@ -1040,13 +1040,13 @@ function showAirportDetails(ap) {
 
         if (ap.is_disabled || allSourcesDisabled || cat === 'DEFAULT') {
             actBadge.className = "px-3 py-1 rounded-full text-xs font-mono font-bold bg-blue-500/20 text-blue-300 border border-blue-500/40";
-            actBadge.innerText = "🔵 Default MSFS Airport";
+            actBadge.innerText = "Default MSFS Airport";
         } else if (cat === 'ASOBO') {
             actBadge.className = "px-3 py-1 rounded-full text-xs font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40";
-            actBadge.innerText = "🟢 Core MSFS Base";
+            actBadge.innerText = "Core MSFS Base";
         } else {
             actBadge.className = "px-3 py-1 rounded-full text-xs font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40";
-            actBadge.innerText = "🟢 Custom Addon Active";
+            actBadge.innerText = "Custom Addon Active";
         }
     }
 
@@ -1206,8 +1206,8 @@ function showAirportDetails(ap) {
             : 'text-slate-200 font-bold bg-slate-950/70 border-slate-800 font-mono text-xs p-2.5 rounded-lg border break-all';
 
         const statusBadge = isDisabled 
-            ? `<span class="text-xs font-mono font-bold px-3 py-1 rounded-full bg-red-500/10 text-red-400 border border-red-500/30 whitespace-nowrap">🔴 Disabled</span>`
-            : `<span class="text-xs font-mono font-bold px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 whitespace-nowrap">🟢 Active</span>`;
+            ? `<span class="text-xs font-mono font-bold px-3 py-1 rounded-full bg-red-500/10 text-red-400 border border-red-500/30 whitespace-nowrap">Disabled</span>`
+            : `<span class="text-xs font-mono font-bold px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 whitespace-nowrap">Active</span>`;
 
         const toggleBtnText = isDisabled ? 'Enable' : 'Disable';
         const toggleBtnIcon = isDisabled ? 'fa-power-off text-emerald-400' : 'fa-ban text-red-400';
@@ -1227,7 +1227,7 @@ function showAirportDetails(ap) {
             actionControlsHtml = `
                 <div class="flex items-center justify-center w-full pt-1 border-t border-slate-800/60">
                     <span class="text-xs font-mono font-bold px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40">
-                        🔵 Built-in Procedural MSFS Airport
+                        Built-in Procedural MSFS Airport
                     </span>
                 </div>
             `;
@@ -1238,7 +1238,7 @@ function showAirportDetails(ap) {
                         <i class="fa-solid fa-folder-open text-cyan-400"></i> Open
                     </button>
                     <span class="text-xs font-mono font-bold px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 whitespace-nowrap">
-                        🟢 Official Asobo Handcrafted
+                        Official Asobo Handcrafted
                     </span>
                 </div>
             `;
@@ -1267,7 +1267,7 @@ function showAirportDetails(ap) {
                 <div class="flex items-center justify-between text-xs font-bold gap-2">
                     <div class="flex items-center gap-1.5 min-w-0 flex-1">
                         <span class="truncate min-w-0 ${titleClass}">${src.source_folder}</span>
-                        ${isFixPatch ? `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shrink-0 whitespace-nowrap">🛠️ Fix / Patch</span>` : ''}
+                        ${isFixPatch ? `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shrink-0 whitespace-nowrap">Fix / Patch</span>` : ''}
                     </div>
                     ${src.size_str === 'Streamed' || src.source_folder.toLowerCase().includes('streamed') 
                         ? `<span class="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full ${isDisabled ? 'bg-slate-950 text-slate-500 border border-slate-800/40' : 'bg-cyan-500/10 text-cyan-300 border border-cyan-500/30'} shrink-0 whitespace-nowrap">Streamed</span>`

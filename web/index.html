@@ -495,18 +495,24 @@
                         <p id="drawer-city-country" class="text-xs text-slate-400">City, Country</p>
                     </div>
 
-                    <!-- Developer Info & Status Pill Row -->
-                    <div class="pt-2.5 border-t border-slate-800/80 flex items-center justify-between gap-2">
-                        <div class="flex items-center gap-1.5 min-w-0">
-                            <span class="text-[10px] text-slate-400 uppercase font-bold shrink-0">Dev:</span>
-                            <span id="drawer-vendor" class="text-xs font-extrabold text-cyan-300 truncate">Unknown Vendor</span>
-                            <span id="drawer-version" class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 hidden">v1.0.0</span>
-                        </div>
-                        <div class="flex items-center gap-1.5 shrink-0">
-                            <span id="drawer-activation-badge" class="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-extrabold">Active</span>
-                            <button onclick="triggerCheckSceneryUpdate()" id="btn-check-update" class="px-2 py-0.5 rounded-full bg-slate-800 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-300 border border-slate-700 text-[10px] font-bold transition-all shadow-sm" title="Check for Scenery Updates">
-                                <i class="fa-solid fa-rotate text-[9px] text-cyan-400"></i> Update
+                    <!-- Developer Info & Status Row -->
+                    <div class="pt-2.5 border-t border-slate-800/80 space-y-2">
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="flex items-center gap-2 min-w-0">
+                                <span class="text-[10px] text-slate-400 uppercase tracking-wider font-bold shrink-0">Developer / Publisher</span>
+                                <span id="drawer-version" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 hidden">v1.0.0</span>
+                            </div>
+                            <button onclick="triggerCheckSceneryUpdate()" id="btn-check-update" class="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-300 border border-slate-700 hover:border-cyan-500/40 text-[10px] font-bold transition-all shadow-sm flex items-center gap-1 shrink-0" title="Check for Scenery Updates">
+                                <i class="fa-solid fa-rotate text-[9px] text-cyan-400"></i> Check Update
                             </button>
+                        </div>
+                        
+                        <!-- Prominent Large Developer Name -->
+                        <div id="drawer-vendor" class="text-sm lg:text-base font-black tracking-wide text-cyan-300 truncate">Unknown Vendor</div>
+
+                        <!-- Status Pill Row -->
+                        <div class="pt-1 flex items-center justify-between">
+                            <span id="drawer-activation-badge" class="px-3 py-1 rounded-full text-xs font-mono font-extrabold shadow-sm">Custom Addon Active</span>
                         </div>
                     </div>
                 </div>
