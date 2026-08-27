@@ -247,20 +247,8 @@
             </div>
         </div>
 
-        <!-- RIGHT: COMPACT ICAO SEARCH & ACTIONS -->
+        <!-- RIGHT: CONFLICT NAVIGATOR (IF ANY) -->
         <div class="flex items-center gap-2 shrink-0">
-            <!-- COMPACT SEARCH BAR (RESPONSIVE WIDTH TO PREVENT COLLISION WHEN RESIZING WINDOW) -->
-            <div class="relative w-28 md:w-36 lg:w-48 transition-all">
-                <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                <input type="text" id="search-input" onkeydown="handleSearchKeyDown(event)" oninput="filterAirports()" 
-                       placeholder="Search ICAO..." 
-                       class="w-full bg-slate-900/90 border border-slate-700/80 rounded-full pl-8 pr-7 py-1.5 text-xs text-slate-100 placeholder-slate-400 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 font-medium transition-all shadow-inner">
-                <button id="clear-search" onclick="clearSearch()" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs">
-                    <i class="fa-solid fa-xmark"></i>
-                </button>
-            </div>
-
-
             <!-- SCENERY CONFLICT NAVIGATOR (IF ANY) -->
             <div id="conflict-nav-pill" class="flex items-center gap-1.5 bg-red-500/15 border border-red-500/40 px-2.5 py-1 rounded-full text-xs font-mono hidden">
                 <i class="fa-solid fa-triangle-exclamation text-red-400 animate-pulse text-xs"></i>
@@ -275,23 +263,6 @@
                     </button>
                 </div>
             </div>
-
-            <!-- EXPORT BUTTON -->
-            <button onclick="openExportModal()" title="Export Scenery Collection (CSV / JSON)" class="px-3 py-1.5 rounded-full bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 text-slate-300 hover:text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm">
-                <i class="fa-solid fa-file-export text-cyan-400 text-xs"></i>
-                <span class="hidden xl:inline">Export</span>
-            </button>
-
-            <!-- RESCAN BUTTON -->
-            <button onclick="rescanMSFS()" title="Rescan MSFS Packages" class="px-3.5 py-1.5 rounded-full bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-300 text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm shadow-cyan-500/10 cursor-pointer">
-                <i id="rescan-icon" class="fa-solid fa-rotate text-cyan-400 text-xs"></i>
-                <span class="hidden xl:inline">Rescan</span>
-            </button>
-
-            <!-- SETTINGS BUTTON -->
-            <button onclick="openSettingsModal()" title="Settings & Scenery Paths" class="w-8 h-8 rounded-full bg-slate-900/80 hover:bg-slate-800 border border-slate-700/80 text-slate-300 hover:text-white flex items-center justify-center transition-all shrink-0">
-                <i class="fa-solid fa-gear text-xs"></i>
-            </button>
         </div>
     </header>
 
@@ -433,6 +404,40 @@
                     </div>
                 </div>
 
+            </div>
+
+            <!-- BOTTOM FIXED ACTION & SEARCH PANEL (LEFT SIDEBAR FOOTER) -->
+            <div class="p-3.5 border-t border-slate-800/80 bg-slate-950/60 flex flex-col gap-2.5 shrink-0">
+                <!-- SEARCH BAR -->
+                <div class="relative w-full">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                    <input type="text" id="search-input" onkeydown="handleSearchKeyDown(event)" oninput="filterAirports()" 
+                           placeholder="Search ICAO..." 
+                           class="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl pl-8 pr-7 py-2 text-xs text-slate-100 placeholder-slate-400 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 font-medium transition-all shadow-inner">
+                    <button id="clear-search" onclick="clearSearch()" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+
+                <!-- ACTION BUTTONS ROW: EXPORT, RESCAN, SETTINGS -->
+                <div class="flex items-center gap-2 w-full">
+                    <!-- EXPORT BUTTON -->
+                    <button onclick="openExportModal()" title="Export Scenery Collection (CSV / JSON)" class="flex-1 py-2 px-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 text-slate-300 hover:text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer">
+                        <i class="fa-solid fa-file-export text-cyan-400 text-xs"></i>
+                        <span>Export</span>
+                    </button>
+
+                    <!-- RESCAN BUTTON -->
+                    <button onclick="rescanMSFS()" title="Rescan MSFS Packages" class="flex-1 py-2 px-3 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-300 text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10 cursor-pointer">
+                        <i id="rescan-icon" class="fa-solid fa-rotate text-cyan-400 text-xs"></i>
+                        <span>Rescan</span>
+                    </button>
+
+                    <!-- SETTINGS GEAR BUTTON -->
+                    <button onclick="openSettingsModal()" title="Settings & Scenery Paths" class="w-9 h-9 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 text-slate-300 hover:text-white flex items-center justify-center transition-all shrink-0 cursor-pointer">
+                        <i class="fa-solid fa-gear text-xs"></i>
+                    </button>
+                </div>
             </div>
         </aside>
 
