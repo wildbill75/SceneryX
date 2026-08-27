@@ -1126,42 +1126,42 @@ function showAirportDetails(ap) {
 
     if (gsxBadge && gsxContainer) {
         if (ap.has_gsx_profile) {
-            gsxBadge.className = "px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+            gsxBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
             gsxBadge.innerText = "Profile Installed";
             const safeGsxPath = encodeURIComponent(ap.gsx_profile_path || '');
             gsxContainer.innerHTML = `
-                <div class="space-y-2">
+                <div class="space-y-2.5">
                     <div onclick="openGsxProfileInExplorer(decodeURIComponent('${safeGsxPath}'))" 
-                         class="p-2.5 rounded-xl bg-slate-950/80 hover:bg-slate-800/80 border border-slate-800/80 hover:border-cyan-500/50 cursor-pointer flex items-center justify-between gap-2 text-xs font-mono font-bold text-slate-200 hover:text-cyan-300 transition-all group shadow-sm"
+                         class="p-3 rounded-xl bg-slate-950/80 hover:bg-slate-800/80 border border-slate-800/80 hover:border-cyan-500/50 cursor-pointer flex items-center justify-between gap-2 text-xs lg:text-sm font-mono font-bold text-slate-100 hover:text-cyan-300 transition-all group shadow-sm"
                          title="Click to reveal GSX INI file in Explorer">
                         <span class="truncate">${ap.gsx_profile_filename}</span>
-                        <i class="fa-solid fa-folder-open text-cyan-400 group-hover:scale-110 transition-transform"></i>
+                        <i class="fa-solid fa-folder-open text-cyan-400 text-sm group-hover:scale-110 transition-transform"></i>
                     </div>
                     <div ondragover="handleGsxDragOver(event)" ondragleave="handleGsxDragLeave(event)" ondrop="handleGsxDrop(event)"
                          onclick="triggerInstallGsxProfile()"
-                         class="p-3 rounded-xl bg-slate-950/40 border-2 border-dashed border-slate-800 hover:border-cyan-500/50 flex flex-col items-center justify-center gap-1 text-center transition-all cursor-pointer group">
-                        <i class="fa-solid fa-file-arrow-up text-cyan-400 text-base group-hover:scale-110 transition-transform"></i>
-                        <span class="text-xs font-bold text-slate-300 group-hover:text-cyan-300">Drop downloaded .zip or .ini here to replace</span>
-                        <span class="text-[10px] text-slate-500">or click to browse & replace directly</span>
+                         class="p-3.5 rounded-xl bg-slate-950/40 border-2 border-dashed border-slate-800 hover:border-cyan-500/50 flex flex-col items-center justify-center gap-1.5 text-center transition-all cursor-pointer group">
+                        <i class="fa-solid fa-file-arrow-up text-cyan-400 text-lg group-hover:scale-110 transition-transform"></i>
+                        <span class="text-xs lg:text-sm font-extrabold text-cyan-300 group-hover:text-cyan-200">Drop downloaded .zip or .ini here to replace</span>
+                        <span class="text-xs text-slate-400">or click to browse & replace directly</span>
                     </div>
                 </div>
             `;
         } else {
-            gsxBadge.className = "px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-slate-800 text-slate-400 border border-slate-700";
+            gsxBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-slate-800 text-slate-400 border border-slate-700";
             gsxBadge.innerText = "No Profile";
             gsxContainer.innerHTML = `
-                <div class="space-y-2">
+                <div class="space-y-2.5">
                     <button onclick="triggerSearchGsxProfile()" 
-                            class="w-full p-2.5 rounded-xl bg-slate-950/40 hover:bg-cyan-500/10 border border-slate-800/50 hover:border-cyan-500/40 text-slate-300 hover:text-cyan-300 text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm">
+                            class="w-full p-3 rounded-xl bg-slate-950/40 hover:bg-cyan-500/10 border border-slate-800/50 hover:border-cyan-500/40 text-slate-200 hover:text-cyan-300 text-xs lg:text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer">
                         <i class="fa-solid fa-magnifying-glass text-cyan-400 text-xs"></i>
                         <span>Search GSX Profile on Flightsim.to</span>
                     </button>
                     <div ondragover="handleGsxDragOver(event)" ondragleave="handleGsxDragLeave(event)" ondrop="handleGsxDrop(event)"
                          onclick="triggerInstallGsxProfile()"
-                         class="p-3 rounded-xl bg-slate-950/40 border-2 border-dashed border-slate-800 hover:border-cyan-500/50 flex flex-col items-center justify-center gap-1 text-center transition-all cursor-pointer group">
-                        <i class="fa-solid fa-file-arrow-up text-cyan-400 text-base group-hover:scale-110 transition-transform"></i>
-                        <span class="text-xs font-bold text-slate-300 group-hover:text-cyan-300">Drop downloaded .zip or .ini here</span>
-                        <span class="text-[10px] text-slate-500">or click to browse & install directly</span>
+                         class="p-3.5 rounded-xl bg-slate-950/40 border-2 border-dashed border-slate-800 hover:border-cyan-500/50 flex flex-col items-center justify-center gap-1.5 text-center transition-all cursor-pointer group">
+                        <i class="fa-solid fa-file-arrow-up text-cyan-400 text-lg group-hover:scale-110 transition-transform"></i>
+                        <span class="text-xs lg:text-sm font-extrabold text-cyan-300 group-hover:text-cyan-200">Drop downloaded .zip or .ini here</span>
+                        <span class="text-xs text-slate-400">or click to browse & install directly</span>
                     </div>
                 </div>
             `;
