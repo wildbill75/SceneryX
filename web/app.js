@@ -2002,6 +2002,9 @@ async function rescanMSFS() {
         if (percentTxt) percentTxt.innerText = "25%";
     }
 
+    // Force browser repaint before calling pywebview rescan
+    await new Promise(r => setTimeout(r, 60));
+
     let progressTimer = setInterval(() => {
         if (!progressFx) return;
         let curr = parseInt(progressFx.style.width) || 25;

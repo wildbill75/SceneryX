@@ -182,7 +182,7 @@ ADDON_LIBRARY_KEYWORDS = [
 FIX_PATCH_KEYWORDS = [
     'fix', 'patch', 'flatten', 'fixer', 'correction', 'enhancement', 'mod',
     'update-fix', 'gsx-fix', 'vdgs-fix', 'ils-fix', 'nav-fix', 'lighting-fix',
-    'taxiway-fix', 'runway-fix', 'flatten-fix'
+    'taxiway-fix', 'runway-fix', 'flatten-fix', 'zparking', 'parking', 'vdgs'
 ]
 
 # Official MSFS Standard Edition Handcrafted Airports (Base Game Standard + World Updates I to XVIII)
@@ -699,6 +699,21 @@ def run_scan():
 
     detected_map = {}
 
+    disabled_in_xml = set()
+    content_xml_path = r'C:\Users\Bertrand\AppData\Local\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\ThirdBuk\Content.xml'
+    if os.path.exists(content_xml_path):
+        try:
+            import xml.etree.ElementTree as ET
+            tree = ET.parse(content_xml_path)
+            root = tree.getroot()
+            for p in root.findall('Package'):
+                if p.get('active') == 'UserDisabled':
+                    name = p.get('name', '').lower()
+                    clean = name[:-9] if name.endswith('.disabled') else name
+                    disabled_in_xml.add(clean.lower())
+        except Exception:
+            pass
+
     def get_source_priority(cat_name):
         c_lower = cat_name.lower()
         if 'community' in c_lower:
@@ -709,9 +724,13 @@ def run_scan():
             return 1
         return 2
 
-    for cat, folder_name, full_path, is_disabled in all_packages:
-        clean_folder = folder_name[:-9] if is_disabled else folder_name
+    for cat, folder_name, full_path, is_disabled_pkg in all_packages:
+        clean_folder = folder_name[:-9] if is_disabled_pkg else folder_name
         fn_lower = clean_folder.lower()
+        fn_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn_lower)
+
+        is_dis_xml = any(fn_lower in d or d in fn_lower or fn_norm in d or d in fn_norm for d in disabled_in_xml)
+        is_disabled = is_disabled_pkg or is_dis_xml
         
         if any(k in fn_lower for k in NON_AIRPORT_KEYWORDS) or '-livery-' in fn_lower or '-aircraft-' in fn_lower:
             continue
@@ -911,6 +930,105 @@ def run_scan():
                     if is_asobo_official:
                         existing["is_asobo_official"] = True
 
+    # Dynamic discovery of future World Updates & City Updates from packages & Content.xml
+    dynamic_asobo_set = set(ASOBO_STANDARD_ICAOS)
+    msfs_edition = settings.get("msfs_edition", "Standard")
+    if msfs_edition in ["Deluxe", "Premium Deluxe"]:
+        dynamic_asobo_set.update(ASOBO_DELUXE_ICAOS)
+    if msfs_edition == "Premium Deluxe":
+        dynamic_asobo_set.update(ASOBO_PREMIUM_DELUXE_ICAOS)
+
+    # Scan package names from Content.xml and physical/streamed folders for new official airports
+    pkg_names_scanned = set()
+    content_xml_path = r'C:\Users\Bertrand\AppData\Local\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\ThirdBuk\Content.xml'
+    if os.path.exists(content_xml_path):
+        try:
+            import xml.etree.ElementTree as ET
+            tree = ET.parse(content_xml_path)
+            root = tree.getroot()
+            for p in root.findall('Package'):
+                name = p.get('name', '').lower()
+                pkg_names_scanned.add(name)
+        except Exception: pass
+
+    for _, f_item, _, _ in all_packages:
+        pkg_names_scanned.add(f_item.lower())
+
+    for p_name in pkg_names_scanned:
+        if any(k in p_name for k in ['asobo-airport-', 'microsoft-airport-', 'worldupdate', 'cityupdate']):
+            tokens = re.split(r'[-_ ]+', p_name)
+            for t in tokens:
+                t_u = t.upper()
+                if len(t_u) == 4 and t_u in airports and t_u not in dynamic_asobo_set:
+                    if t.lower() not in ['fs20', 'fs24', 'vfra', 'pack', 'aero', 'vfr', 'mesh', 'tree', 'data', 'area', 'zone', 'city']:
+                        dynamic_asobo_set.add(t_u)
+
+    for h_icao in dynamic_asobo_set:
+        h_u = h_icao.upper()
+        if h_u in airports:
+            is_asobo_dis = any(h_icao.lower() in d for d in disabled_in_xml)
+            asobo_src = {
+                "folder_name": f"fs24-asobo-airport-{h_icao.lower()}",
+                "package_path": "",
+                "source_folder": "MSFS 2024 - StreamedPackages",
+                "match_source": "Default Asobo Handcrafted",
+                "vendor": "Microsoft / Asobo",
+                "pricing_type": "Asobo",
+                "is_payware": False,
+                "is_asobo_official": True,
+                "is_disabled": is_asobo_dis,
+                "is_addon": False,
+                "is_fix_patch": False,
+                "version": "",
+                "size_str": "Streamed"
+            }
+            if h_u not in detected_map:
+                ap_info = airports[h_u]
+                raw_type = ap_info.get('type', 'airport')
+                if raw_type == 'large_airport':
+                    english_type = "International"
+                elif raw_type == 'medium_airport':
+                    english_type = "Regional"
+                elif raw_type in ['small_airport', 'closed']:
+                    english_type = "General Aviation"
+                elif raw_type in ['heliport', 'seaplane_base']:
+                    english_type = "Heli / Water"
+                else:
+                    english_type = "General Aviation"
+
+                detected_map[h_u] = {
+                    "icao": h_u,
+                    "ident": h_u,
+                    "name": ap_info.get('name', ''),
+                    "city": ap_info.get('city', ''),
+                    "country": ap_info.get('country', ''),
+                    "lat": ap_info.get('lat', 0.0),
+                    "lon": ap_info.get('lon', 0.0),
+                    "type": raw_type,
+                    "english_type": english_type,
+                    "vendor": "Microsoft / Asobo",
+                    "pricing_type": "Asobo",
+                    "is_payware": False,
+                    "is_asobo_official": True,
+                    "is_custom_price": False,
+                    "price_eur": 0.0,
+                    "package_name": f"fs24-asobo-airport-{h_icao.lower()}",
+                    "package_path": "",
+                    "source_folder": "MSFS 2024 - StreamedPackages",
+                    "version": "",
+                    "size_str": "Streamed",
+                    "match_source": "Default Asobo Handcrafted",
+                    "all_sources": [asobo_src],
+                    "is_disabled": False,
+                    "has_conflict": False,
+                    "conflict_count": 1,
+                    "rating": ratings.get(h_u, 0.0)
+                }
+            else:
+                existing = detected_map[h_u]
+                if not any(s.get('is_asobo_official') or s.get('pricing_type') == 'Asobo' or 'asobo-airport-' in s.get('folder_name', '').lower() for s in existing["all_sources"]):
+                    existing["all_sources"].append(asobo_src)
+
     # Process each detected airport and resolve primary package & classification
     for icao, item in detected_map.items():
         # 1. Determine if this airport has an Official Asobo/Microsoft base scenery in ANY source (including StreamedPackages)
@@ -928,10 +1046,7 @@ def run_scan():
             for s in item['all_sources']
         )
 
-        # 3. Clean up all_sources: if physical local installation exists (non-streamed and non-default), purge StreamedPackages entries for drawer UI
-        has_physical_install = any('streamed' not in s.get('source_folder', '').lower() and 'default' not in s.get('source_folder', '').lower() for s in item['all_sources'])
-        if has_physical_install:
-            item['all_sources'] = [s for s in item['all_sources'] if 'streamed' not in s.get('source_folder', '').lower()]
+
 
         if item['all_sources']:
             def get_package_score(s):
@@ -946,9 +1061,9 @@ def run_scan():
                         score += 500
                 
                 if s.get('is_fix_patch'):
-                    score -= 10
+                    score -= 1000
                 elif s.get('is_addon'):
-                    score -= 20
+                    score -= 500
                 else:
                     score += 20
                 return score
@@ -1043,106 +1158,6 @@ def run_scan():
     # Scan GSX Profiles
     gsx_path_cfg = settings.get("gsx_profile_path", get_default_gsx_path())
     gsx_map = scan_gsx_profiles(gsx_path_cfg)
-
-    # Dynamic discovery of future World Updates & City Updates from packages & Content.xml
-    dynamic_asobo_set = set(ASOBO_STANDARD_ICAOS)
-    msfs_edition = settings.get("msfs_edition", "Standard")
-    if msfs_edition in ["Deluxe", "Premium Deluxe"]:
-        dynamic_asobo_set.update(ASOBO_DELUXE_ICAOS)
-    if msfs_edition == "Premium Deluxe":
-        dynamic_asobo_set.update(ASOBO_PREMIUM_DELUXE_ICAOS)
-
-    # Scan package names from Content.xml and physical/streamed folders for new official airports
-    pkg_names_scanned = set()
-    content_xml_path = r'C:\Users\Bertrand\AppData\Local\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\ThirdBuk\Content.xml'
-    if os.path.exists(content_xml_path):
-        try:
-            import xml.etree.ElementTree as ET
-            tree = ET.parse(content_xml_path)
-            root = tree.getroot()
-            for p in root.findall('Package'):
-                name = p.get('name', '').lower()
-                pkg_names_scanned.add(name)
-        except Exception: pass
-
-    for _, f_item, _, _ in all_packages:
-        pkg_names_scanned.add(f_item.lower())
-
-    for p_name in pkg_names_scanned:
-        if any(k in p_name for k in ['asobo-airport-', 'microsoft-airport-', 'worldupdate', 'cityupdate']):
-            tokens = re.split(r'[-_ ]+', p_name)
-            for t in tokens:
-                t_u = t.upper()
-                if len(t_u) == 4 and t_u in airports and t_u not in dynamic_asobo_set:
-                    if t.lower() not in ['fs20', 'fs24', 'vfra', 'pack', 'aero', 'vfr', 'mesh', 'tree', 'data', 'area', 'zone', 'city']:
-                        dynamic_asobo_set.add(t_u)
-
-    for h_icao in dynamic_asobo_set:
-        h_u = h_icao.upper()
-        if h_u in airports:
-            asobo_src = {
-                "folder_name": f"fs24-asobo-airport-{h_icao.lower()}",
-                "package_path": "",
-                "source_folder": "MSFS 2024 - StreamedPackages",
-                "match_source": "Default Asobo Handcrafted",
-                "vendor": "Microsoft / Asobo",
-                "pricing_type": "Asobo",
-                "is_payware": False,
-                "is_asobo_official": True,
-                "is_disabled": False,
-                "is_addon": False,
-                "is_fix_patch": False,
-                "version": "",
-                "size_str": "Streamed"
-            }
-            if h_u not in detected_map:
-                ap_info = airports[h_u]
-                raw_type = ap_info.get('type', 'airport')
-                if raw_type == 'large_airport':
-                    english_type = "International"
-                elif raw_type == 'medium_airport':
-                    english_type = "Regional"
-                elif raw_type in ['small_airport', 'closed']:
-                    english_type = "General Aviation"
-                elif raw_type in ['heliport', 'seaplane_base']:
-                    english_type = "Heli / Water"
-                else:
-                    english_type = "General Aviation"
-
-                detected_map[h_u] = {
-                    "icao": h_u,
-                    "ident": h_u,
-                    "name": ap_info.get('name', ''),
-                    "city": ap_info.get('city', ''),
-                    "country": ap_info.get('country', ''),
-                    "lat": ap_info.get('lat', 0.0),
-                    "lon": ap_info.get('lon', 0.0),
-                    "type": raw_type,
-                    "english_type": english_type,
-                    "vendor": "Microsoft / Asobo",
-                    "pricing_type": "Asobo",
-                    "is_payware": False,
-                    "is_asobo_official": True,
-                    "is_custom_price": False,
-                    "price_eur": 0.0,
-                    "package_name": f"fs24-asobo-airport-{h_icao.lower()}",
-                    "package_path": "",
-                    "source_folder": "MSFS 2024 - StreamedPackages",
-                    "version": "",
-                    "size_str": "Streamed",
-                    "match_source": "Default Asobo Handcrafted",
-                    "all_sources": [asobo_src],
-                    "is_disabled": False,
-                    "has_conflict": False,
-                    "conflict_count": 1,
-                    "rating": ratings.get(h_u, 0.0)
-                }
-            else:
-                existing = detected_map[h_u]
-                if not any(s.get('is_asobo_official') or s.get('pricing_type') == 'Asobo' or 'asobo-airport-' in s.get('folder_name', '').lower() for s in existing["all_sources"]):
-                    existing["all_sources"].append(asobo_src)
-                    existing["has_conflict"] = len(existing["all_sources"]) > 1
-                    existing["conflict_count"] = len(existing["all_sources"])
 
     # Include all 4-letter ICAO default procedural MSFS airports from airports.json that are not already in detected_map
     for d_icao, ap_info in airports.items():
