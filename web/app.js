@@ -20,7 +20,7 @@ const ALL_PRICING_LIST = ['Payware', 'Freeware / Flightsim.to', 'Asobo', 'Defaul
 const ALL_SOURCES_LIST = ['asobo', 'Community', 'StreamedPackages', 'Official'];
 const ALL_TYPES_LIST = ['International', 'Regional', 'General Aviation', 'Heli / Water'];
 
-let selectedPricing = new Set(ALL_PRICING_LIST);
+let selectedPricing = new Set(['Payware', 'Freeware / Flightsim.to', 'Asobo']);
 let selectedSources = new Set(ALL_SOURCES_LIST);
 let selectedTypes = new Set(ALL_TYPES_LIST);
 let selectedMinRating = 0; // 0 = All ratings
