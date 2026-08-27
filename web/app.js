@@ -1032,13 +1032,14 @@ function showAirportDetails(ap) {
 
     if (typeBadge) typeBadge.innerText = ap.english_type || ap.type;
 
-    // Update Activation Status Card in Drawer (Simple Status Pill Only)
+    // Update Activation Status Card in Drawer & Developer Info Visibility
     const actBadge = document.getElementById('drawer-activation-badge');
+    const devBlockEl = document.getElementById('drawer-dev-block');
+    const allSourcesDisabled = ap.all_sources && ap.all_sources.length > 0 && ap.all_sources.every(s => s.is_disabled);
+    const isFallbackDefault = ap.is_disabled || allSourcesDisabled || cat === 'DEFAULT';
 
     if (actBadge) {
-        const allSourcesDisabled = ap.all_sources && ap.all_sources.length > 0 && ap.all_sources.every(s => s.is_disabled);
-
-        if (ap.is_disabled || allSourcesDisabled || cat === 'DEFAULT') {
+        if (isFallbackDefault) {
             actBadge.className = "px-3 py-1 rounded-full text-xs font-mono font-bold bg-blue-500/20 text-blue-300 border border-blue-500/40";
             actBadge.innerText = "Default MSFS Airport";
         } else if (cat === 'ASOBO') {
@@ -1047,6 +1048,14 @@ function showAirportDetails(ap) {
         } else {
             actBadge.className = "px-3 py-1 rounded-full text-xs font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40";
             actBadge.innerText = "Custom Addon Active";
+        }
+    }
+
+    if (devBlockEl) {
+        if (isFallbackDefault) {
+            devBlockEl.classList.add('hidden');
+        } else {
+            devBlockEl.classList.remove('hidden');
         }
     }
 

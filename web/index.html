@@ -495,8 +495,8 @@
                         <p id="drawer-city-country" class="text-xs text-slate-400">City, Country</p>
                     </div>
 
-                    <!-- Developer Info & Status Row -->
-                    <div class="pt-2.5 border-t border-slate-800/80 space-y-2">
+                    <!-- Developer Info Row (Hidden when Default MSFS fallback is active) -->
+                    <div id="drawer-dev-block" class="pt-2.5 border-t border-slate-800/80 space-y-1">
                         <div class="flex items-center justify-between gap-2">
                             <div class="flex items-center gap-2 min-w-0">
                                 <span class="text-[10px] text-slate-400 uppercase tracking-wider font-bold shrink-0">Developer / Publisher</span>
@@ -509,11 +509,11 @@
                         
                         <!-- Prominent Large Developer Name -->
                         <div id="drawer-vendor" class="text-sm lg:text-base font-black tracking-wide text-cyan-300 truncate">Unknown Vendor</div>
+                    </div>
 
-                        <!-- Status Pill Row -->
-                        <div class="pt-1 flex items-center justify-between">
-                            <span id="drawer-activation-badge" class="px-3 py-1 rounded-full text-xs font-mono font-extrabold shadow-sm">Custom Addon Active</span>
-                        </div>
+                    <!-- Status Pill Row -->
+                    <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between">
+                        <span id="drawer-activation-badge" class="px-3 py-1 rounded-full text-xs font-mono font-extrabold shadow-sm">Custom Addon Active</span>
                     </div>
                 </div>
 
