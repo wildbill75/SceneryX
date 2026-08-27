@@ -1236,7 +1236,7 @@ function showAirportDetails(ap) {
 
         const openBtnClass = 'px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold border border-slate-700 flex items-center gap-1.5 transition-all shadow-sm shrink-0 whitespace-nowrap cursor-pointer';
 
-        const hasConflict = ap.has_conflict || (ap.all_sources && ap.all_sources.length > 1);
+        const hasConflict = ap.has_conflict;
         const isAsoboPkg = (src.is_asobo_official || src.vendor === 'Microsoft / Asobo' || (src.folder_name && (src.folder_name.toLowerCase().includes('asobo-airport-') || src.folder_name.toLowerCase().includes('microsoft-airport-'))));
         const isDefaultPkg = (src.pricing_type === 'Default' || (src.folder_name && src.folder_name.startsWith('msfs-default-')));
 

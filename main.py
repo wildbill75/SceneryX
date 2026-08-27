@@ -155,7 +155,56 @@ def fast_update_airport_cache(icao_target, target_pkg_name=None, toggle_all=Fals
 
             # Check if all 3rd-party sources are disabled
             all_dis = len(all_srcs) > 0 and all(s.get('is_disabled') for s in all_srcs)
-            target_ap['is_disabled'] = all_dis
+
+        # Recalculate active main scenery packages (excluding Fix/Patch and Addon packages)
+        active_primary_installs = [
+            s for s in all_srcs 
+            if not s.get('is_disabled') and not s.get('is_addon') and not s.get('is_fix_patch')
+        ]
+        
+        # Conflict recalculation: A conflict ONLY exists if 2 or more MAIN sceneries are ACTIVE
+        if len(active_primary_installs) > 1:
+            target_ap['has_conflict'] = True
+            target_ap['conflict_count'] = len(active_primary_installs)
+        else:
+            target_ap['has_conflict'] = False
+            active_sources = [s for s in all_srcs if not s.get('is_disabled')]
+            target_ap['conflict_count'] = max(1, len(active_sources))
+
+        # Recalculate primary package & vendor from active sources
+        active_sources = [s for s in all_srcs if not s.get('is_disabled')]
+        if active_sources:
+            main_active = [s for s in active_sources if not s.get('is_fix_patch') and not s.get('is_addon')]
+            primary = main_active[0] if main_active else active_sources[0]
+
+            target_ap['package_name'] = primary['folder_name']
+            target_ap['package_path'] = primary.get('package_path', '')
+            target_ap['source_folder'] = primary.get('source_folder', '')
+            target_ap['match_source'] = primary.get('match_source', '')
+            target_ap['version'] = primary.get('version', '')
+
+            if primary.get('is_payware'):
+                target_ap['vendor'] = primary.get('vendor', 'Unknown')
+                target_ap['pricing_type'] = "Payware"
+                target_ap['is_payware'] = True
+                target_ap['is_asobo_official'] = False
+            elif primary.get('is_asobo_official') or primary.get('pricing_type') == 'Asobo' or primary.get('vendor') == 'Microsoft / Asobo':
+                target_ap['vendor'] = "Microsoft / Asobo"
+                target_ap['pricing_type'] = "Asobo"
+                target_ap['is_payware'] = False
+                target_ap['is_asobo_official'] = True
+            else:
+                target_ap['vendor'] = primary.get('vendor', 'Unknown')
+                target_ap['pricing_type'] = primary.get('pricing_type', 'Freeware / Flightsim.to')
+                target_ap['is_payware'] = primary.get('is_payware', False)
+                target_ap['is_asobo_official'] = False
+            target_ap['is_disabled'] = False
+        else:
+            target_ap['vendor'] = "Microsoft Flight Simulator (Default)"
+            target_ap['pricing_type'] = "Default"
+            target_ap['is_payware'] = False
+            target_ap['is_asobo_official'] = False
+            target_ap['is_disabled'] = False
 
         with open(OUTPUT_JSON_PATH, 'w', encoding='utf-8') as f:
             json.dump(airports, f, ensure_ascii=False, indent=2)
