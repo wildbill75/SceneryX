@@ -889,8 +889,18 @@ def run_scan():
             except Exception:
                 pass
                 
-        if manifest_ctype in ['AIRCRAFT', 'LIVERY', 'TOOL', 'MISC', 'INSTRUMENT']:
-            continue
+        if manifest_ctype in ['AIRCRAFT', 'LIVERY', 'TOOL', 'MISC', 'INSTRUMENT', 'CORE', 'LIBRARY']:
+            tokens = re.split(r'[-_ ]+', fn_lower)
+            has_explicit_icao = any(len(t) == 4 and t.isalpha() and t.upper() in airports for t in tokens)
+            if not has_explicit_icao:
+                continue
+
+        # Filter out generic global asset libraries that have no ICAO code in folder name
+        if any(k in fn_lower for k in ['assetpack', 'vegetation-library', 'windy-things', 'palm_trees_library', 'fly-in-library', 'libraryv14', 'object-library', 'objects-library']):
+            tokens = re.split(r'[-_ ]+', fn_lower)
+            has_explicit_icao = any(len(t) == 4 and t.isalpha() and t.upper() in airports for t in tokens)
+            if not has_explicit_icao:
+                continue
         
         # Check if this package is a fix/patch or a model library/interior/mesh addon rather than a main scenery
         m_title_lower = manifest_title.lower() if manifest_title else ""
@@ -898,25 +908,11 @@ def run_scan():
         for hint_term in ['custom_airport_patch', 'bespoke_airport_patch', 'community_airport_patch', 'official_airport_patch', 'airport_patch', 'custom_airport', 'bespoke_airport', 'community_airport']:
             clean_hint = clean_hint.replace(hint_term, '')
 
-        size_str = get_folder_size_formatted(full_path, folder_size_cache) if full_path else ""
-        is_small_patch = False
-        if size_str:
-            if 'KB' in size_str or ' B' in size_str:
-                is_small_patch = True
-            elif 'MB' in size_str:
-                try:
-                    mb_val = float(size_str.replace('MB', '').strip())
-                    if mb_val < 80.0:
-                        is_small_patch = True
-                except Exception:
-                    pass
-
         is_fix_patch = (
             any(re.search(rf'\b{re.escape(k)}\b', fn_lower) for k in FIX_PATCH_KEYWORDS)
             or any(fn_lower.endswith(f"_{k}") or fn_lower.endswith(f"-{k}") for k in FIX_PATCH_KEYWORDS)
-            or any(k in clean_hint for k in ['patch', 'fix', 'enhancement', 'correction'])
-            or any(k in m_title_lower for k in ['fix', 'patch', 'enhancement', 'flatten', 'correction'])
-            or (is_small_patch and not (fn_lower.startswith(('asobo-', 'microsoft-', 'fs20-asobo-', 'fs24-asobo-')) or (manifest_data and 'asobo' in str(manifest_data.get('creator','')).lower())))
+            or any(k in clean_hint for k in ['patch', 'fix', 'enhancement', 'correction', 'overlay'])
+            or any(k in m_title_lower for k in ['fix', 'patch', 'enhancement', 'flatten', 'correction', 'overlay'])
         )
         is_addon_package = is_fix_patch or any(k in fn_lower for k in ADDON_LIBRARY_KEYWORDS)
 
@@ -954,7 +950,7 @@ def run_scan():
                         ldata = json.load(f)
                         entries = ldata.get('content', [])
                         paths_str = ' '.join([c.get('path', '') for c in entries[:2000]])
-                        bgl_icaos = set(re.findall(r'([a-zA-Z]{4})[-_.]?(?:airport|scenery)?\.bgl', paths_str, re.IGNORECASE))
+                        bgl_icaos = set(re.findall(r'[/\\]([a-zA-Z]{4})[-_.]?(?:airport|scenery)?\.bgl', paths_str, re.IGNORECASE))
                         bgl_icaos.update(re.findall(r'scenery[/\\](?:airports[/\\])?(?:world[/\\]scenery[/\\])?(?:airport-)?([A-Za-z]{4})[._\\]', paths_str, re.IGNORECASE))
                         for tok in bgl_icaos:
                             tok_u = tok.upper()
