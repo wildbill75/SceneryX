@@ -681,12 +681,12 @@ def get_clean_vendor(folder_name, manifest_data):
     # Strip system prefixes (e.g. communityfs20-, fs24-, etc.)
     clean_fn = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn_lower)
 
-    # 1. Check cleaned folder name against VENDOR_MAP
+    # 1. Check cleaned folder name against VENDOR_MAP first (Folder naming is almost always higher quality than manifest fields)
     for key, pretty_name in VENDOR_MAP.items():
         if key in clean_fn:
             return pretty_name
 
-    # 2. Check manifest creator / author / manufacturer
+    # 2. Check manifest creator / author / manufacturer against VENDOR_MAP
     if manifest_data and isinstance(manifest_data, dict):
         creator = str(manifest_data.get('creator', '')).strip()
         author = str(manifest_data.get('author', '')).strip()
@@ -698,20 +698,23 @@ def get_clean_vendor(folder_name, manifest_data):
             if key in c_check:
                 return pretty_name
 
+        # 3. Only accept manifest candidate if it has a real brand name (> 3 chars, not 2-3 letter dev initials like "HB", "AB", "MS")
         for candidate in [creator, author, manufacturer]:
-            if candidate and candidate.lower() not in ['handcrafted', 'scenery', 'airport', 'default', 'none', 'unknown', 'france', 'asobo', 'microsoft', 'community creator']:
+            if candidate and len(candidate) > 3 and candidate.lower() not in ['handcrafted', 'scenery', 'airport', 'default', 'none', 'unknown', 'france', 'asobo', 'microsoft', 'community creator', 'builder']:
                 return candidate
 
-    # 3. Fallback for Asobo / Microsoft
+    # 4. Fallback for Asobo / Microsoft
     if 'asobo' in clean_fn or 'microsoft' in clean_fn:
         return 'Microsoft / Asobo'
 
-    # 4. Extract first valid segment from cleaned folder name
+    # 5. Extract first valid segment from cleaned folder name
     parts = clean_fn.split('-')
     if parts:
         for p in parts:
-            if p and p not in ['airport', 'scenery', 'handcrafted', 'france', 'pack', 'project', 'z', 'zzz', 'zzzz']:
+            if p and p not in ['airport', 'scenery', 'handcrafted', 'france', 'pack', 'project', 'z', 'zzz', 'zzzz', 'msfs2024', 'msfs2020', 'msfs', 'fs20', 'fs24']:
                 return p.capitalize()
+
+    return 'Community Creator'
 
     return 'Community Creator'
 
