@@ -1955,8 +1955,7 @@ function filterAirports() {
         } else {
             // Pricing Filter (only applied when NOT in specific airline route mode)
             const pt = getAirportPricingType(ap);
-            const allSourcesDisabled = ap.all_sources && ap.all_sources.length > 0 && ap.all_sources.every(s => s.is_disabled);
-            const hasDisabledAddon = (ap.all_sources && ap.all_sources.length > 0) && (ap.is_disabled || allSourcesDisabled);
+            const hasDisabledAddon = ap.all_sources && ap.all_sources.some(s => s.is_disabled && !(s.is_default || (s.folder_name && s.folder_name.startsWith('msfs-default-'))));
 
             // If an airport has installed addons that are currently disabled, keep its Default MSFS Blue Circle Dot visible!
             if (!selectedPricing.has(pt) && !hasDisabledAddon) return false;

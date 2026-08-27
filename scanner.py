@@ -543,7 +543,7 @@ def get_estimated_price(icao, folder_name, vendor, pricing_type, english_type, i
     if icao in custom_prices:
         return float(custom_prices[icao]), True
 
-    if is_asobo or pricing_type == "Asobo / MS" or pricing_type == "Freeware / Flightsim.to":
+    if is_asobo or pricing_type in ["Asobo", "Asobo / MS", "Freeware", "Freeware / Flightsim.to"] or "freeware" in str(pricing_type).lower():
         return 0.0, False
 
     fn_lower = folder_name.lower()
