@@ -1366,11 +1366,11 @@ class Api:
         import webbrowser
         import urllib.parse
         
-        query = f"{icao}".strip()
-        if vendor and vendor.lower() not in ['unknown', 'microsoft / asobo', 'asobo', 'unknown vendor']:
-            query = f"{icao} {vendor}".strip()
-        elif name and name.lower() not in ['unknown', 'default']:
-            query = f"{icao} {name}".strip()
+        clean_name = (name or '').strip()
+        if not clean_name or clean_name.lower() in ['unknown', 'default']:
+            query = f"{icao}".strip()
+        else:
+            query = f"{icao} {clean_name}".strip()
 
         url = f"https://flightsim.to/search?q={urllib.parse.quote(query)}"
         webbrowser.open(url)
