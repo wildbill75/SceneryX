@@ -705,15 +705,15 @@ function createCustomIcon(ap) {
     let strokeColor = ap.has_conflict ? '#ef4444' : '#ffffff';
     let strokeWidth = ap.has_conflict ? '2' : '1.2';
 
-    if (hasActiveFix) {
-        strokeColor = '#10b981'; // Emerald Green stroke outline for airports with active Fix/Patch!
-        strokeWidth = '2.2';
-    }
-
     if (isApDisabled && cat !== 'DEFAULT') {
         color = '#475569'; // Slate 600 Matte Gray fill
         strokeColor = '#cbd5e1'; // Crisp Silver/Slate 300 Outline
         strokeWidth = '1.5';
+    }
+
+    if (hasActiveFix) {
+        strokeColor = '#10b981'; // Emerald Green stroke outline for airports with active Fix/Patch!
+        strokeWidth = '2.5';
     }
 
     // Default MSFS procedural airports are drawn as CIRCLES / DOTS (not stars)
@@ -733,7 +733,7 @@ function createCustomIcon(ap) {
 
     return L.divIcon({
         html: svgIcon,
-        className: `custom-map-marker ${isApDisabled ? 'grayscale-[0.5]' : ''}`,
+        className: `custom-map-marker ${isApDisabled && !hasActiveFix ? 'grayscale-[0.5]' : ''}`,
         iconSize: isCircleShape ? [22, 22] : [26, 26],
         iconAnchor: isCircleShape ? [11, 11] : [13, 13]
     });
