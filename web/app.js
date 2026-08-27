@@ -26,6 +26,7 @@ let selectedTypes = new Set(ALL_TYPES_LIST);
 let selectedMinRating = 0; // 0 = All ratings
 let selectedGsxFilter = 'all'; // 'all', 'with', 'none'
 let selectedAirline = null;
+let selectedAirlines = new Set();
 let activeRouteOrigin = null;
 let activeRouteLinesGroup = null;
 
@@ -39,40 +40,35 @@ function filterByAirline(airlineName) {
     const originAp = selectedAirport;
     if (!originAp) return;
 
-    const isSameAirline = (selectedAirline === airlineName && activeRouteOrigin && activeRouteOrigin.icao === originAp.icao);
-
-    // Always reset current airline selection first
-    selectedAirline = null;
-    activeRouteOrigin = null;
-
-    if (isSameAirline) {
-        // Toggle off current airline
-        filterAirports();
-        updateFilterUI();
-        showAirportDetails(originAp);
-        return;
+    if (!activeRouteOrigin || activeRouteOrigin.icao !== originAp.icao) {
+        selectedAirlines.clear();
+        activeRouteOrigin = originAp;
     }
 
-    // Get all destination ICAOs for this airline from origin
-    const destIcaos = (originAp.routes && originAp.routes[airlineName]) || [];
-
-    if (destIcaos.length === 0) {
-        filterAirports();
-        updateFilterUI();
-        showAirportDetails(originAp);
-
-        showCustomModal({
-            title: 'No Route Destinations',
-            message: `No scheduled route destination data found for ${airlineName} from ${originAp.icao}.`,
-            type: 'info',
-            confirmText: 'OK'
-        });
-        return;
+    if (selectedAirlines.has(airlineName)) {
+        selectedAirlines.delete(airlineName);
+        if (selectedAirlines.size === 0) {
+            activeRouteOrigin = null;
+            selectedAirline = null;
+        } else {
+            selectedAirline = Array.from(selectedAirlines)[selectedAirlines.size - 1];
+        }
+    } else {
+        const destIcaos = (originAp.routes && originAp.routes[airlineName]) || [];
+        if (destIcaos.length === 0 && selectedAirlines.size === 0) {
+            showCustomModal({
+                title: 'No Route Destinations',
+                message: `No scheduled route destination data found for ${airlineName} from ${originAp.icao}.`,
+                type: 'info',
+                confirmText: 'OK'
+            });
+            return;
+        }
+        selectedAirlines.add(airlineName);
+        selectedAirline = airlineName;
+        activeRouteOrigin = originAp;
     }
 
-    // Activate airline filter!
-    selectedAirline = airlineName;
-    activeRouteOrigin = originAp;
     filterAirports();
     updateFilterUI();
     showAirportDetails(originAp);
@@ -80,6 +76,7 @@ function filterByAirline(airlineName) {
 
 function clearAirlineFilter() {
     selectedAirline = null;
+    selectedAirlines.clear();
     activeRouteOrigin = null;
     filterAirports();
     updateFilterUI();
@@ -926,7 +923,7 @@ function renderRouteLines(filteredAirports) {
         if (map) activeRouteLinesGroup = L.layerGroup().addTo(map);
     }
 
-    if (!selectedAirline || !activeRouteOrigin || !activeRouteOrigin.lat || !activeRouteOrigin.lon || !activeRouteLinesGroup) {
+    if (selectedAirlines.size === 0 || !activeRouteOrigin || !activeRouteOrigin.lat || !activeRouteOrigin.lon || !activeRouteLinesGroup) {
         return;
     }
 
@@ -1173,7 +1170,7 @@ function showAirportDetails(ap) {
         if (airlines.length > 0) {
             airlinesCountEl.innerText = `${airlines.length} Airlines`;
             airlinesListEl.innerHTML = airlines.map(al => {
-                const isActive = (selectedAirline === al && activeRouteOrigin && activeRouteOrigin.icao === ap.icao);
+                const isActive = selectedAirlines.has(al) && (activeRouteOrigin && activeRouteOrigin.icao === ap.icao);
                 const activeClass = isActive 
                     ? 'bg-cyan-500/25 text-cyan-300 border-cyan-400 shadow-[0_0_12px_rgba(56,189,248,0.4)] scale-105 font-bold' 
                     : 'bg-slate-950 text-slate-200 border-slate-800/80 hover:border-cyan-500/50 hover:text-cyan-300';
@@ -1936,18 +1933,22 @@ function filterAirports() {
         }
 
         // Operating Airline & Direct Route Filter
-        if (selectedAirline) {
+        if (selectedAirlines.size > 0) {
             if (activeRouteOrigin) {
                 // Specific origin airport route mode: Include origin AND all destination ICAOs (custom + default MSFS)
                 if (ap.icao === activeRouteOrigin.icao) {
                     return true;
                 }
-                const destIcaos = (activeRouteOrigin.routes && activeRouteOrigin.routes[selectedAirline]) || [];
-                if (!destIcaos.includes(ap.icao)) return false;
+                let combinedDestIcaos = new Set();
+                selectedAirlines.forEach(al => {
+                    const dests = (activeRouteOrigin.routes && activeRouteOrigin.routes[al]) || [];
+                    dests.forEach(d => combinedDestIcaos.add(d));
+                });
+                if (!combinedDestIcaos.has(ap.icao)) return false;
             } else {
                 // Global airline filter mode
                 const airlines = ap.operating_airlines || [];
-                if (!airlines.includes(selectedAirline)) return false;
+                if (!Array.from(selectedAirlines).some(al => airlines.includes(al))) return false;
             }
         } else {
             // Pricing Filter (only applied when NOT in specific airline route mode)
@@ -2174,10 +2175,11 @@ function updateFilterUI() {
     const airlineNameEl = document.getElementById('airline-filter-name');
     const airlineCountEl = document.getElementById('airline-filter-count');
     if (airlinePill) {
-        if (selectedAirline) {
+        if (selectedAirlines.size > 0) {
             airlinePill.classList.remove('hidden');
             airlinePill.classList.add('flex');
-            if (airlineNameEl) airlineNameEl.innerText = selectedAirline;
+            const namesList = Array.from(selectedAirlines).join(', ');
+            if (airlineNameEl) airlineNameEl.innerText = namesList;
             if (airlineCountEl) airlineCountEl.innerText = currentlyFilteredAirports ? currentlyFilteredAirports.length : 0;
         } else {
             airlinePill.classList.add('hidden');
