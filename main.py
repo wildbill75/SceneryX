@@ -611,13 +611,16 @@ class Api:
                     if not dp or not os.path.exists(dp):
                         continue
                     onestore = os.path.join(dp, 'OneStore')
-                    dirs = [onestore] if os.path.exists(onestore) else [dp]
+                    dirs = [onestore, dp] if os.path.exists(onestore) else [dp]
                     found = False
                     for d in dirs:
-                        cand = os.path.join(d, pkg_name)
-                        if os.path.exists(cand):
-                            target_path = cand
-                            found = True
+                        for candidate_name in [pkg_name, clean_pkg, clean_pkg + '.disabled']:
+                            cand = os.path.join(d, candidate_name)
+                            if os.path.exists(cand):
+                                target_path = cand
+                                found = True
+                                break
+                        if found:
                             break
                     if found:
                         break

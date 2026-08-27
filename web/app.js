@@ -1395,15 +1395,19 @@ function showToast(message, type = 'success') {
     if (!toast) {
         toast = document.createElement('div');
         toast.id = 'sceneryx-toast';
-        toast.className = 'fixed bottom-6 right-6 z-[9999] px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 border transition-all duration-300 transform translate-y-10 opacity-0 pointer-events-none font-semibold text-xs';
+        toast.className = 'fixed bottom-6 z-[9999] px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 border transition-all duration-300 transform translate-y-10 opacity-0 pointer-events-none font-semibold text-xs backdrop-blur-md';
         document.body.appendChild(toast);
     }
     
+    const drawer = document.getElementById('detail-drawer');
+    const isDrawerOpen = drawer && !drawer.classList.contains('translate-x-full');
+    const rightPosClass = isDrawerOpen ? 'right-[440px]' : 'right-6';
+    
     if (type === 'success') {
-        toast.className = 'fixed bottom-6 right-6 z-[9999] px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 border border-emerald-500/50 bg-slate-900/95 text-emerald-300 transition-all duration-300 transform translate-y-0 opacity-100 shadow-emerald-500/20';
+        toast.className = `fixed bottom-6 ${rightPosClass} z-[9999] px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 border border-emerald-500/50 bg-slate-900/95 text-emerald-300 transition-all duration-300 transform translate-y-0 opacity-100 shadow-emerald-500/20 backdrop-blur-md`;
         toast.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400 text-base"></i> <span>${message}</span>`;
     } else {
-        toast.className = 'fixed bottom-6 right-6 z-[9999] px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 border border-cyan-500/50 bg-slate-900/95 text-cyan-300 transition-all duration-300 transform translate-y-0 opacity-100 shadow-cyan-500/20';
+        toast.className = `fixed bottom-6 ${rightPosClass} z-[9999] px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 border border-cyan-500/50 bg-slate-900/95 text-cyan-300 transition-all duration-300 transform translate-y-0 opacity-100 shadow-cyan-500/20 backdrop-blur-md`;
         toast.innerHTML = `<i class="fa-solid fa-circle-info text-cyan-400 text-base"></i> <span>${message}</span>`;
     }
     
