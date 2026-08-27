@@ -53,17 +53,25 @@ function filterByAirline(airlineName) {
         return;
     }
 
-    // Get all real-world destination ICAOs for this airline from origin
+    // Get all destination ICAOs for this airline from origin
     const destIcaos = (originAp.routes && originAp.routes[airlineName]) || [];
+    
+    // Strictly match custom sceneries owned by the user (Payware / Freeware / Asobo - excluding Default MSFS)
+    const matchingCustomDests = allAirportsData.filter(a => {
+        if (a.icao === originAp.icao || !destIcaos.includes(a.icao)) return false;
+        const cat = getAirportCategory(a);
+        return cat !== 'DEFAULT';
+    });
 
-    if (destIcaos.length === 0) {
+    if (matchingCustomDests.length === 0) {
         filterAirports();
         updateFilterUI();
         showAirportDetails(originAp);
 
+        const destText = destIcaos.length > 0 ? ` (${destIcaos.length} destinations)` : '';
         showCustomModal({
-            title: 'No Route Destinations',
-            message: `No scheduled route destination data found for ${airlineName} from ${originAp.icao}.`,
+            title: 'No Custom Destinations',
+            message: `You don't have any custom addon airport (Payware/Freeware/Asobo) in your scenery collection for ${airlineName} from ${originAp.icao}${destText}.`,
             type: 'info',
             confirmText: 'OK'
         });
@@ -1667,6 +1675,10 @@ function filterAirports() {
                 }
                 const destIcaos = (activeRouteOrigin.routes && activeRouteOrigin.routes[selectedAirline]) || [];
                 if (!destIcaos.includes(ap.icao)) return false;
+
+                // STRICTLY ONLY SHOW CUSTOM SCENERIES (Payware / Freeware / Asobo - Exclude Default MSFS)
+                const cat = getAirportCategory(ap);
+                if (cat === 'DEFAULT') return false;
             } else {
                 // Global airline filter mode
                 const airlines = ap.operating_airlines || [];
