@@ -1655,11 +1655,9 @@ function resetFullDatabase() {
         confirmText: 'Yes, Reset All',
         cancelText: 'Cancel',
         onConfirm: () => {
-            const icon = document.getElementById('reset-icon');
-            if (icon) icon.className = "fa-solid fa-spinner fa-spin text-red-400 text-xs";
+            closeSettingsModal();
             if (!window.pywebview) return;
             window.pywebview.api.reset_full_database().then(resStr => {
-                if (icon) icon.className = "fa-solid fa-trash-can-arrow-up text-red-400 text-xs";
                 try {
                     const res = JSON.parse(resStr);
                     if (res.status === 'success') {
