@@ -1396,8 +1396,7 @@ async function toggleSpecificPackage(path, icao) {
                 const updatedAp = allAirportsData.find(a => a.icao === selectedAirport.icao);
                 if (updatedAp) showAirportDetails(updatedAp);
             }
-            const statusLabel = res.enabled ? 'Enabled' : 'Disabled';
-            showToast(`✓ ${icao || 'Package'} ${statusLabel} & Saved to Disk`, res.enabled ? 'success' : 'info');
+            showToast(`✓ ${icao || 'Scenery'} Activated & Saved to Disk`, 'success');
         }
     } catch (e) {
         console.error("Failed to toggle package:", e);
