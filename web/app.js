@@ -1344,7 +1344,7 @@ function showAirportDetails(ap) {
             const idx = sources.indexOf(src);
             const isDisabled = !!src.is_disabled;
             const isActive = !isDisabled;
-            const pkgPath = src.package_path || src.folder_name;
+            const pkgPath = (src.folder_name || '').replace(/'/g, "\\'");
             const openBtnClass = 'px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold border border-slate-700 flex items-center gap-1.5 transition-all shadow-sm shrink-0 whitespace-nowrap cursor-pointer';
 
             if (isActive) {
