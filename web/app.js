@@ -1744,6 +1744,15 @@ function filterAirports() {
             return false;
         }
 
+        // GSX Profile Filter (all, with, none)
+        const hasGsx = !!(ap.gsx_profile || ap.has_gsx_profile);
+        if (selectedGsxFilter === 'with' && !hasGsx) {
+            return false;
+        }
+        if (selectedGsxFilter === 'none' && hasGsx) {
+            return false;
+        }
+
         // Operating Airline & Direct Route Filter
         if (selectedAirline) {
             if (activeRouteOrigin) {
