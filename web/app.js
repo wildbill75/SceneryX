@@ -961,7 +961,7 @@ function focusAirportWithAnimation(ap) {
     lastFocusedIcao = ap.icao;
 
     if (map && ap.lat && ap.lon) {
-        map.flyTo([ap.lat, ap.lon], 11, {
+        map.flyTo([ap.lat, ap.lon], 14, {
             animate: true,
             duration: 1.5
         });
@@ -1649,11 +1649,12 @@ function resetMinRatingFilter() {
 
 function resetFullDatabase() {
     showCustomModal({
-        title: 'Reset Full Database & Restore Sceneries?',
-        message: 'This will re-activate all disabled MSFS scenery packages, clear flight mode, and perform a fresh scan of your Community & Official folders.',
+        title: 'Are you sure you want to reset?',
+        message: 'This will re-activate all disabled MSFS scenery packages, reset custom pricing overrides, and perform a fresh scan of your Community & Official folders. All custom toggles and state overrides will be reset to default.',
         type: 'warning',
         confirmText: 'Yes, Reset All',
         cancelText: 'Cancel',
+        showCancel: true,
         onConfirm: () => {
             closeSettingsModal();
             if (!window.pywebview) return;
@@ -1664,12 +1665,7 @@ function resetFullDatabase() {
                         allAirportsData = res.airports || [];
                         updateFlightModeBannerUI({ active: false, icaos: [] });
                         filterAirports();
-                        showCustomModal({
-                            title: 'Database Reset Complete',
-                            message: 'All sceneries have been restored to Activated status and your database has been freshly scanned.',
-                            type: 'success',
-                            confirmText: 'Great!'
-                        });
+                        showToast('✓ Database reset & freshly scanned', 'success');
                     }
                 } catch(e){}
             });
@@ -2471,8 +2467,8 @@ function showCustomModal(titleOrObj, messageStr, typeStr = 'info') {
         message = titleOrObj.message || '';
         type = titleOrObj.type || 'info';
         confirmText = titleOrObj.confirmText || 'OK';
-        cancelText = titleOrObj.cancelText || 'Annuler';
-        showCancel = !!titleOrObj.showCancel;
+        cancelText = titleOrObj.cancelText || 'Cancel';
+        showCancel = titleOrObj.showCancel !== undefined ? !!titleOrObj.showCancel : (!!titleOrObj.cancelText || !!titleOrObj.onCancel);
         customModalConfirmCallback = titleOrObj.onConfirm || null;
         customModalCancelCallback = titleOrObj.onCancel || null;
     } else {
