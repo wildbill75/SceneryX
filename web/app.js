@@ -1337,7 +1337,6 @@ function showAirportDetails(ap) {
                         <i class="fa-solid fa-wrench text-emerald-400 text-xs"></i>
                         <span class="text-xs font-bold uppercase tracking-wider text-slate-300">Available Fixes & Overlays</span>
                     </div>
-                    <span class="text-[10px] font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 font-semibold">Stackable</span>
                 </div>
                 <div class="space-y-2.5">
         `;

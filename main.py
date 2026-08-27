@@ -954,8 +954,8 @@ class Api:
                 if found_path:
                     target_path = found_path
 
-            is_currently_disabled = False
-            if os.path.exists(content_xml_path):
+            is_currently_disabled = target_path.endswith('.disabled') or os.path.exists(os.path.join(target_path, 'manifest.json.disabled'))
+            if not is_currently_disabled and os.path.exists(content_xml_path):
                 import xml.etree.ElementTree as ET
                 tree = ET.parse(content_xml_path)
                 root = tree.getroot()
@@ -965,11 +965,7 @@ class Api:
                     if clean.lower() == clean_name.lower() or clean_name.lower() in clean.lower() or clean.lower() in clean_name.lower():
                         if p.get('active') == 'UserDisabled':
                             is_currently_disabled = True
-                        break
-
-            if os.path.exists(target_path):
-                if target_path.endswith('.disabled') or os.path.exists(os.path.join(target_path, 'manifest.json.disabled')):
-                    is_currently_disabled = True
+                            break
 
             should_enable = is_currently_disabled
 
