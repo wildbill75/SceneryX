@@ -1362,19 +1362,60 @@ class Api:
         webbrowser.open(url)
         return json.dumps({"status": "ok", "url": url})
 
-    def check_update(self, icao, name, vendor, version):
+    def check_update(self, icao, name, vendor, version, pricing_type=""):
         import webbrowser
         import urllib.parse
         
-        clean_name = (name or '').strip()
-        if not clean_name or clean_name.lower() in ['unknown', 'default']:
-            query = f"{icao}".strip()
-        else:
-            query = f"{icao} {clean_name}".strip()
+        PAYWARE_VENDOR_URLS = {
+            'orbx': 'https://orbxdirect.com/search?q={query}',
+            'aerosoft': 'https://www.aerosoft.com/en/search?sSearch={query}',
+            'inibuilds': 'https://inibuilds.com/search?q={query}',
+            'flightbeam': 'https://www.flightbeam.com/search?q={query}',
+            'flytampa': 'https://www.flytampa.org/',
+            'pyreegue': 'https://pyreegue.dev/',
+            'fsdreamteam': 'https://www.fsdreamteam.com/',
+            'fsdt': 'https://www.fsdreamteam.com/',
+            'mk-studios': 'https://mkstudios.com/',
+            'mk studios': 'https://mkstudios.com/',
+            'drzewiecki': 'https://www.drzewiecki-design.net/products.htm',
+            'drzewiecki design': 'https://www.drzewiecki-design.net/products.htm',
+            'simmarket': 'https://secure.simmarket.com/advanced_search_result.php?keywords={query}',
+            'simwings': 'https://www.aerosoft.com/en/search?sSearch={query}',
+            'sim-wings': 'https://www.aerosoft.com/en/search?sSearch={query}',
+            'digital design': 'https://secure.simmarket.com/advanced_search_result.php?keywords={query}',
+            'nza': 'https://nzasimulations.com/',
+            'nza simulations': 'https://nzasimulations.com/',
+            'verticalsim': 'https://verticalsim.com/shop/',
+            'latinvfr': 'https://www.latinvfr.com/',
+            'pilotplus': 'https://pilotplus.io/',
+            'threshold': 'https://www.thresholdx.net/search?q={query}',
+            'tailstrike': 'https://tailstrikedesigns.com/',
+            'gaya': 'https://www.gaya-simulations.com/',
+            'gaya simulations': 'https://www.gaya-simulations.com/',
+            'dominicdesignteam': 'https://secure.simmarket.com/advanced_search_result.php?keywords={query}',
+            'taimedia': 'https://secure.simmarket.com/advanced_search_result.php?keywords={query}'
+        }
 
-        url = f"https://flightsim.to/search?q={urllib.parse.quote(query)}"
-        webbrowser.open(url)
-        return json.dumps({"status": "ok", "url": url})
+        clean_name = (name or '').strip()
+        q_str = f"{icao} {clean_name}".strip() if clean_name and clean_name.lower() not in ['unknown', 'default'] else f"{icao}".strip()
+        q_enc = urllib.parse.quote(q_str)
+
+        v_lower = (vendor or '').lower().strip()
+        target_url = None
+
+        for key, pattern in PAYWARE_VENDOR_URLS.items():
+            if key in v_lower:
+                target_url = pattern.format(query=q_enc) if '{query}' in pattern else pattern
+                break
+
+        if not target_url:
+            if pricing_type == 'Payware' or (vendor and vendor.lower() not in ['unknown', 'microsoft / asobo', 'asobo', 'unknown vendor']):
+                target_url = f"https://secure.simmarket.com/advanced_search_result.php?keywords={q_enc}"
+            else:
+                target_url = f"https://flightsim.to/search?q={q_enc}"
+
+        webbrowser.open(target_url)
+        return json.dumps({"status": "ok", "url": target_url})
 
     def export_collection_csv(self, airports_json_str):
         import csv

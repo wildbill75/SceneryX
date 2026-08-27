@@ -1415,7 +1415,8 @@ async function triggerCheckSceneryUpdate() {
                 selectedAirport.icao,
                 selectedAirport.name || '',
                 selectedAirport.vendor || '',
-                selectedAirport.version || ''
+                selectedAirport.version || '',
+                selectedAirport.pricing_type || ''
             );
         }
     } catch (e) {
