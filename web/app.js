@@ -1026,25 +1026,25 @@ function showAirportDetails(ap) {
 
     if (cat === 'DEFAULT') {
         pricingBadge.innerText = "Default MSFS";
-        pricingBadge.className = "px-3.5 py-1.5 rounded-full text-xs lg:text-sm font-mono font-black bg-blue-500/20 text-blue-300 border border-blue-500/40 shadow-sm";
+        pricingBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30";
         if (icaoEl) icaoEl.classList.add('text-blue-400', 'drop-shadow-[0_0_10px_rgba(59,130,246,0.3)]');
         if (vendorEl) vendorEl.classList.add('text-blue-400', 'drop-shadow-[0_0_10px_rgba(59,130,246,0.3)]');
         if (typeBadge) typeBadge.classList.add('text-blue-400');
     } else if (cat === 'ASOBO') {
         pricingBadge.innerText = hasActiveFix ? "Asobo + Fix" : "Asobo";
-        pricingBadge.className = "px-3.5 py-1.5 rounded-full text-xs lg:text-sm font-mono font-black bg-amber-500/20 text-amber-400 border border-amber-500/40 shadow-sm";
+        pricingBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30";
         if (icaoEl) icaoEl.classList.add('text-amber-400', 'drop-shadow-[0_0_10px_rgba(245,158,11,0.3)]');
         if (vendorEl) vendorEl.classList.add('text-amber-400', 'drop-shadow-[0_0_10px_rgba(245,158,11,0.3)]');
         if (typeBadge) typeBadge.classList.add('text-amber-400');
     } else if (cat === 'PAYWARE') {
         pricingBadge.innerText = "Payware Addon";
-        pricingBadge.className = "px-3.5 py-1.5 rounded-full text-xs lg:text-sm font-mono font-black bg-purple-500/20 text-purple-400 border border-purple-500/40 shadow-sm";
+        pricingBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30";
         if (icaoEl) icaoEl.classList.add('text-purple-400', 'drop-shadow-[0_0_10px_rgba(192,132,252,0.3)]');
         if (vendorEl) vendorEl.classList.add('text-purple-400', 'drop-shadow-[0_0_10px_rgba(192,132,252,0.3)]');
         if (typeBadge) typeBadge.classList.add('text-purple-400');
     } else {
         pricingBadge.innerText = "Freeware";
-        pricingBadge.className = "px-3.5 py-1.5 rounded-full text-xs lg:text-sm font-mono font-black bg-cyan-500/20 text-cyan-400 border border-cyan-500/40 shadow-sm";
+        pricingBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-cyan-500/20 text-cyan-400 border border-cyan-500/30";
         if (icaoEl) icaoEl.classList.add('text-cyan-400', 'drop-shadow-[0_0_10px_rgba(56,189,248,0.3)]');
         if (vendorEl) vendorEl.classList.add('text-cyan-400', 'drop-shadow-[0_0_10px_rgba(56,189,248,0.3)]');
         if (typeBadge) typeBadge.classList.add('text-cyan-400');
@@ -1060,16 +1060,16 @@ function showAirportDetails(ap) {
 
     if (actBadge) {
         if (isFallbackDefault) {
-            actBadge.className = "px-3.5 py-1.5 rounded-full text-xs lg:text-sm font-mono font-black bg-blue-500/20 text-blue-300 border border-blue-500/40 shadow-sm";
+            actBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-blue-500/20 text-blue-300 border border-blue-500/40";
             actBadge.innerText = "Default MSFS Airport";
         } else if (cat === 'ASOBO') {
-            actBadge.className = "px-3.5 py-1.5 rounded-full text-xs lg:text-sm font-mono font-black bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm";
+            actBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40";
             actBadge.innerText = ap.world_update_name || "Asobo Sim Update";
         } else if (cat === 'PAYWARE') {
-            actBadge.className = "px-3.5 py-1.5 rounded-full text-xs lg:text-sm font-mono font-black bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-sm";
+            actBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40";
             actBadge.innerText = "Payware Addon Active";
         } else {
-            actBadge.className = "px-3.5 py-1.5 rounded-full text-xs lg:text-sm font-mono font-black bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm";
+            actBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40";
             actBadge.innerText = "Custom Addon Active";
         }
     }
