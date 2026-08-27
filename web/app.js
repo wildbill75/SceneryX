@@ -1380,12 +1380,36 @@ async function toggleSpecificPackage(path, icao) {
                 const updatedAp = allAirportsData.find(a => a.icao === selectedAirport.icao);
                 if (updatedAp) showAirportDetails(updatedAp);
             }
+            const statusLabel = res.enabled ? 'Enabled' : 'Disabled';
+            showToast(`✓ ${icao || 'Package'} ${statusLabel} & Saved to Disk`, res.enabled ? 'success' : 'info');
         }
     } catch (e) {
         console.error("Failed to toggle package:", e);
     } finally {
         isToggleInProgress = false;
     }
+}
+
+function showToast(message, type = 'success') {
+    let toast = document.getElementById('sceneryx-toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'sceneryx-toast';
+        toast.className = 'fixed bottom-6 right-6 z-[9999] px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 border transition-all duration-300 transform translate-y-10 opacity-0 pointer-events-none font-semibold text-xs';
+        document.body.appendChild(toast);
+    }
+    
+    if (type === 'success') {
+        toast.className = 'fixed bottom-6 right-6 z-[9999] px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 border border-emerald-500/50 bg-slate-900/95 text-emerald-300 transition-all duration-300 transform translate-y-0 opacity-100 shadow-emerald-500/20';
+        toast.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400 text-base"></i> <span>${message}</span>`;
+    } else {
+        toast.className = 'fixed bottom-6 right-6 z-[9999] px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 border border-cyan-500/50 bg-slate-900/95 text-cyan-300 transition-all duration-300 transform translate-y-0 opacity-100 shadow-cyan-500/20';
+        toast.innerHTML = `<i class="fa-solid fa-circle-info text-cyan-400 text-base"></i> <span>${message}</span>`;
+    }
+    
+    setTimeout(() => {
+        toast.classList.add('translate-y-10', 'opacity-0', 'pointer-events-none');
+    }, 3000);
 }
 
 function openSpecificPackageFolder(path) {

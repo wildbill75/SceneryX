@@ -654,10 +654,10 @@ def run_scan():
                 folder_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_folder.lower())
                 is_active = (act == 'Activated') and not pkg_name.endswith('.disabled')
 
-                if folder_norm not in content_xml_status:
-                    content_xml_status[folder_norm] = is_active
+                if clean_folder.lower() not in content_xml_status:
+                    content_xml_status[clean_folder.lower()] = is_active
                 else:
-                    content_xml_status[folder_norm] = content_xml_status[folder_norm] or is_active
+                    content_xml_status[clean_folder.lower()] = content_xml_status[clean_folder.lower()] or is_active
 
                 content_xml_packages.append((pkg_name, clean_folder, not is_active))
         except Exception:
@@ -683,8 +683,7 @@ def run_scan():
                     ipath = os.path.join(td, item)
                     if os.path.isdir(ipath) and item != 'OneStore':
                         clean_folder = item[:-9] if item.endswith('.disabled') else item
-                        folder_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_folder.lower())
-                        is_disabled = item.endswith('.disabled') or not content_xml_status.get(folder_norm, True)
+                        is_disabled = item.endswith('.disabled') or not content_xml_status.get(clean_folder.lower(), True)
                         all_packages.append((category_label, item, ipath, is_disabled))
             except Exception:
                 pass
@@ -729,8 +728,7 @@ def run_scan():
         fn_lower = clean_folder.lower()
         fn_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn_lower)
 
-        is_dis_xml = any(fn_lower in d or d in fn_lower or fn_norm in d or d in fn_norm for d in disabled_in_xml)
-        is_disabled = is_disabled_pkg or is_dis_xml
+        is_disabled = is_disabled_pkg
         
         if any(k in fn_lower for k in NON_AIRPORT_KEYWORDS) or '-livery-' in fn_lower or '-aircraft-' in fn_lower:
             continue

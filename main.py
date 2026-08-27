@@ -151,7 +151,18 @@ def fast_update_airport_cache(icao_target, target_pkg_name=None, toggle_all=Fals
                 clean_fn = fn[:-9] if fn.endswith('.disabled') else fn
                 fn_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_fn.lower())
                 if clean_fn.lower() == clean_target.lower() or fn_norm == t_norm:
-                    s['is_disabled'] = not s.get('is_disabled', False)
+                    new_dis = not s.get('is_disabled', False)
+                    s['is_disabled'] = new_dis
+                    if s.get('package_path'):
+                        p = s['package_path']
+                        if new_dis and not p.endswith('.disabled'):
+                            s['package_path'] = p + '.disabled'
+                            if s.get('folder_name', '') and not s['folder_name'].endswith('.disabled'):
+                                s['folder_name'] = s['folder_name'] + '.disabled'
+                        elif not new_dis and p.endswith('.disabled'):
+                            s['package_path'] = p[:-9]
+                            if s.get('folder_name', '').endswith('.disabled'):
+                                s['folder_name'] = s['folder_name'][:-9]
 
             # Check if all 3rd-party sources are disabled
             all_dis = len(all_srcs) > 0 and all(s.get('is_disabled') for s in all_srcs)
@@ -591,15 +602,35 @@ class Api:
                 if changed:
                     tree.write(content_xml_path, encoding='utf-8', xml_declaration=True)
 
-            if os.path.exists(package_path):
-                if package_path.endswith('.disabled'):
-                    new_path = package_path[:-9]
-                    os.rename(package_path, new_path)
+            target_path = package_path
+            if not os.path.exists(target_path):
+                settings = get_settings()
+                scan_paths_cfg = settings.get("scan_paths", [])
+                for cfg in scan_paths_cfg:
+                    dp = cfg.get('path', '')
+                    if not dp or not os.path.exists(dp):
+                        continue
+                    onestore = os.path.join(dp, 'OneStore')
+                    dirs = [onestore] if os.path.exists(onestore) else [dp]
+                    found = False
+                    for d in dirs:
+                        cand = os.path.join(d, pkg_name)
+                        if os.path.exists(cand):
+                            target_path = cand
+                            found = True
+                            break
+                    if found:
+                        break
+
+            if os.path.exists(target_path):
+                if target_path.endswith('.disabled'):
+                    new_path = target_path[:-9]
+                    os.rename(target_path, new_path)
                 else:
-                    new_path = package_path + '.disabled'
-                    os.rename(package_path, new_path)
+                    new_path = target_path + '.disabled'
+                    os.rename(target_path, new_path)
             else:
-                new_path = package_path
+                new_path = target_path
 
             airports = fast_update_airport_cache(icao, target_pkg_name=clean_pkg) if icao else run_scan()
             return json.dumps({"status": "ok", "enabled": is_enabled, "new_path": new_path, "airports": airports}, ensure_ascii=False)
