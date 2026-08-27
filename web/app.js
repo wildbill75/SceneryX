@@ -1030,38 +1030,21 @@ function showAirportDetails(ap) {
 
     if (typeBadge) typeBadge.innerText = ap.english_type || ap.type;
 
-    // Update Activation Status Card in Drawer
+    // Update Activation Status Card in Drawer (Simple Status Pill Only)
     const actBadge = document.getElementById('drawer-activation-badge');
-    const actBtn = document.getElementById('drawer-toggle-activation-btn');
-    const actIcon = document.getElementById('drawer-toggle-icon');
-    const actText = document.getElementById('drawer-toggle-text');
 
-    if (actBadge && actBtn) {
+    if (actBadge) {
         const allSourcesDisabled = ap.all_sources && ap.all_sources.length > 0 && ap.all_sources.every(s => s.is_disabled);
 
-        if (cat === 'DEFAULT' && !allSourcesDisabled) {
-            actBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-blue-500/20 text-blue-300 border border-blue-500/40";
-            actBadge.innerText = "🔵 Native Game Airport (Built-in)";
-            actBtn.classList.add('hidden');
+        if (ap.is_disabled || allSourcesDisabled || cat === 'DEFAULT') {
+            actBadge.className = "px-3 py-1 rounded-full text-xs font-mono font-bold bg-blue-500/20 text-blue-300 border border-blue-500/40";
+            actBadge.innerText = "🔵 Default MSFS Airport";
         } else if (cat === 'ASOBO') {
-            actBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40";
+            actBadge.className = "px-3 py-1 rounded-full text-xs font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40";
             actBadge.innerText = "🟢 Core MSFS Base";
-            actBtn.classList.add('hidden');
         } else {
-            actBtn.classList.remove('hidden');
-            if (ap.is_disabled || allSourcesDisabled) {
-                actBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-blue-500/20 text-blue-300 border border-blue-500/40";
-                actBadge.innerText = "🔵 In-Game Fallback: MSFS Native Airport";
-                actBtn.className = "px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40";
-                if (actIcon) actIcon.className = "fa-solid fa-power-off text-emerald-400";
-                if (actText) actText.innerText = "Enable Scenery";
-            } else {
-                actBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40";
-                actBadge.innerText = "🟢 Activated Addon";
-                actBtn.className = "px-3 py-1.5 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer bg-slate-800 hover:bg-red-500/20 text-slate-200 hover:text-red-300 border border-slate-700 hover:border-red-500/40";
-                if (actIcon) actIcon.className = "fa-solid fa-power-off text-red-400";
-                if (actText) actText.innerText = "Disable Scenery";
-            }
+            actBadge.className = "px-3 py-1 rounded-full text-xs font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40";
+            actBadge.innerText = "🟢 Custom Addon Active";
         }
     }
 
