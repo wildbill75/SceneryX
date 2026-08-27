@@ -1665,12 +1665,28 @@ function airportMatchesSourceFilter(ap) {
         return false;
     }
 
-    return sources.some(s => {
+    // Only evaluate ACTIVE sources (or primary active source) so disabled packages don't trigger wrong category/source filters
+    const activeSources = sources.filter(s => !s.is_disabled);
+    const evalSources = activeSources.length > 0 ? activeSources : sources;
+
+    return evalSources.some(s => {
         const sf = (s.source_folder || '').toLowerCase();
+        const v = (s.vendor || '').toLowerCase();
+        const fn = (s.folder_name || '').toLowerCase();
+        const pt = (s.pricing_type || '').toLowerCase();
+
+        // 1. Community Filter
         if (selectedSources.has('Community') && sf.includes('community')) return true;
-        if (selectedSources.has('StreamedPackages') && (sf.includes('streamed') || sf.includes('2024'))) return true;
-        if (selectedSources.has('asobo') && (sf.includes('asobo') || s.is_asobo_official || s.vendor === 'Microsoft / Asobo')) return true;
+
+        // 2. StreamedPackages Filter (MSFS 2024 Streamed)
+        if (selectedSources.has('StreamedPackages') && sf.includes('streamedpackages')) return true;
+
+        // 3. Asobo Filter (Asobo / Microsoft Handcrafted)
+        if (selectedSources.has('asobo') && (s.is_asobo_official || pt === 'asobo' || v.includes('asobo') || (v.includes('microsoft') && !v.includes('community')) || fn.startsWith('asobo-') || fn.startsWith('microsoft-') || fn.startsWith('fs20-asobo-') || fn.startsWith('fs24-asobo-'))) return true;
+
+        // 4. Official / OneStore Filter
         if (selectedSources.has('Official') && (sf.includes('official') || sf.includes('onestore'))) return true;
+
         return false;
     });
 }
