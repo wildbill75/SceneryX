@@ -1134,9 +1134,11 @@ function showAirportDetails(ap) {
                         <i class="fa-solid fa-folder-open text-cyan-400 group-hover:scale-110 transition-transform"></i>
                     </div>
                     <div ondragover="handleGsxDragOver(event)" ondragleave="handleGsxDragLeave(event)" ondrop="handleGsxDrop(event)"
-                         class="p-2 rounded-xl bg-slate-950/40 border border-dashed border-slate-800/60 hover:border-cyan-500/40 flex items-center justify-between text-[11px] text-slate-400 hover:text-cyan-300 transition-all">
-                        <span>📥 Drop .zip / .ini here to replace</span>
-                        <button onclick="triggerInstallGsxProfile()" class="text-cyan-400 font-bold hover:underline">Replace .zip</button>
+                         onclick="triggerInstallGsxProfile()"
+                         class="p-3 rounded-xl bg-slate-950/40 border-2 border-dashed border-slate-800 hover:border-cyan-500/50 flex flex-col items-center justify-center gap-1 text-center transition-all cursor-pointer group">
+                        <i class="fa-solid fa-file-arrow-up text-cyan-400 text-base group-hover:scale-110 transition-transform"></i>
+                        <span class="text-xs font-bold text-slate-300 group-hover:text-cyan-300">Drop downloaded .zip or .ini here to replace</span>
+                        <span class="text-[10px] text-slate-500">or click to browse & replace directly</span>
                     </div>
                 </div>
             `;
