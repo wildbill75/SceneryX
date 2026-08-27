@@ -1987,14 +1987,47 @@ async function rescanMSFS() {
     const icon = document.getElementById('rescan-icon');
     if (icon) icon.classList.add('fa-spin');
 
+    const splash = document.getElementById('splash-screen');
+    const statusTxt = document.getElementById('splash-status-text');
+    const folderTxt = document.getElementById('splash-folder-text');
+    const progressFx = document.getElementById('splash-progress-bar');
+    const percentTxt = document.getElementById('splash-percent-text');
+
+    if (splash) {
+        splash.classList.remove('hidden', 'opacity-0', 'pointer-events-none');
+        splash.classList.add('flex', 'opacity-100');
+        if (statusTxt) statusTxt.innerText = "Rescanning MSFS 2024 Sceneries & Packages...";
+        if (folderTxt) folderTxt.innerText = "Scanning Community & StreamedPackages folders...";
+        if (progressFx) progressFx.style.width = "25%";
+        if (percentTxt) percentTxt.innerText = "25%";
+    }
+
+    let progressTimer = setInterval(() => {
+        if (!progressFx) return;
+        let curr = parseInt(progressFx.style.width) || 25;
+        if (curr < 85) {
+            curr += 15;
+            progressFx.style.width = curr + '%';
+            if (percentTxt) percentTxt.innerText = curr + '%';
+            if (curr === 40 && folderTxt) folderTxt.innerText = "Scanning Official2020 / OneStore packages...";
+            if (curr === 70 && folderTxt) folderTxt.innerText = "Parsing Content.xml & resolving conflicts...";
+        }
+    }, 150);
+
     try {
+        let dataStr;
         if (window.pywebview) {
-            const dataStr = await window.pywebview.api.rescan();
+            dataStr = await window.pywebview.api.rescan();
             allAirportsData = JSON.parse(dataStr);
         } else {
             const resp = await fetch('/api/rescan', { method: 'POST' });
             allAirportsData = await resp.json();
         }
+
+        clearInterval(progressTimer);
+        if (progressFx) progressFx.style.width = "100%";
+        if (percentTxt) percentTxt.innerText = "100%";
+        if (folderTxt) folderTxt.innerText = "Scan complete! Updating database...";
 
         allAirportsData.forEach(ap => {
             if (userRatingsMap[ap.icao] !== undefined) {
@@ -2011,10 +2044,17 @@ async function rescanMSFS() {
             const updatedAp = allAirportsData.find(a => a.icao === selectedAirport.icao);
             if (updatedAp) showAirportDetails(updatedAp);
         }
+
+        await new Promise(r => setTimeout(r, 400));
     } catch (err) {
         console.error("Rescan error:", err);
     } finally {
+        clearInterval(progressTimer);
         if (icon) icon.classList.remove('fa-spin');
+        if (splash) {
+            splash.classList.add('opacity-0', 'pointer-events-none');
+            setTimeout(() => splash.classList.add('hidden'), 500);
+        }
     }
 }
 

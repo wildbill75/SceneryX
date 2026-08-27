@@ -1079,62 +1079,70 @@ def run_scan():
 
     for h_icao in dynamic_asobo_set:
         h_u = h_icao.upper()
-        if h_u not in detected_map and h_u in airports:
-            ap_info = airports[h_u]
-            raw_type = ap_info.get('type', 'airport')
-            if raw_type == 'large_airport':
-                english_type = "International"
-            elif raw_type == 'medium_airport':
-                english_type = "Regional"
-            elif raw_type in ['small_airport', 'closed']:
-                english_type = "General Aviation"
-            elif raw_type in ['heliport', 'seaplane_base']:
-                english_type = "Heli / Water"
-            else:
-                english_type = "General Aviation"
-
-            detected_map[h_u] = {
-                "icao": h_u,
-                "ident": h_u,
-                "name": ap_info.get('name', ''),
-                "city": ap_info.get('city', ''),
-                "country": ap_info.get('country', ''),
-                "lat": ap_info.get('lat', 0.0),
-                "lon": ap_info.get('lon', 0.0),
-                "type": raw_type,
-                "english_type": english_type,
+        if h_u in airports:
+            asobo_src = {
+                "folder_name": f"fs24-asobo-airport-{h_icao.lower()}",
+                "package_path": "",
+                "source_folder": "MSFS 2024 - StreamedPackages",
+                "match_source": "Default Asobo Handcrafted",
                 "vendor": "Microsoft / Asobo",
                 "pricing_type": "Asobo",
                 "is_payware": False,
                 "is_asobo_official": True,
-                "is_custom_price": False,
-                "price_eur": 0.0,
-                "package_name": f"fs24-asobo-airport-{h_icao.lower()}",
-                "package_path": "",
-                "source_folder": "MSFS 2024 - StreamedPackages",
+                "is_disabled": False,
+                "is_addon": False,
+                "is_fix_patch": False,
                 "version": "",
-                "size_str": "Streamed",
-                "match_source": "Default Asobo Handcrafted",
-                "all_sources": [{
-                    "folder_name": f"fs24-asobo-airport-{h_icao.lower()}",
-                    "package_path": "",
-                    "source_folder": "MSFS 2024 - StreamedPackages",
-                    "match_source": "Default Asobo Handcrafted",
+                "size_str": "Streamed"
+            }
+            if h_u not in detected_map:
+                ap_info = airports[h_u]
+                raw_type = ap_info.get('type', 'airport')
+                if raw_type == 'large_airport':
+                    english_type = "International"
+                elif raw_type == 'medium_airport':
+                    english_type = "Regional"
+                elif raw_type in ['small_airport', 'closed']:
+                    english_type = "General Aviation"
+                elif raw_type in ['heliport', 'seaplane_base']:
+                    english_type = "Heli / Water"
+                else:
+                    english_type = "General Aviation"
+
+                detected_map[h_u] = {
+                    "icao": h_u,
+                    "ident": h_u,
+                    "name": ap_info.get('name', ''),
+                    "city": ap_info.get('city', ''),
+                    "country": ap_info.get('country', ''),
+                    "lat": ap_info.get('lat', 0.0),
+                    "lon": ap_info.get('lon', 0.0),
+                    "type": raw_type,
+                    "english_type": english_type,
                     "vendor": "Microsoft / Asobo",
                     "pricing_type": "Asobo",
                     "is_payware": False,
                     "is_asobo_official": True,
-                    "is_disabled": False,
-                    "is_addon": False,
-                    "is_fix_patch": False,
+                    "is_custom_price": False,
+                    "price_eur": 0.0,
+                    "package_name": f"fs24-asobo-airport-{h_icao.lower()}",
+                    "package_path": "",
+                    "source_folder": "MSFS 2024 - StreamedPackages",
                     "version": "",
-                    "size_str": "Streamed"
-                }],
-                "is_disabled": False,
-                "has_conflict": False,
-                "conflict_count": 1,
-                "rating": ratings.get(h_u, 0.0)
-            }
+                    "size_str": "Streamed",
+                    "match_source": "Default Asobo Handcrafted",
+                    "all_sources": [asobo_src],
+                    "is_disabled": False,
+                    "has_conflict": False,
+                    "conflict_count": 1,
+                    "rating": ratings.get(h_u, 0.0)
+                }
+            else:
+                existing = detected_map[h_u]
+                if not any(s.get('is_asobo_official') or s.get('pricing_type') == 'Asobo' or 'asobo-airport-' in s.get('folder_name', '').lower() for s in existing["all_sources"]):
+                    existing["all_sources"].append(asobo_src)
+                    existing["has_conflict"] = len(existing["all_sources"]) > 1
+                    existing["conflict_count"] = len(existing["all_sources"])
 
     # Include all 4-letter ICAO default procedural MSFS airports from airports.json that are not already in detected_map
     for d_icao, ap_info in airports.items():
