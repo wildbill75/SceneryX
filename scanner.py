@@ -185,7 +185,8 @@ FIX_PATCH_KEYWORDS = [
     'fix', 'patch', 'flatten', 'fixer', 'correction', 'enhancement', 'mod',
     'update-fix', 'gsx-fix', 'vdgs-fix', 'ils-fix', 'nav-fix', 'lighting-fix',
     'taxiway-fix', 'runway-fix', 'flatten-fix', 'zparking', 'parking', 'vdgs',
-    'stalex', 'stg', 'overlay', 'exclusion', 'excl', 'profile'
+    'stalex', 'stg', 'overlay', 'exclusion', 'excl', 'profile', 'xavios',
+    'jetway', 'jetways', 'gate', 'gates', 'frequency', 'frequencies', 'marking', 'markings'
 ]
 
 # Official MSFS Standard Edition Handcrafted Airports (Base Game Standard + World Updates I to XVIII)
@@ -897,11 +898,25 @@ def run_scan():
         for hint_term in ['custom_airport_patch', 'bespoke_airport_patch', 'community_airport_patch', 'official_airport_patch', 'airport_patch', 'custom_airport', 'bespoke_airport', 'community_airport']:
             clean_hint = clean_hint.replace(hint_term, '')
 
+        size_str = get_folder_size_formatted(full_path, folder_size_cache) if full_path else ""
+        is_small_patch = False
+        if size_str:
+            if 'KB' in size_str or ' B' in size_str:
+                is_small_patch = True
+            elif 'MB' in size_str:
+                try:
+                    mb_val = float(size_str.replace('MB', '').strip())
+                    if mb_val < 80.0:
+                        is_small_patch = True
+                except Exception:
+                    pass
+
         is_fix_patch = (
             any(re.search(rf'\b{re.escape(k)}\b', fn_lower) for k in FIX_PATCH_KEYWORDS)
             or any(fn_lower.endswith(f"_{k}") or fn_lower.endswith(f"-{k}") for k in FIX_PATCH_KEYWORDS)
             or any(k in clean_hint for k in ['patch', 'fix', 'enhancement', 'correction'])
             or any(k in m_title_lower for k in ['fix', 'patch', 'enhancement', 'flatten', 'correction'])
+            or (is_small_patch and not (fn_lower.startswith(('asobo-', 'microsoft-', 'fs20-asobo-', 'fs24-asobo-')) or (manifest_data and 'asobo' in str(manifest_data.get('creator','')).lower())))
         )
         is_addon_package = is_fix_patch or any(k in fn_lower for k in ADDON_LIBRARY_KEYWORDS)
 
