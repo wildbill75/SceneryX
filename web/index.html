@@ -242,8 +242,8 @@
             </div>
 
             <!-- SPENT CAROUSEL SUB-BANNER (AIRY MARGIN TOP) -->
-            <div id="investment-card" class="text-xs font-extrabold text-slate-300 font-mono tracking-wider uppercase flex items-center justify-center gap-1 cursor-pointer hover:text-white transition-colors" title="Based on catalog market prices & custom entries.">
-                <span>YOU HAVE SPENT <span id="investment-banner-text" class="text-amber-300 font-black text-sm font-mono mx-1">$0.00</span> ON PAYWARE SCENERIES SO FAR !</span>
+            <div id="investment-card" class="text-sm lg:text-base font-extrabold text-slate-200 font-mono tracking-wider uppercase flex items-center justify-center gap-1.5 cursor-pointer hover:text-white transition-colors py-0.5" title="Based on catalog market prices & custom entries.">
+                <span>YOU HAVE SPENT <span id="investment-banner-text" class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5 drop-shadow-[0_0_10px_rgba(245,158,11,0.4)]">$0.00</span> ON PAYWARE SCENERIES SO FAR !</span>
             </div>
         </div>
 
@@ -480,17 +480,17 @@
 
             <div class="p-5 space-y-6 overflow-y-auto flex-1">
                 <!-- 1. HERO AIRPORT HEADER CARD -->
-                <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3">
+                <div class="p-4.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3.5 shadow-lg">
                     <div class="flex items-center justify-between">
-                        <div class="flex items-center gap-2">
-                            <span id="drawer-icao" class="text-2xl font-black font-mono">ICAO</span>
-                            <span id="drawer-iata" class="text-xs font-mono bg-slate-800 px-2 py-0.5 rounded text-slate-300 font-bold">IATA</span>
+                        <div class="flex items-center gap-2.5">
+                            <span id="drawer-icao" class="text-3xl lg:text-4xl font-black font-mono tracking-tight">ICAO</span>
+                            <span id="drawer-iata" class="text-xs lg:text-sm font-mono bg-slate-800/90 px-2.5 py-0.5 rounded-lg text-slate-200 font-bold border border-slate-700/60">IATA</span>
                         </div>
-                        <span id="drawer-pricing-badge" class="px-2.5 py-1 rounded-full text-xs font-mono font-bold">Badge</span>
+                        <span id="drawer-pricing-badge" class="px-3.5 py-1.5 rounded-full text-xs lg:text-sm font-mono font-black shadow-md">Badge</span>
                     </div>
                     <div>
-                        <h3 id="drawer-name" class="text-base font-bold text-white leading-snug">Airport Full Name</h3>
-                        <p id="drawer-city-country" class="text-xs text-slate-400">City, Country</p>
+                        <h3 id="drawer-name" class="text-lg lg:text-xl font-extrabold text-white leading-snug tracking-wide">Airport Full Name</h3>
+                        <p id="drawer-city-country" class="text-sm font-medium text-slate-300 mt-0.5">City, Country</p>
                     </div>
 
                     <!-- 2. AIRPORT SPECS METRICS GRID (Elevation, Category, Lat, Lon) -->
@@ -515,21 +515,21 @@
                 </div>
 
                 <!-- 3. ACTIVE DEVELOPER & PUBLISHER CARD -->
-                <div id="drawer-dev-block" class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2.5">
+                <div id="drawer-dev-block" class="p-4.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3 shadow-lg">
                     <div class="flex items-center justify-between gap-2">
                         <div class="flex items-center gap-2 min-w-0">
-                            <span class="text-[10px] text-slate-400 uppercase tracking-wider font-bold shrink-0">Active Developer / Publisher</span>
-                            <span id="drawer-version" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 hidden">v1.0.0</span>
+                            <span class="text-xs font-extrabold text-slate-400 uppercase tracking-wider shrink-0">Active Developer / Publisher</span>
+                            <span id="drawer-version" class="text-xs font-mono font-bold px-2.5 py-0.5 rounded-full bg-slate-800 text-slate-200 border border-slate-700 hidden">v1.0.0</span>
                         </div>
-                        <button onclick="triggerCheckSceneryUpdate()" id="btn-check-update" class="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-300 border border-slate-700 hover:border-cyan-500/40 text-[10px] font-bold transition-all shadow-sm flex items-center gap-1 shrink-0" title="Check for Scenery Updates">
-                            <i class="fa-solid fa-rotate text-[9px] text-cyan-400"></i> Check Update
+                        <button onclick="triggerCheckSceneryUpdate()" id="btn-check-update" class="px-3 py-1 rounded-full bg-slate-800 hover:bg-cyan-500/20 text-slate-200 hover:text-cyan-300 border border-slate-700 hover:border-cyan-500/40 text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 shrink-0 cursor-pointer" title="Check for Scenery Updates">
+                            <i class="fa-solid fa-rotate text-xs text-cyan-400"></i> Check Update
                         </button>
                     </div>
                     
-                    <div id="drawer-vendor" class="text-base lg:text-lg font-black tracking-wide text-cyan-300 truncate">Unknown Vendor</div>
+                    <div id="drawer-vendor" class="text-xl lg:text-2xl font-black tracking-wide text-cyan-300 truncate">Unknown Vendor</div>
 
                     <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between">
-                        <span id="drawer-activation-badge" class="px-3 py-1 rounded-full text-xs font-mono font-extrabold shadow-sm">Custom Addon Active</span>
+                        <span id="drawer-activation-badge" class="px-3.5 py-1.5 rounded-full text-xs lg:text-sm font-mono font-black shadow-sm">Custom Addon Active</span>
                     </div>
                 </div>
 
