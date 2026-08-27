@@ -806,7 +806,7 @@ def run_scan():
                 items = os.listdir(td)
                 for item in items:
                     ipath = os.path.join(td, item)
-                    if os.path.isdir(ipath) and item != 'OneStore':
+                    if os.path.isdir(ipath) and item != 'OneStore' and 'projectairports' not in item.lower():
                         clean_folder = item[:-9] if item.endswith('.disabled') else item
                         is_disabled = item.endswith('.disabled') or os.path.exists(os.path.join(ipath, 'manifest.json.disabled')) or not content_xml_status.get(clean_folder.lower(), True)
                         all_packages.append((category_label, item, ipath, is_disabled))
@@ -932,7 +932,7 @@ def run_scan():
 
         # Manifest Title explicit ICAO matching
         if not found_ap_list and manifest_title:
-            m_tokens = re.findall(r'([A-Za-z]{4})', manifest_title)
+            m_tokens = re.findall(r'(?:^|[-_ \d])([A-Za-z]{4})(?=$|[-_ \d])', manifest_title)
             for tok in m_tokens:
                 tok_u = tok.upper()
                 if tok_u in airports and tok.lower() not in EXCLUDE_WORDS:
