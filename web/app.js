@@ -2133,7 +2133,8 @@ function updateFilterUI() {
     const priceMap = {
         'Payware': 'filter-price-payware',
         'Freeware / Flightsim.to': 'filter-price-freeware',
-        'Asobo': 'filter-price-asobo'
+        'Asobo': 'filter-price-asobo',
+        'Default': 'filter-price-default'
     };
 
     const allPriceBtn = document.getElementById('filter-price-all');
