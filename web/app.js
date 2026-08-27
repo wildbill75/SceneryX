@@ -1201,14 +1201,20 @@ function showAirportDetails(ap) {
 
     const sources = ap.all_sources || [];
     const nonDefaultSources = sources.filter(s => !(s.pricing_type === 'Default' || (s.folder_name && s.folder_name.startsWith('msfs-default-'))));
-    const isDefaultActive = (ap.pricing_type === 'Default') || nonDefaultSources.length === 0 || nonDefaultSources.every(s => s.is_disabled);
+    
+    // Separate into Main Base Sceneries vs Stackable Fixes/Patches
+    const baseSources = nonDefaultSources.filter(s => !s.is_fix_patch);
+    const fixSources = nonDefaultSources.filter(s => !!s.is_fix_patch);
+
+    const isDefaultActive = baseSources.length === 0 || baseSources.every(s => s.is_disabled);
 
     let html = `
-        <div class="flex items-center justify-between pb-1">
-            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Available Scenery Options</span>
-            <span class="text-[10px] font-mono text-slate-500 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">1-Click Selection</span>
-        </div>
-        <div class="space-y-2.5">
+        <div class="space-y-3">
+            <div class="flex items-center justify-between pb-1">
+                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Available Scenery Options</span>
+                <span class="text-[10px] font-mono text-slate-500 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">1-Click Selection</span>
+            </div>
+            <div class="space-y-2.5">
     `;
 
     // CHOICE 1: Default MSFS Base Airport Card
@@ -1241,15 +1247,12 @@ function showAirportDetails(ap) {
         `;
     }
 
-    // CHOICE 2+: Installed Scenery Addons / World Updates
-    sources.forEach((src, idx) => {
-        const isDefaultPkg = (src.pricing_type === 'Default' || (src.folder_name && src.folder_name.startsWith('msfs-default-')));
-        if (isDefaultPkg) return;
-
+    // CHOICE 2+: Installed Base Scenery Addons / World Updates
+    baseSources.forEach((src) => {
+        const idx = sources.indexOf(src);
         const isDisabled = !!src.is_disabled;
         const isActive = !isDisabled;
         const isAsoboPkg = (src.is_asobo_official || src.vendor === 'Microsoft / Asobo' || (src.folder_name && (src.folder_name.toLowerCase().includes('asobo-airport-') || src.folder_name.toLowerCase().includes('microsoft-airport-'))));
-        const isFixPatch = !!src.is_fix_patch || (src.folder_name && (src.folder_name.toLowerCase().includes('fix') || src.folder_name.toLowerCase().includes('patch')));
 
         const updateLabel = src.world_update_name || ap.world_update_name || "Asobo World Update";
         const titleLabel = isAsoboPkg ? updateLabel : (src.vendor && src.vendor !== 'Unknown' ? src.vendor : src.folder_name);
@@ -1276,7 +1279,6 @@ function showAirportDetails(ap) {
                         <div class="flex items-center gap-2 min-w-0 flex-1">
                             <i class="fa-solid fa-circle-dot ${activeIconColor} text-sm shrink-0"></i>
                             <span class="text-xs font-bold text-white truncate min-w-0">${titleLabel}</span>
-                            ${isFixPatch ? `<span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shrink-0 whitespace-nowrap">Fix / Patch</span>` : ''}
                         </div>
                         <span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full ${activeBadgeClass} shrink-0 whitespace-nowrap">Active</span>
                     </div>
@@ -1300,7 +1302,6 @@ function showAirportDetails(ap) {
                         <div class="flex items-center gap-2 min-w-0 flex-1">
                             <i class="fa-regular fa-circle text-slate-500 group-hover:text-emerald-400 text-sm transition-colors shrink-0"></i>
                             <span class="text-xs font-bold text-slate-300 group-hover:text-white truncate transition-colors min-w-0">${titleLabel}</span>
-                            ${isFixPatch ? `<span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shrink-0 whitespace-nowrap">Fix / Patch</span>` : ''}
                         </div>
                         <span class="text-[10px] font-mono text-slate-500 group-hover:text-slate-300 shrink-0 whitespace-nowrap">Click to Activate</span>
                     </div>
@@ -1316,6 +1317,71 @@ function showAirportDetails(ap) {
             `;
         }
     });
+
+    html += `</div></div>`;
+
+    // SECTION 2: Available Fixes & Overlays (Stackable Independent Toggles)
+    if (fixSources.length > 0) {
+        html += `
+            <div class="pt-4 border-t border-slate-800/80 space-y-3">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-wrench text-cyan-400 text-xs"></i>
+                        <span class="text-xs font-bold uppercase tracking-wider text-slate-300">Available Fixes & Overlays</span>
+                    </div>
+                    <span class="text-[10px] font-mono text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-full border border-cyan-500/20 font-semibold">Stackable</span>
+                </div>
+                <div class="space-y-2">
+        `;
+
+        fixSources.forEach((src) => {
+            const idx = sources.indexOf(src);
+            const isDisabled = !!src.is_disabled;
+            const isActive = !isDisabled;
+            const pkgPath = src.package_path || src.folder_name;
+
+            if (isActive) {
+                html += `
+                    <div class="p-3 rounded-xl border border-cyan-500/60 bg-cyan-500/10 transition-all space-y-2">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2 min-w-0 flex-1">
+                                <i class="fa-solid fa-puzzle-piece text-cyan-400 text-xs shrink-0"></i>
+                                <span class="text-xs font-bold text-white truncate min-w-0">${src.folder_name}</span>
+                            </div>
+                            <button onclick="toggleFixPatchPackage('${pkgPath}', '${ap.icao}')" class="px-3 py-1 rounded-full bg-cyan-400 text-slate-950 font-black text-xs hover:bg-cyan-300 transition-all shadow-sm cursor-pointer shrink-0">
+                                Enabled
+                            </button>
+                        </div>
+                        <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 pt-0.5">
+                            <span>${src.source_folder} ${src.size_str ? `• ${src.size_str}` : ''}</span>
+                            <button onclick="openSpecificPackageFolderByIndex('${ap.icao}', ${idx})" class="text-slate-300 hover:text-white flex items-center gap-1 cursor-pointer">
+                                <i class="fa-solid fa-folder-open text-cyan-400"></i> Open
+                            </button>
+                        </div>
+                    </div>
+                `;
+            } else {
+                html += `
+                    <div class="p-3 rounded-xl border border-slate-800 bg-slate-900/60 transition-all space-y-2 group">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2 min-w-0 flex-1">
+                                <i class="fa-solid fa-puzzle-piece text-slate-500 group-hover:text-cyan-400 text-xs transition-colors shrink-0"></i>
+                                <span class="text-xs font-bold text-slate-400 group-hover:text-slate-200 truncate transition-colors min-w-0">${src.folder_name}</span>
+                            </div>
+                            <button onclick="toggleFixPatchPackage('${pkgPath}', '${ap.icao}')" class="px-3 py-1 rounded-full bg-slate-800 text-slate-400 font-bold text-xs hover:bg-slate-700 hover:text-white border border-slate-700 transition-all cursor-pointer shrink-0">
+                                Disabled
+                            </button>
+                        </div>
+                        <div class="flex items-center justify-between text-[11px] font-mono text-slate-500 pt-0.5">
+                            <span>${src.source_folder} ${src.size_str ? `• ${src.size_str}` : ''}</span>
+                        </div>
+                    </div>
+                `;
+            }
+        });
+
+        html += `</div></div>`;
+    }
 
     html += `</div>`;
     sourcesContainer.innerHTML = html;
@@ -1497,6 +1563,35 @@ async function selectSceneryPackageByIndex(icao, idx) {
         }
     } catch (e) {
         console.error("Failed to select scenery option:", e);
+    } finally {
+        isToggleInProgress = false;
+    }
+}
+
+async function toggleFixPatchPackage(path, icao) {
+    if (!window.pywebview || isToggleInProgress || !path) return;
+    isToggleInProgress = true;
+    try {
+        const resStr = await window.pywebview.api.toggle_fix_patch(path, icao || '');
+        const res = JSON.parse(resStr);
+        if (res.status === 'ok') {
+            allAirportsData = res.airports;
+            allAirportsData.forEach(ap => {
+                if (userRatingsMap[ap.icao] !== undefined) {
+                    ap.rating = userRatingsMap[ap.icao];
+                }
+            });
+            updateStats(allAirportsData);
+            filterAirports();
+            if (selectedAirport) {
+                const updatedAp = allAirportsData.find(a => a.icao === selectedAirport.icao);
+                if (updatedAp) showAirportDetails(updatedAp);
+            }
+            const statusLabel = res.enabled ? 'Enabled' : 'Disabled';
+            showToast(`✓ Fix / Overlay ${statusLabel} & Saved to Disk`, res.enabled ? 'success' : 'info');
+        }
+    } catch (e) {
+        console.error("Failed to toggle fix/patch package:", e);
     } finally {
         isToggleInProgress = false;
     }

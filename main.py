@@ -892,6 +892,95 @@ class Api:
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
 
+    def toggle_fix_patch(self, path, icao):
+        try:
+            if not path:
+                return json.dumps({"status": "error", "message": "No path provided"})
+
+            content_xml_path = r'C:\Users\Bertrand\AppData\Local\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\ThirdBuk\Content.xml'
+            
+            clean_name = os.path.basename(path)
+            if clean_name.lower().endswith('.disabled'):
+                clean_name = clean_name[:-9]
+
+            target_path = path
+
+            def disable_physical_package(p_path):
+                if not p_path or not os.path.exists(p_path):
+                    return p_path
+                new_p = p_path
+                if not p_path.endswith('.disabled'):
+                    new_p = p_path + '.disabled'
+                    os.rename(p_path, new_p)
+                for mf in ['manifest.json', 'layout.json']:
+                    mf_norm = os.path.join(new_p, mf)
+                    mf_dis = os.path.join(new_p, mf + '.disabled')
+                    if os.path.exists(mf_norm):
+                        if os.path.exists(mf_dis):
+                            os.remove(mf_dis)
+                        os.rename(mf_norm, mf_dis)
+                return new_p
+
+            def enable_physical_package(p_path):
+                if not p_path or not os.path.exists(p_path):
+                    return p_path
+                new_p = p_path
+                if p_path.endswith('.disabled'):
+                    new_p = p_path[:-9]
+                    os.rename(p_path, new_p)
+                for mf in ['manifest.json', 'layout.json']:
+                    mf_dis = os.path.join(new_p, mf + '.disabled')
+                    mf_norm = os.path.join(new_p, mf)
+                    if os.path.exists(mf_dis):
+                        if os.path.exists(mf_norm):
+                            os.remove(mf_norm)
+                        os.rename(mf_dis, mf_norm)
+                return new_p
+
+            is_currently_disabled = False
+            if os.path.exists(content_xml_path):
+                import xml.etree.ElementTree as ET
+                tree = ET.parse(content_xml_path)
+                root = tree.getroot()
+                for p in root.findall('Package'):
+                    name = p.get('name', '')
+                    clean = name[:-9] if name.lower().endswith('.disabled') else name
+                    if clean.lower() == clean_name.lower():
+                        if p.get('active') == 'UserDisabled':
+                            is_currently_disabled = True
+                        break
+
+            if not is_currently_disabled and os.path.exists(target_path):
+                if target_path.endswith('.disabled') or os.path.exists(os.path.join(target_path, 'manifest.json.disabled')):
+                    is_currently_disabled = True
+
+            should_enable = is_currently_disabled
+
+            if os.path.exists(content_xml_path):
+                import xml.etree.ElementTree as ET
+                tree = ET.parse(content_xml_path)
+                root = tree.getroot()
+                changed = False
+                for p in root.findall('Package'):
+                    name = p.get('name', '')
+                    clean = name[:-9] if name.lower().endswith('.disabled') else name
+                    p.set('name', clean)
+                    if clean.lower() == clean_name.lower():
+                        p.set('active', 'Activated' if should_enable else 'UserDisabled')
+                        changed = True
+                if changed:
+                    tree.write(content_xml_path, encoding='utf-8', xml_declaration=True)
+
+            if should_enable:
+                enable_physical_package(target_path)
+            else:
+                disable_physical_package(target_path)
+
+            airports = run_scan()
+            return json.dumps({"status": "ok", "enabled": should_enable, "airports": airports}, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
     def optimize_flight(self, keep_icaos_json):
         return self.optimize_flight_mode(keep_icaos_json)
 

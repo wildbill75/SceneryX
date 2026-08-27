@@ -182,7 +182,8 @@ ADDON_LIBRARY_KEYWORDS = [
 FIX_PATCH_KEYWORDS = [
     'fix', 'patch', 'flatten', 'fixer', 'correction', 'enhancement', 'mod',
     'update-fix', 'gsx-fix', 'vdgs-fix', 'ils-fix', 'nav-fix', 'lighting-fix',
-    'taxiway-fix', 'runway-fix', 'flatten-fix', 'zparking', 'parking', 'vdgs'
+    'taxiway-fix', 'runway-fix', 'flatten-fix', 'zparking', 'parking', 'vdgs',
+    'stalex', 'stg', 'overlay', 'exclusion', 'excl', 'profile'
 ]
 
 # Official MSFS Standard Edition Handcrafted Airports (Base Game Standard + World Updates I to XVIII)
