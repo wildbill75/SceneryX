@@ -119,6 +119,52 @@ def update_msfs_content_xml(keep_icaos=None, restore_all=False, folder_to_icaos=
         except Exception as e:
             print(f"Error updating Content.xml at {xml_path}: {e}")
 
+def fast_update_airport_cache(icao_target, target_pkg_name=None, toggle_all=False):
+    if not os.path.exists(OUTPUT_JSON_PATH):
+        return run_scan()
+    try:
+        with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
+            airports = json.load(f)
+
+        target_ap = None
+        for ap in airports:
+            if ap.get('icao') == icao_target:
+                target_ap = ap
+                break
+
+        if not target_ap:
+            return run_scan()
+
+        all_srcs = target_ap.get('all_sources', [])
+
+        if toggle_all:
+            curr_disabled = target_ap.get('is_disabled', False)
+            new_dis = not curr_disabled
+            for s in all_srcs:
+                s['is_disabled'] = new_dis
+            target_ap['is_disabled'] = new_dis
+        elif target_pkg_name:
+            clean_target = target_pkg_name[:-9] if target_pkg_name.endswith('.disabled') else target_pkg_name
+            t_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_target.lower())
+            for s in all_srcs:
+                fn = s.get('folder_name', '')
+                clean_fn = fn[:-9] if fn.endswith('.disabled') else fn
+                fn_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_fn.lower())
+                if clean_fn.lower() == clean_target.lower() or fn_norm == t_norm or fn_norm in t_norm or t_norm in fn_norm:
+                    s['is_disabled'] = not s.get('is_disabled', False)
+
+            # Check if all 3rd-party sources are disabled
+            all_dis = len(all_srcs) > 0 and all(s.get('is_disabled') for s in all_srcs)
+            target_ap['is_disabled'] = all_dis
+
+        with open(OUTPUT_JSON_PATH, 'w', encoding='utf-8') as f:
+            json.dump(airports, f, ensure_ascii=False, indent=2)
+
+        return airports
+    except Exception as e:
+        print("Error fast updating cache:", e)
+        return run_scan()
+
 class Api:
     def __init__(self):
         pass
@@ -381,7 +427,7 @@ class Api:
             if changed:
                 tree.write(content_xml_path, encoding='utf-8', xml_declaration=True)
 
-            updated_airports = run_scan()
+            updated_airports = fast_update_airport_cache(icao_target, toggle_all=True)
             return json.dumps({
                 "status": "success",
                 "icao": icao_target,
@@ -470,7 +516,7 @@ class Api:
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
 
-    def toggle_package(self, package_path):
+    def toggle_package(self, package_path, icao=None):
         try:
             content_xml_path = r'C:\Users\Bertrand\AppData\Local\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\ThirdBuk\Content.xml'
             pkg_name = os.path.basename(package_path)
@@ -506,7 +552,7 @@ class Api:
             else:
                 new_path = package_path
 
-            airports = run_scan()
+            airports = fast_update_airport_cache(icao, target_pkg_name=clean_pkg) if icao else run_scan()
             return json.dumps({"status": "ok", "enabled": is_enabled, "new_path": new_path, "airports": airports}, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})

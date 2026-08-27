@@ -791,9 +791,13 @@ function getAirportPopupHtml(ap) {
     `;
 }
 
+let isToggleInProgress = false;
+
 function toggleAirportScenery(icao) {
-    if (!window.pywebview) return;
+    if (!window.pywebview || isToggleInProgress) return;
+    isToggleInProgress = true;
     window.pywebview.api.toggle_airport_disabled(icao).then(resStr => {
+        isToggleInProgress = false;
         try {
             const res = JSON.parse(resStr);
             if (res.status === 'success') {
@@ -812,7 +816,7 @@ function toggleAirportScenery(icao) {
                 });
             }
         } catch(e){}
-    });
+    }).catch(() => { isToggleInProgress = false; });
 }
 
 function toggleSelectedAirportScenery() {
@@ -1254,6 +1258,7 @@ function showAirportDetails(ap) {
                 </div>
             `;
         } else {
+            const hasMultiplePkgs = (ap.all_sources && ap.all_sources.length > 1);
             actionControlsHtml = `
                 <div class="flex items-center justify-between gap-2 pt-1 border-t border-slate-800/60">
                     <!-- 1. Open Button -->
@@ -1264,10 +1269,12 @@ function showAirportDetails(ap) {
                     <!-- 2. Active / Disabled Status Pill -->
                     ${statusBadge}
                     
-                    <!-- 3. Disable / Enable Button -->
+                    <!-- 3. Disable / Enable Button (Only displayed if airport has multiple packages/fixes) -->
+                    ${hasMultiplePkgs ? `
                     <button onclick="toggleSpecificPackageByIndex('${ap.icao}', ${idx})" class="px-2.5 py-1.5 rounded-lg border text-xs flex items-center gap-1.5 transition-all shadow-sm shrink-0 whitespace-nowrap ${toggleBtnClass}" title="Toggle Enable/Disable">
                         <i class="fa-solid ${toggleBtnIcon}"></i> ${toggleBtnText}
                     </button>
+                    ` : ''}
                 </div>
             `;
         }
@@ -1353,28 +1360,30 @@ async function saveCustomPriceForSelected() {
     }
 }
 
-async function toggleSpecificPackage(path) {
+async function toggleSpecificPackage(path, icao) {
+    if (!window.pywebview || isToggleInProgress) return;
+    isToggleInProgress = true;
     try {
-        if (window.pywebview) {
-            const resStr = await window.pywebview.api.toggle_package(path);
-            const res = JSON.parse(resStr);
-            if (res.status === 'ok') {
-                allAirportsData = res.airports;
-                allAirportsData.forEach(ap => {
-                    if (userRatingsMap[ap.icao] !== undefined) {
-                        ap.rating = userRatingsMap[ap.icao];
-                    }
-                });
-                updateStats(allAirportsData);
-                filterAirports();
-                if (selectedAirport) {
-                    const updatedAp = allAirportsData.find(a => a.icao === selectedAirport.icao);
-                    if (updatedAp) showAirportDetails(updatedAp);
+        const resStr = await window.pywebview.api.toggle_package(path, icao || '');
+        const res = JSON.parse(resStr);
+        if (res.status === 'ok') {
+            allAirportsData = res.airports;
+            allAirportsData.forEach(ap => {
+                if (userRatingsMap[ap.icao] !== undefined) {
+                    ap.rating = userRatingsMap[ap.icao];
                 }
+            });
+            updateStats(allAirportsData);
+            filterAirports();
+            if (selectedAirport) {
+                const updatedAp = allAirportsData.find(a => a.icao === selectedAirport.icao);
+                if (updatedAp) showAirportDetails(updatedAp);
             }
         }
     } catch (e) {
         console.error("Failed to toggle package:", e);
+    } finally {
+        isToggleInProgress = false;
     }
 }
 
@@ -1394,7 +1403,7 @@ function toggleSpecificPackageByIndex(icao, idx) {
     if (!selectedAirport || !selectedAirport.all_sources || !selectedAirport.all_sources[idx]) return;
     const src = selectedAirport.all_sources[idx];
     const pathOrName = src.package_path || src.folder_name;
-    if (pathOrName) toggleSpecificPackage(pathOrName);
+    if (pathOrName) toggleSpecificPackage(pathOrName, icao);
 }
 
 function closeDrawer() {
