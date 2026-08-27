@@ -628,12 +628,13 @@ function updateInvestmentBanner() {
 }
 
 function getAirportPricingType(ap) {
+    const allSourcesDisabled = ap.all_sources && ap.all_sources.length > 0 && ap.all_sources.every(s => s.is_disabled);
+    if (ap.is_default || ap.pricing_type === 'Default' || allSourcesDisabled) {
+        return 'Default';
+    }
     const pt = ap.pricing_type || '';
     const v = (ap.vendor || '').toLowerCase();
     
-    if (ap.is_default || pt === 'Default') {
-        return 'Default';
-    }
     if (pt === 'Payware' || ap.is_payware) {
         return 'Payware';
     }
@@ -1754,7 +1755,11 @@ function filterAirports() {
         } else {
             // Pricing Filter (only applied when NOT in specific airline route mode)
             const pt = getAirportPricingType(ap);
-            if (!selectedPricing.has(pt)) return false;
+            const allSourcesDisabled = ap.all_sources && ap.all_sources.length > 0 && ap.all_sources.every(s => s.is_disabled);
+            const hasDisabledAddon = (ap.all_sources && ap.all_sources.length > 0) && (ap.is_disabled || allSourcesDisabled);
+
+            // If an airport has installed addons that are currently disabled, keep its Default MSFS Blue Circle Dot visible!
+            if (!selectedPricing.has(pt) && !hasDisabledAddon) return false;
         }
 
         // Search text
