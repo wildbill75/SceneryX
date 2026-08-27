@@ -642,11 +642,6 @@ class Api:
 
             # Determine whether we are ENABLING or DISABLING
             is_currently_disabled = False
-            if os.path.exists(target_path):
-                if target_path.endswith('.disabled'):
-                    is_currently_disabled = True
-                elif os.path.exists(os.path.join(target_path, 'manifest.json.disabled')):
-                    is_currently_disabled = True
 
             if os.path.exists(content_xml_path):
                 import xml.etree.ElementTree as ET
@@ -655,8 +650,13 @@ class Api:
                 for p in root.findall('Package'):
                     name = p.get('name', '')
                     if is_xml_match(clean_pkg, name, icao):
-                        if p.get('active') == 'UserDisabled' or name.endswith('.disabled'):
+                        if p.get('active') == 'UserDisabled' or name.lower().endswith('.disabled'):
                             is_currently_disabled = True
+                            break
+
+            if os.path.exists(target_path):
+                if target_path.endswith('.disabled') or os.path.exists(os.path.join(target_path, 'manifest.json.disabled')):
+                    is_currently_disabled = True
 
             should_enable = is_currently_disabled
 
@@ -713,24 +713,30 @@ class Api:
                 tree = ET.parse(content_xml_path)
                 root = tree.getroot()
                 changed = False
-                for p in root.findall('Package'):
+                seen_packages = set()
+                to_remove = []
+
+                for p in list(root.findall('Package')):
                     name = p.get('name', '')
-                    clean = name[:-9] if name.endswith('.disabled') else name
+                    clean = name[:-9] if name.lower().endswith('.disabled') else name
+                    p.set('name', clean)
+
+                    if clean.lower() in seen_packages:
+                        to_remove.append(p)
+                        changed = True
+                        continue
+                    seen_packages.add(clean.lower())
                     
                     if is_xml_match(clean_pkg, name, icao):
                         new_val = 'Activated' if should_enable else 'UserDisabled'
                         p.set('active', new_val)
-                        if should_enable and name.endswith('.disabled'):
-                            p.set('name', clean)
-                        elif not should_enable and not name.endswith('.disabled'):
-                            p.set('name', clean + '.disabled')
                         changed = True
                     elif should_enable and icao and icao.lower() in clean.lower():
-                        # Mutual Exclusion: Disable conflicting package in Content.xml
                         p.set('active', 'UserDisabled')
-                        if not name.endswith('.disabled'):
-                            p.set('name', clean + '.disabled')
                         changed = True
+
+                for p in to_remove:
+                    root.remove(p)
 
                 if changed:
                     tree.write(content_xml_path, encoding='utf-8', xml_declaration=True)

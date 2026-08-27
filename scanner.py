@@ -785,7 +785,7 @@ def run_scan():
                 act = p.get('active', 'Activated')
                 clean_folder = pkg_name[:-9] if pkg_name.endswith('.disabled') else pkg_name
                 folder_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_folder.lower())
-                is_active = (act == 'Activated') and not pkg_name.endswith('.disabled')
+                is_active = (act == 'Activated')
 
                 if clean_folder.lower() not in content_xml_status:
                     content_xml_status[clean_folder.lower()] = is_active
