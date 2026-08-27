@@ -68,6 +68,8 @@ COMMERCIAL_PAYWARE_VENDORS = {
 }
 
 VENDOR_MAP = {
+    'argaeus': 'Argaeus',
+    'hb': 'Argaeus',
     'scenerytr': 'SceneryTR Design',
     'scenerytrdesign': 'SceneryTR Design',
     'scenerytr design': 'SceneryTR Design',
@@ -808,9 +810,14 @@ def run_scan():
                 pass
 
     # Dynamic discovery of StreamedPackages & Official packages listed in Content.xml
-    existing_norms = {re.sub(r'^(community|official)?(fs20|fs24)?-?', '', (f[:-9] if f.endswith('.disabled') else f).lower()) for _, f, _, _ in all_packages}
+    def _normalize_pkg(f_name):
+        c = f_name[:-9] if f_name.lower().endswith('.disabled') else f_name
+        n = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', c.lower())
+        return re.sub(r'-(airport|scenery|pack|project)-', '-', n)
+
+    existing_norms = {_normalize_pkg(f) for _, f, _, _ in all_packages}
     for pkg_name, clean_f, is_dis in content_xml_packages:
-        fn_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_f.lower())
+        fn_norm = _normalize_pkg(clean_f)
         if fn_norm not in existing_norms:
             all_packages.append(("MSFS 2024 - StreamedPackages", clean_f, "", is_dis))
             existing_norms.add(fn_norm)
@@ -1169,8 +1176,7 @@ def run_scan():
             )
             for s in sorted_srcs:
                 fn = s.get('folder_name', '')
-                clean_fn = fn[:-9] if fn.endswith('.disabled') else fn
-                fn_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_fn.lower())
+                fn_norm = _normalize_pkg(fn)
                 if fn_norm not in seen_norms:
                     seen_norms.add(fn_norm)
                     unique_srcs.append(s)
