@@ -625,17 +625,16 @@ function updateInvestmentBanner() {
 }
 
 function getAirportPricingType(ap) {
-    const allSourcesDisabled = ap.all_sources && ap.all_sources.length > 0 && ap.all_sources.every(s => s.is_disabled);
-    if (ap.is_default || ap.pricing_type === 'Default' || allSourcesDisabled) {
+    if (!ap) return 'Default';
+    const nonDefaultSources = ap.all_sources ? ap.all_sources.filter(s => !(s.pricing_type === 'Default' || (s.folder_name && s.folder_name.startsWith('msfs-default-')))) : [];
+    if (nonDefaultSources.length === 0) {
         return 'Default';
     }
-    const pt = ap.pricing_type || '';
-    const v = (ap.vendor || '').toLowerCase();
-    
-    if (pt === 'Payware' || ap.is_payware) {
+
+    if (nonDefaultSources.some(s => s.is_payware || s.pricing_type === 'Payware')) {
         return 'Payware';
     }
-    if (ap.is_asobo_official || pt === 'Asobo' || pt === 'Asobo / MS' || v.includes('asobo') || v.includes('microsoft')) {
+    if (nonDefaultSources.some(s => s.is_asobo_official || s.pricing_type === 'Asobo' || (s.vendor && s.vendor.toLowerCase().includes('asobo')))) {
         return 'Asobo';
     }
     return 'Freeware / Flightsim.to';
@@ -643,9 +642,8 @@ function getAirportPricingType(ap) {
 
 function getAirportCategory(ap) {
     if (!ap) return 'DEFAULT';
-    if (ap.pricing_type === 'Default') return 'DEFAULT';
     const nonDefaultSources = ap.all_sources ? ap.all_sources.filter(s => !(s.pricing_type === 'Default' || (s.folder_name && s.folder_name.startsWith('msfs-default-')))) : [];
-    if (nonDefaultSources.length === 0 || nonDefaultSources.every(s => s.is_disabled)) return 'DEFAULT';
+    if (nonDefaultSources.length === 0) return 'DEFAULT';
 
     const pt = getAirportPricingType(ap);
     if (pt === 'Asobo') return 'ASOBO';
@@ -662,15 +660,16 @@ function updateStats(airports) {
     let defaultCount = 0;
 
     airports.forEach(ap => {
-        const pt = getAirportPricingType(ap);
-        if (pt === 'Asobo') {
-            asoboCount++;
-        } else if (pt === 'Payware') {
-            paywareCount++;
-        } else if (pt === 'Default') {
+        const nonDefaultSources = ap.all_sources ? ap.all_sources.filter(s => !(s.pricing_type === 'Default' || (s.folder_name && s.folder_name.startsWith('msfs-default-')))) : [];
+        const hasActiveCustom = nonDefaultSources.some(s => !s.is_disabled);
+
+        if (!hasActiveCustom) {
             defaultCount++;
         } else {
-            freewareCount++;
+            const pt = getAirportPricingType(ap);
+            if (pt === 'Payware') paywareCount++;
+            else if (pt === 'Asobo') asoboCount++;
+            else freewareCount++;
         }
     });
 
@@ -687,8 +686,8 @@ function updateStats(airports) {
 let currentFlightMode = { active: false, icaos: [] };
 
 function createCustomIcon(ap) {
-    const allSourcesDisabled = ap.all_sources && ap.all_sources.length > 0 && ap.all_sources.every(s => s.is_disabled);
-    let isApDisabled = ap.is_disabled || allSourcesDisabled;
+    const nonDefaultSources = ap.all_sources ? ap.all_sources.filter(s => !(s.pricing_type === 'Default' || (s.folder_name && s.folder_name.startsWith('msfs-default-')))) : [];
+    let isApDisabled = ap.is_disabled || (nonDefaultSources.length > 0 && nonDefaultSources.every(s => s.is_disabled));
 
     const cat = getAirportCategory(ap);
     let color = '#06b6d4'; // Freeware = Neon Cyan
