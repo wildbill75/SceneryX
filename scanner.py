@@ -1031,6 +1031,23 @@ def run_scan():
 
     # Process each detected airport and resolve primary package & classification
     for icao, item in detected_map.items():
+        # Deduplicate sources that represent the exact same package between physical disk and StreamedPackages
+        if len(item['all_sources']) > 1:
+            unique_srcs = []
+            seen_norms = set()
+            sorted_srcs = sorted(
+                item['all_sources'], 
+                key=lambda s: 0 if 'streamed' not in s.get('source_folder', '').lower() else 1
+            )
+            for s in sorted_srcs:
+                fn = s.get('folder_name', '')
+                clean_fn = fn[:-9] if fn.endswith('.disabled') else fn
+                fn_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_fn.lower())
+                if fn_norm not in seen_norms:
+                    seen_norms.add(fn_norm)
+                    unique_srcs.append(s)
+            item['all_sources'] = unique_srcs
+
         # 1. Determine if this airport has an Official Asobo/Microsoft base scenery in ANY source (including StreamedPackages)
         has_asobo = (icao in ['LFPB', 'LFPG']) or any(
             s.get('is_asobo_official') 

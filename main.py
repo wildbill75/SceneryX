@@ -150,7 +150,7 @@ def fast_update_airport_cache(icao_target, target_pkg_name=None, toggle_all=Fals
                 fn = s.get('folder_name', '')
                 clean_fn = fn[:-9] if fn.endswith('.disabled') else fn
                 fn_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_fn.lower())
-                if clean_fn.lower() == clean_target.lower() or fn_norm == t_norm or fn_norm in t_norm or t_norm in fn_norm:
+                if clean_fn.lower() == clean_target.lower() or fn_norm == t_norm:
                     s['is_disabled'] = not s.get('is_disabled', False)
 
             # Check if all 3rd-party sources are disabled
@@ -582,7 +582,7 @@ class Api:
                     name = p.get('name', '')
                     clean = name[:-9] if name.endswith('.disabled') else name
                     s_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean.lower())
-                    if clean.lower() == clean_pkg.lower() or p_norm == s_norm or p_norm in s_norm or s_norm in p_norm:
+                    if clean.lower() == clean_pkg.lower() or p_norm == s_norm:
                         curr = p.get('active', 'Activated')
                         new_val = 'UserDisabled' if curr == 'Activated' else 'Activated'
                         p.set('active', new_val)
