@@ -20,7 +20,7 @@ const ALL_PRICING_LIST = ['Payware', 'Freeware / Flightsim.to', 'Asobo', 'Defaul
 const ALL_SOURCES_LIST = ['asobo', 'Community', 'StreamedPackages', 'Official'];
 const ALL_TYPES_LIST = ['International', 'Regional', 'General Aviation', 'Heli / Water'];
 
-let selectedPricing = new Set(['Payware', 'Freeware / Flightsim.to', 'Asobo']);
+let selectedPricing = new Set(ALL_PRICING_LIST);
 let selectedSources = new Set(ALL_SOURCES_LIST);
 let selectedTypes = new Set(ALL_TYPES_LIST);
 let selectedMinRating = 0; // 0 = All ratings
@@ -1959,10 +1959,7 @@ function filterAirports() {
         } else {
             // Pricing Filter (only applied when NOT in specific airline route mode)
             const pt = getAirportPricingType(ap);
-            const hasDisabledAddon = ap.all_sources && ap.all_sources.some(s => s.is_disabled && !(s.is_default || (s.folder_name && s.folder_name.startsWith('msfs-default-'))));
-
-            // If an airport has installed addons that are currently disabled, keep its Default MSFS Blue Circle Dot visible!
-            if (!selectedPricing.has(pt) && !hasDisabledAddon) return false;
+            if (!selectedPricing.has(pt)) return false;
         }
 
         // Search text
@@ -2013,27 +2010,27 @@ function filterByPricingPill(pricing) {
         selectedPricing = new Set(ALL_PRICING_LIST);
     } else if (pricing === 'Payware') {
         if (selectedPricing.size === 1 && selectedPricing.has('Payware')) {
-            selectedPricing = new Set(['Payware', 'Freeware / Flightsim.to', 'Asobo']);
+            selectedPricing = new Set(ALL_PRICING_LIST);
         } else {
             selectedPricing = new Set(['Payware']);
         }
     } else if (pricing === 'Freeware') {
         if (selectedPricing.size === 1 && selectedPricing.has('Freeware / Flightsim.to')) {
-            selectedPricing = new Set(['Payware', 'Freeware / Flightsim.to', 'Asobo']);
+            selectedPricing = new Set(ALL_PRICING_LIST);
         } else {
             selectedPricing = new Set(['Freeware / Flightsim.to']);
         }
     } else if (pricing === 'Asobo') {
         if (selectedPricing.size === 1 && selectedPricing.has('Asobo')) {
-            selectedPricing = new Set(['Payware', 'Freeware / Flightsim.to', 'Asobo']);
+            selectedPricing = new Set(ALL_PRICING_LIST);
         } else {
             selectedPricing = new Set(['Asobo']);
         }
     } else if (pricing === 'Default') {
-        if (selectedPricing.has('Default')) {
-            selectedPricing.delete('Default');
+        if (selectedPricing.size === 1 && selectedPricing.has('Default')) {
+            selectedPricing = new Set(ALL_PRICING_LIST);
         } else {
-            selectedPricing.add('Default');
+            selectedPricing = new Set(['Default']);
         }
     }
     updateFilterUI();
@@ -2098,10 +2095,10 @@ function setPillHighlight(el, isActive, colorType) {
     if (!el) return;
 
     el.classList.remove(
-        'border-2', 'border-sky-400', 'border-purple-400', 'border-cyan-400', 'border-amber-400',
-        'bg-sky-500/30', 'bg-purple-500/30', 'bg-cyan-500/30', 'bg-amber-500/30',
+        'border-2', 'border-sky-400', 'border-purple-400', 'border-cyan-400', 'border-amber-400', 'border-blue-400',
+        'bg-sky-500/30', 'bg-purple-500/30', 'bg-cyan-500/30', 'bg-amber-500/30', 'bg-blue-500/30',
         'shadow-[0_0_15px_rgba(56,189,248,0.4)]', 'shadow-[0_0_15px_rgba(168,85,247,0.4)]',
-        'shadow-[0_0_15px_rgba(6,182,212,0.4)]', 'shadow-[0_0_15px_rgba(245,158,11,0.4)]',
+        'shadow-[0_0_15px_rgba(6,182,212,0.4)]', 'shadow-[0_0_15px_rgba(245,158,11,0.4)]', 'shadow-[0_0_15px_rgba(59,130,246,0.4)]',
         'scale-105', 'opacity-60'
     );
 
@@ -2114,6 +2111,8 @@ function setPillHighlight(el, isActive, colorType) {
             el.classList.add('border-2', 'border-cyan-400', 'bg-cyan-500/30', 'shadow-[0_0_15px_rgba(6,182,212,0.4)]', 'scale-105');
         } else if (colorType === 'amber') {
             el.classList.add('border-2', 'border-amber-400', 'bg-amber-500/30', 'shadow-[0_0_15px_rgba(245,158,11,0.4)]', 'scale-105');
+        } else if (colorType === 'blue') {
+            el.classList.add('border-2', 'border-blue-400', 'bg-blue-500/30', 'shadow-[0_0_15px_rgba(59,130,246,0.4)]', 'scale-105');
         }
     } else {
         el.classList.add('opacity-60');
@@ -2126,11 +2125,13 @@ function updateFilterUI() {
     const isOnlyPayware = (selectedPricing.size === 1 && selectedPricing.has('Payware'));
     const isOnlyFreeware = (selectedPricing.size === 1 && selectedPricing.has('Freeware / Flightsim.to'));
     const isOnlyAsobo = (selectedPricing.size === 1 && selectedPricing.has('Asobo'));
+    const isOnlyDefault = (selectedPricing.size === 1 && selectedPricing.has('Default'));
 
     setPillHighlight(document.getElementById('stat-pill-total'), isAllSelected, 'sky');
     setPillHighlight(document.getElementById('stat-pill-payware'), isOnlyPayware, 'purple');
     setPillHighlight(document.getElementById('stat-pill-freeware'), isOnlyFreeware, 'cyan');
     setPillHighlight(document.getElementById('stat-pill-asobo'), isOnlyAsobo, 'amber');
+    setPillHighlight(document.getElementById('stat-pill-default'), isOnlyDefault, 'blue');
 
     // Pricing Buttons UI
     const priceMap = {
