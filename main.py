@@ -625,18 +625,71 @@ class Api:
                     if found:
                         break
 
+            # Determine whether we are ENABLING or DISABLING
+            is_currently_disabled = False
             if os.path.exists(target_path):
                 if target_path.endswith('.disabled'):
-                    new_path = target_path[:-9]
-                    os.rename(target_path, new_path)
-                else:
-                    new_path = target_path + '.disabled'
-                    os.rename(target_path, new_path)
-            else:
-                new_path = target_path
+                    is_currently_disabled = True
+                elif os.path.exists(os.path.join(target_path, 'manifest.json.disabled')):
+                    is_currently_disabled = True
+            
+            should_enable = is_currently_disabled
 
-            airports = fast_update_airport_cache(icao, target_pkg_name=clean_pkg) if icao else run_scan()
-            return json.dumps({"status": "ok", "enabled": is_enabled, "new_path": new_path, "airports": airports}, ensure_ascii=False)
+            # 1. Update Content.xml
+            if os.path.exists(content_xml_path):
+                import xml.etree.ElementTree as ET
+                tree = ET.parse(content_xml_path)
+                root = tree.getroot()
+                changed = False
+                for p in root.findall('Package'):
+                    name = p.get('name', '')
+                    clean = name[:-9] if name.endswith('.disabled') else name
+                    s_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean.lower())
+                    if clean.lower() == clean_pkg.lower() or p_norm == s_norm:
+                        new_val = 'Activated' if should_enable else 'UserDisabled'
+                        p.set('active', new_val)
+                        if should_enable and name.endswith('.disabled'):
+                            p.set('name', clean)
+                        elif not should_enable and not name.endswith('.disabled'):
+                            p.set('name', clean + '.disabled')
+                        changed = True
+                if changed:
+                    tree.write(content_xml_path, encoding='utf-8', xml_declaration=True)
+
+            # 2. Rename physical directory on disk and inner manifest.json / layout.json files
+            new_path = target_path
+            if os.path.exists(target_path):
+                if should_enable:
+                    if target_path.endswith('.disabled'):
+                        new_path = target_path[:-9]
+                        os.rename(target_path, new_path)
+                    else:
+                        new_path = target_path
+
+                    for mf in ['manifest.json', 'layout.json']:
+                        mf_dis = os.path.join(new_path, mf + '.disabled')
+                        mf_norm = os.path.join(new_path, mf)
+                        if os.path.exists(mf_dis):
+                            if os.path.exists(mf_norm):
+                                os.remove(mf_norm)
+                            os.rename(mf_dis, mf_norm)
+                else:
+                    if not target_path.endswith('.disabled'):
+                        new_path = target_path + '.disabled'
+                        os.rename(target_path, new_path)
+                    else:
+                        new_path = target_path
+
+                    for mf in ['manifest.json', 'layout.json']:
+                        mf_norm = os.path.join(new_path, mf)
+                        mf_dis = os.path.join(new_path, mf + '.disabled')
+                        if os.path.exists(mf_norm):
+                            if os.path.exists(mf_dis):
+                                os.remove(mf_dis)
+                            os.rename(mf_norm, mf_dis)
+
+            airports = run_scan()
+            return json.dumps({"status": "ok", "enabled": should_enable, "new_path": new_path, "airports": airports}, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
 
