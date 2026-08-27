@@ -55,23 +55,15 @@ function filterByAirline(airlineName) {
 
     // Get all destination ICAOs for this airline from origin
     const destIcaos = (originAp.routes && originAp.routes[airlineName]) || [];
-    
-    // Strictly match custom sceneries owned by the user (Payware / Freeware / Asobo - excluding Default MSFS)
-    const matchingCustomDests = allAirportsData.filter(a => {
-        if (a.icao === originAp.icao || !destIcaos.includes(a.icao)) return false;
-        const cat = getAirportCategory(a);
-        return cat !== 'DEFAULT';
-    });
 
-    if (matchingCustomDests.length === 0) {
+    if (destIcaos.length === 0) {
         filterAirports();
         updateFilterUI();
         showAirportDetails(originAp);
 
-        const destText = destIcaos.length > 0 ? ` (${destIcaos.length} destinations)` : '';
         showCustomModal({
-            title: 'No Custom Destinations',
-            message: `You don't have any custom addon airport (Payware/Freeware/Asobo) in your scenery collection for ${airlineName} from ${originAp.icao}${destText}.`,
+            title: 'No Route Destinations',
+            message: `No scheduled route destination data found for ${airlineName} from ${originAp.icao}.`,
             type: 'info',
             confirmText: 'OK'
         });
@@ -1654,36 +1646,24 @@ function filterAirports() {
             return false;
         }
 
-        // Pricing Filter
-        const pt = getAirportPricingType(ap);
-        if (!selectedPricing.has(pt)) return false;
-
-        // Type Filter
-        const typeStr = ap.english_type || ap.type;
-        if (!selectedTypes.has(typeStr)) return false;
-
-        // GSX Profile Filter
-        if (selectedGsxFilter === 'with' && !ap.has_gsx_profile) return false;
-        if (selectedGsxFilter === 'none' && ap.has_gsx_profile) return false;
-
         // Operating Airline & Direct Route Filter
         if (selectedAirline) {
             if (activeRouteOrigin) {
-                // Specific origin airport route mode
+                // Specific origin airport route mode: Include origin AND all destination ICAOs (custom + default MSFS)
                 if (ap.icao === activeRouteOrigin.icao) {
                     return true;
                 }
                 const destIcaos = (activeRouteOrigin.routes && activeRouteOrigin.routes[selectedAirline]) || [];
                 if (!destIcaos.includes(ap.icao)) return false;
-
-                // STRICTLY ONLY SHOW CUSTOM SCENERIES (Payware / Freeware / Asobo - Exclude Default MSFS)
-                const cat = getAirportCategory(ap);
-                if (cat === 'DEFAULT') return false;
             } else {
                 // Global airline filter mode
                 const airlines = ap.operating_airlines || [];
                 if (!airlines.includes(selectedAirline)) return false;
             }
+        } else {
+            // Pricing Filter (only applied when NOT in specific airline route mode)
+            const pt = getAirportPricingType(ap);
+            if (!selectedPricing.has(pt)) return false;
         }
 
         // Search text
