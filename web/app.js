@@ -734,16 +734,24 @@ function getAirportPopupHtml(ap) {
     const cat = getAirportCategory(ap);
     let badgeClass = 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40';
     let badgeLabel = 'Freeware';
+    let icaoColorClass = 'text-cyan-400';
+    let publisherColorClass = 'text-cyan-400';
 
     if (cat === 'DEFAULT') {
         badgeClass = 'bg-blue-500/20 text-blue-300 border-blue-500/40';
         badgeLabel = 'Default MSFS';
+        icaoColorClass = 'text-blue-400';
+        publisherColorClass = 'text-slate-400';
     } else if (cat === 'ASOBO') {
         badgeClass = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
         badgeLabel = 'Asobo';
+        icaoColorClass = 'text-amber-400';
+        publisherColorClass = 'text-amber-400';
     } else if (cat === 'PAYWARE') {
         badgeClass = 'bg-purple-500/20 text-purple-300 border-purple-500/40';
         badgeLabel = 'Payware Addon';
+        icaoColorClass = 'text-purple-400';
+        publisherColorClass = 'text-purple-400';
     }
 
     const ratingVal = ap.rating || 0;
@@ -761,17 +769,19 @@ function getAirportPopupHtml(ap) {
         </div>
     ` : '';
 
-    const publisherHtml = `
-        <div class="text-[10px] font-bold text-amber-300/90 truncate pt-1 border-t border-slate-800/60 flex items-center gap-1.5">
-            <i class="fa-solid fa-building text-[10px] text-amber-400"></i>
-            <span class="truncate">${ap.vendor || 'Unknown Publisher'}</span>
+    const allSourcesDisabled = ap.all_sources && ap.all_sources.length > 0 && ap.all_sources.every(s => s.is_disabled);
+    const isFallbackDefault = ap.is_disabled || allSourcesDisabled || cat === 'DEFAULT';
+
+    const publisherHtml = (!isFallbackDefault && ap.vendor) ? `
+        <div class="pt-1.5 border-t border-slate-800/60">
+            <span class="text-xs font-black ${publisherColorClass} truncate block">${ap.vendor}</span>
         </div>
-    `;
+    ` : '';
 
     return `
         <div class="p-1 font-['Outfit'] space-y-2">
             <div class="flex items-center justify-between gap-2">
-                <span class="text-xl font-black font-mono text-cyan-400 leading-none">${ap.icao}</span>
+                <span class="text-xl font-black font-mono ${icaoColorClass} leading-none">${ap.icao}</span>
                 <span class="text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${badgeClass} shrink-0">${badgeLabel}</span>
             </div>
             <div>
@@ -781,7 +791,7 @@ function getAirportPopupHtml(ap) {
             ${publisherHtml}
             ${ratingBadgeHtml}
             ${conflictBadgeHtml}
-            <div class="text-[10px] font-semibold text-cyan-400 pt-1.5 border-t border-slate-800 flex justify-between items-center">
+            <div class="text-[10px] font-semibold ${icaoColorClass} pt-1.5 border-t border-slate-800 flex justify-between items-center">
                 <span class="font-bold">${ap.english_type || ap.type}</span>
             </div>
         </div>
