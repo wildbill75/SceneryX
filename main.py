@@ -635,6 +635,20 @@ class Api:
             
             should_enable = is_currently_disabled
 
+            def is_xml_match(clean_target, xml_pkg_name, target_icao=None):
+                c1 = clean_target.lower()
+                c2 = xml_pkg_name[:-9].lower() if xml_pkg_name.lower().endswith('.disabled') else xml_pkg_name.lower()
+                if c1 == c2:
+                    return True
+                p1 = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', c1)
+                p2 = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', c2)
+                if p1 == p2:
+                    return True
+                if target_icao and target_icao.lower() in p1 and target_icao.lower() in p2:
+                    if p1 in p2 or p2 in p1:
+                        return True
+                return False
+
             # 1. Update Content.xml
             if os.path.exists(content_xml_path):
                 import xml.etree.ElementTree as ET
@@ -644,8 +658,7 @@ class Api:
                 for p in root.findall('Package'):
                     name = p.get('name', '')
                     clean = name[:-9] if name.endswith('.disabled') else name
-                    s_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean.lower())
-                    if clean.lower() == clean_pkg.lower() or p_norm == s_norm:
+                    if is_xml_match(clean_pkg, name, icao):
                         new_val = 'Activated' if should_enable else 'UserDisabled'
                         p.set('active', new_val)
                         if should_enable and name.endswith('.disabled'):

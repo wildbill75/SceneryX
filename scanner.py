@@ -659,6 +659,11 @@ def run_scan():
                 else:
                     content_xml_status[clean_folder.lower()] = content_xml_status[clean_folder.lower()] or is_active
 
+                if folder_norm not in content_xml_status:
+                    content_xml_status[folder_norm] = is_active
+                else:
+                    content_xml_status[folder_norm] = content_xml_status[folder_norm] or is_active
+
                 content_xml_packages.append((pkg_name, clean_folder, not is_active))
         except Exception:
             pass
