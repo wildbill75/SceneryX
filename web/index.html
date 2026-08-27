@@ -481,8 +481,8 @@
             </div>
 
             <div class="p-5 space-y-6 overflow-y-auto flex-1">
-                <!-- 1. HEADER AIRPORT CODE & NAME -->
-                <div class="space-y-2">
+                <!-- 1. HERO AIRPORT IDENTITY & DEVELOPER -->
+                <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-2">
                             <span id="drawer-icao" class="text-2xl font-black font-mono">ICAO</span>
@@ -490,13 +490,23 @@
                         </div>
                         <span id="drawer-pricing-badge" class="px-2.5 py-1 rounded-full text-xs font-mono font-bold">Badge</span>
                     </div>
-                    <h3 id="drawer-name" class="text-base font-bold text-white leading-snug">Airport Full Name</h3>
-                    <p id="drawer-city-country" class="text-xs text-slate-400">City, Country</p>
-                    
-                    <!-- ACTIVATION STATUS CARD -->
-                    <div id="drawer-activation-card" class="p-2.5 rounded-2xl bg-slate-900/90 border border-slate-800 flex items-center justify-between gap-3 shadow-sm mt-2">
-                        <div class="flex items-center gap-2 w-full">
-                            <span id="drawer-activation-badge" class="px-3 py-1 rounded-full text-xs font-mono font-extrabold">Active</span>
+                    <div>
+                        <h3 id="drawer-name" class="text-base font-bold text-white leading-snug">Airport Full Name</h3>
+                        <p id="drawer-city-country" class="text-xs text-slate-400">City, Country</p>
+                    </div>
+
+                    <!-- Developer Info & Status Pill Row -->
+                    <div class="pt-2.5 border-t border-slate-800/80 flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-1.5 min-w-0">
+                            <span class="text-[10px] text-slate-400 uppercase font-bold shrink-0">Dev:</span>
+                            <span id="drawer-vendor" class="text-xs font-extrabold text-cyan-300 truncate">Unknown Vendor</span>
+                            <span id="drawer-version" class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 hidden">v1.0.0</span>
+                        </div>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <span id="drawer-activation-badge" class="px-2.5 py-0.5 rounded-full text-[11px] font-mono font-extrabold">Active</span>
+                            <button onclick="triggerCheckSceneryUpdate()" id="btn-check-update" class="px-2 py-0.5 rounded-full bg-slate-800 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-300 border border-slate-700 text-[10px] font-bold transition-all shadow-sm" title="Check for Scenery Updates">
+                                <i class="fa-solid fa-rotate text-[9px] text-cyan-400"></i> Update
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -504,18 +514,12 @@
                 <!-- CONFLICT ALERT BANNER -->
                 <div id="drawer-conflict-banner" class="hidden"></div>
 
-                <!-- 2. DEVELOPER / PUBLISHER -->
-                <div class="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-1">
-                    <div class="flex items-center justify-between">
-                        <span class="text-[10px] text-slate-400 uppercase font-bold block">Developer / Publisher</span>
-                        <div class="flex items-center gap-1.5">
-                            <span id="drawer-version" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 hidden">v1.0.0</span>
-                            <button onclick="triggerCheckSceneryUpdate()" id="btn-check-update" class="px-2 py-0.5 rounded-full bg-slate-800 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-300 border border-slate-700 hover:border-cyan-500/40 text-[10px] font-bold transition-all flex items-center gap-1 shadow-sm" title="Check for Scenery Updates">
-                                <i class="fa-solid fa-rotate text-[9px] text-cyan-400"></i> Check Update
-                            </button>
-                        </div>
+                <!-- 2. INSTALLED SCENERY ADDONS (PRIMARY CONTROL BLOCK) -->
+                <div class="space-y-2">
+                    <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Installed Scenery Addons</label>
+                    <div id="drawer-sources-list" class="space-y-2">
+                        <!-- Populated by app.js -->
                     </div>
-                    <div id="drawer-vendor" class="text-sm lg:text-base font-extrabold tracking-wide">Unknown Vendor</div>
                 </div>
 
                 <!-- 3. AIRPORT SPECS METRICS GRID -->
@@ -535,14 +539,6 @@
                     <div class="p-3 rounded-xl bg-slate-900/80 border border-slate-800/80">
                         <span class="text-[10px] text-slate-400 uppercase font-bold block mb-1">Longitude</span>
                         <span id="drawer-lon" class="text-xs font-mono font-semibold text-slate-200">0.0000</span>
-                    </div>
-                </div>
-
-                <!-- 4. INSTALLED PACKAGES LIST -->
-                <div class="space-y-2">
-                    <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Installed Scenery Addons</label>
-                    <div id="drawer-sources-list" class="space-y-2">
-                        <!-- Populated by app.js -->
                     </div>
                 </div>
 
