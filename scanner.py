@@ -863,7 +863,7 @@ def run_scan():
         return 2
 
     for cat, folder_name, full_path, is_disabled_pkg in all_packages:
-        clean_folder = folder_name[:-9] if is_disabled_pkg else folder_name
+        clean_folder = folder_name[:-9] if folder_name.lower().endswith('.disabled') else folder_name
         fn_lower = clean_folder.lower()
         fn_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn_lower)
 
@@ -878,6 +878,9 @@ def run_scan():
         manifest_data = None
         
         mpath = os.path.join(full_path, 'manifest.json')
+        if not os.path.exists(mpath):
+            mpath = os.path.join(full_path, 'manifest.json.disabled')
+
         pkg_order_hint = ""
         if os.path.exists(mpath):
             try:
@@ -931,6 +934,8 @@ def run_scan():
         # Strict Layout BGL path matching (only BGL files starting/ending with an ICAO)
         if not found_ap_list:
             lpath = os.path.join(full_path, 'layout.json')
+            if not os.path.exists(lpath):
+                lpath = os.path.join(full_path, 'layout.json.disabled')
             if os.path.exists(lpath):
                 try:
                     with open(lpath, 'r', encoding='utf-8', errors='ignore') as f:

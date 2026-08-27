@@ -817,13 +817,15 @@ class Api:
                 if not p_path.endswith('.disabled'):
                     new_p = p_path + '.disabled'
                     os.rename(p_path, new_p)
+                # Restore manifest/layout if previously renamed to .disabled
                 for mf in ['manifest.json', 'layout.json']:
-                    mf_norm = os.path.join(new_p, mf)
                     mf_dis = os.path.join(new_p, mf + '.disabled')
-                    if os.path.exists(mf_norm):
-                        if os.path.exists(mf_dis):
+                    mf_norm = os.path.join(new_p, mf)
+                    if os.path.exists(mf_dis):
+                        if os.path.exists(mf_norm):
                             os.remove(mf_dis)
-                        os.rename(mf_norm, mf_dis)
+                        else:
+                            os.rename(mf_dis, mf_norm)
 
             def enable_physical_package(p_path):
                 if not p_path or not os.path.exists(p_path):
@@ -913,12 +915,13 @@ class Api:
                     new_p = p_path + '.disabled'
                     os.rename(p_path, new_p)
                 for mf in ['manifest.json', 'layout.json']:
-                    mf_norm = os.path.join(new_p, mf)
                     mf_dis = os.path.join(new_p, mf + '.disabled')
-                    if os.path.exists(mf_norm):
-                        if os.path.exists(mf_dis):
+                    mf_norm = os.path.join(new_p, mf)
+                    if os.path.exists(mf_dis):
+                        if os.path.exists(mf_norm):
                             os.remove(mf_dis)
-                        os.rename(mf_norm, mf_dis)
+                        else:
+                            os.rename(mf_dis, mf_norm)
                 return new_p
 
             def enable_physical_package(p_path):
