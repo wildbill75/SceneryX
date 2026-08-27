@@ -937,6 +937,23 @@ class Api:
                         os.rename(mf_dis, mf_norm)
                 return new_p
 
+            target_path = path
+            if not os.path.isabs(target_path) or not os.path.exists(target_path):
+                scanned_airports = run_scan()
+                found_path = None
+                for ap in scanned_airports:
+                    for src in ap.get('all_sources', []):
+                        fn = src.get('folder_name', '')
+                        pkg_p = src.get('package_path', '')
+                        if fn.lower() == clean_name.lower() or fn.lower() == (clean_name + '.disabled').lower():
+                            if pkg_p and os.path.exists(pkg_p):
+                                found_path = pkg_p
+                                break
+                    if found_path:
+                        break
+                if found_path:
+                    target_path = found_path
+
             is_currently_disabled = False
             if os.path.exists(content_xml_path):
                 import xml.etree.ElementTree as ET
@@ -945,12 +962,12 @@ class Api:
                 for p in root.findall('Package'):
                     name = p.get('name', '')
                     clean = name[:-9] if name.lower().endswith('.disabled') else name
-                    if clean.lower() == clean_name.lower():
+                    if clean.lower() == clean_name.lower() or clean_name.lower() in clean.lower() or clean.lower() in clean_name.lower():
                         if p.get('active') == 'UserDisabled':
                             is_currently_disabled = True
                         break
 
-            if not is_currently_disabled and os.path.exists(target_path):
+            if os.path.exists(target_path):
                 if target_path.endswith('.disabled') or os.path.exists(os.path.join(target_path, 'manifest.json.disabled')):
                     is_currently_disabled = True
 
@@ -965,7 +982,7 @@ class Api:
                     name = p.get('name', '')
                     clean = name[:-9] if name.lower().endswith('.disabled') else name
                     p.set('name', clean)
-                    if clean.lower() == clean_name.lower():
+                    if clean.lower() == clean_name.lower() or clean_name.lower() in clean.lower() or clean.lower() in clean_name.lower():
                         p.set('active', 'Activated' if should_enable else 'UserDisabled')
                         changed = True
                 if changed:
