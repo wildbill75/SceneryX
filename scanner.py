@@ -1034,7 +1034,7 @@ def run_scan():
                 "is_asobo_official": is_asobo_official,
                 "is_disabled": is_disabled,
                 "is_addon": is_addon_package,
-                "is_fix_patch": is_fix_patch,
+                "is_fix_patch": False if (is_asobo_official or is_payware) else is_fix_patch,
                 "version": pkg_version,
                 "size_str": pkg_size_str,
                 "world_update_name": get_world_update_name(icao, folder_name)
