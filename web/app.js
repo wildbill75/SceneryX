@@ -630,6 +630,11 @@ function getActiveSource(ap) {
     return ap.all_sources.find(s => !s.is_disabled && !(s.is_default || (s.folder_name && s.folder_name.startsWith('msfs-default-')))) || null;
 }
 
+function hasCustomAddonSources(ap) {
+    if (!ap || !ap.all_sources) return false;
+    return ap.all_sources.some(s => !(s.is_default || s.pricing_type === 'Default' || (s.folder_name && s.folder_name.startsWith('msfs-default-'))));
+}
+
 function getAirportPricingType(ap) {
     if (!ap) return 'Default';
     const activeSrc = getActiveSource(ap);
@@ -1960,7 +1965,13 @@ function filterAirports() {
         } else {
             // Pricing Filter (only applied when NOT in specific airline route mode)
             const pt = getAirportPricingType(ap);
-            if (!selectedPricing.has(pt)) return false;
+            if (selectedPricing.size === 1) {
+                // Strict single-category mode (e.g. clicking top pill "PAYWARE", "FREEWARE", "ASOBO", "DEFAULT")
+                if (!selectedPricing.has(pt)) return false;
+            } else {
+                // Multi-select mode: show selected pricing categories OR managed addon airports set to Default (Blue Circle Dot)
+                if (!selectedPricing.has(pt) && !hasCustomAddonSources(ap)) return false;
+            }
         }
 
         // Search text
