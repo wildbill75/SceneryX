@@ -86,13 +86,16 @@
 
         /* Leaflet Dark Tooltip Customization for Mouse Hover Preview */
         .leaflet-tooltip.custom-dark-tooltip {
-            background: rgba(15, 23, 42, 0.95) !important;
-            backdrop-filter: blur(12px) !important;
-            border: 1px solid #334155 !important;
-            border-radius: 1rem !important;
+            background: rgba(15, 23, 42, 0.96) !important;
+            backdrop-filter: blur(16px) !important;
+            -webkit-backdrop-filter: blur(16px) !important;
+            border: 1px solid rgba(51, 65, 85, 0.8) !important;
+            border-radius: 1.25rem !important;
             color: #f8fafc !important;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5) !important;
-            padding: 4px !important;
+            box-shadow: 0 25px 30px -5px rgba(0, 0, 0, 0.6), 0 10px 10px -5px rgba(0, 0, 0, 0.4) !important;
+            padding: 10px 14px !important;
+            min-width: 320px !important;
+            max-width: 360px !important;
         }
         .leaflet-tooltip.custom-dark-tooltip::before {
             border-top-color: rgba(15, 23, 42, 0.95) !important;

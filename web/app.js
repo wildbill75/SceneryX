@@ -743,23 +743,23 @@ function createCustomIcon(ap) {
 
 function getAirportPopupHtml(ap) {
     const cat = getAirportCategory(ap);
-    let badgeClass = 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40';
+    let badgeClass = 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40 shadow-sm';
     let badgeLabel = 'Freeware';
     let icaoColorClass = 'text-cyan-400';
     let publisherColorClass = 'text-cyan-400';
 
     if (cat === 'DEFAULT') {
-        badgeClass = 'bg-blue-500/20 text-blue-300 border-blue-500/40';
+        badgeClass = 'bg-blue-500/20 text-blue-300 border-blue-500/40 shadow-sm';
         badgeLabel = 'Default MSFS';
         icaoColorClass = 'text-blue-400';
         publisherColorClass = 'text-slate-400';
     } else if (cat === 'ASOBO') {
-        badgeClass = 'bg-amber-500/20 text-amber-300 border-amber-500/40';
+        badgeClass = 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm';
         badgeLabel = 'Asobo';
         icaoColorClass = 'text-amber-400';
         publisherColorClass = 'text-amber-400';
     } else if (cat === 'PAYWARE') {
-        badgeClass = 'bg-purple-500/20 text-purple-300 border-purple-500/40';
+        badgeClass = 'bg-purple-500/20 text-purple-300 border-purple-500/40 shadow-sm';
         badgeLabel = 'Payware Addon';
         icaoColorClass = 'text-purple-400';
         publisherColorClass = 'text-purple-400';
@@ -767,14 +767,14 @@ function getAirportPopupHtml(ap) {
 
     const ratingVal = ap.rating || 0;
     const ratingBadgeHtml = ratingVal > 0 ? `
-        <div class="flex items-center gap-1 text-amber-400 font-bold text-xs pt-0.5">
-            <i class="fa-solid fa-star text-[11px]"></i>
+        <div class="flex items-center gap-1.5 text-amber-400 font-bold text-xs pt-1">
+            <i class="fa-solid fa-star text-xs"></i>
             <span>${ratingVal.toFixed(1)} / 5.0</span>
         </div>
     ` : '';
 
     const conflictBadgeHtml = ap.has_conflict ? `
-        <div class="mt-1 flex items-center gap-1 text-red-400 font-bold text-[10px] bg-red-500/10 px-2 py-0.5 rounded border border-red-500/20">
+        <div class="mt-1.5 flex items-center gap-1.5 text-red-400 font-bold text-xs bg-red-500/10 px-2.5 py-1 rounded-lg border border-red-500/30">
             <i class="fa-solid fa-triangle-exclamation"></i>
             <span>Conflict: ${ap.conflict_count} Active Sceneries</span>
         </div>
@@ -784,26 +784,26 @@ function getAirportPopupHtml(ap) {
     const isFallbackDefault = ap.is_disabled || allSourcesDisabled || cat === 'DEFAULT';
 
     const publisherHtml = (!isFallbackDefault && ap.vendor) ? `
-        <div class="pt-1.5 border-t border-slate-800/60">
-            <span class="text-xs font-black ${publisherColorClass} truncate block">${ap.vendor}</span>
+        <div class="pt-2 border-t border-slate-800/80">
+            <span class="text-sm font-black ${publisherColorClass} truncate block tracking-wide">${ap.vendor}</span>
         </div>
     ` : '';
 
     return `
-        <div class="p-1 font-['Outfit'] space-y-2">
-            <div class="flex items-center justify-between gap-2">
-                <span class="text-xl font-black font-mono ${icaoColorClass} leading-none">${ap.icao}</span>
-                <span class="text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${badgeClass} shrink-0">${badgeLabel}</span>
+        <div class="p-1.5 font-['Outfit'] space-y-2.5">
+            <div class="flex items-center justify-between gap-2.5">
+                <span class="text-2xl font-black font-mono ${icaoColorClass} leading-none tracking-tight">${ap.icao}</span>
+                <span class="text-xs font-mono font-bold px-3 py-1 rounded-full border ${badgeClass} shrink-0">${badgeLabel}</span>
             </div>
             <div>
-                <div class="text-xs font-bold text-slate-100 leading-snug line-clamp-2">${ap.name}</div>
-                <div class="text-[11px] text-slate-400 mt-0.5 truncate">${ap.city || ''} ${ap.country ? '(' + ap.country + ')' : ''}</div>
+                <div class="text-sm lg:text-base font-extrabold text-white leading-snug line-clamp-2">${ap.name}</div>
+                <div class="text-xs font-medium text-slate-300 mt-0.5 truncate">${ap.city || ''} ${ap.country ? '(' + ap.country + ')' : ''}</div>
             </div>
             ${publisherHtml}
             ${ratingBadgeHtml}
             ${conflictBadgeHtml}
-            <div class="text-[10px] font-semibold ${icaoColorClass} pt-1.5 border-t border-slate-800 flex justify-between items-center">
-                <span class="font-bold">${ap.english_type || ap.type}</span>
+            <div class="text-xs font-bold ${icaoColorClass} pt-2 border-t border-slate-800/80 flex justify-between items-center">
+                <span>${ap.english_type || ap.type}</span>
             </div>
         </div>
     `;
