@@ -1538,13 +1538,21 @@ class Api:
         webbrowser.open(target_url)
         return json.dumps({"status": "ok", "url": target_url})
 
+    def get_exports_dir(self):
+        app_root = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+        exports_dir = os.path.join(app_root, "exports")
+        os.makedirs(exports_dir, exist_ok=True)
+        return exports_dir
+
     def export_collection_csv(self, airports_json_str):
         import csv
         try:
             airports = json.loads(airports_json_str)
             window = webview.windows[0]
+            exports_dir = self.get_exports_dir()
             result = window.create_file_dialog(
                 webview.SAVE_DIALOG,
+                directory=exports_dir,
                 save_filename="SceneryX_Collection.csv",
                 file_types=('CSV Files (*.csv)', 'All files (*.*)')
             )
@@ -1584,8 +1592,10 @@ class Api:
         try:
             airports = json.loads(airports_json_str)
             window = webview.windows[0]
+            exports_dir = self.get_exports_dir()
             result = window.create_file_dialog(
                 webview.SAVE_DIALOG,
+                directory=exports_dir,
                 save_filename="SceneryX_Collection.json",
                 file_types=('JSON Files (*.json)', 'All files (*.*)')
             )
