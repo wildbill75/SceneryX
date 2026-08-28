@@ -944,23 +944,48 @@ function renderRouteLines(filteredAirports) {
     filteredAirports.forEach(ap => {
         if (!ap.lat || !ap.lon || ap.icao === activeRouteOrigin.icao) return;
 
-        // ONLY draw connecting arc lines to custom/handcrafted sceneries (Payware / Freeware / Asobo)!
-        // Default MSFS airports are displayed on the map as Blue Circle Dots without connecting lines.
         const cat = getAirportCategory(ap);
-        if (cat === 'DEFAULT') return;
+        let lineColor = '#38bdf8';
+        let lineWeight = 1.8;
+        let lineOpacity = 0.8;
+        let lineDashArray = null;
+
+        if (cat === 'DEFAULT') {
+            // Fine subtle gray dashed line for Default MSFS destination airports
+            lineColor = '#64748b';  // Slate Gray
+            lineWeight = 1.2;       // Fine thin line
+            lineOpacity = 0.65;     // Subtle & elegant
+            lineDashArray = '3, 4'; // Discrete dashed line
+        } else if (cat === 'PAYWARE') {
+            lineColor = '#c084fc';  // Vibrant Purple
+            lineWeight = 2.0;
+            lineOpacity = 0.85;
+        } else if (cat === 'ASOBO') {
+            lineColor = '#fbbf24';  // Vibrant Amber
+            lineWeight = 2.0;
+            lineOpacity = 0.85;
+        } else if (cat === 'FREEWARE') {
+            lineColor = '#22d3ee';  // Vibrant Cyan
+            lineWeight = 2.0;
+            lineOpacity = 0.85;
+        }
 
         const destLat = ap.lat;
         const destLon = ap.lon;
 
         const arcPoints = createBezierArcPoints(originLat, originLon, destLat, destLon, 30);
 
-        const routeLine = L.polyline(arcPoints, {
-            color: '#38bdf8', // Vibrant Sky Blue Arc
-            weight: 1.8,      // Clean & crisp
-            opacity: 0.8,     // High visibility
+        const routeLineOptions = {
+            color: lineColor,
+            weight: lineWeight,
+            opacity: lineOpacity,
             smoothFactor: 1
-        });
+        };
+        if (lineDashArray) {
+            routeLineOptions.dashArray = lineDashArray;
+        }
 
+        const routeLine = L.polyline(arcPoints, routeLineOptions);
         routeLine.addTo(activeRouteLinesGroup);
     });
 }
