@@ -1156,11 +1156,30 @@ function showAirportDetails(ap) {
         }
     }
 
-    if (devBlockEl) {
-        if (isFallbackDefault) {
-            devBlockEl.classList.add('hidden');
+    // Pricing category override toggle logic (Payware vs Freeware for 3rd party sceneries)
+    const toggleContainer = document.getElementById('drawer-pricing-toggle-container');
+    const btnPayware = document.getElementById('btn-override-payware');
+    const btnFreeware = document.getElementById('btn-override-freeware');
+
+    if (toggleContainer) {
+        if (isFallbackDefault || cat === 'ASOBO' || ap.is_asobo_official) {
+            toggleContainer.classList.add('hidden');
+            toggleContainer.classList.remove('flex');
         } else {
-            devBlockEl.classList.remove('hidden');
+            toggleContainer.classList.remove('hidden');
+            toggleContainer.classList.add('flex');
+
+            const isCurrentPayware = (cat === 'PAYWARE');
+            if (btnPayware) {
+                btnPayware.className = isCurrentPayware
+                    ? "px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-sm cursor-pointer"
+                    : "px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all text-slate-500 hover:text-slate-300 cursor-pointer";
+            }
+            if (btnFreeware) {
+                btnFreeware.className = !isCurrentPayware
+                    ? "px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm cursor-pointer"
+                    : "px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all text-slate-500 hover:text-slate-300 cursor-pointer";
+            }
         }
     }
 
@@ -1553,6 +1572,36 @@ async function saveCustomPriceForSelected() {
         }
     } catch (e) {
         console.error("Failed to save custom price:", e);
+    }
+}
+
+async function toggleUserCategoryOverride(newCategory) {
+    if (!selectedAirport || !selectedAirport.icao || isToggleInProgress) return;
+    isToggleInProgress = true;
+    try {
+        const icao = selectedAirport.icao;
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.set_user_category_override) {
+            const resStr = await window.pywebview.api.set_user_category_override(icao, newCategory);
+            const res = JSON.parse(resStr);
+            if (res.status === 'ok') {
+                allAirportsData = res.airports;
+                allAirportsData.forEach(ap => {
+                    if (userRatingsMap[ap.icao] !== undefined) {
+                        ap.rating = userRatingsMap[ap.icao];
+                    }
+                    ap._searchKey = `${ap.icao} ${ap.name} ${ap.city || ''} ${ap.package_name || ''} ${ap.vendor || ''}`.toLowerCase();
+                });
+                updateStats(allAirportsData);
+                filterAirports();
+                const updatedAp = allAirportsData.find(a => a.icao === icao);
+                if (updatedAp) showAirportDetails(updatedAp);
+                showToast(`✓ Pricing model changed to ${newCategory} for ${icao}`, 'success');
+            }
+        }
+    } catch (e) {
+        console.error("Failed to set category override:", e);
+    } finally {
+        isToggleInProgress = false;
     }
 }
 

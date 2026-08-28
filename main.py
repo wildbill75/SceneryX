@@ -5,7 +5,7 @@ import re
 import urllib.request
 import webbrowser
 import webview
-from scanner import run_scan, get_settings, save_settings, load_ratings, save_rating, save_custom_price, load_custom_prices, get_default_gsx_path, load_airport_database, SPECIAL_BUNDLE_MAP, OUTPUT_JSON_PATH
+from scanner import run_scan, get_settings, save_settings, load_ratings, save_rating, save_custom_price, save_custom_category, load_custom_prices, get_default_gsx_path, load_airport_database, SPECIAL_BUNDLE_MAP, OUTPUT_JSON_PATH
 
 AIRPORTS_DB_CACHE = None
 
@@ -195,7 +195,24 @@ def fast_update_airport_cache(icao_target, target_pkg_name=None, toggle_all=Fals
             target_ap['match_source'] = primary.get('match_source', '')
             target_ap['version'] = primary.get('version', '')
 
-            if primary.get('is_payware'):
+            custom_prices = load_custom_prices()
+            user_override_cat = None
+            if icao_target in custom_prices:
+                val = custom_prices[icao_target]
+                if isinstance(val, dict) and val.get('category'):
+                    user_override_cat = val['category']
+
+            if user_override_cat == 'Payware':
+                target_ap['vendor'] = primary.get('vendor', 'Unknown')
+                target_ap['pricing_type'] = "Payware"
+                target_ap['is_payware'] = True
+                target_ap['is_asobo_official'] = False
+            elif user_override_cat in ['Freeware', 'Freeware / Flightsim.to']:
+                target_ap['vendor'] = primary.get('vendor', 'Unknown')
+                target_ap['pricing_type'] = "Freeware / Flightsim.to"
+                target_ap['is_payware'] = False
+                target_ap['is_asobo_official'] = False
+            elif primary.get('is_payware'):
                 target_ap['vendor'] = primary.get('vendor', 'Unknown')
                 target_ap['pricing_type'] = "Payware"
                 target_ap['is_payware'] = True
@@ -1549,6 +1566,14 @@ class Api:
             print("open_external_url error:", e)
             return json.dumps({"status": "error", "message": str(e)})
         return json.dumps({"status": "error", "message": "Invalid URL"})
+
+    def set_user_category_override(self, icao, category):
+        try:
+            save_custom_category(icao, category)
+            airports = fast_update_airport_cache(icao)
+            return json.dumps({"status": "ok", "airports": airports}, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
 
     def close_app(self):
         try:

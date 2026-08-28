@@ -526,16 +526,53 @@ def load_custom_prices():
 def save_custom_price(icao, price_val):
     prices = load_custom_prices()
     if price_val is not None and float(price_val) >= 0:
-        prices[icao] = float(price_val)
+        if icao in prices and isinstance(prices[icao], dict):
+            prices[icao]['price'] = float(price_val)
+        else:
+            prices[icao] = {"price": float(price_val)}
     else:
-        prices.pop(icao, None)
+        if icao in prices:
+            if isinstance(prices[icao], dict):
+                prices[icao].pop('price', None)
+                if not prices[icao]:
+                    prices.pop(icao, None)
+            else:
+                prices.pop(icao, None)
+    with open(CUSTOM_PRICES_JSON_PATH, 'w', encoding='utf-8') as f:
+        json.dump(prices, f, indent=2, ensure_ascii=False)
+    return prices
+
+def save_custom_category(icao, category):
+    prices = load_custom_prices()
+    if category in ["Payware", "Freeware", "Freeware / Flightsim.to"]:
+        if icao not in prices:
+            prices[icao] = {}
+        elif not isinstance(prices[icao], dict):
+            prices[icao] = {"price": float(prices[icao])}
+        prices[icao]["category"] = category
+    else:
+        if icao in prices:
+            if isinstance(prices[icao], dict):
+                prices[icao].pop("category", None)
+                if not prices[icao]:
+                    prices.pop(icao, None)
+            else:
+                prices.pop(icao, None)
     with open(CUSTOM_PRICES_JSON_PATH, 'w', encoding='utf-8') as f:
         json.dump(prices, f, indent=2, ensure_ascii=False)
     return prices
 
 def get_estimated_price(icao, folder_name, vendor, pricing_type, english_type, is_asobo, custom_prices):
     if icao in custom_prices:
-        return float(custom_prices[icao]), True
+        val = custom_prices[icao]
+        if isinstance(val, dict):
+            if 'price' in val:
+                return float(val['price']), True
+        elif isinstance(val, (int, float, str)):
+            try:
+                return float(val), True
+            except Exception:
+                pass
 
     if is_asobo or pricing_type in ["Asobo", "Asobo / MS", "Freeware", "Freeware / Flightsim.to"] or "freeware" in str(pricing_type).lower():
         return 0.0, False
@@ -729,7 +766,16 @@ def get_clean_vendor(folder_name, manifest_data):
 
     return 'Community Creator'
 
-def determine_pricing(source_folder, folder_name, vendor, manifest_data):
+def determine_pricing(source_folder, folder_name, vendor, manifest_data, icao=None, custom_prices=None):
+    if icao and custom_prices and icao in custom_prices:
+        val = custom_prices[icao]
+        if isinstance(val, dict) and val.get('category'):
+            user_cat = val['category']
+            if user_cat == 'Payware':
+                return "Payware", True
+            elif user_cat in ['Freeware', 'Freeware / Flightsim.to']:
+                return "Freeware / Flightsim.to", False
+
     fn_lower = folder_name.lower()
     v_lower = vendor.lower()
     creator = (manifest_data.get('creator', '') if manifest_data else '').lower()
@@ -996,7 +1042,7 @@ def run_scan():
             seen_in_pkg.add(icao)
 
             vendor = get_clean_vendor(clean_folder, manifest_data)
-            pricing_type, is_payware = determine_pricing(cat, clean_folder, vendor, manifest_data)
+            pricing_type, is_payware = determine_pricing(cat, clean_folder, vendor, manifest_data, icao=icao, custom_prices=custom_prices)
             is_asobo_official = (pricing_type == "Asobo / MS" or vendor == "Microsoft / Asobo")
 
             raw_type = found_ap.get('type', 'airport')
