@@ -1019,6 +1019,23 @@ def run_scan():
             else:
                 pkg_size_str = get_folder_size_formatted(full_path, folder_size_cache)
 
+            # Check per-ICAO BGL disabled state inside active multi-airport packages
+            source_is_disabled = is_disabled
+            if not source_is_disabled and os.path.exists(full_path):
+                icao_l = icao.lower()
+                has_active_bgl = False
+                has_disabled_bgl = False
+                for root, dirs, files in os.walk(full_path):
+                    for f in files:
+                        f_l = f.lower()
+                        if icao_l in f_l:
+                            if f_l.endswith('.bgl'):
+                                has_active_bgl = True
+                            elif f_l.endswith('.bgl.disabled'):
+                                has_disabled_bgl = True
+                if has_disabled_bgl and not has_active_bgl:
+                    source_is_disabled = True
+
             new_source = {
                 "folder_name": folder_name,
                 "package_path": full_path,
@@ -1028,7 +1045,7 @@ def run_scan():
                 "pricing_type": pricing_type,
                 "is_payware": is_payware,
                 "is_asobo_official": is_asobo_official,
-                "is_disabled": is_disabled,
+                "is_disabled": source_is_disabled,
                 "is_addon": is_addon_package,
                 "is_fix_patch": False if (is_asobo_official or is_payware) else is_fix_patch,
                 "version": pkg_version,

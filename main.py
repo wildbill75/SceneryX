@@ -776,6 +776,72 @@ class Api:
                             os.remove(mf_dis)
                         os.rename(mf_norm, mf_dis)
 
+            def enable_physical_package(p_path):
+                if not p_path or not os.path.exists(p_path):
+                    return
+                new_p = p_path
+                if p_path.endswith('.disabled'):
+                    new_p = p_path[:-9]
+                    os.rename(p_path, new_p)
+                for mf in ['manifest.json', 'layout.json']:
+                    mf_dis = os.path.join(new_p, mf + '.disabled')
+                    mf_norm = os.path.join(new_p, mf)
+                    if os.path.exists(mf_dis):
+                        if os.path.exists(mf_norm):
+                            os.remove(mf_norm)
+                        os.rename(mf_dis, mf_norm)
+
+            def set_package_state_for_icao(p_path, target_icao, should_enable):
+                if not p_path:
+                    return
+                clean_p = p_path[:-9] if p_path.endswith('.disabled') else p_path
+                dis_p = clean_p + '.disabled'
+                target_dir = clean_p if os.path.exists(clean_p) else (dis_p if os.path.exists(dis_p) else None)
+                if not target_dir:
+                    return
+
+                icao_l = target_icao.lower() if target_icao else ""
+                matching_bgls = []
+                other_bgls = []
+
+                if os.path.exists(target_dir):
+                    for root, dirs, files in os.walk(target_dir):
+                        for f in files:
+                            f_l = f.lower()
+                            if f_l.endswith('.bgl') or f_l.endswith('.bgl.disabled'):
+                                f_path = os.path.join(root, f)
+                                if icao_l and icao_l in f_l:
+                                    matching_bgls.append(f_path)
+                                else:
+                                    other_bgls.append(f_path)
+
+                if matching_bgls and len(other_bgls) > 0:
+                    if target_dir.endswith('.disabled'):
+                        enable_physical_package(target_dir)
+                        target_dir = clean_p
+                        matching_bgls = []
+                        for root, dirs, files in os.walk(target_dir):
+                            for f in files:
+                                if icao_l and icao_l in f.lower() and (f.lower().endswith('.bgl') or f.lower().endswith('.bgl.disabled')):
+                                    matching_bgls.append(os.path.join(root, f))
+
+                    for bgl_p in matching_bgls:
+                        if should_enable:
+                            if bgl_p.endswith('.bgl.disabled'):
+                                new_bgl = bgl_p[:-9]
+                                if not os.path.exists(new_bgl):
+                                    os.rename(bgl_p, new_bgl)
+                        else:
+                            if bgl_p.endswith('.bgl'):
+                                new_bgl = bgl_p + '.disabled'
+                                if not os.path.exists(new_bgl):
+                                    os.rename(bgl_p, new_bgl)
+                else:
+                    if should_enable:
+                        enable_physical_package(target_dir)
+                    else:
+                        disable_physical_package(target_dir)
+
             if os.path.exists(content_xml_path):
                 import xml.etree.ElementTree as ET
                 tree = ET.parse(content_xml_path)
@@ -796,7 +862,7 @@ class Api:
             if ap_obj and ap_obj.get('all_sources'):
                 for src in ap_obj['all_sources']:
                     pkg_p = src.get('package_path', '')
-                    disable_physical_package(pkg_p)
+                    set_package_state_for_icao(pkg_p, icao, should_enable=False)
 
             airports = run_scan()
             return json.dumps({"status": "ok", "airports": airports}, ensure_ascii=False)
@@ -817,7 +883,6 @@ class Api:
                 if not p_path.endswith('.disabled'):
                     new_p = p_path + '.disabled'
                     os.rename(p_path, new_p)
-                # Restore manifest/layout if previously renamed to .disabled
                 for mf in ['manifest.json', 'layout.json']:
                     mf_dis = os.path.join(new_p, mf + '.disabled')
                     mf_norm = os.path.join(new_p, mf)
@@ -841,6 +906,57 @@ class Api:
                         if os.path.exists(mf_norm):
                             os.remove(mf_norm)
                         os.rename(mf_dis, mf_norm)
+
+            def set_package_state_for_icao(p_path, target_icao, should_enable):
+                if not p_path:
+                    return
+                clean_p = p_path[:-9] if p_path.endswith('.disabled') else p_path
+                dis_p = clean_p + '.disabled'
+                target_dir = clean_p if os.path.exists(clean_p) else (dis_p if os.path.exists(dis_p) else None)
+                if not target_dir:
+                    return
+
+                icao_l = target_icao.lower() if target_icao else ""
+                matching_bgls = []
+                other_bgls = []
+
+                if os.path.exists(target_dir):
+                    for root, dirs, files in os.walk(target_dir):
+                        for f in files:
+                            f_l = f.lower()
+                            if f_l.endswith('.bgl') or f_l.endswith('.bgl.disabled'):
+                                f_path = os.path.join(root, f)
+                                if icao_l and icao_l in f_l:
+                                    matching_bgls.append(f_path)
+                                else:
+                                    other_bgls.append(f_path)
+
+                if matching_bgls and len(other_bgls) > 0:
+                    if target_dir.endswith('.disabled'):
+                        enable_physical_package(target_dir)
+                        target_dir = clean_p
+                        matching_bgls = []
+                        for root, dirs, files in os.walk(target_dir):
+                            for f in files:
+                                if icao_l and icao_l in f.lower() and (f.lower().endswith('.bgl') or f.lower().endswith('.bgl.disabled')):
+                                    matching_bgls.append(os.path.join(root, f))
+
+                    for bgl_p in matching_bgls:
+                        if should_enable:
+                            if bgl_p.endswith('.bgl.disabled'):
+                                new_bgl = bgl_p[:-9]
+                                if not os.path.exists(new_bgl):
+                                    os.rename(bgl_p, new_bgl)
+                        else:
+                            if bgl_p.endswith('.bgl'):
+                                new_bgl = bgl_p + '.disabled'
+                                if not os.path.exists(new_bgl):
+                                    os.rename(bgl_p, new_bgl)
+                else:
+                    if should_enable:
+                        enable_physical_package(target_dir)
+                    else:
+                        disable_physical_package(target_dir)
 
             target_clean = target_folder_name[:-9] if target_folder_name.lower().endswith('.disabled') else target_folder_name
 
@@ -885,9 +1001,9 @@ class Api:
                     fn_clean = fn[:-9] if fn.lower().endswith('.disabled') else fn
 
                     if target_clean != 'DEFAULT' and (fn_clean.lower() == target_clean.lower() or target_clean.lower() in fn_clean.lower()):
-                        enable_physical_package(pkg_p)
+                        set_package_state_for_icao(pkg_p, icao, should_enable=True)
                     else:
-                        disable_physical_package(pkg_p)
+                        set_package_state_for_icao(pkg_p, icao, should_enable=False)
 
             airports = run_scan()
             return json.dumps({"status": "ok", "airports": airports}, ensure_ascii=False)
