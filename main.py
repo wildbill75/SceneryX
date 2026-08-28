@@ -137,35 +137,35 @@ def fast_update_airport_cache(icao_target, target_pkg_name=None, toggle_all=Fals
 
         all_srcs = target_ap.get('all_sources', [])
 
-        if toggle_all:
-            curr_disabled = target_ap.get('is_disabled', False)
-            new_dis = not curr_disabled
-            for s in all_srcs:
-                s['is_disabled'] = new_dis
-            target_ap['is_disabled'] = new_dis
-        elif target_pkg_name:
-            clean_target = target_pkg_name[:-9] if target_pkg_name.endswith('.disabled') else target_pkg_name
-            t_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_target.lower())
-            for s in all_srcs:
-                fn = s.get('folder_name', '')
-                clean_fn = fn[:-9] if fn.endswith('.disabled') else fn
-                fn_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_fn.lower())
-                if clean_fn.lower() == clean_target.lower() or fn_norm == t_norm:
-                    new_dis = not s.get('is_disabled', False)
-                    s['is_disabled'] = new_dis
-                    if s.get('package_path'):
-                        p = s['package_path']
-                        if new_dis and not p.endswith('.disabled'):
-                            s['package_path'] = p + '.disabled'
-                            if s.get('folder_name', '') and not s['folder_name'].endswith('.disabled'):
-                                s['folder_name'] = s['folder_name'] + '.disabled'
-                        elif not new_dis and p.endswith('.disabled'):
-                            s['package_path'] = p[:-9]
-                            if s.get('folder_name', '').endswith('.disabled'):
-                                s['folder_name'] = s['folder_name'][:-9]
+        for s in all_srcs:
+            p = s.get('package_path', '')
+            clean_p = p[:-9] if p and p.endswith('.disabled') else p
+            dis_p = clean_p + '.disabled' if clean_p else None
 
-            # Check if all 3rd-party sources are disabled
-            all_dis = len(all_srcs) > 0 and all(s.get('is_disabled') for s in all_srcs)
+            folder_exists = clean_p and os.path.exists(clean_p)
+            dis_folder_exists = dis_p and os.path.exists(dis_p)
+
+            if dis_folder_exists and not folder_exists:
+                s['is_disabled'] = True
+                s['package_path'] = dis_p
+            elif folder_exists:
+                s['package_path'] = clean_p
+                # Check per-ICAO BGL status in multi-airport packs
+                icao_l = icao_target.lower()
+                has_act_bgl = False
+                has_dis_bgl = False
+                for root, dirs, files in os.walk(clean_p):
+                    for f in files:
+                        f_l = f.lower()
+                        if icao_l in f_l:
+                            if f_l.endswith('.bgl'):
+                                has_act_bgl = True
+                            elif f_l.endswith('.bgl.disabled'):
+                                has_dis_bgl = True
+                if has_dis_bgl and not has_act_bgl:
+                    s['is_disabled'] = True
+                else:
+                    s['is_disabled'] = False
 
         # Recalculate active main scenery packages (excluding Fix/Patch and Addon packages)
         active_primary_installs = [
@@ -857,14 +857,15 @@ class Api:
                 if changed:
                     tree.write(content_xml_path, encoding='utf-8', xml_declaration=True)
 
-            scanned_airports = run_scan()
+            with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
+                scanned_airports = json.load(f)
             ap_obj = next((a for a in scanned_airports if a['icao'].upper() == icao.upper()), None)
             if ap_obj and ap_obj.get('all_sources'):
                 for src in ap_obj['all_sources']:
                     pkg_p = src.get('package_path', '')
                     set_package_state_for_icao(pkg_p, icao, should_enable=False)
 
-            airports = run_scan()
+            airports = fast_update_airport_cache(icao, toggle_all=True)
             return json.dumps({"status": "ok", "airports": airports}, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
@@ -992,7 +993,8 @@ class Api:
                 if changed:
                     tree.write(content_xml_path, encoding='utf-8', xml_declaration=True)
 
-            scanned_airports = run_scan()
+            with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
+                scanned_airports = json.load(f)
             ap_obj = next((a for a in scanned_airports if a['icao'].upper() == icao.upper()), None)
             if ap_obj and ap_obj.get('all_sources'):
                 for src in ap_obj['all_sources']:
@@ -1005,7 +1007,7 @@ class Api:
                     else:
                         set_package_state_for_icao(pkg_p, icao, should_enable=False)
 
-            airports = run_scan()
+            airports = fast_update_airport_cache(icao, target_pkg_name=target_clean)
             return json.dumps({"status": "ok", "airports": airports}, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
