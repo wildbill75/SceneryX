@@ -207,11 +207,17 @@ def fast_update_airport_cache(icao_target, target_pkg_name=None, toggle_all=Fals
                 target_ap['pricing_type'] = "Payware"
                 target_ap['is_payware'] = True
                 target_ap['is_asobo_official'] = False
+                for s in all_srcs:
+                    s['pricing_type'] = "Payware"
+                    s['is_payware'] = True
             elif user_override_cat in ['Freeware', 'Freeware / Flightsim.to']:
                 target_ap['vendor'] = primary.get('vendor', 'Unknown')
                 target_ap['pricing_type'] = "Freeware / Flightsim.to"
                 target_ap['is_payware'] = False
                 target_ap['is_asobo_official'] = False
+                for s in all_srcs:
+                    s['pricing_type'] = "Freeware / Flightsim.to"
+                    s['is_payware'] = False
             elif primary.get('is_payware'):
                 target_ap['vendor'] = primary.get('vendor', 'Unknown')
                 target_ap['pricing_type'] = "Payware"

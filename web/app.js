@@ -688,6 +688,10 @@ function hasCustomAddonSources(ap) {
 
 function getAirportPricingType(ap) {
     if (!ap) return 'Default';
+    if (ap.pricing_type === 'Payware') return 'Payware';
+    if (ap.pricing_type === 'Asobo') return 'Asobo';
+    if (ap.pricing_type && ap.pricing_type.startsWith('Freeware')) return 'Freeware / Flightsim.to';
+
     const activeSrc = getActiveSource(ap);
     if (!activeSrc) {
         return 'Default';
@@ -1149,10 +1153,10 @@ function showAirportDetails(ap) {
             actBadge.innerText = ap.world_update_name || "Asobo Sim Update";
         } else if (cat === 'PAYWARE') {
             actBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40";
-            actBadge.innerText = "Payware Addon Active";
+            actBadge.innerText = "Payware Addon";
         } else {
             actBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40";
-            actBadge.innerText = "Custom Addon Active";
+            actBadge.innerText = "Freeware Addon";
         }
     }
 
