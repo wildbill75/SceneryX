@@ -2005,30 +2005,36 @@ function clearSearch() {
     filterAirports();
 }
 
+const DEFAULT_STARTUP_PRICING = ['Payware', 'Freeware / Flightsim.to', 'Asobo'];
+
 function filterByPricingPill(pricing) {
     if (pricing === 'All') {
-        selectedPricing = new Set(ALL_PRICING_LIST);
+        if (selectedPricing.size === ALL_PRICING_LIST.length) {
+            selectedPricing = new Set(DEFAULT_STARTUP_PRICING);
+        } else {
+            selectedPricing = new Set(ALL_PRICING_LIST);
+        }
     } else if (pricing === 'Payware') {
         if (selectedPricing.size === 1 && selectedPricing.has('Payware')) {
-            selectedPricing = new Set(ALL_PRICING_LIST);
+            selectedPricing = new Set(DEFAULT_STARTUP_PRICING);
         } else {
             selectedPricing = new Set(['Payware']);
         }
     } else if (pricing === 'Freeware') {
         if (selectedPricing.size === 1 && selectedPricing.has('Freeware / Flightsim.to')) {
-            selectedPricing = new Set(ALL_PRICING_LIST);
+            selectedPricing = new Set(DEFAULT_STARTUP_PRICING);
         } else {
             selectedPricing = new Set(['Freeware / Flightsim.to']);
         }
     } else if (pricing === 'Asobo') {
         if (selectedPricing.size === 1 && selectedPricing.has('Asobo')) {
-            selectedPricing = new Set(ALL_PRICING_LIST);
+            selectedPricing = new Set(DEFAULT_STARTUP_PRICING);
         } else {
             selectedPricing = new Set(['Asobo']);
         }
     } else if (pricing === 'Default') {
         if (selectedPricing.size === 1 && selectedPricing.has('Default')) {
-            selectedPricing = new Set(ALL_PRICING_LIST);
+            selectedPricing = new Set(DEFAULT_STARTUP_PRICING);
         } else {
             selectedPricing = new Set(['Default']);
         }
@@ -2094,28 +2100,33 @@ function toggleTypeFilter(type) {
 function setPillHighlight(el, isActive, colorType) {
     if (!el) return;
 
+    // Fully strip both active and default colored backgrounds, borders, and shadows
     el.classList.remove(
-        'border-2', 'border-sky-400', 'border-purple-400', 'border-cyan-400', 'border-amber-400', 'border-blue-400',
-        'bg-sky-500/30', 'bg-purple-500/30', 'bg-cyan-500/30', 'bg-amber-500/30', 'bg-blue-500/30',
+        'border-2', 'border', 'border-sky-400', 'border-purple-400', 'border-cyan-400', 'border-amber-400', 'border-blue-400', 'border-slate-800',
+        'border-sky-500/40', 'border-purple-500/40', 'border-cyan-500/40', 'border-amber-500/40', 'border-blue-500/40',
+        'bg-sky-500/15', 'bg-purple-500/15', 'bg-cyan-500/15', 'bg-amber-500/15', 'bg-blue-500/15',
+        'bg-sky-500/30', 'bg-purple-500/30', 'bg-cyan-500/30', 'bg-amber-500/30', 'bg-blue-500/30', 'bg-slate-900/60',
         'shadow-[0_0_15px_rgba(56,189,248,0.4)]', 'shadow-[0_0_15px_rgba(168,85,247,0.4)]',
         'shadow-[0_0_15px_rgba(6,182,212,0.4)]', 'shadow-[0_0_15px_rgba(245,158,11,0.4)]', 'shadow-[0_0_15px_rgba(59,130,246,0.4)]',
-        'scale-105', 'opacity-60'
+        'shadow-sky-950/20', 'shadow-purple-950/20', 'shadow-cyan-950/20', 'shadow-amber-950/20', 'shadow-blue-950/20',
+        'scale-105', 'opacity-60', 'opacity-100'
     );
 
     if (isActive) {
+        el.classList.add('opacity-100', 'scale-105');
         if (colorType === 'sky') {
-            el.classList.add('border-2', 'border-sky-400', 'bg-sky-500/30', 'shadow-[0_0_15px_rgba(56,189,248,0.4)]', 'scale-105');
+            el.classList.add('border-2', 'border-sky-400', 'bg-sky-500/30', 'shadow-[0_0_15px_rgba(56,189,248,0.4)]');
         } else if (colorType === 'purple') {
-            el.classList.add('border-2', 'border-purple-400', 'bg-purple-500/30', 'shadow-[0_0_15px_rgba(168,85,247,0.4)]', 'scale-105');
+            el.classList.add('border-2', 'border-purple-400', 'bg-purple-500/30', 'shadow-[0_0_15px_rgba(168,85,247,0.4)]');
         } else if (colorType === 'cyan') {
-            el.classList.add('border-2', 'border-cyan-400', 'bg-cyan-500/30', 'shadow-[0_0_15px_rgba(6,182,212,0.4)]', 'scale-105');
+            el.classList.add('border-2', 'border-cyan-400', 'bg-cyan-500/30', 'shadow-[0_0_15px_rgba(6,182,212,0.4)]');
         } else if (colorType === 'amber') {
-            el.classList.add('border-2', 'border-amber-400', 'bg-amber-500/30', 'shadow-[0_0_15px_rgba(245,158,11,0.4)]', 'scale-105');
+            el.classList.add('border-2', 'border-amber-400', 'bg-amber-500/30', 'shadow-[0_0_15px_rgba(245,158,11,0.4)]');
         } else if (colorType === 'blue') {
-            el.classList.add('border-2', 'border-blue-400', 'bg-blue-500/30', 'shadow-[0_0_15px_rgba(59,130,246,0.4)]', 'scale-105');
+            el.classList.add('border-2', 'border-blue-400', 'bg-blue-500/30', 'shadow-[0_0_15px_rgba(59,130,246,0.4)]');
         }
     } else {
-        el.classList.add('opacity-60');
+        el.classList.add('border', 'border-slate-800', 'bg-slate-900/60', 'opacity-60');
     }
 }
 
