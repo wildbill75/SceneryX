@@ -44,6 +44,8 @@ COMMERCIAL_PAYWARE_VENDORS = {
     'justflight', 'just flight', 'simmarket', 'flightsimto_store', 'flightsimto store',
     
     # Tier-1 & Tier-2 Scenery Studios
+    'simdesigngroup', 'sim design group', 'sdg', 'simdesigngroup-airport',
+    'dominicdesignteam', 'dominic design team', 'dominic design', 'ddt',
     'flytampa', 'flytampa-amsterdam', 'flightbeam', 'flightbeam studios', 'fsdreamteam', 'fsdt',
     'drzewieckidesign', 'drzewiecki', 'pyreegue', 'pyreegue dev co', 'mkstudios', 'mk-studios',
     'gaya', 'gaya simulations', 'latinvfr', 'lvfr', 'uk2000', 'uk2000scenery', 'pilotplus', 'pilot plus',
@@ -64,10 +66,18 @@ COMMERCIAL_PAYWARE_VENDORS = {
     'fsimstudio', 'fsimstudios', 'fs painter', 'skyport', 'skyport design', 'designworks',
     'airworthy designs', 'digital design', 'funner2010', 'prealistic', 'perfect flight',
     'chilek', 'chilek scenery', 'mexicoovfr', 'mexico vfr', 'southsim', 'southsimulations',
-    'scenerytr', 'scenerytrdesign', 'scenerytr design', 'scenery tr', 'agsim', 'ag-sim', 'st-designs'
+    'scenerytr', 'scenerytrdesign', 'scenerytr design', 'scenery tr', 'agsim', 'ag-sim', 'st-designs',
+    'pyszny', 'pyszny design', 'geardown', 'geardown simulations', 'vabb', 'vabb design',
+    'rodriguez', 'rodriguez scenery', 'aliens', 'aliens simulations', 'aerobask', 'flyer',
+    'bksim', 'shd', 'nemo', 'pilotg', 'rara-avis', 'aerodesigns', 'darkscenery', 'dark scenery'
 }
 
 VENDOR_MAP = {
+    'simdesigngroup': 'Sim Design Group',
+    'sim design group': 'Sim Design Group',
+    'sdg': 'Sim Design Group',
+    'dominicdesignteam': 'Dominic Design Team',
+    'dominic design team': 'Dominic Design Team',
     'argaeus': 'Argaeus',
     'hb': 'Argaeus',
     'scenerytr': 'SceneryTR Design',
@@ -735,15 +745,15 @@ def determine_pricing(source_folder, folder_name, vendor, manifest_data):
 
     s_lower = source_folder.lower()
 
-    # 3rd-Party Payware Marketplace sceneries (France VFR, Gaya, Deimos, BMW, Orbx, etc.)
+    # 3rd-Party Payware Marketplace sceneries (France VFR, Gaya, Deimos, BMW, Orbx, Sim Design Group, etc.)
     if any(p in fn_lower or p in v_lower or p in creator for p in COMMERCIAL_PAYWARE_VENDORS):
+        return "Payware", True
+
+    if 'official' in s_lower or 'streamed' in s_lower:
         return "Payware", True
 
     if 'community' in fn_lower or fn_lower.startswith('community'):
         return "Freeware / Flightsim.to", False
-
-    if 'official' in s_lower or 'streamed' in s_lower:
-        return "Payware", True
 
     return "Freeware / Flightsim.to", False
 
