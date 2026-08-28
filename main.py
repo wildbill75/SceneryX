@@ -1538,6 +1538,12 @@ class Api:
         webbrowser.open(target_url)
         return json.dumps({"status": "ok", "url": target_url})
 
+    def open_external_url(self, url):
+        if url and url.startswith(('http://', 'https://')):
+            webbrowser.open(url)
+            return json.dumps({"status": "ok"})
+        return json.dumps({"status": "error", "message": "Invalid URL"})
+
     def close_app(self):
         try:
             if hasattr(webview, 'windows') and webview.windows:

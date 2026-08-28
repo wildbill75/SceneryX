@@ -532,6 +532,15 @@ function disagreeAndExitApp() {
     }
 }
 
+function openSupportLink() {
+    const targetUrl = "https://www.flightsim.to/profile/wildbill75";
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.open_external_url) {
+        window.pywebview.api.open_external_url(targetUrl);
+    } else {
+        window.open(targetUrl, '_blank');
+    }
+}
+
 function formatCurrency(amountEur) {
     const rate = CURRENCY_RATES[selectedCurrency] || 1.0;
     const symbol = CURRENCY_SYMBOLS[selectedCurrency] || '€';
