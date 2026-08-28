@@ -483,6 +483,7 @@ async function loadAirportsData() {
             } else {
                 ap.rating = ap.rating || 0;
             }
+            ap._searchKey = `${ap.icao} ${ap.name} ${ap.city || ''} ${ap.package_name || ''} ${ap.vendor || ''}`.toLowerCase();
         });
 
         updateStats(allAirportsData);
@@ -1974,14 +1975,12 @@ function filterAirports() {
             }
         }
 
-        // Search text
+        // High-performance search text filtering via pre-computed _searchKey
         if (search) {
-            const matchesIcao = ap.icao.toLowerCase().includes(search);
-            const matchesName = ap.name.toLowerCase().includes(search);
-            const matchesCity = (ap.city || '').toLowerCase().includes(search);
-            const matchesPkg = ap.package_name.toLowerCase().includes(search);
-            const matchesVendor = (ap.vendor || '').toLowerCase().includes(search);
-            return matchesIcao || matchesName || matchesCity || matchesPkg || matchesVendor;
+            if (!ap._searchKey) {
+                ap._searchKey = `${ap.icao} ${ap.name} ${ap.city || ''} ${ap.package_name || ''} ${ap.vendor || ''}`.toLowerCase();
+            }
+            if (!ap._searchKey.includes(search)) return false;
         }
 
         return true;
