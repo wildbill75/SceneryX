@@ -490,9 +490,45 @@ async function loadAirportsData() {
         updateFilterUI();
         filterAirports();
         hideSplashScreen();
+        checkFirstLaunchDisclaimer();
     } catch (err) {
         console.error("Failed to load airports:", err);
         hideSplashScreen();
+        checkFirstLaunchDisclaimer();
+    }
+}
+
+function checkFirstLaunchDisclaimer() {
+    try {
+        const accepted = localStorage.getItem('sceneryx_disclaimer_accepted');
+        if (accepted !== 'true') {
+            const modal = document.getElementById('disclaimer-modal');
+            if (modal) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+        }
+    } catch (e) {
+        console.error("Disclaimer check failed:", e);
+    }
+}
+
+function agreeAndContinueApp() {
+    try {
+        localStorage.setItem('sceneryx_disclaimer_accepted', 'true');
+    } catch (e) {}
+    const modal = document.getElementById('disclaimer-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+}
+
+function disagreeAndExitApp() {
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.close_app) {
+        window.pywebview.api.close_app();
+    } else {
+        window.close();
     }
 }
 
@@ -2680,14 +2716,26 @@ async function triggerExportCollection(format) {
             const res = JSON.parse(resStr);
             if (res.status === 'ok') {
                 closeExportModal();
-                alert(`✅ Collection Exported Successfully!\n\nExported ${res.count} sceneries to:\n${res.path}`);
+                showCustomModal({
+                    title: "Collection Exported Successfully",
+                    message: `Exported ${res.count} sceneries to:\n${res.path}`,
+                    confirmText: "OK"
+                });
             } else if (res.status !== 'cancelled') {
-                alert(`⚠️ Export Error: ${res.message}`);
+                showCustomModal({
+                    title: "Export Failed",
+                    message: res.message || "Could not export collection.",
+                    confirmText: "OK"
+                });
             }
         }
     } catch (e) {
         console.error("Export collection error:", e);
-        alert("Failed to export collection.");
+        showCustomModal({
+            title: "Export Error",
+            message: "Failed to export collection.",
+            confirmText: "OK"
+        });
     }
 }
 

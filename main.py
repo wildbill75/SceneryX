@@ -1538,6 +1538,14 @@ class Api:
         webbrowser.open(target_url)
         return json.dumps({"status": "ok", "url": target_url})
 
+    def close_app(self):
+        try:
+            if hasattr(webview, 'windows') and webview.windows:
+                webview.windows[0].destroy()
+        except Exception as e:
+            print("Error closing app:", e)
+        return json.dumps({"status": "ok"})
+
     def get_exports_dir(self):
         app_root = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
         exports_dir = os.path.join(app_root, "exports")
