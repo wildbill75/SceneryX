@@ -3,6 +3,7 @@ import sys
 import json
 import re
 import urllib.request
+import webbrowser
 import webview
 from scanner import run_scan, get_settings, save_settings, load_ratings, save_rating, save_custom_price, load_custom_prices, get_default_gsx_path, load_airport_database, SPECIAL_BUNDLE_MAP, OUTPUT_JSON_PATH
 
@@ -1539,9 +1540,14 @@ class Api:
         return json.dumps({"status": "ok", "url": target_url})
 
     def open_external_url(self, url):
-        if url and url.startswith(('http://', 'https://')):
-            webbrowser.open(url)
-            return json.dumps({"status": "ok"})
+        import webbrowser
+        try:
+            if url and (url.startswith('http://') or url.startswith('https://')):
+                webbrowser.open(url)
+                return json.dumps({"status": "ok"})
+        except Exception as e:
+            print("open_external_url error:", e)
+            return json.dumps({"status": "error", "message": str(e)})
         return json.dumps({"status": "error", "message": "Invalid URL"})
 
     def close_app(self):

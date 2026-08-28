@@ -532,11 +532,16 @@ function disagreeAndExitApp() {
     }
 }
 
-function openSupportLink() {
+async function openSupportLink() {
     const targetUrl = "https://www.flightsim.to/profile/wildbill75";
-    if (window.pywebview && window.pywebview.api && window.pywebview.api.open_external_url) {
-        window.pywebview.api.open_external_url(targetUrl);
-    } else {
+    try {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.open_external_url) {
+            await window.pywebview.api.open_external_url(targetUrl);
+        } else {
+            window.open(targetUrl, '_blank');
+        }
+    } catch (e) {
+        console.error("Failed to open support URL:", e);
         window.open(targetUrl, '_blank');
     }
 }
