@@ -486,6 +486,7 @@ async function loadAirportsData() {
         });
 
         updateStats(allAirportsData);
+        updateFilterUI();
         filterAirports();
         hideSplashScreen();
     } catch (err) {
