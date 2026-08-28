@@ -5,7 +5,7 @@ import re
 import urllib.request
 import webbrowser
 import webview
-from scanner import run_scan, get_settings, save_settings, load_ratings, save_rating, save_custom_price, save_custom_category, load_custom_prices, get_default_gsx_path, load_airport_database, SPECIAL_BUNDLE_MAP, OUTPUT_JSON_PATH
+from scanner import run_scan, get_settings, save_settings, load_ratings, save_rating, save_custom_price, save_custom_category, load_custom_prices, get_estimated_price, get_default_gsx_path, load_airport_database, SPECIAL_BUNDLE_MAP, OUTPUT_JSON_PATH
 
 AIRPORTS_DB_CACHE = None
 
@@ -234,12 +234,26 @@ def fast_update_airport_cache(icao_target, target_pkg_name=None, toggle_all=Fals
                 target_ap['is_payware'] = primary.get('is_payware', False)
                 target_ap['is_asobo_official'] = False
             target_ap['is_disabled'] = False
+
+            price_val, is_cust = get_estimated_price(
+                icao_target,
+                primary.get('folder_name', ''),
+                target_ap.get('vendor', ''),
+                target_ap.get('pricing_type', ''),
+                target_ap.get('english_type', ''),
+                target_ap.get('is_asobo_official', False),
+                custom_prices
+            )
+            target_ap['price_eur'] = price_val
+            target_ap['is_custom_price'] = is_cust
         else:
             target_ap['vendor'] = "Microsoft Flight Simulator (Default)"
             target_ap['pricing_type'] = "Default"
             target_ap['is_payware'] = False
             target_ap['is_asobo_official'] = False
             target_ap['is_disabled'] = False
+            target_ap['price_eur'] = 0.0
+            target_ap['is_custom_price'] = False
 
         with open(OUTPUT_JSON_PATH, 'w', encoding='utf-8') as f:
             json.dump(airports, f, ensure_ascii=False, indent=2)
