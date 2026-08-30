@@ -1080,9 +1080,16 @@ function renderAirportsOnMap(airports) {
             this.closePopup();
         });
 
-        // Left-Click event: opens detailed drawer on right sidebar
-        marker.on('click', function () {
-            showAirportDetails(ap);
+        // Left-Click event: opens detailed drawer on right sidebar (or Alt+Click for Flight Corridor)
+        marker.on('click', function (e) {
+            if (e.originalEvent && (e.originalEvent.altKey || e.originalEvent.metaKey)) {
+                setArrivalAirportCorridor(ap);
+            } else {
+                if (flightCorridorArrivalAirport) {
+                    clearFlightCorridor();
+                }
+                showAirportDetails(ap);
+            }
         });
 
         // Right-Click event: toggles scenery activation state directly & changes star color!
@@ -1102,6 +1109,114 @@ function renderAirportsOnMap(airports) {
     if (fcEl) fcEl.innerText = `${airports.length} visible`;
 
     renderRouteLines(airports);
+}
+
+/* ================= FLIGHT CORRIDOR (ALT + CLICK) LOGIC ================= */
+
+let flightCorridorArrivalAirport = null;
+let flightCorridorLayerGroup = L.layerGroup();
+
+function getHaversineDistanceKm(lat1, lon1, lat2, lon2) {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function isAirportInCorridor(ap, depAp, arrAp, maxDistKm = 250) {
+    if (!ap || !depAp || !arrAp || !ap.lat || !ap.lon) return false;
+    if (ap.icao === depAp.icao || ap.icao === arrAp.icao) return true;
+
+    const totalDist = getHaversineDistanceKm(depAp.lat, depAp.lon, arrAp.lat, arrAp.lon);
+    if (totalDist === 0) return false;
+
+    // Fast bounding box check
+    const minLat = Math.min(depAp.lat, arrAp.lat) - 3.0;
+    const maxLat = Math.max(depAp.lat, arrAp.lat) + 3.0;
+    const minLon = Math.min(depAp.lon, arrAp.lon) - 4.0;
+    const maxLon = Math.max(depAp.lon, arrAp.lon) + 4.0;
+
+    if (ap.lat < minLat || ap.lat > maxLat || ap.lon < minLon || ap.lon > maxLon) {
+        return false;
+    }
+
+    const numSteps = Math.max(15, Math.floor(totalDist / 50));
+    for (let i = 0; i <= numSteps; i++) {
+        const t = i / numSteps;
+        const pLat = depAp.lat + t * (arrAp.lat - depAp.lat);
+        const pLon = depAp.lon + t * (arrAp.lon - depAp.lon);
+        const distToPath = getHaversineDistanceKm(ap.lat, ap.lon, pLat, pLon);
+        if (distToPath <= maxDistKm) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function setArrivalAirportCorridor(arrAp) {
+    if (!selectedAirport) {
+        showToast('Click an Airport first (Departure), then Alt+Click an Arrival airport.', 'warning');
+        return;
+    }
+
+    if (selectedAirport.icao === arrAp.icao) {
+        clearFlightCorridor();
+        showToast('Flight corridor cleared', 'info');
+        return;
+    }
+
+    flightCorridorArrivalAirport = arrAp;
+    renderFlightCorridor();
+}
+
+function clearFlightCorridor() {
+    flightCorridorArrivalAirport = null;
+    if (flightCorridorLayerGroup && map) {
+        flightCorridorLayerGroup.clearLayers();
+    }
+    filterAirports();
+}
+
+function renderFlightCorridor() {
+    if (!map || !selectedAirport || !flightCorridorArrivalAirport) return;
+
+    if (!map.hasLayer(flightCorridorLayerGroup)) {
+        map.addLayer(flightCorridorLayerGroup);
+    }
+    flightCorridorLayerGroup.clearLayers();
+
+    const dep = selectedAirport;
+    const arr = flightCorridorArrivalAirport;
+
+    const distKm = getHaversineDistanceKm(dep.lat, dep.lon, arr.lat, arr.lon);
+    const distNm = Math.round(distKm * 0.539957);
+
+    // Create curved Bezier arc points for the flight corridor line
+    const arcPts = createBezierArcPoints(dep.lat, dep.lon, arr.lat, arr.lon, 40);
+
+    // Glowing Neon Flight Corridor Line
+    const corridorLine = L.polyline(arcPts, {
+        color: '#a855f7',
+        weight: 4,
+        dashArray: '10, 8',
+        opacity: 0.95
+    });
+
+    flightCorridorLayerGroup.addLayer(corridorLine);
+
+    // Filter airports to display only sceneries/airports inside corridor
+    filterAirports();
+
+    // Count custom sceneries along corridor
+    const customCount = currentlyFilteredAirports.filter(a => hasCustomAddonSources(a)).length;
+
+    showToast(`✈ Flight Corridor: ${dep.icao} → ${arr.icao} (${distNm.toLocaleString()} NM / ${Math.round(distKm).toLocaleString()} km) | ${customCount} Custom Sceneries En-Route`, 'success');
+
+    // Smoothly zoom map to fit both departure & arrival airports
+    map.fitBounds([[dep.lat, dep.lon], [arr.lat, arr.lon]], { padding: [60, 60], animate: true });
 }
 
 function createBezierArcPoints(lat1, lon1, lat2, lon2, numPoints = 30) {
@@ -2303,6 +2418,13 @@ function filterAirports() {
     document.getElementById('clear-search').classList.toggle('hidden', search.length === 0);
 
     currentlyFilteredAirports = allAirportsData.filter(ap => {
+        // Active Flight Corridor Filter (Alt + Click)
+        if (selectedAirport && flightCorridorArrivalAirport) {
+            if (!isAirportInCorridor(ap, selectedAirport, flightCorridorArrivalAirport, 250)) {
+                return false;
+            }
+        }
+
         // Selected Country Overlay Filter
         if (selectedCountryCode) {
             const apIso = ((ap.country || ap.iso_country || '').toString()).toUpperCase().trim();
