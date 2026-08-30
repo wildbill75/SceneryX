@@ -1369,8 +1369,12 @@ function renderFlightCorridor() {
 }
 
 function createBezierArcPoints(lat1, lon1, lat2, lon2, numPoints = 30) {
+    let targetLon2 = lon2;
+    while (targetLon2 - lon1 > 180.0) targetLon2 -= 360.0;
+    while (targetLon2 - lon1 < -180.0) targetLon2 += 360.0;
+
     const dLat = lat2 - lat1;
-    const dLon = lon2 - lon1;
+    const dLon = targetLon2 - lon1;
     const dist = Math.sqrt(dLat * dLat + dLon * dLon);
     if (dist === 0) return [[lat1, lon1]];
 
@@ -1380,14 +1384,14 @@ function createBezierArcPoints(lat1, lon1, lat2, lon2, numPoints = 30) {
     const curvature = Math.min(dist * 0.18, 10.0);
 
     const ctrlLat = (lat1 + lat2) / 2 + normLat * curvature;
-    const ctrlLon = (lon1 + lon2) / 2 + normLon * curvature;
+    const ctrlLon = (lon1 + targetLon2) / 2 + normLon * curvature;
 
     const points = [];
     for (let i = 0; i <= numPoints; i++) {
         const t = i / numPoints;
         const oneMinusT = 1 - t;
         const lat = oneMinusT * oneMinusT * lat1 + 2 * oneMinusT * t * ctrlLat + t * t * lat2;
-        const lon = oneMinusT * oneMinusT * lon1 + 2 * oneMinusT * t * ctrlLon + t * t * lon2;
+        const lon = oneMinusT * oneMinusT * lon1 + 2 * oneMinusT * t * ctrlLon + t * t * targetLon2;
         points.push([lat, lon]);
     }
     return points;
