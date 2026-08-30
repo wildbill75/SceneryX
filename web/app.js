@@ -86,6 +86,134 @@ const COUNTRY_NAME_TO_ISO = {
     'zambia': 'ZM', 'zimbabwe': 'ZW'
 };
 
+// Authoritative ISO to Full English Country Name Map
+const ISO_TO_COUNTRY_NAME = {
+    'AF': 'Afghanistan', 'AL': 'Albania', 'DZ': 'Algeria', 'AD': 'Andorra', 'AO': 'Angola',
+    'AR': 'Argentina', 'AM': 'Armenia', 'AU': 'Australia', 'AT': 'Austria', 'AZ': 'Azerbaijan',
+    'BS': 'Bahamas', 'BH': 'Bahrain', 'BD': 'Bangladesh', 'BB': 'Barbados', 'BY': 'Belarus',
+    'BE': 'Belgium', 'BZ': 'Belize', 'BJ': 'Benin', 'BT': 'Bhutan', 'BO': 'Bolivia',
+    'BA': 'Bosnia & Herzegovina', 'BW': 'Botswana', 'BR': 'Brazil', 'BN': 'Brunei', 'BG': 'Bulgaria',
+    'BF': 'Burkina Faso', 'BI': 'Burundi', 'KH': 'Cambodia', 'CM': 'Cameroon', 'CA': 'Canada',
+    'CV': 'Cape Verde', 'CF': 'Central African Republic', 'TD': 'Chad', 'CL': 'Chile', 'CN': 'China',
+    'CO': 'Colombia', 'KM': 'Comoros', 'CG': 'Congo', 'CD': 'DR Congo', 'CR': 'Costa Rica',
+    'HR': 'Croatia', 'CU': 'Cuba', 'CY': 'Cyprus', 'CZ': 'Czech Republic', 'DK': 'Denmark',
+    'DJ': 'Djibouti', 'DM': 'Dominica', 'DO': 'Dominican Republic', 'EC': 'Ecuador', 'EG': 'Egypt',
+    'SV': 'El Salvador', 'GQ': 'Equatorial Guinea', 'ER': 'Eritrea', 'EE': 'Estonia', 'SZ': 'Eswatini',
+    'ET': 'Ethiopia', 'FJ': 'Fiji', 'FI': 'Finland', 'FR': 'France', 'GF': 'French Guiana',
+    'PF': 'French Polynesia', 'GA': 'Gabon', 'GM': 'Gambia', 'GE': 'Georgia', 'DE': 'Germany',
+    'GH': 'Ghana', 'GR': 'Greece', 'GL': 'Greenland', 'GD': 'Grenada', 'GT': 'Guatemala',
+    'GN': 'Guinea', 'GW': 'Guinea-Bissau', 'GY': 'Guyana', 'HT': 'Haiti', 'HN': 'Honduras',
+    'HK': 'Hong Kong', 'HU': 'Hungary', 'IS': 'Iceland', 'IN': 'India', 'ID': 'Indonesia',
+    'IR': 'Iran', 'IQ': 'Iraq', 'IE': 'Ireland', 'IL': 'Israel', 'IT': 'Italy', 'CI': 'Ivory Coast',
+    'JM': 'Jamaica', 'JP': 'Japan', 'JO': 'Jordan', 'KZ': 'Kazakhstan', 'KE': 'Kenya', 'KI': 'Kiribati',
+    'KP': 'North Korea', 'KR': 'South Korea', 'KW': 'Kuwait', 'KG': 'Kyrgyzstan', 'LA': 'Laos',
+    'LV': 'Latvia', 'LB': 'Lebanon', 'LS': 'Lesotho', 'LR': 'Liberia', 'LY': 'Libya', 'LI': 'Liechtenstein',
+    'LT': 'Lithuania', 'LU': 'Luxembourg', 'MO': 'Macau', 'MG': 'Madagascar', 'MW': 'Malawi',
+    'MY': 'Malaysia', 'MV': 'Maldives', 'ML': 'Mali', 'MT': 'Malta', 'MH': 'Marshall Islands',
+    'MR': 'Mauritania', 'MU': 'Mauritius', 'MX': 'Mexico', 'FM': 'Micronesia', 'MD': 'Moldova',
+    'MC': 'Monaco', 'MN': 'Mongolia', 'ME': 'Montenegro', 'MA': 'Morocco', 'MZ': 'Mozambique',
+    'MM': 'Myanmar', 'NA': 'Namibia', 'NR': 'Nauru', 'NP': 'Nepal', 'NL': 'Netherlands',
+    'NZ': 'New Zealand', 'NI': 'Nicaragua', 'NE': 'Niger', 'NG': 'Nigeria', 'MK': 'North Macedonia',
+    'NO': 'Norway', 'OM': 'Oman', 'PK': 'Pakistan', 'PW': 'Palau', 'PS': 'Palestine', 'PA': 'Panama',
+    'PG': 'Papua New Guinea', 'PY': 'Paraguay', 'PE': 'Peru', 'PH': 'Philippines', 'PL': 'Poland',
+    'PT': 'Portugal', 'PR': 'Puerto Rico', 'QA': 'Qatar', 'RO': 'Romania', 'RU': 'Russia',
+    'RW': 'Rwanda', 'KN': 'Saint Kitts & Nevis', 'LC': 'Saint Lucia', 'VC': 'Saint Vincent',
+    'WS': 'Samoa', 'SM': 'San Marino', 'ST': 'Sao Tome & Principe', 'SA': 'Saudi Arabia',
+    'SN': 'Senegal', 'RS': 'Serbia', 'SC': 'Seychelles', 'SL': 'Sierra Leone', 'SG': 'Singapore',
+    'SK': 'Slovakia', 'SI': 'Slovenia', 'SB': 'Solomon Islands', 'SO': 'Somalia', 'ZA': 'South Africa',
+    'SS': 'South Sudan', 'ES': 'Spain', 'LK': 'Sri Lanka', 'SD': 'Sudan', 'SR': 'Suriname',
+    'SE': 'Sweden', 'CH': 'Switzerland', 'SY': 'Syria', 'TW': 'Taiwan', 'TJ': 'Tajikistan',
+    'TZ': 'Tanzania', 'TH': 'Thailand', 'TL': 'Timor-Leste', 'TG': 'Togo', 'TO': 'Tonga',
+    'TT': 'Trinidad & Tobago', 'TN': 'Tunisia', 'TR': 'Turkey', 'TM': 'Turkmenistan',
+    'TV': 'Tuvalu', 'UG': 'Uganda', 'UA': 'Ukraine', 'AE': 'United Arab Emirates',
+    'GB': 'United Kingdom', 'US': 'United States', 'UY': 'Uruguay', 'UZ': 'Uzbekistan',
+    'VU': 'Vanuatu', 'VA': 'Vatican City', 'VE': 'Venezuela', 'VN': 'Vietnam', 'YE': 'Yemen',
+    'ZM': 'Zambia', 'ZW': 'Zimbabwe'
+};
+
+function getCountryFlagEmoji(iso) {
+    if (!iso || iso.length !== 2) return '🌐';
+    const codePoints = iso.toUpperCase().split('').map(char => 127397 + char.charCodeAt(0));
+    return String.fromCodePoint(...codePoints);
+}
+
+let selectedCountryPricingFilters = new Set(['PAYWARE', 'FREEWARE', 'ASOBO', 'DEFAULT']);
+let selectedCountryTypeFilters = new Set(['INT', 'REG', 'GA', 'HW']);
+
+function toggleCountryPricingFilter(cat) {
+    if (selectedCountryPricingFilters.has(cat)) {
+        if (selectedCountryPricingFilters.size > 1) {
+            selectedCountryPricingFilters.delete(cat);
+        }
+    } else {
+        selectedCountryPricingFilters.add(cat);
+    }
+    if (selectedCountryCode) {
+        openCountryDrawer(selectedCountryCode);
+        filterAirports();
+    }
+}
+
+function toggleCountryTypeFilter(type) {
+    if (selectedCountryTypeFilters.has(type)) {
+        if (selectedCountryTypeFilters.size > 1) {
+            selectedCountryTypeFilters.delete(type);
+        }
+    } else {
+        selectedCountryTypeFilters.add(type);
+    }
+    if (selectedCountryCode) {
+        openCountryDrawer(selectedCountryCode);
+        filterAirports();
+    }
+}
+
+function updateCountryFilterButtonsUI() {
+    const pBtn = document.getElementById('country-btn-payware');
+    const fBtn = document.getElementById('country-btn-freeware');
+    const aBtn = document.getElementById('country-btn-asobo');
+    const dBtn = document.getElementById('country-btn-default');
+
+    if (pBtn) {
+        const active = selectedCountryPricingFilters.has('PAYWARE');
+        pBtn.className = `p-3 rounded-xl border flex items-center justify-between transition-all cursor-pointer text-left group hover:scale-[1.02] ${active ? 'bg-purple-500/20 text-purple-200 border-purple-500/40 shadow-lg shadow-purple-500/10 font-bold' : 'bg-slate-950/40 text-slate-500 border-slate-800/80 opacity-60'}`;
+    }
+    if (fBtn) {
+        const active = selectedCountryPricingFilters.has('FREEWARE');
+        fBtn.className = `p-3 rounded-xl border flex items-center justify-between transition-all cursor-pointer text-left group hover:scale-[1.02] ${active ? 'bg-cyan-500/20 text-cyan-200 border-cyan-500/40 shadow-lg shadow-cyan-500/10 font-bold' : 'bg-slate-950/40 text-slate-500 border-slate-800/80 opacity-60'}`;
+    }
+    if (aBtn) {
+        const active = selectedCountryPricingFilters.has('ASOBO');
+        aBtn.className = `p-3 rounded-xl border flex items-center justify-between transition-all cursor-pointer text-left group hover:scale-[1.02] ${active ? 'bg-amber-500/20 text-amber-200 border-amber-500/40 shadow-lg shadow-amber-500/10 font-bold' : 'bg-slate-950/40 text-slate-500 border-slate-800/80 opacity-60'}`;
+    }
+    if (dBtn) {
+        const active = selectedCountryPricingFilters.has('DEFAULT');
+        dBtn.className = `p-3 rounded-xl border flex items-center justify-between transition-all cursor-pointer text-left group hover:scale-[1.02] ${active ? 'bg-slate-800/80 text-slate-200 border-slate-700 shadow-md font-bold' : 'bg-slate-950/40 text-slate-500 border-slate-800/80 opacity-60'}`;
+    }
+
+    const intBtn = document.getElementById('country-btn-type-int');
+    const regBtn = document.getElementById('country-btn-type-reg');
+    const gaBtn = document.getElementById('country-btn-type-ga');
+    const hwBtn = document.getElementById('country-btn-type-hw');
+
+    if (intBtn) {
+        const active = selectedCountryTypeFilters.has('INT');
+        intBtn.className = `p-2.5 rounded-xl border flex items-center justify-between transition-all cursor-pointer text-left hover:scale-[1.02] ${active ? 'bg-indigo-500/20 text-indigo-200 border-indigo-500/40 font-bold' : 'bg-slate-950/40 text-slate-500 border-slate-800/80 opacity-60'}`;
+    }
+    if (regBtn) {
+        const active = selectedCountryTypeFilters.has('REG');
+        regBtn.className = `p-2.5 rounded-xl border flex items-center justify-between transition-all cursor-pointer text-left hover:scale-[1.02] ${active ? 'bg-indigo-500/20 text-indigo-200 border-indigo-500/40 font-bold' : 'bg-slate-950/40 text-slate-500 border-slate-800/80 opacity-60'}`;
+    }
+    if (gaBtn) {
+        const active = selectedCountryTypeFilters.has('GA');
+        gaBtn.className = `p-2.5 rounded-xl border flex items-center justify-between transition-all cursor-pointer text-left hover:scale-[1.02] ${active ? 'bg-indigo-500/20 text-indigo-200 border-indigo-500/40 font-bold' : 'bg-slate-950/40 text-slate-500 border-slate-800/80 opacity-60'}`;
+    }
+    if (hwBtn) {
+        const active = selectedCountryTypeFilters.has('HW');
+        hwBtn.className = `p-2.5 rounded-xl border flex items-center justify-between transition-all cursor-pointer text-left hover:scale-[1.02] ${active ? 'bg-indigo-500/20 text-indigo-200 border-indigo-500/40 font-bold' : 'bg-slate-950/40 text-slate-500 border-slate-800/80 opacity-60'}`;
+    }
+}
+
 // Flight Optimizer Engine State
 let flightOriginAirport = null;
 let flightDestAirport = null;
@@ -547,6 +675,10 @@ function openCountryDrawer(iso, countryName) {
     activeDrawerMode = 'COUNTRY';
     selectedAirport = null;
 
+    // Auto-hide Left Sidebar to maximize map viewport
+    const sb = document.getElementById('sidebar-panel');
+    if (sb) sb.classList.add('-ml-80', 'opacity-0', 'pointer-events-none');
+
     // 1. Find all airports belonging to this country
     const isoUpper = iso.toUpperCase().trim();
     const countryAirports = allAirportsData.filter(ap => {
@@ -556,12 +688,13 @@ function openCountryDrawer(iso, countryName) {
 
     if (countryAirports.length === 0) return;
 
-    // 2. Set Header Data
+    // 2. Set Header Data with Full English Country Name & Flag Emoji
+    const resolvedName = ISO_TO_COUNTRY_NAME[isoUpper] || countryName || isoUpper;
     const flagEl = document.getElementById('country-drawer-flag');
-    if (flagEl) flagEl.innerText = isoUpper;
+    if (flagEl) flagEl.innerText = getCountryFlagEmoji(isoUpper);
 
     const nameEl = document.getElementById('country-drawer-name');
-    if (nameEl) nameEl.innerText = countryName || isoUpper;
+    if (nameEl) nameEl.innerText = resolvedName;
 
     const totalEl = document.getElementById('country-drawer-total-airports');
     if (totalEl) totalEl.innerText = countryAirports.length.toLocaleString();
@@ -648,29 +781,51 @@ function openCountryDrawer(iso, countryName) {
     const hwEl = document.getElementById('country-type-hw');
     if (hwEl) hwEl.innerText = countHw;
 
+    // Update Interactive Country Filter Buttons
+    updateCountryFilterButtonsUI();
+
+    // Filter Custom Sceneries based on active country pricing & type filter sets
+    const filteredCustomSceneries = customSceneryAirports.filter(ap => {
+        const pt = getAirportPricingType(ap);
+        let catKey = 'FREEWARE';
+        if (pt === 'Payware') catKey = 'PAYWARE';
+        else if (pt === 'Asobo') catKey = 'ASOBO';
+
+        if (!selectedCountryPricingFilters.has(catKey)) return false;
+
+        const typeStr = (ap.english_type || ap.type || '').toLowerCase();
+        let typeKey = 'REG';
+        if (typeStr.includes('international')) typeKey = 'INT';
+        else if (typeStr.includes('regional')) typeKey = 'REG';
+        else if (typeStr.includes('general') || typeStr.includes('ga')) typeKey = 'GA';
+        else if (typeStr.includes('heli') || typeStr.includes('water')) typeKey = 'HW';
+
+        return selectedCountryTypeFilters.has(typeKey);
+    });
+
     // Populate Custom Sceneries List
     const sceneryBadgeEl = document.getElementById('country-scenery-count-badge');
-    if (sceneryBadgeEl) sceneryBadgeEl.innerText = `${customSceneryAirports.length} Custom Sceneries`;
+    if (sceneryBadgeEl) sceneryBadgeEl.innerText = `${filteredCustomSceneries.length} Custom Sceneries`;
 
     const listEl = document.getElementById('country-airports-list');
     if (listEl) {
-        if (customSceneryAirports.length === 0) {
+        if (filteredCustomSceneries.length === 0) {
             listEl.innerHTML = `
                 <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800 text-center space-y-1">
-                    <p class="text-xs font-semibold text-slate-400">No Custom Sceneries Installed</p>
-                    <p class="text-[10px] text-slate-500">All ${countryAirports.length} airports in this country are Default MSFS airports.</p>
+                    <p class="text-xs font-semibold text-slate-400">No Custom Sceneries Matching Filter</p>
+                    <p class="text-[10px] text-slate-500">Try enabling more pricing or airport type filter buttons above.</p>
                 </div>
             `;
         } else {
             // Sort custom sceneries: Payware first, then Freeware, then Asobo
-            customSceneryAirports.sort((a, b) => {
+            filteredCustomSceneries.sort((a, b) => {
                 const ptOrder = { 'Payware': 1, 'Freeware': 2, 'Asobo': 3 };
                 const ptA = getAirportPricingType(a);
                 const ptB = getAirportPricingType(b);
                 return (ptOrder[ptA] || 9) - (ptOrder[ptB] || 9);
             });
 
-            listEl.innerHTML = customSceneryAirports.map(ap => {
+            listEl.innerHTML = filteredCustomSceneries.map(ap => {
                 const pt = getAirportPricingType(ap);
                 let badgeHtml = '';
                 let borderClass = 'border-slate-800 hover:border-indigo-500/50';
@@ -1746,6 +1901,9 @@ function showAirportDetails(ap) {
     activeDrawerMode = 'AIRPORT';
     selectedAirport = ap;
 
+    const sb = document.getElementById('sidebar-panel');
+    if (sb) sb.classList.remove('-ml-80', 'opacity-0', 'pointer-events-none');
+
     const cMode = document.getElementById('drawer-country-mode');
     if (cMode) cMode.classList.add('hidden');
     const apMode = document.getElementById('drawer-airport-mode');
@@ -2453,6 +2611,8 @@ function closeDrawer() {
     activeDrawerMode = 'MAP';
     selectedAirport = null;
     selectedCountryCode = null;
+    const sb = document.getElementById('sidebar-panel');
+    if (sb) sb.classList.remove('-ml-80', 'opacity-0', 'pointer-events-none');
     if (countryGeoJsonLayer) {
         countryGeoJsonLayer.eachLayer(l => countryGeoJsonLayer.resetStyle(l));
     }

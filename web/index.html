@@ -278,7 +278,7 @@
     <div class="relative flex-1 flex overflow-hidden">
 
         <!-- LEFT SIDEBAR FILTERS -->
-        <aside class="w-80 glass-panel z-20 flex flex-col shrink-0 border-r border-slate-800/80">
+        <aside id="sidebar-panel" class="w-80 glass-panel z-20 flex flex-col shrink-0 border-r border-slate-800/80 transition-all duration-300 ease-in-out">
 
             <div class="p-4 space-y-6 overflow-y-auto flex-1">
 
@@ -665,13 +665,16 @@
 
                     <!-- COUNTRY OVERVIEW MODE CONTAINER -->
                     <div id="drawer-country-mode" class="space-y-5 hidden">
-                        <!-- 1. HERO COUNTRY HEADER CARD -->
+                        <!-- 1. HERO COUNTRY HEADER CARD WITH GRADIENT OPACITY FLAG BADGE -->
                         <div class="p-4 rounded-2xl bg-gradient-to-br from-indigo-950/90 via-slate-900 to-slate-950 border border-indigo-500/30 space-y-3 shadow-xl relative overflow-hidden">
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center gap-3">
-                                    <span id="country-drawer-flag" class="text-xl font-black font-mono px-3 py-1 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 shadow-sm">FR</span>
-                                    <div>
-                                        <h3 id="country-drawer-name" class="text-xl lg:text-2xl font-black text-white leading-snug tracking-wide">France</h3>
+                                    <!-- SQUARE FLAG BADGE WITH GRADIENT OPACITY EFFECT -->
+                                    <div id="country-drawer-flag-container" class="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500/25 via-purple-500/15 to-slate-950 border border-indigo-500/40 flex items-center justify-center text-2xl shadow-lg shadow-indigo-500/10 backdrop-blur-md shrink-0">
+                                        <span id="country-drawer-flag">🌐</span>
+                                    </div>
+                                    <div class="min-w-0">
+                                        <h3 id="country-drawer-name" class="text-xl lg:text-2xl font-black text-white leading-snug tracking-wide truncate">Country Name</h3>
                                         <p id="country-drawer-subtitle" class="text-xs font-semibold text-indigo-300/80 mt-0.5">Country Scenery & Airport Network</p>
                                     </div>
                                 </div>
@@ -690,61 +693,64 @@
                             </div>
                         </div>
 
-                        <!-- 2. SCENERY PRICING MODEL BREAKDOWN -->
+                        <!-- 2. SCENERY PRICING MODEL BREAKDOWN (INTERACTIVE TOGGLE BUTTONS) -->
                         <div class="space-y-2">
                             <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Scenery Pricing Breakdown</label>
                             <div class="grid grid-cols-2 gap-2">
-                                <div class="p-3 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-between">
+                                <button id="country-btn-payware" onclick="toggleCountryPricingFilter('PAYWARE')" class="p-3 rounded-xl border flex items-center justify-between transition-all cursor-pointer text-left group hover:scale-[1.02]">
                                     <div>
-                                        <span class="text-[10px] text-purple-300 font-extrabold uppercase block">★ Payware</span>
-                                        <span id="country-count-payware" class="text-lg font-mono font-black text-purple-200">0</span>
+                                        <span class="text-[10px] font-extrabold uppercase block tracking-wider">★ Payware</span>
+                                        <span id="country-count-payware" class="text-lg font-mono font-black">0</span>
                                     </div>
-                                    <i class="fa-solid fa-star text-purple-400 text-base opacity-80"></i>
-                                </div>
-                                <div class="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-between">
+                                    <i class="fa-solid fa-star text-base transition-all group-hover:rotate-12"></i>
+                                </button>
+
+                                <button id="country-btn-freeware" onclick="toggleCountryPricingFilter('FREEWARE')" class="p-3 rounded-xl border flex items-center justify-between transition-all cursor-pointer text-left group hover:scale-[1.02]">
                                     <div>
-                                        <span class="text-[10px] text-cyan-300 font-extrabold uppercase block">★ Freeware</span>
-                                        <span id="country-count-freeware" class="text-lg font-mono font-black text-cyan-200">0</span>
+                                        <span class="text-[10px] font-extrabold uppercase block tracking-wider">★ Freeware</span>
+                                        <span id="country-count-freeware" class="text-lg font-mono font-black">0</span>
                                     </div>
-                                    <i class="fa-solid fa-download text-cyan-400 text-base opacity-80"></i>
-                                </div>
-                                <div class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between">
+                                    <i class="fa-solid fa-download text-base transition-all group-hover:translate-y-0.5"></i>
+                                </button>
+
+                                <button id="country-btn-asobo" onclick="toggleCountryPricingFilter('ASOBO')" class="p-3 rounded-xl border flex items-center justify-between transition-all cursor-pointer text-left group hover:scale-[1.02]">
                                     <div>
-                                        <span class="text-[10px] text-amber-300 font-extrabold uppercase block">★ Asobo</span>
-                                        <span id="country-count-asobo" class="text-lg font-mono font-black text-amber-200">0</span>
+                                        <span class="text-[10px] font-extrabold uppercase block tracking-wider">★ Asobo</span>
+                                        <span id="country-count-asobo" class="text-lg font-mono font-black">0</span>
                                     </div>
-                                    <i class="fa-solid fa-crown text-amber-400 text-base opacity-80"></i>
-                                </div>
-                                <div class="p-3 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
+                                    <i class="fa-solid fa-crown text-base transition-all group-hover:scale-110"></i>
+                                </button>
+
+                                <button id="country-btn-default" onclick="toggleCountryPricingFilter('DEFAULT')" class="p-3 rounded-xl border flex items-center justify-between transition-all cursor-pointer text-left group hover:scale-[1.02]">
                                     <div>
-                                        <span class="text-[10px] text-slate-400 font-extrabold uppercase block">● Default MSFS</span>
-                                        <span id="country-count-default" class="text-lg font-mono font-black text-slate-300">0</span>
+                                        <span class="text-[10px] font-extrabold uppercase block tracking-wider">● Default MSFS</span>
+                                        <span id="country-count-default" class="text-lg font-mono font-black">0</span>
                                     </div>
-                                    <i class="fa-solid fa-plane text-slate-500 text-base opacity-80"></i>
-                                </div>
+                                    <i class="fa-solid fa-plane text-base transition-all group-hover:translate-x-0.5"></i>
+                                </button>
                             </div>
                         </div>
 
-                        <!-- 3. AIRPORT TYPE BREAKDOWN -->
+                        <!-- 3. AIRPORT TYPE BREAKDOWN (INTERACTIVE TOGGLE BUTTONS) -->
                         <div class="space-y-2">
                             <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Airport Types</label>
                             <div class="grid grid-cols-2 gap-2 text-xs">
-                                <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
-                                    <span class="text-slate-300 font-semibold">International</span>
-                                    <span id="country-type-int" class="font-mono font-bold text-indigo-400">0</span>
-                                </div>
-                                <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
-                                    <span class="text-slate-300 font-semibold">Regional</span>
-                                    <span id="country-type-reg" class="font-mono font-bold text-indigo-400">0</span>
-                                </div>
-                                <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
-                                    <span class="text-slate-300 font-semibold">General Aviation</span>
-                                    <span id="country-type-ga" class="font-mono font-bold text-indigo-400">0</span>
-                                </div>
-                                <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
-                                    <span class="text-slate-300 font-semibold">Heli / Water</span>
-                                    <span id="country-type-hw" class="font-mono font-bold text-indigo-400">0</span>
-                                </div>
+                                <button id="country-btn-type-int" onclick="toggleCountryTypeFilter('INT')" class="p-2.5 rounded-xl border flex items-center justify-between transition-all cursor-pointer text-left hover:scale-[1.02]">
+                                    <span class="font-semibold">International</span>
+                                    <span id="country-type-int" class="font-mono font-bold">0</span>
+                                </button>
+                                <button id="country-btn-type-reg" onclick="toggleCountryTypeFilter('REG')" class="p-2.5 rounded-xl border flex items-center justify-between transition-all cursor-pointer text-left hover:scale-[1.02]">
+                                    <span class="font-semibold">Regional</span>
+                                    <span id="country-type-reg" class="font-mono font-bold">0</span>
+                                </button>
+                                <button id="country-btn-type-ga" onclick="toggleCountryTypeFilter('GA')" class="p-2.5 rounded-xl border flex items-center justify-between transition-all cursor-pointer text-left hover:scale-[1.02]">
+                                    <span class="font-semibold">General Aviation</span>
+                                    <span id="country-type-ga" class="font-mono font-bold">0</span>
+                                </button>
+                                <button id="country-btn-type-hw" onclick="toggleCountryTypeFilter('HW')" class="p-2.5 rounded-xl border flex items-center justify-between transition-all cursor-pointer text-left hover:scale-[1.02]">
+                                    <span class="font-semibold">Heli / Water</span>
+                                    <span id="country-type-hw" class="font-mono font-bold">0</span>
+                                </button>
                             </div>
                         </div>
 
