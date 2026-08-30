@@ -387,6 +387,96 @@ function initMap() {
     });
 
     map.addLayer(markerClusterGroup);
+
+    // Click map background to clear active country filter
+    map.on('click', () => {
+        if (selectedCountryCode) {
+            selectedCountryCode = null;
+            if (countryGeoJsonLayer) {
+                countryGeoJsonLayer.eachLayer(l => countryGeoJsonLayer.resetStyle(l));
+            }
+            filterAirports();
+        }
+    });
+
+    loadCountryOverlays();
+}
+
+let countryGeoJsonLayer = null;
+let selectedCountryCode = null;
+
+async function loadCountryOverlays() {
+    try {
+        const resp = await fetch('countries.geojson');
+        if (!resp.ok) return;
+        const geoData = await resp.json();
+
+        countryGeoJsonLayer = L.geoJSON(geoData, {
+            style: feature => {
+                const props = feature.properties || {};
+                const iso = ((props.ISO_A2 || props.ISO_A2_EH || props.ADM0_A3 || '').toString()).toUpperCase().trim();
+                const isSelected = (selectedCountryCode === iso);
+                return {
+                    fillColor: isSelected ? '#a855f7' : '#06b6d4',
+                    fillOpacity: isSelected ? 0.22 : 0.0,
+                    color: isSelected ? '#a855f7' : '#475569',
+                    weight: isSelected ? 2 : 0.5,
+                    opacity: isSelected ? 0.9 : 0.3
+                };
+            },
+            onEachFeature: (feature, layer) => {
+                const props = feature.properties || {};
+                const cName = props.NAME || props.ADMIN || props.NAME_LONG || 'Country';
+                const iso = ((props.ISO_A2 || props.ISO_A2_EH || props.ADM0_A3 || '').toString()).toUpperCase().trim();
+
+                layer.on({
+                    mouseover: (e) => {
+                        const l = e.target;
+                        if (selectedCountryCode !== iso) {
+                            l.setStyle({
+                                fillColor: '#06b6d4',
+                                fillOpacity: 0.16,
+                                color: '#06b6d4',
+                                weight: 1.5,
+                                opacity: 0.8
+                            });
+                        }
+                    },
+                    mouseout: (e) => {
+                        if (countryGeoJsonLayer) {
+                            countryGeoJsonLayer.resetStyle(e.target);
+                        }
+                    },
+                    click: (e) => {
+                        L.DomEvent.stopPropagation(e);
+                        toggleCountrySelection(iso, cName, layer);
+                    }
+                });
+            }
+        }).addTo(map);
+    } catch (err) {
+        console.error("Failed to load country overlay GeoJSON:", err);
+    }
+}
+
+function toggleCountrySelection(iso, countryName, layer) {
+    if (selectedCountryCode === iso) {
+        selectedCountryCode = null;
+        showToast(`Cleared country filter`, 'info');
+    } else {
+        selectedCountryCode = iso;
+        if (layer && layer.getBounds) {
+            const b = layer.getBounds();
+            map.fitBounds(b, { padding: [40, 40], maxZoom: 7, animate: true });
+        }
+        showToast(`✓ Filtered country: ${countryName}`, 'info');
+    }
+
+    if (countryGeoJsonLayer) {
+        countryGeoJsonLayer.eachLayer(l => countryGeoJsonLayer.resetStyle(l));
+    }
+
+    filterAirports();
 }
 
 async function loadInitialAppData() {
@@ -2173,6 +2263,14 @@ function filterAirports() {
     document.getElementById('clear-search').classList.toggle('hidden', search.length === 0);
 
     currentlyFilteredAirports = allAirportsData.filter(ap => {
+        // Selected Country Overlay Filter
+        if (selectedCountryCode) {
+            const apIso = ((ap.country || ap.iso_country || '').toString()).toUpperCase().trim();
+            if (apIso !== selectedCountryCode) {
+                return false;
+            }
+        }
+
         // Geographic Region Filter (Cumulative Multi-select)
         if (selectedRegions.size > 0) {
             const apIso = ((ap.country || ap.iso_country || '').toString()).toUpperCase().trim();
