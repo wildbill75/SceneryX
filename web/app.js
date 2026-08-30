@@ -1220,6 +1220,84 @@ function getCommercialFlightCorridorWaypoints(depAp, arrAp) {
     return makeContinuousLongitudePoints(rawPath);
 }
 
+function getCommercialCorridorFilterPoints(depAp, arrAp) {
+    const lat1 = depAp.lat;
+    const lon1 = depAp.lon;
+    const lat2 = arrAp.lat;
+    const lon2 = arrAp.lon;
+
+    const isUSEastToAsia = (
+        ((lon1 < -60 && lat1 > 25) && (lon2 > 60 && lon2 < 140)) ||
+        ((lon2 < -60 && lat2 > 25) && (lon1 > 60 && lon1 < 140))
+    );
+
+    const isEuropeToAsia = (
+        ((lon1 > -15 && lon1 < 35 && lat1 > 35) && (lon2 > 80 && lon2 < 140 && lat2 < 35)) ||
+        ((lon2 > -15 && lon2 < 35 && lat2 > 35) && (lon1 > 80 && lon1 < 140 && lat1 < 35))
+    );
+
+    const filterWaypoints = [];
+
+    // 1. Commercial US East Coast <-> SE Asia / Far East via NOPAC Alaska & Japan Corridor
+    if (isUSEastToAsia) {
+        const isDepUS = lon1 < -60;
+        const usAp = isDepUS ? depAp : arrAp;
+        const asiaAp = isDepUS ? arrAp : depAp;
+
+        const waypoints = [
+            [usAp.lat, usAp.lon],
+            [56.0, -112.0],   // Canada (Edmonton / Alberta)
+            [61.17, -149.99], // Alaska (Anchorage PANC)
+            [48.0, 162.0],    // Aleutian Islands / NOPAC Track
+            [35.77, 140.39],  // Japan (Tokyo RJTT)
+            [22.31, 113.91],  // Hong Kong / Taiwan
+            [asiaAp.lat, asiaAp.lon]
+        ];
+
+        if (!isDepUS) waypoints.reverse();
+
+        for (let i = 0; i < waypoints.length - 1; i++) {
+            const w1 = waypoints[i];
+            const w2 = waypoints[i + 1];
+            const segPts = createBezierArcPoints(w1[0], w1[1], w2[0], w2[1], 15);
+            filterWaypoints.push(...segPts);
+        }
+    } else if (isEuropeToAsia) {
+        // 2. Commercial Europe <-> South East Asia via Silk Road / Middle East Corridor
+        const isDepEU = lon1 < 35;
+        const euAp = isDepEU ? depAp : arrAp;
+        const asiaAp = isDepEU ? arrAp : depAp;
+
+        const waypoints = [
+            [euAp.lat, euAp.lon],
+            [41.0, 29.0],    // Turkey (Istanbul)
+            [25.25, 55.36],  // Middle East (Dubai)
+            [19.07, 72.87],  // India (Mumbai)
+            [13.69, 100.75], // Thailand (Bangkok)
+            [asiaAp.lat, asiaAp.lon]
+        ];
+
+        if (!isDepEU) waypoints.reverse();
+
+        for (let i = 0; i < waypoints.length - 1; i++) {
+            const w1 = waypoints[i];
+            const w2 = waypoints[i + 1];
+            const segPts = createBezierArcPoints(w1[0], w1[1], w2[0], w2[1], 15);
+            filterWaypoints.push(...segPts);
+        }
+    } else {
+        // 3. Standard Spherical Great Circle (Orthodromic / NAT Track) for all other flights
+        const numPts = 80;
+        for (let i = 0; i <= numPts; i++) {
+            const f = i / numPts;
+            let [ptLat, ptLon] = getGreatCircleInterpolatedPoint(lat1, lon1, lat2, lon2, f);
+            filterWaypoints.push([ptLat, ptLon]);
+        }
+    }
+
+    return filterWaypoints;
+}
+
 function isAirportInCorridor(ap, depAp, arrAp) {
     if (!ap || !depAp || !arrAp || !ap.lat || !ap.lon) return false;
     if (ap.icao === depAp.icao || ap.icao === arrAp.icao) return true;
@@ -1227,11 +1305,11 @@ function isAirportInCorridor(ap, depAp, arrAp) {
     const totalDist = getHaversineDistanceKm(depAp.lat, depAp.lon, arrAp.lat, arrAp.lon);
     if (totalDist === 0) return false;
 
-    // Dynamic corridor width: 250 km for regional, 600 km for oceanic/long-haul to capture NAT tracks, Iceland, Greenland & ETOPS sceneries
-    const maxDistKm = totalDist > 1500 ? 600 : 250;
-    const pathWaypoints = getCommercialFlightCorridorWaypoints(depAp, arrAp);
+    // Dynamic corridor width: 300 km for regional, 750 km for long-haul routes to match real-world commercial flight paths
+    const maxDistKm = totalDist > 1500 ? 750 : 300;
+    const filterWaypoints = getCommercialCorridorFilterPoints(depAp, arrAp);
 
-    for (const p of pathWaypoints) {
+    for (const p of filterWaypoints) {
         const distToPath = getHaversineDistanceKm(ap.lat, ap.lon, p[0], p[1]);
         if (distToPath <= maxDistKm) {
             return true;
