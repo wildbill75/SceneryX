@@ -388,13 +388,24 @@ function initMap() {
 
     map.addLayer(markerClusterGroup);
 
-    // Click map background to clear active country filter
+    // Click map background to clear active country filter & active flight corridor
     map.on('click', () => {
+        let needsFilterUpdate = false;
+        if (flightCorridorArrivalAirport) {
+            flightCorridorArrivalAirport = null;
+            if (flightCorridorLayerGroup && map) {
+                flightCorridorLayerGroup.clearLayers();
+            }
+            needsFilterUpdate = true;
+        }
         if (selectedCountryCode) {
             selectedCountryCode = null;
             if (countryGeoJsonLayer) {
                 countryGeoJsonLayer.eachLayer(l => countryGeoJsonLayer.resetStyle(l));
             }
+            needsFilterUpdate = true;
+        }
+        if (needsFilterUpdate) {
             filterAirports();
         }
     });
