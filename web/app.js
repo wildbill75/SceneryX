@@ -2533,11 +2533,13 @@ async function selectDefaultMSFSScenery(icao) {
                 }
             });
             updateStats(allAirportsData);
-            filterAirports();
-            if (selectedAirport) {
-                const updatedAp = allAirportsData.find(a => a.icao === selectedAirport.icao);
-                if (updatedAp) showAirportDetails(updatedAp);
+            const targetIcao = selectedAirport ? selectedAirport.icao : icao;
+            const updatedAp = allAirportsData.find(a => a.icao === targetIcao);
+            if (updatedAp) {
+                selectedAirport = updatedAp;
+                showAirportDetails(updatedAp);
             }
+            filterAirports();
             showToast(`✓ Reverted to Default MSFS Base Airport`, 'info');
         }
     } catch (e) {
@@ -2561,10 +2563,13 @@ async function selectSceneryPackageByName(icao, folderName) {
                 }
             });
             updateStats(allAirportsData);
-            filterAirports();
             const targetIcao = selectedAirport ? selectedAirport.icao : icao;
             const updatedAp = allAirportsData.find(a => a.icao === targetIcao);
-            if (updatedAp) showAirportDetails(updatedAp);
+            if (updatedAp) {
+                selectedAirport = updatedAp;
+                showAirportDetails(updatedAp);
+            }
+            filterAirports();
             showToast(`✓ ${icao} Scenery Activated & Saved to Disk`, 'success');
         }
     } catch (e) {
