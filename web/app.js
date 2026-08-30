@@ -405,6 +405,19 @@ function initMap() {
 let countryGeoJsonLayer = null;
 let selectedCountryCode = null;
 
+function getFeatureIso(feature) {
+    if (!feature || !feature.properties) return '';
+    const p = feature.properties;
+    let iso = p.ISO_A2_EH;
+    if (!iso || iso === '-99') {
+        iso = p.ISO_A2;
+    }
+    if (!iso || iso === '-99') {
+        iso = p.ISO_A3 || p.ADM0_A3 || p.SU_A3 || '';
+    }
+    return (iso || '').toString().toUpperCase().trim();
+}
+
 async function loadCountryOverlays() {
     try {
         const resp = await fetch('countries.geojson');
@@ -413,9 +426,8 @@ async function loadCountryOverlays() {
 
         countryGeoJsonLayer = L.geoJSON(geoData, {
             style: feature => {
-                const props = feature.properties || {};
-                const iso = ((props.ISO_A2 || props.ISO_A2_EH || props.ADM0_A3 || '').toString()).toUpperCase().trim();
-                const isSelected = (selectedCountryCode === iso);
+                const iso = getFeatureIso(feature);
+                const isSelected = (selectedCountryCode && iso && selectedCountryCode === iso);
                 return {
                     fillColor: isSelected ? '#a855f7' : '#06b6d4',
                     fillOpacity: isSelected ? 0.22 : 0.0,
@@ -427,12 +439,12 @@ async function loadCountryOverlays() {
             onEachFeature: (feature, layer) => {
                 const props = feature.properties || {};
                 const cName = props.NAME || props.ADMIN || props.NAME_LONG || 'Country';
-                const iso = ((props.ISO_A2 || props.ISO_A2_EH || props.ADM0_A3 || '').toString()).toUpperCase().trim();
+                const iso = getFeatureIso(feature);
 
                 layer.on({
                     mouseover: (e) => {
                         const l = e.target;
-                        if (selectedCountryCode !== iso) {
+                        if (!selectedCountryCode || selectedCountryCode !== iso) {
                             l.setStyle({
                                 fillColor: '#06b6d4',
                                 fillOpacity: 0.16,
@@ -460,15 +472,43 @@ async function loadCountryOverlays() {
 }
 
 function toggleCountrySelection(iso, countryName, layer) {
+    if (!iso || iso === '-99') return;
+
     if (selectedCountryCode === iso) {
         selectedCountryCode = null;
         showToast(`Cleared country filter`, 'info');
     } else {
         selectedCountryCode = iso;
-        if (layer && layer.getBounds) {
-            const b = layer.getBounds();
-            map.fitBounds(b, { padding: [40, 40], maxZoom: 7, animate: true });
+
+        // Smooth zoom to country bounds
+        if (countryGeoJsonLayer) {
+            const matchingLayers = [];
+            countryGeoJsonLayer.eachLayer(l => {
+                if (getFeatureIso(l.feature) === iso) {
+                    matchingLayers.push(l);
+                }
+            });
+
+            if (matchingLayers.length > 0) {
+                // If France (FR), fit bounds to main European France polygon to prevent overseas territories from over-expanding zoom
+                let targetLayer = matchingLayers[0];
+                if (iso === 'FR') {
+                    // Pick the largest polygon or main France layer
+                    const mainFrance = matchingLayers.find(l => {
+                        const b = l.getBounds();
+                        return b.getNorth() > 40 && b.getSouth() < 52 && b.getEast() > -5 && b.getWest() < 10;
+                    });
+                    if (mainFrance) targetLayer = mainFrance;
+                }
+
+                if (targetLayer && targetLayer.getBounds) {
+                    map.fitBounds(targetLayer.getBounds(), { padding: [40, 40], maxZoom: 7, animate: true });
+                }
+            } else if (layer && layer.getBounds) {
+                map.fitBounds(layer.getBounds(), { padding: [40, 40], maxZoom: 7, animate: true });
+            }
         }
+
         showToast(`✓ Filtered country: ${countryName}`, 'info');
     }
 
