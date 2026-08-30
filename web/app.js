@@ -827,34 +827,79 @@ function openCountryDrawer(iso, countryName) {
 
             listEl.innerHTML = filteredCustomSceneries.map(ap => {
                 const pt = getAirportPricingType(ap);
+                const isExpanded = (expandedCountryIcao === ap.icao);
                 let badgeHtml = '';
                 let borderClass = 'border-slate-800 hover:border-indigo-500/50';
 
                 if (pt === 'Payware') {
                     badgeHtml = `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">PAYWARE</span>`;
-                    borderClass = 'border-purple-500/30 hover:border-purple-400 bg-purple-950/20';
+                    borderClass = isExpanded ? 'border-purple-400 bg-purple-950/40 shadow-lg shadow-purple-950/30' : 'border-purple-500/30 hover:border-purple-400 bg-purple-950/20';
                 } else if (pt === 'Freeware') {
                     badgeHtml = `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">FREEWARE</span>`;
-                    borderClass = 'border-cyan-500/30 hover:border-cyan-400 bg-cyan-950/20';
+                    borderClass = isExpanded ? 'border-cyan-400 bg-cyan-950/40 shadow-lg shadow-cyan-950/30' : 'border-cyan-500/30 hover:border-cyan-400 bg-cyan-950/20';
                 } else if (pt === 'Asobo') {
                     badgeHtml = `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">ASOBO</span>`;
-                    borderClass = 'border-amber-500/30 hover:border-amber-400 bg-amber-950/20';
+                    borderClass = isExpanded ? 'border-amber-400 bg-amber-950/40 shadow-lg shadow-amber-950/30' : 'border-amber-500/30 hover:border-amber-400 bg-amber-950/20';
                 }
 
-                const vendorStr = ap.vendor || (ap.is_asobo_official ? 'Microsoft / Asobo' : 'Unknown');
+                const vendorStr = ap.vendor || (ap.is_asobo_official ? 'Microsoft / Asobo' : 'Community');
+                const activeSrc = getActiveSource(ap);
+                const safeFolder = activeSrc ? (activeSrc.folder_name || '') : (ap.package_name || '');
+                const sizeStr = (activeSrc && activeSrc.size_str) ? activeSrc.size_str : (ap.size_str || '');
+                const storeSearchUrl = `https://flightsim.to/sceneries?q=${encodeURIComponent(ap.icao)}`;
+
+                let accordionHtml = '';
+                if (isExpanded) {
+                    accordionHtml = `
+                        <div class="mt-3 pt-3 border-t border-slate-800/80 space-y-2.5">
+                            <div class="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800 text-[11px] space-y-1.5 font-mono">
+                                <div class="flex items-center justify-between text-slate-300">
+                                    <span class="text-slate-500">Creator / Publisher:</span>
+                                    <span class="font-bold text-white">${vendorStr}</span>
+                                </div>
+                                <div class="flex items-center justify-between text-slate-400 text-[10px]">
+                                    <span class="text-slate-500">Active Package:</span>
+                                    <span class="truncate max-w-[180px] text-slate-300">${safeFolder}</span>
+                                </div>
+                                ${sizeStr ? `
+                                <div class="flex items-center justify-between text-slate-400 text-[10px]">
+                                    <span class="text-slate-500">Package Size:</span>
+                                    <span class="text-slate-300">${sizeStr}</span>
+                                </div>` : ''}
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-2 text-xs">
+                                <button onclick="event.stopPropagation(); toggleCountrySceneryInPlace('${ap.icao}', '${activeSrc ? 'DEFAULT' : safeFolder}')"
+                                        class="px-2.5 py-1.5 rounded-lg font-bold transition-all flex items-center justify-center gap-1.5 ${activeSrc ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40' : 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40'}">
+                                    <i class="fa-solid ${activeSrc ? 'fa-power-off' : 'fa-check'} text-xs"></i>
+                                    <span>${activeSrc ? 'Switch Default' : 'Activate Addon'}</span>
+                                </button>
+                                <a href="${storeSearchUrl}" target="_blank" onclick="event.stopPropagation()"
+                                   class="px-2.5 py-1.5 rounded-lg font-bold bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/40 transition-all flex items-center justify-center gap-1.5 no-underline">
+                                    <i class="fa-solid fa-store text-xs"></i>
+                                    <span>Creator Store</span>
+                                </a>
+                            </div>
+                        </div>
+                    `;
+                }
 
                 return `
-                    <div onclick="focusAirportWithAnimation(allAirportsData.find(a => a.icao === '${ap.icao}'))" 
-                         class="p-3 rounded-xl bg-slate-900/90 border ${borderClass} shadow-md hover:bg-slate-850 cursor-pointer transition-all flex items-center justify-between gap-2.5 group">
-                        <div class="min-w-0 flex-1">
-                            <div class="flex items-center gap-2 mb-0.5">
-                                <span class="text-xs font-mono font-black text-white group-hover:text-cyan-300 transition-colors">${ap.icao}</span>
-                                ${badgeHtml}
+                    <div id="country-ap-card-${ap.icao}"
+                         onclick="selectCountryAirport('${ap.icao}')" 
+                         class="p-3 rounded-xl bg-slate-900/90 border ${borderClass} shadow-md hover:bg-slate-850 cursor-pointer transition-all flex flex-col gap-1 group">
+                        <div class="flex items-center justify-between gap-2.5 min-w-0">
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center gap-2 mb-0.5">
+                                    <span class="text-xs font-mono font-black text-white group-hover:text-cyan-300 transition-colors">${ap.icao}</span>
+                                    ${badgeHtml}
+                                </div>
+                                <h4 class="text-xs font-extrabold text-slate-200 truncate group-hover:text-white leading-tight">${ap.name}</h4>
+                                <p class="text-[10px] font-medium text-slate-400 truncate mt-0.5">${ap.city || 'Unknown City'} • <span class="text-slate-300 font-semibold">${vendorStr}</span></p>
                             </div>
-                            <h4 class="text-xs font-extrabold text-slate-200 truncate group-hover:text-white leading-tight">${ap.name}</h4>
-                            <p class="text-[10px] font-medium text-slate-400 truncate mt-0.5">${ap.city || 'Unknown City'} • <span class="text-slate-300 font-semibold">${vendorStr}</span></p>
+                            <i class="fa-solid ${isExpanded ? 'fa-chevron-down text-cyan-400' : 'fa-chevron-right text-slate-500'} text-xs group-hover:text-white transition-all shrink-0"></i>
                         </div>
-                        <i class="fa-solid fa-chevron-right text-xs text-slate-500 group-hover:text-white group-hover:translate-x-0.5 transition-all"></i>
+                        ${accordionHtml}
                     </div>
                 `;
             }).join('');
@@ -868,6 +913,59 @@ function openCountryDrawer(iso, countryName) {
     if (cMode) cMode.classList.remove('hidden');
     const drawer = document.getElementById('detail-drawer');
     if (drawer) drawer.classList.remove('translate-x-full');
+}
+
+let expandedCountryIcao = null;
+
+function selectCountryAirport(icao) {
+    if (!icao) return;
+    const ap = allAirportsData.find(a => a.icao === icao);
+    if (!ap) return;
+
+    if (map && ap.lat && ap.lon) {
+        map.flyTo([ap.lat, ap.lon], 13, {
+            animate: true,
+            duration: 1.2
+        });
+    }
+
+    expandedCountryIcao = (expandedCountryIcao === icao) ? null : icao;
+    if (selectedCountryCode) {
+        openCountryDrawer(selectedCountryCode, selectedCountryName);
+        const cardEl = document.getElementById(`country-ap-card-${icao}`);
+        if (cardEl) {
+            cardEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    }
+}
+
+async function toggleCountrySceneryInPlace(icao, folderName) {
+    if (!window.pywebview || isToggleInProgress || !icao) return;
+    isToggleInProgress = true;
+    try {
+        const targetPkg = folderName || 'DEFAULT';
+        const resStr = await window.pywebview.api.select_scenery_option(icao, targetPkg);
+        const res = JSON.parse(resStr);
+        if (res.status === 'ok') {
+            allAirportsData = res.airports;
+            allAirportsData.forEach(ap => {
+                if (userRatingsMap[ap.icao] !== undefined) {
+                    ap.rating = userRatingsMap[ap.icao];
+                }
+            });
+            updateStats(allAirportsData);
+            filterAirports();
+            if (selectedCountryCode) {
+                expandedCountryIcao = icao;
+                openCountryDrawer(selectedCountryCode, selectedCountryName);
+            }
+            showToast(`✓ ${icao} Scenery State Updated`, 'success');
+        }
+    } catch (e) {
+        console.error("Failed to toggle scenery in country mode:", e);
+    } finally {
+        isToggleInProgress = false;
+    }
 }
 
 function resetConflictingFiltersForCountrySelection() {
@@ -1499,7 +1597,11 @@ function renderAirportsOnMap(airports) {
                 if (flightCorridorArrivalAirport) {
                     clearFlightCorridor();
                 }
-                showAirportDetails(ap);
+                if (activeDrawerMode === 'COUNTRY') {
+                    selectCountryAirport(ap.icao);
+                } else {
+                    showAirportDetails(ap);
+                }
             }
         });
 
@@ -2612,6 +2714,7 @@ function closeDrawer() {
     activeDrawerMode = 'MAP';
     selectedAirport = null;
     selectedCountryCode = null;
+    expandedCountryIcao = null;
     const sb = document.getElementById('sidebar-panel');
     if (sb) sb.classList.remove('-ml-80', 'opacity-0', 'pointer-events-none');
     if (countryGeoJsonLayer) {
