@@ -579,27 +579,28 @@ function openCountryDrawer(iso, countryName) {
     const customSceneryAirports = [];
 
     countryAirports.forEach(ap => {
-        const cat = getAirportCategory(ap);
-        if (cat === 'PAYWARE') {
-            countPayware++;
-            customSceneryAirports.push(ap);
+        const hasCustom = hasCustomAddonSources(ap);
+        const pt = getAirportPricingType(ap);
 
-            // Compute spent price in EUR / local currency
-            if (ap.is_bundle || ap.bundle_id) {
-                const bKey = ap.bundle_id || ap.package_name;
-                if (!processedBundles.has(bKey)) {
-                    processedBundles.add(bKey);
-                    totalSpentEur += (ap.bundle_total_price || 39.00);
+        if (hasCustom) {
+            customSceneryAirports.push(ap);
+            if (pt === 'Payware') {
+                countPayware++;
+                // Compute spent price in EUR / local currency
+                if (ap.is_bundle || ap.bundle_id) {
+                    const bKey = ap.bundle_id || ap.package_name;
+                    if (!processedBundles.has(bKey)) {
+                        processedBundles.add(bKey);
+                        totalSpentEur += (ap.bundle_total_price || 39.00);
+                    }
+                } else {
+                    totalSpentEur += (ap.price_eur || 0);
                 }
+            } else if (pt === 'Asobo') {
+                countAsobo++;
             } else {
-                totalSpentEur += (ap.price_eur || 0);
+                countFreeware++;
             }
-        } else if (cat === 'FREEWARE') {
-            countFreeware++;
-            customSceneryAirports.push(ap);
-        } else if (cat === 'ASOBO') {
-            countAsobo++;
-            customSceneryAirports.push(ap);
         } else {
             countDefault++;
         }
@@ -659,22 +660,24 @@ function openCountryDrawer(iso, countryName) {
         } else {
             // Sort custom sceneries: Payware first, then Freeware, then Asobo
             customSceneryAirports.sort((a, b) => {
-                const catOrder = { 'PAYWARE': 1, 'FREEWARE': 2, 'ASOBO': 3, 'DEFAULT': 4 };
-                return (catOrder[getAirportCategory(a)] || 9) - (catOrder[getAirportCategory(b)] || 9);
+                const ptOrder = { 'Payware': 1, 'Freeware': 2, 'Asobo': 3 };
+                const ptA = getAirportPricingType(a);
+                const ptB = getAirportPricingType(b);
+                return (ptOrder[ptA] || 9) - (ptOrder[ptB] || 9);
             });
 
             listEl.innerHTML = customSceneryAirports.map(ap => {
-                const cat = getAirportCategory(ap);
+                const pt = getAirportPricingType(ap);
                 let badgeHtml = '';
                 let borderClass = 'border-slate-800 hover:border-indigo-500/50';
 
-                if (cat === 'PAYWARE') {
+                if (pt === 'Payware') {
                     badgeHtml = `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">PAYWARE</span>`;
                     borderClass = 'border-purple-500/30 hover:border-purple-400 bg-purple-950/20';
-                } else if (cat === 'FREEWARE') {
+                } else if (pt === 'Freeware') {
                     badgeHtml = `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">FREEWARE</span>`;
                     borderClass = 'border-cyan-500/30 hover:border-cyan-400 bg-cyan-950/20';
-                } else if (cat === 'ASOBO') {
+                } else if (pt === 'Asobo') {
                     badgeHtml = `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">ASOBO</span>`;
                     borderClass = 'border-amber-500/30 hover:border-amber-400 bg-amber-950/20';
                 }
