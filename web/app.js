@@ -2021,16 +2021,32 @@ function resetFullDatabase() {
 
 let selectedRegions = new Set();
 
+const REGION_VIEWPORTS = {
+    'weurope': { center: [54.0, 10.0], zoom: 4 },
+    'eeurope': { center: [45.0, 25.0], zoom: 4.5 },
+    'namerica': { center: [48.0, -95.0], zoom: 3.5 },
+    'camerica_caribbean': { center: [18.0, -78.0], zoom: 4.8 },
+    'samerica': { center: [-15.0, -60.0], zoom: 3.5 },
+    'asia': { center: [25.0, 105.0], zoom: 3.5 },
+    'middleeast': { center: [26.0, 48.0], zoom: 4.8 },
+    'nafrica': { center: [27.0, 17.0], zoom: 4.8 },
+    'ssafrica': { center: [-5.0, 22.0], zoom: 3.5 },
+    'oceania': { center: [-25.0, 135.0], zoom: 4 },
+    'pacific': { center: [-15.0, -145.0], zoom: 3.5 }
+};
+
 const REGION_COUNTRY_MAP = {
     'weurope': ['FR', 'DE', 'GB', 'IT', 'ES', 'NL', 'BE', 'CH', 'AT', 'PT', 'IE', 'NO', 'SE', 'DK', 'FI', 'LU', 'IS', 'MC', 'AD', 'SM', 'VA', 'LI', 'GI', 'FO', 'AX', 'SJ'],
     'eeurope': ['PL', 'GR', 'TR', 'RO', 'CZ', 'HU', 'BG', 'HR', 'SK', 'UA', 'RS', 'SI', 'EE', 'LV', 'LT', 'CY', 'AL', 'BA', 'ME', 'MK', 'MD', 'BY', 'MT', 'GE', 'AM', 'AZ', 'RU'],
-    'namerica': ['US', 'CA', 'MX', 'GL', 'PM'],
-    'samerica': ['BR', 'AR', 'CL', 'CO', 'PE', 'VE', 'EC', 'BO', 'PY', 'UY', 'GY', 'SR', 'GF', 'CU', 'DO', 'JM', 'HT', 'PR', 'BS', 'TT', 'BB', 'CW', 'AW', 'GP', 'MQ', 'KY', 'VG', 'VI', 'KN', 'LC', 'VC', 'AG', 'GD', 'TC', 'SX', 'HN', 'CR', 'NI', 'PA', 'SV', 'GT', 'BZ', 'BL', 'BQ', 'MF', 'AI', 'MS'],
+    'namerica': ['US', 'CA', 'GL', 'PM'],
+    'camerica_caribbean': ['MX', 'GT', 'BZ', 'HN', 'SV', 'NI', 'CR', 'PA', 'CU', 'DO', 'JM', 'HT', 'PR', 'BS', 'TT', 'BB', 'CW', 'AW', 'GP', 'MQ', 'KY', 'VG', 'VI', 'KN', 'LC', 'VC', 'AG', 'GD', 'TC', 'SX', 'BL', 'BQ', 'MF', 'AI', 'MS'],
+    'samerica': ['BR', 'AR', 'CL', 'CO', 'PE', 'VE', 'EC', 'BO', 'PY', 'UY', 'GY', 'SR', 'GF'],
     'asia': ['JP', 'CN', 'IN', 'KR', 'TH', 'ID', 'MY', 'PH', 'VN', 'SG', 'PK', 'BD', 'LK', 'NP', 'MM', 'KH', 'LA', 'TW', 'HK', 'MO', 'MN', 'KZ', 'UZ', 'TM', 'KG', 'TJ', 'AF', 'BT', 'MV', 'TL', 'BN'],
     'middleeast': ['AE', 'SA', 'QA', 'KW', 'OM', 'BH', 'JO', 'LB', 'IQ', 'IR', 'IL', 'PS', 'YE'],
     'nafrica': ['EG', 'MA', 'DZ', 'TN', 'LY', 'SD', 'MR', 'EH'],
     'ssafrica': ['ZA', 'KE', 'NG', 'GH', 'TZ', 'UG', 'ET', 'CI', 'CM', 'SN', 'ZW', 'AM', 'MU', 'RE', 'YT', 'SC', 'CV', 'AO', 'MZ', 'NA', 'BW', 'ZMW', 'ZM', 'MW', 'MG', 'RW', 'BI', 'DJ', 'ER', 'SO', 'SL', 'LR', 'GN', 'GW', 'GM', 'TG', 'BJ', 'NE', 'BF', 'ML', 'TD', 'CF', 'CG', 'CD', 'GA', 'GQ', 'ST', 'LS', 'SZ', 'SH', 'KM', 'SS'],
-    'oceania': ['AU', 'NZ', 'FJ', 'PF', 'NC', 'PG', 'GU', 'MP', 'WS', 'TO', 'VU', 'SB', 'FM', 'PW', 'MH', 'KI', 'NR', 'TV', 'CK', 'NU', 'WF', 'AS', 'UM', 'NF', 'CC', 'CX', 'TK']
+    'oceania': ['AU', 'NZ', 'PG', 'NF', 'CC', 'CX'],
+    'pacific': ['PF', 'NC', 'FJ', 'GU', 'MP', 'WS', 'TO', 'VU', 'SB', 'FM', 'PW', 'MH', 'KI', 'NR', 'TV', 'CK', 'NU', 'WF', 'AS', 'UM', 'TK']
 };
 
 function toggleRegionFilter(regionKey) {
@@ -2046,8 +2062,18 @@ function toggleRegionFilter(regionKey) {
     updateRegionPillUI();
     filterAirports();
 
-    if (selectedRegions.size > 0 && currentlyFilteredAirports.length > 0) {
-        zoomToFilteredAirportsBounds();
+    if (map) {
+        if (selectedRegions.size === 1) {
+            const singleKey = Array.from(selectedRegions)[0];
+            const vp = REGION_VIEWPORTS[singleKey];
+            if (vp) {
+                map.flyTo(vp.center, vp.zoom, { duration: 1.2 });
+            } else if (currentlyFilteredAirports.length > 0) {
+                zoomToFilteredAirportsBounds();
+            }
+        } else if (selectedRegions.size > 1 && currentlyFilteredAirports.length > 0) {
+            zoomToFilteredAirportsBounds();
+        }
     }
 }
 
@@ -2064,11 +2090,11 @@ function updateRegionPillUI() {
         }
     }
 
-    const keys = ['weurope', 'eeurope', 'namerica', 'samerica', 'asia', 'middleeast', 'nafrica', 'ssafrica', 'oceania'];
+    const keys = ['weurope', 'eeurope', 'namerica', 'camerica_caribbean', 'samerica', 'asia', 'middleeast', 'nafrica', 'ssafrica', 'oceania', 'pacific'];
     keys.forEach(k => {
         const btn = document.getElementById(`filter-region-${k}`);
         if (btn) {
-            const isSpan2 = (k === 'oceania');
+            const isSpan2 = (k === 'pacific');
             const spanClass = isSpan2 ? 'col-span-2 ' : '';
             if (selectedRegions.has(k)) {
                 btn.className = `${spanClass}py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center shadow-sm shadow-cyan-500/10 cursor-pointer`;
