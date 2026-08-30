@@ -460,6 +460,7 @@ function initMap() {
             if (countryGeoJsonLayer) {
                 countryGeoJsonLayer.eachLayer(l => countryGeoJsonLayer.resetStyle(l));
             }
+            closeDrawer();
             needsFilterUpdate = true;
         }
         if (needsFilterUpdate) {
@@ -572,7 +573,8 @@ function openCountryDrawer(iso, countryName) {
     let countGa = 0;
     let countHw = 0;
 
-    let totalSpentUSD = 0;
+    let totalSpentEur = 0;
+    const processedBundles = new Set();
 
     const customSceneryAirports = [];
 
@@ -582,12 +584,15 @@ function openCountryDrawer(iso, countryName) {
             countPayware++;
             customSceneryAirports.push(ap);
 
-            // Compute spent price
-            const savedPrice = customSceneryPrices[ap.icao];
-            if (savedPrice !== undefined && savedPrice !== null) {
-                totalSpentUSD += parseFloat(savedPrice) || 0;
-            } else if (ap.estimated_price) {
-                totalSpentUSD += parseFloat(ap.estimated_price) || 0;
+            // Compute spent price in EUR / local currency
+            if (ap.is_bundle || ap.bundle_id) {
+                const bKey = ap.bundle_id || ap.package_name;
+                if (!processedBundles.has(bKey)) {
+                    processedBundles.add(bKey);
+                    totalSpentEur += (ap.bundle_total_price || 39.00);
+                }
+            } else {
+                totalSpentEur += (ap.price_eur || 0);
             }
         } else if (cat === 'FREEWARE') {
             countFreeware++;
@@ -626,7 +631,7 @@ function openCountryDrawer(iso, countryName) {
 
     // Populate Total Spent
     const spentEl = document.getElementById('country-drawer-total-spent');
-    if (spentEl) spentEl.innerText = `$${totalSpentUSD.toFixed(2)}`;
+    if (spentEl) spentEl.innerText = formatCurrency(totalSpentEur);
 
     // Populate Airport Types
     const intEl = document.getElementById('country-type-int');
