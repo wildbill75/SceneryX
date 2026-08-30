@@ -2268,8 +2268,9 @@ function showAirportDetails(ap) {
                 </div>
             `;
         } else {
+            const safePkgName = (src.folder_name || '').replace(/'/g, "\\'");
             html += `
-                <div onclick="selectSceneryPackageByIndex('${ap.icao}', ${idx})" class="p-3.5 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-800/80 hover:border-slate-700 cursor-pointer transition-all space-y-2 group">
+                <div onclick="selectSceneryPackageByName('${ap.icao}', '${safePkgName}')" class="p-3.5 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-800/80 hover:border-slate-700 cursor-pointer transition-all space-y-2 group">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-2 min-w-0 flex-1">
                             <i class="fa-regular fa-circle text-slate-500 text-sm transition-colors shrink-0"></i>
@@ -2548,13 +2549,11 @@ async function selectDefaultMSFSScenery(icao) {
     }
 }
 
-async function selectSceneryPackageByIndex(icao, idx) {
-    if (!selectedAirport || !selectedAirport.all_sources || !selectedAirport.all_sources[idx] || isToggleInProgress) return;
+async function selectSceneryPackageByName(icao, folderName) {
+    if (!window.pywebview || isToggleInProgress || !icao || !folderName) return;
     isToggleInProgress = true;
-    const src = selectedAirport.all_sources[idx];
-    const targetFolder = src.folder_name;
     try {
-        const resStr = await window.pywebview.api.select_scenery_option(icao, targetFolder);
+        const resStr = await window.pywebview.api.select_scenery_option(icao, folderName);
         const res = JSON.parse(resStr);
         if (res.status === 'ok') {
             allAirportsData = res.airports;
@@ -2565,10 +2564,9 @@ async function selectSceneryPackageByIndex(icao, idx) {
             });
             updateStats(allAirportsData);
             filterAirports();
-            if (selectedAirport) {
-                const updatedAp = allAirportsData.find(a => a.icao === selectedAirport.icao);
-                if (updatedAp) showAirportDetails(updatedAp);
-            }
+            const targetIcao = selectedAirport ? selectedAirport.icao : icao;
+            const updatedAp = allAirportsData.find(a => a.icao === targetIcao);
+            if (updatedAp) showAirportDetails(updatedAp);
             showToast(`✓ ${icao} Scenery Activated & Saved to Disk`, 'success');
         }
     } catch (e) {

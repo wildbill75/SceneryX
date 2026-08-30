@@ -247,7 +247,8 @@ def fast_update_airport_cache(icao_target, target_pkg_name=None, toggle_all=Fals
             target_ap['price_eur'] = price_val
             target_ap['is_custom_price'] = is_cust
         else:
-            target_ap['vendor'] = "Microsoft Flight Simulator (Default)"
+            target_ap['package_name'] = "Default MSFS Base Airport"
+            target_ap['vendor'] = "Microsoft / Asobo"
             target_ap['pricing_type'] = "Default"
             target_ap['is_payware'] = False
             target_ap['is_asobo_official'] = False
