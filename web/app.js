@@ -1139,13 +1139,21 @@ function getHaversineDistanceKm(lat1, lon1, lat2, lon2) {
 
 function getGreatCircleInterpolatedPoint(lat1, lon1, lat2, lon2, f) {
     const rLat1 = lat1 * Math.PI / 180;
-    const rLon1 = lon1 * Math.PI / 180;
+    let rLon1 = lon1 * Math.PI / 180;
     const rLat2 = lat2 * Math.PI / 180;
-    const rLon2 = lon2 * Math.PI / 180;
+    let rLon2 = lon2 * Math.PI / 180;
+
+    // Handle Antimeridian Longitude Wrapping (-180 / +180) for Transpacific & Transpolar routes
+    let dlon = rLon2 - rLon1;
+    if (dlon > Math.PI) {
+        rLon2 -= 2 * Math.PI;
+    } else if (dlon < -Math.PI) {
+        rLon2 += 2 * Math.PI;
+    }
 
     const d = 2 * Math.asin(Math.sqrt(
         Math.pow(Math.sin((rLat1 - rLat2) / 2), 2) +
-        Math.cos(rLat1) * Math.cos(rLat2) * Math.pow(Math.sin((rLon1 - rLon2) / 2), 2)
+        Math.cos(rLat1) * Math.cos(rLat2) * Math.pow(Math.sin((rLon2 - rLon1) / 2), 2)
     ));
 
     if (d === 0) return [lat1, lon1];
@@ -1157,8 +1165,18 @@ function getGreatCircleInterpolatedPoint(lat1, lon1, lat2, lon2, f) {
     const y = A * Math.cos(rLat1) * Math.sin(rLon1) + B * Math.cos(rLat2) * Math.sin(rLon2);
     const z = A * Math.sin(rLat1) + B * Math.sin(rLat2);
 
-    const lat = Math.atan2(z, Math.sqrt(x * x + y * y)) * 180 / Math.PI;
-    const lon = Math.atan2(y, x) * 180 / Math.PI;
+    let lat = Math.atan2(z, Math.sqrt(x * x + y * y)) * 180 / Math.PI;
+    let lon = Math.atan2(y, x) * 180 / Math.PI;
+
+    // North Atlantic Track Arc Curve (NAT Bias) for Europe <-> North America flights (Iceland/Greenland)
+    const isTransatlantic = (
+        ((lon1 > -15 && lon1 < 35 && lat1 > 35) && (lon2 < -50 && lat2 > 25)) ||
+        ((lon2 > -15 && lon2 < 35 && lat2 > 35) && (lon1 < -50 && lat1 > 25))
+    );
+
+    if (isTransatlantic) {
+        lat += 4.8 * Math.sin(f * Math.PI);
+    }
 
     return [lat, lon];
 }
@@ -1170,10 +1188,10 @@ function isAirportInCorridor(ap, depAp, arrAp) {
     const totalDist = getHaversineDistanceKm(depAp.lat, depAp.lon, arrAp.lat, arrAp.lon);
     if (totalDist === 0) return false;
 
-    // Dynamic corridor width: 250 km for regional flights, 450 km for oceanic/long-haul flights to capture NAT tracks & ETOPS sceneries
-    const maxDistKm = totalDist > 1500 ? 450 : 250;
+    // Dynamic corridor width: 250 km for regional, 600 km for oceanic/long-haul to capture NAT tracks, Iceland, Greenland & ETOPS sceneries
+    const maxDistKm = totalDist > 1500 ? 600 : 250;
 
-    const numSteps = Math.max(25, Math.floor(totalDist / 40));
+    const numSteps = Math.max(30, Math.floor(totalDist / 40));
     for (let i = 0; i <= numSteps; i++) {
         const f = i / numSteps;
         const [pLat, pLon] = getGreatCircleInterpolatedPoint(depAp.lat, depAp.lon, arrAp.lat, arrAp.lon, f);
