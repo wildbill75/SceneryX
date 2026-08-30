@@ -1137,28 +1137,46 @@ function getHaversineDistanceKm(lat1, lon1, lat2, lon2) {
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
-function isAirportInCorridor(ap, depAp, arrAp, maxDistKm = 250) {
+function getGreatCircleInterpolatedPoint(lat1, lon1, lat2, lon2, f) {
+    const rLat1 = lat1 * Math.PI / 180;
+    const rLon1 = lon1 * Math.PI / 180;
+    const rLat2 = lat2 * Math.PI / 180;
+    const rLon2 = lon2 * Math.PI / 180;
+
+    const d = 2 * Math.asin(Math.sqrt(
+        Math.pow(Math.sin((rLat1 - rLat2) / 2), 2) +
+        Math.cos(rLat1) * Math.cos(rLat2) * Math.pow(Math.sin((rLon1 - rLon2) / 2), 2)
+    ));
+
+    if (d === 0) return [lat1, lon1];
+
+    const A = Math.sin((1 - f) * d) / Math.sin(d);
+    const B = Math.sin(f * d) / Math.sin(d);
+
+    const x = A * Math.cos(rLat1) * Math.cos(rLon1) + B * Math.cos(rLat2) * Math.cos(rLon2);
+    const y = A * Math.cos(rLat1) * Math.sin(rLon1) + B * Math.cos(rLat2) * Math.sin(rLon2);
+    const z = A * Math.sin(rLat1) + B * Math.sin(rLat2);
+
+    const lat = Math.atan2(z, Math.sqrt(x * x + y * y)) * 180 / Math.PI;
+    const lon = Math.atan2(y, x) * 180 / Math.PI;
+
+    return [lat, lon];
+}
+
+function isAirportInCorridor(ap, depAp, arrAp) {
     if (!ap || !depAp || !arrAp || !ap.lat || !ap.lon) return false;
     if (ap.icao === depAp.icao || ap.icao === arrAp.icao) return true;
 
     const totalDist = getHaversineDistanceKm(depAp.lat, depAp.lon, arrAp.lat, arrAp.lon);
     if (totalDist === 0) return false;
 
-    // Fast bounding box check
-    const minLat = Math.min(depAp.lat, arrAp.lat) - 3.0;
-    const maxLat = Math.max(depAp.lat, arrAp.lat) + 3.0;
-    const minLon = Math.min(depAp.lon, arrAp.lon) - 4.0;
-    const maxLon = Math.max(depAp.lon, arrAp.lon) + 4.0;
+    // Dynamic corridor width: 250 km for regional flights, 450 km for oceanic/long-haul flights to capture NAT tracks & ETOPS sceneries
+    const maxDistKm = totalDist > 1500 ? 450 : 250;
 
-    if (ap.lat < minLat || ap.lat > maxLat || ap.lon < minLon || ap.lon > maxLon) {
-        return false;
-    }
-
-    const numSteps = Math.max(15, Math.floor(totalDist / 50));
+    const numSteps = Math.max(25, Math.floor(totalDist / 40));
     for (let i = 0; i <= numSteps; i++) {
-        const t = i / numSteps;
-        const pLat = depAp.lat + t * (arrAp.lat - depAp.lat);
-        const pLon = depAp.lon + t * (arrAp.lon - depAp.lon);
+        const f = i / numSteps;
+        const [pLat, pLon] = getGreatCircleInterpolatedPoint(depAp.lat, depAp.lon, arrAp.lat, arrAp.lon, f);
         const distToPath = getHaversineDistanceKm(ap.lat, ap.lon, pLat, pLon);
         if (distToPath <= maxDistKm) {
             return true;
@@ -1205,8 +1223,13 @@ function renderFlightCorridor() {
     const distKm = getHaversineDistanceKm(dep.lat, dep.lon, arr.lat, arr.lon);
     const distNm = Math.round(distKm * 0.539957);
 
-    // Create curved Bezier arc points for the flight corridor line
-    const arcPts = createBezierArcPoints(dep.lat, dep.lon, arr.lat, arr.lon, 40);
+    // Generate true Spherical Great Circle (Orthodromic / NAT Track) Arc points
+    const arcPts = [];
+    const numPts = 60;
+    for (let i = 0; i <= numPts; i++) {
+        const f = i / numPts;
+        arcPts.push(getGreatCircleInterpolatedPoint(dep.lat, dep.lon, arr.lat, arr.lon, f));
+    }
 
     // Glowing Neon Flight Corridor Line
     const corridorLine = L.polyline(arcPts, {
@@ -1224,10 +1247,13 @@ function renderFlightCorridor() {
     // Count custom sceneries along corridor
     const customCount = currentlyFilteredAirports.filter(a => hasCustomAddonSources(a)).length;
 
-    showToast(`✈ Flight Corridor: ${dep.icao} → ${arr.icao} (${distNm.toLocaleString()} NM / ${Math.round(distKm).toLocaleString()} km) | ${customCount} Custom Sceneries En-Route`, 'success');
+    const isTransoceanic = distKm > 2000;
+    const trackLabel = isTransoceanic ? 'Great Circle / NAT Track' : 'Orthodromic Track';
+
+    showToast(`✈ Flight Corridor (${trackLabel}): ${dep.icao} → ${arr.icao} (${distNm.toLocaleString()} NM / ${Math.round(distKm).toLocaleString()} km) | ${customCount} Custom Sceneries En-Route`, 'success');
 
     // Smoothly zoom map to fit both departure & arrival airports
-    map.fitBounds([[dep.lat, dep.lon], [arr.lat, arr.lon]], { padding: [60, 60], animate: true });
+    map.fitBounds(arcPts, { padding: [60, 60], animate: true });
 }
 
 function createBezierArcPoints(lat1, lon1, lat2, lon2, numPoints = 30) {
