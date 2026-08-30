@@ -2019,36 +2019,64 @@ function resetFullDatabase() {
 
 /* ================= FILTER & UI LOGIC ================= */
 
-let selectedRegionFilter = 'all';
+let selectedRegions = new Set();
 
 const REGION_COUNTRY_MAP = {
-    'weurope': ['FR', 'DE', 'GB', 'IT', 'ES', 'NL', 'BE', 'CH', 'AT', 'PT', 'IE', 'NO', 'SE', 'DK', 'FI', 'LU', 'IS', 'MC', 'AD', 'SM', 'VA', 'LI'],
-    'eeurope': ['PL', 'GR', 'TR', 'RO', 'CZ', 'HU', 'BG', 'HR', 'SK', 'UA', 'RS', 'SI', 'EE', 'LV', 'LT', 'CY', 'AL', 'BA', 'ME', 'MK', 'MD', 'BY', 'MT', 'GE', 'AM', 'AZ'],
+    'weurope': ['FR', 'DE', 'GB', 'IT', 'ES', 'NL', 'BE', 'CH', 'AT', 'PT', 'IE', 'NO', 'SE', 'DK', 'FI', 'LU', 'IS', 'MC', 'AD', 'SM', 'VA', 'LI', 'GI', 'FO', 'AX', 'SJ'],
+    'eeurope': ['PL', 'GR', 'TR', 'RO', 'CZ', 'HU', 'BG', 'HR', 'SK', 'UA', 'RS', 'SI', 'EE', 'LV', 'LT', 'CY', 'AL', 'BA', 'ME', 'MK', 'MD', 'BY', 'MT', 'GE', 'AM', 'AZ', 'RU'],
     'namerica': ['US', 'CA', 'MX', 'GL', 'PM'],
-    'samerica': ['BR', 'AR', 'CL', 'CO', 'PE', 'VE', 'EC', 'BO', 'PY', 'UY', 'GY', 'SR', 'GF', 'CU', 'DO', 'JM', 'HT', 'PR', 'BS', 'TT', 'BB', 'CW', 'AW', 'GP', 'MQ', 'KY', 'VG', 'VI', 'KN', 'LC', 'VC', 'AG', 'GD', 'TC', 'SX'],
-    'asia': ['JP', 'CN', 'IN', 'KR', 'TH', 'ID', 'MY', 'PH', 'VN', 'SG', 'PK', 'BD', 'LK', 'NP', 'MM', 'KH', 'LA', 'TW', 'HK', 'MO', 'MN', 'KZ', 'UZ', 'TM', 'KG', 'TJ'],
-    'middleeast': ['AE', 'SA', 'EG', 'QA', 'KW', 'OM', 'BH', 'JO', 'LB', 'IQ', 'IR', 'IL', 'PS', 'YE', 'MA', 'DZ', 'TN', 'LY', 'SD'],
-    'oceania': ['AU', 'NZ', 'FJ', 'PF', 'NC', 'PG', 'GU', 'MP', 'WS', 'TO', 'VU', 'SB', 'FM', 'PW', 'MH', 'KI', 'NR', 'TV', 'CK', 'NU', 'WF', 'AS'],
-    'africa': ['ZA', 'KE', 'NG', 'GH', 'TZ', 'UG', 'ET', 'CI', 'CM', 'SN', 'ZW', 'AM', 'MU', 'RE', 'YT', 'SC', 'CV', 'AO', 'MZ', 'NA', 'BW', 'ZMW', 'ZM', 'MW', 'MG', 'RW', 'BI', 'DJ', 'ER', 'SO', 'SL', 'LR', 'GN', 'GW', 'GM', 'TG', 'BJ', 'NE', 'BF', 'ML', 'MR', 'TD', 'CF', 'CG', 'CD', 'GA', 'GQ', 'ST', 'LS', 'SZ', 'SH']
+    'samerica': ['BR', 'AR', 'CL', 'CO', 'PE', 'VE', 'EC', 'BO', 'PY', 'UY', 'GY', 'SR', 'GF', 'CU', 'DO', 'JM', 'HT', 'PR', 'BS', 'TT', 'BB', 'CW', 'AW', 'GP', 'MQ', 'KY', 'VG', 'VI', 'KN', 'LC', 'VC', 'AG', 'GD', 'TC', 'SX', 'HN', 'CR', 'NI', 'PA', 'SV', 'GT', 'BZ', 'BL', 'BQ', 'MF', 'AI', 'MS'],
+    'asia': ['JP', 'CN', 'IN', 'KR', 'TH', 'ID', 'MY', 'PH', 'VN', 'SG', 'PK', 'BD', 'LK', 'NP', 'MM', 'KH', 'LA', 'TW', 'HK', 'MO', 'MN', 'KZ', 'UZ', 'TM', 'KG', 'TJ', 'AF', 'BT', 'MV', 'TL', 'BN'],
+    'middleeast': ['AE', 'SA', 'QA', 'KW', 'OM', 'BH', 'JO', 'LB', 'IQ', 'IR', 'IL', 'PS', 'YE'],
+    'nafrica': ['EG', 'MA', 'DZ', 'TN', 'LY', 'SD', 'MR', 'EH'],
+    'ssafrica': ['ZA', 'KE', 'NG', 'GH', 'TZ', 'UG', 'ET', 'CI', 'CM', 'SN', 'ZW', 'AM', 'MU', 'RE', 'YT', 'SC', 'CV', 'AO', 'MZ', 'NA', 'BW', 'ZMW', 'ZM', 'MW', 'MG', 'RW', 'BI', 'DJ', 'ER', 'SO', 'SL', 'LR', 'GN', 'GW', 'GM', 'TG', 'BJ', 'NE', 'BF', 'ML', 'TD', 'CF', 'CG', 'CD', 'GA', 'GQ', 'ST', 'LS', 'SZ', 'SH', 'KM', 'SS'],
+    'oceania': ['AU', 'NZ', 'FJ', 'PF', 'NC', 'PG', 'GU', 'MP', 'WS', 'TO', 'VU', 'SB', 'FM', 'PW', 'MH', 'KI', 'NR', 'TV', 'CK', 'NU', 'WF', 'AS', 'UM', 'NF', 'CC', 'CX', 'TK']
 };
 
-function toggleRegionFilter(region) {
-    selectedRegionFilter = region;
-    const container = document.getElementById('region-pills-container');
-    if (container) {
-        container.querySelectorAll('button').forEach(btn => {
-            if (btn.id === `filter-region-${region}`) {
-                btn.className = "py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1 shadow-sm shadow-cyan-500/10 cursor-pointer";
-            } else {
-                btn.className = "py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center gap-1 cursor-pointer";
-            }
-        });
+function toggleRegionFilter(regionKey) {
+    if (regionKey === 'all') {
+        selectedRegions.clear();
+    } else {
+        if (selectedRegions.has(regionKey)) {
+            selectedRegions.delete(regionKey);
+        } else {
+            selectedRegions.add(regionKey);
+        }
     }
+    updateRegionPillUI();
     filterAirports();
 
-    if (region !== 'all' && currentlyFilteredAirports.length > 0) {
+    if (selectedRegions.size > 0 && currentlyFilteredAirports.length > 0) {
         zoomToFilteredAirportsBounds();
     }
+}
+
+function updateRegionPillUI() {
+    const container = document.getElementById('region-pills-container');
+    if (!container) return;
+
+    const allBtn = document.getElementById('filter-region-all');
+    if (allBtn) {
+        if (selectedRegions.size === 0) {
+            allBtn.className = "col-span-2 py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center shadow-sm shadow-cyan-500/10 cursor-pointer";
+        } else {
+            allBtn.className = "col-span-2 py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center cursor-pointer";
+        }
+    }
+
+    const keys = ['weurope', 'eeurope', 'namerica', 'samerica', 'asia', 'middleeast', 'nafrica', 'ssafrica', 'oceania'];
+    keys.forEach(k => {
+        const btn = document.getElementById(`filter-region-${k}`);
+        if (btn) {
+            const isSpan2 = (k === 'oceania');
+            const spanClass = isSpan2 ? 'col-span-2 ' : '';
+            if (selectedRegions.has(k)) {
+                btn.className = `${spanClass}py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center shadow-sm shadow-cyan-500/10 cursor-pointer`;
+            } else {
+                btn.className = `${spanClass}py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center cursor-pointer`;
+            }
+        }
+    });
 }
 
 function zoomToAirportsBounds(airports) {
@@ -2119,11 +2147,18 @@ function filterAirports() {
     document.getElementById('clear-search').classList.toggle('hidden', search.length === 0);
 
     currentlyFilteredAirports = allAirportsData.filter(ap => {
-        // Geographic Region Filter
-        if (selectedRegionFilter !== 'all') {
-            const regionIsoCodes = REGION_COUNTRY_MAP[selectedRegionFilter] || [];
+        // Geographic Region Filter (Cumulative Multi-select)
+        if (selectedRegions.size > 0) {
             const apIso = ((ap.country || ap.iso_country || '').toString()).toUpperCase().trim();
-            if (!regionIsoCodes.includes(apIso)) return false;
+            let isMatched = false;
+            for (const rKey of selectedRegions) {
+                const allowedIsos = REGION_COUNTRY_MAP[rKey] || [];
+                if (allowedIsos.includes(apIso)) {
+                    isMatched = true;
+                    break;
+                }
+            }
+            if (!isMatched) return false;
         }
 
         // Rating Filter
