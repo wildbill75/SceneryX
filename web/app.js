@@ -3,6 +3,7 @@ let markerClusterGroup;
 let allAirportsData = [];
 let currentlyFilteredAirports = [];
 let selectedAirport = null;
+let activeDrawerMode = 'MAP'; // 'MAP', 'COUNTRY', 'AIRPORT'
 let userRatingsMap = {};
 let currentSettings = { auto_scan_on_startup: true, scan_paths: [] };
 let lastFocusedIcao = null;
@@ -543,6 +544,9 @@ async function loadCountryOverlays() {
 function openCountryDrawer(iso, countryName) {
     if (!iso || iso === '-99') return;
 
+    activeDrawerMode = 'COUNTRY';
+    selectedAirport = null;
+
     // 1. Find all airports belonging to this country
     const isoUpper = iso.toUpperCase().trim();
     const countryAirports = allAirportsData.filter(ap => {
@@ -964,8 +968,10 @@ function setCurrency(curr) {
         }
     });
     updateStats(allAirportsData);
-    if (selectedAirport) {
+    if (activeDrawerMode === 'AIRPORT' && selectedAirport) {
         showAirportDetails(selectedAirport);
+    } else if (activeDrawerMode === 'COUNTRY' && selectedCountryCode) {
+        openCountryDrawer(selectedCountryCode);
     }
 }
 
@@ -1019,8 +1025,10 @@ function startCurrencyCarousel() {
         currencyIndex = (currencyIndex + 1) % currencyList.length;
         selectedCurrency = currencyList[currencyIndex];
         updateInvestmentBanner();
-        if (selectedAirport) {
+        if (activeDrawerMode === 'AIRPORT' && selectedAirport) {
             showAirportDetails(selectedAirport);
+        } else if (activeDrawerMode === 'COUNTRY' && selectedCountryCode) {
+            openCountryDrawer(selectedCountryCode);
         }
     }, 10000); // 10 seconds per currency
 }
@@ -1735,6 +1743,7 @@ function focusAirportWithAnimation(ap) {
 }
 
 function showAirportDetails(ap) {
+    activeDrawerMode = 'AIRPORT';
     selectedAirport = ap;
 
     const cMode = document.getElementById('drawer-country-mode');
@@ -2441,7 +2450,14 @@ async function toggleFixPatchPackage(path, icao) {
 }
 
 function closeDrawer() {
-    document.getElementById('detail-drawer').classList.add('translate-x-full');
+    activeDrawerMode = 'MAP';
+    selectedAirport = null;
+    selectedCountryCode = null;
+    if (countryGeoJsonLayer) {
+        countryGeoJsonLayer.eachLayer(l => countryGeoJsonLayer.resetStyle(l));
+    }
+    const drawer = document.getElementById('detail-drawer');
+    if (drawer) drawer.classList.add('translate-x-full');
 }
 
 /* ================= STAR RATING WIDGET LOGIC (AIRPORT DETAIL) ================= */
