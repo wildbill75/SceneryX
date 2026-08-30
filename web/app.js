@@ -711,22 +711,30 @@ function openCountryDrawer(iso, countryName) {
     if (drawer) drawer.classList.remove('translate-x-full');
 }
 
+function resetConflictingFiltersForCountrySelection() {
+    selectedRegions.clear();
+    updateRegionPillUI();
+}
+
 function toggleCountrySelection(iso, countryName, layer, forceSelect = false) {
     if (!iso || iso === '-99') return;
 
-    if (selectedCountryCode === iso && !forceSelect) {
+    const isoUpper = iso.toUpperCase().trim();
+
+    if (selectedCountryCode === isoUpper && !forceSelect) {
         selectedCountryCode = null;
         showToast(`Cleared country filter`, 'info');
         closeDrawer();
     } else {
-        selectedCountryCode = iso;
-        resetConflictingFiltersForCountrySelection(); // Auto-reset Region, Type, and GSX to "All"
+        selectedCountryCode = isoUpper;
+        resetConflictingFiltersForCountrySelection();
 
         // Smooth zoom to country bounds
         if (countryGeoJsonLayer) {
             const matchingLayers = [];
             countryGeoJsonLayer.eachLayer(l => {
-                if (getFeatureIso(l.feature) === iso) {
+                const lIso = getFeatureIso(l.feature);
+                if (lIso === isoUpper) {
                     matchingLayers.push(l);
                 }
             });
@@ -734,8 +742,7 @@ function toggleCountrySelection(iso, countryName, layer, forceSelect = false) {
             if (matchingLayers.length > 0) {
                 // If France (FR), fit bounds to main European France polygon to prevent overseas territories from over-expanding zoom
                 let targetLayer = matchingLayers[0];
-                if (iso === 'FR') {
-                    // Pick the largest polygon or main France layer
+                if (isoUpper === 'FR') {
                     const mainFrance = matchingLayers.find(l => {
                         const b = l.getBounds();
                         return b.getNorth() > 40 && b.getSouth() < 52 && b.getEast() > -5 && b.getWest() < 10;
@@ -751,8 +758,8 @@ function toggleCountrySelection(iso, countryName, layer, forceSelect = false) {
             }
         }
 
-        showToast(`✓ Filtered country: ${countryName}`, 'info');
-        openCountryDrawer(iso, countryName);
+        showToast(`✓ Filtered country: ${countryName || isoUpper}`, 'info');
+        openCountryDrawer(isoUpper, countryName);
     }
 
     if (countryGeoJsonLayer) {
