@@ -368,7 +368,8 @@ function initMap() {
     map = L.map('map', {
         center: [46.2276, 2.2137], // Default view Europe
         zoom: 5,
-        zoomControl: false
+        zoomControl: false,
+        worldCopyJump: true
     });
 
     L.control.zoom({ position: 'topright' }).addTo(map);
@@ -1181,6 +1182,25 @@ function getGreatCircleInterpolatedPoint(lat1, lon1, lat2, lon2, f) {
     return [lat, lon];
 }
 
+function makeContinuousLongitudePoints(points) {
+    if (!points || points.length === 0) return points;
+    const result = [[points[0][0], points[0][1]]];
+    for (let i = 1; i < points.length; i++) {
+        let lat = points[i][0];
+        let lon = points[i][1];
+        const prevLon = result[i - 1][1];
+
+        while (lon - prevLon > 180.0) {
+            lon -= 360.0;
+        }
+        while (lon - prevLon < -180.0) {
+            lon += 360.0;
+        }
+        result.push([lat, lon]);
+    }
+    return result;
+}
+
 function getCommercialFlightCorridorWaypoints(depAp, arrAp) {
     const lat1 = depAp.lat;
     const lon1 = depAp.lon;
@@ -1196,6 +1216,8 @@ function getCommercialFlightCorridorWaypoints(depAp, arrAp) {
         ((lon1 > -15 && lon1 < 35 && lat1 > 35) && (lon2 > 80 && lon2 < 140 && lat2 < 35)) ||
         ((lon2 > -15 && lon2 < 35 && lat2 > 35) && (lon1 > 80 && lon1 < 140 && lat1 < 35))
     );
+
+    let rawPath = [];
 
     // 1. Commercial US East Coast <-> SE Asia / Far East via NOPAC Alaska & Japan Corridor
     if (isUSEastToAsia) {
@@ -1215,19 +1237,15 @@ function getCommercialFlightCorridorWaypoints(depAp, arrAp) {
 
         if (!isDepUS) waypoints.reverse();
 
-        const fullArcPts = [];
         for (let i = 0; i < waypoints.length - 1; i++) {
             const w1 = waypoints[i];
             const w2 = waypoints[i + 1];
             const segPts = createBezierArcPoints(w1[0], w1[1], w2[0], w2[1], 12);
             if (i > 0) segPts.shift();
-            fullArcPts.push(...segPts);
+            rawPath.push(...segPts);
         }
-        return fullArcPts;
-    }
-
-    // 2. Commercial Europe <-> South East Asia via Silk Road / Middle East Corridor
-    if (isEuropeToAsia) {
+    } else if (isEuropeToAsia) {
+        // 2. Commercial Europe <-> South East Asia via Silk Road / Middle East Corridor
         const isDepEU = lon1 < 35;
         const euAp = isDepEU ? depAp : arrAp;
         const asiaAp = isDepEU ? arrAp : depAp;
@@ -1243,27 +1261,25 @@ function getCommercialFlightCorridorWaypoints(depAp, arrAp) {
 
         if (!isDepEU) waypoints.reverse();
 
-        const fullArcPts = [];
         for (let i = 0; i < waypoints.length - 1; i++) {
             const w1 = waypoints[i];
             const w2 = waypoints[i + 1];
             const segPts = createBezierArcPoints(w1[0], w1[1], w2[0], w2[1], 12);
             if (i > 0) segPts.shift();
-            fullArcPts.push(...segPts);
+            rawPath.push(...segPts);
         }
-        return fullArcPts;
+    } else {
+        // 3. Standard Spherical Great Circle (Orthodromic / NAT Track) for all other flights
+        const numPts = 60;
+        for (let i = 0; i <= numPts; i++) {
+            const f = i / numPts;
+            let [ptLat, ptLon] = getGreatCircleInterpolatedPoint(lat1, lon1, lat2, lon2, f);
+            if (ptLat > 75.0) ptLat = 75.0; // Cap latitude to 75° N so map doesn't clip top edge
+            rawPath.push([ptLat, ptLon]);
+        }
     }
 
-    // 3. Standard Spherical Great Circle (Orthodromic / NAT Track) for all other flights
-    const arcPts = [];
-    const numPts = 60;
-    for (let i = 0; i <= numPts; i++) {
-        const f = i / numPts;
-        let [ptLat, ptLon] = getGreatCircleInterpolatedPoint(lat1, lon1, lat2, lon2, f);
-        if (ptLat > 75.0) ptLat = 75.0; // Cap latitude to 75° N so map doesn't clip top edge
-        arcPts.push([ptLat, ptLon]);
-    }
-    return arcPts;
+    return makeContinuousLongitudePoints(rawPath);
 }
 
 function isAirportInCorridor(ap, depAp, arrAp) {
