@@ -28,7 +28,62 @@ let selectedGsxFilter = 'all'; // 'all', 'with', 'none'
 let selectedAirline = null;
 let selectedAirlines = new Set();
 let activeRouteOrigin = null;
-let activeRouteLinesGroup = null;
+// Global Country Name to ISO Lookup Map
+const COUNTRY_NAME_TO_ISO = {
+    'afghanistan': 'AF', 'albania': 'AL', 'algeria': 'DZ', 'andorra': 'AD', 'angola': 'AO',
+    'argentina': 'AR', 'armenia': 'AM', 'australia': 'AU', 'austria': 'AT', 'azerbaijan': 'AZ',
+    'bahamas': 'BS', 'bahrain': 'BH', 'bangladesh': 'BD', 'barbados': 'BB', 'belarus': 'BY',
+    'belgium': 'BE', 'belize': 'BZ', 'benin': 'BJ', 'bhutan': 'BT', 'bolivia': 'BO',
+    'bosnia': 'BA', 'bosnia and herzegovina': 'BA', 'botswana': 'BW', 'brazil': 'BR', 'brunei': 'BN',
+    'bulgaria': 'BG', 'burkina faso': 'BF', 'burundi': 'BI',
+    'cambodia': 'KH', 'cameroon': 'CM', 'canada': 'CA', 'cape verde': 'CV', 'central african republic': 'CF',
+    'chad': 'TD', 'chile': 'CL', 'china': 'CN', 'colombia': 'CO', 'comoros': 'KM',
+    'congo': 'CG', 'dr congo': 'CD', 'democratic republic of the congo': 'CD', 'costa rica': 'CR', 'croatia': 'HR', 'cuba': 'CU',
+    'cyprus': 'CY', 'czech republic': 'CZ', 'czechia': 'CZ',
+    'denmark': 'DK', 'djibouti': 'DJ', 'dominica': 'DM', 'dominican republic': 'DO',
+    'ecuador': 'EC', 'egypt': 'EG', 'el salvador': 'SV', 'equatorial guinea': 'GQ', 'eritrea': 'ER',
+    'estonia': 'EE', 'eswatini': 'SZ', 'ethiopia': 'ET',
+    'fiji': 'FJ', 'finland': 'FI', 'france': 'FR', 'french guiana': 'GF', 'french polynesia': 'PF',
+    'gabon': 'GA', 'gambia': 'GM', 'georgia': 'GE', 'germany': 'DE', 'ghana': 'GH',
+    'greece': 'GR', 'greenland': 'GL', 'grenada': 'GD', 'guatemala': 'GT', 'guinea': 'GN',
+    'guinea-bissau': 'GW', 'guyana': 'GY',
+    'haiti': 'HT', 'honduras': 'HN', 'hong kong': 'HK', 'hungary': 'HU',
+    'iceland': 'IS', 'india': 'IN', 'indonesia': 'ID', 'iran': 'IR', 'iraq': 'IQ',
+    'ireland': 'IE', 'israel': 'IL', 'italy': 'IT', 'ivory coast': 'CI',
+    'jamaica': 'JM', 'japan': 'JP', 'jordan': 'JO',
+    'kazakhstan': 'KZ', 'kenya': 'KE', 'kiribati': 'KI', 'north korea': 'KP', 'south korea': 'KR', 'korea': 'KR',
+    'kosovo': 'XK', 'kuwait': 'KW', 'kyrgyzstan': 'KG',
+    'laos': 'LA', 'latvia': 'LV', 'lebanon': 'LB', 'lesotho': 'LS', 'liberia': 'LR',
+    'libya': 'LY', 'liechtenstein': 'LI', 'lithuania': 'LT', 'luxembourg': 'LU',
+    'macao': 'MO', 'macedonia': 'MK', 'north macedonia': 'MK', 'madagascar': 'MG', 'malawi': 'MW',
+    'malaysia': 'MY', 'maldives': 'MV', 'mali': 'ML', 'malta': 'MT', 'marshall islands': 'MH',
+    'mauritania': 'MR', 'mauritius': 'MU', 'mexico': 'MX', 'micronesia': 'FM', 'moldova': 'MD',
+    'monaco': 'MC', 'mongolia': 'MN', 'montenegro': 'ME', 'morocco': 'MA', 'mozambique': 'MZ',
+    'myanmar': 'MM',
+    'namibia': 'NA', 'nauru': 'NR', 'nepal': 'NP', 'netherlands': 'NL', 'holland': 'NL',
+    'new caledonia': 'NC', 'new zealand': 'NZ', 'nicaragua': 'NI', 'niger': 'NE', 'nigeria': 'NG',
+    'norway': 'NO',
+    'oman': 'OM',
+    'pakistan': 'PK', 'palau': 'PW', 'palestine': 'PS', 'panama': 'PA', 'papua new guinea': 'PG',
+    'paraguay': 'PY', 'peru': 'PE', 'philippines': 'PH', 'poland': 'PL', 'portugal': 'PT', 'puerto rico': 'PR',
+    'qatar': 'QA',
+    'romania': 'RO', 'russia': 'RU', 'rwanda': 'RW',
+    'samoa': 'WS', 'san marino': 'SM', 'saudi arabia': 'SA', 'senegal': 'SN', 'serbia': 'RS',
+    'seychelles': 'SC', 'sierra leone': 'SL', 'singapore': 'SG', 'slovakia': 'SK', 'slovenia': 'SI',
+    'solomon islands': 'SB', 'somalia': 'SO', 'south africa': 'ZA', 'south sudan': 'SS',
+    'spain': 'ES', 'espana': 'ES', 'sri lanka': 'LK', 'sudan': 'SD', 'suriname': 'SR',
+    'sweden': 'SE', 'switzerland': 'CH', 'syria': 'SY',
+    'taiwan': 'TW', 'tajikistan': 'TJ', 'tanzania': 'TZ', 'thailand': 'TH', 'timor-leste': 'TL',
+    'togo': 'TG', 'tonga': 'TO', 'trinidad': 'TT', 'trinidad and tobago': 'TT', 'tunisia': 'TN',
+    'turkey': 'TR', 'turkiye': 'TR', 'turkmenistan': 'TM', 'tuvalu': 'TV',
+    'uganda': 'UG', 'ukraine': 'UA', 'united arab emirates': 'AE', 'uae': 'AE',
+    'united kingdom': 'GB', 'uk': 'GB', 'england': 'GB', 'scotland': 'GB', 'wales': 'GB',
+    'united states': 'US', 'united states of america': 'US', 'usa': 'US', 'us': 'US',
+    'uruguay': 'UY', 'uzbekistan': 'UZ',
+    'vanuatu': 'VU', 'venezuela': 'VE', 'vietnam': 'VN', 'viet nam': 'VN',
+    'yemen': 'YE',
+    'zambia': 'ZM', 'zimbabwe': 'ZW'
+};
 
 // Flight Optimizer Engine State
 let flightOriginAirport = null;
@@ -2675,10 +2730,18 @@ function filterAirports() {
 
         // High-performance search text filtering via pre-computed _searchKey
         if (search) {
-            if (!ap._searchKey) {
-                ap._searchKey = `${ap.icao} ${ap.name} ${ap.city || ''} ${ap.country || ''} ${ap.iso_country || ''} ${ap.package_name || ''} ${ap.vendor || ''}`.toLowerCase();
+            const searchIso = COUNTRY_NAME_TO_ISO[search] || (search.length === 2 ? search.toUpperCase() : null);
+            const apIso = ((ap.country || ap.iso_country || '').toString()).toUpperCase().trim();
+
+            if (searchIso) {
+                // If search query is a country name, match airports in that country ISO!
+                if (apIso !== searchIso) return false;
+            } else {
+                if (!ap._searchKey) {
+                    ap._searchKey = `${ap.icao} ${ap.name} ${ap.city || ''} ${ap.country || ''} ${ap.iso_country || ''} ${ap.package_name || ''} ${ap.vendor || ''}`.toLowerCase();
+                }
+                if (!ap._searchKey.includes(search)) return false;
             }
-            if (!ap._searchKey.includes(search)) return false;
         }
 
         return true;
@@ -2695,7 +2758,7 @@ function handleSearchKeyDown(e) {
 
 function triggerSearchFocus() {
     const rawSearch = document.getElementById('search-input').value.toLowerCase().trim();
-    if (!rawSearch || currentlyFilteredAirports.length === 0) return;
+    if (!rawSearch) return;
 
     // 1. Check for exact ICAO match
     const sUpper = rawSearch.toUpperCase();
@@ -2706,21 +2769,27 @@ function triggerSearchFocus() {
     }
 
     // 2. Check if search query matches a Country Name or Country ISO Code
-    const matchingCountryAirports = currentlyFilteredAirports.filter(a => 
-        (a.country && a.country.toLowerCase() === rawSearch) || 
-        (a.iso_country && a.iso_country.toLowerCase() === rawSearch)
-    );
+    const targetIso = COUNTRY_NAME_TO_ISO[rawSearch] || (rawSearch.length === 2 ? rawSearch.toUpperCase() : null);
 
-    if (matchingCountryAirports.length > 0) {
-        zoomToAirportsBounds(matchingCountryAirports);
-        showToast(`✓ Filtered ${matchingCountryAirports.length} airports in ${matchingCountryAirports[0].country}`, 'info');
+    if (targetIso) {
+        let countryLayer = null;
+        if (countryGeoJsonLayer) {
+            countryGeoJsonLayer.eachLayer(layer => {
+                if (layer.feature && getFeatureIso(layer.feature) === targetIso) {
+                    countryLayer = layer;
+                }
+            });
+        }
+
+        const countryName = rawSearch.charAt(0).toUpperCase() + rawSearch.slice(1);
+        toggleCountrySelection(targetIso, countryName, countryLayer);
         return;
     }
 
     // 3. Fallback to zooming to the filtered airports bounds or first airport
     if (currentlyFilteredAirports.length > 1) {
         zoomToFilteredAirportsBounds();
-    } else {
+    } else if (currentlyFilteredAirports.length === 1) {
         focusAirportWithAnimation(currentlyFilteredAirports[0]);
     }
 }
