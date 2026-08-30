@@ -498,25 +498,43 @@ async function loadAirportsData() {
     }
 }
 
-function checkFirstLaunchDisclaimer() {
+async function checkFirstLaunchDisclaimer() {
     try {
         const accepted = localStorage.getItem('sceneryx_disclaimer_accepted');
-        if (accepted !== 'true') {
-            const modal = document.getElementById('disclaimer-modal');
-            if (modal) {
-                modal.classList.remove('hidden');
-                modal.classList.add('flex');
+        if (accepted === 'true') {
+            return;
+        }
+
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.is_disclaimer_accepted) {
+            const resStr = await window.pywebview.api.is_disclaimer_accepted();
+            const res = JSON.parse(resStr);
+            if (res.accepted) {
+                try {
+                    localStorage.setItem('sceneryx_disclaimer_accepted', 'true');
+                } catch (e) {}
+                return;
             }
+        }
+
+        const modal = document.getElementById('disclaimer-modal');
+        if (modal) {
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
         }
     } catch (e) {
         console.error("Disclaimer check failed:", e);
     }
 }
 
-function agreeAndContinueApp() {
+async function agreeAndContinueApp() {
     try {
         localStorage.setItem('sceneryx_disclaimer_accepted', 'true');
-    } catch (e) {}
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.accept_disclaimer) {
+            await window.pywebview.api.accept_disclaimer();
+        }
+    } catch (e) {
+        console.error("Error saving disclaimer acceptance:", e);
+    }
     const modal = document.getElementById('disclaimer-modal');
     if (modal) {
         modal.classList.add('hidden');

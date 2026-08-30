@@ -1595,6 +1595,22 @@ class Api:
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
 
+    def is_disclaimer_accepted(self):
+        try:
+            settings = get_settings()
+            return json.dumps({"accepted": bool(settings.get("disclaimer_accepted", False))})
+        except Exception as e:
+            return json.dumps({"accepted": False})
+
+    def accept_disclaimer(self):
+        try:
+            settings = get_settings()
+            settings["disclaimer_accepted"] = True
+            save_settings(settings)
+            return json.dumps({"status": "ok"})
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
     def close_app(self):
         try:
             if hasattr(webview, 'windows') and webview.windows:
