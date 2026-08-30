@@ -2019,6 +2019,60 @@ function resetFullDatabase() {
 
 /* ================= FILTER & UI LOGIC ================= */
 
+let selectedRegionFilter = 'all';
+
+const REGION_COUNTRY_MAP = {
+    'weurope': ['FR', 'DE', 'GB', 'IT', 'ES', 'NL', 'BE', 'CH', 'AT', 'PT', 'IE', 'NO', 'SE', 'DK', 'FI', 'LU', 'IS', 'MC', 'AD', 'SM', 'VA', 'LI'],
+    'eeurope': ['PL', 'GR', 'TR', 'RO', 'CZ', 'HU', 'BG', 'HR', 'SK', 'UA', 'RS', 'SI', 'EE', 'LV', 'LT', 'CY', 'AL', 'BA', 'ME', 'MK', 'MD', 'BY', 'MT', 'GE', 'AM', 'AZ'],
+    'namerica': ['US', 'CA', 'MX', 'GL', 'PM'],
+    'samerica': ['BR', 'AR', 'CL', 'CO', 'PE', 'VE', 'EC', 'BO', 'PY', 'UY', 'GY', 'SR', 'GF', 'CU', 'DO', 'JM', 'HT', 'PR', 'BS', 'TT', 'BB', 'CW', 'AW', 'GP', 'MQ', 'KY', 'VG', 'VI', 'KN', 'LC', 'VC', 'AG', 'GD', 'TC', 'SX'],
+    'asia': ['JP', 'CN', 'IN', 'KR', 'TH', 'ID', 'MY', 'PH', 'VN', 'SG', 'PK', 'BD', 'LK', 'NP', 'MM', 'KH', 'LA', 'TW', 'HK', 'MO', 'MN', 'KZ', 'UZ', 'TM', 'KG', 'TJ'],
+    'middleeast': ['AE', 'SA', 'EG', 'QA', 'KW', 'OM', 'BH', 'JO', 'LB', 'IQ', 'IR', 'IL', 'PS', 'YE', 'MA', 'DZ', 'TN', 'LY', 'SD'],
+    'oceania': ['AU', 'NZ', 'FJ', 'PF', 'NC', 'PG', 'GU', 'MP', 'WS', 'TO', 'VU', 'SB', 'FM', 'PW', 'MH', 'KI', 'NR', 'TV', 'CK', 'NU', 'WF', 'AS'],
+    'africa': ['ZA', 'KE', 'NG', 'GH', 'TZ', 'UG', 'ET', 'CI', 'CM', 'SN', 'ZW', 'AM', 'MU', 'RE', 'YT', 'SC', 'CV', 'AO', 'MZ', 'NA', 'BW', 'ZMW', 'ZM', 'MW', 'MG', 'RW', 'BI', 'DJ', 'ER', 'SO', 'SL', 'LR', 'GN', 'GW', 'GM', 'TG', 'BJ', 'NE', 'BF', 'ML', 'MR', 'TD', 'CF', 'CG', 'CD', 'GA', 'GQ', 'ST', 'LS', 'SZ', 'SH']
+};
+
+function toggleRegionFilter(region) {
+    selectedRegionFilter = region;
+    const container = document.getElementById('region-pills-container');
+    if (container) {
+        container.querySelectorAll('button').forEach(btn => {
+            if (btn.id === `filter-region-${region}`) {
+                btn.className = "py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1 shadow-sm shadow-cyan-500/10 cursor-pointer";
+            } else {
+                btn.className = "py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center gap-1 cursor-pointer";
+            }
+        });
+    }
+    filterAirports();
+
+    if (region !== 'all' && currentlyFilteredAirports.length > 0) {
+        zoomToFilteredAirportsBounds();
+    }
+}
+
+function zoomToAirportsBounds(airports) {
+    if (!map || !airports || airports.length === 0) return;
+    const validAps = airports.filter(a => a.lat && a.lon);
+    if (validAps.length === 0) return;
+
+    let minLat = 90, maxLat = -90, minLon = 180, maxLon = -180;
+    validAps.forEach(a => {
+        if (a.lat < minLat) minLat = a.lat;
+        if (a.lat > maxLat) maxLat = a.lat;
+        if (a.lon < minLon) minLon = a.lon;
+        if (a.lon > maxLon) maxLon = a.lon;
+    });
+
+    if (minLat !== 90 && maxLat !== -90) {
+        map.fitBounds([[minLat, minLon], [maxLat, maxLon]], { padding: [50, 50], maxZoom: 8, animate: true });
+    }
+}
+
+function zoomToFilteredAirportsBounds() {
+    zoomToAirportsBounds(currentlyFilteredAirports);
+}
+
 function airportMatchesSourceFilter(ap) {
     if (selectedSources.size === ALL_SOURCES_LIST.length) return true;
     if (selectedSources.size === 0) return false;
@@ -2065,6 +2119,13 @@ function filterAirports() {
     document.getElementById('clear-search').classList.toggle('hidden', search.length === 0);
 
     currentlyFilteredAirports = allAirportsData.filter(ap => {
+        // Geographic Region Filter
+        if (selectedRegionFilter !== 'all') {
+            const regionIsoCodes = REGION_COUNTRY_MAP[selectedRegionFilter] || [];
+            const apIso = (ap.iso_country || '').toUpperCase();
+            if (!regionIsoCodes.includes(apIso)) return false;
+        }
+
         // Rating Filter
         const apRating = ap.rating || 0;
         if (selectedMinRating > 0 && apRating < selectedMinRating) {
@@ -2124,7 +2185,7 @@ function filterAirports() {
         // High-performance search text filtering via pre-computed _searchKey
         if (search) {
             if (!ap._searchKey) {
-                ap._searchKey = `${ap.icao} ${ap.name} ${ap.city || ''} ${ap.package_name || ''} ${ap.vendor || ''}`.toLowerCase();
+                ap._searchKey = `${ap.icao} ${ap.name} ${ap.city || ''} ${ap.country || ''} ${ap.iso_country || ''} ${ap.package_name || ''} ${ap.vendor || ''}`.toLowerCase();
             }
             if (!ap._searchKey.includes(search)) return false;
         }
@@ -2142,15 +2203,32 @@ function handleSearchKeyDown(e) {
 }
 
 function triggerSearchFocus() {
-    const rawSearch = document.getElementById('search-input').value.toLowerCase();
-    const search = rawSearch.trim ? rawSearch.trim() : rawSearch;
-    if (!search || currentlyFilteredAirports.length === 0) return;
+    const rawSearch = document.getElementById('search-input').value.toLowerCase().trim();
+    if (!rawSearch || currentlyFilteredAirports.length === 0) return;
 
-    const sUpper = search.toUpperCase();
+    // 1. Check for exact ICAO match
+    const sUpper = rawSearch.toUpperCase();
     const exactIcaoMatch = currentlyFilteredAirports.find(a => a.icao === sUpper);
-
     if (exactIcaoMatch) {
         focusAirportWithAnimation(exactIcaoMatch);
+        return;
+    }
+
+    // 2. Check if search query matches a Country Name or Country ISO Code
+    const matchingCountryAirports = currentlyFilteredAirports.filter(a => 
+        (a.country && a.country.toLowerCase() === rawSearch) || 
+        (a.iso_country && a.iso_country.toLowerCase() === rawSearch)
+    );
+
+    if (matchingCountryAirports.length > 0) {
+        zoomToAirportsBounds(matchingCountryAirports);
+        showToast(`✓ Filtered ${matchingCountryAirports.length} airports in ${matchingCountryAirports[0].country}`, 'info');
+        return;
+    }
+
+    // 3. Fallback to zooming to the filtered airports bounds or first airport
+    if (currentlyFilteredAirports.length > 1) {
+        zoomToFilteredAirportsBounds();
     } else {
         focusAirportWithAnimation(currentlyFilteredAirports[0]);
     }

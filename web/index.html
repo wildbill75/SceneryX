@@ -323,6 +323,37 @@
                     </div>
                 </div>
 
+                <!-- GEOGRAPHIC REGION FILTER -->
+                <div>
+                    <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2.5">Geographic Region</label>
+                    <div class="grid grid-cols-2 gap-1.5" id="region-pills-container">
+                        <button id="filter-region-all" onclick="toggleRegionFilter('all')" class="py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1 shadow-sm shadow-cyan-500/10 cursor-pointer">
+                            All Regions
+                        </button>
+                        <button id="filter-region-weurope" onclick="toggleRegionFilter('weurope')" class="py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center gap-1 cursor-pointer">
+                            🇪🇺 W. Europe
+                        </button>
+                        <button id="filter-region-eeurope" onclick="toggleRegionFilter('eeurope')" class="py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center gap-1 cursor-pointer">
+                            🏛️ E. Europe
+                        </button>
+                        <button id="filter-region-namerica" onclick="toggleRegionFilter('namerica')" class="py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center gap-1 cursor-pointer">
+                            🇺🇸 N. America
+                        </button>
+                        <button id="filter-region-samerica" onclick="toggleRegionFilter('samerica')" class="py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center gap-1 cursor-pointer">
+                            🏖️ S. America
+                        </button>
+                        <button id="filter-region-asia" onclick="toggleRegionFilter('asia')" class="py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center gap-1 cursor-pointer">
+                            ⛩️ Asia
+                        </button>
+                        <button id="filter-region-middleeast" onclick="toggleRegionFilter('middleeast')" class="py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center gap-1 cursor-pointer">
+                            🐪 Middle East
+                        </button>
+                        <button id="filter-region-oceania" onclick="toggleRegionFilter('oceania')" class="py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center gap-1 cursor-pointer">
+                            🦘 Oceania
+                        </button>
+                    </div>
+                </div>
+
                 <!-- AIRPORT TYPE FILTER -->
                 <div>
                     <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2.5">Airport Type</label>
@@ -416,11 +447,11 @@
 
             <!-- BOTTOM FIXED ACTION & SEARCH PANEL (LEFT SIDEBAR FOOTER) -->
             <div class="p-3.5 border-t border-slate-800/80 bg-slate-950/60 flex flex-col gap-2.5 shrink-0">
-                <!-- SEARCH BAR -->
+                <!-- UNIFIED SMART SEARCH BAR (ICAO, AIRPORT, COUNTRY) -->
                 <div class="relative w-full">
                     <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
                     <input type="text" id="search-input" onkeydown="handleSearchKeyDown(event)" oninput="filterAirports()" 
-                           placeholder="Search ICAO..." 
+                           placeholder="Search ICAO, Airport, Country..." 
                            class="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl pl-8 pr-7 py-2 text-xs text-slate-100 placeholder-slate-400 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 font-medium transition-all shadow-inner">
                     <button id="clear-search" onclick="clearSearch()" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs">
                         <i class="fa-solid fa-xmark"></i>
