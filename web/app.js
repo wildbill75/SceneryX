@@ -1249,19 +1249,16 @@ function hasCustomAddonSources(ap) {
 
 function getAirportPricingType(ap) {
     if (!ap) return 'Default';
-    if (ap.pricing_type === 'Payware') return 'Payware';
-    if (ap.pricing_type === 'Asobo') return 'Asobo';
-    if (ap.pricing_type && ap.pricing_type.startsWith('Freeware')) return 'Freeware / Flightsim.to';
-
+    
     const activeSrc = getActiveSource(ap);
     if (!activeSrc) {
         return 'Default';
     }
 
-    if (activeSrc.is_payware || activeSrc.pricing_type === 'Payware') {
+    if (ap.pricing_type === 'Payware' || activeSrc.is_payware || activeSrc.pricing_type === 'Payware') {
         return 'Payware';
     }
-    if (activeSrc.is_asobo_official || activeSrc.pricing_type === 'Asobo' || (activeSrc.vendor && activeSrc.vendor.toLowerCase().includes('asobo'))) {
+    if (ap.pricing_type === 'Asobo' || activeSrc.is_asobo_official || activeSrc.pricing_type === 'Asobo' || (activeSrc.vendor && activeSrc.vendor.toLowerCase().includes('asobo'))) {
         return 'Asobo';
     }
     return 'Freeware / Flightsim.to';
@@ -1275,6 +1272,7 @@ function getAirportCategory(ap) {
     const pt = getAirportPricingType(ap);
     if (pt === 'Asobo') return 'ASOBO';
     if (pt === 'Payware') return 'PAYWARE';
+    if (pt === 'Default') return 'DEFAULT';
     return 'FREEWARE';
 }
 
@@ -2178,7 +2176,7 @@ function showAirportDetails(ap) {
     const baseSources = nonDefaultSources.filter(s => !s.is_fix_patch);
     const fixSources = nonDefaultSources.filter(s => !!s.is_fix_patch);
 
-    const isDefaultActive = baseSources.length === 0 || baseSources.every(s => s.is_disabled);
+    const isDefaultActive = (ap.pricing_type === 'Default' || ap.package_name === 'Default MSFS Base Airport' || baseSources.length === 0 || baseSources.every(s => s.is_disabled));
 
     let html = `
         <div class="space-y-3">

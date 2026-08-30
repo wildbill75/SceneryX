@@ -138,35 +138,58 @@ def fast_update_airport_cache(icao_target, target_pkg_name=None, toggle_all=Fals
 
         all_srcs = target_ap.get('all_sources', [])
 
-        for s in all_srcs:
-            p = s.get('package_path', '')
-            clean_p = p[:-9] if p and p.endswith('.disabled') else p
-            dis_p = clean_p + '.disabled' if clean_p else None
-
-            folder_exists = clean_p and os.path.exists(clean_p)
-            dis_folder_exists = dis_p and os.path.exists(dis_p)
-
-            if dis_folder_exists and not folder_exists:
+        if target_pkg_name == 'DEFAULT':
+            for s in all_srcs:
                 s['is_disabled'] = True
-                s['package_path'] = dis_p
-            elif folder_exists:
-                s['package_path'] = clean_p
-                # Check per-ICAO BGL status in multi-airport packs
-                icao_l = icao_target.lower()
-                has_act_bgl = False
-                has_dis_bgl = False
-                for root, dirs, files in os.walk(clean_p):
-                    for f in files:
-                        f_l = f.lower()
-                        if icao_l in f_l:
-                            if f_l.endswith('.bgl'):
-                                has_act_bgl = True
-                            elif f_l.endswith('.bgl.disabled'):
-                                has_dis_bgl = True
-                if has_dis_bgl and not has_act_bgl:
-                    s['is_disabled'] = True
-                else:
+                fn = s.get('folder_name', '')
+                s['folder_name'] = fn[:-9] if fn.lower().endswith('.disabled') else fn
+        elif target_pkg_name:
+            t_clean = target_pkg_name[:-9] if target_pkg_name.lower().endswith('.disabled') else target_pkg_name
+            for s in all_srcs:
+                fn = s.get('folder_name', '')
+                fn_clean = fn[:-9] if fn.lower().endswith('.disabled') else fn
+                s['folder_name'] = fn_clean
+                p = s.get('package_path', '')
+                clean_p = p[:-9] if p and p.endswith('.disabled') else p
+                dis_p = clean_p + '.disabled' if clean_p else None
+
+                if fn_clean.lower() == t_clean.lower() or t_clean.lower() in fn_clean.lower():
                     s['is_disabled'] = False
+                    if clean_p:
+                        s['package_path'] = clean_p
+                else:
+                    s['is_disabled'] = True
+                    if dis_p and os.path.exists(dis_p):
+                        s['package_path'] = dis_p
+        else:
+            for s in all_srcs:
+                p = s.get('package_path', '')
+                clean_p = p[:-9] if p and p.endswith('.disabled') else p
+                dis_p = clean_p + '.disabled' if clean_p else None
+
+                folder_exists = clean_p and os.path.exists(clean_p)
+                dis_folder_exists = dis_p and os.path.exists(dis_p)
+
+                if dis_folder_exists and not folder_exists:
+                    s['is_disabled'] = True
+                    s['package_path'] = dis_p
+                elif folder_exists:
+                    s['package_path'] = clean_p
+                    icao_l = icao_target.lower()
+                    has_act_bgl = False
+                    has_dis_bgl = False
+                    for root, dirs, files in os.walk(clean_p):
+                        for f in files:
+                            f_l = f.lower()
+                            if icao_l in f_l:
+                                if f_l.endswith('.bgl'):
+                                    has_act_bgl = True
+                                elif f_l.endswith('.bgl.disabled'):
+                                    has_dis_bgl = True
+                    if has_dis_bgl and not has_act_bgl:
+                        s['is_disabled'] = True
+                    else:
+                        s['is_disabled'] = False
 
         # Recalculate active main scenery packages (excluding Fix/Patch and Addon packages)
         active_primary_installs = [
