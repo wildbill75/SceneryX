@@ -539,14 +539,180 @@ async function loadCountryOverlays() {
     }
 }
 
-function toggleCountrySelection(iso, countryName, layer) {
+function openCountryDrawer(iso, countryName) {
     if (!iso || iso === '-99') return;
 
-    if (selectedCountryCode === iso) {
+    // 1. Find all airports belonging to this country
+    const isoUpper = iso.toUpperCase().trim();
+    const countryAirports = allAirportsData.filter(ap => {
+        const apIso = ((ap.country || ap.iso_country || '').toString()).toUpperCase().trim();
+        return apIso === isoUpper;
+    });
+
+    if (countryAirports.length === 0) return;
+
+    // 2. Set Header Data
+    const flagEl = document.getElementById('country-drawer-flag');
+    if (flagEl) flagEl.innerText = isoUpper;
+
+    const nameEl = document.getElementById('country-drawer-name');
+    if (nameEl) nameEl.innerText = countryName || isoUpper;
+
+    const totalEl = document.getElementById('country-drawer-total-airports');
+    if (totalEl) totalEl.innerText = countryAirports.length.toLocaleString();
+
+    // 3. Compute Breakdown Statistics
+    let countPayware = 0;
+    let countFreeware = 0;
+    let countAsobo = 0;
+    let countDefault = 0;
+
+    let countInt = 0;
+    let countReg = 0;
+    let countGa = 0;
+    let countHw = 0;
+
+    let totalSpentUSD = 0;
+
+    const customSceneryAirports = [];
+
+    countryAirports.forEach(ap => {
+        const cat = getAirportCategory(ap);
+        if (cat === 'PAYWARE') {
+            countPayware++;
+            customSceneryAirports.push(ap);
+
+            // Compute spent price
+            const savedPrice = customSceneryPrices[ap.icao];
+            if (savedPrice !== undefined && savedPrice !== null) {
+                totalSpentUSD += parseFloat(savedPrice) || 0;
+            } else if (ap.estimated_price) {
+                totalSpentUSD += parseFloat(ap.estimated_price) || 0;
+            }
+        } else if (cat === 'FREEWARE') {
+            countFreeware++;
+            customSceneryAirports.push(ap);
+        } else if (cat === 'ASOBO') {
+            countAsobo++;
+            customSceneryAirports.push(ap);
+        } else {
+            countDefault++;
+        }
+
+        // Airport Type
+        const typeStr = (ap.english_type || ap.type || '').toLowerCase();
+        if (typeStr.includes('international')) {
+            countInt++;
+        } else if (typeStr.includes('regional')) {
+            countReg++;
+        } else if (typeStr.includes('general') || typeStr.includes('ga')) {
+            countGa++;
+        } else if (typeStr.includes('heli') || typeStr.includes('water')) {
+            countHw++;
+        } else {
+            countReg++;
+        }
+    });
+
+    // Populate Pricing Breakdown
+    const pEl = document.getElementById('country-count-payware');
+    if (pEl) pEl.innerText = countPayware;
+    const fEl = document.getElementById('country-count-freeware');
+    if (fEl) fEl.innerText = countFreeware;
+    const aEl = document.getElementById('country-count-asobo');
+    if (aEl) aEl.innerText = countAsobo;
+    const dEl = document.getElementById('country-count-default');
+    if (dEl) dEl.innerText = countDefault;
+
+    // Populate Total Spent
+    const spentEl = document.getElementById('country-drawer-total-spent');
+    if (spentEl) spentEl.innerText = `$${totalSpentUSD.toFixed(2)}`;
+
+    // Populate Airport Types
+    const intEl = document.getElementById('country-type-int');
+    if (intEl) intEl.innerText = countInt;
+    const regEl = document.getElementById('country-type-reg');
+    if (regEl) regEl.innerText = countReg;
+    const gaEl = document.getElementById('country-type-ga');
+    if (gaEl) gaEl.innerText = countGa;
+    const hwEl = document.getElementById('country-type-hw');
+    if (hwEl) hwEl.innerText = countHw;
+
+    // Populate Custom Sceneries List
+    const sceneryBadgeEl = document.getElementById('country-scenery-count-badge');
+    if (sceneryBadgeEl) sceneryBadgeEl.innerText = `${customSceneryAirports.length} Custom Sceneries`;
+
+    const listEl = document.getElementById('country-airports-list');
+    if (listEl) {
+        if (customSceneryAirports.length === 0) {
+            listEl.innerHTML = `
+                <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800 text-center space-y-1">
+                    <p class="text-xs font-semibold text-slate-400">No Custom Sceneries Installed</p>
+                    <p class="text-[10px] text-slate-500">All ${countryAirports.length} airports in this country are Default MSFS airports.</p>
+                </div>
+            `;
+        } else {
+            // Sort custom sceneries: Payware first, then Freeware, then Asobo
+            customSceneryAirports.sort((a, b) => {
+                const catOrder = { 'PAYWARE': 1, 'FREEWARE': 2, 'ASOBO': 3, 'DEFAULT': 4 };
+                return (catOrder[getAirportCategory(a)] || 9) - (catOrder[getAirportCategory(b)] || 9);
+            });
+
+            listEl.innerHTML = customSceneryAirports.map(ap => {
+                const cat = getAirportCategory(ap);
+                let badgeHtml = '';
+                let borderClass = 'border-slate-800 hover:border-indigo-500/50';
+
+                if (cat === 'PAYWARE') {
+                    badgeHtml = `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">PAYWARE</span>`;
+                    borderClass = 'border-purple-500/30 hover:border-purple-400 bg-purple-950/20';
+                } else if (cat === 'FREEWARE') {
+                    badgeHtml = `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">FREEWARE</span>`;
+                    borderClass = 'border-cyan-500/30 hover:border-cyan-400 bg-cyan-950/20';
+                } else if (cat === 'ASOBO') {
+                    badgeHtml = `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">ASOBO</span>`;
+                    borderClass = 'border-amber-500/30 hover:border-amber-400 bg-amber-950/20';
+                }
+
+                const vendorStr = ap.vendor || (ap.is_asobo_official ? 'Microsoft / Asobo' : 'Unknown');
+
+                return `
+                    <div onclick="focusAirportWithAnimation(allAirportsData.find(a => a.icao === '${ap.icao}'))" 
+                         class="p-3 rounded-xl bg-slate-900/90 border ${borderClass} shadow-md hover:bg-slate-850 cursor-pointer transition-all flex items-center justify-between gap-2.5 group">
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center gap-2 mb-0.5">
+                                <span class="text-xs font-mono font-black text-white group-hover:text-cyan-300 transition-colors">${ap.icao}</span>
+                                ${badgeHtml}
+                            </div>
+                            <h4 class="text-xs font-extrabold text-slate-200 truncate group-hover:text-white leading-tight">${ap.name}</h4>
+                            <p class="text-[10px] font-medium text-slate-400 truncate mt-0.5">${ap.city || 'Unknown City'} • <span class="text-slate-300 font-semibold">${vendorStr}</span></p>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-xs text-slate-500 group-hover:text-white group-hover:translate-x-0.5 transition-all"></i>
+                    </div>
+                `;
+            }).join('');
+        }
+    }
+
+    // 4. Switch Drawer Modes and Open Drawer
+    const apMode = document.getElementById('drawer-airport-mode');
+    if (apMode) apMode.classList.add('hidden');
+    const cMode = document.getElementById('drawer-country-mode');
+    if (cMode) cMode.classList.remove('hidden');
+    const drawer = document.getElementById('detail-drawer');
+    if (drawer) drawer.classList.remove('translate-x-full');
+}
+
+function toggleCountrySelection(iso, countryName, layer, forceSelect = false) {
+    if (!iso || iso === '-99') return;
+
+    if (selectedCountryCode === iso && !forceSelect) {
         selectedCountryCode = null;
         showToast(`Cleared country filter`, 'info');
+        closeDrawer();
     } else {
         selectedCountryCode = iso;
+        resetConflictingFiltersForCountrySelection(); // Auto-reset Region, Type, and GSX to "All"
 
         // Smooth zoom to country bounds
         if (countryGeoJsonLayer) {
@@ -578,6 +744,7 @@ function toggleCountrySelection(iso, countryName, layer) {
         }
 
         showToast(`✓ Filtered country: ${countryName}`, 'info');
+        openCountryDrawer(iso, countryName);
     }
 
     if (countryGeoJsonLayer) {
@@ -1554,6 +1721,13 @@ function focusAirportWithAnimation(ap) {
 
 function showAirportDetails(ap) {
     selectedAirport = ap;
+
+    const cMode = document.getElementById('drawer-country-mode');
+    if (cMode) cMode.classList.add('hidden');
+    const apMode = document.getElementById('drawer-airport-mode');
+    if (apMode) apMode.classList.remove('hidden');
+    const drawer = document.getElementById('detail-drawer');
+    if (drawer) drawer.classList.remove('translate-x-full');
 
     document.getElementById('drawer-icao').innerText = ap.icao;
     document.getElementById('drawer-iata').innerText = ap.iata ? ap.iata : '—';
