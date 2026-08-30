@@ -2122,7 +2122,7 @@ function filterAirports() {
         // Geographic Region Filter
         if (selectedRegionFilter !== 'all') {
             const regionIsoCodes = REGION_COUNTRY_MAP[selectedRegionFilter] || [];
-            const apIso = (ap.iso_country || '').toUpperCase();
+            const apIso = ((ap.country || ap.iso_country || '').toString()).toUpperCase().trim();
             if (!regionIsoCodes.includes(apIso)) return false;
         }
 
