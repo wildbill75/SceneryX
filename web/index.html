@@ -515,253 +515,254 @@
                         <i class="fa-solid fa-xmark"></i>
                     </button>
                 </div>
+                </div>
             </div>
-        </main>
 
-        <!-- RIGHT DETAIL DRAWER -->
-        <aside id="detail-drawer" class="absolute right-0 top-0 bottom-0 w-[460px] glass-panel z-20 transform translate-x-full transition-transform duration-300 ease-in-out border-l border-slate-800/80 flex flex-col relative">
-            <!-- CLOSE BUTTON -->
-            <button onclick="closeDrawer()" class="absolute top-4 right-4 z-30 w-7 h-7 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-xs transition-all shadow-md">
-                <i class="fa-solid fa-xmark"></i>
-            </button>
+            <!-- RIGHT DETAIL DRAWER OVERLAY -->
+            <aside id="detail-drawer" class="absolute right-0 top-0 bottom-0 w-[460px] glass-panel z-[1001] transform translate-x-full transition-transform duration-300 ease-in-out border-l border-slate-800/80 flex flex-col pointer-events-auto">
+                <!-- CLOSE BUTTON -->
+                <button onclick="closeDrawer()" class="absolute top-4 right-4 z-30 w-7 h-7 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-xs transition-all shadow-md">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
 
-            <div class="p-5 space-y-6 overflow-y-auto flex-1 pt-4">
-                <!-- AIRPORT DETAIL MODE CONTAINER -->
-                <div id="drawer-airport-mode" class="space-y-6">
-                    <!-- 1. HERO AIRPORT HEADER CARD -->
-                    <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3 shadow-lg">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-2.5">
-                                <span id="drawer-icao" class="text-3xl lg:text-4xl font-black font-mono tracking-tight">ICAO</span>
-                                <span id="drawer-iata" class="text-xs lg:text-sm font-mono bg-slate-800/90 px-2.5 py-0.5 rounded-lg text-slate-200 font-bold border border-slate-700/60">IATA</span>
+                <div class="p-5 space-y-6 overflow-y-auto flex-1 pt-4">
+                    <!-- AIRPORT DETAIL MODE CONTAINER -->
+                    <div id="drawer-airport-mode" class="space-y-6">
+                        <!-- 1. HERO AIRPORT HEADER CARD -->
+                        <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3 shadow-lg">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-2.5">
+                                    <span id="drawer-icao" class="text-3xl lg:text-4xl font-black font-mono tracking-tight">ICAO</span>
+                                    <span id="drawer-iata" class="text-xs lg:text-sm font-mono bg-slate-800/90 px-2.5 py-0.5 rounded-lg text-slate-200 font-bold border border-slate-700/60">IATA</span>
+                                </div>
+                                <span id="drawer-pricing-badge" class="px-2.5 py-1 rounded-full text-xs font-mono font-bold shadow-sm">Badge</span>
                             </div>
-                            <span id="drawer-pricing-badge" class="px-2.5 py-1 rounded-full text-xs font-mono font-bold shadow-sm">Badge</span>
+                            <div>
+                                <h3 id="drawer-name" class="text-lg lg:text-xl font-extrabold text-white leading-snug tracking-wide">Airport Full Name</h3>
+                                <p id="drawer-city-country" class="text-sm font-medium text-slate-300 mt-0.5">City, Country</p>
+                            </div>
+
+                            <!-- 2. AIRPORT SPECS METRICS GRID (Elevation, Category, Lat, Lon) -->
+                            <div class="grid grid-cols-2 gap-2.5 pt-2 border-t border-slate-800/80">
+                                <div class="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80">
+                                    <span class="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Elevation</span>
+                                    <span id="drawer-elevation" class="text-xs font-mono font-semibold text-slate-200">0 ft</span>
+                                </div>
+                                <div class="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80">
+                                    <span class="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Category</span>
+                                    <span id="drawer-type-badge" class="text-xs font-semibold">Type</span>
+                                </div>
+                                <div class="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80">
+                                    <span class="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Latitude</span>
+                                    <span id="drawer-lat" class="text-xs font-mono font-semibold text-slate-200">0.0000</span>
+                                </div>
+                                <div class="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80">
+                                    <span class="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Longitude</span>
+                                    <span id="drawer-lon" class="text-xs font-mono font-semibold text-slate-200">0.0000</span>
+                                </div>
+                            </div>
                         </div>
-                        <div>
-                            <h3 id="drawer-name" class="text-lg lg:text-xl font-extrabold text-white leading-snug tracking-wide">Airport Full Name</h3>
-                            <p id="drawer-city-country" class="text-sm font-medium text-slate-300 mt-0.5">City, Country</p>
-                        </div>
 
-                        <!-- 2. AIRPORT SPECS METRICS GRID (Elevation, Category, Lat, Lon) -->
-                        <div class="grid grid-cols-2 gap-2.5 pt-2 border-t border-slate-800/80">
-                            <div class="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80">
-                                <span class="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Elevation</span>
-                                <span id="drawer-elevation" class="text-xs font-mono font-semibold text-slate-200">0 ft</span>
+                        <!-- 3. ACTIVE DEVELOPER & PUBLISHER CARD -->
+                        <div id="drawer-dev-block" class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2.5 shadow-lg">
+                            <div class="flex items-center justify-between gap-2 pt-0.5">
+                                <div class="flex items-center gap-2 min-w-0">
+                                    <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 leading-tight">Active Developer / Publisher</span>
+                                    <span id="drawer-version" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 hidden">v1.0.0</span>
+                                </div>
+                                <button onclick="triggerCheckSceneryUpdate()" id="btn-check-update" class="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-300 border border-slate-700 hover:border-cyan-500/40 text-[10px] font-bold transition-all shadow-sm flex items-center gap-1 shrink-0 cursor-pointer" title="Check for Scenery Updates">
+                                    <i class="fa-solid fa-rotate text-[9px] text-cyan-400"></i> Check Update
+                                </button>
                             </div>
-                            <div class="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80">
-                                <span class="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Category</span>
-                                <span id="drawer-type-badge" class="text-xs font-semibold">Type</span>
-                            </div>
-                            <div class="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80">
-                                <span class="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Latitude</span>
-                                <span id="drawer-lat" class="text-xs font-mono font-semibold text-slate-200">0.0000</span>
-                            </div>
-                            <div class="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80">
-                                <span class="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Longitude</span>
-                                <span id="drawer-lon" class="text-xs font-mono font-semibold text-slate-200">0.0000</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 3. ACTIVE DEVELOPER & PUBLISHER CARD -->
-                    <div id="drawer-dev-block" class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2.5 shadow-lg">
-                        <div class="flex items-center justify-between gap-2 pt-0.5">
-                            <div class="flex items-center gap-2 min-w-0">
-                                <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider shrink-0 leading-tight">Active Developer / Publisher</span>
-                                <span id="drawer-version" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 hidden">v1.0.0</span>
-                            </div>
-                            <button onclick="triggerCheckSceneryUpdate()" id="btn-check-update" class="px-2.5 py-1 rounded-full bg-slate-800 hover:bg-cyan-500/20 text-slate-300 hover:text-cyan-300 border border-slate-700 hover:border-cyan-500/40 text-[10px] font-bold transition-all shadow-sm flex items-center gap-1 shrink-0 cursor-pointer" title="Check for Scenery Updates">
-                                <i class="fa-solid fa-rotate text-[9px] text-cyan-400"></i> Check Update
-                            </button>
-                        </div>
-                        
-                        <div id="drawer-vendor" class="text-xl lg:text-2xl font-black tracking-wide text-cyan-300 truncate">Unknown Vendor</div>
-
-                        <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2">
-                            <span id="drawer-activation-badge" class="px-2.5 py-1 rounded-full text-xs font-mono font-bold shadow-sm">Custom Addon Active</span>
                             
-                            <!-- PRICING CATEGORY OVERRIDE TOGGLE (FOR 3RD-PARTY SCENERIES) -->
-                            <div id="drawer-pricing-toggle-container" class="hidden items-center gap-1 bg-slate-950/80 p-1 rounded-xl border border-slate-800/80">
-                                <button id="btn-override-payware" onclick="toggleUserCategoryOverride('Payware')" title="Force Payware category for this airport" class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer">
-                                    Payware
+                            <div id="drawer-vendor" class="text-xl lg:text-2xl font-black tracking-wide text-cyan-300 truncate">Unknown Vendor</div>
+
+                            <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2">
+                                <span id="drawer-activation-badge" class="px-2.5 py-1 rounded-full text-xs font-mono font-bold shadow-sm">Custom Addon Active</span>
+                                
+                                <!-- PRICING CATEGORY OVERRIDE TOGGLE (FOR 3RD-PARTY SCENERIES) -->
+                                <div id="drawer-pricing-toggle-container" class="hidden items-center gap-1 bg-slate-950/80 p-1 rounded-xl border border-slate-800/80">
+                                    <button id="btn-override-payware" onclick="toggleUserCategoryOverride('Payware')" title="Force Payware category for this airport" class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer">
+                                        Payware
+                                    </button>
+                                    <button id="btn-override-freeware" onclick="toggleUserCategoryOverride('Freeware')" title="Force Freeware category for this airport" class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer">
+                                        Freeware
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- CONFLICT ALERT BANNER -->
+                        <div id="drawer-conflict-banner" class="hidden"></div>
+
+                        <!-- 4. AVAILABLE SCENERY OPTIONS (1-CLICK SELECTION BLOCK) -->
+                        <div class="space-y-2">
+                            <div id="drawer-sources-list" class="space-y-2">
+                                <!-- Populated by app.js -->
+                            </div>
+                        </div>
+
+                        <!-- 5. GSX PROFILE CARD -->
+                        <div id="drawer-gsx-card" class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3 shadow-lg transition-all">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs font-extrabold text-slate-300 uppercase tracking-wider block">GSX Profile</span>
+                                <span id="drawer-gsx-badge" class="text-xs font-mono font-bold px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Profile Installed</span>
+                            </div>
+                            <div id="drawer-gsx-container" class="pt-0.5">
+                                <!-- Populated by app.js -->
+                            </div>
+                        </div>
+
+                        <!-- OPERATING AIRLINES CARD (SIMPLE CLEAN TEXT BADGES, IN ENGLISH) -->
+                        <div id="drawer-airlines-card" class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3 shadow-lg">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs font-extrabold text-slate-300 uppercase tracking-wider block">Operating Airlines</span>
+                                <span id="drawer-airlines-count" class="text-xs font-mono font-bold text-cyan-400 bg-cyan-500/10 px-2.5 py-1 rounded-full border border-cyan-500/20">0 Airlines</span>
+                            </div>
+                            <div id="drawer-airlines-list" class="flex flex-wrap gap-1.5 p-1 max-h-40 overflow-y-auto">
+                                <!-- Populated by app.js -->
+                            </div>
+                        </div>
+
+                        <!-- 6. SCENERY PRICE / VALUE CARD -->
+                        <div id="drawer-price-card" class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3 shadow-lg hidden">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs font-extrabold text-slate-300 uppercase tracking-wider block">Scenery Price / Value</span>
+                                <span id="drawer-price-tag" class="text-sm font-mono font-black text-emerald-400">~19.99 €</span>
+                            </div>
+                            <div class="flex items-center gap-2 pt-1">
+                                <div class="relative flex-1">
+                                    <span id="drawer-price-curr-symbol" class="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-mono font-extrabold text-white">€</span>
+                                    <input type="number" step="any" id="drawer-price-input" placeholder="Price Paid (e.g. 14.50)" 
+                                           onfocus="pauseCurrencyCarousel()" onblur="resumeCurrencyCarousel()"
+                                           class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-3 py-2 text-sm font-mono font-bold text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500">
+                                </div>
+                                <button onclick="saveCustomPriceForSelected()" class="px-3.5 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold transition-all cursor-pointer" title="Save Price">
+                                    Save
                                 </button>
-                                <button id="btn-override-freeware" onclick="toggleUserCategoryOverride('Freeware')" title="Force Freeware category for this airport" class="px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer">
-                                    Freeware
+                                <button onclick="resetCustomPriceForSelected()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-400 hover:text-white text-xs font-bold transition-all flex items-center justify-center w-9 h-9 shrink-0 cursor-pointer" title="Reset to Estimated Catalog Price">
+                                    <i class="fa-solid fa-rotate-left"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 7. USER RATING WIDGET (MY RATING) -->
+                        <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3 shadow-lg">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs font-extrabold text-slate-300 uppercase tracking-wider block">My Rating</span>
+                                <span id="rating-score-display" class="text-sm font-mono font-black text-amber-400">★ 0.0</span>
+                            </div>
+                            <div class="flex items-center justify-between pt-1">
+                                <div id="interactive-star-widget" class="flex items-center gap-2" onmouseleave="resetStarHover()">
+                                    <!-- Rendered dynamically by app.js -->
+                                </div>
+                                <button onclick="clearCurrentRating()" class="text-xs text-slate-400 hover:text-red-400 font-bold transition-colors cursor-pointer">
+                                    Clear
                                 </button>
                             </div>
                         </div>
                     </div>
 
-                    <!-- CONFLICT ALERT BANNER -->
-                    <div id="drawer-conflict-banner" class="hidden"></div>
-
-                    <!-- 4. AVAILABLE SCENERY OPTIONS (1-CLICK SELECTION BLOCK) -->
-                    <div class="space-y-2">
-                        <div id="drawer-sources-list" class="space-y-2">
-                            <!-- Populated by app.js -->
-                        </div>
-                    </div>
-
-                    <!-- 5. GSX PROFILE CARD -->
-                    <div id="drawer-gsx-card" class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3 shadow-lg transition-all">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs font-extrabold text-slate-300 uppercase tracking-wider block">GSX Profile</span>
-                            <span id="drawer-gsx-badge" class="text-xs font-mono font-bold px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Profile Installed</span>
-                        </div>
-                        <div id="drawer-gsx-container" class="pt-0.5">
-                            <!-- Populated by app.js -->
-                        </div>
-                    </div>
-
-                    <!-- OPERATING AIRLINES CARD (SIMPLE CLEAN TEXT BADGES, IN ENGLISH) -->
-                    <div id="drawer-airlines-card" class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3 shadow-lg">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs font-extrabold text-slate-300 uppercase tracking-wider block">Operating Airlines</span>
-                            <span id="drawer-airlines-count" class="text-xs font-mono font-bold text-cyan-400 bg-cyan-500/10 px-2.5 py-1 rounded-full border border-cyan-500/20">0 Airlines</span>
-                        </div>
-                        <div id="drawer-airlines-list" class="flex flex-wrap gap-1.5 p-1 max-h-40 overflow-y-auto">
-                            <!-- Populated by app.js -->
-                        </div>
-                    </div>
-
-                    <!-- 6. SCENERY PRICE / VALUE CARD -->
-                    <div id="drawer-price-card" class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3 shadow-lg hidden">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs font-extrabold text-slate-300 uppercase tracking-wider block">Scenery Price / Value</span>
-                            <span id="drawer-price-tag" class="text-sm font-mono font-black text-emerald-400">~19.99 €</span>
-                        </div>
-                        <div class="flex items-center gap-2 pt-1">
-                            <div class="relative flex-1">
-                                <span id="drawer-price-curr-symbol" class="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-mono font-extrabold text-white">€</span>
-                                <input type="number" step="any" id="drawer-price-input" placeholder="Price Paid (e.g. 14.50)" 
-                                       onfocus="pauseCurrencyCarousel()" onblur="resumeCurrencyCarousel()"
-                                       class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-3 py-2 text-sm font-mono font-bold text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500">
+                    <!-- COUNTRY OVERVIEW MODE CONTAINER -->
+                    <div id="drawer-country-mode" class="space-y-5 hidden">
+                        <!-- 1. HERO COUNTRY HEADER CARD -->
+                        <div class="p-4 rounded-2xl bg-gradient-to-br from-indigo-950/90 via-slate-900 to-slate-950 border border-indigo-500/30 space-y-3 shadow-xl relative overflow-hidden">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-3">
+                                    <span id="country-drawer-flag" class="text-xl font-black font-mono px-3 py-1 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 shadow-sm">FR</span>
+                                    <div>
+                                        <h3 id="country-drawer-name" class="text-xl lg:text-2xl font-black text-white leading-snug tracking-wide">France</h3>
+                                        <p id="country-drawer-subtitle" class="text-xs font-semibold text-indigo-300/80 mt-0.5">Country Scenery & Airport Network</p>
+                                    </div>
+                                </div>
                             </div>
-                            <button onclick="saveCustomPriceForSelected()" class="px-3.5 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold transition-all cursor-pointer" title="Save Price">
-                                Save
-                            </button>
-                            <button onclick="resetCustomPriceForSelected()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-400 hover:text-white text-xs font-bold transition-all flex items-center justify-center w-9 h-9 shrink-0 cursor-pointer" title="Reset to Estimated Catalog Price">
-                                <i class="fa-solid fa-rotate-left"></i>
-                            </button>
-                        </div>
-                    </div>
 
-                    <!-- 7. USER RATING WIDGET (MY RATING) -->
-                    <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3 shadow-lg">
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs font-extrabold text-slate-300 uppercase tracking-wider block">My Rating</span>
-                            <span id="rating-score-display" class="text-sm font-mono font-black text-amber-400">★ 0.0</span>
-                        </div>
-                        <div class="flex items-center justify-between pt-1">
-                            <div id="interactive-star-widget" class="flex items-center gap-2" onmouseleave="resetStarHover()">
-                                <!-- Rendered dynamically by app.js -->
+                            <!-- STATS METRICS GRID -->
+                            <div class="grid grid-cols-2 gap-2.5 pt-3 border-t border-indigo-500/20">
+                                <div class="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800">
+                                    <span class="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Total Airports</span>
+                                    <span id="country-drawer-total-airports" class="text-sm font-mono font-black text-white">0</span>
+                                </div>
+                                <div class="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800">
+                                    <span class="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Payware Spent</span>
+                                    <span id="country-drawer-total-spent" class="text-sm font-mono font-black text-emerald-400">$0.00</span>
+                                </div>
                             </div>
-                            <button onclick="clearCurrentRating()" class="text-xs text-slate-400 hover:text-red-400 font-bold transition-colors cursor-pointer">
-                                Clear
-                            </button>
+                        </div>
+
+                        <!-- 2. SCENERY PRICING MODEL BREAKDOWN -->
+                        <div class="space-y-2">
+                            <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Scenery Pricing Breakdown</label>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div class="p-3 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-between">
+                                    <div>
+                                        <span class="text-[10px] text-purple-300 font-extrabold uppercase block">★ Payware</span>
+                                        <span id="country-count-payware" class="text-lg font-mono font-black text-purple-200">0</span>
+                                    </div>
+                                    <i class="fa-solid fa-star text-purple-400 text-base opacity-80"></i>
+                                </div>
+                                <div class="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-between">
+                                    <div>
+                                        <span class="text-[10px] text-cyan-300 font-extrabold uppercase block">★ Freeware</span>
+                                        <span id="country-count-freeware" class="text-lg font-mono font-black text-cyan-200">0</span>
+                                    </div>
+                                    <i class="fa-solid fa-download text-cyan-400 text-base opacity-80"></i>
+                                </div>
+                                <div class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between">
+                                    <div>
+                                        <span class="text-[10px] text-amber-300 font-extrabold uppercase block">★ Asobo</span>
+                                        <span id="country-count-asobo" class="text-lg font-mono font-black text-amber-200">0</span>
+                                    </div>
+                                    <i class="fa-solid fa-crown text-amber-400 text-base opacity-80"></i>
+                                </div>
+                                <div class="p-3 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
+                                    <div>
+                                        <span class="text-[10px] text-slate-400 font-extrabold uppercase block">● Default MSFS</span>
+                                        <span id="country-count-default" class="text-lg font-mono font-black text-slate-300">0</span>
+                                    </div>
+                                    <i class="fa-solid fa-plane text-slate-500 text-base opacity-80"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 3. AIRPORT TYPE BREAKDOWN -->
+                        <div class="space-y-2">
+                            <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Airport Types</label>
+                            <div class="grid grid-cols-2 gap-2 text-xs">
+                                <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
+                                    <span class="text-slate-300 font-semibold">International</span>
+                                    <span id="country-type-int" class="font-mono font-bold text-indigo-400">0</span>
+                                </div>
+                                <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
+                                    <span class="text-slate-300 font-semibold">Regional</span>
+                                    <span id="country-type-reg" class="font-mono font-bold text-indigo-400">0</span>
+                                </div>
+                                <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
+                                    <span class="text-slate-300 font-semibold">General Aviation</span>
+                                    <span id="country-type-ga" class="font-mono font-bold text-indigo-400">0</span>
+                                </div>
+                                <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
+                                    <span class="text-slate-300 font-semibold">Heli / Water</span>
+                                    <span id="country-type-hw" class="font-mono font-bold text-indigo-400">0</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 4. CATEGORIZED AIRPORT LIST (CLICK TO FOCUS AIRPORT) -->
+                        <div class="space-y-2">
+                            <div class="flex items-center justify-between mb-1">
+                                <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Custom Sceneries List</label>
+                                <span id="country-scenery-count-badge" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">0 Sceneries</span>
+                            </div>
+
+                            <div id="country-airports-list" class="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+                                <!-- Populated dynamically by app.js -->
+                            </div>
                         </div>
                     </div>
                 </div>
-
-                <!-- COUNTRY OVERVIEW MODE CONTAINER -->
-                <div id="drawer-country-mode" class="space-y-5 hidden">
-                    <!-- 1. HERO COUNTRY HEADER CARD -->
-                    <div class="p-4 rounded-2xl bg-gradient-to-br from-indigo-950/90 via-slate-900 to-slate-950 border border-indigo-500/30 space-y-3 shadow-xl relative overflow-hidden">
-                        <div class="flex items-center justify-between">
-                            <div class="flex items-center gap-3">
-                                <span id="country-drawer-flag" class="text-xl font-black font-mono px-3 py-1 rounded-xl bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 shadow-sm">FR</span>
-                                <div>
-                                    <h3 id="country-drawer-name" class="text-xl lg:text-2xl font-black text-white leading-snug tracking-wide">France</h3>
-                                    <p id="country-drawer-subtitle" class="text-xs font-semibold text-indigo-300/80 mt-0.5">Country Scenery & Airport Network</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- STATS METRICS GRID -->
-                        <div class="grid grid-cols-2 gap-2.5 pt-3 border-t border-indigo-500/20">
-                            <div class="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800">
-                                <span class="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Total Airports</span>
-                                <span id="country-drawer-total-airports" class="text-sm font-mono font-black text-white">0</span>
-                            </div>
-                            <div class="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800">
-                                <span class="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Payware Spent</span>
-                                <span id="country-drawer-total-spent" class="text-sm font-mono font-black text-emerald-400">$0.00</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 2. SCENERY PRICING MODEL BREAKDOWN -->
-                    <div class="space-y-2">
-                        <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Scenery Pricing Breakdown</label>
-                        <div class="grid grid-cols-2 gap-2">
-                            <div class="p-3 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-between">
-                                <div>
-                                    <span class="text-[10px] text-purple-300 font-extrabold uppercase block">★ Payware</span>
-                                    <span id="country-count-payware" class="text-lg font-mono font-black text-purple-200">0</span>
-                                </div>
-                                <i class="fa-solid fa-star text-purple-400 text-base opacity-80"></i>
-                            </div>
-                            <div class="p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-between">
-                                <div>
-                                    <span class="text-[10px] text-cyan-300 font-extrabold uppercase block">★ Freeware</span>
-                                    <span id="country-count-freeware" class="text-lg font-mono font-black text-cyan-200">0</span>
-                                </div>
-                                <i class="fa-solid fa-download text-cyan-400 text-base opacity-80"></i>
-                            </div>
-                            <div class="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between">
-                                <div>
-                                    <span class="text-[10px] text-amber-300 font-extrabold uppercase block">★ Asobo</span>
-                                    <span id="country-count-asobo" class="text-lg font-mono font-black text-amber-200">0</span>
-                                </div>
-                                <i class="fa-solid fa-crown text-amber-400 text-base opacity-80"></i>
-                            </div>
-                            <div class="p-3 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
-                                <div>
-                                    <span class="text-[10px] text-slate-400 font-extrabold uppercase block">● Default MSFS</span>
-                                    <span id="country-count-default" class="text-lg font-mono font-black text-slate-300">0</span>
-                                </div>
-                                <i class="fa-solid fa-plane text-slate-500 text-base opacity-80"></i>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 3. AIRPORT TYPE BREAKDOWN -->
-                    <div class="space-y-2">
-                        <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Airport Types</label>
-                        <div class="grid grid-cols-2 gap-2 text-xs">
-                            <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
-                                <span class="text-slate-300 font-semibold">International</span>
-                                <span id="country-type-int" class="font-mono font-bold text-indigo-400">0</span>
-                            </div>
-                            <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
-                                <span class="text-slate-300 font-semibold">Regional</span>
-                                <span id="country-type-reg" class="font-mono font-bold text-indigo-400">0</span>
-                            </div>
-                            <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
-                                <span class="text-slate-300 font-semibold">General Aviation</span>
-                                <span id="country-type-ga" class="font-mono font-bold text-indigo-400">0</span>
-                            </div>
-                            <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
-                                <span class="text-slate-300 font-semibold">Heli / Water</span>
-                                <span id="country-type-hw" class="font-mono font-bold text-indigo-400">0</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 4. CATEGORIZED AIRPORT LIST (CLICK TO FOCUS AIRPORT) -->
-                    <div class="space-y-2">
-                        <div class="flex items-center justify-between mb-1">
-                            <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Custom Sceneries List</label>
-                            <span id="country-scenery-count-badge" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">0 Sceneries</span>
-                        </div>
-
-                        <div id="country-airports-list" class="space-y-2 max-h-[380px] overflow-y-auto pr-1">
-                            <!-- Populated dynamically by app.js -->
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </aside>
+            </aside>
+        </main>
 
     </div>
 
