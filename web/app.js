@@ -649,6 +649,11 @@ function initMap() {
 
 let countryGeoJsonLayer = null;
 let selectedCountryCode = null;
+let selectedCountryPolygonLayer = null;
+
+function restoreMapToNeutralState(flyCamera = true) {
+    exitCountryMode();
+}
 
 function getFeatureIso(feature) {
     if (!feature || !feature.properties) return '';
@@ -2932,14 +2937,13 @@ function exitCountryMode() {
         }
 
         // 3. Reset Country Polygon Overlay & Hover Styles
-        if (selectedCountryPolygonLayer && map) {
-            map.removeLayer(selectedCountryPolygonLayer);
+        if (typeof selectedCountryPolygonLayer !== 'undefined' && selectedCountryPolygonLayer && map) {
+            try { map.removeLayer(selectedCountryPolygonLayer); } catch(err) {}
             selectedCountryPolygonLayer = null;
         }
         if (countryGeoJsonLayer) {
-            try { countryGeoJsonLayer.resetStyle(); } catch (err) {}
             countryGeoJsonLayer.eachLayer(l => {
-                if (l.setStyle) {
+                if (l && l.setStyle) {
                     l.setStyle({
                         fillColor: '#06b6d4',
                         fillOpacity: 0.0,
