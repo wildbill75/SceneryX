@@ -853,74 +853,89 @@ function openCountryDrawer(iso, countryName) {
                 const storeSearchUrl = `https://flightsim.to/sceneries?q=${encodeURIComponent(ap.icao)}`;
 
                 let accordionHtml = '';
-                if (isExpanded) {
-                    const sources = ap.all_sources || [];
-                    const fsToSearchUrl = `https://flightsim.to/sceneries?q=${encodeURIComponent(ap.icao + ' ' + (ap.name || ''))}`;
+                const sources = ap.all_sources || [];
+                const fsToSearchUrl = `https://flightsim.to/search?q=${encodeURIComponent(ap.icao)}`;
+                const simMarketSearchUrl = `https://secure.simmarket.com/advanced_search_result.php?keywords=${encodeURIComponent(ap.icao)}`;
 
-                    let rowsHtml = '';
-                    if (sources.length > 0) {
-                        rowsHtml = sources.map(s => {
-                            const isInst = !s.is_disabled;
-                            const devName = s.vendor || (s.is_asobo_official ? 'Microsoft / Asobo' : 'Community');
-                            const sPt = s.pricing_type || (s.is_payware ? 'Payware' : (s.is_asobo_official ? 'Asobo' : 'Freeware'));
-                            let pBadge = '';
-                            if (sPt === 'Payware') pBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">PAYWARE</span>`;
-                            else if (sPt === 'Asobo') pBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">ASOBO</span>`;
-                            else pBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">FREEWARE</span>`;
+                let rowsHtml = '';
+                if (sources.length > 0) {
+                    rowsHtml = sources.map(s => {
+                        const isInst = !s.is_disabled;
+                        const devName = s.vendor || (s.is_asobo_official ? 'Microsoft / Asobo' : 'Community');
+                        const sPt = s.pricing_type || (s.is_payware ? 'Payware' : (s.is_asobo_official ? 'Asobo' : 'Freeware'));
+                        let pBadge = '';
+                        if (sPt === 'Payware') pBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">PAYWARE</span>`;
+                        else if (sPt === 'Asobo') pBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">ASOBO</span>`;
+                        else if (sPt === 'Default' || ap.pricing_type === 'Default') pBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-slate-800 text-slate-400 border border-slate-700">DEFAULT</span>`;
+                        else pBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">FREEWARE</span>`;
 
-                            return `
-                                <div onclick="event.stopPropagation(); window.open('${fsToSearchUrl}', '_blank')"
-                                     class="flex items-center justify-between p-2 rounded-lg bg-slate-900/70 hover:bg-slate-800/80 border border-slate-800/80 cursor-pointer transition-all group">
-                                    <div class="flex items-center gap-2 min-w-0 flex-1">
-                                        <span class="text-xs font-mono font-black text-cyan-300 shrink-0">${ap.icao}</span>
-                                        <span class="text-xs font-bold text-slate-200 group-hover:text-white truncate min-w-0">${devName}</span>
-                                        ${pBadge}
-                                    </div>
-                                    <div class="shrink-0 pl-2">
-                                        ${isInst ? '<i class="fa-solid fa-circle-check text-emerald-400 text-sm" title="Installed"></i>' : '<i class="fa-regular fa-circle text-slate-600 text-sm group-hover:text-slate-400" title="Not Installed"></i>'}
-                                    </div>
-                                </div>
-                            `;
-                        }).join('');
-                    } else {
-                        rowsHtml = `
-                            <div onclick="event.stopPropagation(); window.open('${fsToSearchUrl}', '_blank')"
+                        return `
+                            <div onclick="event.stopPropagation(); window.open('${sPt === 'Payware' ? simMarketSearchUrl : fsToSearchUrl}', '_blank')"
                                  class="flex items-center justify-between p-2 rounded-lg bg-slate-900/70 hover:bg-slate-800/80 border border-slate-800/80 cursor-pointer transition-all group">
                                 <div class="flex items-center gap-2 min-w-0 flex-1">
                                     <span class="text-xs font-mono font-black text-cyan-300 shrink-0">${ap.icao}</span>
-                                    <span class="text-xs font-bold text-slate-300 group-hover:text-white truncate min-w-0">Microsoft / Asobo (Default)</span>
-                                    <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-slate-800 text-slate-400 border border-slate-700">DEFAULT</span>
+                                    <span class="text-xs font-bold text-slate-200 group-hover:text-white truncate min-w-0">${devName}</span>
+                                    ${pBadge}
                                 </div>
                                 <div class="shrink-0 pl-2">
-                                    <i class="fa-solid fa-circle-check text-emerald-400 text-sm" title="Installed"></i>
+                                    ${isInst ? '<i class="fa-solid fa-circle-check text-emerald-400 text-sm" title="Installed"></i>' : '<i class="fa-regular fa-circle text-slate-600 text-sm group-hover:text-slate-400" title="Not Installed"></i>'}
                                 </div>
                             </div>
                         `;
-                    }
-
-                    const freewareSearchRow = `
+                    }).join('');
+                } else {
+                    rowsHtml = `
                         <div onclick="event.stopPropagation(); window.open('${fsToSearchUrl}', '_blank')"
-                             class="flex items-center justify-between p-2 rounded-lg bg-slate-900/40 hover:bg-slate-800/60 border border-slate-800/50 cursor-pointer transition-all group opacity-85 hover:opacity-100">
+                             class="flex items-center justify-between p-2 rounded-lg bg-slate-900/70 hover:bg-slate-800/80 border border-slate-800/80 cursor-pointer transition-all group">
                             <div class="flex items-center gap-2 min-w-0 flex-1">
-                                <span class="text-xs font-mono font-black text-slate-400 shrink-0">${ap.icao}</span>
-                                <span class="text-xs font-semibold text-slate-400 group-hover:text-cyan-300 truncate min-w-0">Search Sceneries on Flightsim.to</span>
-                                <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">FREEWARE</span>
+                                <span class="text-xs font-mono font-black text-cyan-300 shrink-0">${ap.icao}</span>
+                                <span class="text-xs font-bold text-slate-300 group-hover:text-white truncate min-w-0">Microsoft / Asobo (Default)</span>
+                                <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-slate-800 text-slate-400 border border-slate-700">DEFAULT</span>
                             </div>
                             <div class="shrink-0 pl-2">
-                                <i class="fa-regular fa-circle text-slate-600 text-sm group-hover:text-cyan-400" title="Not Installed - Search Online"></i>
-                            </div>
-                        </div>
-                    `;
-
-                    accordionHtml = `
-                        <div class="mt-2.5 pt-2.5 border-t border-slate-800/80">
-                            <div class="p-2 rounded-xl bg-slate-950/80 border border-slate-800/80 space-y-1.5 font-mono">
-                                ${rowsHtml}
-                                ${freewareSearchRow}
+                                <i class="fa-solid fa-circle-check text-emerald-400 text-sm" title="Installed Base Airport"></i>
                             </div>
                         </div>
                     `;
                 }
+
+                const freewareSearchRow = `
+                    <div onclick="event.stopPropagation(); window.open('${fsToSearchUrl}', '_blank')"
+                         class="flex items-center justify-between p-2 rounded-lg bg-slate-900/40 hover:bg-slate-800/60 border border-slate-800/50 cursor-pointer transition-all group opacity-85 hover:opacity-100">
+                        <div class="flex items-center gap-2 min-w-0 flex-1">
+                            <span class="text-xs font-mono font-black text-slate-400 shrink-0">${ap.icao}</span>
+                            <span class="text-xs font-semibold text-slate-400 group-hover:text-cyan-300 truncate min-w-0">Search Freeware on Flightsim.to</span>
+                            <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">FREEWARE</span>
+                        </div>
+                        <div class="shrink-0 pl-2">
+                            <i class="fa-regular fa-circle text-slate-600 text-sm group-hover:text-cyan-400" title="Search Freeware"></i>
+                        </div>
+                    </div>
+                `;
+
+                const paywareSearchRow = `
+                    <div onclick="event.stopPropagation(); window.open('${simMarketSearchUrl}', '_blank')"
+                         class="flex items-center justify-between p-2 rounded-lg bg-slate-900/40 hover:bg-slate-800/60 border border-slate-800/50 cursor-pointer transition-all group opacity-85 hover:opacity-100">
+                        <div class="flex items-center gap-2 min-w-0 flex-1">
+                            <span class="text-xs font-mono font-black text-slate-400 shrink-0">${ap.icao}</span>
+                            <span class="text-xs font-semibold text-slate-400 group-hover:text-purple-300 truncate min-w-0">Search Payware Stores (SimMarket)</span>
+                            <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20">PAYWARE</span>
+                        </div>
+                        <div class="shrink-0 pl-2">
+                            <i class="fa-regular fa-circle text-slate-600 text-sm group-hover:text-purple-400" title="Search Payware Stores"></i>
+                        </div>
+                    </div>
+                `;
+
+                accordionHtml = `
+                    <div id="country-accordion-${ap.icao}" class="mt-2.5 pt-2.5 border-t border-slate-800/80 ${isExpanded ? '' : 'hidden'}">
+                        <div class="p-2 rounded-xl bg-slate-950/80 border border-slate-800/80 space-y-1.5 font-mono">
+                            ${rowsHtml}
+                            ${freewareSearchRow}
+                            ${paywareSearchRow}
+                        </div>
+                    </div>
+                `;
 
                 return `
                     <div id="country-ap-card-${ap.icao}"
@@ -935,7 +950,7 @@ function openCountryDrawer(iso, countryName) {
                                 <h4 class="text-xs font-extrabold text-slate-200 truncate group-hover:text-white leading-tight">${ap.name}</h4>
                                 <p class="text-[10px] font-medium text-slate-400 truncate mt-0.5">${ap.city || 'Unknown City'} • <span class="text-slate-300 font-semibold">${vendorStr}</span></p>
                             </div>
-                            <i class="fa-solid ${isExpanded ? 'fa-chevron-down text-cyan-400' : 'fa-chevron-right text-slate-500'} text-xs group-hover:text-white transition-all shrink-0"></i>
+                            <i id="country-chevron-${ap.icao}" class="fa-solid ${isExpanded ? 'fa-chevron-down text-cyan-400' : 'fa-chevron-right text-slate-500'} text-xs group-hover:text-white transition-all shrink-0"></i>
                         </div>
                         ${accordionHtml}
                     </div>
@@ -967,13 +982,26 @@ function selectCountryAirport(icao) {
         });
     }
 
-    expandedCountryIcao = (expandedCountryIcao === icao) ? null : icao;
-    if (selectedCountryCode) {
-        openCountryDrawer(selectedCountryCode, selectedCountryName);
-        const cardEl = document.getElementById(`country-ap-card-${icao}`);
-        if (cardEl) {
-            cardEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    const targetCard = document.getElementById(`country-ap-card-${icao}`);
+    const accordionEl = document.getElementById(`country-accordion-${icao}`);
+    const iconEl = document.getElementById(`country-chevron-${icao}`);
+
+    if (accordionEl) {
+        const isHidden = accordionEl.classList.contains('hidden');
+        document.querySelectorAll('[id^="country-accordion-"]').forEach(el => el.classList.add('hidden'));
+        document.querySelectorAll('[id^="country-chevron-"]').forEach(el => el.className = 'fa-solid fa-chevron-right text-xs text-slate-500 group-hover:text-white transition-all shrink-0');
+
+        if (isHidden) {
+            accordionEl.classList.remove('hidden');
+            if (iconEl) iconEl.className = 'fa-solid fa-chevron-down text-xs text-cyan-400 transition-all shrink-0';
+            expandedCountryIcao = icao;
+        } else {
+            expandedCountryIcao = null;
         }
+    }
+
+    if (targetCard) {
+        targetCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
 }
 
