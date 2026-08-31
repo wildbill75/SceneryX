@@ -2065,8 +2065,17 @@ function renderRouteLines(filteredAirports) {
     const originLat = parseFloat(activeRouteOrigin.lat);
     const originLon = parseFloat(activeRouteOrigin.lon);
 
-    filteredAirports.forEach(ap => {
-        if (!ap.lat || !ap.lon || ap.icao === activeRouteOrigin.icao) return;
+    // Collect all destination ICAOs across all selected active airlines at origin airport
+    const allDestIcaos = new Set();
+    selectedAirlines.forEach(al => {
+        const dests = (activeRouteOrigin.routes && activeRouteOrigin.routes[al]) || [];
+        dests.forEach(d => allDestIcaos.add(d));
+    });
+
+    allDestIcaos.forEach(destIcao => {
+        if (destIcao === activeRouteOrigin.icao) return;
+        const ap = allAirportsData.find(a => a.icao === destIcao);
+        if (!ap || !ap.lat || !ap.lon) return;
 
         const cat = getAirportCategory(ap);
         let lineColor = '#38bdf8';
@@ -2077,21 +2086,21 @@ function renderRouteLines(filteredAirports) {
         if (cat === 'DEFAULT') {
             // Fine subtle gray dashed line for Default MSFS destination airports
             lineColor = '#64748b';  // Slate Gray
-            lineWeight = 1.2;       // Fine thin line
-            lineOpacity = 0.65;     // Subtle & elegant
+            lineWeight = 1.4;       // Fine thin line
+            lineOpacity = 0.70;     // Subtle & elegant
             lineDashArray = '3, 4'; // Discrete dashed line
         } else if (cat === 'PAYWARE') {
             lineColor = '#c084fc';  // Vibrant Purple (Payware Addon)
-            lineWeight = 2.0;
-            lineOpacity = 0.85;
+            lineWeight = 2.2;
+            lineOpacity = 0.90;
         } else if (cat === 'ASOBO') {
             lineColor = '#fbbf24';  // Vibrant Amber/Gold (Asobo Official Handcrafted)
-            lineWeight = 2.0;
-            lineOpacity = 0.85;
+            lineWeight = 2.2;
+            lineOpacity = 0.90;
         } else if (cat === 'FREEWARE') {
             lineColor = '#22d3ee';  // Vibrant Cyan (Freeware Addon)
-            lineWeight = 2.0;
-            lineOpacity = 0.85;
+            lineWeight = 2.2;
+            lineOpacity = 0.90;
         }
 
         const destLat = parseFloat(ap.lat);
