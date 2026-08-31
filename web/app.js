@@ -2052,13 +2052,16 @@ function createBezierArcPoints(lat1, lon1, lat2, lon2, numPoints = 30) {
 }
 
 function renderRouteLines(filteredAirports) {
-    if (activeRouteLinesGroup) {
-        activeRouteLinesGroup.clearLayers();
-    } else {
-        if (map) activeRouteLinesGroup = L.layerGroup().addTo(map);
+    if (!map) return;
+    if (!activeRouteLinesGroup) {
+        activeRouteLinesGroup = L.layerGroup().addTo(map);
     }
+    if (!map.hasLayer(activeRouteLinesGroup)) {
+        map.addLayer(activeRouteLinesGroup);
+    }
+    activeRouteLinesGroup.clearLayers();
 
-    if (selectedAirlines.size === 0 || !activeRouteOrigin || !activeRouteOrigin.lat || !activeRouteOrigin.lon || !activeRouteLinesGroup) {
+    if (selectedAirlines.size === 0 || !activeRouteOrigin || !activeRouteOrigin.lat || !activeRouteOrigin.lon) {
         return;
     }
 
@@ -2079,34 +2082,34 @@ function renderRouteLines(filteredAirports) {
 
         const cat = getAirportCategory(ap);
         let lineColor = '#38bdf8';
-        let lineWeight = 2.0;
-        let lineOpacity = 0.85;
+        let lineWeight = 2.4;
+        let lineOpacity = 0.90;
         let lineDashArray = null;
 
         if (cat === 'DEFAULT') {
             // Fine subtle gray dashed line for Default MSFS destination airports
-            lineColor = '#64748b';  // Slate Gray
-            lineWeight = 1.4;       // Fine thin line
-            lineOpacity = 0.70;     // Subtle & elegant
-            lineDashArray = '3, 4'; // Discrete dashed line
+            lineColor = '#94a3b8';  // Bright Slate Gray
+            lineWeight = 1.8;       // Fine thin line
+            lineOpacity = 0.75;     // Subtle & elegant
+            lineDashArray = '4, 4'; // Discrete dashed line
         } else if (cat === 'PAYWARE') {
             lineColor = '#c084fc';  // Vibrant Purple (Payware Addon)
-            lineWeight = 2.2;
-            lineOpacity = 0.90;
+            lineWeight = 2.6;
+            lineOpacity = 0.95;
         } else if (cat === 'ASOBO') {
             lineColor = '#fbbf24';  // Vibrant Amber/Gold (Asobo Official Handcrafted)
-            lineWeight = 2.2;
-            lineOpacity = 0.90;
+            lineWeight = 2.6;
+            lineOpacity = 0.95;
         } else if (cat === 'FREEWARE') {
             lineColor = '#22d3ee';  // Vibrant Cyan (Freeware Addon)
-            lineWeight = 2.2;
-            lineOpacity = 0.90;
+            lineWeight = 2.6;
+            lineOpacity = 0.95;
         }
 
         const destLat = parseFloat(ap.lat);
         const destLon = parseFloat(ap.lon);
 
-        const arcPoints = createBezierArcPoints(originLat, originLon, destLat, destLon, 30);
+        const arcPoints = createBezierArcPoints(originLat, originLon, destLat, destLon, 35);
 
         const routeLineOptions = {
             color: lineColor,
@@ -2119,7 +2122,10 @@ function renderRouteLines(filteredAirports) {
         }
 
         const routeLine = L.polyline(arcPoints, routeLineOptions);
-        routeLine.addTo(activeRouteLinesGroup);
+        activeRouteLinesGroup.addLayer(routeLine);
+        if (routeLine.bringToFront) {
+            try { routeLine.bringToFront(); } catch (e) {}
+        }
     });
 }
 
