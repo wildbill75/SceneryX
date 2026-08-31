@@ -784,12 +784,13 @@ function openCountryDrawer(iso, countryName) {
     // Update Interactive Country Filter Buttons
     updateCountryFilterButtonsUI();
 
-    // Filter Custom Sceneries based on active country pricing & type filter sets
-    const filteredCustomSceneries = customSceneryAirports.filter(ap => {
+    // Filter Airports in this country based on active country pricing & type filter sets
+    const filteredCountryAirports = countryAirports.filter(ap => {
         const pt = getAirportPricingType(ap);
         let catKey = 'FREEWARE';
         if (pt === 'Payware') catKey = 'PAYWARE';
         else if (pt === 'Asobo') catKey = 'ASOBO';
+        else if (pt === 'Default' || ap.pricing_type === 'Default' || ap.package_name === 'Default MSFS Base Airport') catKey = 'DEFAULT';
 
         if (!selectedCountryPricingFilters.has(catKey)) return false;
 
@@ -803,29 +804,29 @@ function openCountryDrawer(iso, countryName) {
         return selectedCountryTypeFilters.has(typeKey);
     });
 
-    // Populate Custom Sceneries List
+    // Populate Sceneries List
     const sceneryBadgeEl = document.getElementById('country-scenery-count-badge');
-    if (sceneryBadgeEl) sceneryBadgeEl.innerText = `${filteredCustomSceneries.length} Custom Sceneries`;
+    if (sceneryBadgeEl) sceneryBadgeEl.innerText = `${filteredCountryAirports.length} Airports`;
 
     const listEl = document.getElementById('country-airports-list');
     if (listEl) {
-        if (filteredCustomSceneries.length === 0) {
+        if (filteredCountryAirports.length === 0) {
             listEl.innerHTML = `
                 <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800 text-center space-y-1">
-                    <p class="text-xs font-semibold text-slate-400">No Custom Sceneries Matching Filter</p>
+                    <p class="text-xs font-semibold text-slate-400">No Airports Matching Filter</p>
                     <p class="text-[10px] text-slate-500">Try enabling more pricing or airport type filter buttons above.</p>
                 </div>
             `;
         } else {
-            // Sort custom sceneries: Payware first, then Freeware, then Asobo
-            filteredCustomSceneries.sort((a, b) => {
-                const ptOrder = { 'Payware': 1, 'Freeware': 2, 'Asobo': 3 };
+            // Sort sceneries: Payware first, then Freeware, then Asobo, then Default
+            filteredCountryAirports.sort((a, b) => {
+                const ptOrder = { 'Payware': 1, 'Freeware': 2, 'Asobo': 3, 'Default': 4 };
                 const ptA = getAirportPricingType(a);
                 const ptB = getAirportPricingType(b);
                 return (ptOrder[ptA] || 9) - (ptOrder[ptB] || 9);
             });
 
-            listEl.innerHTML = filteredCustomSceneries.map(ap => {
+            listEl.innerHTML = filteredCountryAirports.map(ap => {
                 const pt = getAirportPricingType(ap);
                 const isExpanded = (expandedCountryIcao === ap.icao);
                 let badgeHtml = '';
@@ -840,6 +841,9 @@ function openCountryDrawer(iso, countryName) {
                 } else if (pt === 'Asobo') {
                     badgeHtml = `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">ASOBO</span>`;
                     borderClass = isExpanded ? 'border-amber-400 bg-amber-950/40 shadow-lg shadow-amber-950/30' : 'border-amber-500/30 hover:border-amber-400 bg-amber-950/20';
+                } else {
+                    badgeHtml = `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-800 text-slate-400 border border-slate-700">DEFAULT</span>`;
+                    borderClass = isExpanded ? 'border-blue-400 bg-blue-950/40 shadow-lg shadow-blue-950/30' : 'border-slate-800 hover:border-slate-700 bg-slate-900/60';
                 }
 
                 const vendorStr = ap.vendor || (ap.is_asobo_official ? 'Microsoft / Asobo' : 'Community');
@@ -3131,7 +3135,7 @@ function filterAirports() {
             let catKey = 'FREEWARE';
             if (pt === 'Payware') catKey = 'PAYWARE';
             else if (pt === 'Asobo') catKey = 'ASOBO';
-            else if (pt === 'Default' || ap.pricing_type === 'Default') catKey = 'DEFAULT';
+            else if (pt === 'Default' || ap.pricing_type === 'Default' || ap.package_name === 'Default MSFS Base Airport') catKey = 'DEFAULT';
 
             if (!selectedCountryPricingFilters.has(catKey)) return false;
 
@@ -3143,37 +3147,17 @@ function filterAirports() {
             else if (typeStr.includes('heli') || typeStr.includes('water')) typeKey = 'HW';
 
             if (!selectedCountryTypeFilters.has(typeKey)) return false;
-        }
-
-        // Geographic Region Filter (Cumulative Multi-select)
-        if (selectedRegions.size > 0) {
-            const apIso = ((ap.country || ap.iso_country || '').toString()).toUpperCase().trim();
-            let isMatched = false;
-            for (const rKey of selectedRegions) {
-                const allowedIsos = REGION_COUNTRY_MAP[rKey] || [];
-                if (allowedIsos.includes(apIso)) {
-                    isMatched = true;
-                    break;
-                }
+        } else {
+            // Global Scenery Source Filter (only applied when NOT in country mode)
+            if (!airportMatchesSourceFilter(ap)) {
+                return false;
             }
-            if (!isMatched) return false;
-        }
 
-        // Rating Filter
-        const apRating = ap.rating || 0;
-        if (selectedMinRating > 0 && apRating < selectedMinRating) {
-            return false;
-        }
-
-        // Scenery Source Filter (Community, Streamed (2024), Asobo, Official)
-        if (!airportMatchesSourceFilter(ap)) {
-            return false;
-        }
-
-        // Airport Type Filter (International, Regional, General Aviation, Heli / Water)
-        const apType = ap.english_type || ap.type || 'General Aviation';
-        if (!selectedTypes.has(apType)) {
-            return false;
+            // Global Airport Type Filter (only applied when NOT in country mode)
+            const apType = ap.english_type || ap.type || 'General Aviation';
+            if (!selectedTypes.has(apType)) {
+                return false;
+            }
         }
 
         // GSX Profile Filter (all, with, none)
@@ -3203,14 +3187,14 @@ function filterAirports() {
                 const airlines = ap.operating_airlines || [];
                 if (!Array.from(selectedAirlines).some(al => airlines.includes(al))) return false;
             }
-        } else {
-            // Pricing Filter (only applied when NOT in specific airline route mode)
+        } else if (!selectedCountryCode) {
+            // Global Pricing Filter (only applied when NOT in country mode and NOT in airline route mode)
             const pt = getAirportPricingType(ap);
             if (selectedPricing.size === 1) {
-                // Strict single-category mode (e.g. clicking top pill "PAYWARE", "FREEWARE", "ASOBO", "DEFAULT")
+                // Strict single-category mode
                 if (!selectedPricing.has(pt)) return false;
             } else {
-                // Multi-select mode: show selected pricing categories OR managed addon airports set to Default (Blue Circle Dot)
+                // Multi-select mode
                 if (!selectedPricing.has(pt) && !hasCustomAddonSources(ap)) return false;
             }
         }
