@@ -593,6 +593,13 @@ function initMap() {
         maxZoom: 16
     }).addTo(map);
 
+    // Dedicated high-z-index map pane for operating airline route lines (z-index 620)
+    if (map && !map.getPane('routeLinesPane')) {
+        const rPane = map.createPane('routeLinesPane');
+        rPane.style.zIndex = '620';
+        rPane.style.pointerEvents = 'none';
+    }
+
     markerClusterGroup = L.markerClusterGroup({
         chunkedLoading: true,
         maxClusterRadius: 25,
@@ -2030,44 +2037,52 @@ function renderRouteLines(filteredAirports) {
         return;
     }
 
-    const originLat = activeRouteOrigin.lat;
-    const originLon = activeRouteOrigin.lon;
+    // Ensure routeLinesPane exists on map
+    if (map && !map.getPane('routeLinesPane')) {
+        const rPane = map.createPane('routeLinesPane');
+        rPane.style.zIndex = '620';
+        rPane.style.pointerEvents = 'none';
+    }
+
+    const originLat = parseFloat(activeRouteOrigin.lat);
+    const originLon = parseFloat(activeRouteOrigin.lon);
 
     filteredAirports.forEach(ap => {
         if (!ap.lat || !ap.lon || ap.icao === activeRouteOrigin.icao) return;
 
         const cat = getAirportCategory(ap);
         let lineColor = '#38bdf8';
-        let lineWeight = 1.8;
-        let lineOpacity = 0.8;
+        let lineWeight = 2.4;
+        let lineOpacity = 0.9;
         let lineDashArray = null;
 
         if (cat === 'DEFAULT') {
             // Fine subtle gray dashed line for Default MSFS destination airports
-            lineColor = '#64748b';  // Slate Gray
-            lineWeight = 1.2;       // Fine thin line
-            lineOpacity = 0.65;     // Subtle & elegant
-            lineDashArray = '3, 4'; // Discrete dashed line
+            lineColor = '#94a3b8';  // Bright Slate Gray
+            lineWeight = 1.6;       // Fine thin line
+            lineOpacity = 0.75;     // Subtle & elegant
+            lineDashArray = '4, 4'; // Discrete dashed line
         } else if (cat === 'PAYWARE') {
-            lineColor = '#c084fc';  // Vibrant Purple
-            lineWeight = 2.0;
-            lineOpacity = 0.85;
+            lineColor = '#c084fc';  // Vibrant Purple (Payware Addon)
+            lineWeight = 2.6;
+            lineOpacity = 0.95;
         } else if (cat === 'ASOBO') {
-            lineColor = '#fbbf24';  // Vibrant Amber
-            lineWeight = 2.0;
-            lineOpacity = 0.85;
+            lineColor = '#fbbf24';  // Vibrant Amber/Gold (Asobo Official Handcrafted)
+            lineWeight = 2.6;
+            lineOpacity = 0.95;
         } else if (cat === 'FREEWARE') {
-            lineColor = '#22d3ee';  // Vibrant Cyan
-            lineWeight = 2.0;
-            lineOpacity = 0.85;
+            lineColor = '#22d3ee';  // Vibrant Cyan (Freeware Addon)
+            lineWeight = 2.6;
+            lineOpacity = 0.95;
         }
 
-        const destLat = ap.lat;
-        const destLon = ap.lon;
+        const destLat = parseFloat(ap.lat);
+        const destLon = parseFloat(ap.lon);
 
-        const arcPoints = createBezierArcPoints(originLat, originLon, destLat, destLon, 30);
+        const arcPoints = createBezierArcPoints(originLat, originLon, destLat, destLon, 35);
 
         const routeLineOptions = {
+            pane: 'routeLinesPane',
             color: lineColor,
             weight: lineWeight,
             opacity: lineOpacity,
