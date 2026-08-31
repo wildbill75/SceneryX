@@ -309,19 +309,24 @@
                     <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2.5">Scenery Source</label>
                     <div class="grid grid-cols-2 gap-2">
                         <button id="filter-src-all" onclick="toggleSourceFilter('all')" 
-                                class="col-span-2 py-2 px-3 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center shadow-sm shadow-cyan-500/10 cursor-pointer"
-                                title="Show all sceneries across all directories (Community, custom user paths, and Streamed/Official)">
+                                class="py-2 px-2.5 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center shadow-sm shadow-cyan-500/10 cursor-pointer whitespace-nowrap"
+                                title="Show all sceneries across all sources (Community, Marketplace, and Official)">
                             All Sources
                         </button>
                         <button id="filter-src-Community" onclick="toggleSourceFilter('Community')" 
                                 class="py-2 px-2.5 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center shadow-sm shadow-cyan-500/10 cursor-pointer whitespace-nowrap"
-                                title="Third-party sceneries and addons installed in Community folders or custom directories (+ Add Path, Addon Linker, secondary drives)">
+                                title="Third-party sceneries and addons installed in Community folders or custom directories (+ Add Path, Addon Linker)">
                             Community
                         </button>
-                        <button id="filter-src-Streamed" onclick="toggleSourceFilter('Streamed')" 
-                                class="py-2 px-2 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center shadow-sm shadow-cyan-500/10 cursor-pointer whitespace-nowrap"
-                                title="Official Microsoft & Asobo content: on-demand streamed packages (MSFS 2024), World Updates, and Official/OneStore directories">
-                            Streamed / Official
+                        <button id="filter-src-Marketplace" onclick="toggleSourceFilter('Marketplace')" 
+                                class="py-2 px-2.5 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center shadow-sm shadow-cyan-500/10 cursor-pointer whitespace-nowrap"
+                                title="Third-party sceneries purchased directly from Microsoft's in-game Marketplace (iniBuilds, Aerosoft, France VFR...)">
+                            Marketplace
+                        </button>
+                        <button id="filter-src-Official" onclick="toggleSourceFilter('Official')" 
+                                class="py-2 px-2.5 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center shadow-sm shadow-cyan-500/10 cursor-pointer whitespace-nowrap"
+                                title="Official Microsoft & Asobo handcrafted content (World Updates, City Updates, Deluxe editions)">
+                            Official
                         </button>
                     </div>
                 </div>

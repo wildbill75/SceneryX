@@ -18,7 +18,7 @@ let currentConflictIndex = 0;
 
 // Multi-select Sets
 const ALL_PRICING_LIST = ['Payware', 'Freeware / Flightsim.to', 'Asobo', 'Default'];
-const ALL_SOURCES_LIST = ['Community', 'Streamed'];
+const ALL_SOURCES_LIST = ['Community', 'Marketplace', 'Official'];
 const ALL_TYPES_LIST = ['International', 'Regional', 'General Aviation', 'Heli / Water'];
 
 const DEFAULT_STARTUP_PRICING = ['Payware', 'Freeware / Flightsim.to', 'Asobo'];
@@ -3291,7 +3291,7 @@ function airportMatchesSourceFilter(ap) {
     if (sources.length === 0) {
         const cat = getAirportCategory(ap);
         if (cat === 'DEFAULT') {
-            return selectedSources.has('Streamed');
+            return selectedSources.has('Official');
         }
         return false;
     }
@@ -3306,29 +3306,23 @@ function airportMatchesSourceFilter(ap) {
         const fn = (s.folder_name || '').toLowerCase();
         const pt = (s.pricing_type || '').toLowerCase();
 
-        // 1. Official / Streamed detection (StreamedPackages, Official/OneStore, Asobo handcrafted / World Updates)
-        const isOfficialOrStreamed = sf.includes('streamed') || 
-                                     sf.includes('official') || 
-                                     sf.includes('onestore') || 
-                                     s.is_asobo_official || 
-                                     pt === 'asobo' || 
-                                     v.includes('asobo') || 
-                                     (v.includes('microsoft') && !v.includes('community')) || 
-                                     fn.startsWith('asobo-') || 
-                                     fn.startsWith('microsoft-') || 
-                                     fn.startsWith('fs20-asobo-') || 
-                                     fn.startsWith('fs24-asobo-');
+        const isAsobo = s.is_asobo_official || 
+                        pt === 'asobo' || 
+                        v.includes('asobo') || 
+                        (v.includes('microsoft') && !v.includes('community')) || 
+                        fn.startsWith('asobo-') || 
+                        fn.startsWith('microsoft-') || 
+                        fn.startsWith('fs20-asobo-') || 
+                        fn.startsWith('fs24-asobo-');
 
-        if (selectedSources.has('Streamed') && isOfficialOrStreamed) {
-            return true;
+        const isStreamOrOfficial = sf.includes('streamed') || sf.includes('official') || sf.includes('onestore');
+
+        let srcCategory = 'Community';
+        if (isStreamOrOfficial) {
+            srcCategory = isAsobo ? 'Official' : 'Marketplace';
         }
 
-        // 2. Community detection (Community folders + Any user-added custom directories)
-        if (selectedSources.has('Community') && !isOfficialOrStreamed) {
-            return true;
-        }
-
-        return false;
+        return selectedSources.has(srcCategory);
     });
 }
 
