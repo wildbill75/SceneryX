@@ -2062,7 +2062,11 @@ function createBezierArcPoints(lat1, lon1, lat2, lon2, numPoints = 30) {
 function renderRouteLines(filteredAirports) {
     if (!map) return;
     if (!activeRouteLinesGroup) {
-        activeRouteLinesGroup = L.layerGroup().addTo(map);
+        if (map.getPane && map.getPane('routeLinesPane')) {
+            activeRouteLinesGroup = L.layerGroup([], { pane: 'routeLinesPane' }).addTo(map);
+        } else {
+            activeRouteLinesGroup = L.layerGroup().addTo(map);
+        }
     }
     if (!map.hasLayer(activeRouteLinesGroup)) {
         map.addLayer(activeRouteLinesGroup);
@@ -2134,7 +2138,6 @@ function renderRouteLines(filteredAirports) {
         const arcPoints = createBezierArcPoints(originLat, originLon, destLat, destLon, 35);
 
         const routeLineOptions = {
-            pane: 'routeLinesPane',
             color: lineColor,
             weight: lineWeight,
             opacity: lineOpacity,
@@ -2146,9 +2149,6 @@ function renderRouteLines(filteredAirports) {
 
         const routeLine = L.polyline(arcPoints, routeLineOptions);
         activeRouteLinesGroup.addLayer(routeLine);
-        if (routeLine.bringToFront) {
-            try { routeLine.bringToFront(); } catch (e) {}
-        }
     });
 }
 
