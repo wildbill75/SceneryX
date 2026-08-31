@@ -731,7 +731,7 @@ function openCountryDrawer(iso, countryName) {
 
     // Auto-hide Left Sidebar to maximize map viewport
     const sb = document.getElementById('sidebar-panel');
-    if (sb) sb.classList.add('-ml-80', 'opacity-0', 'pointer-events-none');
+    if (sb) sb.classList.add('-ml-[345px]', 'opacity-0', 'pointer-events-none');
 
     // 1. Find all airports belonging to this country
     const isoUpper = iso.toUpperCase().trim();
@@ -2186,7 +2186,7 @@ function showAirportDetails(ap) {
     }
 
     const sb = document.getElementById('sidebar-panel');
-    if (sb) sb.classList.remove('-ml-80', 'opacity-0', 'pointer-events-none');
+    if (sb) sb.classList.remove('-ml-[345px]', 'opacity-0', 'pointer-events-none');
 
     const cMode = document.getElementById('drawer-country-mode');
     if (cMode) cMode.classList.add('hidden');
@@ -2915,7 +2915,7 @@ function exitCountryMode() {
         if (apMode) apMode.classList.add('hidden');
 
         const sb = document.getElementById('sidebar-panel');
-        if (sb) sb.classList.remove('-ml-80', 'opacity-0', 'pointer-events-none');
+        if (sb) sb.classList.remove('-ml-[345px]', 'opacity-0', 'pointer-events-none');
 
         // 2. Clear Operating Airline Route Lines & Flight Corridor Layers
         selectedAirlines.clear();

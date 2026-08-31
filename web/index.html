@@ -278,7 +278,7 @@
     <div class="relative flex-1 flex overflow-hidden">
 
         <!-- LEFT SIDEBAR FILTERS -->
-        <aside id="sidebar-panel" class="w-80 glass-panel z-20 flex flex-col shrink-0 border-r border-slate-800/80 transition-all duration-300 ease-in-out">
+        <aside id="sidebar-panel" class="w-[345px] glass-panel z-20 flex flex-col shrink-0 border-r border-slate-800/80 transition-all duration-300 ease-in-out">
 
             <div class="p-4 space-y-6 overflow-y-auto flex-1">
 
@@ -286,7 +286,7 @@
                 <div>
                     <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2.5">Pricing Model</label>
                     <div class="grid grid-cols-2 gap-2">
-                        <button id="filter-price-all" onclick="togglePricingFilter('all')" class="py-2 px-3 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10">
+                        <button id="filter-price-all" onclick="togglePricingFilter('all')" class="col-span-2 py-2 px-3 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10">
                             All Models
                         </button>
                         <button id="filter-price-payware" onclick="togglePricingFilter('Payware')" class="py-2 px-3 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10">
@@ -309,19 +309,19 @@
                     <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2.5">Scenery Source</label>
                     <div class="grid grid-cols-2 gap-2">
                         <button id="filter-src-all" onclick="toggleSourceFilter('all')" 
-                                class="col-span-2 py-2 px-3 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10 cursor-pointer"
-                                title="Afficher toutes les scènes de toutes les sources (Community, répertoires personnalisés et Streamed/Official)">
+                                class="col-span-2 py-2 px-3 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center shadow-sm shadow-cyan-500/10 cursor-pointer"
+                                title="Show all sceneries across all directories (Community, custom user paths, and Streamed/Official)">
                             All Sources
                         </button>
                         <button id="filter-src-Community" onclick="toggleSourceFilter('Community')" 
-                                class="py-2 px-2.5 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10 cursor-pointer"
-                                title="Scènes tierces et addons installés dans les dossiers Community ou répertoires personnalisés (+ Add Path, Addon Linker, disques secondaires...)">
-                            <i class="fa-solid fa-folder-open text-[11px] text-cyan-400"></i> Community
+                                class="py-2 px-2.5 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center shadow-sm shadow-cyan-500/10 cursor-pointer whitespace-nowrap"
+                                title="Third-party sceneries and addons installed in Community folders or custom directories (+ Add Path, Addon Linker, secondary drives)">
+                            Community
                         </button>
                         <button id="filter-src-Streamed" onclick="toggleSourceFilter('Streamed')" 
-                                class="py-2 px-2.5 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10 cursor-pointer"
-                                title="Contenu officiel Microsoft & Asobo : scènes streamées à la demande (MSFS 2024), World Updates et répertoires Official / OneStore">
-                            <i class="fa-solid fa-cloud text-[11px] text-indigo-400"></i> Streamed / Official
+                                class="py-2 px-2 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center shadow-sm shadow-cyan-500/10 cursor-pointer whitespace-nowrap"
+                                title="Official Microsoft & Asobo content: on-demand streamed packages (MSFS 2024), World Updates, and Official/OneStore directories">
+                            Streamed / Official
                         </button>
                     </div>
                 </div>
