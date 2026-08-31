@@ -3428,12 +3428,8 @@ function filterAirports() {
         } else if (!selectedCountryCode) {
             // Global Pricing Filter (only applied when NOT in country mode and NOT in airline route mode)
             const pt = getAirportPricingType(ap);
-            if (selectedPricing.size === 1) {
-                // Strict single-category mode
-                if (!selectedPricing.has(pt)) return false;
-            } else {
-                // Multi-select mode
-                if (!selectedPricing.has(pt) && !hasCustomAddonSources(ap)) return false;
+            if (!selectedPricing.has(pt)) {
+                return false;
             }
         }
 
