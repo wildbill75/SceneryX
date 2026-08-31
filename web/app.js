@@ -657,10 +657,10 @@ function initMap() {
         maxZoom: 16
     }).addTo(map);
 
-    // Dedicated high-z-index map pane for operating airline route lines (z-index 620)
+    // Dedicated map pane for operating airline route lines (z-index 550: above country polygons, below markers)
     if (map && !map.getPane('routeLinesPane')) {
         const rPane = map.createPane('routeLinesPane');
-        rPane.style.zIndex = '620';
+        rPane.style.zIndex = '550';
         rPane.style.pointerEvents = 'none';
     }
 
@@ -674,6 +674,13 @@ function initMap() {
     });
 
     map.addLayer(markerClusterGroup);
+
+    // Auto-refresh airline route lines on moveend/zoomend to guarantee unbroken display
+    map.on('moveend zoomend', () => {
+        if (selectedAirlines.size > 0 && activeRouteOrigin) {
+            renderRouteLines(currentlyFilteredAirports);
+        }
+    });
 
     // Click map background (neutral area) to clear active mode/overlays and restore neutral global state
     map.on('click', () => {
@@ -2126,8 +2133,15 @@ function createBezierArcPoints(lat1, lon1, lat2, lon2, numPoints = 30) {
 
 function renderRouteLines(filteredAirports) {
     if (!map) return;
+
+    if (!map.getPane('routeLinesPane')) {
+        const rPane = map.createPane('routeLinesPane');
+        rPane.style.zIndex = '550';
+        rPane.style.pointerEvents = 'none';
+    }
+
     if (!activeRouteLinesGroup) {
-        activeRouteLinesGroup = L.layerGroup().addTo(map);
+        activeRouteLinesGroup = L.layerGroup([], { pane: 'routeLinesPane' }).addTo(map);
     } else {
         if (!map.hasLayer(activeRouteLinesGroup)) {
             map.addLayer(activeRouteLinesGroup);
@@ -2203,7 +2217,9 @@ function renderRouteLines(filteredAirports) {
             color: lineColor,
             weight: lineWeight,
             opacity: lineOpacity,
-            smoothFactor: 1
+            smoothFactor: 0,
+            pane: 'routeLinesPane',
+            interactive: false
         };
         if (lineDashArray) {
             routeLineOptions.dashArray = lineDashArray;
@@ -2211,9 +2227,6 @@ function renderRouteLines(filteredAirports) {
 
         const routeLine = L.polyline(arcPoints, routeLineOptions);
         activeRouteLinesGroup.addLayer(routeLine);
-        if (routeLine.bringToFront) {
-            try { routeLine.bringToFront(); } catch (e) {}
-        }
     });
 }
 
@@ -2242,18 +2255,21 @@ function focusAirportWithAnimation(ap) {
 }
 
 function showAirportDetails(ap) {
+    const isDifferentAirport = !selectedAirport || selectedAirport.icao !== ap.icao;
     activeDrawerMode = 'AIRPORT';
     selectedAirport = ap;
 
-    // Clear previous airline route lines & corridors when inspecting new airport details
-    selectedAirlines.clear();
-    activeRouteOrigin = null;
-    if (activeRouteLinesGroup) activeRouteLinesGroup.clearLayers();
-    if (flightCorridorLayerGroup && map) flightCorridorLayerGroup.clearLayers();
-    const airlinePill = document.getElementById('airline-filter-pill');
-    if (airlinePill) {
-        airlinePill.classList.add('hidden');
-        airlinePill.classList.remove('flex');
+    // Only clear previous airline route lines & corridors when inspecting a DIFFERENT airport
+    if (isDifferentAirport) {
+        selectedAirlines.clear();
+        activeRouteOrigin = null;
+        if (activeRouteLinesGroup) activeRouteLinesGroup.clearLayers();
+        if (flightCorridorLayerGroup && map) flightCorridorLayerGroup.clearLayers();
+        const airlinePill = document.getElementById('airline-filter-pill');
+        if (airlinePill) {
+            airlinePill.classList.add('hidden');
+            airlinePill.classList.remove('flex');
+        }
     }
 
     const sb = document.getElementById('sidebar-panel');
