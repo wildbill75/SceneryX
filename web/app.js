@@ -1626,6 +1626,15 @@ function toggleSelectedAirportScenery() {
 }
 
 function renderAirportsOnMap(airports) {
+    if (map && !map._hasBackgroundClickListener) {
+        map._hasBackgroundClickListener = true;
+        map.on('click', function (e) {
+            if (selectedCountryCode || activeDrawerMode === 'COUNTRY' || activeDrawerMode === 'AIRPORT' || selectedAirport) {
+                exitCountryMode();
+            }
+        });
+    }
+
     markerClusterGroup.clearLayers();
 
     const markers = [];
@@ -1657,6 +1666,9 @@ function renderAirportsOnMap(airports) {
 
         // Left-Click event: opens detailed drawer on right sidebar (or Alt+Click for Flight Corridor)
         marker.on('click', function (e) {
+            if (e.originalEvent) {
+                L.DomEvent.stopPropagation(e.originalEvent);
+            }
             if (e.originalEvent && (e.originalEvent.altKey || e.originalEvent.metaKey)) {
                 setArrivalAirportCorridor(ap);
             } else {
@@ -2781,10 +2793,14 @@ function exitCountryMode() {
     selectedCountryCode = null;
     selectedCountryName = '';
     expandedCountryIcao = null;
+    selectedAirport = null;
 
-    // 1. Hide Country Mode drawer & close drawer panel
+    // 1. Hide Country Mode & Airport Mode drawers, close drawer panel
     const cMode = document.getElementById('drawer-country-mode');
     if (cMode) cMode.classList.add('hidden');
+
+    const apMode = document.getElementById('drawer-airport-mode');
+    if (apMode) apMode.classList.add('hidden');
 
     const drawer = document.getElementById('detail-drawer');
     if (drawer) drawer.classList.add('translate-x-full');
@@ -2811,25 +2827,7 @@ function exitCountryMode() {
 }
 
 function closeDrawer() {
-    if (activeDrawerMode === 'COUNTRY' || selectedCountryCode) {
-        exitCountryMode();
-        return;
-    }
-
-    activeDrawerMode = 'MAP';
-    selectedAirport = null;
-    selectedCountryCode = null;
-    expandedCountryIcao = null;
-
-    const sb = document.getElementById('sidebar-panel');
-    if (sb) sb.classList.remove('-ml-80', 'opacity-0', 'pointer-events-none');
-
-    if (countryGeoJsonLayer) {
-        countryGeoJsonLayer.eachLayer(l => countryGeoJsonLayer.resetStyle(l));
-    }
-
-    const drawer = document.getElementById('detail-drawer');
-    if (drawer) drawer.classList.add('translate-x-full');
+    exitCountryMode();
 }
 
 /* ================= STAR RATING WIDGET LOGIC (AIRPORT DETAIL) ================= */
