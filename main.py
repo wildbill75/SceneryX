@@ -1613,7 +1613,7 @@ class Api:
             if pricing_type == 'Payware' or (vendor and vendor.lower() not in ['unknown', 'microsoft / asobo', 'asobo', 'unknown vendor']):
                 target_url = f"https://secure.simmarket.com/advanced_search_result.php?keywords={q_enc}"
             else:
-                target_url = f"https://flightsim.to/search?q={q_enc}"
+                target_url = f"https://flightsim.to/search?q={q_enc}&exclude_cat=gsx-pro"
 
         webbrowser.open(target_url)
         return json.dumps({"status": "ok", "url": target_url})
