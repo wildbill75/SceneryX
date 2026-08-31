@@ -910,7 +910,7 @@ function openCountryDrawer(iso, countryName) {
 
                 let accordionHtml = '';
                 const sources = ap.all_sources || [];
-                const fsToSearchUrl = `https://flightsim.to/search?q=${encodeURIComponent(ap.icao)}&cat=airports,scenery&exclude_cat=static-aircraft,gsx-pro`;
+                const fsToSearchUrl = `https://flightsim.to/search?q=${encodeURIComponent(ap.icao)}&cat=airports,scenery&exclude_cat=static-aircraft,gsx-pro&sim=msfs2020,msfs2024`;
                 const simMarketSearchUrl = `https://secure.simmarket.com/advanced_search_result.php?keywords=${encodeURIComponent(ap.icao)}`;
 
                 let rowsHtml = '';
