@@ -527,7 +527,7 @@
 
             <!-- RIGHT DETAIL DRAWER OVERLAY -->
             <aside id="detail-drawer" class="absolute right-0 top-0 bottom-0 w-[460px] glass-panel z-[1001] transform translate-x-full transition-transform duration-300 ease-in-out border-l border-slate-800/80 flex flex-col pointer-events-auto">
-                <div class="p-5 space-y-6 overflow-y-auto flex-1 pt-4">
+                <div class="p-5 overflow-y-auto flex-1 pt-4 flex flex-col min-h-0">
                     <!-- AIRPORT DETAIL MODE CONTAINER -->
                     <div id="drawer-airport-mode" class="space-y-6">
                         <!-- 1. HERO AIRPORT HEADER CARD -->
@@ -666,9 +666,9 @@
                     </div>
 
                     <!-- COUNTRY OVERVIEW MODE CONTAINER -->
-                    <div id="drawer-country-mode" class="space-y-5 hidden">
+                    <div id="drawer-country-mode" class="space-y-4 hidden flex-1 flex flex-col min-h-0">
                         <!-- 1. HERO COUNTRY HEADER CARD WITH GRADIENT OPACITY FLAG BADGE -->
-                        <div class="p-4 rounded-2xl bg-gradient-to-br from-indigo-950/90 via-slate-900 to-slate-950 border border-indigo-500/30 space-y-3 shadow-xl relative overflow-hidden">
+                        <div class="p-4 rounded-2xl bg-gradient-to-br from-indigo-950/90 via-slate-900 to-slate-950 border border-indigo-500/30 space-y-3 shadow-xl relative overflow-hidden shrink-0">
                             <div class="flex items-start justify-between gap-3">
                                 <div class="flex items-center gap-3 min-w-0 flex-1">
                                     <!-- SQUARE FLAG BADGE WITH GRADIENT OPACITY EFFECT -->
@@ -699,7 +699,7 @@
                         </div>
 
                         <!-- 2. SCENERY PRICING MODEL BREAKDOWN (INTERACTIVE TOGGLE BUTTONS) -->
-                        <div class="space-y-2">
+                        <div class="space-y-2 shrink-0">
                             <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Scenery Pricing Breakdown</label>
                             <div class="grid grid-cols-2 gap-2">
                                 <button id="country-btn-payware" onclick="toggleCountryPricingFilter('PAYWARE')" class="p-3 rounded-xl border flex items-center justify-between transition-all cursor-pointer text-left group hover:scale-[1.02]">
@@ -737,7 +737,7 @@
                         </div>
 
                         <!-- 3. AIRPORT TYPE BREAKDOWN (INTERACTIVE TOGGLE BUTTONS) -->
-                        <div class="space-y-2">
+                        <div class="space-y-2 shrink-0">
                             <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Airport Types</label>
                             <div class="grid grid-cols-2 gap-2 text-xs">
                                 <button id="country-btn-type-int" onclick="toggleCountryTypeFilter('INT')" class="p-2.5 rounded-xl border flex items-center justify-between transition-all cursor-pointer text-left hover:scale-[1.02]">
@@ -760,13 +760,13 @@
                         </div>
 
                         <!-- 4. CATEGORIZED AIRPORT LIST (CLICK TO FOCUS AIRPORT) -->
-                        <div class="space-y-2">
-                            <div class="flex items-center justify-between mb-1">
+                        <div class="space-y-2 flex-1 flex flex-col min-h-0 pt-1">
+                            <div class="flex items-center justify-between mb-1 shrink-0">
                                 <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Custom Sceneries List</label>
                                 <span id="country-scenery-count-badge" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700">0 Sceneries</span>
                             </div>
 
-                            <div id="country-airports-list" class="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+                            <div id="country-airports-list" class="space-y-2 flex-1 overflow-y-auto pr-1">
                                 <!-- Populated dynamically by app.js -->
                             </div>
                         </div>
