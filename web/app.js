@@ -750,7 +750,7 @@ function openCountryDrawer(iso, countryName) {
     const flagImgEl = document.getElementById('country-drawer-flag-img');
     const flagBgEl = document.getElementById('country-hero-flag-bg');
     const flagUrl = `https://flagcdn.com/w160/${isoUpper.toLowerCase()}.png`;
-    const flagBgUrl = `https://flagcdn.com/w320/${isoUpper.toLowerCase()}.png`;
+    const flagBgUrl = `https://flagcdn.com/w640/${isoUpper.toLowerCase()}.png`;
 
     if (flagImgEl) {
         flagImgEl.src = flagUrl;
