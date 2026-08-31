@@ -267,9 +267,6 @@ function filterByAirline(airlineName, btnEl = null) {
         } else {
             selectedAirline = Array.from(selectedAirlines)[selectedAirlines.size - 1];
         }
-        if (btnEl) {
-            btnEl.className = 'text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer shadow-sm bg-slate-950 text-slate-200 border-slate-800/80 hover:border-cyan-500/50 hover:text-cyan-300';
-        }
     } else {
         const destIcaos = (originAp.routes && originAp.routes[airlineName]) || [];
         if (destIcaos.length === 0 && selectedAirlines.size === 0) {
@@ -284,14 +281,40 @@ function filterByAirline(airlineName, btnEl = null) {
         selectedAirlines.add(airlineName);
         selectedAirline = airlineName;
         activeRouteOrigin = originAp;
-        if (btnEl) {
-            btnEl.className = 'text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer shadow-sm bg-cyan-500/25 text-cyan-300 border-cyan-400 shadow-[0_0_12px_rgba(56,189,248,0.4)] scale-105 font-bold';
-        }
     }
 
     filterAirports();
     updateFilterUI();
     updateAirlinePillsUI(originAp);
+}
+
+let AIRLINE_TO_IATA = {};
+let AIRLINE_TO_IATA_LOWER = {};
+
+async function loadAirlineIataDatabase() {
+    try {
+        const resp = await fetch('airlines_iata.json');
+        if (resp.ok) {
+            AIRLINE_TO_IATA = await resp.json();
+            AIRLINE_TO_IATA_LOWER = {};
+            for (const [k, v] of Object.entries(AIRLINE_TO_IATA)) {
+                if (k && v) AIRLINE_TO_IATA_LOWER[k.toLowerCase()] = v;
+            }
+        }
+    } catch (e) {
+        console.warn("Could not load airlines_iata.json:", e);
+    }
+}
+loadAirlineIataDatabase();
+
+function getAirlineIata(al) {
+    if (!al) return null;
+    const clean = al.trim();
+    if (AIRLINE_TO_IATA[clean]) return AIRLINE_TO_IATA[clean];
+    const lower = clean.toLowerCase();
+    if (AIRLINE_TO_IATA_LOWER[lower]) return AIRLINE_TO_IATA_LOWER[lower];
+    if (clean.length === 2 && clean === clean.toUpperCase()) return clean;
+    return null;
 }
 
 function updateAirlinePillsUI(ap) {
@@ -305,10 +328,17 @@ function updateAirlinePillsUI(ap) {
         if (!alName) return;
 
         const isActive = selectedAirlines.has(alName) && (activeRouteOrigin && activeRouteOrigin.icao === ap.icao);
+        const img = btn.querySelector('img');
         if (isActive) {
-            btn.className = 'text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer shadow-sm bg-cyan-500/25 text-cyan-300 border-cyan-400 shadow-[0_0_12px_rgba(56,189,248,0.4)] scale-105 font-bold';
+            btn.className = 'group relative min-h-[50px] rounded-xl overflow-hidden border-2 transition-all cursor-pointer flex items-center justify-center p-1.5 shadow-sm text-center border-cyan-400 bg-cyan-950/50 shadow-[0_0_14px_rgba(56,189,248,0.5)] scale-[1.03]';
+            if (img) {
+                img.className = 'w-full h-full object-contain opacity-100 transition-opacity duration-200';
+            }
         } else {
-            btn.className = 'text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer shadow-sm bg-slate-950 text-slate-200 border-slate-800/80 hover:border-cyan-500/50 hover:text-cyan-300';
+            btn.className = 'group relative min-h-[50px] rounded-xl overflow-hidden border transition-all cursor-pointer flex items-center justify-center p-1.5 shadow-sm text-center border-slate-800/90 bg-slate-950/90 hover:border-cyan-500/60';
+            if (img) {
+                img.className = 'w-full h-full object-contain opacity-60 group-hover:opacity-100 transition-opacity duration-200';
+            }
         }
     });
 }
@@ -2434,7 +2464,7 @@ function showAirportDetails(ap) {
         }
     }
 
-    // Render Operating Airlines Card (Simple Clean Text Badges, in English - Alphabetical & Interactive)
+    // Render Operating Airlines Card (3x3 Grid with Airline Logo Background)
     const airlinesListEl = document.getElementById('drawer-airlines-list');
     const airlinesCountEl = document.getElementById('drawer-airlines-count');
     if (airlinesListEl && airlinesCountEl) {
@@ -2443,22 +2473,35 @@ function showAirportDetails(ap) {
             airlinesCountEl.innerText = `${airlines.length} Airlines`;
             airlinesListEl.innerHTML = airlines.map(al => {
                 const isActive = selectedAirlines.has(al) && (activeRouteOrigin && activeRouteOrigin.icao === ap.icao);
-                const activeClass = isActive 
-                    ? 'bg-cyan-500/25 text-cyan-300 border-cyan-400 shadow-[0_0_12px_rgba(56,189,248,0.4)] scale-105 font-bold' 
-                    : 'bg-slate-950 text-slate-200 border-slate-800/80 hover:border-cyan-500/50 hover:text-cyan-300';
+                const activeBtnClass = isActive 
+                    ? 'border-2 border-cyan-400 bg-cyan-950/50 shadow-[0_0_14px_rgba(56,189,248,0.5)] scale-[1.03]' 
+                    : 'border border-slate-800/90 bg-slate-950/90 hover:border-cyan-500/60 shadow-sm';
+                const activeImgClass = isActive
+                    ? 'opacity-100'
+                    : 'opacity-60 group-hover:opacity-100';
+
+                const iata = getAirlineIata(al);
+                const logoUrl = iata ? `https://images.kiwi.com/airlines/64x64/${iata}.png` : '';
                 const safeAl = al.replace(/'/g, "\\'");
                 const safeAttrAl = al.replace(/"/g, '&quot;');
                 const dests = (ap.routes && ap.routes[al]) ? ap.routes[al].length : 0;
                 const tooltipText = dests > 0 ? `Show ${dests} direct flight connections from ${ap.icao} on ${al}` : `Filter map by ${al}`;
+
                 return `<button data-airline="${safeAttrAl}" onclick="filterByAirline('${safeAl}', this)" 
-                                class="text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer shadow-sm ${activeClass}" 
+                                class="group relative min-h-[50px] rounded-xl overflow-hidden transition-all cursor-pointer flex items-center justify-center p-1.5 text-center ${activeBtnClass}" 
                                 title="${tooltipText}">
-                            ${al}
+                            ${logoUrl ? `
+                            <div class="absolute inset-0 flex items-center justify-center p-1 pointer-events-none">
+                                <img src="${logoUrl}" class="w-full h-full object-contain ${activeImgClass} transition-opacity duration-200" alt="${safeAttrAl}" onerror="this.style.display='none'" />
+                            </div>` : ''}
+                            <span class="relative z-10 text-[11px] font-black text-white leading-tight text-center line-clamp-2 px-1" style="text-shadow: 0 1px 3px rgba(0,0,0,0.95), 0 0 2px rgba(0,0,0,0.9), 0 0 5px rgba(0,0,0,0.85);">
+                                ${al}
+                            </span>
                         </button>`;
             }).join('');
         } else {
             airlinesCountEl.innerText = `0 Airlines`;
-            airlinesListEl.innerHTML = `<span class="text-xs text-slate-500 italic">No scheduled airlines data available for this airport.</span>`;
+            airlinesListEl.innerHTML = `<span class="col-span-3 text-xs text-slate-500 italic py-2 text-center">No scheduled airlines data available for this airport.</span>`;
         }
     }
 
