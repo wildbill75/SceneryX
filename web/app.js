@@ -854,36 +854,41 @@ function openCountryDrawer(iso, countryName) {
 
                 let accordionHtml = '';
                 if (isExpanded) {
+                    const hasAddon = !!activeSrc || pt !== 'Default';
+                    const numSources = (ap.all_sources || []).length;
                     accordionHtml = `
                         <div class="mt-3 pt-3 border-t border-slate-800/80 space-y-2.5">
-                            <div class="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800 text-[11px] space-y-1.5 font-mono">
-                                <div class="flex items-center justify-between text-slate-300">
-                                    <span class="text-slate-500">Creator / Publisher:</span>
-                                    <span class="font-bold text-white">${vendorStr}</span>
+                            <div class="p-2.5 rounded-lg bg-slate-950/70 border border-slate-800/80 text-[11px] space-y-2 font-mono">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-slate-500 font-medium">Installed Addon:</span>
+                                    ${hasAddon ? `<span class="font-bold text-emerald-400 flex items-center gap-1"><i class="fa-solid fa-circle-check text-xs"></i> Yes (${numSources} Pack${numSources > 1 ? 's' : ''})</span>` : `<span class="font-bold text-slate-400 flex items-center gap-1"><i class="fa-solid fa-ban text-xs"></i> None (Default MSFS)</span>`}
                                 </div>
-                                <div class="flex items-center justify-between text-slate-400 text-[10px]">
-                                    <span class="text-slate-500">Active Package:</span>
-                                    <span class="truncate max-w-[180px] text-slate-300">${safeFolder}</span>
+                                ${hasAddon ? `
+                                <div class="flex items-center justify-between">
+                                    <span class="text-slate-500 font-medium">Developer / Vendor:</span>
+                                    <span class="font-bold text-white truncate max-w-[160px]">${vendorStr}</span>
+                                </div>
+                                <div class="flex items-center justify-between text-[10px]">
+                                    <span class="text-slate-500">Package Folder:</span>
+                                    <span class="truncate max-w-[170px] text-slate-300">${safeFolder}</span>
                                 </div>
                                 ${sizeStr ? `
-                                <div class="flex items-center justify-between text-slate-400 text-[10px]">
-                                    <span class="text-slate-500">Package Size:</span>
-                                    <span class="text-slate-300">${sizeStr}</span>
+                                <div class="flex items-center justify-between text-[10px]">
+                                    <span class="text-slate-500">Folder Size:</span>
+                                    <span class="text-slate-300 font-semibold">${sizeStr}</span>
                                 </div>` : ''}
+                                ` : `
+                                <div class="text-[10px] text-slate-400 leading-tight pt-0.5">
+                                    Procedural MSFS base airport. No custom scenery currently installed in your Community folder.
+                                </div>
+                                `}
                             </div>
 
-                            <div class="grid grid-cols-2 gap-2 text-xs">
-                                <button onclick="event.stopPropagation(); toggleCountrySceneryInPlace('${ap.icao}', '${activeSrc ? 'DEFAULT' : safeFolder}')"
-                                        class="px-2.5 py-1.5 rounded-lg font-bold transition-all flex items-center justify-center gap-1.5 ${activeSrc ? 'bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40' : 'bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40'}">
-                                    <i class="fa-solid ${activeSrc ? 'fa-power-off' : 'fa-check'} text-xs"></i>
-                                    <span>${activeSrc ? 'Switch Default' : 'Activate Addon'}</span>
-                                </button>
-                                <a href="${storeSearchUrl}" target="_blank" onclick="event.stopPropagation()"
-                                   class="px-2.5 py-1.5 rounded-lg font-bold bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-300 border border-indigo-500/40 transition-all flex items-center justify-center gap-1.5 no-underline">
-                                    <i class="fa-solid fa-store text-xs"></i>
-                                    <span>Creator Store</span>
-                                </a>
-                            </div>
+                            <a href="${storeSearchUrl}" target="_blank" onclick="event.stopPropagation()"
+                               class="w-full py-2 px-3 rounded-lg font-bold bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/40 transition-all flex items-center justify-center gap-2 no-underline text-xs shadow-md group">
+                                <i class="fa-solid fa-store text-indigo-400 group-hover:scale-110 transition-transform"></i>
+                                <span>Discover Sceneries on Flightsim.to</span>
+                            </a>
                         </div>
                     `;
                 }
