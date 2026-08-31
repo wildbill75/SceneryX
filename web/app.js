@@ -615,6 +615,19 @@ function initMap() {
         }
     });
 
+    const mapEl = document.getElementById('map');
+    if (mapEl && !mapEl._hasExitClickListener) {
+        mapEl._hasExitClickListener = true;
+        mapEl.addEventListener('click', (e) => {
+            if (e.target.closest('#detail-drawer') || e.target.closest('#sidebar-panel') || e.target.closest('.custom-map-marker') || e.target.closest('.leaflet-marker-icon')) {
+                return;
+            }
+            if (selectedCountryCode || activeDrawerMode === 'COUNTRY' || selectedAirport || activeDrawerMode === 'AIRPORT') {
+                exitCountryMode();
+            }
+        });
+    }
+
     loadCountryOverlays();
 }
 
@@ -677,7 +690,11 @@ async function loadCountryOverlays() {
                     },
                     click: (e) => {
                         L.DomEvent.stopPropagation(e);
-                        toggleCountrySelection(iso, cName, layer);
+                        if (selectedCountryCode && selectedCountryCode === iso) {
+                            exitCountryMode();
+                        } else {
+                            toggleCountrySelection(iso, cName, layer);
+                        }
                     }
                 });
             }
