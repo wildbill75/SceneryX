@@ -2776,16 +2776,58 @@ async function toggleFixPatchPackage(path, icao) {
     }
 }
 
+function exitCountryMode() {
+    activeDrawerMode = 'MAP';
+    selectedCountryCode = null;
+    selectedCountryName = '';
+    expandedCountryIcao = null;
+
+    // 1. Hide Country Mode drawer & close drawer panel
+    const cMode = document.getElementById('drawer-country-mode');
+    if (cMode) cMode.classList.add('hidden');
+
+    const drawer = document.getElementById('detail-drawer');
+    if (drawer) drawer.classList.add('translate-x-full');
+
+    // 2. Slide Left Sidebar back into view
+    const sb = document.getElementById('sidebar-panel');
+    if (sb) sb.classList.remove('-ml-80', 'opacity-0', 'pointer-events-none');
+
+    // 3. Reset Country Polygon Overlay on Leaflet map
+    if (selectedCountryPolygonLayer) {
+        map.removeLayer(selectedCountryPolygonLayer);
+        selectedCountryPolygonLayer = null;
+    }
+    if (countryGeoJsonLayer) {
+        countryGeoJsonLayer.eachLayer(l => countryGeoJsonLayer.resetStyle(l));
+    }
+
+    // 4. Hide Country Filter Status Indicator Pill
+    const statusEl = document.getElementById('country-filter-indicator');
+    if (statusEl) statusEl.classList.add('hidden');
+
+    // 5. Restore global airport map markers according to global sidebar filters
+    filterAirports();
+}
+
 function closeDrawer() {
+    if (activeDrawerMode === 'COUNTRY' || selectedCountryCode) {
+        exitCountryMode();
+        return;
+    }
+
     activeDrawerMode = 'MAP';
     selectedAirport = null;
     selectedCountryCode = null;
     expandedCountryIcao = null;
+
     const sb = document.getElementById('sidebar-panel');
     if (sb) sb.classList.remove('-ml-80', 'opacity-0', 'pointer-events-none');
+
     if (countryGeoJsonLayer) {
         countryGeoJsonLayer.eachLayer(l => countryGeoJsonLayer.resetStyle(l));
     }
+
     const drawer = document.getElementById('detail-drawer');
     if (drawer) drawer.classList.add('translate-x-full');
 }
