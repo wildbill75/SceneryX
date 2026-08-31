@@ -711,11 +711,7 @@ async function loadCountryOverlays() {
                     },
                     click: (e) => {
                         L.DomEvent.stopPropagation(e);
-                        if (selectedCountryCode || activeDrawerMode === 'COUNTRY') {
-                            exitCountryMode();
-                        } else {
-                            toggleCountrySelection(iso, cName, layer);
-                        }
+                        toggleCountrySelection(iso, cName, layer);
                     }
                 });
             }
@@ -1141,10 +1137,10 @@ function toggleCountrySelection(iso, countryName, layer, forceSelect = false) {
             }
 
             if (targetLayer && targetLayer.getBounds) {
-                map.fitBounds(targetLayer.getBounds(), { padding: [40, 40], maxZoom: 7, animate: true });
+                map.fitBounds(targetLayer.getBounds(), { padding: [40, 40], maxZoom: 7, animate: true, duration: 0.5 });
             }
         } else if (layer && layer.getBounds) {
-            map.fitBounds(layer.getBounds(), { padding: [40, 40], maxZoom: 7, animate: true });
+            map.fitBounds(layer.getBounds(), { padding: [40, 40], maxZoom: 7, animate: true, duration: 0.5 });
         }
     }
 
