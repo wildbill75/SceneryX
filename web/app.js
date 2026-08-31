@@ -1048,7 +1048,11 @@ function selectCountryAirport(icao) {
     if (!ap) return;
 
     if (map && ap.lat && ap.lon) {
-        map.flyTo([ap.lat, ap.lon], 13, {
+        let flyLon = ap.lon;
+        if (((ap.country === 'RU' || ap.iso_country === 'RU') || (ap.icao && ap.icao.startsWith('UH'))) && flyLon < -100) {
+            flyLon = flyLon + 360;
+        }
+        map.flyTo([ap.lat, flyLon], 13, {
             animate: true,
             duration: 1.2
         });
@@ -1151,7 +1155,11 @@ function toggleCountrySelection(iso, countryName, layer, forceSelect = false) {
                 if (mainFrance) targetLayer = mainFrance;
             }
 
-            if (targetLayer && targetLayer.getBounds) {
+            if (isoUpper === 'RU') {
+                // Optimal framing across the entire Russian Federation on a single continuous map
+                const ruBounds = L.latLngBounds([[41.15, 20.0], [77.5, 188.0]]);
+                map.fitBounds(ruBounds, { padding: [40, 40], maxZoom: 4, animate: true, duration: 0.5 });
+            } else if (targetLayer && targetLayer.getBounds) {
                 map.fitBounds(targetLayer.getBounds(), { padding: [40, 40], maxZoom: 7, animate: true, duration: 0.5 });
             }
         } else if (layer && layer.getBounds) {
@@ -1722,8 +1730,14 @@ function renderAirportsOnMap(airports) {
     airports.forEach(ap => {
         if (!ap.lat || !ap.lon) return;
 
+        let displayLon = ap.lon;
+        // Normalize Chukotka / Russian far-east airports so they display attached to the continuous Russia map
+        if (((ap.country === 'RU' || ap.iso_country === 'RU') || (ap.icao && ap.icao.startsWith('UH'))) && displayLon < -100) {
+            displayLon = displayLon + 360;
+        }
+
         const icon = createCustomIcon(ap);
-        const marker = L.marker([ap.lat, ap.lon], { icon: icon });
+        const marker = L.marker([ap.lat, displayLon], { icon: icon });
 
         // Bind default preview popup content
         marker.bindPopup(getAirportPopupHtml(ap), {
@@ -2177,7 +2191,11 @@ function focusAirportWithAnimation(ap) {
     lastFocusedIcao = ap.icao;
 
     if (map && ap.lat && ap.lon) {
-        map.flyTo([ap.lat, ap.lon], 14, {
+        let flyLon = ap.lon;
+        if (((ap.country === 'RU' || ap.iso_country === 'RU') || (ap.icao && ap.icao.startsWith('UH'))) && flyLon < -100) {
+            flyLon = flyLon + 360;
+        }
+        map.flyTo([ap.lat, flyLon], 14, {
             animate: true,
             duration: 1.5
         });
@@ -3281,12 +3299,18 @@ function zoomToAirportsBounds(airports) {
     const validAps = airports.filter(a => a.lat && a.lon);
     if (validAps.length === 0) return;
 
-    let minLat = 90, maxLat = -90, minLon = 180, maxLon = -180;
+    const isAllRussia = validAps.length > 0 && validAps.every(a => (a.country === 'RU' || a.iso_country === 'RU' || (a.icao && a.icao.startsWith('UH'))));
+
+    let minLat = 90, maxLat = -90, minLon = 360, maxLon = -360;
     validAps.forEach(a => {
+        let lon = a.lon;
+        if (isAllRussia && lon < -100) {
+            lon = lon + 360;
+        }
         if (a.lat < minLat) minLat = a.lat;
         if (a.lat > maxLat) maxLat = a.lat;
-        if (a.lon < minLon) minLon = a.lon;
-        if (a.lon > maxLon) maxLon = a.lon;
+        if (lon < minLon) minLon = lon;
+        if (lon > maxLon) maxLon = lon;
     });
 
     if (minLat !== 90 && maxLat !== -90) {
