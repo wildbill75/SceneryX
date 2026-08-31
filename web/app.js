@@ -1045,9 +1045,9 @@ function toggleCountrySelection(iso, countryName, layer, forceSelect = false) {
     const isoUpper = iso.toUpperCase().trim();
 
     if (selectedCountryCode === isoUpper && !forceSelect) {
-        selectedCountryCode = null;
         showToast(`Cleared country filter`, 'info');
-        closeDrawer();
+        exitCountryMode();
+        return;
     } else {
         selectedCountryCode = isoUpper;
         resetConflictingFiltersForCountrySelection();
@@ -2789,6 +2789,8 @@ async function toggleFixPatchPackage(path, icao) {
 }
 
 function exitCountryMode() {
+    const prevCountryCode = selectedCountryCode;
+
     activeDrawerMode = 'MAP';
     selectedCountryCode = null;
     selectedCountryName = '';
@@ -2824,6 +2826,21 @@ function exitCountryMode() {
 
     // 5. Restore global airport map markers according to global sidebar filters
     filterAirports();
+
+    // 6. Camera Zoom: Smoothly fly camera to the geographic region of the exited country
+    if (prevCountryCode && map) {
+        let regionKey = null;
+        for (const [rKey, isoList] of Object.entries(REGION_COUNTRY_MAP)) {
+            if (isoList.includes(prevCountryCode)) {
+                regionKey = rKey;
+                break;
+            }
+        }
+        if (regionKey && REGION_VIEWPORTS[regionKey]) {
+            const vp = REGION_VIEWPORTS[regionKey];
+            map.flyTo(vp.center, vp.zoom, { animate: true, duration: 1.2 });
+        }
+    }
 }
 
 function closeDrawer() {
