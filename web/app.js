@@ -165,7 +165,7 @@ function getCountryFlagEmoji(iso) {
     return String.fromCodePoint(...codePoints);
 }
 
-let selectedCountryPricingFilters = new Set(['PAYWARE', 'FREEWARE', 'ASOBO', 'DEFAULT']);
+let selectedCountryPricingFilters = new Set(['PAYWARE', 'FREEWARE', 'ASOBO']);
 let selectedCountryTypeFilters = new Set(['INT', 'REG', 'GA', 'HW']);
 
 function toggleCountryPricingFilter(cat) {
@@ -696,6 +696,10 @@ function openCountryDrawer(iso, countryName) {
 
     activeDrawerMode = 'COUNTRY';
     selectedAirport = null;
+
+    // Reset pricing filters on entry: Exclude 'DEFAULT' by default for lightweight rendering
+    selectedCountryPricingFilters = new Set(['PAYWARE', 'FREEWARE', 'ASOBO']);
+    updateCountryFilterButtonsUI();
 
     // Auto-hide Left Sidebar to maximize map viewport
     const sb = document.getElementById('sidebar-panel');
@@ -2833,7 +2837,15 @@ function exitCountryMode() {
             selectedCountryPolygonLayer = null;
         }
         if (countryGeoJsonLayer) {
-            countryGeoJsonLayer.eachLayer(l => countryGeoJsonLayer.resetStyle(l));
+            countryGeoJsonLayer.eachLayer(l => {
+                l.setStyle({
+                    fillColor: '#06b6d4',
+                    fillOpacity: 0.0,
+                    color: '#475569',
+                    weight: 0.5,
+                    opacity: 0.3
+                });
+            });
         }
 
         // 4. Hide Country Filter Status Indicator Pill & active Toast
