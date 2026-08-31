@@ -602,26 +602,16 @@ function initMap() {
 
     map.addLayer(markerClusterGroup);
 
-    // Click map background to clear active country filter & active flight corridor
+    // Click map background (neutral area) to clear active country filter, close drawer, and restore global mode
     map.on('click', () => {
-        let needsFilterUpdate = false;
         if (flightCorridorArrivalAirport) {
             flightCorridorArrivalAirport = null;
             if (flightCorridorLayerGroup && map) {
                 flightCorridorLayerGroup.clearLayers();
             }
-            needsFilterUpdate = true;
         }
-        if (selectedCountryCode) {
-            selectedCountryCode = null;
-            if (countryGeoJsonLayer) {
-                countryGeoJsonLayer.eachLayer(l => countryGeoJsonLayer.resetStyle(l));
-            }
-            closeDrawer();
-            needsFilterUpdate = true;
-        }
-        if (needsFilterUpdate) {
-            filterAirports();
+        if (selectedCountryCode || activeDrawerMode === 'COUNTRY' || selectedAirport || activeDrawerMode === 'AIRPORT') {
+            exitCountryMode();
         }
     });
 
@@ -1654,14 +1644,7 @@ function toggleSelectedAirportScenery() {
 }
 
 function renderAirportsOnMap(airports) {
-    if (map && !map._hasBackgroundClickListener) {
-        map._hasBackgroundClickListener = true;
-        map.on('click', function (e) {
-            if (selectedCountryCode || activeDrawerMode === 'COUNTRY' || activeDrawerMode === 'AIRPORT' || selectedAirport) {
-                exitCountryMode();
-            }
-        });
-    }
+    if (!map) return;
 
     markerClusterGroup.clearLayers();
 
