@@ -697,8 +697,6 @@ function openCountryDrawer(iso, countryName) {
     activeDrawerMode = 'COUNTRY';
     selectedAirport = null;
 
-    // Reset pricing filters on entry: Exclude 'DEFAULT' by default for lightweight rendering
-    selectedCountryPricingFilters = new Set(['PAYWARE', 'FREEWARE', 'ASOBO']);
     updateCountryFilterButtonsUI();
 
     // Auto-hide Left Sidebar to maximize map viewport
@@ -1081,6 +1079,8 @@ function toggleCountrySelection(iso, countryName, layer, forceSelect = false) {
 
     selectedCountryCode = isoUpper;
     selectedCountryName = countryName || isoUpper;
+    selectedCountryPricingFilters = new Set(['PAYWARE', 'FREEWARE', 'ASOBO']);
+    selectedCountryTypeFilters = new Set(['INT', 'REG', 'GA', 'HW']);
     resetConflictingFiltersForCountrySelection();
 
     // Smooth zoom to country bounds
