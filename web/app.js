@@ -2368,6 +2368,8 @@ function showAirportDetails(ap) {
                     : 'bg-slate-950 text-slate-200 border-slate-800/80 hover:border-cyan-500/50 hover:text-cyan-300';
                 const safeAl = al.replace(/'/g, "\\'");
                 const safeAttrAl = al.replace(/"/g, '&quot;');
+                const dests = (ap.routes && ap.routes[al]) ? ap.routes[al].length : 0;
+                const tooltipText = dests > 0 ? `Show ${dests} direct flight connections from ${ap.icao} on ${al}` : `Filter map by ${al}`;
                 return `<button data-airline="${safeAttrAl}" onclick="filterByAirline('${safeAl}', this)" 
                                 class="text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer shadow-sm ${activeClass}" 
                                 title="${tooltipText}">
