@@ -1100,10 +1100,12 @@ function toggleCountrySelection(iso, countryName, layer, forceSelect = false) {
 
     const isoUpper = iso.toUpperCase().trim();
 
-    // If currently in Country Mode, ANY click on map/polygon exits Country Mode back to Global Addon Mode
+    // If clicking the same active country, exit Country Mode. If clicking a different country, switch to it!
     if ((selectedCountryCode || activeDrawerMode === 'COUNTRY') && !forceSelect) {
-        exitCountryMode();
-        return;
+        if (selectedCountryCode === isoUpper) {
+            exitCountryMode();
+            return;
+        }
     }
 
     selectedCountryCode = isoUpper;
@@ -2892,7 +2894,7 @@ async function toggleFixPatchPackage(path, icao) {
     }
 }
 
-function restoreMapToNeutralState(flyCamera = true) {
+function exitCountryMode() {
     try {
         activeDrawerMode = 'MAP';
         selectedCountryCode = null;
@@ -2901,21 +2903,32 @@ function restoreMapToNeutralState(flyCamera = true) {
         selectedAirport = null;
         flightCorridorArrivalAirport = null;
 
-        // 1. Clear Operating Airline Route Lines & Selections
+        // 1. Hide Drawers & Slide Left Sidebar Panel Back
+        const drawer = document.getElementById('detail-drawer');
+        if (drawer) drawer.classList.add('translate-x-full');
+
+        const cMode = document.getElementById('drawer-country-mode');
+        if (cMode) cMode.classList.add('hidden');
+
+        const apMode = document.getElementById('drawer-airport-mode');
+        if (apMode) apMode.classList.add('hidden');
+
+        const sb = document.getElementById('sidebar-panel');
+        if (sb) sb.classList.remove('-ml-80', 'opacity-0', 'pointer-events-none');
+
+        // 2. Clear Operating Airline Route Lines & Flight Corridor Layers
         selectedAirlines.clear();
         activeRouteOrigin = null;
         if (activeRouteLinesGroup) {
             activeRouteLinesGroup.clearLayers();
         }
+        if (flightCorridorLayerGroup && map) {
+            flightCorridorLayerGroup.clearLayers();
+        }
         const airlinePill = document.getElementById('airline-filter-pill');
         if (airlinePill) {
             airlinePill.classList.add('hidden');
             airlinePill.classList.remove('flex');
-        }
-
-        // 2. Clear Flight Corridor Layer
-        if (flightCorridorLayerGroup && map) {
-            flightCorridorLayerGroup.clearLayers();
         }
 
         // 3. Reset Country Polygon Overlay & Hover Styles
@@ -2938,20 +2951,7 @@ function restoreMapToNeutralState(flyCamera = true) {
             });
         }
 
-        // 4. Hide Drawers & Slide Left Sidebar Panel Back
-        const cMode = document.getElementById('drawer-country-mode');
-        if (cMode) cMode.classList.add('hidden');
-
-        const apMode = document.getElementById('drawer-airport-mode');
-        if (apMode) apMode.classList.add('hidden');
-
-        const drawer = document.getElementById('detail-drawer');
-        if (drawer) drawer.classList.add('translate-x-full');
-
-        const sb = document.getElementById('sidebar-panel');
-        if (sb) sb.classList.remove('-ml-80', 'opacity-0', 'pointer-events-none');
-
-        // 5. Hide Toasts & Country Filter Indicators
+        // 4. Hide Toasts & Country Filter Indicators
         const statusEl = document.getElementById('country-filter-indicator');
         if (statusEl) statusEl.classList.add('hidden');
 
@@ -2960,38 +2960,18 @@ function restoreMapToNeutralState(flyCamera = true) {
             try { toast.remove(); } catch(e) {}
         }
 
-        // 6. Clear Search Input
-        const searchInput = document.getElementById('search-input');
-        if (searchInput) searchInput.value = '';
-        const clearSearchBtn = document.getElementById('clear-search');
-        if (clearSearchBtn) clearSearchBtn.classList.add('hidden');
-
-        // 7. Restore Global Sidebar Filters to Startup Defaults
-        selectedPricing = new Set(DEFAULT_STARTUP_PRICING);
-        selectedSources = new Set(ALL_SOURCES_LIST);
-        selectedRegion = null;
-        selectedTypes = new Set(ALL_TYPES_LIST);
-        selectedGsxFilter = 'all';
-        selectedMinRating = 0;
-
-        updateFilterUI();
+        // 5. Re-filter airports for Global Map View & Reset Camera
         filterAirports();
-
-        // 8. Neutral Camera Viewport FlyTo
-        if (flyCamera && map) {
+        if (map) {
             map.flyTo([20.0, 0.0], 2.5, { animate: true, duration: 1.2 });
         }
     } catch (e) {
-        console.error("Error in restoreMapToNeutralState:", e);
+        console.error("Error in exitCountryMode:", e);
     }
 }
 
-function exitCountryMode() {
-    restoreMapToNeutralState(true);
-}
-
 function closeDrawer() {
-    restoreMapToNeutralState(true);
+    exitCountryMode();
 }
 
 /* ================= STAR RATING WIDGET LOGIC (AIRPORT DETAIL) ================= */
