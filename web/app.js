@@ -21,7 +21,8 @@ const ALL_PRICING_LIST = ['Payware', 'Freeware / Flightsim.to', 'Asobo', 'Defaul
 const ALL_SOURCES_LIST = ['asobo', 'Community', 'StreamedPackages', 'Official'];
 const ALL_TYPES_LIST = ['International', 'Regional', 'General Aviation', 'Heli / Water'];
 
-let selectedPricing = new Set(ALL_PRICING_LIST);
+const DEFAULT_STARTUP_PRICING = ['Payware', 'Freeware / Flightsim.to', 'Asobo'];
+let selectedPricing = new Set(DEFAULT_STARTUP_PRICING);
 let selectedSources = new Set(ALL_SOURCES_LIST);
 let selectedTypes = new Set(ALL_TYPES_LIST);
 let selectedMinRating = 0; // 0 = All ratings
@@ -578,8 +579,9 @@ window.addEventListener('pywebviewready', async () => {
 
 function initMap() {
     map = L.map('map', {
-        center: [46.2276, 2.2137], // Default view Europe
-        zoom: 5,
+        center: [20.0, 0.0], // Global world view (Screenshot 3)
+        zoom: 2.5,
+        minZoom: 2,
         zoomControl: false,
         worldCopyJump: true
     });
@@ -2866,8 +2868,8 @@ function exitCountryMode() {
             try { toast.remove(); } catch(e) {}
         }
 
-        // 5. Restore global sidebar filters to default map mode (Screenshot 2)
-        selectedPricing = new Set(ALL_PRICING_LIST);
+        // 5. Restore global sidebar filters to default map mode (Screenshot 2 & 3: Default MSFS unchecked)
+        selectedPricing = new Set(DEFAULT_STARTUP_PRICING);
         selectedSources = new Set(ALL_SOURCES_LIST);
         selectedRegions.clear();
         selectedTypes = new Set(ALL_TYPES_LIST);
