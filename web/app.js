@@ -1124,9 +1124,11 @@ function toggleCountrySelection(iso, countryName, layer, forceSelect = false) {
 
 async function loadInitialAppData() {
     try {
+        updateSplashProgress(15, "Initializing SceneryX Engine...", "Starting components");
         if (!map) initMap();
         if (window.pywebview && window.pywebview.api) {
             try {
+                updateSplashProgress(25, "Loading user preferences...", "Settings & Credentials");
                 const cfgStr = await window.pywebview.api.get_settings();
                 if (cfgStr) {
                     currentSettings = JSON.parse(cfgStr);
@@ -1137,6 +1139,7 @@ async function loadInitialAppData() {
             }
 
             try {
+                updateSplashProgress(35, "Loading user ratings database...", "Database");
                 const rStr = await window.pywebview.api.get_ratings();
                 if (rStr) {
                     userRatingsMap = JSON.parse(rStr);
