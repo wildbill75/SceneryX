@@ -308,17 +308,20 @@
                 <div>
                     <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2.5">Scenery Source</label>
                     <div class="grid grid-cols-2 gap-2">
-                        <button id="filter-src-all" onclick="toggleSourceFilter('all')" class="py-2 px-3 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10">
+                        <button id="filter-src-all" onclick="toggleSourceFilter('all')" 
+                                class="col-span-2 py-2 px-3 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10 cursor-pointer"
+                                title="Afficher toutes les scènes de toutes les sources (Community, répertoires personnalisés et Streamed/Official)">
                             All Sources
                         </button>
-                        <button id="filter-src-Community" onclick="toggleSourceFilter('Community')" class="py-2 px-3 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10">
-                            Community
+                        <button id="filter-src-Community" onclick="toggleSourceFilter('Community')" 
+                                class="py-2 px-2.5 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10 cursor-pointer"
+                                title="Scènes tierces et addons installés dans les dossiers Community ou répertoires personnalisés (+ Add Path, Addon Linker, disques secondaires...)">
+                            <i class="fa-solid fa-folder-open text-[11px] text-cyan-400"></i> Community
                         </button>
-                        <button id="filter-src-StreamedPackages" onclick="toggleSourceFilter('StreamedPackages')" class="py-2 px-3 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10">
-                            Streamed (2024)
-                        </button>
-                        <button id="filter-src-asobo" onclick="toggleSourceFilter('asobo')" class="py-2 px-3 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10">
-                            Asobo
+                        <button id="filter-src-Streamed" onclick="toggleSourceFilter('Streamed')" 
+                                class="py-2 px-2.5 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10 cursor-pointer"
+                                title="Contenu officiel Microsoft & Asobo : scènes streamées à la demande (MSFS 2024), World Updates et répertoires Official / OneStore">
+                            <i class="fa-solid fa-cloud text-[11px] text-indigo-400"></i> Streamed / Official
                         </button>
                     </div>
                 </div>
