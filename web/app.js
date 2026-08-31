@@ -3274,7 +3274,29 @@ function filterAirports() {
     
     document.getElementById('clear-search').classList.toggle('hidden', search.length === 0);
 
+    // Pre-calculate active route destination ICAOs if operating airline route filter is active
+    let activeRouteDestIcaos = null;
+    if (selectedAirlines.size > 0 && activeRouteOrigin) {
+        activeRouteDestIcaos = new Set();
+        selectedAirlines.forEach(al => {
+            const dests = (activeRouteOrigin.routes && activeRouteOrigin.routes[al]) || [];
+            dests.forEach(d => activeRouteDestIcaos.add(d));
+        });
+    }
+
     currentlyFilteredAirports = allAirportsData.filter(ap => {
+        // High Priority: Origin Airport & Direct Airline Route Destinations (Bypasses global filters)
+        if (activeRouteDestIcaos) {
+            if (ap.icao === activeRouteOrigin.icao || activeRouteDestIcaos.has(ap.icao)) {
+                if (search && search.length > 0) {
+                    const searchStr = `${ap.icao} ${ap.name || ''} ${ap.city || ''} ${ap.country || ''}`.toLowerCase();
+                    if (!searchStr.includes(search)) return false;
+                }
+                return true;
+            }
+            return false;
+        }
+
         // Active Flight Corridor Filter (Alt + Click)
         if (selectedAirport && flightCorridorArrivalAirport) {
             if (!isAirportInCorridor(ap, selectedAirport, flightCorridorArrivalAirport, 250)) {
