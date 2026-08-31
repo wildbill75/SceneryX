@@ -854,41 +854,70 @@ function openCountryDrawer(iso, countryName) {
 
                 let accordionHtml = '';
                 if (isExpanded) {
-                    const hasAddon = !!activeSrc || pt !== 'Default';
-                    const numSources = (ap.all_sources || []).length;
-                    accordionHtml = `
-                        <div class="mt-3 pt-3 border-t border-slate-800/80 space-y-2.5">
-                            <div class="p-2.5 rounded-lg bg-slate-950/70 border border-slate-800/80 text-[11px] space-y-2 font-mono">
-                                <div class="flex items-center justify-between">
-                                    <span class="text-slate-500 font-medium">Installed Addon:</span>
-                                    ${hasAddon ? `<span class="font-bold text-emerald-400 flex items-center gap-1"><i class="fa-solid fa-circle-check text-xs"></i> Yes (${numSources} Pack${numSources > 1 ? 's' : ''})</span>` : `<span class="font-bold text-slate-400 flex items-center gap-1"><i class="fa-solid fa-ban text-xs"></i> None (Default MSFS)</span>`}
-                                </div>
-                                ${hasAddon ? `
-                                <div class="flex items-center justify-between">
-                                    <span class="text-slate-500 font-medium">Developer / Vendor:</span>
-                                    <span class="font-bold text-white truncate max-w-[160px]">${vendorStr}</span>
-                                </div>
-                                <div class="flex items-center justify-between text-[10px]">
-                                    <span class="text-slate-500">Package Folder:</span>
-                                    <span class="truncate max-w-[170px] text-slate-300">${safeFolder}</span>
-                                </div>
-                                ${sizeStr ? `
-                                <div class="flex items-center justify-between text-[10px]">
-                                    <span class="text-slate-500">Folder Size:</span>
-                                    <span class="text-slate-300 font-semibold">${sizeStr}</span>
-                                </div>` : ''}
-                                ` : `
-                                <div class="text-[10px] text-slate-400 leading-tight pt-0.5">
-                                    Procedural MSFS base airport. No custom scenery currently installed in your Community folder.
-                                </div>
-                                `}
-                            </div>
+                    const sources = ap.all_sources || [];
+                    const fsToSearchUrl = `https://flightsim.to/sceneries?q=${encodeURIComponent(ap.icao + ' ' + (ap.name || ''))}`;
 
-                            <a href="${storeSearchUrl}" target="_blank" onclick="event.stopPropagation()"
-                               class="w-full py-2 px-3 rounded-lg font-bold bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-200 border border-indigo-500/40 transition-all flex items-center justify-center gap-2 no-underline text-xs shadow-md group">
-                                <i class="fa-solid fa-store text-indigo-400 group-hover:scale-110 transition-transform"></i>
-                                <span>Discover Sceneries on Flightsim.to</span>
-                            </a>
+                    let rowsHtml = '';
+                    if (sources.length > 0) {
+                        rowsHtml = sources.map(s => {
+                            const isInst = !s.is_disabled;
+                            const devName = s.vendor || (s.is_asobo_official ? 'Microsoft / Asobo' : 'Community');
+                            const sPt = s.pricing_type || (s.is_payware ? 'Payware' : (s.is_asobo_official ? 'Asobo' : 'Freeware'));
+                            let pBadge = '';
+                            if (sPt === 'Payware') pBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">PAYWARE</span>`;
+                            else if (sPt === 'Asobo') pBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">ASOBO</span>`;
+                            else pBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">FREEWARE</span>`;
+
+                            return `
+                                <div onclick="event.stopPropagation(); window.open('${fsToSearchUrl}', '_blank')"
+                                     class="flex items-center justify-between p-2 rounded-lg bg-slate-900/70 hover:bg-slate-800/80 border border-slate-800/80 cursor-pointer transition-all group">
+                                    <div class="flex items-center gap-2 min-w-0 flex-1">
+                                        <span class="text-xs font-mono font-black text-cyan-300 shrink-0">${ap.icao}</span>
+                                        <span class="text-xs font-bold text-slate-200 group-hover:text-white truncate min-w-0">${devName}</span>
+                                        ${pBadge}
+                                    </div>
+                                    <div class="shrink-0 pl-2">
+                                        ${isInst ? '<i class="fa-solid fa-circle-check text-emerald-400 text-sm" title="Installed"></i>' : '<i class="fa-regular fa-circle text-slate-600 text-sm group-hover:text-slate-400" title="Not Installed"></i>'}
+                                    </div>
+                                </div>
+                            `;
+                        }).join('');
+                    } else {
+                        rowsHtml = `
+                            <div onclick="event.stopPropagation(); window.open('${fsToSearchUrl}', '_blank')"
+                                 class="flex items-center justify-between p-2 rounded-lg bg-slate-900/70 hover:bg-slate-800/80 border border-slate-800/80 cursor-pointer transition-all group">
+                                <div class="flex items-center gap-2 min-w-0 flex-1">
+                                    <span class="text-xs font-mono font-black text-cyan-300 shrink-0">${ap.icao}</span>
+                                    <span class="text-xs font-bold text-slate-300 group-hover:text-white truncate min-w-0">Microsoft / Asobo (Default)</span>
+                                    <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-slate-800 text-slate-400 border border-slate-700">DEFAULT</span>
+                                </div>
+                                <div class="shrink-0 pl-2">
+                                    <i class="fa-solid fa-circle-check text-emerald-400 text-sm" title="Installed"></i>
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    const freewareSearchRow = `
+                        <div onclick="event.stopPropagation(); window.open('${fsToSearchUrl}', '_blank')"
+                             class="flex items-center justify-between p-2 rounded-lg bg-slate-900/40 hover:bg-slate-800/60 border border-slate-800/50 cursor-pointer transition-all group opacity-85 hover:opacity-100">
+                            <div class="flex items-center gap-2 min-w-0 flex-1">
+                                <span class="text-xs font-mono font-black text-slate-400 shrink-0">${ap.icao}</span>
+                                <span class="text-xs font-semibold text-slate-400 group-hover:text-cyan-300 truncate min-w-0">Search Sceneries on Flightsim.to</span>
+                                <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">FREEWARE</span>
+                            </div>
+                            <div class="shrink-0 pl-2">
+                                <i class="fa-regular fa-circle text-slate-600 text-sm group-hover:text-cyan-400" title="Not Installed - Search Online"></i>
+                            </div>
+                        </div>
+                    `;
+
+                    accordionHtml = `
+                        <div class="mt-2.5 pt-2.5 border-t border-slate-800/80">
+                            <div class="p-2 rounded-xl bg-slate-950/80 border border-slate-800/80 space-y-1.5 font-mono">
+                                ${rowsHtml}
+                                ${freewareSearchRow}
+                            </div>
                         </div>
                     `;
                 }
