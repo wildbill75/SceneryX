@@ -21,7 +21,7 @@ const ALL_PRICING_LIST = ['Payware', 'Freeware / Flightsim.to', 'Asobo', 'Defaul
 const ALL_SOURCES_LIST = ['asobo', 'Community', 'StreamedPackages', 'Official'];
 const ALL_TYPES_LIST = ['International', 'Regional', 'General Aviation', 'Heli / Water'];
 
-let selectedPricing = new Set(['Payware', 'Freeware / Flightsim.to', 'Asobo']);
+let selectedPricing = new Set(ALL_PRICING_LIST);
 let selectedSources = new Set(ALL_SOURCES_LIST);
 let selectedTypes = new Set(ALL_TYPES_LIST);
 let selectedMinRating = 0; // 0 = All ratings
@@ -2866,7 +2866,13 @@ function exitCountryMode() {
             try { toast.remove(); } catch(e) {}
         }
 
-        // 5. Restore global airport map markers according to global sidebar filters
+        // 5. Restore global sidebar filters to default map mode (Screenshot 2)
+        selectedPricing = new Set(ALL_PRICING_LIST);
+        selectedSources = new Set(ALL_SOURCES_LIST);
+        selectedRegions.clear();
+        selectedTypes = new Set(ALL_TYPES_LIST);
+        selectedGsxFilter = 'all';
+        updateFilterUI();
         filterAirports();
 
         // 6. Camera Zoom: Smoothly fly camera to the geographic region of the exited country
@@ -3407,7 +3413,7 @@ function clearSearch() {
     filterAirports();
 }
 
-const DEFAULT_STARTUP_PRICING = ['Payware', 'Freeware / Flightsim.to', 'Asobo'];
+const DEFAULT_STARTUP_PRICING = ['Payware', 'Freeware / Flightsim.to', 'Asobo', 'Default'];
 
 function filterByPricingPill(pricing) {
     if (pricing === 'All') {
