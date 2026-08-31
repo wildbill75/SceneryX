@@ -608,57 +608,57 @@
                                 <span class="text-xs font-extrabold text-slate-300 uppercase tracking-wider block">GSX Profile</span>
                                 <span id="drawer-gsx-badge" class="text-xs font-mono font-bold px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">Profile Installed</span>
                             </div>
-                                    <span id="drawer-type-badge" class="text-xs font-mono font-semibold text-cyan-300">Intl Airport</span>
-                                </div>
+                            <div id="drawer-gsx-container" class="pt-0.5">
+                                <!-- Populated by app.js -->
                             </div>
                         </div>
 
-                        <!-- 3. SCENERY SELECTION MANAGEMENT -->
-                        <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3.5 shadow-lg">
+                        <!-- OPERATING AIRLINES CARD (SIMPLE CLEAN TEXT BADGES, IN ENGLISH) -->
+                        <div id="drawer-airlines-card" class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3 shadow-lg">
                             <div class="flex items-center justify-between">
-                                <div>
-                                    <h4 class="text-xs font-extrabold text-slate-300 uppercase tracking-wider">Scenery Selection</h4>
-                                    <p class="text-[10px] text-slate-400 mt-0.5">Choose active package or base airport</p>
-                                </div>
-                                <span id="active-scenery-vendor-tag" class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-800 text-slate-300 border border-slate-700">Community</span>
+                                <span class="text-xs font-extrabold text-slate-300 uppercase tracking-wider block">Operating Airlines</span>
+                                <span id="drawer-airlines-count" class="text-xs font-mono font-bold text-cyan-400 bg-cyan-500/10 px-2.5 py-1 rounded-full border border-cyan-500/20">0 Airlines</span>
                             </div>
-                            <div id="scenery-options-container" class="space-y-2">
-                                <!-- Dynamic Options rendered by app.js -->
+                            <div id="drawer-airlines-list" class="flex flex-wrap gap-1.5 p-1 max-h-40 overflow-y-auto">
+                                <!-- Populated by app.js -->
                             </div>
                         </div>
 
-                        <!-- 4. FLIGHT ROUTE & AIRLINE MATRIX -->
-                        <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3 shadow-lg">
-                            <div class="flex items-center justify-between">
-                                <span class="text-xs font-extrabold text-slate-300 uppercase tracking-wider block">Airline Routes</span>
-                                <span id="drawer-airline-count" class="text-xs font-mono font-bold text-cyan-400">0 Airlines</span>
-                            </div>
-                            <div id="drawer-airlines-list" class="flex flex-wrap gap-1.5 pt-1">
-                                <!-- Airline pills rendered by app.js -->
-                            </div>
-                        </div>
-
-                        <!-- 5. GSX PROFILE DETECTOR & INSTALLER -->
-                        <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3 shadow-lg">
-                            <div class="flex items-center justify-between">
-                                <div class="flex items-center gap-2">
-                                    <i class="fa-solid fa-truck-plane text-cyan-400 text-sm"></i>
-                                    <span class="text-xs font-extrabold text-slate-300 uppercase tracking-wider">GSX Profile Status</span>
-                                </div>
-                                <span id="gsx-status-pill" class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-800 text-slate-400 border border-slate-700">None Installed</span>
-                            </div>
-                            <div id="gsx-profile-details" class="text-xs space-y-2">
-                                <!-- Dynamic GSX Status rendered by app.js -->
-                            </div>
-                        </div>
-
-                        <!-- 6. PRICING MANAGEMENT -->
-                        <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3 shadow-lg">
+                        <!-- 6. SCENERY PRICE / VALUE CARD -->
+                        <div id="drawer-price-card" class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3 shadow-lg hidden">
                             <div class="flex items-center justify-between">
                                 <span class="text-xs font-extrabold text-slate-300 uppercase tracking-wider block">Scenery Price / Value</span>
                                 <span id="drawer-price-tag" class="text-sm font-mono font-black text-emerald-400">~19.99 €</span>
                             </div>
                             <div class="flex items-center gap-2 pt-1">
+                                <div class="relative flex-1">
+                                    <span id="drawer-price-curr-symbol" class="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-mono font-extrabold text-white">€</span>
+                                    <input type="number" step="any" id="drawer-price-input" placeholder="Price Paid (e.g. 14.50)" 
+                                           onfocus="pauseCurrencyCarousel()" onblur="resumeCurrencyCarousel()"
+                                           class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-3 py-2 text-sm font-mono font-bold text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500">
+                                </div>
+                                <button onclick="saveCustomPriceForSelected()" class="px-3.5 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-emerald-300 text-xs font-bold transition-all cursor-pointer" title="Save Price">
+                                    Save
+                                </button>
+                                <button onclick="resetCustomPriceForSelected()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-400 hover:text-white text-xs font-bold transition-all flex items-center justify-center w-9 h-9 shrink-0 cursor-pointer" title="Reset to Estimated Catalog Price">
+                                    <i class="fa-solid fa-rotate-left"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- 7. USER RATING WIDGET (MY RATING) -->
+                        <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3 shadow-lg">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs font-extrabold text-slate-300 uppercase tracking-wider block">My Rating</span>
+                                <span id="rating-score-display" class="text-sm font-mono font-black text-amber-400">★ 0.0</span>
+                            </div>
+                            <div class="flex items-center justify-between pt-1">
+                                <div id="interactive-star-widget" class="flex items-center gap-2" onmouseleave="resetStarHover()">
+                                    <!-- Rendered dynamically by app.js -->
+                                </div>
+                                <button onclick="clearCurrentRating()" class="text-xs text-slate-400 hover:text-red-400 font-bold transition-colors cursor-pointer">
+                                    Clear
+                                </button>
                             </div>
                         </div>
                     </div>
