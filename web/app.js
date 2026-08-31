@@ -249,7 +249,7 @@ let flightDestAirport = null;
 let isFlightOptimizerActive = false;
 let flightRouteLineGroup = null;
 
-function filterByAirline(airlineName) {
+function filterByAirline(airlineName, btnEl = null) {
     const originAp = selectedAirport;
     if (!originAp) return;
 
@@ -266,6 +266,9 @@ function filterByAirline(airlineName) {
         } else {
             selectedAirline = Array.from(selectedAirlines)[selectedAirlines.size - 1];
         }
+        if (btnEl) {
+            btnEl.className = 'text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer shadow-sm bg-slate-950 text-slate-200 border-slate-800/80 hover:border-cyan-500/50 hover:text-cyan-300';
+        }
     } else {
         const destIcaos = (originAp.routes && originAp.routes[airlineName]) || [];
         if (destIcaos.length === 0 && selectedAirlines.size === 0) {
@@ -280,6 +283,9 @@ function filterByAirline(airlineName) {
         selectedAirlines.add(airlineName);
         selectedAirline = airlineName;
         activeRouteOrigin = originAp;
+        if (btnEl) {
+            btnEl.className = 'text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer shadow-sm bg-cyan-500/25 text-cyan-300 border-cyan-400 shadow-[0_0_12px_rgba(56,189,248,0.4)] scale-105 font-bold';
+        }
     }
 
     filterAirports();
@@ -292,18 +298,16 @@ function updateAirlinePillsUI(ap) {
     const airlinesListEl = document.getElementById('drawer-airlines-list');
     if (!airlinesListEl) return;
 
-    const btns = airlinesListEl.querySelectorAll('button');
+    const btns = airlinesListEl.querySelectorAll('button[data-airline]');
     btns.forEach(btn => {
-        const onclickAttr = btn.getAttribute('onclick') || '';
-        const match = onclickAttr.match(/filterByAirline\('([^']+)'\)/);
-        if (match && match[1]) {
-            const alName = match[1].replace(/\\'/g, "'");
-            const isActive = selectedAirlines.has(alName) && (activeRouteOrigin && activeRouteOrigin.icao === ap.icao);
-            if (isActive) {
-                btn.className = 'px-2.5 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer bg-cyan-500/25 text-cyan-300 border-cyan-400 shadow-[0_0_12px_rgba(56,189,248,0.4)] scale-105 font-bold';
-            } else {
-                btn.className = 'px-2.5 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer bg-slate-950 text-slate-200 border-slate-800/80 hover:border-cyan-500/50 hover:text-cyan-300';
-            }
+        const alName = btn.getAttribute('data-airline');
+        if (!alName) return;
+
+        const isActive = selectedAirlines.has(alName) && (activeRouteOrigin && activeRouteOrigin.icao === ap.icao);
+        if (isActive) {
+            btn.className = 'text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer shadow-sm bg-cyan-500/25 text-cyan-300 border-cyan-400 shadow-[0_0_12px_rgba(56,189,248,0.4)] scale-105 font-bold';
+        } else {
+            btn.className = 'text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer shadow-sm bg-slate-950 text-slate-200 border-slate-800/80 hover:border-cyan-500/50 hover:text-cyan-300';
         }
     });
 }
@@ -2363,9 +2367,8 @@ function showAirportDetails(ap) {
                     ? 'bg-cyan-500/25 text-cyan-300 border-cyan-400 shadow-[0_0_12px_rgba(56,189,248,0.4)] scale-105 font-bold' 
                     : 'bg-slate-950 text-slate-200 border-slate-800/80 hover:border-cyan-500/50 hover:text-cyan-300';
                 const safeAl = al.replace(/'/g, "\\'");
-                const dests = (ap.routes && ap.routes[al]) ? ap.routes[al].length : 0;
-                const tooltipText = dests > 0 ? `Show ${dests} direct flight connections from ${ap.icao} on ${al}` : `Filter map by ${al}`;
-                return `<button onclick="filterByAirline('${safeAl}')" 
+                const safeAttrAl = al.replace(/"/g, '&quot;');
+                return `<button data-airline="${safeAttrAl}" onclick="filterByAirline('${safeAl}', this)" 
                                 class="text-xs font-semibold px-2.5 py-1 rounded-lg border transition-all cursor-pointer shadow-sm ${activeClass}" 
                                 title="${tooltipText}">
                             ${al}
