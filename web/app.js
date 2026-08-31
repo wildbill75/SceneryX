@@ -745,10 +745,25 @@ function openCountryDrawer(iso, countryName) {
         return;
     }
 
-    // 2. Set Header Data with Full English Country Name & Flag Emoji
+    // 2. Set Header Data with Full English Country Name & High-Res Country Flag
     const resolvedName = ISO_TO_COUNTRY_NAME[isoUpper] || countryName || isoUpper;
-    const flagEl = document.getElementById('country-drawer-flag');
-    if (flagEl) flagEl.innerText = getCountryFlagEmoji(isoUpper);
+    const flagImgEl = document.getElementById('country-drawer-flag-img');
+    const flagBgEl = document.getElementById('country-hero-flag-bg');
+    const flagUrl = `https://flagcdn.com/w160/${isoUpper.toLowerCase()}.png`;
+    const flagBgUrl = `https://flagcdn.com/w320/${isoUpper.toLowerCase()}.png`;
+
+    if (flagImgEl) {
+        flagImgEl.src = flagUrl;
+        flagImgEl.alt = resolvedName;
+        flagImgEl.style.display = 'block';
+        flagImgEl.onerror = () => { flagImgEl.style.display = 'none'; };
+    }
+    if (flagBgEl) {
+        flagBgEl.src = flagBgUrl;
+        flagBgEl.alt = '';
+        flagBgEl.style.display = 'block';
+        flagBgEl.onerror = () => { flagBgEl.style.display = 'none'; };
+    }
 
     const nameEl = document.getElementById('country-drawer-name');
     if (nameEl) nameEl.innerText = resolvedName;
