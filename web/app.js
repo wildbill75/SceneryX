@@ -1080,40 +1080,40 @@ function toggleCountrySelection(iso, countryName, layer, forceSelect = false) {
     }
 
     selectedCountryCode = isoUpper;
+    selectedCountryName = countryName || isoUpper;
     resetConflictingFiltersForCountrySelection();
 
-        // Smooth zoom to country bounds
-        if (countryGeoJsonLayer) {
-            const matchingLayers = [];
-            countryGeoJsonLayer.eachLayer(l => {
-                const lIso = getFeatureIso(l.feature);
-                if (lIso === isoUpper) {
-                    matchingLayers.push(l);
-                }
-            });
-
-            if (matchingLayers.length > 0) {
-                // If France (FR), fit bounds to main European France polygon to prevent overseas territories from over-expanding zoom
-                let targetLayer = matchingLayers[0];
-                if (isoUpper === 'FR') {
-                    const mainFrance = matchingLayers.find(l => {
-                        const b = l.getBounds();
-                        return b.getNorth() > 40 && b.getSouth() < 52 && b.getEast() > -5 && b.getWest() < 10;
-                    });
-                    if (mainFrance) targetLayer = mainFrance;
-                }
-
-                if (targetLayer && targetLayer.getBounds) {
-                    map.fitBounds(targetLayer.getBounds(), { padding: [40, 40], maxZoom: 7, animate: true });
-                }
-            } else if (layer && layer.getBounds) {
-                map.fitBounds(layer.getBounds(), { padding: [40, 40], maxZoom: 7, animate: true });
+    // Smooth zoom to country bounds
+    if (countryGeoJsonLayer) {
+        const matchingLayers = [];
+        countryGeoJsonLayer.eachLayer(l => {
+            const lIso = getFeatureIso(l.feature);
+            if (lIso === isoUpper) {
+                matchingLayers.push(l);
             }
-        }
+        });
 
-        showToast(`✓ Filtered country: ${countryName || isoUpper}`, 'info');
-        openCountryDrawer(isoUpper, countryName);
+        if (matchingLayers.length > 0) {
+            // If France (FR), fit bounds to main European France polygon to prevent overseas territories from over-expanding zoom
+            let targetLayer = matchingLayers[0];
+            if (isoUpper === 'FR') {
+                const mainFrance = matchingLayers.find(l => {
+                    const b = l.getBounds();
+                    return b.getNorth() > 40 && b.getSouth() < 52 && b.getEast() > -5 && b.getWest() < 10;
+                });
+                if (mainFrance) targetLayer = mainFrance;
+            }
+
+            if (targetLayer && targetLayer.getBounds) {
+                map.fitBounds(targetLayer.getBounds(), { padding: [40, 40], maxZoom: 7, animate: true });
+            }
+        } else if (layer && layer.getBounds) {
+            map.fitBounds(layer.getBounds(), { padding: [40, 40], maxZoom: 7, animate: true });
+        }
     }
+
+    showToast(`✓ Filtered country: ${countryName || isoUpper}`, 'info');
+    openCountryDrawer(isoUpper, countryName);
 
     if (countryGeoJsonLayer) {
         countryGeoJsonLayer.eachLayer(l => countryGeoJsonLayer.resetStyle(l));
