@@ -1112,7 +1112,6 @@ function toggleCountrySelection(iso, countryName, layer, forceSelect = false) {
         }
     }
 
-    showToast(`✓ Filtered country: ${countryName || isoUpper}`, 'info');
     openCountryDrawer(isoUpper, countryName);
 
     if (countryGeoJsonLayer) {
@@ -2858,21 +2857,17 @@ function exitCountryMode() {
             });
         }
 
-        // 4. Instantly remove country toast pill from screen
+        // 4. Instantly remove and destroy any leftover toast element from DOM
         const statusEl = document.getElementById('country-filter-indicator');
         if (statusEl) statusEl.classList.add('hidden');
 
         const toast = document.getElementById('sceneryx-toast');
         if (toast) {
-            toast.classList.add('translate-y-10', 'opacity-0', 'pointer-events-none');
-            toast.style.display = 'none';
+            try { toast.remove(); } catch(e) {}
         }
 
         // 5. Restore global airport map markers according to global sidebar filters
         filterAirports();
-
-        // 6. Show clear confirmation toast
-        showToast('✓ Country Mode Exited - Restored Global Addon Map', 'info');
 
         // 6. Camera Zoom: Smoothly fly camera to the geographic region of the exited country
         if (prevCountryCode && map && typeof REGION_COUNTRY_MAP !== 'undefined') {
