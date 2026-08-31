@@ -3125,6 +3125,24 @@ function filterAirports() {
             if (apIso !== selectedCountryCode) {
                 return false;
             }
+
+            // Apply Country Pricing Breakdown Filter
+            const pt = getAirportPricingType(ap);
+            let catKey = 'FREEWARE';
+            if (pt === 'Payware') catKey = 'PAYWARE';
+            else if (pt === 'Asobo') catKey = 'ASOBO';
+            else if (pt === 'Default' || ap.pricing_type === 'Default') catKey = 'DEFAULT';
+
+            if (!selectedCountryPricingFilters.has(catKey)) return false;
+
+            // Apply Country Airport Type Filter
+            const typeStr = (ap.english_type || ap.type || '').toLowerCase();
+            let typeKey = 'REG';
+            if (typeStr.includes('international')) typeKey = 'INT';
+            else if (typeStr.includes('general') || typeStr.includes('ga')) typeKey = 'GA';
+            else if (typeStr.includes('heli') || typeStr.includes('water')) typeKey = 'HW';
+
+            if (!selectedCountryTypeFilters.has(typeKey)) return false;
         }
 
         // Geographic Region Filter (Cumulative Multi-select)
