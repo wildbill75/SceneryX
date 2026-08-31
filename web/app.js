@@ -2854,15 +2854,15 @@ function exitCountryMode() {
             });
         }
 
-        // 4. Hide Country Filter Status Indicator Pill & active Toast
+        // 4. Hide Country Filter Status Indicator Pill
         const statusEl = document.getElementById('country-filter-indicator');
         if (statusEl) statusEl.classList.add('hidden');
 
-        const toast = document.getElementById('sceneryx-toast');
-        if (toast) toast.classList.add('translate-y-10', 'opacity-0', 'pointer-events-none');
-
         // 5. Restore global airport map markers according to global sidebar filters
         filterAirports();
+
+        // 6. Toast Confirmation
+        showToast('✓ Exited Country Mode & Restored Global Map', 'info');
 
         // 6. Camera Zoom: Smoothly fly camera to the geographic region of the exited country
         if (prevCountryCode && map && typeof REGION_COUNTRY_MAP !== 'undefined') {
