@@ -712,7 +712,10 @@ function openCountryDrawer(iso, countryName) {
         return apIso === isoUpper;
     });
 
-    if (countryAirports.length === 0) return;
+    if (countryAirports.length === 0) {
+        exitCountryMode();
+        return;
+    }
 
     // 2. Set Header Data with Full English Country Name & Flag Emoji
     const resolvedName = ISO_TO_COUNTRY_NAME[isoUpper] || countryName || isoUpper;
@@ -2837,14 +2840,17 @@ function exitCountryMode() {
             selectedCountryPolygonLayer = null;
         }
         if (countryGeoJsonLayer) {
+            try { countryGeoJsonLayer.resetStyle(); } catch (err) {}
             countryGeoJsonLayer.eachLayer(l => {
-                l.setStyle({
-                    fillColor: '#06b6d4',
-                    fillOpacity: 0.0,
-                    color: '#475569',
-                    weight: 0.5,
-                    opacity: 0.3
-                });
+                if (l.setStyle) {
+                    l.setStyle({
+                        fillColor: '#06b6d4',
+                        fillOpacity: 0.0,
+                        color: '#475569',
+                        weight: 0.5,
+                        opacity: 0.3
+                    });
+                }
             });
         }
 
