@@ -2134,6 +2134,7 @@ function renderRouteLines(filteredAirports) {
         const arcPoints = createBezierArcPoints(originLat, originLon, destLat, destLon, 35);
 
         const routeLineOptions = {
+            pane: 'routeLinesPane',
             color: lineColor,
             weight: lineWeight,
             opacity: lineOpacity,
