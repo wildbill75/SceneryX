@@ -284,7 +284,28 @@ function filterByAirline(airlineName) {
 
     filterAirports();
     updateFilterUI();
-    showAirportDetails(originAp);
+    updateAirlinePillsUI(originAp);
+}
+
+function updateAirlinePillsUI(ap) {
+    if (!ap) return;
+    const airlinesListEl = document.getElementById('drawer-airlines-list');
+    if (!airlinesListEl) return;
+
+    const btns = airlinesListEl.querySelectorAll('button');
+    btns.forEach(btn => {
+        const onclickAttr = btn.getAttribute('onclick') || '';
+        const match = onclickAttr.match(/filterByAirline\('([^']+)'\)/);
+        if (match && match[1]) {
+            const alName = match[1].replace(/\\'/g, "'");
+            const isActive = selectedAirlines.has(alName) && (activeRouteOrigin && activeRouteOrigin.icao === ap.icao);
+            if (isActive) {
+                btn.className = 'px-2.5 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer bg-cyan-500/25 text-cyan-300 border-cyan-400 shadow-[0_0_12px_rgba(56,189,248,0.4)] scale-105 font-bold';
+            } else {
+                btn.className = 'px-2.5 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer bg-slate-950 text-slate-200 border-slate-800/80 hover:border-cyan-500/50 hover:text-cyan-300';
+            }
+        }
+    });
 }
 
 function clearAirlineFilter() {
@@ -2037,13 +2058,6 @@ function renderRouteLines(filteredAirports) {
         return;
     }
 
-    // Ensure routeLinesPane exists on map
-    if (map && !map.getPane('routeLinesPane')) {
-        const rPane = map.createPane('routeLinesPane');
-        rPane.style.zIndex = '620';
-        rPane.style.pointerEvents = 'none';
-    }
-
     const originLat = parseFloat(activeRouteOrigin.lat);
     const originLon = parseFloat(activeRouteOrigin.lon);
 
@@ -2052,37 +2066,36 @@ function renderRouteLines(filteredAirports) {
 
         const cat = getAirportCategory(ap);
         let lineColor = '#38bdf8';
-        let lineWeight = 2.4;
-        let lineOpacity = 0.9;
+        let lineWeight = 2.0;
+        let lineOpacity = 0.85;
         let lineDashArray = null;
 
         if (cat === 'DEFAULT') {
             // Fine subtle gray dashed line for Default MSFS destination airports
-            lineColor = '#94a3b8';  // Bright Slate Gray
-            lineWeight = 1.6;       // Fine thin line
-            lineOpacity = 0.75;     // Subtle & elegant
-            lineDashArray = '4, 4'; // Discrete dashed line
+            lineColor = '#64748b';  // Slate Gray
+            lineWeight = 1.2;       // Fine thin line
+            lineOpacity = 0.65;     // Subtle & elegant
+            lineDashArray = '3, 4'; // Discrete dashed line
         } else if (cat === 'PAYWARE') {
             lineColor = '#c084fc';  // Vibrant Purple (Payware Addon)
-            lineWeight = 2.6;
-            lineOpacity = 0.95;
+            lineWeight = 2.0;
+            lineOpacity = 0.85;
         } else if (cat === 'ASOBO') {
             lineColor = '#fbbf24';  // Vibrant Amber/Gold (Asobo Official Handcrafted)
-            lineWeight = 2.6;
-            lineOpacity = 0.95;
+            lineWeight = 2.0;
+            lineOpacity = 0.85;
         } else if (cat === 'FREEWARE') {
             lineColor = '#22d3ee';  // Vibrant Cyan (Freeware Addon)
-            lineWeight = 2.6;
-            lineOpacity = 0.95;
+            lineWeight = 2.0;
+            lineOpacity = 0.85;
         }
 
         const destLat = parseFloat(ap.lat);
         const destLon = parseFloat(ap.lon);
 
-        const arcPoints = createBezierArcPoints(originLat, originLon, destLat, destLon, 35);
+        const arcPoints = createBezierArcPoints(originLat, originLon, destLat, destLon, 30);
 
         const routeLineOptions = {
-            pane: 'routeLinesPane',
             color: lineColor,
             weight: lineWeight,
             opacity: lineOpacity,
