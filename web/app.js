@@ -131,6 +131,34 @@ const ISO_TO_COUNTRY_NAME = {
     'ZM': 'Zambia', 'ZW': 'Zimbabwe'
 };
 
+const REGION_VIEWPORTS = {
+    'weurope': { center: [54.0, 10.0], zoom: 4 },
+    'eeurope': { center: [45.0, 25.0], zoom: 4.5 },
+    'namerica': { center: [48.0, -95.0], zoom: 3.5 },
+    'camerica_caribbean': { center: [18.0, -78.0], zoom: 4.8 },
+    'samerica': { center: [-15.0, -60.0], zoom: 3.5 },
+    'asia': { center: [25.0, 105.0], zoom: 3.5 },
+    'middleeast': { center: [26.0, 48.0], zoom: 4.8 },
+    'nafrica': { center: [27.0, 17.0], zoom: 4.8 },
+    'ssafrica': { center: [-5.0, 22.0], zoom: 3.5 },
+    'oceania': { center: [-25.0, 135.0], zoom: 4 },
+    'pacific': { center: [-15.0, -145.0], zoom: 3.5 }
+};
+
+const REGION_COUNTRY_MAP = {
+    'weurope': ['FR', 'DE', 'GB', 'IT', 'ES', 'NL', 'BE', 'CH', 'AT', 'PT', 'IE', 'NO', 'SE', 'DK', 'FI', 'LU', 'IS', 'MC', 'AD', 'SM', 'VA', 'LI', 'GI', 'FO', 'AX', 'SJ'],
+    'eeurope': ['PL', 'GR', 'TR', 'RO', 'CZ', 'HU', 'BG', 'HR', 'SK', 'UA', 'RS', 'SI', 'EE', 'LV', 'LT', 'CY', 'AL', 'BA', 'ME', 'MK', 'MD', 'BY', 'MT', 'GE', 'AM', 'AZ', 'RU'],
+    'namerica': ['US', 'CA', 'GL', 'PM'],
+    'camerica_caribbean': ['MX', 'GT', 'BZ', 'HN', 'SV', 'NI', 'CR', 'PA', 'CU', 'DO', 'JM', 'HT', 'PR', 'BS', 'TT', 'BB', 'CW', 'AW', 'GP', 'MQ', 'KY', 'VG', 'VI', 'KN', 'LC', 'VC', 'AG', 'GD', 'TC', 'SX', 'BL', 'BQ', 'MF', 'AI', 'MS'],
+    'samerica': ['BR', 'AR', 'CL', 'CO', 'PE', 'VE', 'EC', 'BO', 'PY', 'UY', 'GY', 'SR', 'GF'],
+    'asia': ['JP', 'CN', 'IN', 'KR', 'TH', 'ID', 'MY', 'PH', 'VN', 'SG', 'PK', 'BD', 'LK', 'NP', 'MM', 'KH', 'LA', 'TW', 'HK', 'MO', 'MN', 'KZ', 'UZ', 'TM', 'KG', 'TJ', 'AF', 'BT', 'MV', 'TL', 'BN'],
+    'middleeast': ['AE', 'SA', 'QA', 'KW', 'OM', 'BH', 'JO', 'LB', 'IQ', 'IR', 'IL', 'PS', 'YE'],
+    'nafrica': ['EG', 'MA', 'DZ', 'TN', 'LY', 'SD', 'MR', 'EH'],
+    'ssafrica': ['ZA', 'KE', 'NG', 'GH', 'TZ', 'UG', 'ET', 'CI', 'CM', 'SN', 'ZW', 'AM', 'MU', 'RE', 'YT', 'SC', 'CV', 'AO', 'MZ', 'NA', 'BW', 'ZMW', 'ZM', 'MW', 'MG', 'RW', 'BI', 'DJ', 'ER', 'SO', 'SL', 'LR', 'GN', 'GW', 'GM', 'TG', 'BJ', 'NE', 'BF', 'ML', 'TD', 'CF', 'CG', 'CD', 'GA', 'GQ', 'ST', 'LS', 'SZ', 'SH', 'KM', 'SS'],
+    'oceania': ['AU', 'NZ', 'PG', 'NF', 'CC', 'CX'],
+    'pacific': ['PF', 'NC', 'FJ', 'GU', 'MP', 'WS', 'TO', 'VU', 'SB', 'FM', 'PW', 'MH', 'KI', 'NR', 'TV', 'CK', 'NU', 'WF', 'AS', 'UM', 'TK']
+};
+
 function getCountryFlagEmoji(iso) {
     if (!iso || iso.length !== 2) return '🌐';
     const codePoints = iso.toUpperCase().split('').map(char => 127397 + char.charCodeAt(0));
@@ -2789,57 +2817,64 @@ async function toggleFixPatchPackage(path, icao) {
 }
 
 function exitCountryMode() {
-    const prevCountryCode = selectedCountryCode;
+    try {
+        const prevCountryCode = selectedCountryCode;
 
-    activeDrawerMode = 'MAP';
-    selectedCountryCode = null;
-    selectedCountryName = '';
-    expandedCountryIcao = null;
-    selectedAirport = null;
+        activeDrawerMode = 'MAP';
+        selectedCountryCode = null;
+        selectedCountryName = '';
+        expandedCountryIcao = null;
+        selectedAirport = null;
 
-    // 1. Hide Country Mode & Airport Mode drawers, close drawer panel
-    const cMode = document.getElementById('drawer-country-mode');
-    if (cMode) cMode.classList.add('hidden');
+        // 1. Hide Country Mode & Airport Mode drawers, close drawer panel
+        const cMode = document.getElementById('drawer-country-mode');
+        if (cMode) cMode.classList.add('hidden');
 
-    const apMode = document.getElementById('drawer-airport-mode');
-    if (apMode) apMode.classList.add('hidden');
+        const apMode = document.getElementById('drawer-airport-mode');
+        if (apMode) apMode.classList.add('hidden');
 
-    const drawer = document.getElementById('detail-drawer');
-    if (drawer) drawer.classList.add('translate-x-full');
+        const drawer = document.getElementById('detail-drawer');
+        if (drawer) drawer.classList.add('translate-x-full');
 
-    // 2. Slide Left Sidebar back into view
-    const sb = document.getElementById('sidebar-panel');
-    if (sb) sb.classList.remove('-ml-80', 'opacity-0', 'pointer-events-none');
+        // 2. Slide Left Sidebar back into view
+        const sb = document.getElementById('sidebar-panel');
+        if (sb) sb.classList.remove('-ml-80', 'opacity-0', 'pointer-events-none');
 
-    // 3. Reset Country Polygon Overlay on Leaflet map
-    if (selectedCountryPolygonLayer) {
-        map.removeLayer(selectedCountryPolygonLayer);
-        selectedCountryPolygonLayer = null;
-    }
-    if (countryGeoJsonLayer) {
-        countryGeoJsonLayer.eachLayer(l => countryGeoJsonLayer.resetStyle(l));
-    }
+        // 3. Reset Country Polygon Overlay on Leaflet map
+        if (selectedCountryPolygonLayer) {
+            map.removeLayer(selectedCountryPolygonLayer);
+            selectedCountryPolygonLayer = null;
+        }
+        if (countryGeoJsonLayer) {
+            countryGeoJsonLayer.eachLayer(l => countryGeoJsonLayer.resetStyle(l));
+        }
 
-    // 4. Hide Country Filter Status Indicator Pill
-    const statusEl = document.getElementById('country-filter-indicator');
-    if (statusEl) statusEl.classList.add('hidden');
+        // 4. Hide Country Filter Status Indicator Pill & active Toast
+        const statusEl = document.getElementById('country-filter-indicator');
+        if (statusEl) statusEl.classList.add('hidden');
 
-    // 5. Restore global airport map markers according to global sidebar filters
-    filterAirports();
+        const toast = document.getElementById('sceneryx-toast');
+        if (toast) toast.classList.add('translate-y-10', 'opacity-0', 'pointer-events-none');
 
-    // 6. Camera Zoom: Smoothly fly camera to the geographic region of the exited country
-    if (prevCountryCode && map) {
-        let regionKey = null;
-        for (const [rKey, isoList] of Object.entries(REGION_COUNTRY_MAP)) {
-            if (isoList.includes(prevCountryCode)) {
-                regionKey = rKey;
-                break;
+        // 5. Restore global airport map markers according to global sidebar filters
+        filterAirports();
+
+        // 6. Camera Zoom: Smoothly fly camera to the geographic region of the exited country
+        if (prevCountryCode && map && typeof REGION_COUNTRY_MAP !== 'undefined') {
+            let regionKey = null;
+            for (const [rKey, isoList] of Object.entries(REGION_COUNTRY_MAP)) {
+                if (isoList.includes(prevCountryCode)) {
+                    regionKey = rKey;
+                    break;
+                }
+            }
+            if (regionKey && typeof REGION_VIEWPORTS !== 'undefined' && REGION_VIEWPORTS[regionKey]) {
+                const vp = REGION_VIEWPORTS[regionKey];
+                map.flyTo(vp.center, vp.zoom, { animate: true, duration: 1.2 });
             }
         }
-        if (regionKey && REGION_VIEWPORTS[regionKey]) {
-            const vp = REGION_VIEWPORTS[regionKey];
-            map.flyTo(vp.center, vp.zoom, { animate: true, duration: 1.2 });
-        }
+    } catch (e) {
+        console.error("Error in exitCountryMode:", e);
     }
 }
 
@@ -3082,34 +3117,6 @@ function resetFullDatabase() {
 /* ================= FILTER & UI LOGIC ================= */
 
 let selectedRegions = new Set();
-
-const REGION_VIEWPORTS = {
-    'weurope': { center: [54.0, 10.0], zoom: 4 },
-    'eeurope': { center: [45.0, 25.0], zoom: 4.5 },
-    'namerica': { center: [48.0, -95.0], zoom: 3.5 },
-    'camerica_caribbean': { center: [18.0, -78.0], zoom: 4.8 },
-    'samerica': { center: [-15.0, -60.0], zoom: 3.5 },
-    'asia': { center: [25.0, 105.0], zoom: 3.5 },
-    'middleeast': { center: [26.0, 48.0], zoom: 4.8 },
-    'nafrica': { center: [27.0, 17.0], zoom: 4.8 },
-    'ssafrica': { center: [-5.0, 22.0], zoom: 3.5 },
-    'oceania': { center: [-25.0, 135.0], zoom: 4 },
-    'pacific': { center: [-15.0, -145.0], zoom: 3.5 }
-};
-
-const REGION_COUNTRY_MAP = {
-    'weurope': ['FR', 'DE', 'GB', 'IT', 'ES', 'NL', 'BE', 'CH', 'AT', 'PT', 'IE', 'NO', 'SE', 'DK', 'FI', 'LU', 'IS', 'MC', 'AD', 'SM', 'VA', 'LI', 'GI', 'FO', 'AX', 'SJ'],
-    'eeurope': ['PL', 'GR', 'TR', 'RO', 'CZ', 'HU', 'BG', 'HR', 'SK', 'UA', 'RS', 'SI', 'EE', 'LV', 'LT', 'CY', 'AL', 'BA', 'ME', 'MK', 'MD', 'BY', 'MT', 'GE', 'AM', 'AZ', 'RU'],
-    'namerica': ['US', 'CA', 'GL', 'PM'],
-    'camerica_caribbean': ['MX', 'GT', 'BZ', 'HN', 'SV', 'NI', 'CR', 'PA', 'CU', 'DO', 'JM', 'HT', 'PR', 'BS', 'TT', 'BB', 'CW', 'AW', 'GP', 'MQ', 'KY', 'VG', 'VI', 'KN', 'LC', 'VC', 'AG', 'GD', 'TC', 'SX', 'BL', 'BQ', 'MF', 'AI', 'MS'],
-    'samerica': ['BR', 'AR', 'CL', 'CO', 'PE', 'VE', 'EC', 'BO', 'PY', 'UY', 'GY', 'SR', 'GF'],
-    'asia': ['JP', 'CN', 'IN', 'KR', 'TH', 'ID', 'MY', 'PH', 'VN', 'SG', 'PK', 'BD', 'LK', 'NP', 'MM', 'KH', 'LA', 'TW', 'HK', 'MO', 'MN', 'KZ', 'UZ', 'TM', 'KG', 'TJ', 'AF', 'BT', 'MV', 'TL', 'BN'],
-    'middleeast': ['AE', 'SA', 'QA', 'KW', 'OM', 'BH', 'JO', 'LB', 'IQ', 'IR', 'IL', 'PS', 'YE'],
-    'nafrica': ['EG', 'MA', 'DZ', 'TN', 'LY', 'SD', 'MR', 'EH'],
-    'ssafrica': ['ZA', 'KE', 'NG', 'GH', 'TZ', 'UG', 'ET', 'CI', 'CM', 'SN', 'ZW', 'AM', 'MU', 'RE', 'YT', 'SC', 'CV', 'AO', 'MZ', 'NA', 'BW', 'ZMW', 'ZM', 'MW', 'MG', 'RW', 'BI', 'DJ', 'ER', 'SO', 'SL', 'LR', 'GN', 'GW', 'GM', 'TG', 'BJ', 'NE', 'BF', 'ML', 'TD', 'CF', 'CG', 'CD', 'GA', 'GQ', 'ST', 'LS', 'SZ', 'SH', 'KM', 'SS'],
-    'oceania': ['AU', 'NZ', 'PG', 'NF', 'CC', 'CX'],
-    'pacific': ['PF', 'NC', 'FJ', 'GU', 'MP', 'WS', 'TO', 'VU', 'SB', 'FM', 'PW', 'MH', 'KI', 'NR', 'TV', 'CK', 'NU', 'WF', 'AS', 'UM', 'TK']
-};
 
 function toggleRegionFilter(regionKey) {
     if (regionKey === 'all') {
