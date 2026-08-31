@@ -329,15 +329,23 @@ function updateAirlinePillsUI(ap) {
 
         const isActive = selectedAirlines.has(alName) && (activeRouteOrigin && activeRouteOrigin.icao === ap.icao);
         const img = btn.querySelector('img');
+        const span = btn.querySelector('span');
+
         if (isActive) {
-            btn.className = 'group relative min-h-[50px] rounded-xl overflow-hidden border-2 transition-all cursor-pointer flex items-center justify-center p-1.5 shadow-sm text-center border-cyan-400 bg-cyan-950/50 shadow-[0_0_14px_rgba(56,189,248,0.5)] scale-[1.03]';
+            btn.className = 'group relative min-h-[50px] rounded-xl overflow-hidden border-2 transition-all cursor-pointer flex items-center justify-center p-0 shadow-sm text-center border-cyan-400 bg-slate-950 shadow-[0_0_10px_rgba(56,189,248,0.35)] scale-[1.02]';
             if (img) {
-                img.className = 'w-full h-full object-contain opacity-100 transition-opacity duration-200';
+                img.className = 'w-full h-full object-cover object-center opacity-100 transition-all duration-200';
+            }
+            if (span) {
+                span.classList.add('hidden');
             }
         } else {
-            btn.className = 'group relative min-h-[50px] rounded-xl overflow-hidden border transition-all cursor-pointer flex items-center justify-center p-1.5 shadow-sm text-center border-slate-800/90 bg-slate-950/90 hover:border-cyan-500/60';
+            btn.className = 'group relative min-h-[50px] rounded-xl overflow-hidden border transition-all cursor-pointer flex items-center justify-center p-0 shadow-sm text-center border-slate-800/90 bg-slate-950/90 hover:border-cyan-400/70';
             if (img) {
-                img.className = 'w-full h-full object-contain opacity-60 group-hover:opacity-100 transition-opacity duration-200';
+                img.className = 'w-full h-full object-cover object-center opacity-60 group-hover:opacity-100 transition-all duration-200';
+            }
+            if (span) {
+                span.classList.remove('hidden');
             }
         }
     });
@@ -2474,8 +2482,8 @@ function showAirportDetails(ap) {
             airlinesListEl.innerHTML = airlines.map(al => {
                 const isActive = selectedAirlines.has(al) && (activeRouteOrigin && activeRouteOrigin.icao === ap.icao);
                 const activeBtnClass = isActive 
-                    ? 'border-2 border-cyan-400 bg-cyan-950/50 shadow-[0_0_14px_rgba(56,189,248,0.5)] scale-[1.03]' 
-                    : 'border border-slate-800/90 bg-slate-950/90 hover:border-cyan-500/60 shadow-sm';
+                    ? 'border-2 border-cyan-400 bg-slate-950 shadow-[0_0_10px_rgba(56,189,248,0.35)] scale-[1.02]' 
+                    : 'border border-slate-800/90 bg-slate-950/90 hover:border-cyan-400/70 shadow-sm';
                 const activeImgClass = isActive
                     ? 'opacity-100'
                     : 'opacity-60 group-hover:opacity-100';
@@ -2488,13 +2496,13 @@ function showAirportDetails(ap) {
                 const tooltipText = dests > 0 ? `Show ${dests} direct flight connections from ${ap.icao} on ${al}` : `Filter map by ${al}`;
 
                 return `<button data-airline="${safeAttrAl}" onclick="filterByAirline('${safeAl}', this)" 
-                                class="group relative min-h-[50px] rounded-xl overflow-hidden transition-all cursor-pointer flex items-center justify-center p-1.5 text-center ${activeBtnClass}" 
+                                class="group relative min-h-[50px] rounded-xl overflow-hidden transition-all cursor-pointer flex items-center justify-center p-0 text-center ${activeBtnClass}" 
                                 title="${tooltipText}">
                             ${logoUrl ? `
-                            <div class="absolute inset-0 flex items-center justify-center p-1 pointer-events-none">
-                                <img src="${logoUrl}" class="w-full h-full object-contain ${activeImgClass} transition-opacity duration-200" alt="${safeAttrAl}" onerror="this.style.display='none'" />
+                            <div class="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden rounded-xl">
+                                <img src="${logoUrl}" class="w-full h-full object-cover object-center ${activeImgClass} transition-all duration-200" alt="${safeAttrAl}" onerror="this.style.display='none'" />
                             </div>` : ''}
-                            <span class="relative z-10 text-[11px] font-black text-white leading-tight text-center line-clamp-2 px-1" style="text-shadow: 0 1px 3px rgba(0,0,0,0.95), 0 0 2px rgba(0,0,0,0.9), 0 0 5px rgba(0,0,0,0.85);">
+                            <span class="relative z-10 text-[11px] font-black text-white leading-tight text-center line-clamp-2 px-1 ${isActive ? 'hidden' : ''}" style="text-shadow: 0 1px 3px rgba(0,0,0,0.95), 0 0 2px rgba(0,0,0,0.9), 0 0 5px rgba(0,0,0,0.85);">
                                 ${al}
                             </span>
                         </button>`;
