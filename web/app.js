@@ -1073,13 +1073,14 @@ function toggleCountrySelection(iso, countryName, layer, forceSelect = false) {
 
     const isoUpper = iso.toUpperCase().trim();
 
-    if (selectedCountryCode === isoUpper && !forceSelect) {
-        showToast(`Cleared country filter`, 'info');
+    // If currently in Country Mode, ANY click on map/polygon exits Country Mode back to Global Addon Mode
+    if ((selectedCountryCode || activeDrawerMode === 'COUNTRY') && !forceSelect) {
         exitCountryMode();
         return;
-    } else {
-        selectedCountryCode = isoUpper;
-        resetConflictingFiltersForCountrySelection();
+    }
+
+    selectedCountryCode = isoUpper;
+    resetConflictingFiltersForCountrySelection();
 
         // Smooth zoom to country bounds
         if (countryGeoJsonLayer) {
@@ -2866,6 +2867,9 @@ function exitCountryMode() {
 
         // 5. Restore global airport map markers according to global sidebar filters
         filterAirports();
+
+        // 6. Show clear confirmation toast
+        showToast('✓ Country Mode Exited - Restored Global Addon Map', 'info');
 
         // 6. Camera Zoom: Smoothly fly camera to the geographic region of the exited country
         if (prevCountryCode && map && typeof REGION_COUNTRY_MAP !== 'undefined') {
