@@ -458,11 +458,10 @@
             </div>
 
             <!-- BOTTOM FIXED ACTION & SEARCH PANEL (LEFT SIDEBAR FOOTER) -->
-            <div class="p-3.5 border-t border-slate-800/80 bg-slate-950/60 flex flex-col gap-2.5 shrink-0">
-                <!-- UNIFIED SMART SEARCH BAR (ICAO, AIRPORT, COUNTRY) -->
-                <div class="relative w-full">
-                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
-                    <input type="text" id="search-input" onkeydown="handleSearchKeyDown(event)" oninput="filterAirports()" 
+            <div class="px-3.5 py-3 border-t border-slate-800/80 bg-slate-950/40">
+            <div class="relative flex items-center">
+                <i class="fa-solid fa-magnifying-glass absolute left-3.5 text-slate-500 text-xs pointer-events-none"></i>
+                <input type="text" id="search-input" onkeydown="handleSearchKeyDown(event)" oninput="debouncedFilterAirports()" 
                            placeholder="Search ICAO, Airport, Country..." 
                            class="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl pl-8 pr-7 py-2 text-xs text-slate-100 placeholder-slate-400 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 font-medium transition-all shadow-inner">
                     <button id="clear-search" onclick="clearSearch()" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs">

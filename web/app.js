@@ -3322,6 +3322,14 @@ function airportMatchesSourceFilter(ap) {
     });
 }
 
+let searchDebounceTimer = null;
+function debouncedFilterAirports() {
+    if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(() => {
+        filterAirports();
+    }, 150);
+}
+
 function filterAirports() {
     const rawSearch = document.getElementById('search-input').value.toLowerCase();
     const search = rawSearch.trim ? rawSearch.trim() : rawSearch;
