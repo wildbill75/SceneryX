@@ -30,6 +30,7 @@ let selectedGsxFilter = 'all'; // 'all', 'with', 'none'
 let selectedAirline = null;
 let selectedAirlines = new Set();
 let activeRouteOrigin = null;
+let activeRouteLinesGroup = null;
 // Global Country Name to ISO Lookup Map
 const COUNTRY_NAME_TO_ISO = {
     'afghanistan': 'AF', 'albania': 'AL', 'algeria': 'DZ', 'andorra': 'AD', 'angola': 'AO',
@@ -2062,16 +2063,13 @@ function createBezierArcPoints(lat1, lon1, lat2, lon2, numPoints = 30) {
 function renderRouteLines(filteredAirports) {
     if (!map) return;
     if (!activeRouteLinesGroup) {
-        if (map.getPane && map.getPane('routeLinesPane')) {
-            activeRouteLinesGroup = L.layerGroup([], { pane: 'routeLinesPane' }).addTo(map);
-        } else {
-            activeRouteLinesGroup = L.layerGroup().addTo(map);
+        activeRouteLinesGroup = L.layerGroup().addTo(map);
+    } else {
+        if (!map.hasLayer(activeRouteLinesGroup)) {
+            map.addLayer(activeRouteLinesGroup);
         }
+        activeRouteLinesGroup.clearLayers();
     }
-    if (!map.hasLayer(activeRouteLinesGroup)) {
-        map.addLayer(activeRouteLinesGroup);
-    }
-    activeRouteLinesGroup.clearLayers();
 
     if (selectedAirlines.size === 0 || !activeRouteOrigin || !activeRouteOrigin.lat || !activeRouteOrigin.lon) {
         return;
@@ -2108,8 +2106,8 @@ function renderRouteLines(filteredAirports) {
 
         const cat = getAirportCategory(ap);
         let lineColor = '#38bdf8';
-        let lineWeight = 2.4;
-        let lineOpacity = 0.90;
+        let lineWeight = 2.8;
+        let lineOpacity = 0.95;
         let lineDashArray = null;
 
         if (cat === 'DEFAULT') {
@@ -2120,15 +2118,15 @@ function renderRouteLines(filteredAirports) {
             lineDashArray = '4, 4'; // Discrete dashed line
         } else if (cat === 'PAYWARE') {
             lineColor = '#c084fc';  // Vibrant Purple (Payware Addon)
-            lineWeight = 2.6;
+            lineWeight = 3.0;
             lineOpacity = 0.95;
         } else if (cat === 'ASOBO') {
             lineColor = '#fbbf24';  // Vibrant Amber/Gold (Asobo Official Handcrafted)
-            lineWeight = 2.6;
+            lineWeight = 3.0;
             lineOpacity = 0.95;
         } else if (cat === 'FREEWARE') {
             lineColor = '#22d3ee';  // Vibrant Cyan (Freeware Addon)
-            lineWeight = 2.6;
+            lineWeight = 3.0;
             lineOpacity = 0.95;
         }
 
@@ -2149,6 +2147,9 @@ function renderRouteLines(filteredAirports) {
 
         const routeLine = L.polyline(arcPoints, routeLineOptions);
         activeRouteLinesGroup.addLayer(routeLine);
+        if (routeLine.bringToFront) {
+            try { routeLine.bringToFront(); } catch (e) {}
+        }
     });
 }
 
