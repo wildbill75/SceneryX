@@ -340,9 +340,9 @@ function updateAirlinePillsUI(ap) {
                 span.classList.add('hidden');
             }
         } else {
-            btn.className = 'group relative min-h-[50px] rounded-xl overflow-hidden border transition-all cursor-pointer flex items-center justify-center p-0 shadow-sm text-center border-slate-800/90 bg-slate-950/90 hover:border-cyan-400/70';
+            btn.className = 'group relative min-h-[50px] rounded-xl overflow-hidden border transition-all cursor-pointer flex items-center justify-center p-1 shadow-sm text-center border-slate-800/90 bg-slate-950/90 hover:border-cyan-400/70';
             if (img) {
-                img.className = 'w-full h-full object-cover object-center opacity-60 group-hover:opacity-100 transition-all duration-200';
+                img.className = 'w-full h-full object-cover object-center opacity-30 group-hover:opacity-100 transition-all duration-200';
             }
             if (span) {
                 span.classList.remove('hidden');
@@ -2472,11 +2472,20 @@ function showAirportDetails(ap) {
         }
     }
 
-    // Render Operating Airlines Card (3x3 Grid with Airline Logo Background)
+    // Render Operating Airlines Card (3x3 Grid sorted by flight/route frequency)
     const airlinesListEl = document.getElementById('drawer-airlines-list');
     const airlinesCountEl = document.getElementById('drawer-airlines-count');
     if (airlinesListEl && airlinesCountEl) {
-        const airlines = (ap.operating_airlines || []).slice().sort((a, b) => a.localeCompare(b));
+        const getFlightCount = (al) => (ap.routes && ap.routes[al]) ? ap.routes[al].length : 0;
+        const airlines = (ap.operating_airlines || []).slice().sort((a, b) => {
+            const countA = getFlightCount(a);
+            const countB = getFlightCount(b);
+            if (countB !== countA) {
+                return countB - countA; // Descending: airlines with most flights/destinations first!
+            }
+            return a.localeCompare(b);
+        });
+
         if (airlines.length > 0) {
             airlinesCountEl.innerText = `${airlines.length} Airlines`;
             airlinesListEl.innerHTML = airlines.map(al => {
@@ -2486,23 +2495,23 @@ function showAirportDetails(ap) {
                     : 'border border-slate-800/90 bg-slate-950/90 hover:border-cyan-400/70 shadow-sm';
                 const activeImgClass = isActive
                     ? 'opacity-100'
-                    : 'opacity-60 group-hover:opacity-100';
+                    : 'opacity-30 group-hover:opacity-100';
 
                 const iata = getAirlineIata(al);
                 const logoUrl = iata ? `https://images.kiwi.com/airlines/64x64/${iata}.png` : '';
                 const safeAl = al.replace(/'/g, "\\'");
                 const safeAttrAl = al.replace(/"/g, '&quot;');
-                const dests = (ap.routes && ap.routes[al]) ? ap.routes[al].length : 0;
+                const dests = getFlightCount(al);
                 const tooltipText = dests > 0 ? `Show ${dests} direct flight connections from ${ap.icao} on ${al}` : `Filter map by ${al}`;
 
                 return `<button data-airline="${safeAttrAl}" onclick="filterByAirline('${safeAl}', this)" 
-                                class="group relative min-h-[50px] rounded-xl overflow-hidden transition-all cursor-pointer flex items-center justify-center p-0 text-center ${activeBtnClass}" 
+                                class="group relative min-h-[50px] rounded-xl overflow-hidden transition-all cursor-pointer flex items-center justify-center p-1 text-center ${activeBtnClass}" 
                                 title="${tooltipText}">
                             ${logoUrl ? `
                             <div class="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden rounded-xl">
                                 <img src="${logoUrl}" class="w-full h-full object-cover object-center ${activeImgClass} transition-all duration-200" alt="${safeAttrAl}" onerror="this.style.display='none'" />
                             </div>` : ''}
-                            <span class="relative z-10 text-[11px] font-black text-white leading-tight text-center line-clamp-2 px-1 ${isActive ? 'hidden' : ''}" style="text-shadow: 0 1px 3px rgba(0,0,0,0.95), 0 0 2px rgba(0,0,0,0.9), 0 0 5px rgba(0,0,0,0.85);">
+                            <span class="relative z-10 text-[12px] sm:text-[13px] font-black text-white leading-tight text-center line-clamp-2 px-1 break-words ${isActive ? 'hidden' : ''}" style="text-shadow: 0 1px 3px rgba(0,0,0,0.95), 0 0 2px rgba(0,0,0,0.9), 0 0 5px rgba(0,0,0,0.85);">
                                 ${al}
                             </span>
                         </button>`;
