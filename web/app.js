@@ -3415,8 +3415,6 @@ function clearSearch() {
     filterAirports();
 }
 
-const DEFAULT_STARTUP_PRICING = ['Payware', 'Freeware / Flightsim.to', 'Asobo', 'Default'];
-
 function filterByPricingPill(pricing) {
     if (pricing === 'All') {
         if (selectedPricing.size === ALL_PRICING_LIST.length) {
