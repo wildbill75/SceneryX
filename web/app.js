@@ -1237,6 +1237,14 @@ async function loadAirportsData() {
             const dataStr = await window.pywebview.api.get_airports();
             updateSplashProgress(85, "Parsing scenery packages...", "Rendering Map");
             allAirportsData = JSON.parse(dataStr);
+            if (window.pywebview.api.get_world_airport_coords) {
+                try {
+                    const coordsStr = await window.pywebview.api.get_world_airport_coords();
+                    window.worldAirportCoords = JSON.parse(coordsStr);
+                } catch(e) {
+                    console.warn("Could not load worldAirportCoords:", e);
+                }
+            }
         } else {
             response = await fetch('/api/airports');
             if (!response.ok) {
@@ -2077,7 +2085,21 @@ function renderRouteLines(filteredAirports) {
 
     allDestIcaos.forEach(destIcao => {
         if (destIcao === activeRouteOrigin.icao) return;
-        const ap = allAirportsData.find(a => a.icao === destIcao);
+        
+        let ap = allAirportsData.find(a => a.icao === destIcao);
+        if (!ap && window.worldAirportCoords && window.worldAirportCoords[destIcao]) {
+            const wInfo = window.worldAirportCoords[destIcao];
+            ap = {
+                icao: destIcao,
+                lat: wInfo.lat,
+                lon: wInfo.lon,
+                name: wInfo.name,
+                country: wInfo.country,
+                pricing_type: 'Default',
+                is_default: true
+            };
+        }
+
         if (!ap || !ap.lat || !ap.lon) return;
 
         const cat = getAirportCategory(ap);
@@ -3431,6 +3453,30 @@ function filterAirports() {
 
         return true;
     });
+
+    if (activeRouteDestIcaos && window.worldAirportCoords) {
+        activeRouteDestIcaos.forEach(dIcao => {
+            if (dIcao !== activeRouteOrigin.icao && !currentlyFilteredAirports.some(a => a.icao === dIcao)) {
+                const wInfo = window.worldAirportCoords[dIcao];
+                if (wInfo) {
+                    currentlyFilteredAirports.push({
+                        icao: dIcao,
+                        ident: dIcao,
+                        lat: wInfo.lat,
+                        lon: wInfo.lon,
+                        name: wInfo.name,
+                        city: wInfo.city || '',
+                        country: wInfo.country || '',
+                        type: wInfo.type || 'airport',
+                        english_type: 'General Aviation',
+                        vendor: 'Microsoft Flight Simulator (Default)',
+                        pricing_type: 'Default',
+                        is_default: true
+                    });
+                }
+            }
+        });
+    }
 
     renderAirportsOnMap(currentlyFilteredAirports);
 }

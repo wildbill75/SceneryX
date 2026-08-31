@@ -301,6 +301,24 @@ class Api:
         airports = run_scan()
         return json.dumps(airports, ensure_ascii=False)
 
+    def get_world_airport_coords(self):
+        try:
+            AIRPORTS_DB_CACHE, _, _ = load_airport_database()
+            coords = {}
+            for icao, ap in AIRPORTS_DB_CACHE.items():
+                coords[icao] = {
+                    'lat': ap.get('lat', 0.0),
+                    'lon': ap.get('lon', 0.0),
+                    'name': ap.get('name', ''),
+                    'city': ap.get('city', ''),
+                    'country': ap.get('country', ''),
+                    'type': ap.get('type', 'airport')
+                }
+            return json.dumps(coords, ensure_ascii=False)
+        except Exception as e:
+            print("Error returning world_airport_coords:", e)
+            return json.dumps({})
+
     def rescan(self):
         airports = run_scan()
         return json.dumps(airports, ensure_ascii=False)
