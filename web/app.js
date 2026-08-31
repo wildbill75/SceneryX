@@ -1097,7 +1097,7 @@ async function toggleCountrySceneryInPlace(icao, folderName) {
 }
 
 function resetConflictingFiltersForCountrySelection() {
-    selectedRegions.clear();
+    selectedRegion = null;
     updateRegionPillUI();
 }
 
@@ -2943,7 +2943,7 @@ function exitCountryMode() {
         // 5. Restore global sidebar filters to default map mode (Screenshot 2 & 3: Default MSFS unchecked)
         selectedPricing = new Set(DEFAULT_STARTUP_PRICING);
         selectedSources = new Set(ALL_SOURCES_LIST);
-        selectedRegions.clear();
+        selectedRegion = null;
         selectedTypes = new Set(ALL_TYPES_LIST);
         selectedGsxFilter = 'all';
         updateFilterUI();
@@ -3206,32 +3206,27 @@ function resetFullDatabase() {
 
 /* ================= FILTER & UI LOGIC ================= */
 
-let selectedRegions = new Set();
+let selectedRegion = null;
 
 function toggleRegionFilter(regionKey) {
-    if (regionKey === 'all') {
-        selectedRegions.clear();
+    if (regionKey === 'all' || selectedRegion === regionKey) {
+        selectedRegion = null;
     } else {
-        if (selectedRegions.has(regionKey)) {
-            selectedRegions.delete(regionKey);
-        } else {
-            selectedRegions.add(regionKey);
-        }
+        selectedRegion = regionKey;
     }
     updateRegionPillUI();
     filterAirports();
 
     if (map) {
-        if (selectedRegions.size === 1) {
-            const singleKey = Array.from(selectedRegions)[0];
-            const vp = REGION_VIEWPORTS[singleKey];
+        if (selectedRegion) {
+            const vp = REGION_VIEWPORTS[selectedRegion];
             if (vp) {
                 map.flyTo(vp.center, vp.zoom, { duration: 1.2 });
             } else if (currentlyFilteredAirports.length > 0) {
                 zoomToFilteredAirportsBounds();
             }
-        } else if (selectedRegions.size > 1 && currentlyFilteredAirports.length > 0) {
-            zoomToFilteredAirportsBounds();
+        } else {
+            map.flyTo([20.0, 0.0], 2.5, { duration: 1.2 });
         }
     }
 }
@@ -3242,7 +3237,7 @@ function updateRegionPillUI() {
 
     const allBtn = document.getElementById('filter-region-all');
     if (allBtn) {
-        if (selectedRegions.size === 0) {
+        if (!selectedRegion) {
             allBtn.className = "col-span-2 py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center shadow-sm shadow-cyan-500/10 cursor-pointer";
         } else {
             allBtn.className = "col-span-2 py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center cursor-pointer";
@@ -3255,7 +3250,7 @@ function updateRegionPillUI() {
         if (btn) {
             const isSpan2 = (k === 'pacific');
             const spanClass = isSpan2 ? 'col-span-2 ' : '';
-            if (selectedRegions.has(k)) {
+            if (selectedRegion === k) {
                 btn.className = `${spanClass}py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center shadow-sm shadow-cyan-500/10 cursor-pointer`;
             } else {
                 btn.className = `${spanClass}py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center cursor-pointer`;
@@ -3386,6 +3381,17 @@ function filterAirports() {
 
             if (!selectedCountryTypeFilters.has(typeKey)) return false;
         } else {
+            // Global Geographic Region Filter (only applied when NOT in country mode)
+            if (selectedRegion) {
+                const allowedIsos = new Set(REGION_COUNTRY_MAP[selectedRegion] || []);
+                const apIso = ((ap.country || ap.iso_country || '').toString()).toUpperCase().trim();
+                const rawCountry = (ap.country || '').toString().toLowerCase().trim();
+                const resolvedIso = COUNTRY_NAME_TO_ISO[rawCountry] || apIso;
+                if (!allowedIsos.has(apIso) && !allowedIsos.has(resolvedIso)) {
+                    return false;
+                }
+            }
+
             // Global Scenery Source Filter (only applied when NOT in country mode)
             if (!airportMatchesSourceFilter(ap)) {
                 return false;
