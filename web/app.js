@@ -2967,7 +2967,7 @@ function exitCountryMode() {
         // 5. Re-filter airports for Global Map View & Reset Camera
         filterAirports();
         if (map) {
-            map.flyTo([20.0, 0.0], 2.5, { animate: true, duration: 1.2 });
+            map.flyTo([25.0, 10.0], 3.0, { animate: true, duration: 0.5 });
         }
     } catch (e) {
         console.error("Error in exitCountryMode:", e);
@@ -3232,7 +3232,7 @@ function toggleRegionFilter(regionKey) {
                 zoomToFilteredAirportsBounds();
             }
         } else {
-            map.flyTo([20.0, 0.0], 2.5, { duration: 1.2 });
+            map.flyTo([25.0, 10.0], 3.0, { duration: 0.5 });
         }
     }
 }
