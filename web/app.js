@@ -632,6 +632,7 @@ async function ensureAppLoaded() {
 document.addEventListener('DOMContentLoaded', () => {
     initMap();
     initSidebarResize();
+    initDrawerAccordions();
     renderStarRatingWidget(0);
     renderFilterStarWidget(0);
     startCurrencyCarousel();
@@ -2332,6 +2333,7 @@ function showAirportDetails(ap) {
     const isDifferentAirport = !selectedAirport || selectedAirport.icao !== ap.icao;
     activeDrawerMode = 'AIRPORT';
     selectedAirport = ap;
+    initDrawerAccordions();
 
     if (isDifferentAirport) {
         centerMapOnAirport(ap);
@@ -2391,7 +2393,17 @@ function showAirportDetails(ap) {
     const elevM = Math.round(elevFt * 0.3048);
     document.getElementById('drawer-elevation').innerText = `${elevFt.toLocaleString()} ft (${elevM} m)`;
     
-    document.getElementById('drawer-vendor').innerText = ap.vendor || (ap.is_asobo_official ? 'Microsoft / Asobo' : 'Unknown');
+    const vendorName = ap.vendor || (ap.is_asobo_official ? 'Microsoft / Asobo' : 'Unknown');
+    document.getElementById('drawer-vendor').innerText = vendorName;
+    const vendorPill = document.getElementById('drawer-vendor-pill');
+    if (vendorPill) {
+        if (vendorName && vendorName !== 'Unknown') {
+            vendorPill.innerText = vendorName;
+            vendorPill.classList.remove('hidden');
+        } else {
+            vendorPill.classList.add('hidden');
+        }
+    }
     const versionBadge = document.getElementById('drawer-version');
     if (versionBadge) {
         if (ap.version) {
@@ -2673,13 +2685,14 @@ function showAirportDetails(ap) {
 
     const isDefaultActive = (ap.pricing_type === 'Default' || ap.package_name === 'Default MSFS Base Airport' || baseSources.length === 0 || baseSources.every(s => s.is_disabled));
 
+    const optionsCountEl = document.getElementById('drawer-options-count');
+    if (optionsCountEl) {
+        const totalOpts = (baseSources.length > 0 ? baseSources.length : 0) + (fixSources.length > 0 ? fixSources.length : 0) + 1;
+        optionsCountEl.innerText = `${totalOpts} ${t('country.options', 'Options')}`;
+    }
+
     let html = `
-        <div class="space-y-3">
-            <div class="flex items-center justify-between pb-1">
-                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">${t('drawer.scenery_options', 'Available Scenery Options')}</span>
-                <span class="text-[10px] font-mono text-slate-500 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">${t('drawer.click_selection', '1-Click Selection')}</span>
-            </div>
-            <div class="space-y-2.5">
+        <div class="space-y-2.5">
     `;
 
     // CHOICE 1: Default MSFS Base Airport Card
@@ -5071,5 +5084,62 @@ function initSidebarResize() {
 
         window.addEventListener('mousemove', onMouseMove);
         window.addEventListener('mouseup', onMouseUp);
+    });
+}
+
+/* ================= RIGHT DETAIL DRAWER ACCORDIONS ================= */
+
+const DRAWER_ACCORDION_DEFAULTS = {
+    'dev': false,
+    'options': false,
+    'gsx': false,
+    'airlines': true,
+    'price': false
+};
+
+function toggleDrawerAccordion(sectionKey) {
+    const content = document.getElementById(`accordion-content-${sectionKey}`);
+    const icon = document.getElementById(`accordion-icon-${sectionKey}`);
+    if (!content || !icon) return;
+
+    const isHidden = content.classList.contains('hidden');
+    if (isHidden) {
+        content.classList.remove('hidden');
+        icon.classList.remove('-rotate-90');
+        icon.classList.add('rotate-0');
+    } else {
+        content.classList.add('hidden');
+        icon.classList.remove('rotate-0');
+        icon.classList.add('-rotate-90');
+    }
+
+    try {
+        const saved = JSON.parse(localStorage.getItem('sceneryx_drawer_accordions') || '{}');
+        saved[sectionKey] = isHidden; // new state is open if it was hidden
+        localStorage.setItem('sceneryx_drawer_accordions', JSON.stringify(saved));
+    } catch (e) {}
+}
+
+function initDrawerAccordions() {
+    let saved = {};
+    try {
+        saved = JSON.parse(localStorage.getItem('sceneryx_drawer_accordions') || '{}');
+    } catch (e) {}
+
+    ['dev', 'options', 'gsx', 'airlines', 'price'].forEach(key => {
+        const isOpen = (saved[key] !== undefined) ? saved[key] : DRAWER_ACCORDION_DEFAULTS[key];
+        const content = document.getElementById(`accordion-content-${key}`);
+        const icon = document.getElementById(`accordion-icon-${key}`);
+        if (!content || !icon) return;
+
+        if (isOpen) {
+            content.classList.remove('hidden');
+            icon.classList.remove('-rotate-90');
+            icon.classList.add('rotate-0');
+        } else {
+            content.classList.add('hidden');
+            icon.classList.remove('rotate-0');
+            icon.classList.add('-rotate-90');
+        }
     });
 }
