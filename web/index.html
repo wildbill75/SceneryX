@@ -466,34 +466,35 @@
             </div>
 
             <!-- BOTTOM FIXED ACTION & SEARCH PANEL (LEFT SIDEBAR FOOTER) -->
-            <div class="px-3.5 py-3 border-t border-slate-800/80 bg-slate-950/40">
-            <div class="relative flex items-center">
-                <i class="fa-solid fa-magnifying-glass absolute left-3.5 text-slate-500 text-xs pointer-events-none"></i>
-                <input type="text" id="search-input" onkeydown="handleSearchKeyDown(event)" oninput="debouncedFilterAirports()" 
+            <div class="px-4 py-4 border-t border-slate-800/80 bg-slate-950/70 flex flex-col gap-3">
+                <!-- SEARCH BAR -->
+                <div class="relative flex items-center">
+                    <i class="fa-solid fa-magnifying-glass absolute left-3.5 text-slate-500 text-xs pointer-events-none"></i>
+                    <input type="text" id="search-input" onkeydown="handleSearchKeyDown(event)" oninput="debouncedFilterAirports()" 
                            placeholder="Search ICAO, Airport, Country..." 
-                           class="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl pl-8 pr-7 py-2 text-xs text-slate-100 placeholder-slate-400 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 font-medium transition-all shadow-inner">
-                    <button id="clear-search" onclick="clearSearch()" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs">
+                           class="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl pl-9 pr-8 py-2.5 text-xs text-slate-100 placeholder-slate-400 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 font-medium transition-all shadow-inner">
+                    <button id="clear-search" onclick="clearSearch()" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs p-1">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
                 </div>
 
                 <!-- ACTION BUTTONS ROW: EXPORT, RESCAN, SETTINGS -->
-                <div class="flex items-center gap-2 w-full">
+                <div class="flex items-center gap-2.5 w-full">
                     <!-- EXPORT BUTTON -->
-                    <button onclick="openExportModal()" title="Export Scenery Collection (CSV / JSON)" class="flex-1 py-2 px-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 text-slate-300 hover:text-white text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer">
+                    <button onclick="openExportModal()" title="Export Scenery Collection (CSV / JSON)" class="flex-1 h-10 px-3 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 text-slate-300 hover:text-white text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer active:scale-98">
                         <i class="fa-solid fa-file-export text-cyan-400 text-xs"></i>
                         <span>Export</span>
                     </button>
 
                     <!-- RESCAN BUTTON -->
-                    <button onclick="rescanMSFS()" title="Rescan MSFS Packages" class="flex-1 py-2 px-3 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-300 text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10 cursor-pointer">
+                    <button onclick="rescanMSFS()" title="Rescan MSFS Packages" class="flex-1 h-10 px-3 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/40 text-cyan-300 text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-sm shadow-cyan-500/10 cursor-pointer active:scale-98">
                         <i id="rescan-icon" class="fa-solid fa-rotate text-cyan-400 text-xs"></i>
                         <span>Rescan</span>
                     </button>
 
                     <!-- SETTINGS GEAR BUTTON -->
-                    <button onclick="openSettingsModal()" title="Settings & Scenery Paths" class="w-9 h-9 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 text-slate-300 hover:text-white flex items-center justify-center transition-all shrink-0 cursor-pointer">
-                        <i class="fa-solid fa-gear text-xs"></i>
+                    <button onclick="openSettingsModal()" title="Settings & Scenery Paths" class="w-10 h-10 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-700/80 text-slate-300 hover:text-white flex items-center justify-center transition-all shrink-0 cursor-pointer active:scale-98">
+                        <i class="fa-solid fa-gear text-sm"></i>
                     </button>
                 </div>
             </div>
