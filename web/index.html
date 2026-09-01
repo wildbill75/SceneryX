@@ -278,7 +278,7 @@
     <div class="relative flex-1 flex overflow-hidden">
 
         <!-- LEFT SIDEBAR FILTERS -->
-        <aside id="sidebar-panel" class="w-[345px] glass-panel z-20 flex flex-col shrink-0 border-r border-slate-800/80 transition-all duration-300 ease-in-out">
+        <aside id="sidebar-panel" style="width: 360px;" class="min-w-[320px] max-w-[600px] glass-panel z-20 flex flex-col shrink-0 border-r border-slate-800/80 transition-all duration-300 ease-in-out">
 
             <div class="p-4 space-y-6 overflow-y-auto flex-1">
 
@@ -508,6 +508,11 @@
                 </div>
             </div>
         </aside>
+
+        <!-- LEFT SIDEBAR RESIZE SPLITTER HANDLE (GLISSIÈRE LATÉRALE) -->
+        <div id="sidebar-resize-handle" class="w-1 hover:w-1.5 bg-slate-800/80 hover:bg-cyan-400 active:bg-cyan-300 cursor-col-resize z-20 transition-all shrink-0 select-none relative group" title="Click & Drag to resize sidebar">
+            <div class="absolute inset-y-0 -left-1.5 -right-1.5 cursor-col-resize"></div>
+        </div>
 
         <!-- LEAFLET MAP CONTAINER -->
         <main class="flex-1 relative">
@@ -914,6 +919,7 @@
                             <option value="en">English (Default)</option>
                             <option value="fr">Français</option>
                             <option value="de">Deutsch</option>
+                            <option value="es">Español</option>
                         </select>
                     </div>
                 </div>

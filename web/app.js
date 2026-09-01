@@ -631,6 +631,7 @@ async function ensureAppLoaded() {
 
 document.addEventListener('DOMContentLoaded', () => {
     initMap();
+    initSidebarResize();
     renderStarRatingWidget(0);
     renderFilterStarWidget(0);
     startCurrencyCarousel();
@@ -776,7 +777,12 @@ function openCountryDrawer(iso, countryName) {
 
     // Auto-hide Left Sidebar to maximize map viewport
     const sb = document.getElementById('sidebar-panel');
-    if (sb) sb.classList.add('-ml-[345px]', 'opacity-0', 'pointer-events-none');
+    const sbHandle = document.getElementById('sidebar-resize-handle');
+    if (sb) {
+        sb.style.marginLeft = `-${sb.offsetWidth || 360}px`;
+        sb.classList.add('opacity-0', 'pointer-events-none');
+    }
+    if (sbHandle) sbHandle.classList.add('hidden');
 
     // 1. Find all airports belonging to this country
     const isoUpper = iso.toUpperCase().trim();
@@ -2359,7 +2365,12 @@ function showAirportDetails(ap) {
     }
 
     const sb = document.getElementById('sidebar-panel');
-    if (sb) sb.classList.remove('-ml-[345px]', 'opacity-0', 'pointer-events-none');
+    const sbHandle = document.getElementById('sidebar-resize-handle');
+    if (sb) {
+        sb.style.marginLeft = '0px';
+        sb.classList.remove('opacity-0', 'pointer-events-none');
+    }
+    if (sbHandle) sbHandle.classList.remove('hidden');
 
     const cMode = document.getElementById('drawer-country-mode');
     if (cMode) cMode.classList.add('hidden');
@@ -3112,7 +3123,12 @@ function exitCountryMode() {
         if (apMode) apMode.classList.add('hidden');
 
         const sb = document.getElementById('sidebar-panel');
-        if (sb) sb.classList.remove('-ml-[345px]', 'opacity-0', 'pointer-events-none');
+        const sbHandle = document.getElementById('sidebar-resize-handle');
+        if (sb) {
+            sb.style.marginLeft = '0px';
+            sb.classList.remove('opacity-0', 'pointer-events-none');
+        }
+        if (sbHandle) sbHandle.classList.remove('hidden');
 
         // 2. Clear Operating Airline Route Lines & Flight Corridor Layers
         selectedAirlines.clear();
@@ -4989,3 +5005,71 @@ function restoreAllFlightSceneriesUI() {
     });
 }
 
+
+// Left Sidebar Interactive Width Resizer (Click & Hold to Resize)
+function initSidebarResize() {
+    const sidebar = document.getElementById('sidebar-panel');
+    const handle = document.getElementById('sidebar-resize-handle');
+    if (!sidebar || !handle) return;
+
+    // Load saved width from localStorage or settings, default to 360px
+    let initialWidth = 360;
+    try {
+        const saved = localStorage.getItem('sceneryx_sidebar_width');
+        if (saved) {
+            const parsed = parseInt(saved, 10);
+            if (!isNaN(parsed) && parsed >= 320 && parsed <= 600) {
+                initialWidth = parsed;
+            }
+        }
+    } catch (e) {}
+
+    sidebar.style.width = initialWidth + 'px';
+
+    let isResizing = false;
+    let startX = 0;
+    let startWidth = 0;
+
+    handle.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        isResizing = true;
+        startX = e.clientX;
+        startWidth = sidebar.offsetWidth;
+
+        sidebar.classList.remove('transition-all', 'duration-300', 'ease-in-out');
+        document.body.classList.add('select-none', 'cursor-col-resize');
+        handle.classList.add('bg-cyan-400', 'w-1.5');
+
+        const onMouseMove = (moveEvent) => {
+            if (!isResizing) return;
+            const deltaX = moveEvent.clientX - startX;
+            let newWidth = startWidth + deltaX;
+            const minW = 320;
+            const maxW = Math.min(600, Math.floor(window.innerWidth * 0.5));
+            if (newWidth < minW) newWidth = minW;
+            if (newWidth > maxW) newWidth = maxW;
+            sidebar.style.width = newWidth + 'px';
+        };
+
+        const onMouseUp = () => {
+            if (!isResizing) return;
+            isResizing = false;
+            sidebar.classList.add('transition-all', 'duration-300', 'ease-in-out');
+            document.body.classList.remove('select-none', 'cursor-col-resize');
+            handle.classList.remove('bg-cyan-400', 'w-1.5');
+            window.removeEventListener('mousemove', onMouseMove);
+            window.removeEventListener('mouseup', onMouseUp);
+
+            try {
+                localStorage.setItem('sceneryx_sidebar_width', sidebar.offsetWidth);
+            } catch (e) {}
+
+            if (typeof map !== 'undefined' && map && typeof map.invalidateSize === 'function') {
+                map.invalidateSize();
+            }
+        };
+
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+    });
+}
