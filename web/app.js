@@ -66,7 +66,7 @@ const COUNTRY_NAME_TO_ISO = {
     'denmark': 'DK', 'djibouti': 'DJ', 'dominica': 'DM', 'dominican republic': 'DO',
     'ecuador': 'EC', 'egypt': 'EG', 'el salvador': 'SV', 'equatorial guinea': 'GQ', 'eritrea': 'ER',
     'estonia': 'EE', 'eswatini': 'SZ', 'ethiopia': 'ET',
-    'fiji': 'FJ', 'finland': 'FI', 'france': 'FR', 'french guiana': 'GF', 'french polynesia': 'PF',
+    'faroe islands': 'FO', 'faroe': 'FO', 'iles feroe': 'FO', 'îles féroé': 'FO', 'faroer': 'FO', 'islas feroe': 'FO', 'fiji': 'FJ', 'finland': 'FI', 'france': 'FR', 'french guiana': 'GF', 'french polynesia': 'PF',
     'gabon': 'GA', 'gambia': 'GM', 'georgia': 'GE', 'germany': 'DE', 'ghana': 'GH',
     'greece': 'GR', 'greenland': 'GL', 'grenada': 'GD', 'guatemala': 'GT', 'guinea': 'GN',
     'guinea-bissau': 'GW', 'guyana': 'GY',
@@ -121,7 +121,7 @@ const ISO_TO_COUNTRY_NAME = {
     'HR': 'Croatia', 'CU': 'Cuba', 'CY': 'Cyprus', 'CZ': 'Czech Republic', 'DK': 'Denmark',
     'DJ': 'Djibouti', 'DM': 'Dominica', 'DO': 'Dominican Republic', 'EC': 'Ecuador', 'EG': 'Egypt',
     'SV': 'El Salvador', 'GQ': 'Equatorial Guinea', 'ER': 'Eritrea', 'EE': 'Estonia', 'SZ': 'Eswatini',
-    'ET': 'Ethiopia', 'FJ': 'Fiji', 'FI': 'Finland', 'FR': 'France', 'GF': 'French Guiana',
+    'ET': 'Ethiopia', 'FO': 'Faroe Islands', 'FJ': 'Fiji', 'FI': 'Finland', 'FR': 'France', 'GF': 'French Guiana',
     'PF': 'French Polynesia', 'GA': 'Gabon', 'GM': 'Gambia', 'GE': 'Georgia', 'DE': 'Germany',
     'GH': 'Ghana', 'GR': 'Greece', 'GL': 'Greenland', 'GD': 'Grenada', 'GT': 'Guatemala',
     'GN': 'Guinea', 'GW': 'Guinea-Bissau', 'GY': 'Guyana', 'HT': 'Haiti', 'HN': 'Honduras',
@@ -1241,7 +1241,10 @@ function toggleCountrySelection(iso, countryName, layer, forceSelect = false) {
                 if (mainFrance) targetLayer = mainFrance;
             }
 
-            if (isoUpper === 'RU') {
+            if (isoUpper === 'FO') {
+                const foBounds = L.latLngBounds([[61.35, -7.75], [62.45, -6.20]]);
+                map.fitBounds(foBounds, { padding: [40, 40], maxZoom: 9, animate: true, duration: 0.5 });
+            } else if (isoUpper === 'RU') {
                 // Optimal framing across the entire Russian Federation on a single continuous map
                 const ruBounds = L.latLngBounds([[41.15, 20.0], [77.5, 188.0]]);
                 map.fitBounds(ruBounds, { padding: [40, 40], maxZoom: 4, animate: true, duration: 0.5 });
