@@ -79,7 +79,8 @@ VENDOR_MAP = {
     'dominicdesignteam': 'Dominic Design Team',
     'dominic design team': 'Dominic Design Team',
     'argaeus': 'Argaeus',
-    'hb': 'Argaeus',
+    'argaeus simulations': 'Argaeus',
+    'argaeus studio': 'Argaeus',
     'scenerytr': 'SceneryTR Design',
     'scenerytrdesign': 'SceneryTR Design',
     'scenerytr design': 'SceneryTR Design',
@@ -137,6 +138,8 @@ VENDOR_MAP = {
     'amsim': 'AMSim',
     'fsx3d': 'FSX3D',
     'lhsimulations': 'LHSimulations',
+    'lhsimulation': 'LHSimulations',
+    'lhsim': 'LHSimulations',
     'pilotexperiencesim': 'Pilot Experience Sim',
     'orbx': 'Orbx',
     'pyreegue': 'Pyreegue Dev Co',
@@ -731,7 +734,10 @@ def get_clean_vendor(folder_name, manifest_data):
 
     # 1. Check cleaned folder name against VENDOR_MAP first (Folder naming is almost always higher quality than manifest fields)
     for key, pretty_name in VENDOR_MAP.items():
-        if key in clean_fn:
+        if len(key) <= 3:
+            if re.search(rf'(^|[-_ ]){re.escape(key)}([-_ ]|$)', clean_fn):
+                return pretty_name
+        elif key in clean_fn:
             return pretty_name
 
     # 2. Check manifest creator / author / manufacturer against VENDOR_MAP
@@ -743,7 +749,10 @@ def get_clean_vendor(folder_name, manifest_data):
         c_check = f"{creator} {author} {manufacturer}".lower()
 
         for key, pretty_name in VENDOR_MAP.items():
-            if key in c_check:
+            if len(key) <= 3:
+                if re.search(rf'\b{re.escape(key)}\b', c_check):
+                    return pretty_name
+            elif key in c_check:
                 return pretty_name
 
         # 3. Only accept manifest candidate if it has a real brand name (> 3 chars, not 2-3 letter dev initials like "HB", "AB", "MS")
