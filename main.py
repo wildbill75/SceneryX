@@ -212,9 +212,9 @@ def fast_update_airport_cache(icao_target, target_pkg_name=None, toggle_all=Fals
 
         # Recalculate primary package & vendor from active sources
         active_sources = [s for s in all_srcs if not s.get('is_disabled')]
-        if active_sources:
-            main_active = [s for s in active_sources if not s.get('is_fix_patch') and not s.get('is_addon')]
-            primary = main_active[0] if main_active else active_sources[0]
+        main_active = [s for s in active_sources if not s.get('is_fix_patch') and not s.get('is_addon')]
+        if main_active:
+            primary = main_active[0]
 
             target_ap['package_name'] = primary['folder_name']
             target_ap['package_path'] = primary.get('package_path', '')

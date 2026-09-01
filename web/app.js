@@ -34,7 +34,7 @@ const ALL_PRICING_LIST = ['Payware', 'Freeware / Flightsim.to', 'Asobo', 'Defaul
 const ALL_SOURCES_LIST = ['Community', 'Marketplace', 'Official'];
 const ALL_TYPES_LIST = ['International', 'Regional', 'General Aviation', 'Heli / Water'];
 
-const DEFAULT_STARTUP_PRICING = ['Payware', 'Freeware / Flightsim.to', 'Asobo'];
+const DEFAULT_STARTUP_PRICING = ['Payware', 'Freeware / Flightsim.to', 'Asobo', 'Default'];
 let selectedPricing = new Set(DEFAULT_STARTUP_PRICING);
 let selectedSources = new Set(ALL_SOURCES_LIST);
 let selectedTypes = new Set(ALL_TYPES_LIST);
@@ -1589,7 +1589,7 @@ function updateInvestmentBanner() {
 
 function getActiveSource(ap) {
     if (!ap || !ap.all_sources) return null;
-    return ap.all_sources.find(s => !s.is_disabled && !(s.is_default || (s.folder_name && s.folder_name.startsWith('msfs-default-')))) || null;
+    return ap.all_sources.find(s => !s.is_disabled && !isFixOrOverlay(s) && !(s.is_default || (s.folder_name && s.folder_name.startsWith('msfs-default-')))) || null;
 }
 
 function hasCustomAddonSources(ap) {
@@ -1661,10 +1661,10 @@ function updateStats(airports) {
 let currentFlightMode = { active: false, icaos: [] };
 
 function createCustomIcon(ap) {
-    const nonDefaultSources = ap.all_sources ? ap.all_sources.filter(s => !(s.pricing_type === 'Default' || (s.folder_name && s.folder_name.startsWith('msfs-default-')))) : [];
-    let isApDisabled = ap.is_disabled || (nonDefaultSources.length > 0 && nonDefaultSources.every(s => s.is_disabled));
-
     const cat = getAirportCategory(ap);
+    const nonDefaultSources = ap.all_sources ? ap.all_sources.filter(s => !(s.pricing_type === 'Default' || (s.folder_name && s.folder_name.startsWith('msfs-default-')))) : [];
+    let isApDisabled = cat !== 'DEFAULT' && (ap.is_disabled || (nonDefaultSources.length > 0 && nonDefaultSources.every(s => s.is_disabled)));
+
     let color = '#06b6d4'; // Freeware = Neon Cyan
     if (cat === 'ASOBO') color = '#f59e0b'; // Asobo Handcrafted = Amber/Gold
     else if (cat === 'PAYWARE') color = '#a855f7'; // Payware = Neon Purple
@@ -1676,7 +1676,7 @@ function createCustomIcon(ap) {
     let strokeColor = ap.has_conflict ? '#ef4444' : '#ffffff';
     let strokeWidth = ap.has_conflict ? '2' : '1.2';
 
-    if (isApDisabled && cat !== 'DEFAULT') {
+    if (isApDisabled) {
         color = '#475569'; // Slate 600 Matte Gray fill
         strokeColor = '#cbd5e1'; // Crisp Silver/Slate 300 Outline
         strokeWidth = '1.5';
@@ -3532,13 +3532,14 @@ function airportMatchesSourceFilter(ap) {
     if (selectedSources.size === ALL_SOURCES_LIST.length) return true;
     if (selectedSources.size === 0) return false;
 
+    const cat = getAirportCategory(ap);
+    if (cat === 'DEFAULT') {
+        return selectedSources.has('Official');
+    }
+
     const sources = ap.all_sources || [];
     if (sources.length === 0) {
-        const cat = getAirportCategory(ap);
-        if (cat === 'DEFAULT') {
-            return selectedSources.has('Official');
-        }
-        return false;
+        return selectedSources.has('Official');
     }
 
     // Only evaluate ACTIVE sources (or primary active source) so disabled packages don't trigger wrong category/source filters
