@@ -3316,7 +3316,7 @@ function renderFilterStarWidget(val) {
         display.innerText = `★ ${val.toFixed(1)}+`;
         display.className = "text-xs font-mono font-bold text-amber-400";
     } else {
-        display.innerText = "All (0.0★)";
+        display.innerText = `${t('filter.rating_all', 'All')} (0.0★)`;
         display.className = "text-xs font-mono font-bold text-cyan-400";
     }
 
