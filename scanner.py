@@ -199,7 +199,10 @@ FIX_PATCH_KEYWORDS = [
     'update-fix', 'gsx-fix', 'vdgs-fix', 'ils-fix', 'nav-fix', 'lighting-fix',
     'taxiway-fix', 'runway-fix', 'flatten-fix', 'zparking', 'parking', 'vdgs',
     'stalex', 'stg', 'overlay', 'exclusion', 'excl', 'profile', 'xavios',
-    'jetway', 'jetways', 'gate', 'gates', 'frequency', 'frequencies', 'marking', 'markings'
+    'jetway', 'jetways', 'gate', 'gates', 'frequency', 'frequencies', 'marking', 'markings',
+    'interior', 'optional', 'extension', 'mesh', 'aerial', 'ortho', 'lights', 'lighting',
+    'trees', 'vegetation', 'sound', 'sounds', 'texture', 'textures', 'liveries', 'livery',
+    'static', 'statics', 'cars', 'people'
 ]
 
 # Official MSFS Standard Edition Handcrafted Airports (Base Game Standard + World Updates I to XVIII)
@@ -1141,7 +1144,7 @@ def run_scan():
                 "is_asobo_official": is_asobo_official,
                 "is_disabled": source_is_disabled,
                 "is_addon": is_addon_package,
-                "is_fix_patch": False if (is_asobo_official or is_payware) else is_fix_patch,
+                "is_fix_patch": False if (is_asobo_official or is_payware) else (is_fix_patch or is_addon_package),
                 "version": pkg_version,
                 "size_str": pkg_size_str,
                 "world_update_name": get_world_update_name(icao, folder_name)

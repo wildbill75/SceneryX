@@ -140,12 +140,16 @@ def fast_update_airport_cache(icao_target, target_pkg_name=None, toggle_all=Fals
 
         if target_pkg_name == 'DEFAULT':
             for s in all_srcs:
+                if s.get('is_fix_patch') or s.get('is_addon'):
+                    continue
                 s['is_disabled'] = True
                 fn = s.get('folder_name', '')
                 s['folder_name'] = fn[:-9] if fn.lower().endswith('.disabled') else fn
         elif target_pkg_name:
             t_clean = target_pkg_name[:-9] if target_pkg_name.lower().endswith('.disabled') else target_pkg_name
             for s in all_srcs:
+                if s.get('is_fix_patch') or s.get('is_addon'):
+                    continue
                 fn = s.get('folder_name', '')
                 fn_clean = fn[:-9] if fn.lower().endswith('.disabled') else fn
                 s['folder_name'] = fn_clean
@@ -1083,6 +1087,8 @@ class Api:
             ap_obj = next((a for a in scanned_airports if a['icao'].upper() == icao.upper()), None)
             if ap_obj and ap_obj.get('all_sources'):
                 for src in ap_obj['all_sources']:
+                    if src.get('is_fix_patch') or src.get('is_addon'):
+                        continue
                     fn = src.get('folder_name', '')
                     pkg_p = src.get('package_path', '')
                     fn_clean = fn[:-9] if fn.lower().endswith('.disabled') else fn

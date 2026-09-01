@@ -1,3 +1,16 @@
+
+function isFixOrOverlay(s) {
+    if (!s) return false;
+    if (s.is_fix_patch || s.is_addon) return true;
+    const fn = (s.folder_name || '').toLowerCase();
+    const fixKeywords = [
+        'fix', 'patch', 'flatten', 'fixer', 'correction', 'enhancement', 'mod',
+        'interior', 'optional', 'overlay', 'mesh', 'aerial', 'ortho', 'vdgs',
+        'lights', 'lighting', 'trees', 'vegetation', 'sound', 'texture', 'extension',
+        'zparking', 'exclusion', 'jetway', 'marking'
+    ];
+    return fixKeywords.some(k => fn.includes(k));
+}
 let map;
 let markerClusterGroup;
 let allAirportsData = [];
@@ -1658,7 +1671,7 @@ function createCustomIcon(ap) {
     else if (cat === 'DEFAULT') color = '#3b82f6'; // Default MSFS = Soft Royal Blue
 
     // Check if airport has at least one active Fix/Patch!
-    const hasActiveFix = ap.all_sources && ap.all_sources.some(s => s.is_fix_patch && !s.is_disabled);
+    const hasActiveFix = ap.all_sources && ap.all_sources.some(s => isFixOrOverlay(s) && !s.is_disabled);
 
     let strokeColor = ap.has_conflict ? '#ef4444' : '#ffffff';
     let strokeWidth = ap.has_conflict ? '2' : '1.2';
@@ -2420,7 +2433,7 @@ function showAirportDetails(ap) {
     const pricingBadge = document.getElementById('drawer-pricing-badge');
 
     const cat = getAirportCategory(ap);
-    const hasActiveFix = (ap.all_sources || []).some(s => !s.is_disabled && (s.is_fix_patch || (s.folder_name && (s.folder_name.toLowerCase().includes('fix') || s.folder_name.toLowerCase().includes('patch')))));
+    const hasActiveFix = (ap.all_sources || []).some(s => !s.is_disabled && isFixOrOverlay(s));
 
     // Clean previous category color classes
     const categoryColorClasses = [
@@ -2680,8 +2693,8 @@ function showAirportDetails(ap) {
     const nonDefaultSources = sources.filter(s => !(s.pricing_type === 'Default' || (s.folder_name && s.folder_name.startsWith('msfs-default-'))));
     
     // Separate into Main Base Sceneries vs Stackable Fixes/Patches
-    const baseSources = nonDefaultSources.filter(s => !s.is_fix_patch);
-    const fixSources = nonDefaultSources.filter(s => !!s.is_fix_patch);
+    const baseSources = nonDefaultSources.filter(s => !isFixOrOverlay(s));
+    const fixSources = nonDefaultSources.filter(s => isFixOrOverlay(s));
 
     const isDefaultActive = (ap.pricing_type === 'Default' || ap.package_name === 'Default MSFS Base Airport' || baseSources.length === 0 || baseSources.every(s => s.is_disabled));
 
@@ -2797,7 +2810,7 @@ function showAirportDetails(ap) {
         }
     });
 
-    html += `</div></div>`;
+    html += `</div>`;
 
     // SECTION 2: Available Fixes & Overlays (Stackable Independent Toggles)
     if (fixSources.length > 0) {
