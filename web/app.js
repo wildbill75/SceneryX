@@ -645,6 +645,7 @@ async function ensureAppLoaded() {
 document.addEventListener('DOMContentLoaded', () => {
     initMap();
     initSidebarResize();
+    initDrawerResize();
     initDrawerAccordions();
     renderStarRatingWidget(0);
     renderFilterStarWidget(0);
@@ -5109,6 +5110,75 @@ function initSidebarResize() {
 
             try {
                 localStorage.setItem('sceneryx_sidebar_width', sidebar.offsetWidth);
+            } catch (e) {}
+
+            if (typeof map !== 'undefined' && map && typeof map.invalidateSize === 'function') {
+                map.invalidateSize();
+            }
+        };
+
+        window.addEventListener('mousemove', onMouseMove);
+        window.addEventListener('mouseup', onMouseUp);
+    });
+}
+
+// Right Detail Drawer Interactive Width Resizer (Click & Hold to Resize)
+function initDrawerResize() {
+    const drawer = document.getElementById('detail-drawer');
+    const handle = document.getElementById('drawer-resize-handle');
+    if (!drawer || !handle) return;
+
+    // Load saved width from localStorage, default to 460px
+    let initialWidth = 460;
+    try {
+        const saved = localStorage.getItem('sceneryx_drawer_width');
+        if (saved) {
+            const parsed = parseInt(saved, 10);
+            if (!isNaN(parsed) && parsed >= 360 && parsed <= 850) {
+                initialWidth = parsed;
+            }
+        }
+    } catch (e) {}
+
+    drawer.style.width = initialWidth + 'px';
+
+    let isResizing = false;
+    let startX = 0;
+    let startWidth = 0;
+
+    handle.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        isResizing = true;
+        startX = e.clientX;
+        startWidth = drawer.offsetWidth;
+
+        drawer.classList.remove('transition-transform', 'duration-300', 'ease-in-out');
+        document.body.classList.add('select-none', 'cursor-col-resize');
+        handle.classList.add('bg-cyan-400', 'w-1.5');
+
+        const onMouseMove = (moveEvent) => {
+            if (!isResizing) return;
+            // Moving mouse left (decreasing clientX) expands drawer width
+            const deltaX = startX - moveEvent.clientX;
+            let newWidth = startWidth + deltaX;
+            const minW = 360;
+            const maxW = Math.min(850, Math.floor(window.innerWidth * 0.65));
+            if (newWidth < minW) newWidth = minW;
+            if (newWidth > maxW) newWidth = maxW;
+            drawer.style.width = newWidth + 'px';
+        };
+
+        const onMouseUp = () => {
+            if (!isResizing) return;
+            isResizing = false;
+            drawer.classList.add('transition-transform', 'duration-300', 'ease-in-out');
+            document.body.classList.remove('select-none', 'cursor-col-resize');
+            handle.classList.remove('bg-cyan-400', 'w-1.5');
+            window.removeEventListener('mousemove', onMouseMove);
+            window.removeEventListener('mouseup', onMouseUp);
+
+            try {
+                localStorage.setItem('sceneryx_drawer_width', drawer.offsetWidth);
             } catch (e) {}
 
             if (typeof map !== 'undefined' && map && typeof map.invalidateSize === 'function') {

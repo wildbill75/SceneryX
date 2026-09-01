@@ -541,7 +541,12 @@
             </div>
 
             <!-- RIGHT DETAIL DRAWER OVERLAY -->
-            <aside id="detail-drawer" class="absolute right-0 top-0 bottom-0 w-[460px] glass-panel z-[1001] transform translate-x-full transition-transform duration-300 ease-in-out border-l border-slate-800/80 flex flex-col pointer-events-auto">
+            <aside id="detail-drawer" style="width: 460px;" class="absolute right-0 top-0 bottom-0 min-w-[360px] max-w-[850px] glass-panel z-[1001] transform translate-x-full transition-transform duration-300 ease-in-out border-l border-slate-800/80 flex flex-col pointer-events-auto">
+                <!-- RESIZE HANDLE (LEFT EDGE) -->
+                <div id="drawer-resize-handle" class="absolute top-0 left-0 w-2 h-full cursor-col-resize hover:bg-cyan-500/30 transition-colors z-50 flex items-center justify-center group" title="Click and drag to resize panel">
+                    <div class="w-0.5 h-8 bg-slate-700 group-hover:bg-cyan-400 rounded-full transition-colors"></div>
+                </div>
+
                 <div class="p-5 overflow-y-auto flex-1 pt-4 flex flex-col min-h-0">
                     <!-- AIRPORT DETAIL MODE CONTAINER -->
                     <div id="drawer-airport-mode" class="space-y-6">
