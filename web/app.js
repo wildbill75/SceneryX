@@ -1092,16 +1092,7 @@ function selectCountryAirport(icao) {
     const ap = allAirportsData.find(a => a.icao === icao);
     if (!ap) return;
 
-    if (map && ap.lat && ap.lon) {
-        let flyLon = ap.lon;
-        if (((ap.country === 'RU' || ap.iso_country === 'RU') || (ap.icao && ap.icao.startsWith('UH'))) && flyLon < -100) {
-            flyLon = flyLon + 360;
-        }
-        map.flyTo([ap.lat, flyLon], 8, {
-            animate: true,
-            duration: 1.0
-        });
-    }
+    centerMapOnAirport(ap, 8);
 
     const targetCard = document.getElementById(`country-ap-card-${icao}`);
     const accordionEl = document.getElementById(`country-accordion-${icao}`);
@@ -1811,7 +1802,8 @@ function renderAirportsOnMap(airports) {
             maxWidth: 340,
             minWidth: 250,
             closeButton: false,
-            autoClose: true
+            autoClose: true,
+            autoPan: false
         });
 
         // Hover events for quick popup preview (shows developer/publisher)
@@ -1839,6 +1831,7 @@ function renderAirportsOnMap(airports) {
                 if (activeDrawerMode === 'COUNTRY') {
                     selectCountryAirport(ap.icao);
                 } else {
+                    centerMapOnAirport(ap);
                     showAirportDetails(ap);
                 }
             }
@@ -2259,19 +2252,53 @@ function selectAirport(icao) {
     }
 }
 
+function centerMapOnAirport(ap, forcedZoom = null) {
+    if (!map || !ap || ap.lat === undefined || ap.lon === undefined) return;
+
+    let flyLon = ap.lon;
+    if (((ap.country === 'RU' || ap.iso_country === 'RU') || (ap.icao && ap.icao.startsWith('UH'))) && flyLon < -100) {
+        flyLon = flyLon + 360;
+    }
+
+    const TARGET_AIRPORT_ZOOM = 6.0;
+    const currentZoom = map.getZoom();
+
+    // If forcedZoom is specified (e.g. 8 for country mode), use it.
+    // Otherwise: if current zoom is below 6.0 (global view), gently zoom in to 6.0.
+    // If already at or above 6.0, maintain current zoom without changing it.
+    let targetZoom = forcedZoom !== null ? forcedZoom : (currentZoom < TARGET_AIRPORT_ZOOM ? TARGET_AIRPORT_ZOOM : currentZoom);
+
+    // Calculate horizontal offset so the airport is centered in the visible area between left sidebar and right drawer
+    let xOffset = 0;
+    const detailDrawer = document.getElementById('detail-drawer');
+    if (detailDrawer) {
+        const drawerWidth = detailDrawer.offsetWidth || 460;
+        xOffset = drawerWidth / 2;
+    }
+
+    try {
+        const targetPoint = map.project([ap.lat, flyLon], targetZoom);
+        const adjustedPoint = L.point(targetPoint.x + xOffset, targetPoint.y);
+        const adjustedLatLng = map.unproject(adjustedPoint, targetZoom);
+
+        map.flyTo(adjustedLatLng, targetZoom, {
+            animate: true,
+            duration: 0.8
+        });
+    } catch (err) {
+        map.flyTo([ap.lat, flyLon], targetZoom, {
+            animate: true,
+            duration: 0.8
+        });
+    }
+}
+
 function focusAirportWithAnimation(ap) {
     if (!ap) return;
     lastFocusedIcao = ap.icao;
 
     if (map && ap.lat && ap.lon) {
-        let flyLon = ap.lon;
-        if (((ap.country === 'RU' || ap.iso_country === 'RU') || (ap.icao && ap.icao.startsWith('UH'))) && flyLon < -100) {
-            flyLon = flyLon + 360;
-        }
-        map.flyTo([ap.lat, flyLon], 14, {
-            animate: true,
-            duration: 1.5
-        });
+        centerMapOnAirport(ap);
         showAirportDetails(ap);
     }
 }
@@ -2280,6 +2307,10 @@ function showAirportDetails(ap) {
     const isDifferentAirport = !selectedAirport || selectedAirport.icao !== ap.icao;
     activeDrawerMode = 'AIRPORT';
     selectedAirport = ap;
+
+    if (isDifferentAirport) {
+        centerMapOnAirport(ap);
+    }
 
     // If transitioning from Country Mode to Airport Mode, cleanly deactivate country mode
     if (selectedCountryCode) {
