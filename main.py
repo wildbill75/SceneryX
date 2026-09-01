@@ -292,6 +292,12 @@ class Api:
         pass
 
     def get_airports(self):
+        settings = get_settings()
+        auto_scan = settings.get("auto_scan_on_startup", True)
+        if auto_scan:
+            airports = run_scan()
+            return json.dumps(airports, ensure_ascii=False)
+
         if os.path.exists(OUTPUT_JSON_PATH):
             try:
                 with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
