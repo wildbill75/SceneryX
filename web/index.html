@@ -912,6 +912,46 @@
         </div>
     </div>
 
+    <!-- RESCAN PROGRESS & RESULT MODAL -->
+    <div id="rescan-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm transition-all duration-300">
+        <div class="glass-modal w-full max-w-md rounded-2xl p-6 shadow-2xl border border-slate-800 space-y-5">
+            <!-- PHASE 1: SCANNING PROGRESS -->
+            <div id="rescan-phase-scanning" class="space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h3 class="text-sm font-bold text-white tracking-wide">Scanning Sceneries</h3>
+                        <p id="rescan-status-sub" class="text-xs text-slate-400 mt-0.5">Checking Community & OneStore folders...</p>
+                    </div>
+                    <span id="rescan-percent-text" class="text-xs font-mono font-bold text-cyan-400">0%</span>
+                </div>
+
+                <!-- Progress Bar -->
+                <div class="w-full bg-slate-900 rounded-full h-2 overflow-hidden border border-slate-800">
+                    <div id="rescan-progress-bar" class="bg-cyan-500 h-full rounded-full transition-all duration-200" style="width: 0%;"></div>
+                </div>
+
+                <p id="rescan-detail-text" class="text-[11px] text-slate-500 font-mono truncate">Scanning packages...</p>
+            </div>
+
+            <!-- PHASE 2: SCAN RESULT -->
+            <div id="rescan-phase-result" class="hidden space-y-4">
+                <div>
+                    <h3 class="text-sm font-bold text-white tracking-wide" id="rescan-result-title">Scan Complete</h3>
+                    <p id="rescan-result-message" class="text-xs text-slate-300 mt-1 leading-relaxed"></p>
+                </div>
+
+                <!-- Optional List of newly detected packages -->
+                <div id="rescan-new-items-container" class="hidden max-h-40 overflow-y-auto space-y-1.5 p-2.5 rounded-xl bg-slate-950/80 border border-slate-800/80 text-xs font-mono">
+                    <!-- Populated dynamically -->
+                </div>
+
+                <button onclick="closeRescanModal()" class="w-full py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs shadow-lg shadow-cyan-500/20 transition-all cursor-pointer active:scale-98">
+                    OK
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- EXPORT COLLECTION MODAL -->
     <div id="export-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md">
         <div class="glass-modal w-full max-w-md rounded-3xl p-6 shadow-2xl border border-slate-800 space-y-4">

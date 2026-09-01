@@ -3977,35 +3977,48 @@ async function rescanMSFS() {
     const icon = document.getElementById('rescan-icon');
     if (icon) icon.classList.add('fa-spin');
 
-    const splash = document.getElementById('splash-screen');
-    const statusTxt = document.getElementById('splash-status-text');
-    const folderTxt = document.getElementById('splash-folder-text');
-    const progressFx = document.getElementById('splash-progress-bar');
-    const percentTxt = document.getElementById('splash-percent-text');
+    // Build set of previous packages & custom sceneries
+    const prevPackages = new Set();
+    allAirportsData.forEach(a => {
+        if (a.package_name) prevPackages.add(a.package_name.toLowerCase());
+        if (a.addons && Array.isArray(a.addons)) {
+            a.addons.forEach(ad => {
+                if (ad.package_name) prevPackages.add(ad.package_name.toLowerCase());
+            });
+        }
+    });
 
-    if (splash) {
-        splash.classList.remove('hidden', 'opacity-0', 'pointer-events-none');
-        splash.classList.add('flex', 'opacity-100');
-        if (statusTxt) statusTxt.innerText = "Rescanning MSFS 2024 Sceneries & Packages...";
-        if (folderTxt) folderTxt.innerText = "Scanning Community & StreamedPackages folders...";
-        if (progressFx) progressFx.style.width = "25%";
-        if (percentTxt) percentTxt.innerText = "25%";
+    const modal = document.getElementById('rescan-modal');
+    const phaseScanning = document.getElementById('rescan-phase-scanning');
+    const phaseResult = document.getElementById('rescan-phase-result');
+    const progressBar = document.getElementById('rescan-progress-bar');
+    const percentText = document.getElementById('rescan-percent-text');
+    const detailText = document.getElementById('rescan-detail-text');
+
+    if (modal) {
+        if (phaseScanning) phaseScanning.classList.remove('hidden');
+        if (phaseResult) phaseResult.classList.add('hidden');
+        if (progressBar) progressBar.style.width = '10%';
+        if (percentText) percentText.innerText = '10%';
+        if (detailText) detailText.innerText = 'Checking Community & OneStore folders...';
+        modal.classList.remove('hidden');
     }
 
-    // Force browser repaint before calling pywebview rescan
+    // Force browser repaint
     await new Promise(r => setTimeout(r, 60));
 
-    let progressTimer = setInterval(() => {
-        if (!progressFx) return;
-        let curr = parseInt(progressFx.style.width) || 25;
-        if (curr < 85) {
-            curr += 15;
-            progressFx.style.width = curr + '%';
-            if (percentTxt) percentTxt.innerText = curr + '%';
-            if (curr === 40 && folderTxt) folderTxt.innerText = "Scanning Official2020 / OneStore packages...";
-            if (curr === 70 && folderTxt) folderTxt.innerText = "Parsing Content.xml & resolving conflicts...";
+    let currentProgress = 10;
+    const progressTimer = setInterval(() => {
+        if (!progressBar) return;
+        if (currentProgress < 85) {
+            currentProgress += 10;
+            progressBar.style.width = currentProgress + '%';
+            if (percentText) percentText.innerText = currentProgress + '%';
+            if (currentProgress === 30 && detailText) detailText.innerText = 'Scanning package manifests & sceneries...';
+            if (currentProgress === 60 && detailText) detailText.innerText = 'Analyzing runway & airport BGL files...';
+            if (currentProgress === 80 && detailText) detailText.innerText = 'Indexing custom addons & GSX profiles...';
         }
-    }, 150);
+    }, 100);
 
     try {
         let dataStr;
@@ -4018,16 +4031,20 @@ async function rescanMSFS() {
         }
 
         clearInterval(progressTimer);
-        if (progressFx) progressFx.style.width = "100%";
-        if (percentTxt) percentTxt.innerText = "100%";
-        if (folderTxt) folderTxt.innerText = "Scan complete! Updating database...";
 
+        // Advance to 100% smoothly
+        if (progressBar) progressBar.style.width = '100%';
+        if (percentText) percentText.innerText = '100%';
+        if (detailText) detailText.innerText = 'Scan complete!';
+
+        // Apply ratings & search index
         allAirportsData.forEach(ap => {
             if (userRatingsMap[ap.icao] !== undefined) {
                 ap.rating = userRatingsMap[ap.icao];
             } else {
                 ap.rating = ap.rating || 0;
             }
+            ap._searchKey = `${ap.icao} ${ap.name} ${ap.city || ''} ${ap.package_name || ''} ${ap.vendor || ''}`.toLowerCase();
         });
 
         updateStats(allAirportsData);
@@ -4038,17 +4055,91 @@ async function rescanMSFS() {
             if (updatedAp) showAirportDetails(updatedAp);
         }
 
-        await new Promise(r => setTimeout(r, 400));
+        // Brief pause at 100% before displaying result
+        await new Promise(r => setTimeout(r, 350));
+
+        // Find newly detected packages
+        const newlyDetected = [];
+        const seenNew = new Set();
+
+        allAirportsData.forEach(a => {
+            if (a.is_addon && a.package_name && !prevPackages.has(a.package_name.toLowerCase())) {
+                const k = a.package_name.toLowerCase();
+                if (!seenNew.has(k)) {
+                    seenNew.add(k);
+                    newlyDetected.push({
+                        icao: a.icao,
+                        name: a.name,
+                        pkg: a.package_name,
+                        type: a.price_category || (a.is_payware ? 'Payware' : 'Freeware')
+                    });
+                }
+            }
+            if (a.addons && Array.isArray(a.addons)) {
+                a.addons.forEach(ad => {
+                    if (ad.package_name && !prevPackages.has(ad.package_name.toLowerCase())) {
+                        const k = ad.package_name.toLowerCase();
+                        if (!seenNew.has(k)) {
+                            seenNew.add(k);
+                            newlyDetected.push({
+                                icao: a.icao,
+                                name: a.name,
+                                pkg: ad.package_name,
+                                type: ad.addon_type || 'Patch'
+                            });
+                        }
+                    }
+                });
+            }
+        });
+
+        // Switch to result phase
+        if (phaseScanning) phaseScanning.classList.add('hidden');
+        if (phaseResult) phaseResult.classList.remove('hidden');
+
+        const titleEl = document.getElementById('rescan-result-title');
+        const msgEl = document.getElementById('rescan-result-message');
+        const listCont = document.getElementById('rescan-new-items-container');
+
+        if (newlyDetected.length > 0) {
+            if (titleEl) titleEl.innerText = "Scan Complete";
+            if (msgEl) msgEl.innerHTML = `<span class="text-cyan-400 font-semibold">${newlyDetected.length} new scenery package${newlyDetected.length > 1 ? 's' : ''}</span> detected and indexed:`;
+            
+            if (listCont) {
+                listCont.innerHTML = newlyDetected.map(item => `
+                    <div class="flex items-center justify-between py-1 border-b border-slate-900 last:border-0">
+                        <div class="flex items-center gap-2 truncate">
+                            <span class="text-cyan-400 font-bold shrink-0">${item.icao}</span>
+                            <span class="text-slate-300 truncate">${item.pkg}</span>
+                        </div>
+                        <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800 shrink-0 ml-2">${item.type}</span>
+                    </div>
+                `).join('');
+                listCont.classList.remove('hidden');
+            }
+        } else {
+            if (titleEl) titleEl.innerText = "Scan Complete";
+            if (msgEl) msgEl.innerText = `Nothing new found. Your scenery library is up to date (${allAirportsData.length.toLocaleString()} sceneries and airports indexed).`;
+            if (listCont) {
+                listCont.classList.add('hidden');
+                listCont.innerHTML = '';
+            }
+        }
+
     } catch (err) {
         console.error("Rescan error:", err);
+        closeRescanModal();
     } finally {
         clearInterval(progressTimer);
         if (icon) icon.classList.remove('fa-spin');
-        if (splash) {
-            splash.classList.add('opacity-0', 'pointer-events-none');
-            setTimeout(() => splash.classList.add('hidden'), 500);
-        }
     }
+}
+
+function closeRescanModal() {
+    const modal = document.getElementById('rescan-modal');
+    if (modal) modal.classList.add('hidden');
+    const icon = document.getElementById('rescan-icon');
+    if (icon) icon.classList.remove('fa-spin');
 }
 
 function openPackageFolder() {
