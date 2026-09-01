@@ -4330,7 +4330,7 @@ function addCustomPathRow() {
     renderSettingsPathsList();
 }
 
-async function saveAndRescanSettings() {
+async function saveSettings() {
     currentSettings.auto_scan_on_startup = document.getElementById('cfg-auto-scan').checked;
     const gsxInput = document.getElementById('cfg-gsx-path');
     if (gsxInput) {
@@ -4357,11 +4357,12 @@ async function saveAndRescanSettings() {
             await window.pywebview.api.save_settings(JSON.stringify(currentSettings));
         }
         closeSettingsModal();
-        await rescanMSFS();
     } catch (e) {
         console.error("Failed to save settings:", e);
     }
 }
+
+const saveAndRescanSettings = saveSettings;
 
 function updateCameraSettingsPreview() {
     const zoomSlider = document.getElementById('cfg-camera-zoom');

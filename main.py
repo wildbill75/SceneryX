@@ -626,8 +626,7 @@ class Api:
         try:
             data = json.loads(settings_json)
             updated = save_settings(data)
-            airports = run_scan()
-            return json.dumps({"status": "ok", "settings": updated, "airports": airports}, ensure_ascii=False)
+            return json.dumps({"status": "ok", "settings": updated}, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
 
