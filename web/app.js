@@ -5090,11 +5090,11 @@ function initSidebarResize() {
 /* ================= RIGHT DETAIL DRAWER ACCORDIONS ================= */
 
 const DRAWER_ACCORDION_DEFAULTS = {
-    'dev': false,
-    'options': false,
-    'gsx': false,
+    'dev': true,
+    'options': true,
+    'gsx': true,
     'airlines': true,
-    'price': false
+    'price': true
 };
 
 function toggleDrawerAccordion(sectionKey) {
@@ -5114,16 +5114,16 @@ function toggleDrawerAccordion(sectionKey) {
     }
 
     try {
-        const saved = JSON.parse(localStorage.getItem('sceneryx_drawer_accordions') || '{}');
+        const saved = JSON.parse(localStorage.getItem('sceneryx_drawer_accordions_v2') || '{}');
         saved[sectionKey] = isHidden; // new state is open if it was hidden
-        localStorage.setItem('sceneryx_drawer_accordions', JSON.stringify(saved));
+        localStorage.setItem('sceneryx_drawer_accordions_v2', JSON.stringify(saved));
     } catch (e) {}
 }
 
 function initDrawerAccordions() {
     let saved = {};
     try {
-        saved = JSON.parse(localStorage.getItem('sceneryx_drawer_accordions') || '{}');
+        saved = JSON.parse(localStorage.getItem('sceneryx_drawer_accordions_v2') || '{}');
     } catch (e) {}
 
     ['dev', 'options', 'gsx', 'airlines', 'price'].forEach(key => {
