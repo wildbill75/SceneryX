@@ -1279,6 +1279,15 @@ function updateSplashProgress(percent, text, folder) {
     if (fText && folder) fText.innerText = folder;
 }
 
+function applyStartupCameraSettings() {
+    if (!map || !currentSettings) return;
+    const regKey = currentSettings.camera_startup_region;
+    if (regKey && regKey !== 'world' && REGION_VIEWPORTS[regKey]) {
+        const vp = REGION_VIEWPORTS[regKey];
+        map.setView(vp.center, vp.zoom, { animate: false });
+    }
+}
+
 function hideSplashScreen() {
     const splash = document.getElementById('splash-screen');
     if (splash) {
@@ -1345,6 +1354,7 @@ async function loadAirportsData() {
         updateStats(allAirportsData);
         updateFilterUI();
         filterAirports();
+        applyStartupCameraSettings();
         hideSplashScreen();
         checkFirstLaunchDisclaimer();
     } catch (err) {
@@ -2260,12 +2270,18 @@ function centerMapOnAirport(ap, forcedZoom = null) {
         flyLon = flyLon + 360;
     }
 
-    const TARGET_AIRPORT_ZOOM = 6.0;
+    const TARGET_AIRPORT_ZOOM = (currentSettings && currentSettings.camera_airport_zoom !== undefined)
+        ? parseFloat(currentSettings.camera_airport_zoom)
+        : 6.0;
+    const PAN_DURATION = (currentSettings && currentSettings.camera_pan_duration !== undefined)
+        ? parseFloat(currentSettings.camera_pan_duration)
+        : 0.8;
+
     const currentZoom = map.getZoom();
 
     // If forcedZoom is specified (e.g. 8 for country mode), use it.
-    // Otherwise: if current zoom is below 6.0 (global view), gently zoom in to 6.0.
-    // If already at or above 6.0, maintain current zoom without changing it.
+    // Otherwise: if current zoom is below target, gently zoom in to TARGET_AIRPORT_ZOOM.
+    // If already at or above TARGET_AIRPORT_ZOOM, maintain current zoom without changing it.
     let targetZoom = forcedZoom !== null ? forcedZoom : (currentZoom < TARGET_AIRPORT_ZOOM ? TARGET_AIRPORT_ZOOM : currentZoom);
 
     // Calculate horizontal offset so the airport is centered in the visible area between left sidebar and right drawer
@@ -2283,12 +2299,12 @@ function centerMapOnAirport(ap, forcedZoom = null) {
 
         map.flyTo(adjustedLatLng, targetZoom, {
             animate: true,
-            duration: 0.8
+            duration: PAN_DURATION
         });
     } catch (err) {
         map.flyTo([ap.lat, flyLon], targetZoom, {
             animate: true,
-            duration: 0.8
+            duration: PAN_DURATION
         });
     }
 }
@@ -4196,6 +4212,27 @@ async function openSettingsModal() {
         gsxInput.value = currentSettings.gsx_profile_path || '';
     }
 
+    const regSelect = document.getElementById('cfg-camera-region');
+    if (regSelect) {
+        regSelect.value = currentSettings.camera_startup_region || 'world';
+    }
+
+    const zoomSlider = document.getElementById('cfg-camera-zoom');
+    if (zoomSlider) {
+        const zVal = (currentSettings.camera_airport_zoom !== undefined) ? parseFloat(currentSettings.camera_airport_zoom) : 6.0;
+        zoomSlider.value = zVal;
+        const zDisp = document.getElementById('cfg-zoom-display');
+        if (zDisp) zDisp.innerText = zVal.toFixed(1);
+    }
+
+    const durSlider = document.getElementById('cfg-camera-duration');
+    if (durSlider) {
+        const dVal = (currentSettings.camera_pan_duration !== undefined) ? parseFloat(currentSettings.camera_pan_duration) : 0.8;
+        durSlider.value = dVal;
+        const dDisp = document.getElementById('cfg-duration-display');
+        if (dDisp) dDisp.innerText = `${dVal.toFixed(1)}s`;
+    }
+
     renderSettingsPathsList();
     document.getElementById('settings-modal').classList.remove('hidden');
 }
@@ -4300,6 +4337,21 @@ async function saveAndRescanSettings() {
         currentSettings.gsx_profile_path = gsxInput.value.trim();
     }
 
+    const regSelect = document.getElementById('cfg-camera-region');
+    if (regSelect) {
+        currentSettings.camera_startup_region = regSelect.value;
+    }
+    const zoomSlider = document.getElementById('cfg-camera-zoom');
+    if (zoomSlider) {
+        currentSettings.camera_airport_zoom = parseFloat(zoomSlider.value);
+    }
+    const durSlider = document.getElementById('cfg-camera-duration');
+    if (durSlider) {
+        currentSettings.camera_pan_duration = parseFloat(durSlider.value);
+    }
+
+    applyStartupCameraSettings();
+
     try {
         if (window.pywebview) {
             await window.pywebview.api.save_settings(JSON.stringify(currentSettings));
@@ -4309,6 +4361,33 @@ async function saveAndRescanSettings() {
     } catch (e) {
         console.error("Failed to save settings:", e);
     }
+}
+
+function updateCameraSettingsPreview() {
+    const zoomSlider = document.getElementById('cfg-camera-zoom');
+    const zoomDisp = document.getElementById('cfg-zoom-display');
+    if (zoomSlider && zoomDisp) {
+        zoomDisp.innerText = parseFloat(zoomSlider.value).toFixed(1);
+    }
+
+    const durSlider = document.getElementById('cfg-camera-duration');
+    const durDisp = document.getElementById('cfg-duration-display');
+    if (durSlider && durDisp) {
+        durDisp.innerText = `${parseFloat(durSlider.value).toFixed(1)}s`;
+    }
+}
+
+function resetCameraSettingsToDefault() {
+    const regSelect = document.getElementById('cfg-camera-region');
+    if (regSelect) regSelect.value = 'world';
+
+    const zoomSlider = document.getElementById('cfg-camera-zoom');
+    if (zoomSlider) zoomSlider.value = 6.0;
+
+    const durSlider = document.getElementById('cfg-camera-duration');
+    if (durSlider) durSlider.value = 0.8;
+
+    updateCameraSettingsPreview();
 }
 
 /* ================= EXPORT COLLECTION FUNCTIONS ================= */
