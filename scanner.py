@@ -176,7 +176,9 @@ NON_AIRPORT_KEYWORDS = [
     'landingchallenge', 'landing-challenge', 'point-of-interest', 'pointofinterest',
     'discovery', 'passiveaircraft', 'passive-aircraft', 'challenges', 'activities', 'activity',
     'certification', 'procedural', 'trainings', 'training', 'travelbook', 'simobjects', 'ships',
-    'modellib', 'library1v14', 'commonlibrary', 'object-library', 'asset-library', 'vertical-obstructions', 'verticalobstructions', 'crowds', 'gliders',
+    'modellib', 'library1v14', 'library2v14', 'commonlibrary', 'object-library', 'asset-library',
+    'assetpack', 'asset-pack', 'sdr-pack', 'windy-things', 'palm_trees_library', 'vegetation-library',
+    'totof-aircraft-library', 'dave-3d-people', 'seismic-library', 'vertical-obstructions', 'verticalobstructions', 'crowds', 'gliders',
     'asobo-aircraft', 'fs20-asobo-aircraft', 'fs24-asobo-aircraft', 'fnx-aircraft', 'flybywire-aircraft',
     'fbw-a20n', 'fnx-livery', 'livery', 'aircraft', 'utility', 'toolbar', 'disastertracker',
     'fsdreamteam-gsx', 'gsx-pro', 'kt-gsx', 'papadelta-', 'navigraph', 'fsltl', 'airrace', 'redbull',
@@ -940,7 +942,12 @@ def run_scan():
 
         is_disabled = is_disabled_pkg
         
-        if any(k in fn_lower for k in NON_AIRPORT_KEYWORDS) or '-livery-' in fn_lower or '-aircraft-' in fn_lower:
+        if (
+            any(k in fn_lower for k in NON_AIRPORT_KEYWORDS)
+            or fn_lower.endswith(('-library', '_library', '-assetpack', '_assetpack', '-asset-pack', '-models'))
+            or '-livery-' in fn_lower
+            or '-aircraft-' in fn_lower
+        ):
             continue
             
         found_ap_list = []
