@@ -4391,6 +4391,38 @@ function resetCameraSettingsToDefault() {
     updateCameraSettingsPreview();
 }
 
+async function saveCameraSettingsOnly() {
+    const regSelect = document.getElementById('cfg-camera-region');
+    if (regSelect) {
+        currentSettings.camera_startup_region = regSelect.value;
+    }
+    const zoomSlider = document.getElementById('cfg-camera-zoom');
+    if (zoomSlider) {
+        currentSettings.camera_airport_zoom = parseFloat(zoomSlider.value);
+    }
+    const durSlider = document.getElementById('cfg-camera-duration');
+    if (durSlider) {
+        currentSettings.camera_pan_duration = parseFloat(durSlider.value);
+    }
+
+    applyStartupCameraSettings();
+
+    try {
+        if (window.pywebview) {
+            await window.pywebview.api.save_settings(JSON.stringify(currentSettings));
+        }
+        const btnText = document.getElementById('btn-save-camera-text');
+        if (btnText) {
+            btnText.innerText = "Saved";
+            setTimeout(() => {
+                btnText.innerText = "Save Camera";
+            }, 1500);
+        }
+    } catch (e) {
+        console.error("Failed to save camera settings:", e);
+    }
+}
+
 /* ================= EXPORT COLLECTION FUNCTIONS ================= */
 
 function openExportModal() {
