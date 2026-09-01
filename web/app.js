@@ -34,7 +34,7 @@ const ALL_PRICING_LIST = ['Payware', 'Freeware / Flightsim.to', 'Asobo', 'Defaul
 const ALL_SOURCES_LIST = ['Community', 'Marketplace', 'Official'];
 const ALL_TYPES_LIST = ['International', 'Regional', 'General Aviation', 'Heli / Water'];
 
-const DEFAULT_STARTUP_PRICING = ['Payware', 'Freeware / Flightsim.to', 'Asobo', 'Default'];
+const DEFAULT_STARTUP_PRICING = ['Payware', 'Freeware / Flightsim.to', 'Asobo'];
 let selectedPricing = new Set(DEFAULT_STARTUP_PRICING);
 let selectedSources = new Set(ALL_SOURCES_LIST);
 let selectedTypes = new Set(ALL_TYPES_LIST);
@@ -3694,8 +3694,28 @@ function filterAirports() {
         } else if (!selectedCountryCode) {
             // Global Pricing Filter (only applied when NOT in country mode and NOT in airline route mode)
             const pt = getAirportPricingType(ap);
-            if (!selectedPricing.has(pt)) {
-                return false;
+            const isPureDefault = !hasCustomAddonSources(ap);
+
+            if (isPureDefault) {
+                // Pure procedural MSFS default airport (from the 19,129 generic database):
+                // ONLY show if user explicitly clicked the 'Default' pricing filter!
+                if (!selectedPricing.has('Default')) {
+                    return false;
+                }
+            } else {
+                // Managed airport with custom addon options (in user's scenery collection):
+                if (pt === 'Default') {
+                    // Airport is currently set to Default MSFS base airport:
+                    // Keep visible on map as a Blue Circle unless filtering exclusively for another category
+                    const isSingleSpecificCategory = (selectedPricing.size === 1 && !selectedPricing.has('Default'));
+                    if (isSingleSpecificCategory) {
+                        return false;
+                    }
+                } else {
+                    if (!selectedPricing.has(pt)) {
+                        return false;
+                    }
+                }
             }
         }
 
