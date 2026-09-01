@@ -1097,9 +1097,9 @@ function selectCountryAirport(icao) {
         if (((ap.country === 'RU' || ap.iso_country === 'RU') || (ap.icao && ap.icao.startsWith('UH'))) && flyLon < -100) {
             flyLon = flyLon + 360;
         }
-        map.flyTo([ap.lat, flyLon], 13, {
+        map.flyTo([ap.lat, flyLon], 8, {
             animate: true,
-            duration: 1.2
+            duration: 1.0
         });
     }
 
