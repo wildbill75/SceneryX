@@ -1158,6 +1158,28 @@ async function toggleCountrySceneryInPlace(icao, folderName) {
 function resetConflictingFiltersForCountrySelection() {
     selectedRegion = null;
     updateRegionPillUI();
+
+    // 1. Clear all active operating airline routes & vector lines
+    selectedAirlines.clear();
+    selectedAirline = null;
+    activeRouteOrigin = null;
+    if (activeRouteLinesGroup) {
+        activeRouteLinesGroup.clearLayers();
+    }
+    const airlinePill = document.getElementById('airline-filter-pill');
+    if (airlinePill) {
+        airlinePill.classList.add('hidden');
+        airlinePill.classList.remove('flex');
+    }
+
+    // 2. Clear active Flight Corridor (Alt+Click) & vector lines
+    if (flightCorridorLayerGroup && map) {
+        flightCorridorLayerGroup.clearLayers();
+    }
+    flightCorridorArrivalAirport = null;
+
+    // 3. Clear selected individual airport
+    selectedAirport = null;
 }
 
 function toggleCountrySelection(iso, countryName, layer, forceSelect = false) {
@@ -2258,6 +2280,20 @@ function showAirportDetails(ap) {
     const isDifferentAirport = !selectedAirport || selectedAirport.icao !== ap.icao;
     activeDrawerMode = 'AIRPORT';
     selectedAirport = ap;
+
+    // If transitioning from Country Mode to Airport Mode, cleanly deactivate country mode
+    if (selectedCountryCode) {
+        selectedCountryCode = null;
+        selectedCountryName = '';
+        expandedCountryIcao = null;
+        if (typeof selectedCountryPolygonLayer !== 'undefined' && selectedCountryPolygonLayer && map) {
+            try { map.removeLayer(selectedCountryPolygonLayer); } catch(err) {}
+            selectedCountryPolygonLayer = null;
+        }
+        if (countryGeoJsonLayer) {
+            countryGeoJsonLayer.eachLayer(l => countryGeoJsonLayer.resetStyle(l));
+        }
+    }
 
     // Only clear previous airline route lines & corridors when inspecting a DIFFERENT airport
     if (isDifferentAirport) {
