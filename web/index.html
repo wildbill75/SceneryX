@@ -209,10 +209,10 @@
             <!-- HERO STATS BAR (CLICKABLE INTERACTIVE BADGES FOR INSTANT FILTERING) -->
             <div class="flex items-center gap-2.5 justify-center flex-nowrap py-1">
                 <!-- TOTAL AIRPORTS BADGE (ELECTRIC SKY BLUE) -->
-                <div id="stat-pill-total" onclick="filterByPricingPill('All')" title="Click to show ALL airports" class="flex items-center gap-1.5 bg-slate-900/60 border border-slate-800 opacity-60 px-3.5 py-1.5 rounded-full shrink-0 cursor-pointer hover:scale-105 active:scale-95 transition-all">
+                <div id="stat-pill-total" onclick="filterByPricingPill('All')" data-i18n-title="stat.tooltip_total" title="Click to show ALL airports" class="flex items-center gap-1.5 bg-slate-900/60 border border-slate-800 opacity-60 px-3.5 py-1.5 rounded-full shrink-0 cursor-pointer hover:scale-105 active:scale-95 transition-all">
                     <i class="fa-solid fa-star text-[10px] text-sky-400"></i>
                     <span id="stat-total" class="font-extrabold font-mono text-sky-300 text-base lg:text-lg leading-none">0</span>
-                    <span class="text-[11px] font-black uppercase tracking-wider text-sky-100">AIRPORTS</span>
+                    <span data-i18n="stat.airports" class="text-[11px] font-black uppercase tracking-wider text-sky-100">AIRPORTS</span>
                 </div>
 
                 <!-- PAYWARE STAT BADGE (PURPLE) -->
