@@ -945,16 +945,34 @@ def run_scan():
             except Exception:
                 pass
                 
+        has_scenery_dir = (
+            os.path.isdir(os.path.join(full_path, 'scenery')) 
+            or os.path.isdir(os.path.join(full_path, 'Scenery'))
+            or os.path.isdir(os.path.join(full_path, 'scenery.disabled'))
+            or os.path.isdir(os.path.join(full_path, 'Scenery.disabled'))
+        )
+
+        tokens = re.split(r'[-_ ]+', fn_lower)
+        has_explicit_icao = any(len(t) == 4 and t.isalpha() and t.upper() in airports and t.lower() not in EXCLUDE_WORDS for t in tokens)
+
+        if not has_explicit_icao:
+            for t in tokens:
+                m = re.match(r'^([a-zA-Z]{4})(?:light|fix|lighting|night|scene|patch|jetway|taxiway|rwy|runway|\d)', t)
+                if m and m.group(1).upper() in airports and m.group(1).lower() not in EXCLUDE_WORDS:
+                    has_explicit_icao = True
+                    break
+
+        if not has_explicit_icao and manifest_title:
+            m_tokens = re.findall(r'(?:^|[-_ \d])([A-Za-z]{4})(?=$|[-_ \d])', manifest_title)
+            if any(tok.upper() in airports and tok.lower() not in EXCLUDE_WORDS for tok in m_tokens):
+                has_explicit_icao = True
+
         if manifest_ctype in ['AIRCRAFT', 'LIVERY', 'TOOL', 'MISC', 'INSTRUMENT', 'CORE', 'LIBRARY']:
-            tokens = re.split(r'[-_ ]+', fn_lower)
-            has_explicit_icao = any(len(t) == 4 and t.isalpha() and t.upper() in airports for t in tokens)
-            if not has_explicit_icao:
+            if not has_explicit_icao and not has_scenery_dir:
                 continue
 
         # Filter out generic global asset libraries that have no ICAO code in folder name
         if any(k in fn_lower for k in ['assetpack', 'vegetation-library', 'windy-things', 'palm_trees_library', 'fly-in-library', 'libraryv14', 'object-library', 'objects-library']):
-            tokens = re.split(r'[-_ ]+', fn_lower)
-            has_explicit_icao = any(len(t) == 4 and t.isalpha() and t.upper() in airports for t in tokens)
             if not has_explicit_icao:
                 continue
         
@@ -986,6 +1004,16 @@ def run_scan():
                 found_ap_list.append((airports[t_upper], f"Folder ICAO ({t_upper})"))
                 break
 
+        # Folder prefix matching (e.g. lirflightfix20 -> LIRF)
+        if not found_ap_list:
+            for t in tokens:
+                m = re.match(r'^([a-zA-Z]{4})(?:light|fix|lighting|night|scene|patch|jetway|taxiway|rwy|runway|\d)', t)
+                if m:
+                    cand = m.group(1).upper()
+                    if cand in airports and cand.lower() not in EXCLUDE_WORDS:
+                        found_ap_list.append((airports[cand], f"Folder Prefix ICAO ({cand})"))
+                        break
+
         # Manifest Title explicit ICAO matching
         if not found_ap_list and manifest_title:
             m_tokens = re.findall(r'(?:^|[-_ \d])([A-Za-z]{4})(?=$|[-_ \d])', manifest_title)
@@ -1008,6 +1036,7 @@ def run_scan():
                         paths_str = ' '.join([c.get('path', '') for c in entries[:2000]])
                         bgl_icaos = set(re.findall(r'[/\\]([a-zA-Z]{4})[-_.]?(?:airport|scenery)?\.bgl', paths_str, re.IGNORECASE))
                         bgl_icaos.update(re.findall(r'scenery[/\\](?:airports[/\\])?(?:world[/\\]scenery[/\\])?(?:airport-)?([A-Za-z]{4})[._\\]', paths_str, re.IGNORECASE))
+                        bgl_icaos.update(re.findall(r'[/\\]([a-zA-Z]{4})[-_. ]', paths_str, re.IGNORECASE))
                         for tok in bgl_icaos:
                             tok_u = tok.upper()
                             if tok_u in airports and tok.lower() not in EXCLUDE_WORDS:
