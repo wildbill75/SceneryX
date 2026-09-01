@@ -167,6 +167,7 @@ EXCLUDE_WORDS = {
     'ktx2', 'ktx2p', 'sign', 'fact', 'wall', 'link', 'pa33', 'pa34', 'pa35', 'pa36', 'pa37', 'sdv2',
     'edge', 'leaf', 'side', 'fact', 'link', 'code', 'base', 'area', 'zone', 'west', 'east', 'south',
     'north', 'city', 'park', 'port', 'view', 'main', 'road', 'hill', 'lake', 'bay',
+    'farm', 'hang', 'silo', 'gate', 'bush', 'shed', 'rail', 'fuel', 'fire', 'flag', 'tile', 'male', 'barb',
     'panama', 'france', 'germany', 'spain', 'italy', 'england', 'poland', 'japan', 'china',
     'canada', 'mexico', 'brazil', 'australia', 'alaska', 'hawaii', 'california', 'texas', 'florida'
 }
@@ -175,7 +176,7 @@ NON_AIRPORT_KEYWORDS = [
     'landingchallenge', 'landing-challenge', 'point-of-interest', 'pointofinterest',
     'discovery', 'passiveaircraft', 'passive-aircraft', 'challenges', 'activities', 'activity',
     'certification', 'procedural', 'trainings', 'training', 'travelbook', 'simobjects', 'ships',
-    'modellib', 'vertical-obstructions', 'verticalobstructions', 'crowds', 'gliders',
+    'modellib', 'library1v14', 'commonlibrary', 'object-library', 'asset-library', 'vertical-obstructions', 'verticalobstructions', 'crowds', 'gliders',
     'asobo-aircraft', 'fs20-asobo-aircraft', 'fs24-asobo-aircraft', 'fnx-aircraft', 'flybywire-aircraft',
     'fbw-a20n', 'fnx-livery', 'livery', 'aircraft', 'utility', 'toolbar', 'disastertracker',
     'fsdreamteam-gsx', 'gsx-pro', 'kt-gsx', 'papadelta-', 'navigraph', 'fsltl', 'airrace', 'redbull',
@@ -1043,7 +1044,7 @@ def run_scan():
                     found_ap_list.append((airports[tok_u], f"Manifest Title ({tok_u})"))
                     break
 
-        # Layout BGL path matching
+        # Layout BGL path matching (only inspect actual compiled .bgl files)
         if not found_ap_list:
             lpath = os.path.join(full_path, 'layout.json')
             if not os.path.exists(lpath):
@@ -1053,10 +1054,13 @@ def run_scan():
                     with open(lpath, 'r', encoding='utf-8', errors='ignore') as f:
                         ldata = json.load(f)
                         entries = ldata.get('content', [])
-                        paths_str = ' '.join([c.get('path', '') for c in entries[:2000]])
-                        bgl_icaos = set(re.findall(r'[/\\]([a-zA-Z]{4})[-_.]?(?:airport|scenery)?\.bgl', paths_str, re.IGNORECASE))
-                        bgl_icaos.update(re.findall(r'scenery[/\\](?:airports[/\\])?(?:world[/\\]scenery[/\\])?(?:airport-)?([A-Za-z]{4})[._\\]', paths_str, re.IGNORECASE))
-                        bgl_icaos.update(re.findall(r'[/\\]([a-zA-Z]{4})[-_. ]', paths_str, re.IGNORECASE))
+                        bgl_entries = [c.get('path', '') for c in entries if c.get('path', '').lower().endswith('.bgl')]
+                        bgl_icaos = set()
+                        for bpath in bgl_entries:
+                            m = re.findall(r'(?:^|[/\-_])([a-zA-Z]{4})(?:[-_.](?:airport|scenery|ap|runway|fix|patch))?\.bgl', bpath, re.IGNORECASE)
+                            bgl_icaos.update(m)
+                            m2 = re.findall(r'scenery[/\\](?:airports[/\\])?(?:world[/\\]scenery[/\\])?(?:airport-)?([A-Za-z]{4})[._/\\]', bpath, re.IGNORECASE)
+                            bgl_icaos.update(m2)
                         for tok in bgl_icaos:
                             tok_u = tok.upper()
                             if tok_u in airports and tok.lower() not in EXCLUDE_WORDS:
