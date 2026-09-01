@@ -284,21 +284,21 @@
 
                 <!-- PRICING FILTER -->
                 <div>
-                    <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2.5">Pricing Model</label>
+                    <label title="Filter sceneries by pricing model: Payware, Freeware, Asobo handcrafted, or Default MSFS." class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2.5 cursor-help">Pricing Model</label>
                     <div class="grid grid-cols-2 gap-2">
-                        <button id="filter-price-all" onclick="togglePricingFilter('all')" class="col-span-2 py-2 px-3 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10">
+                        <button id="filter-price-all" onclick="togglePricingFilter('all')" title="Show all sceneries across all pricing categories" class="col-span-2 py-2 px-3 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10 cursor-pointer">
                             All Models
                         </button>
-                        <button id="filter-price-payware" onclick="togglePricingFilter('Payware')" class="py-2 px-3 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10">
+                        <button id="filter-price-payware" onclick="togglePricingFilter('Payware')" title="Show only third-party commercial payware sceneries" class="py-2 px-3 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10 cursor-pointer">
                             <i class="fa-solid fa-star text-[10px] text-purple-400"></i> Payware
                         </button>
-                        <button id="filter-price-freeware" onclick="togglePricingFilter('Freeware / Flightsim.to')" class="py-2 px-3 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10">
+                        <button id="filter-price-freeware" onclick="togglePricingFilter('Freeware / Flightsim.to')" title="Show community freeware sceneries (Flightsim.to, etc.)" class="py-2 px-3 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10 cursor-pointer">
                             <i class="fa-solid fa-star text-[10px] text-cyan-400"></i> Freeware
                         </button>
-                        <button id="filter-price-asobo" onclick="togglePricingFilter('Asobo')" class="py-2 px-3 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10">
+                        <button id="filter-price-asobo" onclick="togglePricingFilter('Asobo')" title="Show official handcrafted sceneries bundled by Microsoft & Asobo" class="py-2 px-3 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10 cursor-pointer">
                             <i class="fa-solid fa-star text-[10px] text-amber-400"></i> Asobo
                         </button>
-                        <button id="filter-price-default" onclick="togglePricingFilter('Default')" class="py-2 px-3 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10">
+                        <button id="filter-price-default" onclick="togglePricingFilter('Default')" title="Show standard procedural default MSFS base airports" class="py-2 px-3 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10 cursor-pointer">
                             <i class="fa-solid fa-circle text-[10px] text-blue-400"></i> Default MSFS
                         </button>
                     </div>
@@ -306,7 +306,7 @@
 
                 <!-- PACKAGE SOURCE FILTER -->
                 <div>
-                    <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2.5">Scenery Source</label>
+                    <label title="Filter sceneries by package origin: Community folders, Marketplace, or Official content." class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2.5 cursor-help">Scenery Source</label>
                     <div class="grid grid-cols-2 gap-2">
                         <button id="filter-src-all" onclick="toggleSourceFilter('all')" 
                                 class="py-2 px-2.5 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center shadow-sm shadow-cyan-500/10 cursor-pointer whitespace-nowrap"
@@ -333,42 +333,42 @@
 
                 <!-- GEOGRAPHIC REGION FILTER -->
                 <div>
-                    <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2.5">Geographic Region</label>
+                    <label title="Filter airports by continental zone and focus the camera on that region." class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2.5 cursor-help">Geographic Region</label>
                     <div class="grid grid-cols-2 gap-1.5" id="region-pills-container">
-                        <button id="filter-region-all" onclick="toggleRegionFilter('all')" class="col-span-2 py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center shadow-sm shadow-cyan-500/10 cursor-pointer">
+                        <button id="filter-region-all" onclick="toggleRegionFilter('all')" title="Show airports across all world regions" class="col-span-2 py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center shadow-sm shadow-cyan-500/10 cursor-pointer">
                             All Regions
                         </button>
-                        <button id="filter-region-weurope" onclick="toggleRegionFilter('weurope')" class="py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center cursor-pointer">
+                        <button id="filter-region-weurope" onclick="toggleRegionFilter('weurope')" title="Western Europe (France, UK, Germany, Spain, Italy...)" class="py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center cursor-pointer">
                             Western Europe
                         </button>
-                        <button id="filter-region-eeurope" onclick="toggleRegionFilter('eeurope')" class="py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center cursor-pointer">
+                        <button id="filter-region-eeurope" onclick="toggleRegionFilter('eeurope')" title="Eastern Europe (Poland, Greece, Turkey, Romania...)" class="py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center cursor-pointer">
                             Eastern Europe
                         </button>
-                        <button id="filter-region-namerica" onclick="toggleRegionFilter('namerica')" class="py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center cursor-pointer">
+                        <button id="filter-region-namerica" onclick="toggleRegionFilter('namerica')" title="North America (United States, Canada, Greenland)" class="py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center cursor-pointer">
                             North America
                         </button>
-                        <button id="filter-region-camerica_caribbean" onclick="toggleRegionFilter('camerica_caribbean')" class="py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center cursor-pointer">
+                        <button id="filter-region-camerica_caribbean" onclick="toggleRegionFilter('camerica_caribbean')" title="Central America & Caribbean (Mexico, Panama, Bahamas...)" class="py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center cursor-pointer">
                             Central America & Caribbean
                         </button>
-                        <button id="filter-region-samerica" onclick="toggleRegionFilter('samerica')" class="py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center cursor-pointer">
+                        <button id="filter-region-samerica" onclick="toggleRegionFilter('samerica')" title="South America (Brazil, Argentina, Colombia, Chile...)" class="py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center cursor-pointer">
                             South America
                         </button>
-                        <button id="filter-region-asia" onclick="toggleRegionFilter('asia')" class="py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center cursor-pointer">
+                        <button id="filter-region-asia" onclick="toggleRegionFilter('asia')" title="Asia (Japan, China, India, Thailand, Indonesia...)" class="py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center cursor-pointer">
                             Asia
                         </button>
-                        <button id="filter-region-middleeast" onclick="toggleRegionFilter('middleeast')" class="py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center cursor-pointer">
+                        <button id="filter-region-middleeast" onclick="toggleRegionFilter('middleeast')" title="Middle East (UAE, Saudi Arabia, Qatar, Israel...)" class="py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center cursor-pointer">
                             Middle East
                         </button>
-                        <button id="filter-region-nafrica" onclick="toggleRegionFilter('nafrica')" class="py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center cursor-pointer">
+                        <button id="filter-region-nafrica" onclick="toggleRegionFilter('nafrica')" title="North Africa (Egypt, Morocco, Algeria, Tunisia...)" class="py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center cursor-pointer">
                             North Africa
                         </button>
-                        <button id="filter-region-ssafrica" onclick="toggleRegionFilter('ssafrica')" class="py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center cursor-pointer">
+                        <button id="filter-region-ssafrica" onclick="toggleRegionFilter('ssafrica')" title="Sub-Saharan Africa (South Africa, Kenya, Nigeria...)" class="py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center cursor-pointer">
                             Sub-Saharan Africa
                         </button>
-                        <button id="filter-region-oceania" onclick="toggleRegionFilter('oceania')" class="py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center cursor-pointer">
+                        <button id="filter-region-oceania" onclick="toggleRegionFilter('oceania')" title="Oceania (Australia, New Zealand, Papua New Guinea)" class="py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center cursor-pointer">
                             Oceania
                         </button>
-                        <button id="filter-region-pacific" onclick="toggleRegionFilter('pacific')" class="col-span-2 py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center cursor-pointer">
+                        <button id="filter-region-pacific" onclick="toggleRegionFilter('pacific')" title="Pacific Ocean islands & territories" class="col-span-2 py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center cursor-pointer">
                             Pacific Ocean
                         </button>
                     </div>
@@ -376,21 +376,21 @@
 
                 <!-- AIRPORT TYPE FILTER -->
                 <div>
-                    <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2.5">Airport Type</label>
+                    <label title="Filter airports by classification: International, Regional, General Aviation, or Heli/Water." class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2.5 cursor-help">Airport Type</label>
                     <div class="grid grid-cols-2 gap-2">
-                        <button id="filter-type-all" onclick="toggleTypeFilter('all')" class="py-2 px-3 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10">
+                        <button id="filter-type-all" onclick="toggleTypeFilter('all')" title="Show all airport types" class="py-2 px-3 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10 cursor-pointer">
                             All Types
                         </button>
-                        <button id="filter-type-International" onclick="toggleTypeFilter('International')" class="py-2 px-3 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10">
+                        <button id="filter-type-International" onclick="toggleTypeFilter('International')" title="Major international hubs with commercial airline service" class="py-2 px-3 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10 cursor-pointer">
                             International
                         </button>
-                        <button id="filter-type-Regional" onclick="toggleTypeFilter('Regional')" class="py-2 px-3 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10">
+                        <button id="filter-type-Regional" onclick="toggleTypeFilter('Regional')" title="Regional airports serving domestic or local commercial routes" class="py-2 px-3 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10 cursor-pointer">
                             Regional
                         </button>
-                        <button id="filter-type-General-Aviation" onclick="toggleTypeFilter('General Aviation')" class="py-2 px-3 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10">
+                        <button id="filter-type-General-Aviation" onclick="toggleTypeFilter('General Aviation')" title="General aviation airfields for private, club, and sport flying" class="py-2 px-3 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10 cursor-pointer">
                             General Aviation
                         </button>
-                        <button id="filter-type-Heli---Water" onclick="toggleTypeFilter('Heli / Water')" class="py-2 px-3 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10">
+                        <button id="filter-type-Heli---Water" onclick="toggleTypeFilter('Heli / Water')" title="Heliports, helipads, and seaplane water runways" class="py-2 px-3 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10 cursor-pointer">
                             Heli / Water
                         </button>
                     </div>
@@ -398,15 +398,15 @@
 
                 <!-- GSX PROFILE FILTER -->
                 <div>
-                    <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2.5">GSX Profile</label>
+                    <label title="Filter airports according to whether a custom GSX Pro ground handling profile (.ini) is installed." class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-2.5 cursor-help">GSX Profile</label>
                     <div class="grid grid-cols-3 gap-2">
-                        <button id="filter-gsx-all" onclick="toggleGsxFilter('all')" class="py-2 px-2 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1 shadow-sm shadow-cyan-500/10">
+                        <button id="filter-gsx-all" onclick="toggleGsxFilter('all')" title="Show all airports with or without GSX profiles" class="py-2 px-2 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1 shadow-sm shadow-cyan-500/10 cursor-pointer">
                             All
                         </button>
-                        <button id="filter-gsx-with" onclick="toggleGsxFilter('with')" class="py-2 px-2 rounded-xl border text-xs font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center gap-1">
+                        <button id="filter-gsx-with" onclick="toggleGsxFilter('with')" title="Show only airports with an active GSX profile installed" class="py-2 px-2 rounded-xl border text-xs font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center gap-1 cursor-pointer">
                             With
                         </button>
-                        <button id="filter-gsx-none" onclick="toggleGsxFilter('none')" class="py-2 px-2 rounded-xl border text-xs font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center gap-1">
+                        <button id="filter-gsx-none" onclick="toggleGsxFilter('none')" title="Show only airports without a GSX profile" class="py-2 px-2 rounded-xl border text-xs font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center gap-1 cursor-pointer">
                             No Profile
                         </button>
                     </div>
@@ -415,15 +415,15 @@
                 <!-- MINIMUM USER RATING STAR FILTER -->
                 <div>
                     <div class="flex items-center justify-between mb-2">
-                        <label class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Minimum User Rating</label>
+                        <label title="Filter airports by your personal star rating to quickly highlight your favorite sceneries." class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block cursor-help">Minimum User Rating</label>
                         <span id="filter-rating-display" class="text-xs font-mono font-bold text-cyan-400">All (0.0★)</span>
                     </div>
 
-                    <div class="p-3 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between">
+                    <div class="p-3 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between" title="Click a star to set the minimum rating threshold (e.g. 4 stars to see 4★ and 5★ airports).">
                         <div id="filter-star-widget" class="flex items-center gap-1.5" onmouseleave="resetFilterStarHover()">
                             <!-- Rendered dynamically by app.js -->
                         </div>
-                        <button onclick="resetMinRatingFilter()" title="Reset Rating Filter" class="text-[10px] text-slate-400 hover:text-cyan-400 underline font-medium">
+                        <button onclick="resetMinRatingFilter()" title="Reset Rating Filter to 0.0★" class="text-[10px] text-slate-400 hover:text-cyan-400 underline font-medium cursor-pointer">
                             Reset
                         </button>
                     </div>
