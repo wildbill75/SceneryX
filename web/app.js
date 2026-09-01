@@ -1311,6 +1311,9 @@ async function loadAirportsData() {
                 const settingsStr = await window.pywebview.api.get_settings();
                 if (settingsStr) {
                     currentSettings = JSON.parse(settingsStr);
+                    if (currentSettings.language && typeof setAppLanguage === 'function') {
+                        setAppLanguage(currentSettings.language);
+                    }
                     loadSimBriefSettingsUI();
                     const st = currentSettings.settings || currentSettings;
                     if (st && st.flight_mode) {
@@ -4000,7 +4003,7 @@ async function rescanMSFS() {
         if (phaseResult) phaseResult.classList.add('hidden');
         if (progressBar) progressBar.style.width = '10%';
         if (percentText) percentText.innerText = '10%';
-        if (detailText) detailText.innerText = 'Checking Community & OneStore folders...';
+        if (detailText) detailText.innerText = t('rescan.sub_checking', 'Checking Community & OneStore folders...');
         modal.classList.remove('hidden');
     }
 
@@ -4014,9 +4017,9 @@ async function rescanMSFS() {
             currentProgress += 10;
             progressBar.style.width = currentProgress + '%';
             if (percentText) percentText.innerText = currentProgress + '%';
-            if (currentProgress === 30 && detailText) detailText.innerText = 'Scanning package manifests & sceneries...';
-            if (currentProgress === 60 && detailText) detailText.innerText = 'Analyzing runway & airport BGL files...';
-            if (currentProgress === 80 && detailText) detailText.innerText = 'Indexing custom addons & GSX profiles...';
+            if (currentProgress === 30 && detailText) detailText.innerText = t('rescan.step_manifests', 'Scanning package manifests & sceneries...');
+            if (currentProgress === 60 && detailText) detailText.innerText = t('rescan.step_bgl', 'Analyzing runway & airport BGL files...');
+            if (currentProgress === 80 && detailText) detailText.innerText = t('rescan.step_indexing', 'Indexing custom addons & GSX profiles...');
         }
     }, 100);
 
@@ -4035,7 +4038,7 @@ async function rescanMSFS() {
         // Advance to 100% smoothly
         if (progressBar) progressBar.style.width = '100%';
         if (percentText) percentText.innerText = '100%';
-        if (detailText) detailText.innerText = 'Scan complete!';
+        if (detailText) detailText.innerText = t('rescan.complete', 'Scan Complete');
 
         // Apply ratings & search index
         allAirportsData.forEach(ap => {
@@ -4102,8 +4105,8 @@ async function rescanMSFS() {
         const listCont = document.getElementById('rescan-new-items-container');
 
         if (newlyDetected.length > 0) {
-            if (titleEl) titleEl.innerText = "Scan Complete";
-            if (msgEl) msgEl.innerHTML = `<span class="text-cyan-400 font-semibold">${newlyDetected.length} new scenery package${newlyDetected.length > 1 ? 's' : ''}</span> detected and indexed:`;
+            if (titleEl) titleEl.innerText = t('rescan.complete', 'Scan Complete');
+            if (msgEl) msgEl.innerHTML = `<span class="text-cyan-400 font-semibold">${newlyDetected.length}</span> ${t('rescan.new_packages_found', 'new scenery package(s) detected and indexed:')}`;
             
             if (listCont) {
                 listCont.innerHTML = newlyDetected.map(item => `
@@ -4118,8 +4121,8 @@ async function rescanMSFS() {
                 listCont.classList.remove('hidden');
             }
         } else {
-            if (titleEl) titleEl.innerText = "Scan Completed";
-            if (msgEl) msgEl.innerText = "No new addon detected.";
+            if (titleEl) titleEl.innerText = t('rescan.completed_title', 'Scan Completed');
+            if (msgEl) msgEl.innerText = t('rescan.no_addon', 'No new addon detected.');
             if (listCont) {
                 listCont.classList.add('hidden');
                 listCont.innerHTML = '';
@@ -4246,24 +4249,24 @@ async function executeGsxInstallation({ filePath = '', base64Data = '', filename
                 const updatedAp = allAirportsData.find(a => a.icao === selectedAirport.icao);
                 if (updatedAp) showAirportDetails(updatedAp);
                 showCustomModal({
-                    title: 'GSX Profile Installed',
-                    message: `GSX profile(s) successfully extracted and installed:\n\n• ${res.installed_files.join('\n• ')}`,
+                    title: t('modal.gsx_installed', 'GSX Profile Installed'),
+                    message: `${t('modal.gsx_installed_msg', 'GSX profile(s) successfully extracted and installed:')}\n\n• ${res.installed_files.join('\n• ')}`,
                     type: 'success',
-                    confirmText: 'Continue'
+                    confirmText: t('modal.continue', 'Continue')
                 });
             } else {
                 showCustomModal({
-                    title: 'GSX Profile Information',
+                    title: t('modal.gsx_info', 'GSX Profile Information'),
                     message: res.message,
                     type: 'info',
-                    confirmText: 'OK'
+                    confirmText: t('modal.ok', 'OK')
                 });
             }
         }
     } catch (e) {
         console.error("GSX Installation error:", e);
         showCustomModal({
-            title: 'GSX Installation Error',
+            title: t('modal.gsx_error', 'GSX Installation Error'),
             message: e.message || String(e),
             type: 'error'
         });
@@ -4322,6 +4325,11 @@ async function openSettingsModal() {
         durSlider.value = dVal;
         const dDisp = document.getElementById('cfg-duration-display');
         if (dDisp) dDisp.innerText = `${dVal.toFixed(1)}s`;
+    }
+
+    const langSelect = document.getElementById('cfg-app-language');
+    if (langSelect) {
+        langSelect.value = currentSettings.language || (typeof currentLang !== 'undefined' ? currentLang : 'en');
     }
 
     renderSettingsPathsList();
@@ -4441,6 +4449,14 @@ async function saveSettings() {
         currentSettings.camera_pan_duration = parseFloat(durSlider.value);
     }
 
+    const langSelect = document.getElementById('cfg-app-language');
+    if (langSelect) {
+        currentSettings.language = langSelect.value;
+        if (typeof setAppLanguage === 'function') {
+            setAppLanguage(langSelect.value);
+        }
+    }
+
     applyStartupCameraSettings();
 
     try {
@@ -4450,6 +4466,12 @@ async function saveSettings() {
         closeSettingsModal();
     } catch (e) {
         console.error("Failed to save settings:", e);
+    }
+}
+
+function previewAppLanguage(lang) {
+    if (typeof setAppLanguage === 'function') {
+        setAppLanguage(lang);
     }
 }
 
@@ -4693,11 +4715,11 @@ function cancelCustomModal() {
 
 function promptClosingFlightMode() {
     showCustomModal({
-        title: 'Active SimBrief Flight Plan',
-        message: 'A SimBrief flight plan is currently active in SceneryX (off-route sceneries are isolated and disabled in MSFS to optimize performance).\n\nWhat would you like to do before exiting SceneryX?',
+        title: t('exit.simbrief_title', 'Active SimBrief Flight Plan'),
+        message: t('exit.simbrief_msg', 'A SimBrief flight plan is currently active in SceneryX (off-route sceneries are isolated and disabled in MSFS to optimize performance).\n\nWhat would you like to do before exiting SceneryX?'),
         type: 'warning',
-        confirmText: 'Keep Isolation (In Flight)',
-        cancelText: 'Restore All Sceneries',
+        confirmText: t('exit.keep_isolation', 'Keep Isolation (In Flight)'),
+        cancelText: t('exit.restore_sceneries', 'Restore All Sceneries'),
         showCancel: true,
         onConfirm: () => {
             if (window.pywebview && window.pywebview.api) {
