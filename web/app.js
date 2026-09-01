@@ -3304,6 +3304,8 @@ async function handleStarClick(e, starIdx) {
 
     selectedAirport.rating = ratingVal;
     userRatingsMap[selectedAirport.icao] = ratingVal;
+    const apInAll = allAirportsData.find(a => a.icao === selectedAirport.icao);
+    if (apInAll) apInAll.rating = ratingVal;
 
     renderStarRatingWidget(ratingVal);
 
@@ -3323,6 +3325,8 @@ async function clearCurrentRating() {
 
     selectedAirport.rating = 0;
     delete userRatingsMap[selectedAirport.icao];
+    const apInAll = allAirportsData.find(a => a.icao === selectedAirport.icao);
+    if (apInAll) apInAll.rating = 0;
 
     renderStarRatingWidget(0);
 
@@ -3679,6 +3683,16 @@ function filterAirports() {
         }
         if (selectedGsxFilter === 'none' && hasGsx) {
             return false;
+        }
+
+        // Minimum User Rating Filter (0.5 to 5.0 stars)
+        if (selectedMinRating > 0) {
+            const apRating = (userRatingsMap && userRatingsMap[ap.icao] !== undefined)
+                ? userRatingsMap[ap.icao]
+                : (ap.rating || 0);
+            if (apRating < selectedMinRating) {
+                return false;
+            }
         }
 
         // Operating Airline & Direct Route Filter
