@@ -1549,7 +1549,7 @@ class Api:
                     return json.dumps({"status": "error", "message": str(e)})
 
             if not installed_files:
-                return json.dumps({"status": "error", "message": "Aucun fichier de profil GSX (.ini ou .py) valide n'a été trouvé dans cette archive."})
+                return json.dumps({"status": "error", "message": "No valid GSX profile file (.ini or .py) found in this archive."})
 
             airports = run_scan()
             return json.dumps({

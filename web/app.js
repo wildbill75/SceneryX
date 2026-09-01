@@ -4213,7 +4213,7 @@ async function handleGsxDrop(e) {
             await executeGsxInstallation({ base64Data: base64Data, filename: file.name });
         };
         reader.onerror = function() {
-            showCustomModal({ title: 'Erreur de lecture', message: 'Impossible de lire le fichier déposé.', type: 'error' });
+            showCustomModal({ title: 'File Read Error', message: 'Unable to read the dropped file.', type: 'error' });
         };
         reader.readAsDataURL(file);
     }
@@ -4246,24 +4246,24 @@ async function executeGsxInstallation({ filePath = '', base64Data = '', filename
                 const updatedAp = allAirportsData.find(a => a.icao === selectedAirport.icao);
                 if (updatedAp) showAirportDetails(updatedAp);
                 showCustomModal({
-                    title: 'Profil GSX Installé',
-                    message: `Profil(s) GSX extrait(s) et installé(s) avec succès :\n\n• ${res.installed_files.join('\n• ')}`,
+                    title: 'GSX Profile Installed',
+                    message: `GSX profile(s) successfully extracted and installed:\n\n• ${res.installed_files.join('\n• ')}`,
                     type: 'success',
-                    confirmText: 'Continuer'
+                    confirmText: 'Continue'
                 });
             } else {
                 showCustomModal({
-                    title: 'Information Profil GSX',
+                    title: 'GSX Profile Information',
                     message: res.message,
                     type: 'info',
-                    confirmText: 'Compris'
+                    confirmText: 'OK'
                 });
             }
         }
     } catch (e) {
         console.error("GSX Installation error:", e);
         showCustomModal({
-            title: 'Erreur d\'installation GSX',
+            title: 'GSX Installation Error',
             message: e.message || String(e),
             type: 'error'
         });
@@ -4606,7 +4606,7 @@ function showCustomModal(titleOrObj, messageStr, typeStr = 'info') {
     let message = '';
     let type = 'info';
     let confirmText = 'OK';
-    let cancelText = 'Annuler';
+    let cancelText = 'Cancel';
     let showCancel = false;
 
     if (typeof titleOrObj === 'object' && titleOrObj !== null) {
@@ -4693,11 +4693,11 @@ function cancelCustomModal() {
 
 function promptClosingFlightMode() {
     showCustomModal({
-        title: 'Plan de Vol SimBrief Actif',
-        message: 'Un plan de vol SimBrief est actuellement actif dans SceneryX (les scènes hors-route sont isolées et désactivées dans MSFS pour optimiser vos performances).\n\nQue souhaitez-vous faire en quittant SceneryX ?',
+        title: 'Active SimBrief Flight Plan',
+        message: 'A SimBrief flight plan is currently active in SceneryX (off-route sceneries are isolated and disabled in MSFS to optimize performance).\n\nWhat would you like to do before exiting SceneryX?',
         type: 'warning',
-        confirmText: '⚡ Garder l\'isolement (En Vol)',
-        cancelText: '🔄 Rétablir toutes mes scènes',
+        confirmText: 'Keep Isolation (In Flight)',
+        cancelText: 'Restore All Sceneries',
         showCancel: true,
         onConfirm: () => {
             if (window.pywebview && window.pywebview.api) {
