@@ -4118,8 +4118,8 @@ async function rescanMSFS() {
                 listCont.classList.remove('hidden');
             }
         } else {
-            if (titleEl) titleEl.innerText = "Scan Complete";
-            if (msgEl) msgEl.innerText = `Nothing new found. Your scenery library is up to date (${allAirportsData.length.toLocaleString()} sceneries and airports indexed).`;
+            if (titleEl) titleEl.innerText = "Scan Completed";
+            if (msgEl) msgEl.innerText = "No new addon detected.";
             if (listCont) {
                 listCont.classList.add('hidden');
                 listCont.innerHTML = '';
