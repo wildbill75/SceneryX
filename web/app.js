@@ -791,7 +791,7 @@ function openCountryDrawer(iso, countryName) {
     }
 
     // 2. Set Header Data with Full English Country Name & High-Res Country Flag
-    const resolvedName = ISO_TO_COUNTRY_NAME[isoUpper] || countryName || isoUpper;
+    const resolvedName = (typeof getLocalizedCountryName === 'function') ? getLocalizedCountryName(isoUpper, countryName) : (ISO_TO_COUNTRY_NAME[isoUpper] || countryName || isoUpper);
     const flagImgEl = document.getElementById('country-drawer-flag-img');
     const flagBgEl = document.getElementById('country-hero-flag-bg');
     const flagUrl = `https://flagcdn.com/w160/${isoUpper.toLowerCase()}.png`;
@@ -923,15 +923,15 @@ function openCountryDrawer(iso, countryName) {
 
     // Populate Sceneries List
     const sceneryBadgeEl = document.getElementById('country-scenery-count-badge');
-    if (sceneryBadgeEl) sceneryBadgeEl.innerText = `${filteredCountryAirports.length} Airports`;
+    if (sceneryBadgeEl) sceneryBadgeEl.innerText = `${filteredCountryAirports.length} ${t('country.airports_count', 'Airports')}`;
 
     const listEl = document.getElementById('country-airports-list');
     if (listEl) {
         if (filteredCountryAirports.length === 0) {
             listEl.innerHTML = `
                 <div class="p-4 rounded-xl bg-slate-900/60 border border-slate-800 text-center space-y-1">
-                    <p class="text-xs font-semibold text-slate-400">No Airports Matching Filter</p>
-                    <p class="text-[10px] text-slate-500">Try enabling more pricing or airport type filter buttons above.</p>
+                    <p class="text-xs font-semibold text-slate-400">${t('country.no_match', 'No Airports Matching Filter')}</p>
+                    <p class="text-[10px] text-slate-500">${t('country.no_match_sub', 'Try enabling more pricing or airport type filter buttons above.')}</p>
                 </div>
             `;
         } else {
@@ -950,16 +950,16 @@ function openCountryDrawer(iso, countryName) {
                 let borderClass = 'border-slate-800 hover:border-indigo-500/50';
 
                 if (pt === 'Payware') {
-                    badgeHtml = `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">PAYWARE</span>`;
+                    badgeHtml = `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">${t('stat.payware', 'PAYWARE')}</span>`;
                     borderClass = isExpanded ? 'border-purple-400 bg-purple-950/40 shadow-lg shadow-purple-950/30' : 'border-purple-500/30 hover:border-purple-400 bg-purple-950/20';
                 } else if (pt === 'Freeware') {
-                    badgeHtml = `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">FREEWARE</span>`;
+                    badgeHtml = `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">${t('stat.freeware', 'FREEWARE')}</span>`;
                     borderClass = isExpanded ? 'border-cyan-400 bg-cyan-950/40 shadow-lg shadow-cyan-950/30' : 'border-cyan-500/30 hover:border-cyan-400 bg-cyan-950/20';
                 } else if (pt === 'Asobo') {
-                    badgeHtml = `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">ASOBO</span>`;
+                    badgeHtml = `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">${t('stat.asobo', 'ASOBO')}</span>`;
                     borderClass = isExpanded ? 'border-amber-400 bg-amber-950/40 shadow-lg shadow-amber-950/30' : 'border-amber-500/30 hover:border-amber-400 bg-amber-950/20';
                 } else {
-                    badgeHtml = `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-800 text-slate-400 border border-slate-700">DEFAULT</span>`;
+                    badgeHtml = `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-800 text-slate-400 border border-slate-700">${t('stat.default', 'DEFAULT')}</span>`;
                     borderClass = isExpanded ? 'border-blue-400 bg-blue-950/40 shadow-lg shadow-blue-950/30' : 'border-slate-800 hover:border-slate-700 bg-slate-900/60';
                 }
 
@@ -1021,7 +1021,7 @@ function openCountryDrawer(iso, countryName) {
                          class="flex items-center justify-between p-2 rounded-lg bg-slate-900/40 hover:bg-slate-800/60 border border-slate-800/50 cursor-pointer transition-all group opacity-85 hover:opacity-100">
                         <div class="flex items-center gap-2 min-w-0 flex-1">
                             <span class="text-xs font-mono font-black text-slate-400 shrink-0">${ap.icao}</span>
-                            <span class="text-xs font-semibold text-slate-400 group-hover:text-cyan-300 truncate min-w-0">Search Freeware on Flightsim.to</span>
+                            <span class="text-xs font-semibold text-slate-400 group-hover:text-cyan-300 truncate min-w-0">${t('country.search_freeware', 'Search Freeware on Flightsim.to')}</span>
                             <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">FREEWARE</span>
                         </div>
                         <div class="shrink-0 pl-2">
@@ -1035,7 +1035,7 @@ function openCountryDrawer(iso, countryName) {
                          class="flex items-center justify-between p-2 rounded-lg bg-slate-900/40 hover:bg-slate-800/60 border border-slate-800/50 cursor-pointer transition-all group opacity-85 hover:opacity-100">
                         <div class="flex items-center gap-2 min-w-0 flex-1">
                             <span class="text-xs font-mono font-black text-slate-400 shrink-0">${ap.icao}</span>
-                            <span class="text-xs font-semibold text-slate-400 group-hover:text-purple-300 truncate min-w-0">Search Payware Stores (SimMarket)</span>
+                            <span class="text-xs font-semibold text-slate-400 group-hover:text-purple-300 truncate min-w-0">${t('country.search_payware', 'Search Payware Stores (SimMarket)')}</span>
                             <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20">PAYWARE</span>
                         </div>
                         <div class="shrink-0 pl-2">
@@ -2412,32 +2412,34 @@ function showAirportDetails(ap) {
     if (typeBadge) typeBadge.classList.remove(...categoryColorClasses);
 
     if (cat === 'DEFAULT') {
-        pricingBadge.innerText = "Default MSFS";
+        pricingBadge.innerText = t('badge.default_msfs', 'Default MSFS');
         pricingBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30";
         if (icaoEl) icaoEl.classList.add('text-blue-400', 'drop-shadow-[0_0_10px_rgba(59,130,246,0.3)]');
         if (vendorEl) vendorEl.classList.add('text-blue-400', 'drop-shadow-[0_0_10px_rgba(59,130,246,0.3)]');
         if (typeBadge) typeBadge.classList.add('text-blue-400');
     } else if (cat === 'ASOBO') {
-        pricingBadge.innerText = hasActiveFix ? "Asobo + Fix" : "Asobo";
+        pricingBadge.innerText = hasActiveFix ? t('badge.asobo_fix', 'Asobo + Fix') : t('badge.asobo', 'Asobo');
         pricingBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30";
         if (icaoEl) icaoEl.classList.add('text-amber-400', 'drop-shadow-[0_0_10px_rgba(245,158,11,0.3)]');
         if (vendorEl) vendorEl.classList.add('text-amber-400', 'drop-shadow-[0_0_10px_rgba(245,158,11,0.3)]');
         if (typeBadge) typeBadge.classList.add('text-amber-400');
     } else if (cat === 'PAYWARE') {
-        pricingBadge.innerText = "Payware Addon";
+        pricingBadge.innerText = t('badge.payware_addon', 'Payware Addon');
         pricingBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30";
         if (icaoEl) icaoEl.classList.add('text-purple-400', 'drop-shadow-[0_0_10px_rgba(192,132,252,0.3)]');
         if (vendorEl) vendorEl.classList.add('text-purple-400', 'drop-shadow-[0_0_10px_rgba(192,132,252,0.3)]');
         if (typeBadge) typeBadge.classList.add('text-purple-400');
     } else {
-        pricingBadge.innerText = "Freeware";
+        pricingBadge.innerText = t('badge.freeware', 'Freeware');
         pricingBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-cyan-500/20 text-cyan-400 border border-cyan-500/30";
         if (icaoEl) icaoEl.classList.add('text-cyan-400', 'drop-shadow-[0_0_10px_rgba(56,189,248,0.3)]');
         if (vendorEl) vendorEl.classList.add('text-cyan-400', 'drop-shadow-[0_0_10px_rgba(56,189,248,0.3)]');
         if (typeBadge) typeBadge.classList.add('text-cyan-400');
     }
 
-    if (typeBadge) typeBadge.innerText = ap.english_type || ap.type;
+    if (typeBadge) {
+        typeBadge.innerText = (typeof getLocalizedAirportType === 'function') ? getLocalizedAirportType(ap.english_type || ap.type) : (ap.english_type || ap.type);
+    }
 
     // Update Activation Status Card in Drawer & Developer Info Visibility
     const actBadge = document.getElementById('drawer-activation-badge');
@@ -2448,16 +2450,16 @@ function showAirportDetails(ap) {
     if (actBadge) {
         if (isFallbackDefault) {
             actBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-blue-500/20 text-blue-300 border border-blue-500/40";
-            actBadge.innerText = "Default MSFS Airport";
+            actBadge.innerText = t('badge.default_msfs_airport', 'Default MSFS Airport');
         } else if (cat === 'ASOBO') {
             actBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40";
-            actBadge.innerText = ap.world_update_name || "Asobo Sim Update";
+            actBadge.innerText = ap.world_update_name || t('badge.asobo_update', 'Asobo Sim Update');
         } else if (cat === 'PAYWARE') {
             actBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40";
-            actBadge.innerText = "Payware Addon";
+            actBadge.innerText = t('badge.payware_addon', 'Payware Addon');
         } else {
             actBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40";
-            actBadge.innerText = "Freeware Addon";
+            actBadge.innerText = t('badge.freeware_addon', 'Freeware Addon');
         }
     }
 
@@ -2533,13 +2535,13 @@ function showAirportDetails(ap) {
     if (gsxBadge && gsxContainer) {
         if (ap.has_gsx_profile) {
             gsxBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
-            gsxBadge.innerText = "Profile Installed";
+            gsxBadge.innerText = t('drawer.gsx_installed', 'Profile Installed');
             const safeGsxPath = encodeURIComponent(ap.gsx_profile_path || '');
             gsxContainer.innerHTML = `
                 <div class="space-y-2.5">
                     <div onclick="openGsxProfileInExplorer(decodeURIComponent('${safeGsxPath}'))" 
                          class="p-3 rounded-xl bg-slate-950/80 hover:bg-slate-800/80 border border-slate-800/80 hover:border-cyan-500/50 cursor-pointer flex items-center justify-between gap-2 text-xs lg:text-sm font-mono font-bold text-slate-100 hover:text-cyan-300 transition-all group shadow-sm"
-                         title="Click to reveal GSX INI file in Explorer">
+                         title="${t('drawer.gsx_reveal_tooltip', 'Click to reveal GSX INI file in Explorer')}">
                         <span class="truncate">${ap.gsx_profile_filename}</span>
                         <i class="fa-solid fa-folder-open text-cyan-400 text-sm group-hover:scale-110 transition-transform"></i>
                     </div>
@@ -2547,27 +2549,27 @@ function showAirportDetails(ap) {
                          onclick="triggerInstallGsxProfile()"
                          class="p-3.5 rounded-xl bg-slate-950/40 border-2 border-dashed border-slate-800 hover:border-cyan-500/50 flex flex-col items-center justify-center gap-1.5 text-center transition-all cursor-pointer group">
                         <i class="fa-solid fa-file-arrow-up text-cyan-400 text-lg group-hover:scale-110 transition-transform"></i>
-                        <span class="text-xs lg:text-sm font-extrabold text-cyan-300 group-hover:text-cyan-200">Drop downloaded .zip or .ini here to replace</span>
-                        <span class="text-xs text-slate-400">or click to browse & replace directly</span>
+                        <span class="text-xs lg:text-sm font-extrabold text-cyan-300 group-hover:text-cyan-200">${t('drawer.gsx_drop_replace', 'Drop downloaded .zip or .ini here to replace')}</span>
+                        <span class="text-xs text-slate-400">${t('drawer.gsx_click_replace', 'or click to browse & replace directly')}</span>
                     </div>
                 </div>
             `;
         } else {
             gsxBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-slate-800 text-slate-400 border border-slate-700";
-            gsxBadge.innerText = "No Profile";
+            gsxBadge.innerText = t('drawer.gsx_none', 'No Profile');
             gsxContainer.innerHTML = `
                 <div class="space-y-2.5">
                     <button onclick="triggerSearchGsxProfile()" 
                             class="w-full p-3 rounded-xl bg-slate-950/40 hover:bg-cyan-500/10 border border-slate-800/50 hover:border-cyan-500/40 text-slate-200 hover:text-cyan-300 text-xs lg:text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer">
                         <i class="fa-solid fa-magnifying-glass text-cyan-400 text-xs"></i>
-                        <span>Search GSX Profile on Flightsim.to</span>
+                        <span>${t('drawer.gsx_search_btn', 'Search GSX Profile on Flightsim.to')}</span>
                     </button>
                     <div ondragover="handleGsxDragOver(event)" ondragleave="handleGsxDragLeave(event)" ondrop="handleGsxDrop(event)"
                          onclick="triggerInstallGsxProfile()"
                          class="p-3.5 rounded-xl bg-slate-950/40 border-2 border-dashed border-slate-800 hover:border-cyan-500/50 flex flex-col items-center justify-center gap-1.5 text-center transition-all cursor-pointer group">
                         <i class="fa-solid fa-file-arrow-up text-cyan-400 text-lg group-hover:scale-110 transition-transform"></i>
-                        <span class="text-xs lg:text-sm font-extrabold text-cyan-300 group-hover:text-cyan-200">Drop downloaded .zip or .ini here</span>
-                        <span class="text-xs text-slate-400">or click to browse & install directly</span>
+                        <span class="text-xs lg:text-sm font-extrabold text-cyan-300 group-hover:text-cyan-200">${t('drawer.gsx_drop_install', 'Drop downloaded .zip or .ini here')}</span>
+                        <span class="text-xs text-slate-400">${t('drawer.gsx_click_install', 'or click to browse & install directly')}</span>
                     </div>
                 </div>
             `;
@@ -2589,7 +2591,7 @@ function showAirportDetails(ap) {
         });
 
         if (airlines.length > 0) {
-            airlinesCountEl.innerText = `${airlines.length} Airlines`;
+            airlinesCountEl.innerText = `${airlines.length} ${t('drawer.airlines_count', 'Airlines')}`;
             airlinesListEl.innerHTML = airlines.map(al => {
                 const isActive = selectedAirlines.has(al) && (activeRouteOrigin && activeRouteOrigin.icao === ap.icao);
                 const activeBtnClass = isActive 
@@ -2619,8 +2621,8 @@ function showAirportDetails(ap) {
                         </button>`;
             }).join('');
         } else {
-            airlinesCountEl.innerText = `0 Airlines`;
-            airlinesListEl.innerHTML = `<span class="col-span-3 text-xs text-slate-500 italic py-2 text-center">No scheduled airlines data available for this airport.</span>`;
+            airlinesCountEl.innerText = `0 ${t('drawer.airlines_count', 'Airlines')}`;
+            airlinesListEl.innerHTML = `<span class="col-span-3 text-xs text-slate-500 italic py-2 text-center">${t('drawer.no_airlines', 'No scheduled airlines data available for this airport.')}</span>`;
         }
     }
 
@@ -2635,10 +2637,10 @@ function showAirportDetails(ap) {
                 <div class="p-3.5 rounded-2xl bg-red-500/15 border border-red-500/40 text-red-300 space-y-1">
                     <div class="flex items-center gap-2 font-bold text-xs">
                         <i class="fa-solid fa-triangle-exclamation text-red-400"></i>
-                        <span>SCENERY CONFLICT DETECTED</span>
+                        <span>${t('drawer.conflict_title', 'SCENERY CONFLICT DETECTED')}</span>
                     </div>
                     <p class="text-[11px] text-red-200/90 leading-relaxed">
-                        ${ap.conflict_count} active main sceneries are installed for ${ap.icao}. You can disable one below to avoid sim overlaps!
+                        ${ap.conflict_count} ${t('drawer.conflict_msg', 'active main sceneries are installed for this airport. You can disable one below to avoid sim overlaps!')}
                     </p>
                 </div>
             `;
@@ -2663,8 +2665,8 @@ function showAirportDetails(ap) {
     let html = `
         <div class="space-y-3">
             <div class="flex items-center justify-between pb-1">
-                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">Available Scenery Options</span>
-                <span class="text-[10px] font-mono text-slate-500 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">1-Click Selection</span>
+                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">${t('drawer.scenery_options', 'Available Scenery Options')}</span>
+                <span class="text-[10px] font-mono text-slate-500 bg-slate-900 px-2 py-0.5 rounded border border-slate-800">${t('drawer.click_selection', '1-Click Selection')}</span>
             </div>
             <div class="space-y-2.5">
     `;
@@ -2676,11 +2678,11 @@ function showAirportDetails(ap) {
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
                         <i class="fa-solid fa-circle-dot text-blue-400 text-sm"></i>
-                        <span class="text-xs font-bold text-blue-200">Default MSFS Base Airport</span>
+                        <span class="text-xs font-bold text-blue-200">${t('drawer.default_airport', 'Default MSFS Base Airport')}</span>
                     </div>
-                    <span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40">Active</span>
+                    <span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40">${t('drawer.active_badge', 'Active')}</span>
                 </div>
-                <p class="text-[11px] text-slate-400 pl-6">Built-in Procedural MSFS Base Scenery</p>
+                <p class="text-[11px] text-slate-400 pl-6">${t('drawer.default_procedural', 'Built-in Procedural MSFS Base Scenery')}</p>
             </div>
         `;
     } else {
@@ -2689,12 +2691,12 @@ function showAirportDetails(ap) {
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
                         <i class="fa-regular fa-circle text-slate-500 text-sm transition-colors"></i>
-                        <span class="text-xs font-bold text-slate-300 group-hover:text-white transition-colors">Default MSFS Base Airport</span>
+                        <span class="text-xs font-bold text-slate-300 group-hover:text-white transition-colors">${t('drawer.default_airport', 'Default MSFS Base Airport')}</span>
                     </div>
-                    <span class="text-[10px] font-mono text-slate-500 group-hover:text-slate-300 shrink-0 whitespace-nowrap">Click to Activate</span>
+                    <span class="text-[10px] font-mono text-slate-500 group-hover:text-slate-300 shrink-0 whitespace-nowrap">${t('drawer.click_to_activate', 'Click to Activate')}</span>
                 </div>
 
-                <p class="text-[11px] text-slate-500 pl-6">Built-in Procedural MSFS Base Scenery</p>
+                <p class="text-[11px] text-slate-500 pl-6">${t('drawer.default_procedural', 'Built-in Procedural MSFS Base Scenery')}</p>
             </div>
         `;
     }
@@ -2732,7 +2734,7 @@ function showAirportDetails(ap) {
                             <i class="fa-solid fa-circle-dot ${activeIconColor} text-sm shrink-0"></i>
                             <span class="text-xs font-bold text-white truncate min-w-0">${titleLabel}</span>
                         </div>
-                        <span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full ${activeBadgeClass} shrink-0 whitespace-nowrap">Active</span>
+                        <span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full ${activeBadgeClass} shrink-0 whitespace-nowrap">${t('drawer.active_badge', 'Active')}</span>
                     </div>
 
                     <div class="text-[11px] font-mono text-slate-300 bg-slate-950/70 border border-slate-800 p-2 rounded-lg break-all">
@@ -2741,8 +2743,8 @@ function showAirportDetails(ap) {
 
                     <div class="flex items-center justify-between text-xs pt-0.5">
                         <span class="text-[11px] font-mono text-slate-400">${src.source_folder} ${src.size_str ? `• ${src.size_str}` : ''}</span>
-                        <button onclick="openSpecificPackageFolderByIndex('${ap.icao}', ${idx})" class="${openBtnClass}" title="Open Folder">
-                            <i class="fa-solid fa-folder-open text-cyan-400"></i> Open Folder
+                        <button onclick="openSpecificPackageFolderByIndex('${ap.icao}', ${idx})" class="${openBtnClass}" title="${t('drawer.open_folder', 'Open Folder')}">
+                            <i class="fa-solid fa-folder-open text-cyan-400"></i> ${t('drawer.open_folder', 'Open Folder')}
                         </button>
                     </div>
                 </div>
@@ -2756,7 +2758,7 @@ function showAirportDetails(ap) {
                             <i class="fa-regular fa-circle text-slate-500 text-sm transition-colors shrink-0"></i>
                             <span class="text-xs font-bold text-slate-300 group-hover:text-white truncate transition-colors min-w-0">${titleLabel}</span>
                         </div>
-                        <span class="text-[10px] font-mono text-slate-500 group-hover:text-slate-300 shrink-0 whitespace-nowrap">Click to Activate</span>
+                        <span class="text-[10px] font-mono text-slate-500 group-hover:text-slate-300 shrink-0 whitespace-nowrap">${t('drawer.click_to_activate', 'Click to Activate')}</span>
                     </div>
 
                     <div class="text-[11px] font-mono text-slate-400 group-hover:text-slate-300 bg-slate-950/40 border border-slate-800/60 p-2 rounded-lg break-all transition-colors">
@@ -2779,7 +2781,7 @@ function showAirportDetails(ap) {
             <div class="pt-4 border-t border-slate-800/80 space-y-3">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
-                        <span class="text-xs font-bold uppercase tracking-wider text-slate-300">Available Fixes & Overlays</span>
+                        <span class="text-xs font-bold uppercase tracking-wider text-slate-300">${t('drawer.fixes_overlays', 'Available Fixes & Overlays')}</span>
                     </div>
                 </div>
                 <div class="space-y-2.5">
@@ -2801,7 +2803,7 @@ function showAirportDetails(ap) {
                                 <span class="text-xs font-bold text-white truncate min-w-0">${src.folder_name}</span>
                                 <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shrink-0 whitespace-nowrap">Fix / Overlay</span>
                             </div>
-                            <span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shrink-0 whitespace-nowrap">Active</span>
+                            <span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shrink-0 whitespace-nowrap">${t('drawer.active_fix', 'Active Fix')}</span>
                         </div>
 
                         <div class="text-[11px] font-mono text-slate-300 bg-slate-950/70 border border-slate-800 p-2 rounded-lg break-all">
@@ -2825,7 +2827,7 @@ function showAirportDetails(ap) {
                                 <span class="text-xs font-bold text-slate-300 group-hover:text-white truncate transition-colors min-w-0">${src.folder_name}</span>
                                 <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 shrink-0 whitespace-nowrap">Fix / Overlay</span>
                             </div>
-                            <span class="text-[10px] font-mono text-slate-500 group-hover:text-slate-300 shrink-0 whitespace-nowrap">Click to Activate</span>
+                            <span class="text-[10px] font-mono text-slate-500 group-hover:text-slate-300 shrink-0 whitespace-nowrap">${t('drawer.click_enable_fix', 'Click to Enable Fix')}</span>
                         </div>
 
                         <div class="text-[11px] font-mono text-slate-400 group-hover:text-slate-300 bg-slate-950/40 border border-slate-800/60 p-2 rounded-lg break-all transition-colors">
