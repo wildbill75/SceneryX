@@ -1,15 +1,22 @@
 
+const MAIN_SCENERY_EXCEPTIONS = new Set([
+    'wombiiactual-airport-enbr-fleslandfix'
+]);
+
 function isFixOrOverlay(s) {
     if (!s) return false;
-    if (s.is_fix_patch || s.is_addon) return true;
     const fn = (s.folder_name || '').toLowerCase();
+    if (MAIN_SCENERY_EXCEPTIONS.has(fn)) return false;
+    if (s.is_fix_patch || s.is_addon) return true;
     const fixKeywords = [
         'fix', 'patch', 'flatten', 'fixer', 'correction', 'enhancement', 'mod',
         'interior', 'optional', 'overlay', 'mesh', 'aerial', 'ortho', 'vdgs',
         'lights', 'lighting', 'trees', 'vegetation', 'sound', 'texture', 'extension',
         'zparking', 'exclusion', 'jetway', 'marking'
     ];
-    return fixKeywords.some(k => fn.includes(k));
+    return fixKeywords.some(k => {
+        return fn.includes(`-${k}`) || fn.includes(`_${k}`) || fn.includes(`${k}-`) || fn.includes(`${k}_`) || fn.endsWith(k);
+    });
 }
 let map;
 let markerClusterGroup;

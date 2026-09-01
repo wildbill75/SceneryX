@@ -205,6 +205,11 @@ FIX_PATCH_KEYWORDS = [
     'static', 'statics', 'cars', 'people'
 ]
 
+# Explicit exceptions for packages whose names contain "fix" but are genuine full sceneries
+MAIN_SCENERY_EXCEPTIONS = {
+    'wombiiactual-airport-enbr-fleslandfix'
+}
+
 # Official MSFS Standard Edition Handcrafted Airports (Base Game Standard + World Updates I to XVIII)
 ASOBO_STANDARD_ICAOS = {
     # MSFS Base Game Standard Edition Handcrafted Airports (40)
@@ -995,12 +1000,15 @@ def run_scan():
             clean_hint = clean_hint.replace(hint_term, '')
 
         is_fix_patch = (
-            any(re.search(rf'\b{re.escape(k)}\b', fn_lower) for k in FIX_PATCH_KEYWORDS)
-            or any(fn_lower.endswith(f"_{k}") or fn_lower.endswith(f"-{k}") for k in FIX_PATCH_KEYWORDS)
-            or any(k in clean_hint for k in ['patch', 'fix', 'enhancement', 'correction', 'overlay'])
-            or any(k in m_title_lower for k in ['fix', 'patch', 'enhancement', 'flatten', 'correction', 'overlay'])
+            fn_lower not in MAIN_SCENERY_EXCEPTIONS
+            and (
+                any(re.search(rf'\b{re.escape(k)}\b', fn_lower) for k in FIX_PATCH_KEYWORDS)
+                or any(fn_lower.endswith(f"_{k}") or fn_lower.endswith(f"-{k}") for k in FIX_PATCH_KEYWORDS)
+                or any(k in clean_hint for k in ['patch', 'fix', 'enhancement', 'correction', 'overlay'])
+                or any(k in m_title_lower for k in ['fix', 'patch', 'enhancement', 'flatten', 'correction', 'overlay'])
+            )
         )
-        is_addon_package = is_fix_patch or any(k in fn_lower for k in ADDON_LIBRARY_KEYWORDS)
+        is_addon_package = (fn_lower not in MAIN_SCENERY_EXCEPTIONS) and (is_fix_patch or any(k in fn_lower for k in ADDON_LIBRARY_KEYWORDS))
 
         if fn_lower in SPECIAL_BUNDLE_MAP:
             bundle_icaos = SPECIAL_BUNDLE_MAP[fn_lower]
