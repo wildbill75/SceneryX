@@ -3490,9 +3490,9 @@ function updateRegionPillUI() {
     const allBtn = document.getElementById('filter-region-all');
     if (allBtn) {
         if (!selectedRegion) {
-            allBtn.className = "col-span-2 py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center shadow-sm shadow-cyan-500/10 cursor-pointer";
+            allBtn.className = "col-span-2 py-1.5 px-2 rounded-xl text-[11px] font-bold bg-cyan-600 text-white transition-colors text-center flex items-center justify-center cursor-pointer border-0";
         } else {
-            allBtn.className = "col-span-2 py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center cursor-pointer";
+            allBtn.className = "col-span-2 py-1.5 px-2 rounded-xl text-[11px] font-medium bg-slate-800 text-slate-400 hover:text-white transition-colors text-center flex items-center justify-center cursor-pointer border-0";
         }
     }
 
@@ -3503,9 +3503,9 @@ function updateRegionPillUI() {
             const isSpan2 = (k === 'pacific');
             const spanClass = isSpan2 ? 'col-span-2 ' : '';
             if (selectedRegion === k) {
-                btn.className = `${spanClass}py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center shadow-sm shadow-cyan-500/10 cursor-pointer`;
+                btn.className = `${spanClass}py-1.5 px-2 rounded-xl text-[11px] font-bold bg-cyan-600 text-white transition-colors text-center flex items-center justify-center cursor-pointer border-0`;
             } else {
-                btn.className = `${spanClass}py-1.5 px-2 rounded-xl border text-[11px] font-semibold bg-slate-900/90 text-slate-400 border-slate-800 hover:border-slate-700 transition-all text-center flex items-center justify-center cursor-pointer`;
+                btn.className = `${spanClass}py-1.5 px-2 rounded-xl text-[11px] font-medium bg-slate-800 text-slate-400 hover:text-white transition-colors text-center flex items-center justify-center cursor-pointer border-0`;
             }
         }
     });
@@ -4036,9 +4036,9 @@ function updateGsxFilterUI() {
         const btn = document.getElementById(`filter-gsx-${mode}`);
         if (!btn) return;
         if (selectedGsxFilter === mode) {
-            btn.className = "py-2 px-2 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1 shadow-sm shadow-cyan-500/10";
+            btn.className = "py-2 px-2 rounded-xl text-xs font-bold bg-cyan-600 text-white transition-colors text-center flex items-center justify-center gap-1 border-0 cursor-pointer";
         } else {
-            btn.className = "py-2 px-2 rounded-xl border text-xs font-medium bg-slate-900/60 text-slate-400 border-slate-800/80 opacity-60 hover:opacity-100 transition-all text-center flex items-center justify-center gap-1";
+            btn.className = "py-2 px-2 rounded-xl text-xs font-medium bg-slate-800 text-slate-400 hover:text-white transition-colors text-center flex items-center justify-center gap-1 border-0 cursor-pointer";
         }
     });
 }
@@ -4439,7 +4439,7 @@ function renderSettingsPathsList() {
                     <input type="text" value="${item.path || ''}" 
                            oninput="updatePathValue(${index}, this.value)"
                            class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs font-mono text-slate-300 focus:outline-none focus:border-cyan-500">
-                    <button onclick="browsePathFolder(${index})" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white text-xs transition-all flex items-center gap-1.5" title="Browse Folder">
+                    <button onclick="browsePathFolder(${index})" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs transition-colors flex items-center gap-1.5 border-0 cursor-pointer" title="Browse Folder">
                         <i class="fa-solid fa-folder-open text-cyan-400"></i>
                     </button>
                 </div>
@@ -4451,7 +4451,7 @@ function renderSettingsPathsList() {
                     <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"></div>
                 </label>
 
-                <button onclick="removePathRow(${index})" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-red-500/20 text-slate-400 hover:text-red-400 border border-slate-700 transition-all flex items-center justify-center" title="Remove Path">
+                <button onclick="removePathRow(${index})" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-red-600 text-slate-400 hover:text-white transition-colors flex items-center justify-center border-0 cursor-pointer" title="Remove Path">
                     <i class="fa-solid fa-trash text-xs"></i>
                 </button>
             </div>
