@@ -2637,28 +2637,26 @@ function showAirportDetails(ap) {
             airlinesCountEl.innerText = `${airlines.length} ${t('drawer.airlines_count', 'Airlines')}`;
             airlinesListEl.innerHTML = airlines.map(al => {
                 const isActive = selectedAirlines.has(al) && (activeRouteOrigin && activeRouteOrigin.icao === ap.icao);
-                const activeBtnClass = isActive 
-                    ? 'border-2 border-cyan-500 bg-slate-950 scale-[1.02]' 
-                    : 'border border-slate-800/90 bg-slate-950/90 hover:border-cyan-400/70 shadow-sm';
-                const activeImgClass = isActive
-                    ? 'opacity-100'
-                    : 'opacity-30 group-hover:opacity-100';
-
                 const iata = getAirlineIata(al);
-                const logoUrl = iata ? `https://images.kiwi.com/airlines/64x64/${iata}.png` : '';
+                const logoUrl = iata ? `https://pics.avs.io/300/100/${iata}.png` : '';
+                const fallbackLogoUrl = iata ? `https://images.kiwi.com/airlines/128x128/${iata}.png` : '';
                 const safeAl = al.replace(/'/g, "\\'");
                 const safeAttrAl = al.replace(/"/g, '&quot;');
                 const dests = getFlightCount(al);
                 const tooltipText = dests > 0 ? `Show ${dests} direct flight connections from ${ap.icao} on ${al}` : `Filter map by ${al}`;
 
+                const activeBtnClass = isActive 
+                    ? 'border-2 border-cyan-500 bg-white scale-[1.02]' 
+                    : (logoUrl ? 'border-0 bg-white hover:brightness-95' : 'border-0 bg-slate-800 text-slate-300 font-medium');
+
                 return `<button data-airline="${safeAttrAl}" onclick="filterByAirline('${safeAl}', this)" 
-                                class="group relative min-h-[50px] rounded-xl overflow-hidden transition-all cursor-pointer flex items-center justify-center p-1 text-center ${activeBtnClass}" 
+                                class="group relative min-h-[50px] rounded-xl overflow-hidden transition-all cursor-pointer flex items-center justify-center p-1.5 text-center ${activeBtnClass}" 
                                 title="${tooltipText}">
                             ${logoUrl ? `
-                            <div class="absolute inset-0 flex items-center justify-center pointer-events-none overflow-hidden rounded-xl">
-                                <img src="${logoUrl}" class="w-full h-full object-cover object-center ${activeImgClass} transition-all duration-200" alt="${safeAttrAl}" onerror="this.style.display='none'" />
+                            <div class="absolute inset-0 flex items-center justify-center pointer-events-none p-1.5 overflow-hidden rounded-xl">
+                                <img src="${logoUrl}" class="w-full h-full object-contain object-center transition-all duration-200" alt="${safeAttrAl}" onerror="if(this.src!=='${fallbackLogoUrl}'){this.src='${fallbackLogoUrl}'}else{this.style.display='none'}" />
                             </div>` : ''}
-                            <span class="relative z-10 text-[12px] sm:text-[13px] font-black text-white leading-tight text-center line-clamp-2 px-1 break-words ${isActive ? 'hidden' : ''}" style="text-shadow: 0 1px 3px rgba(0,0,0,0.95), 0 0 2px rgba(0,0,0,0.9), 0 0 5px rgba(0,0,0,0.85);">
+                            <span class="relative z-10 text-[12px] sm:text-[13px] font-bold leading-tight text-center line-clamp-2 px-1 break-words ${logoUrl ? 'text-slate-800 hidden group-hover:block' : 'text-slate-200'}">
                                 ${al}
                             </span>
                         </button>`;
