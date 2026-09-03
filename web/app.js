@@ -1016,7 +1016,7 @@ function openCountryDrawer(iso, countryName) {
                         else pBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">FREEWARE</span>`;
 
                         return `
-                            <div onclick="event.stopPropagation(); window.open('${sPt === 'Payware' ? simMarketSearchUrl : fsToSearchUrl}', '_blank')"
+                            <div onclick="event.stopPropagation(); ${sPt === 'Payware' ? `openPaywareStoresModal('${ap.icao}', '${(ap.name || '').replace(/'/g, "\\'")}')` : `window.open('${fsToSearchUrl}', '_blank')`}"
                                  class="flex items-center justify-between p-2 rounded-lg bg-slate-900/70 hover:bg-slate-800/80 border border-slate-800/80 cursor-pointer transition-all group">
                                 <div class="flex items-center gap-2 min-w-0 flex-1">
                                     <span class="text-xs font-mono font-black text-cyan-300 shrink-0">${ap.icao}</span>
@@ -1059,12 +1059,13 @@ function openCountryDrawer(iso, countryName) {
                     </div>
                 `;
 
+                const safeAirportName = (ap.name || '').replace(/'/g, "\\'");
                 const paywareSearchRow = `
-                    <div onclick="event.stopPropagation(); window.open('${simMarketSearchUrl}', '_blank')"
+                    <div onclick="event.stopPropagation(); openPaywareStoresModal('${ap.icao}', '${safeAirportName}')"
                          class="flex items-center justify-between p-2 rounded-lg bg-slate-900/40 hover:bg-slate-800/60 border border-slate-800/50 cursor-pointer transition-all group opacity-85 hover:opacity-100">
                         <div class="flex items-center gap-2 min-w-0 flex-1">
                             <span class="text-xs font-mono font-black text-slate-400 shrink-0">${ap.icao}</span>
-                            <span class="text-xs font-semibold text-slate-400 group-hover:text-purple-300 truncate min-w-0">${t('country.search_payware', 'Search Payware Stores (SimMarket)')}</span>
+                            <span class="text-xs font-semibold text-slate-400 group-hover:text-purple-300 truncate min-w-0">${t('country.search_payware', 'Search Payware Stores')}</span>
                             <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20">PAYWARE</span>
                         </div>
                         <div class="shrink-0 pl-2">
@@ -5260,4 +5261,80 @@ function initDrawerAccordions() {
             icon.classList.add('-rotate-90');
         }
     });
+}
+
+function openPaywareStoresModal(icao, airportName) {
+    const modal = document.getElementById('payware-stores-modal');
+    if (!modal) return;
+
+    const subtitle = document.getElementById('payware-modal-subtitle');
+    if (subtitle) {
+        const titleText = airportName ? `${icao} - ${airportName}` : icao;
+        subtitle.innerText = `Results for "${titleText}"`;
+        subtitle.title = `Results for "${titleText}"`;
+    }
+
+    const listContainer = document.getElementById('payware-stores-list');
+    if (listContainer) {
+        const cleanIcao = encodeURIComponent((icao || '').trim());
+        const stores = [
+            {
+                name: 'simMarket',
+                desc: 'Global flight simulation store & marketplace',
+                url: `https://secure.simmarket.com/advanced_search_result.php?keywords=${cleanIcao}`
+            },
+            {
+                name: 'Orbx Direct',
+                desc: 'OrbxDirect official MSFS sceneries catalog',
+                url: `https://orbxdirect.com/msfs?search=${cleanIcao}`
+            },
+            {
+                name: 'Flightsim.to Store',
+                desc: 'Official payware marketplace on Flightsim.to',
+                url: `https://flightsim.to/store/search?q=${cleanIcao}`
+            },
+            {
+                name: 'iniBuilds Store',
+                desc: 'iniBuilds premier sceneries & partner developer store',
+                url: `https://inibuilds.com/search?q=${cleanIcao}`
+            },
+            {
+                name: 'Aerosoft Shop',
+                desc: 'Aerosoft official European flight simulation store',
+                url: `https://www.aerosoft.com/en/search?search=${cleanIcao}`
+            },
+            {
+                name: 'Contrail Web Shop',
+                desc: 'Flightbeam, Jo Erlend, Pyreegue & developer addons',
+                url: `https://contrail.shop/search?q=${cleanIcao}`
+            }
+        ];
+
+        listContainer.innerHTML = stores.map(st => `
+            <button onclick="window.open('${st.url}', '_blank'); closePaywareStoresModal();"
+                    class="w-full p-3 rounded-2xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800/80 hover:border-purple-500/50 text-slate-200 hover:text-white text-xs flex items-center justify-between transition-colors group cursor-pointer">
+                <div class="flex items-center gap-3 text-left min-w-0">
+                    <div class="w-8 h-8 rounded-xl bg-slate-800 group-hover:bg-purple-600 text-slate-400 group-hover:text-white flex items-center justify-center text-xs shrink-0 transition-colors border-0">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                    </div>
+                    <div class="truncate min-w-0">
+                        <div class="text-xs font-bold text-white group-hover:text-purple-300 transition-colors">${st.name}</div>
+                        <div class="text-[10px] text-slate-400 font-normal truncate">${st.desc}</div>
+                    </div>
+                </div>
+                <span class="text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400 group-hover:bg-purple-600 group-hover:text-white transition-colors shrink-0 ml-2 border-0">OPEN</span>
+            </button>
+        `).join('');
+    }
+
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function closePaywareStoresModal() {
+    const modal = document.getElementById('payware-stores-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
 }

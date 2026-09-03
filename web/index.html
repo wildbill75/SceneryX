@@ -1059,6 +1059,31 @@
         </div>
     </div>
 
+        <!-- PAYWARE STORES SELECTION MODAL -->
+    <div id="payware-stores-modal" onclick="if(event.target === this) closePaywareStoresModal()" class="hidden fixed inset-0 z-[200] items-center justify-center bg-slate-950/80 backdrop-blur-md transition-all duration-200">
+        <div class="glass-modal w-full max-w-md rounded-3xl p-6 shadow-2xl border border-slate-800 space-y-4">
+            <div class="flex items-start justify-between border-b border-slate-800/80 pb-3.5 gap-3">
+                <div class="flex items-center gap-3 min-w-0">
+                    <div class="w-8 h-8 rounded-lg bg-purple-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
+                        <i class="fa-solid fa-store"></i>
+                    </div>
+                    <div class="truncate min-w-0">
+                        <h2 class="text-base font-bold text-white leading-tight">Payware Stores</h2>
+                        <p id="payware-modal-subtitle" class="text-xs font-mono text-slate-400 mt-0.5 truncate max-w-[280px]">Results for "..."</p>
+                    </div>
+                </div>
+                <button onclick="closePaywareStoresModal()" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition-colors border-0 cursor-pointer shrink-0">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- Vertical Stores List -->
+            <div id="payware-stores-list" class="space-y-2 pt-1 max-h-[60vh] overflow-y-auto">
+                <!-- Dynamically populated by app.js -->
+            </div>
+        </div>
+    </div>
+
     <!-- SYSTEM NOTICE & NOTIFICATION MODAL -->
     <div id="custom-modal" class="hidden fixed inset-0 z-[200] items-center justify-center bg-slate-950/75 backdrop-blur-sm transition-all duration-300">
         <div class="glass-modal w-full max-w-md rounded-3xl p-6 shadow-2xl shadow-slate-950/90 border border-slate-800/90 bg-slate-900/95 space-y-5 transform transition-all scale-100">
