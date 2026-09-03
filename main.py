@@ -2007,6 +2007,35 @@ class Api:
             }
         }
 
+        def check_flightbeam(code):
+            prod_url = DEV_CATALOGS['Flightbeam'].get(code)
+            if not prod_url:
+                return False, f"https://shop.flightbeam.net/search?q={code}", None, ""
+            try:
+                req = urllib.request.Request(prod_url, headers={'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'fr-FR,fr;q=0.9'})
+                with urllib.request.urlopen(req, timeout=4) as resp:
+                    html = resp.read().decode('utf-8', errors='ignore')
+                    num_m = re.search(r'€\s*(\d+[\.,]\d{2})|(\d+[\.,]\d{2})\s*€', html)
+                    if num_m:
+                        val = num_m.group(1) or num_m.group(2)
+                        return True, prod_url, float(val.replace(',', '.')), "EUR"
+                    usd_m = re.search(r'\$\s*(\d+[\.,]\d{2})', html)
+                    if usd_m:
+                        return True, prod_url, float(usd_m.group(1).replace(',', '.')), "USD"
+            except Exception:
+                pass
+            try:
+                json_u = prod_url.split('?')[0] + '.json'
+                req = urllib.request.Request(json_u, headers={'User-Agent': 'Mozilla/5.0'})
+                with urllib.request.urlopen(req, timeout=4) as resp:
+                    d = json.loads(resp.read().decode('utf-8'))
+                    v = d.get('product', {}).get('variants', [{}])[0]
+                    if v.get('price'):
+                        return True, prod_url, float(v['price']), "USD"
+            except Exception:
+                pass
+            return True, prod_url, None, ""
+
         def check_francevfr(code):
             u = f"https://www.vfrnetwork.com/shop/fr/recherche?controller=search&s={code}"
             h = fetch_html(u)
@@ -2040,10 +2069,10 @@ class Api:
 
         stores_def = [
             ("France VFR", check_francevfr, "France VFR official scenery boutique & regional airports", "dev"),
-            ("Flightbeam Studios", lambda c: (c in DEV_CATALOGS['Flightbeam'], DEV_CATALOGS['Flightbeam'].get(c, f"https://shop.flightbeam.net/search?q={c}"), 19.99, "USD"), "Flightbeam official store & next-gen sceneries", "dev"),
+            ("Flightbeam Studios", check_flightbeam, "Flightbeam official store & next-gen sceneries", "dev"),
             ("FlyTampa", lambda c: (c in DEV_CATALOGS['FlyTampa'], DEV_CATALOGS['FlyTampa'].get(c, "https://www.flytampa.org/"), 21.99, "USD"), "FlyTampa official creator website & airports", "dev"),
             ("FSDreamTeam", lambda c: (c in DEV_CATALOGS['FSDreamTeam'], DEV_CATALOGS['FSDreamTeam'].get(c, "https://www.fsdreamteam.com/products_msfs.html"), 19.99, "USD"), "FSDreamTeam official studio & GSX creator", "dev"),
-            ("Jetstream Designs", lambda c: (c in DEV_CATALOGS['Jetstream Designs'], DEV_CATALOGS['Jetstream Designs'].get(c, "https://www.jetstream-designs.com/"), 21.99, "USD"), "Jetstream Designs official creator showcase", "dev"),
+            ("Jetstream Designs", lambda c: (c in DEV_CATALOGS['Jetstream Designs'], DEV_CATALOGS['Jetstream Designs'].get(c, "https://www.jetstream-designs.com/"), None, ""), "Jetstream Designs official creator showcase", "dev"),
             ("NZA Simulations", lambda c: (c in DEV_CATALOGS['NZA Simulations'], DEV_CATALOGS['NZA Simulations'].get(c, "https://nzasimulations.com/"), 24.99, "AUD"), "NZA Simulations official Australasia scenery store", "dev"),
             ("Pyreegue Dev Co.", lambda c: (c in DEV_CATALOGS['Pyreegue Dev Co.'], DEV_CATALOGS['Pyreegue Dev Co.'].get(c, "https://pyreegue.dev/"), 16.99, "GBP"), "Pyreegue Dev Co. official studio & airports", "dev"),
             ("Drzewiecki Design", lambda c: (c in DEV_CATALOGS['Drzewiecki Design'], DEV_CATALOGS['Drzewiecki Design'].get(c, "https://drzewiecki-design.net/products.htm"), 21.00, "EUR"), "Drzewiecki Design official airports catalog", "dev"),
