@@ -5291,7 +5291,7 @@ function openPaywareStoresModal(icao, airportName) {
 
     // Call Python backend to verify product existence on all stores concurrently
     if (window.pywebview && window.pywebview.api && window.pywebview.api.check_payware_stores) {
-        window.pywebview.api.check_payware_stores(cleanIcao).then(raw => {
+        window.pywebview.api.check_payware_stores(cleanIcao, airportName || '').then(raw => {
             const stores = typeof raw === 'string' ? JSON.parse(raw) : raw;
             renderPaywareStoresList(stores, cleanIcao);
         }).catch(err => {

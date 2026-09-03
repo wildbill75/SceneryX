@@ -1722,7 +1722,7 @@ class Api:
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
 
-    def check_payware_stores(self, icao):
+    def check_payware_stores(self, icao, airport_name=""):
         """Check availability of payware scenery for an ICAO code across major stores."""
         import urllib.request
         import urllib.parse
@@ -1734,11 +1734,13 @@ class Api:
             self._payware_store_cache = {}
 
         icao_clean = (icao or "").strip().upper()
+        name_clean = (airport_name or "").strip()
         if not icao_clean:
             return json.dumps([])
 
-        if icao_clean in self._payware_store_cache:
-            return json.dumps(self._payware_store_cache[icao_clean])
+        cache_key = f"{icao_clean}_{name_clean.lower()}"
+        if cache_key in self._payware_store_cache:
+            return json.dumps(self._payware_store_cache[cache_key])
 
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -1780,7 +1782,6 @@ class Api:
                     if re.search(r'(^|-)' + re.escape(code.lower()) + r'(-|$)', slug):
                         msfs_slugs.append(slug)
                 if msfs_slugs:
-                    # Prefer standard msfs slug or 2024
                     best = next((s for s in msfs_slugs if s.endswith('-msfs')), msfs_slugs[0])
                     return True, f"https://orbxdirect.com/product/{best}"
                 elif results:
@@ -1811,13 +1812,37 @@ class Api:
             return bool(pat.search(stripped)), u
 
         def check_aero(code):
-            u = f"https://www.aerosoft.com/en/search?search={code}"
-            h = fetch_html(u)
-            if not h or "No results were found" in h or "Keine Ergebnisse" in h:
-                return False, u
-            boxes = re.findall(r'class=[\'"][^\'"]*product--(?:box|title|info)[^\'"]*[\'"][\s\S]*?</div>', h)
-            has_match = any(re.search(r'\b' + re.escape(code) + r'\b', b, re.IGNORECASE) for b in boxes)
-            return has_match, u
+            default_url = f"https://www.aerosoft.com/en/search?sSearch={code}"
+            h = fetch_html(default_url)
+            if not h:
+                return False, default_url
+
+            matches = re.findall(r'<a\s+href=[\'"]([^\'"]*)[\'"]\s+class=[\'"][^\'"]*product--title[^\'"]*[\'"]\s+title=[\'"]([^\'"]*)[\'"]', h)
+            
+            clean_words = []
+            if name_clean:
+                words = re.split(r'[\s\-,/]+', name_clean)
+                for w in words:
+                    w_clean = re.sub(r'[^a-zA-Z]', '', w).strip()
+                    if len(w_clean) >= 4 and w_clean.lower() not in ['airport', 'international', 'regional', 'national', 'field']:
+                        clean_words.append(w_clean.lower())
+
+            for link, title in matches:
+                if any(g in title.lower() for g in ['free trial', 'emergencydispatcher', 'donation', 'linienstern', 'pushback pro', 'a330 neo', 'paderborn', 'skyelite']):
+                    continue
+                    
+                t_low = title.lower()
+                l_low = link.lower()
+                code_low = code.lower()
+                
+                if re.search(r'\b' + re.escape(code_low) + r'\b', t_low) or (code_low in l_low):
+                    return True, link
+                    
+                for cw in clean_words:
+                    if cw in t_low or cw in l_low:
+                        return True, link
+
+            return False, default_url
 
         def check_contrail(code):
             u = f"https://contrail.shop/search?q={code}"
@@ -1851,7 +1876,7 @@ class Api:
         order = ["simMarket", "Orbx Direct", "Flightsim.to Store", "iniBuilds Store", "Aerosoft Shop", "Contrail Web Shop"]
         results.sort(key=lambda x: order.index(x["name"]) if x["name"] in order else 99)
 
-        self._payware_store_cache[icao_clean] = results
+        self._payware_store_cache[cache_key] = results
         return json.dumps(results)
 
     def export_collection_json(self, airports_json_str):
