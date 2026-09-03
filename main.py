@@ -1765,9 +1765,19 @@ class Api:
             '1935', '1940', '1944', '1945', '1950', '1960', '1970', '1980',
             'retro', 'vintage', 'historical', 'historic', 'mesh', 'dem', 'traffic',
             'sound', 'pushback', 'ground service', 'gsx', 'livery', 'liveries',
-            'texture', 'textures', 'night lighting', 'trial', 'free trial',
-            'emergencydispatcher', 'donation', 'linienstern', 'skyelite'
+            'texture', 'textures', 'night lighting', 'night light', 'lighting',
+            'trial', 'free trial', 'emergencydispatcher', 'donation', 'linienstern',
+            'skyelite', 'landmark', 'landmarks', 'city pack', 'city scenery', 'bridges',
+            'photogrammetry', 'satellite', 'aerial', 'poi', 'points of interest',
+            'profile', 'profiles', 'approach plate', 'charts', 'guide', 'manual'
         ]
+
+        clean_words = []
+        if name_clean:
+            for w in re.split(r'[\s\-,/]+', name_clean):
+                w_clean = re.sub(r'[^a-zA-Z]', '', w).strip()
+                if len(w_clean) >= 4 and w_clean.lower() not in ['airport', 'international', 'regional', 'national', 'field', 'paris', 'london', 'berlin']:
+                    clean_words.append(w_clean.lower())
 
         def check_sm(code):
             u = f"https://secure.simmarket.com/advanced_search_result.php?keywords={code}"
@@ -1778,10 +1788,18 @@ class Api:
             for link, title, price_raw in cards:
                 t = re.sub(r'<[^>]+>', '', title).strip()
                 t_low = t.lower()
+                # 1. Blacklist check (landmarks, retro, sounds, etc.)
                 if any(b in t_low for b in BLACKLIST_KEYWORDS):
                     continue
-                if any(old in t_low for old in ['p3d', 'prepar3d', 'fsx', 'fs9', 'xp11', 'xp12', 'xp ']) and 'msfs' not in t_low:
+                # 2. Simulator check (exclude X-Plane, P3D, FSX if not MSFS)
+                if any(old in t_low for old in ['p3d', 'prepar3d', 'fsx', 'fs9', 'xp11', 'xp12', 'xp ', 'x-plane', 'xplane']) and 'msfs' not in t_low:
                     continue
+                # 3. Product title must explicitly match ICAO code or airport city name
+                has_code = bool(re.search(r'\b' + re.escape(code.lower()) + r'\b', t_low))
+                has_name = any(re.search(r'\b' + re.escape(cw) + r'\b', t_low) for cw in clean_words) if clean_words else False
+                if not (has_code or has_name):
+                    continue
+
                 p_clean = re.sub(r'<[^>]+>', '', price_raw).replace('&nbsp;', ' ').strip()
                 num_m = re.search(r'(\d+[\.,]\d{2})', p_clean)
                 price_val = float(num_m.group(1).replace(',', '.')) if num_m else None
@@ -1804,6 +1822,8 @@ class Api:
                     name = p.get('primary_text', '')
                     full_desc = (slug + ' ' + name).lower()
                     if any(b in full_desc for b in BLACKLIST_KEYWORDS):
+                        continue
+                    if any(old in full_desc for old in ['p3d', 'prepar3d', 'fsx', 'fs9', 'xp11', 'xp12', 'xp ', 'x-plane', 'xplane']) and 'msfs' not in full_desc:
                         continue
                     if re.search(r'(^|-)' + re.escape(code.lower()) + r'(-|$)', slug) or code.lower() in slug:
                         prod_url = f"https://orbxdirect.com/product/{slug}"
