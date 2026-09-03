@@ -352,7 +352,7 @@ function updateAirlinePillsUI(ap) {
         const span = btn.querySelector('span');
 
         if (isActive) {
-            btn.className = 'group relative min-h-[50px] rounded-xl overflow-hidden border-2 transition-all cursor-pointer flex items-center justify-center p-0 shadow-sm text-center border-cyan-400 bg-slate-950 shadow-[0_0_10px_rgba(56,189,248,0.35)] scale-[1.02]';
+            btn.className = 'group relative min-h-[50px] rounded-xl overflow-hidden border-2 transition-all cursor-pointer flex items-center justify-center p-0 text-center border-cyan-500 bg-slate-950 scale-[1.02]';
             if (img) {
                 img.className = 'w-full h-full object-cover object-center opacity-100 transition-all duration-200';
             }
@@ -1702,12 +1702,12 @@ function createCustomIcon(ap) {
     const isCircleShape = (cat === 'DEFAULT');
 
     const svgIcon = isCircleShape ? `
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="${hasActiveFix ? 'drop-shadow-[0_0_8px_rgba(16,185,129,0.9)]' : 'drop-shadow-md'}">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="">
             <circle cx="12" cy="12" r="7.5" fill="${color}" stroke="${strokeColor}" stroke-width="${strokeWidth}" />
             <circle cx="12" cy="12" r="2.5" fill="#ffffff" opacity="0.9" />
         </svg>
     ` : `
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="${hasActiveFix ? 'drop-shadow-[0_0_8px_rgba(16,185,129,0.9)]' : 'drop-shadow-md'}">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="">
             <path d="M12 2l2.9 6.26 6.9.83-5.2 4.7 1.4 6.84L12 17.1 5.9 20.63l1.4-6.84-5.2-4.7 6.9-.83L12 2z" 
                   fill="${color}" stroke="${strokeColor}" stroke-width="${strokeWidth}" stroke-linejoin="round"/>
         </svg>
@@ -2448,11 +2448,7 @@ function showAirportDetails(ap) {
 
     // Clean previous category color classes
     const categoryColorClasses = [
-        'text-purple-400', 'text-cyan-400', 'text-amber-400', 'text-blue-400',
-        'drop-shadow-[0_0_10px_rgba(192,132,252,0.3)]',
-        'drop-shadow-[0_0_10px_rgba(56,189,248,0.3)]',
-        'drop-shadow-[0_0_10px_rgba(245,158,11,0.3)]',
-        'drop-shadow-[0_0_10px_rgba(59,130,246,0.3)]'
+        'text-purple-400', 'text-cyan-400', 'text-amber-400', 'text-blue-400'
     ];
     if (icaoEl) icaoEl.classList.remove(...categoryColorClasses);
     if (vendorEl) vendorEl.classList.remove(...categoryColorClasses);
@@ -2460,27 +2456,27 @@ function showAirportDetails(ap) {
 
     if (cat === 'DEFAULT') {
         pricingBadge.innerText = t('badge.default_msfs', 'Default MSFS');
-        pricingBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30";
-        if (icaoEl) icaoEl.classList.add('text-blue-400', 'drop-shadow-[0_0_10px_rgba(59,130,246,0.3)]');
-        if (vendorEl) vendorEl.classList.add('text-blue-400', 'drop-shadow-[0_0_10px_rgba(59,130,246,0.3)]');
+        pricingBadge.className = "px-3 py-1 rounded-full text-xs font-mono font-bold bg-blue-600 text-white";
+        if (icaoEl) icaoEl.classList.add('text-blue-400');
+        if (vendorEl) vendorEl.classList.add('text-blue-400');
         if (typeBadge) typeBadge.classList.add('text-blue-400');
     } else if (cat === 'ASOBO') {
         pricingBadge.innerText = hasActiveFix ? t('badge.asobo_fix', 'Asobo + Fix') : t('badge.asobo', 'Asobo');
-        pricingBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-amber-500/20 text-amber-400 border border-amber-500/30";
-        if (icaoEl) icaoEl.classList.add('text-amber-400', 'drop-shadow-[0_0_10px_rgba(245,158,11,0.3)]');
-        if (vendorEl) vendorEl.classList.add('text-amber-400', 'drop-shadow-[0_0_10px_rgba(245,158,11,0.3)]');
+        pricingBadge.className = "px-3 py-1 rounded-full text-xs font-mono font-bold bg-amber-500 text-slate-950 font-black";
+        if (icaoEl) icaoEl.classList.add('text-amber-400');
+        if (vendorEl) vendorEl.classList.add('text-amber-400');
         if (typeBadge) typeBadge.classList.add('text-amber-400');
     } else if (cat === 'PAYWARE') {
         pricingBadge.innerText = t('badge.payware_addon', 'Payware Addon');
-        pricingBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30";
-        if (icaoEl) icaoEl.classList.add('text-purple-400', 'drop-shadow-[0_0_10px_rgba(192,132,252,0.3)]');
-        if (vendorEl) vendorEl.classList.add('text-purple-400', 'drop-shadow-[0_0_10px_rgba(192,132,252,0.3)]');
+        pricingBadge.className = "px-3 py-1 rounded-full text-xs font-mono font-bold bg-purple-600 text-white";
+        if (icaoEl) icaoEl.classList.add('text-purple-400');
+        if (vendorEl) vendorEl.classList.add('text-purple-400');
         if (typeBadge) typeBadge.classList.add('text-purple-400');
     } else {
         pricingBadge.innerText = t('badge.freeware', 'Freeware');
-        pricingBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-cyan-500/20 text-cyan-400 border border-cyan-500/30";
-        if (icaoEl) icaoEl.classList.add('text-cyan-400', 'drop-shadow-[0_0_10px_rgba(56,189,248,0.3)]');
-        if (vendorEl) vendorEl.classList.add('text-cyan-400', 'drop-shadow-[0_0_10px_rgba(56,189,248,0.3)]');
+        pricingBadge.className = "px-3 py-1 rounded-full text-xs font-mono font-bold bg-cyan-600 text-white";
+        if (icaoEl) icaoEl.classList.add('text-cyan-400');
+        if (vendorEl) vendorEl.classList.add('text-cyan-400');
         if (typeBadge) typeBadge.classList.add('text-cyan-400');
     }
 
@@ -2496,16 +2492,16 @@ function showAirportDetails(ap) {
 
     if (actBadge) {
         if (isFallbackDefault) {
-            actBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-blue-500/20 text-blue-300 border border-blue-500/40";
+            actBadge.className = "px-3 py-1 rounded-full text-xs font-mono font-bold bg-blue-600 text-white";
             actBadge.innerText = t('badge.default_msfs_airport', 'Default MSFS Airport');
         } else if (cat === 'ASOBO') {
-            actBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40";
+            actBadge.className = "px-3 py-1 rounded-full text-xs font-mono font-bold bg-amber-500 text-slate-950 font-black";
             actBadge.innerText = ap.world_update_name || t('badge.asobo_update', 'Asobo Sim Update');
         } else if (cat === 'PAYWARE') {
-            actBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/40";
+            actBadge.className = "px-3 py-1 rounded-full text-xs font-mono font-bold bg-purple-600 text-white";
             actBadge.innerText = t('badge.payware_addon', 'Payware Addon');
         } else {
-            actBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40";
+            actBadge.className = "px-3 py-1 rounded-full text-xs font-mono font-bold bg-cyan-600 text-white";
             actBadge.innerText = t('badge.freeware_addon', 'Freeware Addon');
         }
     }
@@ -2526,13 +2522,13 @@ function showAirportDetails(ap) {
             const isCurrentPayware = (cat === 'PAYWARE');
             if (btnPayware) {
                 btnPayware.className = isCurrentPayware
-                    ? "px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all bg-purple-500/20 text-purple-300 border border-purple-500/40 shadow-sm cursor-pointer"
-                    : "px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all text-slate-500 hover:text-slate-300 cursor-pointer";
+                    ? "px-3 py-1 rounded-lg text-xs font-bold transition-colors bg-purple-600 text-white cursor-pointer"
+                    : "px-3 py-1 rounded-lg text-xs font-medium transition-colors bg-slate-800 text-slate-400 hover:text-white cursor-pointer";
             }
             if (btnFreeware) {
                 btnFreeware.className = !isCurrentPayware
-                    ? "px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm cursor-pointer"
-                    : "px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all text-slate-500 hover:text-slate-300 cursor-pointer";
+                    ? "px-3 py-1 rounded-lg text-xs font-bold transition-colors bg-cyan-600 text-white cursor-pointer"
+                    : "px-3 py-1 rounded-lg text-xs font-medium transition-colors bg-slate-800 text-slate-400 hover:text-white cursor-pointer";
             }
         }
     }
@@ -2581,7 +2577,7 @@ function showAirportDetails(ap) {
 
     if (gsxBadge && gsxContainer) {
         if (ap.has_gsx_profile) {
-            gsxBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30";
+            gsxBadge.className = "px-3 py-1 rounded-full text-xs font-mono font-bold bg-emerald-600 text-white";
             gsxBadge.innerText = t('drawer.gsx_installed', 'Profile Installed');
             const safeGsxPath = encodeURIComponent(ap.gsx_profile_path || '');
             gsxContainer.innerHTML = `
@@ -2602,7 +2598,7 @@ function showAirportDetails(ap) {
                 </div>
             `;
         } else {
-            gsxBadge.className = "px-2.5 py-1 rounded-full text-xs font-mono font-bold bg-slate-800 text-slate-400 border border-slate-700";
+            gsxBadge.className = "px-3 py-1 rounded-full text-xs font-mono font-bold bg-slate-800 text-slate-400";
             gsxBadge.innerText = t('drawer.gsx_none', 'No Profile');
             gsxContainer.innerHTML = `
                 <div class="space-y-2.5">
@@ -2642,7 +2638,7 @@ function showAirportDetails(ap) {
             airlinesListEl.innerHTML = airlines.map(al => {
                 const isActive = selectedAirlines.has(al) && (activeRouteOrigin && activeRouteOrigin.icao === ap.icao);
                 const activeBtnClass = isActive 
-                    ? 'border-2 border-cyan-400 bg-slate-950 shadow-[0_0_10px_rgba(56,189,248,0.35)] scale-[1.02]' 
+                    ? 'border-2 border-cyan-500 bg-slate-950 scale-[1.02]' 
                     : 'border border-slate-800/90 bg-slate-950/90 hover:border-cyan-400/70 shadow-sm';
                 const activeImgClass = isActive
                     ? 'opacity-100'
@@ -2728,7 +2724,7 @@ function showAirportDetails(ap) {
                         <i class="fa-solid fa-circle-dot text-blue-400 text-sm"></i>
                         <span class="text-xs font-bold text-blue-200">${t('drawer.default_airport', 'Default MSFS Base Airport')}</span>
                     </div>
-                    <span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40">${t('drawer.active_badge', 'Active')}</span>
+                    <span class="text-[10px] font-mono font-bold px-2.5 py-1 rounded-full bg-blue-600 text-white">${t('drawer.active_badge', 'Active')}</span>
                 </div>
                 <p class="text-[11px] text-slate-400 pl-6">${t('drawer.default_procedural', 'Built-in Procedural MSFS Base Scenery')}</p>
             </div>
@@ -2763,16 +2759,16 @@ function showAirportDetails(ap) {
         if (isActive) {
             let activeBorderClass = 'border-cyan-500/80 bg-cyan-500/10 shadow-cyan-500/10';
             let activeIconColor = 'text-cyan-400';
-            let activeBadgeClass = 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40';
+            let activeBadgeClass = 'bg-cyan-600 text-white';
 
             if (isAsoboPkg) {
                 activeBorderClass = 'border-amber-500/80 bg-amber-500/10 shadow-amber-500/10';
                 activeIconColor = 'text-amber-400';
-                activeBadgeClass = 'bg-amber-500/20 text-amber-300 border border-amber-500/40';
+                activeBadgeClass = 'bg-amber-500 text-slate-950 font-black';
             } else if (src.pricing_type === 'Payware') {
                 activeBorderClass = 'border-purple-500/80 bg-purple-500/10 shadow-purple-500/10';
                 activeIconColor = 'text-purple-400';
-                activeBadgeClass = 'bg-purple-500/20 text-purple-300 border border-purple-500/40';
+                activeBadgeClass = 'bg-purple-600 text-white';
             }
 
             html += `
@@ -2849,9 +2845,9 @@ function showAirportDetails(ap) {
                             <div class="flex items-center gap-2 min-w-0 flex-1">
                                 <i class="fa-solid fa-circle-dot text-emerald-400 text-sm shrink-0"></i>
                                 <span class="text-xs font-bold text-white truncate min-w-0">${src.folder_name}</span>
-                                <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shrink-0 whitespace-nowrap">Fix / Overlay</span>
+                                <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-600 text-white font-bold shrink-0 whitespace-nowrap">Fix / Overlay</span>
                             </div>
-                            <span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 shrink-0 whitespace-nowrap">${t('drawer.active_fix', 'Active Fix')}</span>
+                            <span class="text-[10px] font-mono font-bold px-2.5 py-1 rounded-full bg-emerald-600 text-white font-bold shrink-0 whitespace-nowrap">${t('drawer.active_fix', 'Active Fix')}</span>
                         </div>
 
                         <div class="text-[11px] font-mono text-slate-300 bg-slate-950/70 border border-slate-800 p-2 rounded-lg break-all">
@@ -2873,7 +2869,7 @@ function showAirportDetails(ap) {
                             <div class="flex items-center gap-2 min-w-0 flex-1">
                                 <i class="fa-regular fa-circle text-slate-500 text-sm transition-colors shrink-0"></i>
                                 <span class="text-xs font-bold text-slate-300 group-hover:text-white truncate transition-colors min-w-0">${src.folder_name}</span>
-                                <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 shrink-0 whitespace-nowrap">Fix / Overlay</span>
+                                <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-bold shrink-0 whitespace-nowrap">Fix / Overlay</span>
                             </div>
                             <span class="text-[10px] font-mono text-slate-500 group-hover:text-slate-300 shrink-0 whitespace-nowrap">${t('drawer.click_enable_fix', 'Click to Enable Fix')}</span>
                         </div>
@@ -3933,33 +3929,23 @@ function toggleTypeFilter(type) {
 function setPillHighlight(el, isActive, colorType) {
     if (!el) return;
 
-    // Fully strip both active and default colored backgrounds, borders, and shadows
-    el.classList.remove(
-        'border-2', 'border', 'border-sky-400', 'border-purple-400', 'border-cyan-400', 'border-amber-400', 'border-blue-400', 'border-slate-800',
-        'border-sky-500/40', 'border-purple-500/40', 'border-cyan-500/40', 'border-amber-500/40', 'border-blue-500/40',
-        'bg-sky-500/15', 'bg-purple-500/15', 'bg-cyan-500/15', 'bg-amber-500/15', 'bg-blue-500/15',
-        'bg-sky-500/30', 'bg-purple-500/30', 'bg-cyan-500/30', 'bg-amber-500/30', 'bg-blue-500/30', 'bg-slate-900/60',
-        'shadow-[0_0_15px_rgba(56,189,248,0.4)]', 'shadow-[0_0_15px_rgba(168,85,247,0.4)]',
-        'shadow-[0_0_15px_rgba(6,182,212,0.4)]', 'shadow-[0_0_15px_rgba(245,158,11,0.4)]', 'shadow-[0_0_15px_rgba(59,130,246,0.4)]',
-        'shadow-sky-950/20', 'shadow-purple-950/20', 'shadow-cyan-950/20', 'shadow-amber-950/20', 'shadow-blue-950/20',
-        'scale-105', 'opacity-60', 'opacity-100'
-    );
+    // Reset base classes for clean flat aplat style
+    el.className = "flex items-center gap-1.5 px-3.5 py-1.5 rounded-full shrink-0 cursor-pointer transition-all";
 
     if (isActive) {
-        el.classList.add('opacity-100', 'scale-105');
         if (colorType === 'sky') {
-            el.classList.add('border-2', 'border-sky-400', 'bg-sky-500/30', 'shadow-[0_0_15px_rgba(56,189,248,0.4)]');
+            el.classList.add('bg-sky-600', 'text-white');
         } else if (colorType === 'purple') {
-            el.classList.add('border-2', 'border-purple-400', 'bg-purple-500/30', 'shadow-[0_0_15px_rgba(168,85,247,0.4)]');
+            el.classList.add('bg-purple-600', 'text-white');
         } else if (colorType === 'cyan') {
-            el.classList.add('border-2', 'border-cyan-400', 'bg-cyan-500/30', 'shadow-[0_0_15px_rgba(6,182,212,0.4)]');
+            el.classList.add('bg-cyan-600', 'text-white');
         } else if (colorType === 'amber') {
-            el.classList.add('border-2', 'border-amber-400', 'bg-amber-500/30', 'shadow-[0_0_15px_rgba(245,158,11,0.4)]');
+            el.classList.add('bg-amber-500', 'text-slate-950', 'font-black');
         } else if (colorType === 'blue') {
-            el.classList.add('border-2', 'border-blue-400', 'bg-blue-500/30', 'shadow-[0_0_15px_rgba(59,130,246,0.4)]');
+            el.classList.add('bg-blue-600', 'text-white');
         }
     } else {
-        el.classList.add('border', 'border-slate-800', 'bg-slate-900/60', 'opacity-60');
+        el.classList.add('bg-slate-800', 'text-slate-300');
     }
 }
 
@@ -4060,9 +4046,9 @@ function updateGsxFilterUI() {
 function setButtonActive(btn, active) {
     if (!btn) return;
     if (active) {
-        btn.className = "py-2 px-3 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center gap-1.5 shadow-sm shadow-cyan-500/10";
+        btn.className = "py-2 px-3 rounded-xl text-xs font-bold bg-cyan-600 text-white transition-colors text-center flex items-center justify-center gap-1.5";
     } else {
-        btn.className = "py-2 px-3 rounded-xl border text-xs font-medium bg-slate-900/60 text-slate-400 border-slate-800/80 opacity-60 hover:opacity-100 transition-all text-center flex items-center justify-center gap-1.5";
+        btn.className = "py-2 px-3 rounded-xl text-xs font-medium bg-slate-800 text-slate-400 hover:text-white transition-colors text-center flex items-center justify-center gap-1.5";
     }
 }
 

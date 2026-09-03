@@ -5,7 +5,7 @@ a = Analysis(
     ['D:\\SceneryX\\main.py'],
     pathex=[],
     binaries=[],
-    datas=[('D:\\SceneryX\\airports.json', '.'), ('D:\\SceneryX\\airport_airlines.json', '.'), ('D:\\SceneryX\\airport_routes.json', '.'), ('D:\\SceneryX\\installed_airports.json', '.'), ('D:\\SceneryX\\web', 'web')],
+    datas=[('D:\\SceneryX\\airports.json', '.'), ('D:\\SceneryX\\airport_airlines.json', '.'), ('D:\\SceneryX\\airport_routes.json', '.'), ('D:\\SceneryX\\installed_airports.json', '.'), ('D:\\SceneryX\\icon.ico', '.'), ('D:\\SceneryX\\web', 'web')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
