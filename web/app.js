@@ -4398,11 +4398,19 @@ async function openSettingsModal() {
     }
 
     renderSettingsPathsList();
-    document.getElementById('settings-modal').classList.remove('hidden');
+    const modal = document.getElementById('settings-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
 }
 
 function closeSettingsModal() {
-    document.getElementById('settings-modal').classList.add('hidden');
+    const modal = document.getElementById('settings-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
 }
 
 function renderSettingsPathsList() {

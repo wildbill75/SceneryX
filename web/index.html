@@ -796,21 +796,23 @@
     </div>
 
     <!-- SETTINGS MODAL -->
-    <div id="settings-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md">
-        <div class="glass-modal w-full max-w-2xl rounded-3xl p-6 shadow-2xl border border-slate-800 space-y-6">
-            <div class="flex items-center justify-between border-b border-slate-800/80 pb-4">
+    <div id="settings-modal" onclick="if(event.target === this) closeSettingsModal()" class="hidden fixed inset-0 z-50 items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 sm:p-6 transition-all duration-200">
+        <div class="glass-modal w-full max-w-2xl max-h-[88vh] flex flex-col rounded-3xl shadow-2xl border border-slate-800 bg-slate-900/95 overflow-hidden">
+            <!-- Pinned Header -->
+            <div class="flex items-center justify-between border-b border-slate-800/80 px-6 py-4 shrink-0 bg-slate-900/90">
                 <div class="flex items-center gap-3">
-                    <div class="w-8 h-8 rounded-lg bg-cyan-600 text-white flex items-center justify-center font-bold">
+                    <div class="w-8 h-8 rounded-xl bg-cyan-600 text-white flex items-center justify-center font-bold text-sm shadow-inner">
                         <i class="fa-solid fa-gear"></i>
                     </div>
                     <h2 data-i18n="settings.title" class="text-base font-bold text-white">Settings</h2>
                 </div>
-                <button onclick="closeSettingsModal()" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-xs transition-all">
+                <button onclick="closeSettingsModal()" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-xs transition-all cursor-pointer border-0">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
 
-            <div class="space-y-4">
+            <!-- Scrollable Content Body -->
+            <div class="space-y-4 p-6 overflow-y-auto flex-1">
                 <div class="flex items-center justify-between">
                     <label data-i18n="settings.auto_scan" class="text-xs font-semibold text-slate-300">Auto Scan on Startup</label>
                     <input type="checkbox" id="cfg-auto-scan" class="w-4 h-4 accent-cyan-500 rounded">
@@ -938,8 +940,9 @@
                 </div>
             </div>
 
-            <div class="flex items-center justify-between border-t border-slate-800/80 pt-4">
-                <button data-i18n="settings.reset_db" onclick="resetFullDatabase()" title="Reset All Sceneries & Restore Database" class="px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition-colors cursor-pointer border-0">
+            <!-- Pinned Footer -->
+            <div class="flex items-center justify-between border-t border-slate-800/80 px-6 py-4 shrink-0 bg-slate-950/60">
+                <button data-i18n="settings.reset_db" onclick="resetFullDatabase()" title="Reset All Sceneries & Restore Database" class="px-4 py-2.5 rounded-xl bg-red-600/90 hover:bg-red-500 text-white text-xs font-bold transition-colors cursor-pointer border-0">
                     Reset Database
                 </button>
 
@@ -947,7 +950,7 @@
                     <button data-i18n="settings.cancel" onclick="closeSettingsModal()" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition-colors border-0 cursor-pointer">
                         Cancel
                     </button>
-                    <button onclick="saveSettings()" class="px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition-colors flex items-center gap-2 cursor-pointer border-0">
+                    <button onclick="saveSettings()" class="px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition-colors flex items-center gap-2 cursor-pointer border-0 shadow-md shadow-cyan-600/25">
                         <span data-i18n="settings.save">Save</span>
                     </button>
                 </div>
