@@ -29,9 +29,9 @@ let currentSettings = { auto_scan_on_startup: true, scan_paths: [] };
 let lastFocusedIcao = null;
 
 // Currency & Investment Engine
-let selectedCurrency = 'EUR';
-const CURRENCY_SYMBOLS = { EUR: '€', USD: '$', GBP: '£' };
-const CURRENCY_RATES = { EUR: 1.0, USD: 1.09, GBP: 0.85 };
+let selectedCurrency = 'USD';
+const CURRENCY_SYMBOLS = { EUR: '€', USD: '$', GBP: '£', AUD: 'A$' };
+const CURRENCY_RATES = { EUR: 1.0, USD: 1.09, GBP: 0.85, AUD: 1.65 };
 
 // Conflict Navigation Engine
 let currentConflictIndex = 0;
@@ -657,7 +657,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initDrawerAccordions();
     renderStarRatingWidget(0);
     renderFilterStarWidget(0);
-    startCurrencyCarousel();
     ensureAppLoaded();
 });
 
@@ -1347,6 +1346,11 @@ async function loadAirportsData() {
                     if (currentSettings.language && typeof setAppLanguage === 'function') {
                         setAppLanguage(currentSettings.language);
                     }
+                    if (currentSettings.currency) {
+                        setCurrency(currentSettings.currency);
+                    } else {
+                        setCurrency('USD');
+                    }
                     loadSimBriefSettingsUI();
                     const st = currentSettings.settings || currentSettings;
                     if (st && st.flight_mode) {
@@ -1468,29 +1472,28 @@ async function openSupportLink() {
 
 function formatCurrency(amountEur) {
     const rate = CURRENCY_RATES[selectedCurrency] || 1.0;
-    const symbol = CURRENCY_SYMBOLS[selectedCurrency] || '€';
+    const symbol = CURRENCY_SYMBOLS[selectedCurrency] || '$';
     const val = (amountEur || 0) * rate;
     return `${symbol}${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function setCurrency(curr) {
+    if (!curr || !CURRENCY_SYMBOLS[curr]) return;
     selectedCurrency = curr;
-    ['EUR', 'USD', 'GBP'].forEach(c => {
-        const btn = document.getElementById(`curr-btn-${c}`);
-        if (btn) {
-            if (c === curr) {
-                btn.className = "font-bold text-emerald-400";
-            } else {
-                btn.className = "text-slate-500 hover:text-slate-300";
-            }
-        }
-    });
+    if (currentSettings) {
+        currentSettings.currency = curr;
+    }
+    updateInvestmentBanner();
     updateStats(allAirportsData);
     if (activeDrawerMode === 'AIRPORT' && selectedAirport) {
         showAirportDetails(selectedAirport);
     } else if (activeDrawerMode === 'COUNTRY' && selectedCountryCode) {
         openCountryDrawer(selectedCountryCode);
     }
+}
+
+function previewAppCurrency(curr) {
+    setCurrency(curr);
 }
 
 function updateConflictNavigator() {
@@ -1531,38 +1534,14 @@ function navigateConflict(direction) {
     focusAirportWithAnimation(targetAp);
 }
 
-let currencyList = ['EUR', 'USD', 'GBP'];
-let currencyIndex = 0;
+// Currency carousel has been abandoned in favor of user-selected currency setting
 let currencyInterval = null;
-let isCurrencyCarouselPaused = false;
-
 function startCurrencyCarousel() {
     if (currencyInterval) clearInterval(currencyInterval);
-    currencyInterval = setInterval(() => {
-        if (isCurrencyCarouselPaused) return;
-        currencyIndex = (currencyIndex + 1) % currencyList.length;
-        selectedCurrency = currencyList[currencyIndex];
-        updateInvestmentBanner();
-        if (activeDrawerMode === 'AIRPORT' && selectedAirport) {
-            showAirportDetails(selectedAirport);
-        } else if (activeDrawerMode === 'COUNTRY' && selectedCountryCode) {
-            openCountryDrawer(selectedCountryCode);
-        }
-    }, 10000); // 10 seconds per currency
+    currencyInterval = null;
 }
-
-function pauseCurrencyCarousel() {
-    isCurrencyCarouselPaused = true;
-}
-
-function resumeCurrencyCarousel() {
-    setTimeout(() => {
-        const inputEl = document.getElementById('drawer-price-input');
-        if (document.activeElement !== inputEl) {
-            isCurrencyCarouselPaused = false;
-        }
-    }, 1500);
-}
+function pauseCurrencyCarousel() {}
+function resumeCurrencyCarousel() {}
 
 function updateInvestmentBanner() {
     let totalSpentEur = 0;
@@ -4413,6 +4392,11 @@ async function openSettingsModal() {
         langSelect.value = currentSettings.language || (typeof currentLang !== 'undefined' ? currentLang : 'en');
     }
 
+    const currSelect = document.getElementById('cfg-app-currency');
+    if (currSelect) {
+        currSelect.value = currentSettings.currency || selectedCurrency || 'USD';
+    }
+
     renderSettingsPathsList();
     document.getElementById('settings-modal').classList.remove('hidden');
 }
@@ -4536,6 +4520,12 @@ async function saveSettings() {
         if (typeof setAppLanguage === 'function') {
             setAppLanguage(langSelect.value);
         }
+    }
+
+    const currSelect = document.getElementById('cfg-app-currency');
+    if (currSelect) {
+        currentSettings.currency = currSelect.value;
+        setCurrency(currSelect.value);
     }
 
     applyStartupCameraSettings();

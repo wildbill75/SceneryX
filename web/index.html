@@ -646,9 +646,8 @@
                             <div id="accordion-content-price" class="px-4 pb-4 pt-1 space-y-3 border-t border-slate-800/50">
                                 <div class="flex items-center gap-2 pt-1">
                                     <div class="relative flex-1">
-                                        <span id="drawer-price-curr-symbol" class="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-mono font-extrabold text-white">€</span>
+                                        <span id="drawer-price-curr-symbol" class="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-mono font-extrabold text-white">$</span>
                                         <input type="number" step="any" id="drawer-price-input" data-i18n-placeholder="drawer.price_placeholder" placeholder="Price Paid (e.g. 14.50)" 
-                                               onfocus="pauseCurrencyCarousel()" onblur="resumeCurrencyCarousel()"
                                                class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-3 py-2 text-sm font-mono font-bold text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500">
                                     </div>
                                     <button onclick="saveCustomPriceForSelected()" data-i18n="drawer.save_price" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-colors cursor-pointer" title="Save Price">
@@ -918,6 +917,22 @@
                             <option value="fr">Français</option>
                             <option value="de">Deutsch</option>
                             <option value="es">Español</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- APPLICATION CURRENCY SETTINGS -->
+                <div class="pt-4 border-t border-slate-800/80 space-y-3">
+                    <label data-i18n="settings.currency_section" class="text-xs font-bold text-slate-400 uppercase tracking-wider block">Currency</label>
+                    <div class="space-y-1.5">
+                        <div class="flex items-center justify-between">
+                            <label data-i18n="settings.currency_label" class="text-xs font-semibold text-slate-300">Display Currency</label>
+                        </div>
+                        <select id="cfg-app-currency" onchange="previewAppCurrency(this.value)" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 cursor-pointer">
+                            <option value="USD">USD ($ - US Dollar)</option>
+                            <option value="EUR">EUR (€ - Euro)</option>
+                            <option value="GBP">GBP (£ - British Pound)</option>
+                            <option value="AUD">AUD (A$ - Australian Dollar)</option>
                         </select>
                     </div>
                 </div>
