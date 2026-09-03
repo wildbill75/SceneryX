@@ -123,36 +123,13 @@
         <div class="flex flex-col items-center space-y-6 text-center max-w-sm px-6">
             
             <!-- Glowing Branding Logo -->
-            <div class="relative group">
-                <div class="absolute -inset-3 bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500 rounded-3xl blur-xl opacity-50 animate-pulse"></div>
-                <div class="relative w-24 h-24 rounded-2xl bg-slate-900 border border-slate-700/80 flex items-center justify-center p-4 shadow-2xl">
-                    <svg viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-full h-full">
-                        <defs>
-                            <linearGradient id="splash-grad1" x1="0%" y1="0%" x2="100%" y2="100%">
-                                <stop offset="0%" stop-color="#06b6d4" />
-                                <stop offset="100%" stop-color="#3b82f6" />
-                            </linearGradient>
-                            <linearGradient id="splash-grad2" x1="100%" y1="0%" x2="0%" y2="100%">
-                                <stop offset="0%" stop-color="#a855f7" />
-                                <stop offset="100%" stop-color="#06b6d4" />
-                            </linearGradient>
-                        </defs>
-                        <circle cx="50" cy="50" r="40" stroke="#1e293b" stroke-width="2" stroke-dasharray="4 4" />
-                        <circle cx="50" cy="50" r="26" stroke="#334155" stroke-width="1.5" />
-                        <path d="M 20 20 L 80 80" stroke="url(#splash-grad1)" stroke-width="12" stroke-linecap="round" />
-                        <path d="M 20 20 L 80 80" stroke="#ffffff" stroke-width="2" stroke-dasharray="5 4" opacity="0.85" />
-                        <path d="M 80 20 L 20 80" stroke="url(#splash-grad2)" stroke-width="12" stroke-linecap="round" />
-                        <path d="M 80 20 L 20 80" stroke="#ffffff" stroke-width="2" stroke-dasharray="5 4" opacity="0.85" />
-                        <circle cx="50" cy="50" r="6" fill="#38bdf8" />
-                    </svg>
-                </div>
+            <div class="relative group flex items-center justify-center mb-1">
+                <div class="absolute -inset-4 bg-gradient-to-r from-purple-600/30 via-fuchsia-500/25 to-purple-600/30 rounded-3xl blur-2xl opacity-60 animate-pulse"></div>
+                <img src="splash_logo.png" alt="SceneryX" class="relative w-44 h-auto max-w-[210px] object-contain select-none drop-shadow-[0_12px_28px_rgba(168,85,247,0.35)]" />
             </div>
 
-            <!-- App Title & Subtitle -->
-            <div class="space-y-1.5">
-                <h1 class="text-3xl font-extrabold tracking-wider text-white flex items-center justify-center gap-1.5">
-                    <span>SCENERY</span><span class="text-cyan-400">X</span>
-                </h1>
+            <!-- App Subtitle -->
+            <div class="space-y-1">
                 <p id="splash-status-text" class="text-xs text-slate-400 font-medium">Scanning MSFS 2024 Sceneries & GSX Profiles...</p>
             </div>
 
