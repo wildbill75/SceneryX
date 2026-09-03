@@ -349,23 +349,24 @@ function updateAirlinePillsUI(ap) {
 
         const isActive = selectedAirlines.has(alName) && (activeRouteOrigin && activeRouteOrigin.icao === ap.icao);
         const img = btn.querySelector('img');
-        const span = btn.querySelector('span');
+        const indicator = btn.querySelector('.airline-selected-dot');
 
-        if (isActive) {
-            btn.className = 'group relative min-h-[50px] rounded-xl overflow-hidden border-2 transition-all cursor-pointer flex items-center justify-center p-0 text-center border-cyan-500 bg-slate-950 scale-[1.02]';
-            if (img) {
-                img.className = 'w-full h-full object-cover object-center opacity-100 transition-all duration-200';
+        if (img) {
+            // Card with logo: keep clean white background, toggle discrete cyan border and indicator dot
+            if (isActive) {
+                btn.className = 'group relative min-h-[50px] rounded-xl overflow-hidden transition-colors cursor-pointer flex items-center justify-center p-1.5 text-center bg-white border-2 border-cyan-400';
+                if (indicator) indicator.classList.remove('hidden');
+            } else {
+                btn.className = 'group relative min-h-[50px] rounded-xl overflow-hidden transition-colors cursor-pointer flex items-center justify-center p-1.5 text-center bg-white border-2 border-transparent hover:border-cyan-400';
+                if (indicator) indicator.classList.add('hidden');
             }
-            if (span) {
-                span.classList.add('hidden');
-            }
+            img.className = 'w-full h-full object-contain object-center';
         } else {
-            btn.className = 'group relative min-h-[50px] rounded-xl overflow-hidden border transition-all cursor-pointer flex items-center justify-center p-1 shadow-sm text-center border-slate-800/90 bg-slate-950/90 hover:border-cyan-400/70';
-            if (img) {
-                img.className = 'w-full h-full object-cover object-center opacity-30 group-hover:opacity-100 transition-all duration-200';
-            }
-            if (span) {
-                span.classList.remove('hidden');
+            // Text-only fallback for airlines without logo
+            if (isActive) {
+                btn.className = 'group relative min-h-[50px] rounded-xl overflow-hidden transition-colors cursor-pointer flex items-center justify-center p-1.5 text-center bg-cyan-600 text-white font-bold border-2 border-cyan-400';
+            } else {
+                btn.className = 'group relative min-h-[50px] rounded-xl overflow-hidden transition-colors cursor-pointer flex items-center justify-center p-1.5 text-center bg-slate-800 text-slate-300 font-medium border-2 border-transparent hover:border-cyan-400';
             }
         }
     });
@@ -2645,21 +2646,35 @@ function showAirportDetails(ap) {
                 const dests = getFlightCount(al);
                 const tooltipText = dests > 0 ? `Show ${dests} direct flight connections from ${ap.icao} on ${al}` : `Filter map by ${al}`;
 
-                const activeBtnClass = isActive 
-                    ? 'border-2 border-cyan-500 bg-white scale-[1.02]' 
-                    : (logoUrl ? 'border-0 bg-white hover:brightness-95' : 'border-0 bg-slate-800 text-slate-300 font-medium');
+                if (logoUrl) {
+                    const btnClass = isActive 
+                        ? 'bg-white border-2 border-cyan-400' 
+                        : 'bg-white border-2 border-transparent hover:border-cyan-400';
 
-                return `<button data-airline="${safeAttrAl}" onclick="filterByAirline('${safeAl}', this)" 
-                                class="group relative min-h-[50px] rounded-xl overflow-hidden transition-all cursor-pointer flex items-center justify-center p-1.5 text-center ${activeBtnClass}" 
-                                title="${tooltipText}">
-                            ${logoUrl ? `
-                            <div class="absolute inset-0 flex items-center justify-center pointer-events-none p-1.5 overflow-hidden rounded-xl">
-                                <img src="${logoUrl}" class="w-full h-full object-contain object-center transition-all duration-200" alt="${safeAttrAl}" onerror="if(this.src!=='${fallbackLogoUrl}'){this.src='${fallbackLogoUrl}'}else{this.style.display='none'}" />
-                            </div>` : ''}
-                            <span class="relative z-10 text-[12px] sm:text-[13px] font-bold leading-tight text-center line-clamp-2 px-1 break-words ${logoUrl ? 'text-slate-800 hidden group-hover:block' : 'text-slate-200'}">
-                                ${al}
-                            </span>
-                        </button>`;
+                    return `<button data-airline="${safeAttrAl}" onclick="filterByAirline('${safeAl}', this)" 
+                                    class="group relative min-h-[50px] rounded-xl overflow-hidden transition-colors cursor-pointer flex items-center justify-center p-1.5 text-center ${btnClass}" 
+                                    title="${tooltipText}">
+                                <div class="absolute inset-0 flex items-center justify-center pointer-events-none p-1.5 overflow-hidden rounded-xl">
+                                    <img src="${logoUrl}" class="w-full h-full object-contain object-center" alt="${safeAttrAl}" onerror="if(this.src!=='${fallbackLogoUrl}'){this.src='${fallbackLogoUrl}'}else{this.style.display='none'; if(this.parentElement.nextElementSibling) this.parentElement.nextElementSibling.classList.remove('hidden');}" />
+                                </div>
+                                <div class="airline-selected-dot absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-cyan-400 ${isActive ? '' : 'hidden'} pointer-events-none"></div>
+                                <span class="relative z-10 text-[12px] sm:text-[13px] font-bold leading-tight text-center line-clamp-2 px-1 break-words text-slate-800 hidden">
+                                    ${al}
+                                </span>
+                            </button>`;
+                } else {
+                    const btnClass = isActive 
+                        ? 'bg-cyan-600 text-white font-bold border-2 border-cyan-400' 
+                        : 'bg-slate-800 text-slate-300 font-medium border-2 border-transparent hover:border-cyan-400';
+
+                    return `<button data-airline="${safeAttrAl}" onclick="filterByAirline('${safeAl}', this)" 
+                                    class="group relative min-h-[50px] rounded-xl overflow-hidden transition-colors cursor-pointer flex items-center justify-center p-1.5 text-center ${btnClass}" 
+                                    title="${tooltipText}">
+                                <span class="relative z-10 text-[12px] sm:text-[13px] font-bold leading-tight text-center line-clamp-2 px-1 break-words">
+                                    ${al}
+                                </span>
+                            </button>`;
+                }
             }).join('');
         } else {
             airlinesCountEl.innerText = `0 ${t('drawer.airlines_count', 'Airlines')}`;
