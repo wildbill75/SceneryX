@@ -2587,13 +2587,13 @@ function showAirportDetails(ap) {
                          class="p-3 rounded-xl bg-slate-950/80 hover:bg-slate-800/80 border border-slate-800/80 hover:border-cyan-500/50 cursor-pointer flex items-center justify-between gap-2 text-xs lg:text-sm font-mono font-bold text-slate-100 hover:text-cyan-300 transition-all group shadow-sm"
                          title="${t('drawer.gsx_reveal_tooltip', 'Click to reveal GSX INI file in Explorer')}">
                         <span class="truncate">${ap.gsx_profile_filename}</span>
-                        <i class="fa-solid fa-folder-open text-cyan-400 text-sm group-hover:scale-110 transition-transform"></i>
+                        <i class="fa-solid fa-folder text-slate-400 text-sm group-hover:text-white transition-colors"></i>
                     </div>
                     <div ondragover="handleGsxDragOver(event)" ondragleave="handleGsxDragLeave(event)" ondrop="handleGsxDrop(event)"
                          onclick="triggerInstallGsxProfile()"
                          class="p-3.5 rounded-xl bg-slate-950/40 border-2 border-dashed border-slate-800 hover:border-cyan-500/50 flex flex-col items-center justify-center gap-1.5 text-center transition-all cursor-pointer group">
-                        <i class="fa-solid fa-file-arrow-up text-cyan-400 text-lg group-hover:scale-110 transition-transform"></i>
-                        <span class="text-xs lg:text-sm font-extrabold text-cyan-300 group-hover:text-cyan-200">${t('drawer.gsx_drop_replace', 'Drop downloaded .zip or .ini here to replace')}</span>
+                        <i class="fa-solid fa-arrow-up-from-bracket text-slate-400 text-base group-hover:text-white transition-colors"></i>
+                        <span class="text-xs lg:text-sm font-bold text-slate-300 group-hover:text-white transition-colors">${t('drawer.gsx_drop_replace', 'Drop downloaded .zip or .ini here to replace')}</span>
                         <span class="text-xs text-slate-400">${t('drawer.gsx_click_replace', 'or click to browse & replace directly')}</span>
                     </div>
                 </div>
@@ -2604,15 +2604,15 @@ function showAirportDetails(ap) {
             gsxContainer.innerHTML = `
                 <div class="space-y-2.5">
                     <button onclick="triggerSearchGsxProfile()" 
-                            class="w-full p-3 rounded-xl bg-slate-950/40 hover:bg-cyan-500/10 border border-slate-800/50 hover:border-cyan-500/40 text-slate-200 hover:text-cyan-300 text-xs lg:text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer">
-                        <i class="fa-solid fa-magnifying-glass text-cyan-400 text-xs"></i>
+                            class="w-full p-3 rounded-xl bg-slate-900/60 hover:bg-slate-800 border border-slate-800/80 text-slate-300 hover:text-white text-xs lg:text-sm font-bold transition-colors flex items-center justify-center gap-2 shadow-sm cursor-pointer group">
+                        <i class="fa-solid fa-magnifying-glass text-slate-400 group-hover:text-white text-xs transition-colors"></i>
                         <span>${t('drawer.gsx_search_btn', 'Search GSX Profile on Flightsim.to')}</span>
                     </button>
                     <div ondragover="handleGsxDragOver(event)" ondragleave="handleGsxDragLeave(event)" ondrop="handleGsxDrop(event)"
                          onclick="triggerInstallGsxProfile()"
                          class="p-3.5 rounded-xl bg-slate-950/40 border-2 border-dashed border-slate-800 hover:border-cyan-500/50 flex flex-col items-center justify-center gap-1.5 text-center transition-all cursor-pointer group">
-                        <i class="fa-solid fa-file-arrow-up text-cyan-400 text-lg group-hover:scale-110 transition-transform"></i>
-                        <span class="text-xs lg:text-sm font-extrabold text-cyan-300 group-hover:text-cyan-200">${t('drawer.gsx_drop_install', 'Drop downloaded .zip or .ini here')}</span>
+                        <i class="fa-solid fa-arrow-up-from-bracket text-slate-400 text-base group-hover:text-white transition-colors"></i>
+                        <span class="text-xs lg:text-sm font-bold text-slate-300 group-hover:text-white transition-colors">${t('drawer.gsx_drop_install', 'Drop downloaded .zip or .ini here')}</span>
                         <span class="text-xs text-slate-400">${t('drawer.gsx_click_install', 'or click to browse & install directly')}</span>
                     </div>
                 </div>
@@ -2801,7 +2801,7 @@ function showAirportDetails(ap) {
                     <div class="flex items-center justify-between text-xs pt-0.5">
                         <span class="text-[11px] font-mono text-slate-400">${src.source_folder} ${src.size_str ? `• ${src.size_str}` : ''}</span>
                         <button onclick="openSpecificPackageFolderByIndex('${ap.icao}', ${idx})" class="${openBtnClass}" title="${t('drawer.open_folder', 'Open Folder')}">
-                            <i class="fa-solid fa-folder-open text-cyan-400"></i> ${t('drawer.open_folder', 'Open Folder')}
+                            <i class="fa-solid fa-folder text-slate-400 group-hover:text-white transition-colors"></i> ${t('drawer.open_folder', 'Open Folder')}
                         </button>
                     </div>
                 </div>
@@ -2870,7 +2870,7 @@ function showAirportDetails(ap) {
                         <div class="flex items-center justify-between text-xs pt-0.5">
                             <span class="text-[11px] font-mono text-slate-400">${src.source_folder} ${src.size_str ? `• ${src.size_str}` : ''}</span>
                             <button onclick="event.stopPropagation(); openSpecificPackageFolderByIndex('${ap.icao}', ${idx})" class="${openBtnClass}" title="Open Folder">
-                                <i class="fa-solid fa-folder-open text-cyan-400"></i> Open Folder
+                                <i class="fa-solid fa-folder text-slate-400 group-hover:text-white transition-colors"></i> Open Folder
                             </button>
                         </div>
                     </div>
@@ -4453,7 +4453,7 @@ function renderSettingsPathsList() {
                            oninput="updatePathValue(${index}, this.value)"
                            class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs font-mono text-slate-300 focus:outline-none focus:border-cyan-500">
                     <button onclick="browsePathFolder(${index})" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs transition-colors flex items-center gap-1.5 border-0 cursor-pointer" title="Browse Folder">
-                        <i class="fa-solid fa-folder-open text-cyan-400"></i>
+                        <i class="fa-solid fa-folder text-slate-400 group-hover:text-white transition-colors"></i>
                     </button>
                 </div>
             </div>
