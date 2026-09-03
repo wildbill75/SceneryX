@@ -2420,15 +2420,6 @@ function showAirportDetails(ap) {
     
     const vendorName = ap.vendor || (ap.is_asobo_official ? 'Microsoft / Asobo' : 'Unknown');
     document.getElementById('drawer-vendor').innerText = vendorName;
-    const vendorPill = document.getElementById('drawer-vendor-pill');
-    if (vendorPill) {
-        if (vendorName && vendorName !== 'Unknown') {
-            vendorPill.innerText = vendorName;
-            vendorPill.classList.remove('hidden');
-        } else {
-            vendorPill.classList.add('hidden');
-        }
-    }
     const versionBadge = document.getElementById('drawer-version');
     if (versionBadge) {
         if (ap.version) {
