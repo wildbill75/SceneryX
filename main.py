@@ -1785,7 +1785,16 @@ def main():
         return True
 
     window.events.closing += on_closing
-    webview.start(debug=False)
+
+    base_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+    icon_path = os.path.join(base_dir, 'icon.ico')
+    if not os.path.exists(icon_path):
+        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'icon.ico')
+
+    if os.path.exists(icon_path):
+        webview.start(debug=False, icon=icon_path)
+    else:
+        webview.start(debug=False)
 
 if __name__ == '__main__':
     main()
