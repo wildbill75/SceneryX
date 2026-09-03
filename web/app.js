@@ -5313,18 +5313,39 @@ function renderPaywareStoresList(stores, cleanIcao) {
     const listContainer = document.getElementById('payware-stores-list');
     if (!listContainer) return;
 
-    listContainer.innerHTML = stores.map(st => {
+    // Show available dev stores + all market stores
+    const visibleStores = stores.filter(st => {
+        if (st.type === 'dev') return st.found; // Only show dev stores that have this airport
+        return true;
+    });
+
+    listContainer.innerHTML = visibleStores.map(st => {
+        const isDev = st.type === 'dev';
         if (st.found) {
+            const badgeHtml = isDev 
+                ? `<span class="px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 ml-2 uppercase">Official Dev</span>`
+                : `<span class="px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 ml-2 uppercase">Store</span>`;
+
+            const iconBoxClass = isDev
+                ? `bg-amber-500/20 group-hover:bg-amber-500 text-amber-300 group-hover:text-slate-950`
+                : `bg-slate-800 group-hover:bg-purple-600 text-slate-400 group-hover:text-white`;
+
+            const iconClass = isDev ? `fa-solid fa-crown` : `fa-solid fa-arrow-up-right-from-square`;
+            const borderClass = isDev ? `border-amber-500/30 hover:border-amber-400/80 bg-slate-900/95` : `border-slate-800 hover:border-purple-500/50 bg-slate-900/90 hover:bg-slate-800`;
+
             return `
                 <button onclick="window.open('${st.url}', '_blank');"
-                        class="w-full p-3.5 rounded-2xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-purple-500/50 text-slate-200 hover:text-white text-xs flex items-center justify-between transition-colors group cursor-pointer shadow-sm">
+                        class="w-full p-3.5 rounded-2xl ${borderClass} border text-slate-200 hover:text-white text-xs flex items-center justify-between transition-colors group cursor-pointer shadow-sm">
                     <div class="flex items-center gap-3 text-left min-w-0">
-                        <div class="w-8 h-8 rounded-xl bg-slate-800 group-hover:bg-purple-600 text-slate-400 group-hover:text-white flex items-center justify-center text-xs shrink-0 transition-colors border-0">
-                            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                        <div class="w-8 h-8 rounded-xl ${iconBoxClass} flex items-center justify-center text-xs shrink-0 transition-colors border-0">
+                            <i class="${iconClass}"></i>
                         </div>
                         <div class="truncate min-w-0">
-                            <div class="text-xs font-bold text-white group-hover:text-purple-300 transition-colors">${st.name}</div>
-                            <div class="text-[10px] text-slate-400 font-normal truncate">${st.desc}</div>
+                            <div class="flex items-center text-xs font-bold text-white group-hover:text-cyan-300 transition-colors">
+                                <span class="truncate">${st.name}</span>
+                                ${badgeHtml}
+                            </div>
+                            <div class="text-[10px] text-slate-400 font-normal truncate mt-0.5">${st.desc}</div>
                         </div>
                     </div>
                     <div class="flex items-center gap-2 shrink-0 ml-2">

@@ -1844,6 +1844,110 @@ class Api:
 
             return False, default_url
 
+        # Developer Direct Store Catalogs
+        DEV_CATALOGS = {
+            'Flightbeam': {
+                'KSFO': 'https://shop.flightbeam.net/products/flightbeam-ksfo-captains-edition-msfs',
+                'KPHX': 'https://shop.flightbeam.net/products/flightbeam-kphx',
+                'KDEN': 'https://shop.flightbeam.net/products/flightbeam-kden-msfs',
+                'KIAD': 'https://shop.flightbeam.net/products/flightbeam-kiad-for-msfs',
+                'KMSP': 'https://shop.flightbeam.net/products/flightbeam-kmsp-msfs',
+                'LFBO': 'https://shop.flightbeam.net/products/flightbeam-lfbo-msfs',
+                'LFBZ': 'https://shop.flightbeam.net/products/flightbeam-lfbz',
+                'NZAA': 'https://shop.flightbeam.net/products/flightbeam-nzaa-msfs',
+                'NZWN': 'https://shop.flightbeam.net/products/flightbeam-nzwn-msfs',
+                'LSGG': 'https://shop.flightbeam.net/collections/frontpage/products/jetstream-lsgg-geneva-airport-for-microsoft-flight-simulator',
+                'LFPO': 'https://shop.flightbeam.net/products/jetstream-designs-lfpo',
+                'LFRS': 'https://shop.flightbeam.net/products/jetstream-designs-lfrs',
+                'LIML': 'https://shop.flightbeam.net/products/jetstream-designs-liml'
+            },
+            'FlyTampa': {
+                'EHAM': 'https://www.flytampa.org/eham.html',
+                'KLAS': 'https://www.flytampa.org/klas.html',
+                'YSSY': 'https://www.flytampa.org/yssy.html',
+                'CYYZ': 'https://www.flytampa.org/cyyz.html',
+                'CYUL': 'https://www.flytampa.org/cyul.html',
+                'LGAV': 'https://www.flytampa.org/lgav.html',
+                'LGKR': 'https://www.flytampa.org/lgkr.html',
+                'LGIR': 'https://www.flytampa.org/lgir.html',
+                'LGTS': 'https://www.flytampa.org/lgts.html',
+                'VHHX': 'https://www.flytampa.org/vhhx.html',
+                'TNCM': 'https://www.flytampa.org/tncm.html',
+                'EGNJ': 'https://www.flytampa.org/egnj.html',
+                'LOWW': 'https://www.flytampa.org/loww.html',
+                'KBOS': 'https://www.flytampa.org/kbos.html',
+                'EKCH': 'https://www.flytampa.org/ekch.html'
+            },
+            'FSDreamTeam': {
+                'KORD': 'https://www.fsdreamteam.com/products_kordv2_msfs.html',
+                'CYVR': 'https://www.fsdreamteam.com/products_cyvr2_msfs.html',
+                'LFSB': 'https://www.fsdreamteam.com/products_lfsb.html',
+                'LSZH': 'https://www.fsdreamteam.com/products_zurich_msfs.html',
+                'KEYW': 'https://www.fsdreamteam.com/products_keyw_msfs.html',
+                'KSDF': 'https://www.fsdreamteam.com/products_ksdf_msfs.html',
+                'KIAH': 'https://www.fsdreamteam.com/products_kiah_msfs.html',
+                'KCLT': 'https://www.fsdreamteam.com/products_kclt_msfs.html',
+                'LFEQ': 'https://www.fsdreamteam.com/products_lfeq_msfs.html',
+                'LFNC': 'https://www.fsdreamteam.com/products_lfnc_msfs.html'
+            },
+            'Jetstream Designs': {
+                'LSGG': 'https://www.jetstream-designs.com/lsgg-for-msfs',
+                'LFPO': 'https://www.jetstream-designs.com/lfpo-for-msfs',
+                'LFRS': 'https://www.jetstream-designs.com/lfrs-for-msfs',
+                'LIML': 'https://www.jetstream-designs.com/liml-for-msfs'
+            },
+            'NZA Simulations': {
+                'NZQN': 'https://nzasimulations.com/',
+                'NZNS': 'https://nzasimulations.com/',
+                'NZCH': 'https://nzasimulations.com/',
+                'YMHB': 'https://nzasimulations.com/',
+                'NZMC': 'https://nzasimulations.com/',
+                'NZFJ': 'https://nzasimulations.com/',
+                'NZWF': 'https://nzasimulations.com/'
+            },
+            'Pyreegue Dev Co.': {
+                'EGPH': 'https://pyreegue.dev/',
+                'EGAA': 'https://pyreegue.dev/',
+                'EGNX': 'https://pyreegue.dev/',
+                'EGSS': 'https://pyreegue.dev/',
+                'EGFF': 'https://pyreegue.dev/',
+                'EGPF': 'https://pyreegue.dev/',
+                'EGNM': 'https://pyreegue.dev/'
+            },
+            'Drzewiecki Design': {
+                'EPWA': 'https://drzewiecki-design.net/products.htm',
+                'EPKK': 'https://drzewiecki-design.net/products.htm',
+                'EPGD': 'https://drzewiecki-design.net/products.htm',
+                'EPPO': 'https://drzewiecki-design.net/products.htm',
+                'EPRZ': 'https://drzewiecki-design.net/products.htm',
+                'KDCA': 'https://drzewiecki-design.net/products.htm',
+                'KEWR': 'https://drzewiecki-design.net/products.htm',
+                'KMDW': 'https://drzewiecki-design.net/products.htm',
+                'KRNT': 'https://drzewiecki-design.net/products.htm',
+                'KBFI': 'https://drzewiecki-design.net/products.htm',
+                'KPAE': 'https://drzewiecki-design.net/products.htm'
+            },
+            'LatinVFR': {
+                'KMIA': 'https://latinvfr.com/products/miami-kmia-v5-msfs',
+                'KFLL': 'https://latinvfr.com/products/fort-lauderdale-kfll-v2-msfs',
+                'LEBL': 'https://latinvfr.com/products/barcelona-lebl-msfs',
+                'LEMD': 'https://latinvfr.com/products/madrid-lemd-msfs',
+                'KRSW': 'https://latinvfr.com/products/fort-myers-krsw-msfs',
+                'KBDL': 'https://latinvfr.com/products/hartford-kbdl-msfs',
+                'KMSY': 'https://latinvfr.com/products/new-orleans-kmsy-msfs'
+            }
+        }
+
+        def check_francevfr(code):
+            u = f"https://www.vfrnetwork.com/shop/fr/recherche?controller=search&s={code}"
+            h = fetch_html(u)
+            if not h or 'product-miniature' not in h:
+                return False, u
+            titles = re.findall(r'<h[23][^>]*class=[\'"][^\'"]*product-title[^\'"]*[\'"][^>]*>[\s\S]*?<a[^>]*>([\s\S]*?)</a>', h)
+            cleaned = [re.sub(r'<[^>]+>', '', t).strip() for t in titles]
+            has_match = any(re.search(r'\b' + re.escape(code) + r'\b', t, re.IGNORECASE) for t in cleaned)
+            return has_match, u
+
         def check_contrail(code):
             u = f"https://contrail.shop/search?q={code}"
             h = fetch_html(u)
@@ -1854,27 +1958,41 @@ class Api:
             return has_match, u
 
         stores_def = [
-            ("simMarket", check_sm, "Global flight simulation store & vendor marketplace"),
-            ("Orbx Direct", check_orbx, "OrbxDirect official MSFS scenery catalog"),
-            ("Flightsim.to Store", check_fsto, "Official payware marketplace on Flightsim.to"),
-            ("iniBuilds Store", check_ini, "iniBuilds premier sceneries & partner developer store"),
-            ("Aerosoft Shop", check_aero, "Aerosoft official European flight simulation store"),
-            ("Contrail Web Shop", check_contrail, "Flightbeam, Jo Erlend, Pyreegue & partner addons")
+            ("France VFR", check_francevfr, "France VFR official scenery boutique & regional airports", "dev"),
+            ("Flightbeam Studios", lambda c: (c in DEV_CATALOGS['Flightbeam'], DEV_CATALOGS['Flightbeam'].get(c, f"https://shop.flightbeam.net/search?q={c}")), "Flightbeam official store & next-gen sceneries", "dev"),
+            ("FlyTampa", lambda c: (c in DEV_CATALOGS['FlyTampa'], DEV_CATALOGS['FlyTampa'].get(c, "https://www.flytampa.org/")), "FlyTampa official creator website & airports", "dev"),
+            ("FSDreamTeam", lambda c: (c in DEV_CATALOGS['FSDreamTeam'], DEV_CATALOGS['FSDreamTeam'].get(c, "https://www.fsdreamteam.com/products_msfs.html")), "FSDreamTeam official studio & GSX creator", "dev"),
+            ("Jetstream Designs", lambda c: (c in DEV_CATALOGS['Jetstream Designs'], DEV_CATALOGS['Jetstream Designs'].get(c, "https://www.jetstream-designs.com/")), "Jetstream Designs official creator showcase", "dev"),
+            ("NZA Simulations", lambda c: (c in DEV_CATALOGS['NZA Simulations'], DEV_CATALOGS['NZA Simulations'].get(c, "https://nzasimulations.com/")), "NZA Simulations official Australasia scenery store", "dev"),
+            ("Pyreegue Dev Co.", lambda c: (c in DEV_CATALOGS['Pyreegue Dev Co.'], DEV_CATALOGS['Pyreegue Dev Co.'].get(c, "https://pyreegue.dev/")), "Pyreegue Dev Co. official studio & airports", "dev"),
+            ("Drzewiecki Design", lambda c: (c in DEV_CATALOGS['Drzewiecki Design'], DEV_CATALOGS['Drzewiecki Design'].get(c, "https://drzewiecki-design.net/products.htm")), "Drzewiecki Design official airports catalog", "dev"),
+            ("LatinVFR", lambda c: (c in DEV_CATALOGS['LatinVFR'], DEV_CATALOGS['LatinVFR'].get(c, f"https://latinvfr.com/search?q={c}")), "LatinVFR official developer store & airports", "dev"),
+            ("simMarket", check_sm, "Global flight simulation store & vendor marketplace", "market"),
+            ("Orbx Direct", check_orbx, "OrbxDirect official MSFS scenery catalog", "market"),
+            ("Flightsim.to Store", check_fsto, "Official payware marketplace on Flightsim.to", "market"),
+            ("iniBuilds Store", check_ini, "iniBuilds premier sceneries & partner developer store", "market"),
+            ("Aerosoft Shop", check_aero, "Aerosoft official European flight simulation store", "market"),
+            ("Contrail Web Shop", check_contrail, "Flightbeam, Jo Erlend, Pyreegue & partner addons", "market")
         ]
 
         results = []
-        with ThreadPoolExecutor(max_workers=6) as ex:
-            futures = {ex.submit(fn, icao_clean): (name, desc) for name, fn, desc in stores_def}
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            futures = {ex.submit(fn, icao_clean): (name, desc, st_type) for name, fn, desc, st_type in stores_def}
             for fut in futures:
-                name, desc = futures[fut]
+                name, desc, st_type = futures[fut]
                 try:
                     found, final_url = fut.result()
                 except Exception:
                     found, final_url = False, ""
-                results.append({"name": name, "url": final_url, "desc": desc, "found": found})
+                results.append({"name": name, "url": final_url, "desc": desc, "found": found, "type": st_type})
 
-        order = ["simMarket", "Orbx Direct", "Flightsim.to Store", "iniBuilds Store", "Aerosoft Shop", "Contrail Web Shop"]
-        results.sort(key=lambda x: order.index(x["name"]) if x["name"] in order else 99)
+        # Order: dev stores with found=True first, then available market stores, then unavailable market stores
+        def sort_key(x):
+            is_found = 0 if x.get("found") else 1
+            is_dev = 0 if x.get("type") == "dev" else 1
+            return (is_found, is_dev)
+
+        results.sort(key=sort_key)
 
         self._payware_store_cache[cache_key] = results
         return json.dumps(results)
