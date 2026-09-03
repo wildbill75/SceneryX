@@ -2147,15 +2147,26 @@ def main():
     web_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'web')
     html_file = os.path.join(web_dir, 'index.html')
 
-    # Calculate optimal window dimensions (85% of primary monitor size for 2K/4K displays)
+    # Dynamically detect monitor resolution & center the window in the usable workspace
     init_width = 1760
     init_height = 1020
+    init_x = None
+    init_y = None
     try:
         if hasattr(webview, 'screens') and webview.screens:
             primary_screen = webview.screens[0]
             if hasattr(primary_screen, 'width') and hasattr(primary_screen, 'height'):
-                init_width = int(primary_screen.width * 0.85)
-                init_height = int(primary_screen.height * 0.85)
+                sw = primary_screen.width
+                sh = primary_screen.height
+                
+                # Proportional sizing: 84% width, 86% usable height (minus ~48px taskbar)
+                init_width = max(1280, min(int(sw * 0.84), 2560))
+                usable_height = max(700, sh - 48)
+                init_height = max(800, min(int(usable_height * 0.86), 1400))
+                
+                # Pixel-perfect centering on the primary desktop workspace
+                init_x = max(0, (sw - init_width) // 2)
+                init_y = max(15, (usable_height - init_height) // 2)
     except Exception as e:
         print("Screen resolution detection fallback:", e)
 
@@ -2166,6 +2177,8 @@ def main():
         js_api=api,
         width=init_width,
         height=init_height,
+        x=init_x,
+        y=init_y,
         min_size=(1280, 800),
         background_color='#0b0f19'
     )
