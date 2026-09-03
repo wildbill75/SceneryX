@@ -5304,9 +5304,50 @@ function renderPaywareStoresList(stores, cleanIcao) {
     if (!listContainer) return;
 
     // Show available dev stores + all market stores
-    const visibleStores = stores.filter(st => {
+    let visibleStores = stores.filter(st => {
         if (st.type === 'dev') return st.found; // Only show dev stores that have this airport
         return true;
+    });
+
+    // Calculate converted prices in user-selected currency
+    visibleStores.forEach(st => {
+        if (st.found && st.price !== null && st.price !== undefined) {
+            const fromCurr = st.currency || 'USD';
+            const rateFrom = CURRENCY_RATES[fromCurr] || 1.0;
+            const priceEur = parseFloat(st.price) / rateFrom;
+            const rateTo = CURRENCY_RATES[selectedCurrency] || 1.0;
+            const priceTarget = priceEur * rateTo;
+            st.convertedPrice = priceTarget;
+
+            const sym = CURRENCY_SYMBOLS[selectedCurrency] || '$';
+            st.formattedPrice = `${sym}${priceTarget.toFixed(2)}`;
+
+            if (fromCurr !== selectedCurrency) {
+                const origSym = CURRENCY_SYMBOLS[fromCurr] || '';
+                st.origPriceFormatted = `${origSym}${parseFloat(st.price).toFixed(2)} ${fromCurr}`;
+            } else {
+                st.origPriceFormatted = null;
+            }
+        } else {
+            st.convertedPrice = null;
+            st.formattedPrice = null;
+            st.origPriceFormatted = null;
+        }
+    });
+
+    // Sort: Available stores with price sorted LOWEST PRICE FIRST!
+    // Followed by available without explicit price, followed by unavailable
+    visibleStores.sort((a, b) => {
+        if (a.found !== b.found) return a.found ? -1 : 1;
+        if (a.found && b.found) {
+            const pA = a.convertedPrice !== null ? a.convertedPrice : 999999;
+            const pB = b.convertedPrice !== null ? b.convertedPrice : 999999;
+            if (pA !== pB) return pA - pB;
+            // If identical price, prioritize official dev stores
+            if (a.type !== b.type) return a.type === 'dev' ? -1 : 1;
+            return 0;
+        }
+        return 0;
     });
 
     listContainer.innerHTML = visibleStores.map(st => {
@@ -5338,9 +5379,19 @@ function renderPaywareStoresList(stores, cleanIcao) {
                             <div class="text-[10px] text-slate-400 font-normal truncate mt-0.5">${st.desc}</div>
                         </div>
                     </div>
-                    <div class="flex items-center gap-2 shrink-0 ml-2">
-                        <span class="text-[10px] font-mono font-bold text-emerald-400">Available</span>
-                        <i class="fa-solid fa-circle-check text-emerald-400 text-base"></i>
+                    <div class="flex items-center gap-3 shrink-0 ml-2">
+                        ${st.formattedPrice ? `
+                            <div class="flex flex-col items-end">
+                                <span class="px-2.5 py-1 rounded-xl text-xs font-mono font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shadow-sm">
+                                    ${st.formattedPrice}
+                                </span>
+                                ${st.origPriceFormatted ? `<span class="text-[9px] font-mono text-slate-400 mt-0.5">${st.origPriceFormatted}</span>` : ''}
+                            </div>
+                        ` : ''}
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-[10px] font-mono font-bold text-emerald-400 hidden sm:inline">Available</span>
+                            <i class="fa-solid fa-circle-check text-emerald-400 text-base"></i>
+                        </div>
                     </div>
                 </button>
             `;

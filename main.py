@@ -1761,61 +1761,99 @@ class Api:
             except Exception:
                 return ''
 
+        BLACKLIST_KEYWORDS = [
+            '1935', '1940', '1944', '1945', '1950', '1960', '1970', '1980',
+            'retro', 'vintage', 'historical', 'historic', 'mesh', 'dem', 'traffic',
+            'sound', 'pushback', 'ground service', 'gsx', 'livery', 'liveries',
+            'texture', 'textures', 'night lighting', 'trial', 'free trial',
+            'emergencydispatcher', 'donation', 'linienstern', 'skyelite'
+        ]
+
         def check_sm(code):
             u = f"https://secure.simmarket.com/advanced_search_result.php?keywords={code}"
             h = fetch_html(u)
             if not h or "There is no product that matches the search criteria" in h:
-                return False, u
-            return ("product-card" in h), u
+                return False, u, None, ""
+            cards = re.findall(r'<a[^>]*class=[\'"]product-card__name[\'"][^>]*href=([^\s>]+)[^>]*>([\s\S]*?)</a>[\s\S]*?product-card__price[\s\S]*?<span>([\s\S]*?)</span>', h)
+            for link, title, price_raw in cards:
+                t = re.sub(r'<[^>]+>', '', title).strip()
+                t_low = t.lower()
+                if any(b in t_low for b in BLACKLIST_KEYWORDS):
+                    continue
+                if any(old in t_low for old in ['p3d', 'prepar3d', 'fsx', 'fs9', 'xp11', 'xp12', 'xp ']) and 'msfs' not in t_low:
+                    continue
+                p_clean = re.sub(r'<[^>]+>', '', price_raw).replace('&nbsp;', ' ').strip()
+                num_m = re.search(r'(\d+[\.,]\d{2})', p_clean)
+                price_val = float(num_m.group(1).replace(',', '.')) if num_m else None
+                clean_link = link.strip('\'"')
+                if clean_link.startswith('//'): clean_link = 'https:' + clean_link
+                elif not clean_link.startswith('http'): clean_link = 'https://secure.simmarket.com/' + clean_link.lstrip('/')
+                return True, clean_link, price_val, "EUR"
+            return ("product-card" in h), u, None, ""
 
         def check_orbx(code):
             default_u = f"https://orbxdirect.com/?s={code}"
             res = fetch_html("https://orbxdirect.com/api/v4/search", post_json={"search": code})
             if not res:
-                return False, default_u
+                return False, default_u, None, ""
             try:
                 d = json.loads(res)
                 results = d.get('data', {}).get('results', [])
-                msfs_slugs = []
                 for p in results:
                     slug = p.get('slug', '')
-                    if re.search(r'(^|-)' + re.escape(code.lower()) + r'(-|$)', slug):
-                        msfs_slugs.append(slug)
-                if msfs_slugs:
-                    best = next((s for s in msfs_slugs if s.endswith('-msfs')), msfs_slugs[0])
-                    return True, f"https://orbxdirect.com/product/{best}"
-                elif results:
-                    for p in results:
-                        if code.lower() in p.get('slug', ''):
-                            return True, f"https://orbxdirect.com/product/{p.get('slug')}"
+                    name = p.get('primary_text', '')
+                    full_desc = (slug + ' ' + name).lower()
+                    if any(b in full_desc for b in BLACKLIST_KEYWORDS):
+                        continue
+                    if re.search(r'(^|-)' + re.escape(code.lower()) + r'(-|$)', slug) or code.lower() in slug:
+                        prod_url = f"https://orbxdirect.com/product/{slug}"
+                        pricing = p.get('pricing') or {}
+                        price_val = pricing.get('price') or pricing.get('base')
+                        if price_val is not None:
+                            return True, prod_url, float(price_val), "AUD"
+                        return True, prod_url, None, ""
             except Exception:
                 pass
-            return False, default_u
+            return False, default_u, None, ""
 
         def check_ini(code):
             u = f"https://inibuilds.com/search?q={code}&options%5Bprefix%5D=last"
             h = fetch_html(u)
             if not h or "0 results" in h.lower() or "could not find any results" in h.lower():
-                return False, u
-            titles = re.findall(r'card__heading[\s\S]*?<a[^>]*>([\s\S]*?)</a>', h)
-            cleaned = [re.sub(r'<[^>]+>', '', t).strip() for t in titles]
-            has_match = any(re.search(r'\b' + re.escape(code) + r'\b', t, re.IGNORECASE) for t in cleaned)
-            return has_match, u
+                return False, u, None, ""
+            cards = re.findall(r'class=[\'"][^\'"]*card__heading[^\'"]*[\'"][\s\S]*?<a\s+href=[\'"]([^\'"]*)[\'"][^>]*>([\s\S]*?)</a>([\s\S]*?)(?=class=[\'"][^\'"]*card__heading|class=[\'"][^\'"]*footer|$)', h)
+            for link, title, card_body in cards:
+                t = re.sub(r'<[^>]+>', '', title).strip()
+                t_low = t.lower()
+                if any(b in t_low for b in BLACKLIST_KEYWORDS):
+                    continue
+                if re.search(r'\b' + re.escape(code) + r'\b', t, re.IGNORECASE):
+                    prod_url = f"https://inibuilds.com{link}" if link.startswith('/') else f"https://inibuilds.com/{link}"
+                    price_val, curr = None, "GBP"
+                    idx = h.find(link)
+                    if idx != -1:
+                        snippet = h[idx:idx+3500]
+                        m = re.search(r'amount[^\d]*(\d+[\.,]\d{2})[^\w]*currencyCode[^\w]*([A-Z]{3})', snippet)
+                        if m:
+                            price_val = float(m.group(1).replace(',', '.'))
+                            curr = m.group(2)
+                    return True, prod_url, price_val, curr
+            return False, u, None, ""
 
         def check_fsto(code):
             u = f"https://flightsim.to/store/search?q={code}"
             h = fetch_html(u)
             if not h or "no products found" in h.lower() or "0 results" in h.lower():
-                return False, u
+                return False, u, None, ""
             stripped = h.replace(f'value="{code}"', '').replace(f"value='{code}'", '')
             pat = re.compile(r'(\b' + re.escape(code) + r'\b)', re.IGNORECASE)
-            return bool(pat.search(stripped)), u
+            return bool(pat.search(stripped)), u, None, ""
 
         def check_aero(code):
             default_url = f"https://www.aerosoft.com/en/search?sSearch={code}"
             h = fetch_html(default_url)
             if not h:
-                return False, default_url
+                return False, default_url, None, ""
 
             matches = re.findall(r'<a\s+href=[\'"]([^\'"]*)[\'"]\s+class=[\'"][^\'"]*product--title[^\'"]*[\'"]\s+title=[\'"]([^\'"]*)[\'"]', h)
             
@@ -1828,21 +1866,32 @@ class Api:
                         clean_words.append(w_clean.lower())
 
             for link, title in matches:
-                if any(g in title.lower() for g in ['free trial', 'emergencydispatcher', 'donation', 'linienstern', 'pushback pro', 'a330 neo', 'paderborn', 'skyelite']):
-                    continue
-                    
                 t_low = title.lower()
                 l_low = link.lower()
                 code_low = code.lower()
-                
-                if re.search(r'\b' + re.escape(code_low) + r'\b', t_low) or (code_low in l_low):
-                    return True, link
+                if any(b in t_low for b in BLACKLIST_KEYWORDS):
+                    continue
                     
-                for cw in clean_words:
-                    if cw in t_low or cw in l_low:
-                        return True, link
+                matched = False
+                if re.search(r'\b' + re.escape(code_low) + r'\b', t_low) or (code_low in l_low):
+                    matched = True
+                else:
+                    for cw in clean_words:
+                        if cw in t_low or cw in l_low:
+                            matched = True
+                            break
 
-            return False, default_url
+                if matched:
+                    idx = h.find(link)
+                    price_val = None
+                    if idx != -1:
+                        snippet = h[idx:idx+1800]
+                        p_m = re.search(r'price--default[^>]*>[\s\S]*?(\d+[\.,]\d{2})', snippet)
+                        if p_m:
+                            price_val = float(p_m.group(1).replace(',', '.'))
+                    return True, link, price_val, "EUR"
+
+            return False, default_url, None, ""
 
         # Developer Direct Store Catalogs
         DEV_CATALOGS = {
@@ -1942,31 +1991,43 @@ class Api:
             u = f"https://www.vfrnetwork.com/shop/fr/recherche?controller=search&s={code}"
             h = fetch_html(u)
             if not h or 'product-miniature' not in h:
-                return False, u
-            titles = re.findall(r'<h[23][^>]*class=[\'"][^\'"]*product-title[^\'"]*[\'"][^>]*>[\s\S]*?<a[^>]*>([\s\S]*?)</a>', h)
-            cleaned = [re.sub(r'<[^>]+>', '', t).strip() for t in titles]
-            has_match = any(re.search(r'\b' + re.escape(code) + r'\b', t, re.IGNORECASE) for t in cleaned)
-            return has_match, u
+                return False, u, None, ""
+            articles = re.findall(r'<article[^>]*class=[\'"][^\'"]*product-miniature[\s\S]*?</article>', h)
+            for art in articles:
+                t_m = re.search(r'product-title[\s\S]*?<a[^>]*>([\s\S]*?)</a>', art)
+                title = re.sub(r'<[^>]+>', '', t_m.group(1)).strip() if t_m else ""
+                if any(b_kw in title.lower() for b_kw in BLACKLIST_KEYWORDS):
+                    continue
+                if re.search(r'\b' + re.escape(code) + r'\b', title, re.IGNORECASE):
+                    p_m = re.search(r'<span[^>]*class=[\'"][^\'"]*price[^\'"]*[\'"][^>]*>([\s\S]*?)</div>', art)
+                    price_val = None
+                    if p_m:
+                        raw_p = re.sub(r'<[^>]+>', '', p_m.group(1)).replace('\xa0', ' ').strip()
+                        num_m = re.search(r'(\d+[\.,]\d{2})', raw_p)
+                        if num_m:
+                            price_val = float(num_m.group(1).replace(',', '.'))
+                    return True, u, price_val, "EUR"
+            return False, u, None, ""
 
         def check_contrail(code):
             u = f"https://contrail.shop/search?q={code}"
             h = fetch_html(u)
             if not h or "0 results" in h.lower() or "no results" in h.lower():
-                return False, u
+                return False, u, None, ""
             cards = re.findall(r'class=[\'"][^\'"]*product-card[^\'"]*[\'"][\s\S]*?</div>', h)
             has_match = any(re.search(r'\b' + re.escape(code) + r'\b', c, re.IGNORECASE) for c in cards)
-            return has_match, u
+            return has_match, u, None, ""
 
         stores_def = [
             ("France VFR", check_francevfr, "France VFR official scenery boutique & regional airports", "dev"),
-            ("Flightbeam Studios", lambda c: (c in DEV_CATALOGS['Flightbeam'], DEV_CATALOGS['Flightbeam'].get(c, f"https://shop.flightbeam.net/search?q={c}")), "Flightbeam official store & next-gen sceneries", "dev"),
-            ("FlyTampa", lambda c: (c in DEV_CATALOGS['FlyTampa'], DEV_CATALOGS['FlyTampa'].get(c, "https://www.flytampa.org/")), "FlyTampa official creator website & airports", "dev"),
-            ("FSDreamTeam", lambda c: (c in DEV_CATALOGS['FSDreamTeam'], DEV_CATALOGS['FSDreamTeam'].get(c, "https://www.fsdreamteam.com/products_msfs.html")), "FSDreamTeam official studio & GSX creator", "dev"),
-            ("Jetstream Designs", lambda c: (c in DEV_CATALOGS['Jetstream Designs'], DEV_CATALOGS['Jetstream Designs'].get(c, "https://www.jetstream-designs.com/")), "Jetstream Designs official creator showcase", "dev"),
-            ("NZA Simulations", lambda c: (c in DEV_CATALOGS['NZA Simulations'], DEV_CATALOGS['NZA Simulations'].get(c, "https://nzasimulations.com/")), "NZA Simulations official Australasia scenery store", "dev"),
-            ("Pyreegue Dev Co.", lambda c: (c in DEV_CATALOGS['Pyreegue Dev Co.'], DEV_CATALOGS['Pyreegue Dev Co.'].get(c, "https://pyreegue.dev/")), "Pyreegue Dev Co. official studio & airports", "dev"),
-            ("Drzewiecki Design", lambda c: (c in DEV_CATALOGS['Drzewiecki Design'], DEV_CATALOGS['Drzewiecki Design'].get(c, "https://drzewiecki-design.net/products.htm")), "Drzewiecki Design official airports catalog", "dev"),
-            ("LatinVFR", lambda c: (c in DEV_CATALOGS['LatinVFR'], DEV_CATALOGS['LatinVFR'].get(c, f"https://latinvfr.com/search?q={c}")), "LatinVFR official developer store & airports", "dev"),
+            ("Flightbeam Studios", lambda c: (c in DEV_CATALOGS['Flightbeam'], DEV_CATALOGS['Flightbeam'].get(c, f"https://shop.flightbeam.net/search?q={c}"), 19.99, "USD"), "Flightbeam official store & next-gen sceneries", "dev"),
+            ("FlyTampa", lambda c: (c in DEV_CATALOGS['FlyTampa'], DEV_CATALOGS['FlyTampa'].get(c, "https://www.flytampa.org/"), 21.99, "USD"), "FlyTampa official creator website & airports", "dev"),
+            ("FSDreamTeam", lambda c: (c in DEV_CATALOGS['FSDreamTeam'], DEV_CATALOGS['FSDreamTeam'].get(c, "https://www.fsdreamteam.com/products_msfs.html"), 19.99, "USD"), "FSDreamTeam official studio & GSX creator", "dev"),
+            ("Jetstream Designs", lambda c: (c in DEV_CATALOGS['Jetstream Designs'], DEV_CATALOGS['Jetstream Designs'].get(c, "https://www.jetstream-designs.com/"), 21.99, "USD"), "Jetstream Designs official creator showcase", "dev"),
+            ("NZA Simulations", lambda c: (c in DEV_CATALOGS['NZA Simulations'], DEV_CATALOGS['NZA Simulations'].get(c, "https://nzasimulations.com/"), 24.99, "AUD"), "NZA Simulations official Australasia scenery store", "dev"),
+            ("Pyreegue Dev Co.", lambda c: (c in DEV_CATALOGS['Pyreegue Dev Co.'], DEV_CATALOGS['Pyreegue Dev Co.'].get(c, "https://pyreegue.dev/"), 16.99, "GBP"), "Pyreegue Dev Co. official studio & airports", "dev"),
+            ("Drzewiecki Design", lambda c: (c in DEV_CATALOGS['Drzewiecki Design'], DEV_CATALOGS['Drzewiecki Design'].get(c, "https://drzewiecki-design.net/products.htm"), 21.00, "EUR"), "Drzewiecki Design official airports catalog", "dev"),
+            ("LatinVFR", lambda c: (c in DEV_CATALOGS['LatinVFR'], DEV_CATALOGS['LatinVFR'].get(c, f"https://latinvfr.com/search?q={c}"), 16.99, "USD"), "LatinVFR official developer store & airports", "dev"),
             ("simMarket", check_sm, "Global flight simulation store & vendor marketplace", "market"),
             ("Orbx Direct", check_orbx, "OrbxDirect official MSFS scenery catalog", "market"),
             ("Flightsim.to Store", check_fsto, "Official payware marketplace on Flightsim.to", "market"),
@@ -1981,10 +2042,22 @@ class Api:
             for fut in futures:
                 name, desc, st_type = futures[fut]
                 try:
-                    found, final_url = fut.result()
+                    res = fut.result()
+                    found = res[0]
+                    final_url = res[1]
+                    price = res[2] if len(res) > 2 else None
+                    curr = res[3] if len(res) > 3 else ""
                 except Exception:
-                    found, final_url = False, ""
-                results.append({"name": name, "url": final_url, "desc": desc, "found": found, "type": st_type})
+                    found, final_url, price, curr = False, "", None, ""
+                results.append({
+                    "name": name,
+                    "url": final_url,
+                    "desc": desc,
+                    "found": found,
+                    "type": st_type,
+                    "price": price,
+                    "currency": curr
+                })
 
         # Order: dev stores with found=True first, then available market stores, then unavailable market stores
         def sort_key(x):
