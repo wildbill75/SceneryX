@@ -1722,6 +1722,116 @@ class Api:
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
 
+    def check_payware_stores(self, icao):
+        """Check availability of payware scenery for an ICAO code across major stores."""
+        import urllib.request
+        import urllib.parse
+        import re
+        from concurrent.futures import ThreadPoolExecutor
+
+        if not hasattr(self, '_payware_store_cache'):
+            self._payware_store_cache = {}
+
+        icao_clean = (icao or "").strip().upper()
+        if not icao_clean:
+            return json.dumps([])
+
+        if icao_clean in self._payware_store_cache:
+            return json.dumps(self._payware_store_cache[icao_clean])
+
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+
+        def fetch_html(u):
+            try:
+                req = urllib.request.Request(u, headers=headers)
+                with urllib.request.urlopen(req, timeout=4) as resp:
+                    return resp.read().decode('utf-8', errors='ignore')
+            except Exception:
+                return ''
+
+        def check_sm(code):
+            u = f"https://secure.simmarket.com/advanced_search_result.php?keywords={code}"
+            h = fetch_html(u)
+            if not h or "There is no product that matches the search criteria" in h:
+                return False
+            return "itemBox2" in h or "product-listing" in h or code.lower() in h.lower()
+
+        def check_orbx(code):
+            u = f"https://orbxdirect.com/msfs?search={code}"
+            h = fetch_html(u)
+            if not h or "No products match your search" in h or "0 products" in h:
+                return False
+            stripped = h.replace(f'value="{code}"', '').replace(f"value='{code}'", '')
+            pat = re.compile(r'(\b' + re.escape(code) + r'\b)', re.IGNORECASE)
+            return bool(pat.search(stripped))
+
+        def check_fsto(code):
+            u = f"https://flightsim.to/store/search?q={code}"
+            h = fetch_html(u)
+            if not h or "no products found" in h.lower() or "0 results" in h.lower():
+                return False
+            stripped = h.replace(f'value="{code}"', '').replace(f"value='{code}'", '')
+            pat = re.compile(r'(\b' + re.escape(code) + r'\b)', re.IGNORECASE)
+            return bool(pat.search(stripped))
+
+        def check_ini(code):
+            u = f"https://inibuilds.com/search?q={code}"
+            h = fetch_html(u)
+            if not h or "0 results" in h.lower() or "could not find any results" in h.lower():
+                return False
+            stripped = h.replace(f'value="{code}"', '').replace(f"value='{code}'", '')
+            stripped = re.sub(r'<title>.*?</title>', '', stripped, flags=re.IGNORECASE)
+            pat = re.compile(r'(\b' + re.escape(code) + r'\b)', re.IGNORECASE)
+            return bool(pat.search(stripped))
+
+        def check_aero(code):
+            u = f"https://www.aerosoft.com/en/search?search={code}"
+            h = fetch_html(u)
+            if not h or "No results were found" in h or "Keine Ergebnisse" in h:
+                return False
+            stripped = h.replace(f'value="{code}"', '').replace(f"value='{code}'", '')
+            stripped = re.sub(r'<title>.*?</title>', '', stripped, flags=re.IGNORECASE)
+            pat = re.compile(r'(\b' + re.escape(code) + r'\b)', re.IGNORECASE)
+            return bool(pat.search(stripped))
+
+        def check_contrail(code):
+            u = f"https://contrail.shop/search?q={code}"
+            h = fetch_html(u)
+            if not h or "0 results" in h.lower() or "no results" in h.lower():
+                return False
+            stripped = h.replace(f'value="{code}"', '').replace(f"value='{code}'", '')
+            stripped = re.sub(r'<title>.*?</title>', '', stripped, flags=re.IGNORECASE)
+            pat = re.compile(r'(\b' + re.escape(code) + r'\b)', re.IGNORECASE)
+            return bool(pat.search(stripped))
+
+        stores_def = [
+            ("simMarket", check_sm, f"https://secure.simmarket.com/advanced_search_result.php?keywords={icao_clean}", "Global flight simulation store & vendor marketplace"),
+            ("Orbx Direct", check_orbx, f"https://orbxdirect.com/msfs?search={icao_clean}", "OrbxDirect official MSFS scenery catalog"),
+            ("Flightsim.to Store", check_fsto, f"https://flightsim.to/store/search?q={icao_clean}", "Official payware marketplace on Flightsim.to"),
+            ("iniBuilds Store", check_ini, f"https://inibuilds.com/search?q={icao_clean}", "iniBuilds premier sceneries & partner developer store"),
+            ("Aerosoft Shop", check_aero, f"https://www.aerosoft.com/en/search?search={icao_clean}", "Aerosoft official European flight simulation store"),
+            ("Contrail Web Shop", check_contrail, f"https://contrail.shop/search?q={icao_clean}", "Flightbeam, Jo Erlend, Pyreegue & partner addons")
+        ]
+
+        results = []
+        with ThreadPoolExecutor(max_workers=6) as ex:
+            futures = {ex.submit(fn, icao_clean): (name, u, desc) for name, fn, u, desc in stores_def}
+            for fut in futures:
+                name, u, desc = futures[fut]
+                try:
+                    found = fut.result()
+                except Exception:
+                    found = False
+                results.append({"name": name, "url": u, "desc": desc, "found": found})
+
+        order = ["simMarket", "Orbx Direct", "Flightsim.to Store", "iniBuilds Store", "Aerosoft Shop", "Contrail Web Shop"]
+        results.sort(key=lambda x: order.index(x["name"]) if x["name"] in order else 99)
+
+        self._payware_store_cache[icao_clean] = results
+        return json.dumps(results)
+
     def export_collection_json(self, airports_json_str):
         try:
             airports = json.loads(airports_json_str)
@@ -1744,6 +1854,7 @@ class Api:
             return json.dumps({"status": "ok", "path": file_path, "count": len(airports)}, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
+
 
 def main():
     web_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'web')

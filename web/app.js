@@ -5267,68 +5267,92 @@ function openPaywareStoresModal(icao, airportName) {
     const modal = document.getElementById('payware-stores-modal');
     if (!modal) return;
 
+    const cleanIcao = (icao || '').trim().toUpperCase();
     const subtitle = document.getElementById('payware-modal-subtitle');
     if (subtitle) {
-        const titleText = airportName ? `${icao} - ${airportName}` : icao;
+        const titleText = airportName ? `${cleanIcao} - ${airportName}` : cleanIcao;
         subtitle.innerText = `Results for "${titleText}"`;
         subtitle.title = `Results for "${titleText}"`;
     }
 
     const listContainer = document.getElementById('payware-stores-list');
     if (listContainer) {
-        const cleanIcao = encodeURIComponent((icao || '').trim());
-        const stores = [
-            {
-                name: 'simMarket',
-                desc: 'Global flight simulation store & marketplace',
-                url: `https://secure.simmarket.com/advanced_search_result.php?keywords=${cleanIcao}`
-            },
-            {
-                name: 'Orbx Direct',
-                desc: 'OrbxDirect official MSFS sceneries catalog',
-                url: `https://orbxdirect.com/msfs?search=${cleanIcao}`
-            },
-            {
-                name: 'Flightsim.to Store',
-                desc: 'Official payware marketplace on Flightsim.to',
-                url: `https://flightsim.to/store/search?q=${cleanIcao}`
-            },
-            {
-                name: 'iniBuilds Store',
-                desc: 'iniBuilds premier sceneries & partner developer store',
-                url: `https://inibuilds.com/search?q=${cleanIcao}`
-            },
-            {
-                name: 'Aerosoft Shop',
-                desc: 'Aerosoft official European flight simulation store',
-                url: `https://www.aerosoft.com/en/search?search=${cleanIcao}`
-            },
-            {
-                name: 'Contrail Web Shop',
-                desc: 'Flightbeam, Jo Erlend, Pyreegue & developer addons',
-                url: `https://contrail.shop/search?q=${cleanIcao}`
-            }
-        ];
-
-        listContainer.innerHTML = stores.map(st => `
-            <button onclick="window.open('${st.url}', '_blank'); closePaywareStoresModal();"
-                    class="w-full p-3 rounded-2xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800/80 hover:border-purple-500/50 text-slate-200 hover:text-white text-xs flex items-center justify-between transition-colors group cursor-pointer">
-                <div class="flex items-center gap-3 text-left min-w-0">
-                    <div class="w-8 h-8 rounded-xl bg-slate-800 group-hover:bg-purple-600 text-slate-400 group-hover:text-white flex items-center justify-center text-xs shrink-0 transition-colors border-0">
-                        <i class="fa-solid fa-arrow-up-right-from-square"></i>
-                    </div>
-                    <div class="truncate min-w-0">
-                        <div class="text-xs font-bold text-white group-hover:text-purple-300 transition-colors">${st.name}</div>
-                        <div class="text-[10px] text-slate-400 font-normal truncate">${st.desc}</div>
-                    </div>
-                </div>
-                <span class="text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg bg-slate-800 text-slate-400 group-hover:bg-purple-600 group-hover:text-white transition-colors shrink-0 ml-2 border-0">OPEN</span>
-            </button>
-        `).join('');
+        // Show loading state while stores are checked
+        listContainer.innerHTML = `
+            <div class="flex flex-col items-center justify-center py-8 space-y-2 text-slate-400">
+                <i class="fa-solid fa-arrows-rotate animate-spin text-purple-400 text-lg"></i>
+                <span class="text-xs font-mono font-medium">Scanning stores for ${cleanIcao}...</span>
+            </div>
+        `;
     }
 
     modal.classList.remove('hidden');
     modal.classList.add('flex');
+
+    // Call Python backend to verify product existence on all stores concurrently
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.check_payware_stores) {
+        window.pywebview.api.check_payware_stores(cleanIcao).then(raw => {
+            const stores = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            renderPaywareStoresList(stores, cleanIcao);
+        }).catch(err => {
+            console.error("Error checking stores:", err);
+            // Fallback default list
+            renderPaywareStoresList([
+                { name: 'simMarket', desc: 'Global flight simulation store & marketplace', url: `https://secure.simmarket.com/advanced_search_result.php?keywords=${cleanIcao}`, found: true },
+                { name: 'Orbx Direct', desc: 'OrbxDirect official MSFS scenery catalog', url: `https://orbxdirect.com/msfs?search=${cleanIcao}`, found: true },
+                { name: 'Flightsim.to Store', desc: 'Official payware marketplace on Flightsim.to', url: `https://flightsim.to/store/search?q=${cleanIcao}`, found: false },
+                { name: 'iniBuilds Store', desc: 'iniBuilds premier sceneries & partner developer store', url: `https://inibuilds.com/search?q=${cleanIcao}`, found: false },
+                { name: 'Aerosoft Shop', desc: 'Aerosoft official European flight simulation store', url: `https://www.aerosoft.com/en/search?search=${cleanIcao}`, found: false },
+                { name: 'Contrail Web Shop', desc: 'Flightbeam, Jo Erlend, Pyreegue & partner addons', url: `https://contrail.shop/search?q=${cleanIcao}`, found: false }
+            ], cleanIcao);
+        });
+    }
+}
+
+function renderPaywareStoresList(stores, cleanIcao) {
+    const listContainer = document.getElementById('payware-stores-list');
+    if (!listContainer) return;
+
+    listContainer.innerHTML = stores.map(st => {
+        if (st.found) {
+            return `
+                <button onclick="window.open('${st.url}', '_blank');"
+                        class="w-full p-3.5 rounded-2xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-purple-500/50 text-slate-200 hover:text-white text-xs flex items-center justify-between transition-colors group cursor-pointer shadow-sm">
+                    <div class="flex items-center gap-3 text-left min-w-0">
+                        <div class="w-8 h-8 rounded-xl bg-slate-800 group-hover:bg-purple-600 text-slate-400 group-hover:text-white flex items-center justify-center text-xs shrink-0 transition-colors border-0">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                        </div>
+                        <div class="truncate min-w-0">
+                            <div class="text-xs font-bold text-white group-hover:text-purple-300 transition-colors">${st.name}</div>
+                            <div class="text-[10px] text-slate-400 font-normal truncate">${st.desc}</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0 ml-2">
+                        <span class="text-[10px] font-mono font-bold text-emerald-400">Available</span>
+                        <i class="fa-solid fa-circle-check text-emerald-400 text-base"></i>
+                    </div>
+                </button>
+            `;
+        } else {
+            return `
+                <div class="w-full p-3.5 rounded-2xl bg-slate-950/40 border border-slate-800/30 text-slate-500 text-xs flex items-center justify-between opacity-35 cursor-not-allowed select-none">
+                    <div class="flex items-center gap-3 text-left min-w-0">
+                        <div class="w-8 h-8 rounded-xl bg-slate-900 text-slate-600 flex items-center justify-center text-xs shrink-0 border-0">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                        </div>
+                        <div class="truncate min-w-0">
+                            <div class="text-xs font-bold text-slate-500">${st.name}</div>
+                            <div class="text-[10px] text-slate-600 font-normal truncate">No scenery found for ${cleanIcao}</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0 ml-2">
+                        <span class="text-[10px] font-mono text-slate-600">Unavailable</span>
+                        <i class="fa-regular fa-circle text-slate-700 text-base"></i>
+                    </div>
+                </div>
+            `;
+        }
+    }).join('');
 }
 
 function closePaywareStoresModal() {
