@@ -1726,6 +1726,7 @@ class Api:
         """Check availability of payware scenery for an ICAO code across major stores."""
         import urllib.request
         import urllib.parse
+        import json
         import re
         from concurrent.futures import ThreadPoolExecutor
 
@@ -1743,10 +1744,17 @@ class Api:
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
         }
 
-        def fetch_html(u):
+        def fetch_html(u, post_json=None):
             try:
-                req = urllib.request.Request(u, headers=headers)
-                with urllib.request.urlopen(req, timeout=4) as resp:
+                h = dict(headers)
+                data = None
+                if post_json is not None:
+                    h['Content-Type'] = 'application/json'
+                    h['Origin'] = 'https://orbxdirect.com'
+                    h['Referer'] = 'https://orbxdirect.com/'
+                    data = json.dumps(post_json).encode('utf-8')
+                req = urllib.request.Request(u, data=data, headers=h)
+                with urllib.request.urlopen(req, timeout=5) as resp:
                     return resp.read().decode('utf-8', errors='ignore')
             except Exception:
                 return ''
@@ -1755,76 +1763,90 @@ class Api:
             u = f"https://secure.simmarket.com/advanced_search_result.php?keywords={code}"
             h = fetch_html(u)
             if not h or "There is no product that matches the search criteria" in h:
-                return False
-            return "itemBox2" in h or "product-listing" in h or code.lower() in h.lower()
+                return False, u
+            return ("product-card" in h), u
 
         def check_orbx(code):
-            u = f"https://orbxdirect.com/msfs?search={code}"
+            default_u = f"https://orbxdirect.com/?s={code}"
+            res = fetch_html("https://orbxdirect.com/api/v4/search", post_json={"search": code})
+            if not res:
+                return False, default_u
+            try:
+                d = json.loads(res)
+                results = d.get('data', {}).get('results', [])
+                msfs_slugs = []
+                for p in results:
+                    slug = p.get('slug', '')
+                    if re.search(r'(^|-)' + re.escape(code.lower()) + r'(-|$)', slug):
+                        msfs_slugs.append(slug)
+                if msfs_slugs:
+                    # Prefer standard msfs slug or 2024
+                    best = next((s for s in msfs_slugs if s.endswith('-msfs')), msfs_slugs[0])
+                    return True, f"https://orbxdirect.com/product/{best}"
+                elif results:
+                    for p in results:
+                        if code.lower() in p.get('slug', ''):
+                            return True, f"https://orbxdirect.com/product/{p.get('slug')}"
+            except Exception:
+                pass
+            return False, default_u
+
+        def check_ini(code):
+            u = f"https://inibuilds.com/search?q={code}&options%5Bprefix%5D=last"
             h = fetch_html(u)
-            if not h or "No products match your search" in h or "0 products" in h:
-                return False
-            stripped = h.replace(f'value="{code}"', '').replace(f"value='{code}'", '')
-            pat = re.compile(r'(\b' + re.escape(code) + r'\b)', re.IGNORECASE)
-            return bool(pat.search(stripped))
+            if not h or "0 results" in h.lower() or "could not find any results" in h.lower():
+                return False, u
+            titles = re.findall(r'card__heading[\s\S]*?<a[^>]*>([\s\S]*?)</a>', h)
+            cleaned = [re.sub(r'<[^>]+>', '', t).strip() for t in titles]
+            has_match = any(re.search(r'\b' + re.escape(code) + r'\b', t, re.IGNORECASE) for t in cleaned)
+            return has_match, u
 
         def check_fsto(code):
             u = f"https://flightsim.to/store/search?q={code}"
             h = fetch_html(u)
             if not h or "no products found" in h.lower() or "0 results" in h.lower():
-                return False
+                return False, u
             stripped = h.replace(f'value="{code}"', '').replace(f"value='{code}'", '')
             pat = re.compile(r'(\b' + re.escape(code) + r'\b)', re.IGNORECASE)
-            return bool(pat.search(stripped))
-
-        def check_ini(code):
-            u = f"https://inibuilds.com/search?q={code}"
-            h = fetch_html(u)
-            if not h or "0 results" in h.lower() or "could not find any results" in h.lower():
-                return False
-            stripped = h.replace(f'value="{code}"', '').replace(f"value='{code}'", '')
-            stripped = re.sub(r'<title>.*?</title>', '', stripped, flags=re.IGNORECASE)
-            pat = re.compile(r'(\b' + re.escape(code) + r'\b)', re.IGNORECASE)
-            return bool(pat.search(stripped))
+            return bool(pat.search(stripped)), u
 
         def check_aero(code):
             u = f"https://www.aerosoft.com/en/search?search={code}"
             h = fetch_html(u)
             if not h or "No results were found" in h or "Keine Ergebnisse" in h:
-                return False
-            stripped = h.replace(f'value="{code}"', '').replace(f"value='{code}'", '')
-            stripped = re.sub(r'<title>.*?</title>', '', stripped, flags=re.IGNORECASE)
-            pat = re.compile(r'(\b' + re.escape(code) + r'\b)', re.IGNORECASE)
-            return bool(pat.search(stripped))
+                return False, u
+            boxes = re.findall(r'class=[\'"][^\'"]*product--(?:box|title|info)[^\'"]*[\'"][\s\S]*?</div>', h)
+            has_match = any(re.search(r'\b' + re.escape(code) + r'\b', b, re.IGNORECASE) for b in boxes)
+            return has_match, u
 
         def check_contrail(code):
             u = f"https://contrail.shop/search?q={code}"
             h = fetch_html(u)
             if not h or "0 results" in h.lower() or "no results" in h.lower():
-                return False
-            stripped = h.replace(f'value="{code}"', '').replace(f"value='{code}'", '')
-            stripped = re.sub(r'<title>.*?</title>', '', stripped, flags=re.IGNORECASE)
-            pat = re.compile(r'(\b' + re.escape(code) + r'\b)', re.IGNORECASE)
-            return bool(pat.search(stripped))
+                return False, u
+            cards = re.findall(r'class=[\'"][^\'"]*product-card[^\'"]*[\'"][\s\S]*?</div>', h)
+            has_match = any(re.search(r'\b' + re.escape(code) + r'\b', c, re.IGNORECASE) for c in cards)
+            return has_match, u
 
         stores_def = [
-            ("simMarket", check_sm, f"https://secure.simmarket.com/advanced_search_result.php?keywords={icao_clean}", "Global flight simulation store & vendor marketplace"),
-            ("Orbx Direct", check_orbx, f"https://orbxdirect.com/msfs?search={icao_clean}", "OrbxDirect official MSFS scenery catalog"),
-            ("Flightsim.to Store", check_fsto, f"https://flightsim.to/store/search?q={icao_clean}", "Official payware marketplace on Flightsim.to"),
-            ("iniBuilds Store", check_ini, f"https://inibuilds.com/search?q={icao_clean}", "iniBuilds premier sceneries & partner developer store"),
-            ("Aerosoft Shop", check_aero, f"https://www.aerosoft.com/en/search?search={icao_clean}", "Aerosoft official European flight simulation store"),
-            ("Contrail Web Shop", check_contrail, f"https://contrail.shop/search?q={icao_clean}", "Flightbeam, Jo Erlend, Pyreegue & partner addons")
+            ("simMarket", check_sm, "Global flight simulation store & vendor marketplace"),
+            ("Orbx Direct", check_orbx, "OrbxDirect official MSFS scenery catalog"),
+            ("Flightsim.to Store", check_fsto, "Official payware marketplace on Flightsim.to"),
+            ("iniBuilds Store", check_ini, "iniBuilds premier sceneries & partner developer store"),
+            ("Aerosoft Shop", check_aero, "Aerosoft official European flight simulation store"),
+            ("Contrail Web Shop", check_contrail, "Flightbeam, Jo Erlend, Pyreegue & partner addons")
         ]
 
         results = []
         with ThreadPoolExecutor(max_workers=6) as ex:
-            futures = {ex.submit(fn, icao_clean): (name, u, desc) for name, fn, u, desc in stores_def}
+            futures = {ex.submit(fn, icao_clean): (name, desc) for name, fn, desc in stores_def}
             for fut in futures:
-                name, u, desc = futures[fut]
+                name, desc = futures[fut]
                 try:
-                    found = fut.result()
+                    found, final_url = fut.result()
                 except Exception:
-                    found = False
-                results.append({"name": name, "url": u, "desc": desc, "found": found})
+                    found, final_url = False, ""
+                results.append({"name": name, "url": final_url, "desc": desc, "found": found})
 
         order = ["simMarket", "Orbx Direct", "Flightsim.to Store", "iniBuilds Store", "Aerosoft Shop", "Contrail Web Shop"]
         results.sort(key=lambda x: order.index(x["name"]) if x["name"] in order else 99)
