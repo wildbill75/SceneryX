@@ -1,4 +1,4 @@
-# SceneryX — Next-Generation MSFS Scenery & Flight Operations Manager
+# SceneryX — Next-Generation MSFS Scenery & Collection Manager
 
 [![Version](https://img.shields.io/badge/version-1.0.1--BETA-cyan.svg)](https://github.com/wildbill75/SceneryX)
 [![Platform](https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-blue.svg)](https://github.com/wildbill75/SceneryX)
@@ -19,9 +19,9 @@
 # 🇬🇧 English
 
 ## 1. Overview
-**SceneryX** is a modern, high-performance desktop suite designed specifically for Microsoft Flight Simulator (MSFS 2020 and MSFS 2024) pilots and enthusiasts. It bridges the gap between scenery library management, collection financial tracking, real-time marketplace price comparison, live weather briefings, and flight plan route optimization (SimBrief).
+**SceneryX** is a modern, high-performance desktop suite designed specifically for Microsoft Flight Simulator (MSFS 2020 and MSFS 2024) pilots and enthusiasts. It bridges the gap between scenery library management, collection financial tracking, and real-time marketplace price comparison across major flight simulation stores.
 
-Built with a native single-executable architecture and an ultra-responsive dark glassmorphism cockpit interface, SceneryX empowers flight simmers to catalog, inspect, audit, and optimize hundreds of installed airport add-ons seamlessly.
+Built with a native single-executable architecture and an ultra-responsive dark glassmorphism cockpit interface, SceneryX empowers flight simmers to catalog, inspect, audit, and organize hundreds of installed airport add-ons seamlessly.
 
 ---
 
@@ -52,16 +52,6 @@ Built with a native single-executable architecture and an ultra-responsive dark 
 - **Smart Anti-False-Positive Engine**: Rigorously excludes vintage/retro packages (e.g. *1935 Geneva*), city landmark packs (e.g. *Paris Landmarks*), GSX profile packs, liveries, textures, night lighting packs, and legacy simulator versions (*FSX*, *P3D*, *X-Plane*).
 - **Non-Closing Modal Workflow**: Keeps the comparator modal open when clicking external links to let you cross-check multiple vendors without interruption.
 
-### 🌦️ Live Weather & ACARS Briefings
-- **Structured Briefing Engine**: Retrieves live METAR and TAF reports for departure, destination, and alternate stations.
-- **Pilot Telemetry Badges**: Key variables (QNH, Wind Direction & Speed, Visibility, Cloud Base, Temperature/Dew point) isolated as color-coded pills.
-- **Operational Commentary**: Runway selection advice and pilot-style weather summaries.
-- **Periodic ACARS Refresh**: Background update loop continuously refreshing weather conditions without flickering.
-
-### ⚡ SimBrief Flight Route Optimizer
-- **Direct SimBrief Dispatch Import**: Pull your latest flight plan using your SimBrief Pilot ID or username.
-- **VRAM & Memory Scenery Isolation**: Temporarily disables unused third-party sceneries worldwide while preserving Origin, Destination, and Alternates, drastically reducing simulator loading times and memory usage.
-
 ### 📤 Multi-Format Exports & Backups
 - **CSV Spreadsheet**: Export your entire catalog or active filtered view into an Excel-, Volanta-, and Elevatex-compatible CSV.
 - **JSON Full Backup**: Export complete raw structured metadata for database backup or custom integration.
@@ -76,7 +66,7 @@ Built with a native single-executable architecture and an ultra-responsive dark 
 # 🇫🇷 Français
 
 ## 1. Présentation
-**SceneryX** est une suite logicielle de bureau moderne et performante conçue pour les pilotes et passionnés de Microsoft Flight Simulator (MSFS 2020 et MSFS 2024). Elle réunit au sein d'une même interface la gestion de votre bibliothèque de scènes, le suivi financier de vos investissements, la comparaison en direct des prix sur les boutiques spécialisées, les briefings météo ACARS et l'optimisation des scènes selon votre plan de vol SimBrief.
+**SceneryX** est une suite logicielle de bureau moderne et performante conçue pour les pilotes et passionnés de Microsoft Flight Simulator (MSFS 2020 et MSFS 2024). Elle réunit au sein d'une même interface la gestion de votre bibliothèque de scènes, le suivi financier de vos investissements et la comparaison en direct des prix sur les principales boutiques spécialisées.
 
 Distribué sous forme d'un exécutable unique autonome et doté d'une interface sombre style cockpit en verre dépoli (glassmorphism), SceneryX vous permet d'auditer, cataloguer et organiser des centaines d'aéroports en toute simplicité.
 
@@ -109,16 +99,6 @@ Distribué sous forme d'un exécutable unique autonome et doté d'une interface 
 - **Moteur Anti-Faux-Positifs** : Écarte automatiquement les scènes d'époque (*Genève 1935*), les packs de monuments/villes (*Paris Landmarks*), les livrées, textures, sons, profils GSX et versions pour anciens simulateurs (*FSX*, *P3D*, *X-Plane*).
 - **Navigation Continue** : La modale reste ouverte lors d'un clic pour vous permettre d'ouvrir plusieurs boutiques en parallèle.
 
-### 🌦️ Briefing Météo & Télégrammes ACARS
-- **Moteur de Briefing Structuré** : Récupération des rapports METAR et TAF pour les stations de départ, d'arrivée et de déroutement.
-- **Badges Télémétriques** : QNH, Vent, Visibilité, Plafond nuageux et Température mis en évidence.
-- **Conseils Opérationnels** : Recommandations de piste en service et commentaires narratifs type pilote de ligne.
-- **Rafraîchissement Arrière-Plan** : Mise à jour périodique transparente sans scintillement d'interface.
-
-### ⚡ Optimiseur de Scènes SimBrief
-- **Import Direct SimBrief** : Récupération de votre dernier plan de vol via votre identifiant pilote ou nom d'utilisateur.
-- **Isolation Mémoire & VRAM** : Désactive temporairement les scènes tierces superflues tout en conservant l'origine, la destination et les dégagements, accélérant drastiquement le chargement du simulateur.
-
 ### 📤 Sauvegardes & Exports Multi-Formats
 - **Export Tableur CSV** : Fichier tableur complet compatible avec Excel, Google Sheets, Volanta et Elevatex.
 - **Sauvegarde JSON Complète** : Export structuré de l'intégralité de vos métadonnées pour archivage ou automatisation.
@@ -133,7 +113,7 @@ Distribué sous forme d'un exécutable unique autonome et doté d'une interface 
 # 🇩🇪 Deutsch
 
 ## 1. Übersicht
-**SceneryX** ist eine moderne, hochperformante Desktop-Suite für Microsoft Flight Simulator (MSFS 2020 und MSFS 2024). Sie vereint Szenerieverwaltung, finanzielle Erfassung Ihrer Add-on-Ausgaben, Echtzeit-Preisvergleiche führender Flugsimulations-Shops, ACARS-Wetterbriefings und SimBrief-Flugstrecken-Optimierung in einer eleganten Benutzeroberfläche.
+**SceneryX** ist eine moderne, hochperformante Desktop-Suite für Microsoft Flight Simulator (MSFS 2020 und MSFS 2024). Sie vereint Szenerieverwaltung, finanzielle Erfassung Ihrer Add-on-Ausgaben und Echtzeit-Preisvergleiche führender Flugsimulations-Shops in einer eleganten Benutzeroberfläche.
 
 Als eigenständige ausführbare Datei mit dunklem Glasmorphismus-Cockpit-Design konzipiert, bietet SceneryX vollständige Übersicht und Kontrolle über Hunderte von Flughafenszenerien.
 
@@ -166,16 +146,6 @@ Als eigenständige ausführbare Datei mit dunklem Glasmorphismus-Cockpit-Design 
 - **Intelligenter Falsch-Positiv-Filter**: Schließt historische Retro-Szenerien (*Genf 1935*), Stadt-Wahrzeichen (*Paris Landmarks*), Lackierungen, Profile und ältere Simulatoren (*FSX*, *P3D*, *X-Plane*) zuverlässig aus.
 - **Paralleles Stöbern**: Das Vergleichsfenster bleibt nach dem Klick geöffnet für bequemes Vergleichen im Browser.
 
-### 🌦️ Live-Wetter & ACARS-Briefings
-- **Strukturiertes Briefing**: METAR- und TAF-Berichte für Abflug-, Ziel- und Ausweichflughäfen.
-- **Piloten-Badges**: QNH, Windrichtung/-stärke, Sichtweite, Wolkenuntergrenze und Temperatur übersichtlich dargestellt.
-- **Bahnempfehlungen**: Berechnete Landebahnempfehlungen und operationelle Kommentare.
-- **Periodische Aktualisierung**: Kontinuierliche Hintergrundaktualisierung ohne Benutzeroberflächen-Flackern.
-
-### ⚡ SimBrief-Streckenoptimierer
-- **SimBrief-Import**: Direkter Import des letzten Flugplans mittels Pilot-ID oder Benutzername.
-- **Speicher- und VRAM-Optimierung**: Deaktiviert ungenutzte weltweite Szenerien temporär und behält Abflug, Ankunft und Ausweichflughäfen bei für maximale Ladeleistung.
-
 ### 📤 Exporte & Datensicherung
 - **CSV-Export**: Kompatibel mit Excel, Google Tabellen, Volanta und Elevatex.
 - **JSON-Komplettsicherung**: Vollständiger strukturierter Metadatenexport für Backups und Werkzeuge.
@@ -190,7 +160,7 @@ Als eigenständige ausführbare Datei mit dunklem Glasmorphismus-Cockpit-Design 
 # 🇪🇸 Español
 
 ## 1. Resumen
-**SceneryX** es una suite de escritorio moderna y de alto rendimiento diseñada específicamente para pilotos y aficionados de Microsoft Flight Simulator (MSFS 2020 y MSFS 2024). Integra en un único entorno la gestión de bibliotecas de escenarios, el control de inversión financiera en complementos, la comparación de precios en tiendas especializadas en tiempo real, informes meteorológicos ACARS y la optimización de rutas de vuelo mediante SimBrief.
+**SceneryX** es una suite de escritorio moderna y de alto rendimiento diseñada específicamente para pilotos y aficionados de Microsoft Flight Simulator (MSFS 2020 y MSFS 2024). Integra en un único entorno la gestión de bibliotecas de escenarios, el control de inversión financiera en complementos y la comparación de precios en tiendas especializadas en tiempo real.
 
 Distribuido como un archivo ejecutable único con una interfaz oscura estilo cabina en vidrio esmerilado (glassmorphism), SceneryX facilita la organización y auditoría de cientos de aeropuertos instalados.
 
@@ -223,16 +193,6 @@ Distribuido como un archivo ejecutable único con una interfaz oscura estilo cab
 - **Filtro Inteligente Anti-Falsos Positivos**: Bloquea paquetes retro (*Ginebra 1935*), monumentos urbanos (*Paris Landmarks*), libreas, texturas, perfiles GSX y simuladores anteriores (*FSX*, *P3D*, *X-Plane*).
 - **Consulta Continua**: La ventana emergente no se cierra al abrir un enlace, permitiendo contrastar varias ofertas simultáneamente.
 
-### 🌦️ Informes Meteorológicos y ACARS
-- **Motor de Briefing Estructurado**: Recepción de METAR y TAF para salida, llegada y alternativas.
-- **Insignias Telemétricas**: QNH, Viento, Visibilidad, Techo de nubes y Temperatura destacados visualmente.
-- **Consejos de Pista**: Sugerencias operativas de pistas activas y comentarios estilo piloto comercial.
-- **Actualización en Segundo Plano**: Bucle periódico transparente sin parpadeos visuales.
-
-### ⚡ Optimizador de Escenarios SimBrief
-- **Importación Directa SimBrief**: Carga instantánea del último plan de vuelo mediante ID de piloto o usuario.
-- **Aislamiento de Memoria y VRAM**: Desactiva temporalmente escenarios innecesarios conservando origen, destino y alternativas para acelerar la carga del simulador.
-
 ### 📤 Exportación y Copias de Seguridad
 - **Hoja de Cálculo CSV**: Exportación compatible con Excel, Google Sheets, Volanta y Elevatex.
 - **Copia de Seguridad JSON**: Exportación estructurada de metadatos completos para respaldo.
@@ -256,17 +216,13 @@ The authors and copyright holders shall in no event be held liable for any claim
 - **Asobo Studio®** is a registered trademark of Asobo Studio SAS.
 - **Lockheed Martin®** and **Prepar3D®** are registered trademarks of Lockheed Martin Corporation.
 - **Laminar Research®** and **X-Plane®** are registered trademarks of Laminar Research.
-- **SimBrief®** and **Navigraph®** are registered trademarks of Navigraph Sweden AB.
 - **GSX Pro®** and **FSDreamTeam®** are registered trademarks of VIRTUALI s.a.s.
 - **simMarket®**, **Orbx®**, **Aerosoft®**, **iniBuilds®**, **Flightbeam®**, **FlyTampa®**, **Flightsim.to®**, **France VFR®**, and other third-party vendor names and logos are trademarks of their respective owners.
 - **SceneryX is an independent community project and is NOT affiliated with, authorized, sponsored, or endorsed by Microsoft Corporation, Asobo Studio, or any third-party developer or storefront mentioned.**
 
 ### 3. Data Privacy & Local Processing
 - **100% Local Processing**: SceneryX does NOT collect, harvest, store, or transmit any personal identifying information, simulator telemetry, credentials, or analytical data.
-- **External Web Queries**: Network traffic generated by SceneryX is strictly restricted to:
-  - Public SimBrief XML dispatch retrieval (upon user manual request).
-  - Public NOAA / VATSIM / Active Sky METAR & TAF meteorological feeds.
-  - Public search endpoints of flight simulation storefronts (to check add-on availability and pricing).
+- **External Web Queries**: Network traffic generated by SceneryX is strictly restricted to public search endpoints of flight simulation storefronts (to check add-on availability and pricing).
 - No user data is stored on remote servers; all settings and library databases reside strictly on your local machine (`%APPDATA%\SceneryX` and application directory).
 
 ### 4. License & Redistribution
