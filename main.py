@@ -5,7 +5,7 @@ import re
 import urllib.request
 import webbrowser
 import webview
-from scanner import run_scan, get_settings, save_settings, load_ratings, save_rating, save_custom_price, save_custom_category, load_custom_prices, get_estimated_price, get_default_gsx_path, load_airport_database, SPECIAL_BUNDLE_MAP, OUTPUT_JSON_PATH
+from scanner import run_scan, get_settings, save_settings, load_ratings, save_rating, save_custom_price, save_custom_category, load_custom_prices, get_estimated_price, get_default_gsx_path, load_airport_database, SPECIAL_BUNDLE_MAP, OUTPUT_JSON_PATH, compute_scan_delta
 
 AIRPORTS_DB_CACHE = None
 
@@ -300,16 +300,24 @@ class Api:
         auto_scan = settings.get("auto_scan_on_startup", True)
         if auto_scan:
             airports = run_scan()
+            self._startup_delta = compute_scan_delta(airports, update_snapshot=True)
             return json.dumps(airports, ensure_ascii=False)
 
         if os.path.exists(OUTPUT_JSON_PATH):
             try:
                 with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
-                    return f.read()
+                    airports = json.load(f)
+                    self._startup_delta = {"added": [], "removed": [], "total_changes": 0}
+                    return json.dumps(airports, ensure_ascii=False)
             except Exception as e:
                 print("Error reading cached installed_airports.json, performing fresh scan:", e)
         airports = run_scan()
+        self._startup_delta = compute_scan_delta(airports, update_snapshot=True)
         return json.dumps(airports, ensure_ascii=False)
+
+    def get_startup_delta(self):
+        delta = getattr(self, '_startup_delta', {"added": [], "removed": [], "total_changes": 0})
+        return json.dumps(delta, ensure_ascii=False)
 
     def get_world_airport_coords(self):
         try:
@@ -331,7 +339,8 @@ class Api:
 
     def rescan(self):
         airports = run_scan()
-        return json.dumps(airports, ensure_ascii=False)
+        delta = compute_scan_delta(airports, update_snapshot=True)
+        return json.dumps({"airports": airports, "delta": delta}, ensure_ascii=False)
 
     def fetch_simbrief(self, identifier):
         identifier = str(identifier).strip()

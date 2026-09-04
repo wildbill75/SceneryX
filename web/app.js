@@ -1397,6 +1397,7 @@ async function loadAirportsData() {
         applyStartupCameraSettings();
         hideSplashScreen();
         checkFirstLaunchDisclaimer();
+        checkStartupChanges();
     } catch (err) {
         console.error("Failed to load airports:", err);
         hideSplashScreen();
@@ -4036,38 +4037,164 @@ function setButtonActive(btn, active) {
     }
 }
 
+async function checkStartupChanges() {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.get_startup_delta) return;
+    try {
+        const resStr = await window.pywebview.api.get_startup_delta();
+        if (!resStr) return;
+        const delta = JSON.parse(resStr);
+        if (delta && delta.total_changes > 0) {
+            displayScanResults(delta, true);
+        }
+    } catch (e) {
+        console.warn("Could not check startup delta:", e);
+    }
+}
+
+function displayScanResults(delta, isStartup = false) {
+    if (!delta) return;
+
+    const totalChanges = delta.total_changes || 0;
+    const addedList = delta.added || [];
+    const removedList = delta.removed || [];
+
+    // On startup, if no changes were detected, DO NOT show the modal
+    if (isStartup && totalChanges === 0) {
+        return;
+    }
+
+    const modal = document.getElementById('rescan-modal');
+    const phaseScanning = document.getElementById('rescan-phase-scanning');
+    const phaseResult = document.getElementById('rescan-phase-result');
+    const titleEl = document.getElementById('rescan-result-title');
+    const msgEl = document.getElementById('rescan-result-message');
+    const listCont = document.getElementById('rescan-new-items-container');
+
+    if (modal) {
+        if (phaseScanning) phaseScanning.classList.add('hidden');
+        if (phaseResult) phaseResult.classList.remove('hidden');
+        modal.classList.remove('hidden');
+    }
+
+    if (totalChanges > 0) {
+        if (titleEl) {
+            titleEl.innerHTML = `<i class="fa-solid fa-layer-group text-cyan-400 text-lg mr-2"></i><span>${t('rescan.changes_detected', 'Library Changes Detected')}</span>`;
+        }
+
+        if (msgEl) {
+            let summaryParts = [];
+            if (addedList.length > 0) {
+                summaryParts.push(`<span class="text-emerald-400 font-bold">+${addedList.length}</span> ${t('rescan.status_added', 'Added').toLowerCase()}`);
+            }
+            if (removedList.length > 0) {
+                summaryParts.push(`<span class="text-rose-400 font-bold">-${removedList.length}</span> ${t('rescan.status_removed', 'Removed').toLowerCase()}`);
+            }
+            msgEl.innerHTML = `${t('rescan.changes_summary', 'SceneryX detected changes in your library folders:')} <span class="ml-1 text-slate-200 font-semibold">(${summaryParts.join(', ')})</span>`;
+        }
+
+        if (listCont) {
+            const htmlItems = [];
+
+            // 1. Added items (Green/Emerald card)
+            addedList.forEach(item => {
+                let badgeClass = "bg-cyan-950/80 text-cyan-300 border-cyan-800/70";
+                const tLower = (item.type || '').toLowerCase();
+                if (tLower.includes('payware')) {
+                    badgeClass = "bg-emerald-950/80 text-emerald-300 border-emerald-800/70";
+                } else if (tLower.includes('asobo')) {
+                    badgeClass = "bg-blue-950/80 text-blue-300 border-blue-800/70";
+                } else if (tLower.includes('gsx')) {
+                    badgeClass = "bg-purple-950/80 text-purple-300 border-purple-800/70";
+                }
+
+                const displayName = item.name || item.icao;
+                const pkgName = item.folder_name || '';
+
+                htmlItems.push(`
+                    <div onclick="closeRescanModal(); selectAirport('${item.icao}')"
+                         title="${t('general.view_on_map', 'Click to view on map')}"
+                         class="group p-2.5 rounded-xl bg-slate-900/95 hover:bg-slate-800/90 border border-emerald-500/40 hover:border-emerald-400 flex items-center justify-between gap-3 transition-all cursor-pointer shadow-sm">
+                        <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                            <span class="px-2 py-1 rounded-lg bg-emerald-950 text-emerald-300 font-mono font-bold text-xs border border-emerald-700/60 shrink-0 shadow-inner">
+                                ${item.icao}
+                            </span>
+                            <div class="min-w-0 flex-1">
+                                <div class="text-xs font-bold text-slate-200 group-hover:text-emerald-300 transition-colors truncate">
+                                    ${displayName}
+                                </div>
+                                <div class="text-[11px] font-mono text-slate-400 truncate mt-0.5 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-folder text-[10px] text-slate-500"></i>
+                                    <span class="truncate">${pkgName}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-500/50 bg-emerald-950/80 text-emerald-300 flex items-center gap-1">
+                                <i class="fa-solid fa-plus text-[9px]"></i> ${t('rescan.status_added', 'Added')}
+                            </span>
+                            <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full border ${badgeClass}">
+                                ${item.type}
+                            </span>
+                            <i class="fa-solid fa-chevron-right text-[10px] text-slate-600 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all"></i>
+                        </div>
+                    </div>
+                `);
+            });
+
+            // 2. Removed items (Rose/Red card)
+            removedList.forEach(item => {
+                const displayName = item.name || item.icao;
+                const pkgName = item.folder_name || '';
+
+                htmlItems.push(`
+                    <div class="p-2.5 rounded-xl bg-slate-900/95 border border-rose-500/30 flex items-center justify-between gap-3 shadow-sm opacity-90">
+                        <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                            <span class="px-2 py-1 rounded-lg bg-rose-950/80 text-rose-300 font-mono font-bold text-xs border border-rose-800/60 shrink-0 shadow-inner">
+                                ${item.icao}
+                            </span>
+                            <div class="min-w-0 flex-1">
+                                <div class="text-xs font-semibold text-slate-300 truncate">
+                                    ${displayName}
+                                </div>
+                                <div class="text-[11px] font-mono text-slate-400 truncate mt-0.5 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-trash-can text-[10px] text-rose-400/70"></i>
+                                    <span class="truncate">${pkgName}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border border-rose-500/50 bg-rose-950/80 text-rose-300 flex items-center gap-1">
+                                <i class="fa-solid fa-minus text-[9px]"></i> ${t('rescan.status_removed', 'Removed')}
+                            </span>
+                            <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-slate-700 bg-slate-800/80 text-slate-400">
+                                ${item.type}
+                            </span>
+                        </div>
+                    </div>
+                `);
+            });
+
+            listCont.innerHTML = htmlItems.join('');
+            listCont.classList.remove('hidden');
+        }
+    } else {
+        // No changes detected (manual rescan)
+        if (titleEl) {
+            titleEl.innerHTML = `<i class="fa-solid fa-circle-check text-cyan-400 text-lg mr-2"></i><span>${t('rescan.completed_title', 'Scan Completed')}</span>`;
+        }
+        if (msgEl) {
+            msgEl.innerText = t('rescan.no_changes', 'No changes detected. Your library is up to date.');
+        }
+        if (listCont) {
+            listCont.classList.add('hidden');
+            listCont.innerHTML = '';
+        }
+    }
+}
+
 async function rescanMSFS() {
     const icon = document.getElementById('rescan-icon');
     if (icon) icon.classList.add('fa-spin');
-
-    // 1. Snapshot all existing custom add-on packages before rescan
-    const prevPackages = new Set();
-    const prevPackagesClean = new Set();
-    const prevGsxProfiles = new Set();
-
-    if (Array.isArray(allAirportsData)) {
-        allAirportsData.forEach(a => {
-            if (a.has_gsx_profile && a.gsx_profile_filename) {
-                prevGsxProfiles.add(a.gsx_profile_filename.toLowerCase());
-            }
-            if (a.all_sources && Array.isArray(a.all_sources)) {
-                a.all_sources.forEach(s => {
-                    const fn = s.folder_name || '';
-                    if (fn && !fn.startsWith('msfs-default-') && s.pricing_type !== 'Default') {
-                        const fnLower = fn.toLowerCase();
-                        prevPackages.add(fnLower);
-                        prevPackagesClean.add(fnLower.replace(/\.disabled$/, ''));
-                    }
-                });
-            }
-            const p = a.package_name || '';
-            if (p && !p.startsWith('msfs-default-') && a.pricing_type !== 'Default') {
-                const pLower = p.toLowerCase();
-                prevPackages.add(pLower);
-                prevPackagesClean.add(pLower.replace(/\.disabled$/, ''));
-            }
-        });
-    }
 
     const modal = document.getElementById('rescan-modal');
     const phaseScanning = document.getElementById('rescan-phase-scanning');
@@ -4102,16 +4229,28 @@ async function rescanMSFS() {
     }, 100);
 
     try {
-        let dataStr;
+        let scanResult;
         if (window.pywebview) {
-            dataStr = await window.pywebview.api.rescan();
-            allAirportsData = JSON.parse(dataStr);
+            const dataStr = await window.pywebview.api.rescan();
+            scanResult = JSON.parse(dataStr);
         } else {
             const resp = await fetch('/api/rescan', { method: 'POST' });
-            allAirportsData = await resp.json();
+            scanResult = await resp.json();
         }
 
         clearInterval(progressTimer);
+
+        let newAirports = [];
+        let delta = null;
+
+        if (Array.isArray(scanResult)) {
+            newAirports = scanResult;
+        } else if (scanResult && scanResult.airports) {
+            newAirports = scanResult.airports;
+            delta = scanResult.delta;
+        }
+
+        allAirportsData = newAirports;
 
         // Advance to 100% smoothly
         if (progressBar) progressBar.style.width = '100%';
@@ -4139,139 +4278,8 @@ async function rescanMSFS() {
         // Brief pause at 100% before displaying result
         await new Promise(r => setTimeout(r, 350));
 
-        // 2. Identify newly detected packages across all_sources and airports
-        const newlyDetected = [];
-        const seenNew = new Set();
-
-        allAirportsData.forEach(a => {
-            // Check all sources of each airport
-            if (a.all_sources && Array.isArray(a.all_sources)) {
-                a.all_sources.forEach(s => {
-                    const fn = s.folder_name || '';
-                    if (!fn || fn.startsWith('msfs-default-') || s.pricing_type === 'Default') return;
-
-                    const fnLower = fn.toLowerCase();
-                    const cleanFn = fnLower.replace(/\.disabled$/, '');
-
-                    if (!prevPackages.has(fnLower) && !prevPackagesClean.has(cleanFn) && !seenNew.has(cleanFn)) {
-                        seenNew.add(cleanFn);
-                        const pType = s.pricing_type || (s.is_payware ? 'Payware' : (s.is_asobo_official ? 'Asobo' : 'Freeware'));
-                        newlyDetected.push({
-                            icao: a.icao,
-                            name: a.name || a.city || a.icao,
-                            pkg: fn.replace(/\.disabled$/, ''),
-                            vendor: s.vendor || a.vendor || '',
-                            source_folder: s.source_folder || a.source_folder || '',
-                            type: pType
-                        });
-                    }
-                });
-            } else {
-                const p = a.package_name || '';
-                if (p && !p.startsWith('msfs-default-') && a.pricing_type !== 'Default') {
-                    const pLower = p.toLowerCase();
-                    const cleanP = pLower.replace(/\.disabled$/, '');
-                    if (!prevPackages.has(pLower) && !prevPackagesClean.has(cleanP) && !seenNew.has(cleanP)) {
-                        seenNew.add(cleanP);
-                        const pType = a.pricing_type || (a.is_payware ? 'Payware' : (a.is_asobo_official ? 'Asobo' : 'Freeware'));
-                        newlyDetected.push({
-                            icao: a.icao,
-                            name: a.name || a.city || a.icao,
-                            pkg: p.replace(/\.disabled$/, ''),
-                            vendor: a.vendor || '',
-                            source_folder: a.source_folder || '',
-                            type: pType
-                        });
-                    }
-                }
-            }
-
-            // Also check newly added GSX profiles
-            if (a.has_gsx_profile && a.gsx_profile_filename) {
-                const gsxLower = a.gsx_profile_filename.toLowerCase();
-                if (!prevGsxProfiles.has(gsxLower) && !seenNew.has(gsxLower)) {
-                    seenNew.add(gsxLower);
-                    newlyDetected.push({
-                        icao: a.icao,
-                        name: a.name || a.city || a.icao,
-                        pkg: a.gsx_profile_filename,
-                        vendor: 'GSX Pro',
-                        source_folder: 'GSX Profiles',
-                        type: 'GSX Profile'
-                    });
-                }
-            }
-        });
-
-        // Switch to result phase
-        if (phaseScanning) phaseScanning.classList.add('hidden');
-        if (phaseResult) phaseResult.classList.remove('hidden');
-
-        const titleEl = document.getElementById('rescan-result-title');
-        const msgEl = document.getElementById('rescan-result-message');
-        const listCont = document.getElementById('rescan-new-items-container');
-
-        if (newlyDetected.length > 0) {
-            if (titleEl) {
-                titleEl.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400 text-lg mr-2"></i><span>${t('rescan.complete', 'Scan Complete')}</span>`;
-            }
-            if (msgEl) {
-                msgEl.innerHTML = `<span class="text-emerald-400 font-bold">${newlyDetected.length}</span> ${t('rescan.new_packages_found', 'new scenery package(s) detected and indexed:')}`;
-            }
-
-            if (listCont) {
-                listCont.innerHTML = newlyDetected.map(item => {
-                    let badgeClass = "bg-cyan-950/80 text-cyan-300 border-cyan-800/70";
-                    const tLower = (item.type || '').toLowerCase();
-                    if (tLower.includes('payware')) {
-                        badgeClass = "bg-emerald-950/80 text-emerald-300 border-emerald-800/70";
-                    } else if (tLower.includes('asobo')) {
-                        badgeClass = "bg-blue-950/80 text-blue-300 border-blue-800/70";
-                    } else if (tLower.includes('gsx')) {
-                        badgeClass = "bg-purple-950/80 text-purple-300 border-purple-800/70";
-                    }
-
-                    return `
-                        <div onclick="closeRescanModal(); selectAirport('${item.icao}')"
-                             title="${t('general.view_on_map', 'Click to view on map')}"
-                             class="group p-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800/90 border border-slate-800/80 hover:border-cyan-500/50 flex items-center justify-between gap-3 transition-all cursor-pointer shadow-sm">
-                            <div class="flex items-center gap-2.5 min-w-0 flex-1">
-                                <span class="px-2 py-1 rounded-lg bg-cyan-950 text-cyan-400 font-mono font-bold text-xs border border-cyan-800/50 shrink-0 shadow-inner">
-                                    ${item.icao}
-                                </span>
-                                <div class="min-w-0 flex-1">
-                                    <div class="text-xs font-bold text-slate-200 group-hover:text-cyan-300 transition-colors truncate">
-                                        ${item.name || item.icao}
-                                    </div>
-                                    <div class="text-[11px] font-mono text-slate-400 truncate mt-0.5 flex items-center gap-1.5">
-                                        <i class="fa-solid fa-folder text-[10px] text-slate-500"></i>
-                                        <span class="truncate">${item.pkg}</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="flex items-center gap-2 shrink-0">
-                                <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full border ${badgeClass}">
-                                    ${item.type}
-                                </span>
-                                <i class="fa-solid fa-chevron-right text-[10px] text-slate-600 group-hover:text-cyan-400 group-hover:translate-x-0.5 transition-all"></i>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-                listCont.classList.remove('hidden');
-            }
-        } else {
-            if (titleEl) {
-                titleEl.innerHTML = `<i class="fa-solid fa-circle-check text-cyan-400 text-lg mr-2"></i><span>${t('rescan.completed_title', 'Scan Completed')}</span>`;
-            }
-            if (msgEl) {
-                msgEl.innerText = t('rescan.no_addon', 'No new addon detected.');
-            }
-            if (listCont) {
-                listCont.classList.add('hidden');
-                listCont.innerHTML = '';
-            }
-        }
+        // Display delta scan results
+        displayScanResults(delta, false);
 
     } catch (err) {
         console.error("Rescan error:", err);

@@ -22,12 +22,14 @@ OUTPUT_JSON_PATH = os.path.join(USER_DATA_DIR, "installed_airports.json")
 SETTINGS_JSON_PATH = os.path.join(USER_DATA_DIR, "settings.json")
 RATINGS_JSON_PATH = os.path.join(USER_DATA_DIR, "ratings.json")
 CUSTOM_PRICES_JSON_PATH = os.path.join(USER_DATA_DIR, "custom_prices.json")
+SNAPSHOT_JSON_PATH = os.path.join(USER_DATA_DIR, "library_snapshot.json")
 
 # Auto-migrate any existing legacy config files from local executable folder to %APPDATA%/SceneryX/
 for filename, target_path in [
     ("settings.json", SETTINGS_JSON_PATH),
     ("ratings.json", RATINGS_JSON_PATH),
     ("custom_prices.json", CUSTOM_PRICES_JSON_PATH),
+    ("library_snapshot.json", SNAPSHOT_JSON_PATH),
     ("installed_airports.json", OUTPUT_JSON_PATH)
 ]:
     local_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
@@ -1548,6 +1550,108 @@ def run_scan():
     save_folder_size_cache(folder_size_cache)
     print(f"Scan complete: {len(detected_airports)} unique airports saved.")
     return detected_airports
+
+def build_library_snapshot(airports):
+    """
+    Extracts all custom scenery packages and GSX profiles into a dictionary
+    keyed by unique clean identifier.
+    Clean names strip '.disabled' so toggling within SceneryX never counts as an external add/remove.
+    """
+    snapshot = {}
+    for ap in airports:
+        icao = ap.get('icao', '')
+        name = ap.get('name', '') or ap.get('city', '') or icao
+
+        # 1. Scenery packages from all_sources
+        for s in ap.get('all_sources', []):
+            fn = s.get('folder_name', '')
+            if not fn or fn.startswith('msfs-default-') or s.get('pricing_type') == 'Default':
+                continue
+
+            clean_fn = fn[:-9] if fn.lower().endswith('.disabled') else fn
+            key = f"pkg:{clean_fn.lower()}"
+
+            p_type = s.get('pricing_type') or ('Payware' if s.get('is_payware') else ('Asobo' if s.get('is_asobo_official') else 'Freeware'))
+
+            snapshot[key] = {
+                "key": key,
+                "kind": "scenery",
+                "folder_name": clean_fn,
+                "icao": icao,
+                "name": name,
+                "type": p_type,
+                "vendor": s.get('vendor', '') or ap.get('vendor', ''),
+                "source_folder": s.get('source_folder', '') or ap.get('source_folder', ''),
+                "is_patch": s.get('is_fix_patch', False) or s.get('is_addon', False)
+            }
+
+        # 2. GSX Profiles
+        if ap.get('has_gsx_profile') and ap.get('gsx_profile_filename'):
+            g_fn = ap.get('gsx_profile_filename', '')
+            key = f"gsx:{icao.lower()}:{g_fn.lower()}"
+            snapshot[key] = {
+                "key": key,
+                "kind": "gsx",
+                "folder_name": g_fn,
+                "icao": icao,
+                "name": name,
+                "type": "GSX Profile",
+                "vendor": "GSX Pro",
+                "source_folder": "GSX Profiles",
+                "is_patch": False
+            }
+
+    return snapshot
+
+def compute_scan_delta(new_airports, update_snapshot=True):
+    """
+    Compares the newly scanned airports with the stored library_snapshot.json.
+    Returns a dict with 'added', 'removed', and 'total_changes'.
+    Updates the snapshot on disk if update_snapshot is True.
+    """
+    current_snapshot = build_library_snapshot(new_airports)
+
+    if not os.path.exists(SNAPSHOT_JSON_PATH):
+        # Initial launch: save snapshot and return 0 changes
+        if update_snapshot:
+            try:
+                with open(SNAPSHOT_JSON_PATH, 'w', encoding='utf-8') as f:
+                    json.dump(current_snapshot, f, indent=2, ensure_ascii=False)
+            except Exception as e:
+                print("Error saving initial library snapshot:", e)
+        return {"added": [], "removed": [], "total_changes": 0}
+
+    try:
+        with open(SNAPSHOT_JSON_PATH, 'r', encoding='utf-8') as f:
+            prev_snapshot = json.load(f)
+    except Exception as e:
+        print("Error reading library_snapshot.json:", e)
+        prev_snapshot = {}
+
+    added = []
+    for k, item in current_snapshot.items():
+        if k not in prev_snapshot:
+            added.append(item)
+
+    removed = []
+    for k, item in prev_snapshot.items():
+        if k not in current_snapshot:
+            removed.append(item)
+
+    delta = {
+        "added": added,
+        "removed": removed,
+        "total_changes": len(added) + len(removed)
+    }
+
+    if update_snapshot:
+        try:
+            with open(SNAPSHOT_JSON_PATH, 'w', encoding='utf-8') as f:
+                json.dump(current_snapshot, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            print("Error updating library snapshot:", e)
+
+    return delta
 
 if __name__ == "__main__":
     run_scan()
