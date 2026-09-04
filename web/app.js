@@ -1396,30 +1396,39 @@ async function loadAirportsData() {
         filterAirports();
         applyStartupCameraSettings();
         hideSplashScreen();
-        checkFirstLaunchDisclaimer();
-        checkStartupChanges();
+        const isAccepted = await checkFirstLaunchDisclaimer();
+        if (isAccepted) {
+            checkStartupChanges();
+        }
     } catch (err) {
         console.error("Failed to load airports:", err);
         hideSplashScreen();
-        checkFirstLaunchDisclaimer();
+        const isAccepted = await checkFirstLaunchDisclaimer();
+        if (isAccepted) {
+            checkStartupChanges();
+        }
     }
 }
 
 async function checkFirstLaunchDisclaimer() {
     try {
-        const accepted = localStorage.getItem('sceneryx_disclaimer_accepted');
-        if (accepted === 'true') {
-            return;
-        }
-
         if (window.pywebview && window.pywebview.api && window.pywebview.api.is_disclaimer_accepted) {
             const resStr = await window.pywebview.api.is_disclaimer_accepted();
             const res = JSON.parse(resStr);
-            if (res.accepted) {
+            if (res && res.accepted) {
                 try {
                     localStorage.setItem('sceneryx_disclaimer_accepted', 'true');
                 } catch (e) {}
-                return;
+                return true;
+            } else {
+                try {
+                    localStorage.removeItem('sceneryx_disclaimer_accepted');
+                } catch (e) {}
+            }
+        } else {
+            const accepted = localStorage.getItem('sceneryx_disclaimer_accepted');
+            if (accepted === 'true') {
+                return true;
             }
         }
 
@@ -1428,8 +1437,10 @@ async function checkFirstLaunchDisclaimer() {
             modal.classList.remove('hidden');
             modal.classList.add('flex');
         }
+        return false;
     } catch (e) {
         console.error("Disclaimer check failed:", e);
+        return true;
     }
 }
 
@@ -1447,6 +1458,9 @@ async function agreeAndContinueApp() {
         modal.classList.add('hidden');
         modal.classList.remove('flex');
     }
+
+    // Launch First-Launch Initial Scan with progress bar!
+    await runInitialFirstLaunchScan();
 }
 
 function disagreeAndExitApp() {
@@ -4290,11 +4304,127 @@ async function rescanMSFS() {
     }
 }
 
+async function runInitialFirstLaunchScan() {
+    const modal = document.getElementById('rescan-modal');
+    const phaseScanning = document.getElementById('rescan-phase-scanning');
+    const phaseResult = document.getElementById('rescan-phase-result');
+    const progressBar = document.getElementById('rescan-progress-bar');
+    const percentText = document.getElementById('rescan-percent-text');
+    const detailText = document.getElementById('rescan-detail-text');
+    const statusSub = document.getElementById('rescan-status-sub');
+    const titleEl = document.querySelector('#rescan-phase-scanning h3');
+
+    if (modal) {
+        if (titleEl) titleEl.innerText = t('rescan.first_launch_title', 'First Launch - Indexing Library');
+        if (statusSub) statusSub.innerText = t('rescan.first_launch_sub', 'Building your initial scenery index from MSFS packages...');
+        if (phaseScanning) phaseScanning.classList.remove('hidden');
+        if (phaseResult) phaseResult.classList.add('hidden');
+        if (progressBar) progressBar.style.width = '15%';
+        if (percentText) percentText.innerText = '15%';
+        if (detailText) detailText.innerText = t('rescan.sub_checking', 'Checking Community & OneStore folders...');
+        modal.classList.remove('hidden');
+    }
+
+    // Force browser repaint
+    await new Promise(r => setTimeout(r, 60));
+
+    let currentProgress = 15;
+    const progressTimer = setInterval(() => {
+        if (!progressBar) return;
+        if (currentProgress < 85) {
+            currentProgress += 10;
+            progressBar.style.width = currentProgress + '%';
+            if (percentText) percentText.innerText = currentProgress + '%';
+            if (currentProgress === 35 && detailText) detailText.innerText = t('rescan.step_manifests', 'Scanning package manifests & sceneries...');
+            if (currentProgress === 65 && detailText) detailText.innerText = t('rescan.step_bgl', 'Analyzing runway & airport BGL files...');
+            if (currentProgress === 85 && detailText) detailText.innerText = t('rescan.step_indexing', 'Indexing custom addons & GSX profiles...');
+        }
+    }, 120);
+
+    try {
+        let scanResult;
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.initial_scan) {
+            const dataStr = await window.pywebview.api.initial_scan();
+            scanResult = JSON.parse(dataStr);
+        } else if (window.pywebview && window.pywebview.api && window.pywebview.api.rescan) {
+            const dataStr = await window.pywebview.api.rescan();
+            scanResult = JSON.parse(dataStr);
+        } else {
+            const resp = await fetch('/api/rescan', { method: 'POST' });
+            scanResult = await resp.json();
+        }
+
+        clearInterval(progressTimer);
+
+        let newAirports = [];
+        if (Array.isArray(scanResult)) {
+            newAirports = scanResult;
+        } else if (scanResult && scanResult.airports) {
+            newAirports = scanResult.airports;
+        }
+
+        allAirportsData = newAirports;
+
+        if (progressBar) progressBar.style.width = '100%';
+        if (percentText) percentText.innerText = '100%';
+        if (detailText) detailText.innerText = t('rescan.complete', 'Scan Complete');
+
+        // Apply ratings & search index
+        allAirportsData.forEach(ap => {
+            if (userRatingsMap[ap.icao] !== undefined) {
+                ap.rating = userRatingsMap[ap.icao];
+            } else {
+                ap.rating = ap.rating || 0;
+            }
+            ap._searchKey = `${ap.icao} ${ap.name} ${ap.city || ''} ${ap.package_name || ''} ${ap.vendor || ''}`.toLowerCase();
+        });
+
+        updateStats(allAirportsData);
+        updateFilterUI();
+        filterAirports();
+        applyStartupCameraSettings();
+
+        // Brief pause at 100%
+        await new Promise(r => setTimeout(r, 600));
+
+        // Switch to result phase to welcome user
+        if (phaseScanning) phaseScanning.classList.add('hidden');
+        if (phaseResult) phaseResult.classList.remove('hidden');
+
+        const resultTitle = document.getElementById('rescan-result-title');
+        const resultMsg = document.getElementById('rescan-result-message');
+        const listCont = document.getElementById('rescan-new-items-container');
+
+        if (resultTitle) {
+            resultTitle.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400 text-lg mr-2"></i><span>${t('rescan.first_launch_complete', 'Library Initialized!')}</span>`;
+        }
+        if (resultMsg) {
+            const customCount = allAirportsData.filter(a => a.pricing_type !== 'Default').length;
+            resultMsg.innerHTML = `<span class="text-emerald-400 font-bold">${allAirportsData.length}</span> ${t('general.airports', 'airports indexed')} (<span class="text-cyan-400 font-bold">${customCount}</span> ${t('general.custom_addons', 'custom add-ons & GSX profiles')}). ${t('general.welcome', 'Welcome to SceneryX!')}`;
+        }
+        if (listCont) {
+            listCont.classList.add('hidden');
+            listCont.innerHTML = '';
+        }
+
+    } catch (err) {
+        console.error("Initial scan error:", err);
+        closeRescanModal();
+    } finally {
+        clearInterval(progressTimer);
+    }
+}
+
 function closeRescanModal() {
     const modal = document.getElementById('rescan-modal');
     if (modal) modal.classList.add('hidden');
     const icon = document.getElementById('rescan-icon');
     if (icon) icon.classList.remove('fa-spin');
+
+    const statusSub = document.getElementById('rescan-status-sub');
+    const titleEl = document.querySelector('#rescan-phase-scanning h3');
+    if (titleEl) titleEl.innerText = t('rescan.title_scanning', 'Scanning Sceneries');
+    if (statusSub) statusSub.innerText = t('rescan.sub_checking', 'Checking Community & OneStore folders...');
 }
 
 function openPackageFolder() {

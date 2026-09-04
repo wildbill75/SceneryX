@@ -5,7 +5,7 @@ import re
 import urllib.request
 import webbrowser
 import webview
-from scanner import run_scan, get_settings, save_settings, load_ratings, save_rating, save_custom_price, save_custom_category, load_custom_prices, get_estimated_price, get_default_gsx_path, load_airport_database, SPECIAL_BUNDLE_MAP, OUTPUT_JSON_PATH, compute_scan_delta
+from scanner import run_scan, get_settings, save_settings, load_ratings, save_rating, save_custom_price, save_custom_category, load_custom_prices, get_estimated_price, get_default_gsx_path, load_airport_database, SPECIAL_BUNDLE_MAP, OUTPUT_JSON_PATH, compute_scan_delta, build_library_snapshot, SNAPSHOT_JSON_PATH
 
 AIRPORTS_DB_CACHE = None
 
@@ -297,6 +297,12 @@ class Api:
 
     def get_airports(self):
         settings = get_settings()
+        disclaimer_accepted = settings.get("disclaimer_accepted", False)
+        if not disclaimer_accepted:
+            # First launch before Terms of Use accepted: don't auto-scan yet, return empty
+            self._startup_delta = {"added": [], "removed": [], "total_changes": 0}
+            return json.dumps([], ensure_ascii=False)
+
         auto_scan = settings.get("auto_scan_on_startup", True)
         if auto_scan:
             airports = run_scan()
@@ -314,6 +320,21 @@ class Api:
         airports = run_scan()
         self._startup_delta = compute_scan_delta(airports, update_snapshot=True)
         return json.dumps(airports, ensure_ascii=False)
+
+    def initial_scan(self):
+        """
+        Runs the first-time scan right after the user accepts the Terms of Use.
+        Builds the baseline library_snapshot.json and saves installed_airports.json.
+        """
+        airports = run_scan()
+        current_snapshot = build_library_snapshot(airports)
+        try:
+            with open(SNAPSHOT_JSON_PATH, 'w', encoding='utf-8') as f:
+                json.dump(current_snapshot, f, indent=2, ensure_ascii=False)
+        except Exception as e:
+            print("Error saving initial library snapshot:", e)
+        self._startup_delta = {"added": [], "removed": [], "total_changes": 0}
+        return json.dumps({"airports": airports, "delta": self._startup_delta}, ensure_ascii=False)
 
     def get_startup_delta(self):
         delta = getattr(self, '_startup_delta', {"added": [], "removed": [], "total_changes": 0})
