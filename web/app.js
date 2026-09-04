@@ -4108,92 +4108,66 @@ function displayScanResults(delta, isStartup = false) {
         }
 
         if (msgEl) {
-            let summaryParts = [];
-            if (addedList.length > 0) {
-                summaryParts.push(`<span class="text-emerald-400 font-bold">+${addedList.length}</span> ${t('rescan.status_added', 'Added').toLowerCase()}`);
-            }
-            if (removedList.length > 0) {
-                summaryParts.push(`<span class="text-rose-400 font-bold">-${removedList.length}</span> ${t('rescan.status_removed', 'Removed').toLowerCase()}`);
-            }
-            msgEl.innerHTML = `${t('rescan.changes_summary', 'SceneryX detected changes in your library folders:')} <span class="ml-1 text-slate-200 font-semibold">(${summaryParts.join(', ')})</span>`;
+            msgEl.innerText = t('rescan.changes_summary', 'SceneryX detected changes in your library folders:');
         }
 
         if (listCont) {
             const htmlItems = [];
 
-            // 1. Added items (Green/Emerald card)
+            // 1. Added items (Flat Emerald solid badge, clean fonts, no icons)
             addedList.forEach(item => {
-                let badgeClass = "bg-cyan-950/80 text-cyan-300 border-cyan-800/70";
-                const tLower = (item.type || '').toLowerCase();
-                if (tLower.includes('payware')) {
-                    badgeClass = "bg-emerald-950/80 text-emerald-300 border-emerald-800/70";
-                } else if (tLower.includes('asobo')) {
-                    badgeClass = "bg-blue-950/80 text-blue-300 border-blue-800/70";
-                } else if (tLower.includes('gsx')) {
-                    badgeClass = "bg-purple-950/80 text-purple-300 border-purple-800/70";
-                }
-
                 const displayName = item.name || item.icao;
                 const pkgName = item.folder_name || '';
 
                 htmlItems.push(`
                     <div onclick="closeRescanModal(); selectAirport('${item.icao}')"
                          title="${t('general.view_on_map', 'Click to view on map')}"
-                         class="group p-2.5 rounded-xl bg-slate-900/95 hover:bg-slate-800/90 border border-emerald-500/40 hover:border-emerald-400 flex items-center justify-between gap-3 transition-all cursor-pointer shadow-sm">
-                        <div class="flex items-center gap-2.5 min-w-0 flex-1">
-                            <span class="px-2 py-1 rounded-lg bg-emerald-950 text-emerald-300 font-mono font-bold text-xs border border-emerald-700/60 shrink-0 shadow-inner">
+                         class="p-3 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800/80 flex items-center justify-between gap-4 transition-colors cursor-pointer">
+                        <div class="flex items-center gap-3 min-w-0 flex-1">
+                            <span class="px-2.5 py-1 rounded-lg bg-slate-800 text-emerald-400 font-mono font-bold text-sm shrink-0">
                                 ${item.icao}
                             </span>
                             <div class="min-w-0 flex-1">
-                                <div class="text-xs font-bold text-slate-200 group-hover:text-emerald-300 transition-colors truncate">
+                                <div class="text-sm font-bold text-white truncate">
                                     ${displayName}
                                 </div>
-                                <div class="text-[11px] font-mono text-slate-400 truncate mt-0.5 flex items-center gap-1.5">
-                                    <i class="fa-solid fa-folder text-[10px] text-slate-500"></i>
-                                    <span class="truncate">${pkgName}</span>
+                                <div class="text-xs font-mono text-slate-400 truncate mt-0.5">
+                                    ${pkgName}
                                 </div>
                             </div>
                         </div>
-                        <div class="flex items-center gap-1.5 shrink-0">
-                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-500/50 bg-emerald-950/80 text-emerald-300 flex items-center gap-1">
-                                <i class="fa-solid fa-plus text-[9px]"></i> ${t('rescan.status_added', 'Added')}
+                        <div class="shrink-0">
+                            <span class="text-xs font-bold px-3 py-1 rounded-full bg-emerald-600 text-white">
+                                ${t('rescan.status_added', 'Added')}
                             </span>
-                            <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full border ${badgeClass}">
-                                ${item.type}
-                            </span>
-                            <i class="fa-solid fa-chevron-right text-[10px] text-slate-600 group-hover:text-emerald-400 group-hover:translate-x-0.5 transition-all"></i>
                         </div>
                     </div>
                 `);
             });
 
-            // 2. Removed items (Rose/Red card)
+            // 2. Removed items (Flat Rose solid badge, clean fonts, no icons)
             removedList.forEach(item => {
                 const displayName = item.name || item.icao;
                 const pkgName = item.folder_name || '';
 
                 htmlItems.push(`
-                    <div class="p-2.5 rounded-xl bg-slate-900/95 border border-rose-500/30 flex items-center justify-between gap-3 shadow-sm opacity-90">
-                        <div class="flex items-center gap-2.5 min-w-0 flex-1">
-                            <span class="px-2 py-1 rounded-lg bg-rose-950/80 text-rose-300 font-mono font-bold text-xs border border-rose-800/60 shrink-0 shadow-inner">
+                    <div class="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-4">
+                        <div class="flex items-center gap-3 min-w-0 flex-1">
+                            <span class="px-2.5 py-1 rounded-lg bg-slate-800 text-rose-400 font-mono font-bold text-sm shrink-0">
                                 ${item.icao}
                             </span>
                             <div class="min-w-0 flex-1">
-                                <div class="text-xs font-semibold text-slate-300 truncate">
+                                <div class="text-sm font-semibold text-slate-200 truncate">
                                     ${displayName}
                                 </div>
-                                <div class="text-[11px] font-mono text-slate-400 truncate mt-0.5 flex items-center gap-1.5">
-                                    <i class="fa-solid fa-trash-can text-[10px] text-rose-400/70"></i>
-                                    <span class="truncate">${pkgName}</span>
+                                <div class="text-xs font-mono text-slate-400 truncate mt-0.5">
+                                    ${pkgName}
                                 </div>
                             </div>
                         </div>
-                        <div class="flex items-center gap-1.5 shrink-0">
-                            <span class="text-[10px] font-bold px-2 py-0.5 rounded-full border border-rose-500/50 bg-rose-950/80 text-rose-300 flex items-center gap-1">
-                                <i class="fa-solid fa-minus text-[9px]"></i> ${t('rescan.status_removed', 'Removed')}
-                            </span>
-                            <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full border border-slate-700 bg-slate-800/80 text-slate-400">
-                                ${item.type}
+                        <div class="shrink-0">
+                            <span class="text-xs font-bold px-3 py-1 rounded-full bg-rose-600 text-white">
+                                ${t('rescan.status_removed', 'Removed')}
                             </span>
                         </div>
                     </div>
