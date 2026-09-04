@@ -630,24 +630,28 @@ function executeFlightOptimizerQuickPrompt() {
 }
 
 // Initialize App
+let isAppLoading = false;
 let isAppInitialized = false;
 
 async function ensureAppLoaded() {
-    if (isAppInitialized || allAirportsData.length > 0) return;
+    if (isAppLoading || isAppInitialized || (allAirportsData && allAirportsData.length > 0)) return;
+    isAppLoading = true;
 
     for (let i = 0; i < 50; i++) {
         if (window.pywebview && window.pywebview.api) {
             isAppInitialized = true;
             await loadInitialAppData();
+            isAppLoading = false;
             return;
         }
         await new Promise(r => setTimeout(r, 100));
     }
 
-    if (!isAppInitialized && allAirportsData.length === 0) {
+    if (!isAppInitialized && (!allAirportsData || allAirportsData.length === 0)) {
         isAppInitialized = true;
         await loadInitialAppData();
     }
+    isAppLoading = false;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1321,16 +1325,21 @@ function applyStartupCameraSettings() {
 }
 
 function hideSplashScreen() {
-    const splash = document.getElementById('splash-screen');
-    if (splash) {
+    return new Promise((resolve) => {
+        const splash = document.getElementById('splash-screen');
+        if (!splash) {
+            resolve();
+            return;
+        }
         updateSplashProgress(100, "Ready!", "Scan Complete");
         setTimeout(() => {
             splash.style.opacity = '0';
             setTimeout(() => {
                 splash.style.display = 'none';
+                resolve();
             }, 700);
         }, 300);
-    }
+    });
 }
 
 async function loadAirportsData() {
@@ -1395,17 +1404,19 @@ async function loadAirportsData() {
         updateFilterUI();
         filterAirports();
         applyStartupCameraSettings();
-        hideSplashScreen();
+        await hideSplashScreen();
         const isAccepted = await checkFirstLaunchDisclaimer();
         if (isAccepted) {
-            checkStartupChanges();
+            await new Promise(r => setTimeout(r, 200));
+            await checkStartupChanges();
         }
     } catch (err) {
         console.error("Failed to load airports:", err);
-        hideSplashScreen();
+        await hideSplashScreen();
         const isAccepted = await checkFirstLaunchDisclaimer();
         if (isAccepted) {
-            checkStartupChanges();
+            await new Promise(r => setTimeout(r, 200));
+            await checkStartupChanges();
         }
     }
 }
@@ -4057,6 +4068,7 @@ async function checkStartupChanges() {
         const resStr = await window.pywebview.api.get_startup_delta();
         if (!resStr) return;
         const delta = JSON.parse(resStr);
+        console.log("Startup delta check:", delta);
         if (delta && delta.total_changes > 0) {
             displayScanResults(delta, true);
         }

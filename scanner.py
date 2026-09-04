@@ -885,8 +885,8 @@ def run_scan():
                 for item in items:
                     ipath = os.path.join(td, item)
                     if os.path.isdir(ipath) and item != 'OneStore' and 'projectairports' not in item.lower():
-                        clean_folder = item[:-9] if item.endswith('.disabled') else item
-                        is_disabled = item.endswith('.disabled') or os.path.exists(os.path.join(ipath, 'manifest.json.disabled')) or not content_xml_status.get(clean_folder.lower(), True)
+                        clean_folder = item[:-9] if item.lower().endswith('.disabled') else item
+                        is_disabled = item.lower().endswith('.disabled') or os.path.exists(os.path.join(ipath, 'manifest.json.disabled')) or not content_xml_status.get(clean_folder.lower(), True)
                         all_packages.append((category_label, item, ipath, is_disabled))
             except Exception:
                 pass

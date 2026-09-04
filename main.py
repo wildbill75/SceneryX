@@ -302,7 +302,8 @@ def sync_library_snapshot(airports):
 
 class Api:
     def __init__(self):
-        pass
+        self._startup_delta = {"added": [], "removed": [], "total_changes": 0}
+        self._startup_scanned = False
 
     def get_airports(self):
         settings = get_settings()
@@ -312,10 +313,19 @@ class Api:
             self._startup_delta = {"added": [], "removed": [], "total_changes": 0}
             return json.dumps([], ensure_ascii=False)
 
+        # If already scanned during this startup session, return cached data without re-running delta
+        if self._startup_scanned and self._startup_delta is not None and os.path.exists(OUTPUT_JSON_PATH):
+            try:
+                with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
+                    return f.read()
+            except Exception:
+                pass
+
         auto_scan = settings.get("auto_scan_on_startup", True)
         if auto_scan:
             airports = run_scan()
             self._startup_delta = compute_scan_delta(airports, update_snapshot=True)
+            self._startup_scanned = True
             return json.dumps(airports, ensure_ascii=False)
 
         if os.path.exists(OUTPUT_JSON_PATH):
@@ -323,11 +333,13 @@ class Api:
                 with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
                     airports = json.load(f)
                     self._startup_delta = {"added": [], "removed": [], "total_changes": 0}
+                    self._startup_scanned = True
                     return json.dumps(airports, ensure_ascii=False)
             except Exception as e:
                 print("Error reading cached installed_airports.json, performing fresh scan:", e)
         airports = run_scan()
         self._startup_delta = compute_scan_delta(airports, update_snapshot=True)
+        self._startup_scanned = True
         return json.dumps(airports, ensure_ascii=False)
 
     def initial_scan(self):
@@ -346,7 +358,9 @@ class Api:
         return json.dumps({"airports": airports, "delta": self._startup_delta}, ensure_ascii=False)
 
     def get_startup_delta(self):
-        delta = getattr(self, '_startup_delta', {"added": [], "removed": [], "total_changes": 0})
+        delta = getattr(self, '_startup_delta', None)
+        if not delta or not isinstance(delta, dict):
+            delta = {"added": [], "removed": [], "total_changes": 0}
         return json.dumps(delta, ensure_ascii=False)
 
     def get_world_airport_coords(self):
@@ -370,6 +384,7 @@ class Api:
     def rescan(self):
         airports = run_scan()
         delta = compute_scan_delta(airports, update_snapshot=True)
+        self._startup_delta = delta
         return json.dumps({"airports": airports, "delta": delta}, ensure_ascii=False)
 
     def fetch_simbrief(self, identifier):
