@@ -959,8 +959,8 @@
     </div>
 
     <!-- RESCAN PROGRESS & RESULT MODAL -->
-    <div id="rescan-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm transition-all duration-300">
-        <div class="glass-modal w-full max-w-md rounded-2xl p-6 shadow-2xl border border-slate-800 space-y-5">
+    <div id="rescan-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 transition-all duration-300">
+        <div class="glass-modal w-full max-w-lg rounded-3xl p-6 shadow-2xl border border-slate-800 space-y-5">
             <!-- PHASE 1: SCANNING PROGRESS -->
             <div id="rescan-phase-scanning" class="space-y-4">
                 <div class="flex items-center justify-between">
@@ -972,7 +972,7 @@
                 </div>
 
                 <!-- Progress Bar -->
-                <div class="w-full bg-slate-900 rounded-full h-2 overflow-hidden border border-slate-800">
+                <div class="w-full bg-slate-900 rounded-full h-2.5 overflow-hidden border border-slate-800">
                     <div id="rescan-progress-bar" class="bg-cyan-500 h-full rounded-full transition-all duration-200" style="width: 0%;"></div>
                 </div>
 
@@ -982,16 +982,19 @@
             <!-- PHASE 2: SCAN RESULT -->
             <div id="rescan-phase-result" class="hidden space-y-4">
                 <div>
-                    <h3 class="text-sm font-bold text-white tracking-wide" id="rescan-result-title">Scan Complete</h3>
-                    <p id="rescan-result-message" class="text-xs text-slate-300 mt-1 leading-relaxed"></p>
+                    <h3 class="text-base font-bold text-white tracking-wide flex items-center gap-2" id="rescan-result-title">
+                        <i class="fa-solid fa-circle-check text-cyan-400 text-lg"></i>
+                        <span>Scan Complete</span>
+                    </h3>
+                    <p id="rescan-result-message" class="text-xs text-slate-300 mt-1.5 leading-relaxed"></p>
                 </div>
 
-                <!-- Optional List of newly detected packages -->
-                <div id="rescan-new-items-container" class="hidden max-h-40 overflow-y-auto space-y-1.5 p-2.5 rounded-xl bg-slate-950/80 border border-slate-800/80 text-xs font-mono">
+                <!-- List of newly detected packages -->
+                <div id="rescan-new-items-container" class="hidden max-h-64 overflow-y-auto space-y-2 p-2.5 rounded-2xl bg-slate-950/90 border border-slate-800/90 text-xs">
                     <!-- Populated dynamically -->
                 </div>
 
-                <button data-i18n="rescan.ok_button" onclick="closeRescanModal()" class="w-full py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition-colors cursor-pointer border-0 active:scale-98">
+                <button data-i18n="rescan.ok_button" onclick="closeRescanModal()" class="w-full py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition-colors cursor-pointer border-0 shadow-md shadow-cyan-600/25 active:scale-98">
                     OK
                 </button>
             </div>

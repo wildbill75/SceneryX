@@ -4040,16 +4040,34 @@ async function rescanMSFS() {
     const icon = document.getElementById('rescan-icon');
     if (icon) icon.classList.add('fa-spin');
 
-    // Build set of previous packages & custom sceneries
+    // 1. Snapshot all existing custom add-on packages before rescan
     const prevPackages = new Set();
-    allAirportsData.forEach(a => {
-        if (a.package_name) prevPackages.add(a.package_name.toLowerCase());
-        if (a.addons && Array.isArray(a.addons)) {
-            a.addons.forEach(ad => {
-                if (ad.package_name) prevPackages.add(ad.package_name.toLowerCase());
-            });
-        }
-    });
+    const prevPackagesClean = new Set();
+    const prevGsxProfiles = new Set();
+
+    if (Array.isArray(allAirportsData)) {
+        allAirportsData.forEach(a => {
+            if (a.has_gsx_profile && a.gsx_profile_filename) {
+                prevGsxProfiles.add(a.gsx_profile_filename.toLowerCase());
+            }
+            if (a.all_sources && Array.isArray(a.all_sources)) {
+                a.all_sources.forEach(s => {
+                    const fn = s.folder_name || '';
+                    if (fn && !fn.startsWith('msfs-default-') && s.pricing_type !== 'Default') {
+                        const fnLower = fn.toLowerCase();
+                        prevPackages.add(fnLower);
+                        prevPackagesClean.add(fnLower.replace(/\.disabled$/, ''));
+                    }
+                });
+            }
+            const p = a.package_name || '';
+            if (p && !p.startsWith('msfs-default-') && a.pricing_type !== 'Default') {
+                const pLower = p.toLowerCase();
+                prevPackages.add(pLower);
+                prevPackagesClean.add(pLower.replace(/\.disabled$/, ''));
+            }
+        });
+    }
 
     const modal = document.getElementById('rescan-modal');
     const phaseScanning = document.getElementById('rescan-phase-scanning');
@@ -4121,38 +4139,67 @@ async function rescanMSFS() {
         // Brief pause at 100% before displaying result
         await new Promise(r => setTimeout(r, 350));
 
-        // Find newly detected packages
+        // 2. Identify newly detected packages across all_sources and airports
         const newlyDetected = [];
         const seenNew = new Set();
 
         allAirportsData.forEach(a => {
-            if (a.is_addon && a.package_name && !prevPackages.has(a.package_name.toLowerCase())) {
-                const k = a.package_name.toLowerCase();
-                if (!seenNew.has(k)) {
-                    seenNew.add(k);
-                    newlyDetected.push({
-                        icao: a.icao,
-                        name: a.name,
-                        pkg: a.package_name,
-                        type: a.price_category || (a.is_payware ? 'Payware' : 'Freeware')
-                    });
-                }
-            }
-            if (a.addons && Array.isArray(a.addons)) {
-                a.addons.forEach(ad => {
-                    if (ad.package_name && !prevPackages.has(ad.package_name.toLowerCase())) {
-                        const k = ad.package_name.toLowerCase();
-                        if (!seenNew.has(k)) {
-                            seenNew.add(k);
-                            newlyDetected.push({
-                                icao: a.icao,
-                                name: a.name,
-                                pkg: ad.package_name,
-                                type: ad.addon_type || 'Patch'
-                            });
-                        }
+            // Check all sources of each airport
+            if (a.all_sources && Array.isArray(a.all_sources)) {
+                a.all_sources.forEach(s => {
+                    const fn = s.folder_name || '';
+                    if (!fn || fn.startsWith('msfs-default-') || s.pricing_type === 'Default') return;
+
+                    const fnLower = fn.toLowerCase();
+                    const cleanFn = fnLower.replace(/\.disabled$/, '');
+
+                    if (!prevPackages.has(fnLower) && !prevPackagesClean.has(cleanFn) && !seenNew.has(cleanFn)) {
+                        seenNew.add(cleanFn);
+                        const pType = s.pricing_type || (s.is_payware ? 'Payware' : (s.is_asobo_official ? 'Asobo' : 'Freeware'));
+                        newlyDetected.push({
+                            icao: a.icao,
+                            name: a.name || a.city || a.icao,
+                            pkg: fn.replace(/\.disabled$/, ''),
+                            vendor: s.vendor || a.vendor || '',
+                            source_folder: s.source_folder || a.source_folder || '',
+                            type: pType
+                        });
                     }
                 });
+            } else {
+                const p = a.package_name || '';
+                if (p && !p.startsWith('msfs-default-') && a.pricing_type !== 'Default') {
+                    const pLower = p.toLowerCase();
+                    const cleanP = pLower.replace(/\.disabled$/, '');
+                    if (!prevPackages.has(pLower) && !prevPackagesClean.has(cleanP) && !seenNew.has(cleanP)) {
+                        seenNew.add(cleanP);
+                        const pType = a.pricing_type || (a.is_payware ? 'Payware' : (a.is_asobo_official ? 'Asobo' : 'Freeware'));
+                        newlyDetected.push({
+                            icao: a.icao,
+                            name: a.name || a.city || a.icao,
+                            pkg: p.replace(/\.disabled$/, ''),
+                            vendor: a.vendor || '',
+                            source_folder: a.source_folder || '',
+                            type: pType
+                        });
+                    }
+                }
+            }
+
+            // Also check newly added GSX profiles
+            if (a.has_gsx_profile && a.gsx_profile_filename) {
+                const gsxLower = a.gsx_profile_filename.toLowerCase();
+                if (!prevGsxProfiles.has(gsxLower) && !seenNew.has(gsxLower)) {
+                    seenNew.add(gsxLower);
+                    newlyDetected.push({
+                        icao: a.icao,
+                        name: a.name || a.city || a.icao,
+                        pkg: a.gsx_profile_filename,
+                        vendor: 'GSX Pro',
+                        source_folder: 'GSX Profiles',
+                        type: 'GSX Profile'
+                    });
+                }
             }
         });
 
@@ -4165,24 +4212,61 @@ async function rescanMSFS() {
         const listCont = document.getElementById('rescan-new-items-container');
 
         if (newlyDetected.length > 0) {
-            if (titleEl) titleEl.innerText = t('rescan.complete', 'Scan Complete');
-            if (msgEl) msgEl.innerHTML = `<span class="text-cyan-400 font-semibold">${newlyDetected.length}</span> ${t('rescan.new_packages_found', 'new scenery package(s) detected and indexed:')}`;
-            
+            if (titleEl) {
+                titleEl.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400 text-lg mr-2"></i><span>${t('rescan.complete', 'Scan Complete')}</span>`;
+            }
+            if (msgEl) {
+                msgEl.innerHTML = `<span class="text-emerald-400 font-bold">${newlyDetected.length}</span> ${t('rescan.new_packages_found', 'new scenery package(s) detected and indexed:')}`;
+            }
+
             if (listCont) {
-                listCont.innerHTML = newlyDetected.map(item => `
-                    <div class="flex items-center justify-between py-1 border-b border-slate-900 last:border-0">
-                        <div class="flex items-center gap-2 truncate">
-                            <span class="text-cyan-400 font-bold shrink-0">${item.icao}</span>
-                            <span class="text-slate-300 truncate">${item.pkg}</span>
+                listCont.innerHTML = newlyDetected.map(item => {
+                    let badgeClass = "bg-cyan-950/80 text-cyan-300 border-cyan-800/70";
+                    const tLower = (item.type || '').toLowerCase();
+                    if (tLower.includes('payware')) {
+                        badgeClass = "bg-emerald-950/80 text-emerald-300 border-emerald-800/70";
+                    } else if (tLower.includes('asobo')) {
+                        badgeClass = "bg-blue-950/80 text-blue-300 border-blue-800/70";
+                    } else if (tLower.includes('gsx')) {
+                        badgeClass = "bg-purple-950/80 text-purple-300 border-purple-800/70";
+                    }
+
+                    return `
+                        <div onclick="closeRescanModal(); selectAirport('${item.icao}')"
+                             title="${t('general.view_on_map', 'Click to view on map')}"
+                             class="group p-2.5 rounded-xl bg-slate-900/90 hover:bg-slate-800/90 border border-slate-800/80 hover:border-cyan-500/50 flex items-center justify-between gap-3 transition-all cursor-pointer shadow-sm">
+                            <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                                <span class="px-2 py-1 rounded-lg bg-cyan-950 text-cyan-400 font-mono font-bold text-xs border border-cyan-800/50 shrink-0 shadow-inner">
+                                    ${item.icao}
+                                </span>
+                                <div class="min-w-0 flex-1">
+                                    <div class="text-xs font-bold text-slate-200 group-hover:text-cyan-300 transition-colors truncate">
+                                        ${item.name || item.icao}
+                                    </div>
+                                    <div class="text-[11px] font-mono text-slate-400 truncate mt-0.5 flex items-center gap-1.5">
+                                        <i class="fa-solid fa-folder text-[10px] text-slate-500"></i>
+                                        <span class="truncate">${item.pkg}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2 shrink-0">
+                                <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full border ${badgeClass}">
+                                    ${item.type}
+                                </span>
+                                <i class="fa-solid fa-chevron-right text-[10px] text-slate-600 group-hover:text-cyan-400 group-hover:translate-x-0.5 transition-all"></i>
+                            </div>
                         </div>
-                        <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-900 text-slate-400 border border-slate-800 shrink-0 ml-2">${item.type}</span>
-                    </div>
-                `).join('');
+                    `;
+                }).join('');
                 listCont.classList.remove('hidden');
             }
         } else {
-            if (titleEl) titleEl.innerText = t('rescan.completed_title', 'Scan Completed');
-            if (msgEl) msgEl.innerText = t('rescan.no_addon', 'No new addon detected.');
+            if (titleEl) {
+                titleEl.innerHTML = `<i class="fa-solid fa-circle-check text-cyan-400 text-lg mr-2"></i><span>${t('rescan.completed_title', 'Scan Completed')}</span>`;
+            }
+            if (msgEl) {
+                msgEl.innerText = t('rescan.no_addon', 'No new addon detected.');
+            }
             if (listCont) {
                 listCont.classList.add('hidden');
                 listCont.innerHTML = '';
