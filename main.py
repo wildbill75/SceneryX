@@ -286,10 +286,19 @@ def fast_update_airport_cache(icao_target, target_pkg_name=None, toggle_all=Fals
         with open(OUTPUT_JSON_PATH, 'w', encoding='utf-8') as f:
             json.dump(airports, f, ensure_ascii=False, indent=2)
 
+        sync_library_snapshot(airports)
         return airports
     except Exception as e:
         print("Error fast updating cache:", e)
         return run_scan()
+
+def sync_library_snapshot(airports):
+    try:
+        current_snapshot = build_library_snapshot(airports)
+        with open(SNAPSHOT_JSON_PATH, 'w', encoding='utf-8') as f:
+            json.dump(current_snapshot, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print("Error syncing library snapshot:", e)
 
 class Api:
     def __init__(self):
@@ -869,6 +878,7 @@ class Api:
                 new_path = disable_physical_package(target_path)
 
             airports = run_scan()
+            sync_library_snapshot(airports)
             return json.dumps({"status": "ok", "enabled": should_enable, "new_path": new_path, "airports": airports}, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
@@ -1220,6 +1230,7 @@ class Api:
                 disable_physical_package(target_path)
 
             airports = run_scan()
+            sync_library_snapshot(airports)
             return json.dumps({"status": "ok", "enabled": should_enable, "airports": airports}, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})

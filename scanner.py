@@ -1568,6 +1568,10 @@ def build_library_snapshot(airports):
             if not fn or fn.startswith('msfs-default-') or s.get('pricing_type') == 'Default':
                 continue
 
+            # If package is disabled, it is not an active scenery in the simulator
+            if s.get('is_disabled') or fn.lower().endswith('.disabled'):
+                continue
+
             clean_fn = fn[:-9] if fn.lower().endswith('.disabled') else fn
             key = f"pkg:{clean_fn.lower()}"
 
