@@ -5507,10 +5507,10 @@ function initDrawerResize() {
 /* ================= RIGHT DETAIL DRAWER ACCORDIONS ================= */
 
 const DRAWER_ACCORDION_DEFAULTS = {
+    'airport_info': true,
     'dev': true,
     'options': true,
     'gsx': true,
-    'runways': true,
     'airlines': true,
     'price': true
 };
@@ -5544,7 +5544,7 @@ function initDrawerAccordions() {
         saved = JSON.parse(localStorage.getItem('sceneryx_drawer_accordions_v2') || '{}');
     } catch (e) {}
 
-    ['dev', 'options', 'gsx', 'runways', 'airlines', 'price'].forEach(key => {
+    ['airport_info', 'dev', 'options', 'gsx', 'airlines', 'price'].forEach(key => {
         const isOpen = (saved[key] !== undefined) ? saved[key] : DRAWER_ACCORDION_DEFAULTS[key];
         const content = document.getElementById(`accordion-content-${key}`);
         const icon = document.getElementById(`accordion-icon-${key}`);
