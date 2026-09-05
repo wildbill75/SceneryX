@@ -982,16 +982,16 @@ function openCountryDrawer(iso, countryName) {
                 let borderClass = 'border-slate-800 hover:border-indigo-500/50';
 
                 if (pt === 'Payware') {
-                    badgeHtml = `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">${t('stat.payware', 'PAYWARE')}</span>`;
+                    badgeHtml = `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-purple-600 text-white">${t('stat.payware', 'PAYWARE')}</span>`;
                     borderClass = isExpanded ? 'border-purple-400 bg-purple-950/40 shadow-lg shadow-purple-950/30' : 'border-purple-500/30 hover:border-purple-400 bg-purple-950/20';
                 } else if (pt === 'Freeware') {
-                    badgeHtml = `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">${t('stat.freeware', 'FREEWARE')}</span>`;
+                    badgeHtml = `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-cyan-600 text-white">${t('stat.freeware', 'FREEWARE')}</span>`;
                     borderClass = isExpanded ? 'border-cyan-400 bg-cyan-950/40 shadow-lg shadow-cyan-950/30' : 'border-cyan-500/30 hover:border-cyan-400 bg-cyan-950/20';
                 } else if (pt === 'Asobo') {
-                    badgeHtml = `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">${t('stat.asobo', 'ASOBO')}</span>`;
+                    badgeHtml = `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-500 text-slate-950 font-black">${t('stat.asobo', 'ASOBO')}</span>`;
                     borderClass = isExpanded ? 'border-amber-400 bg-amber-950/40 shadow-lg shadow-amber-950/30' : 'border-amber-500/30 hover:border-amber-400 bg-amber-950/20';
                 } else {
-                    badgeHtml = `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-800 text-slate-400 border border-slate-700">${t('stat.default', 'DEFAULT')}</span>`;
+                    badgeHtml = `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-800 text-slate-300 border border-slate-700">${t('stat.default', 'DEFAULT')}</span>`;
                     borderClass = isExpanded ? 'border-blue-400 bg-blue-950/40 shadow-lg shadow-blue-950/30' : 'border-slate-800 hover:border-slate-700 bg-slate-900/60';
                 }
 
@@ -1013,10 +1013,10 @@ function openCountryDrawer(iso, countryName) {
                         const devName = s.vendor || (s.is_asobo_official ? 'Microsoft / Asobo' : 'Community');
                         const sPt = s.pricing_type || (s.is_payware ? 'Payware' : (s.is_asobo_official ? 'Asobo' : 'Freeware'));
                         let pBadge = '';
-                        if (sPt === 'Payware') pBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">PAYWARE</span>`;
-                        else if (sPt === 'Asobo') pBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">ASOBO</span>`;
-                        else if (sPt === 'Default' || ap.pricing_type === 'Default') pBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-slate-800 text-slate-400 border border-slate-700">DEFAULT</span>`;
-                        else pBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">FREEWARE</span>`;
+                        if (sPt === 'Payware') pBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-purple-600 text-white">PAYWARE</span>`;
+                        else if (sPt === 'Asobo') pBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-500 text-slate-950 font-black">ASOBO</span>`;
+                        else if (sPt === 'Default' || ap.pricing_type === 'Default') pBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-slate-800 text-slate-300 border border-slate-700">DEFAULT</span>`;
+                        else pBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-cyan-600 text-white">FREEWARE</span>`;
 
                         return `
                             <div onclick="event.stopPropagation(); ${sPt === 'Payware' ? `openPaywareStoresModal('${ap.icao}', '${(ap.name || '').replace(/'/g, "\\'")}')` : `window.open('${fsToSearchUrl}', '_blank')`}"
@@ -3272,35 +3272,36 @@ async function renderAirportRunways(ap) {
             const widthStr = (widFt && widM) ? `${widFt} (${widM})` : (widFt || widM || '');
             const surfaceName = rwy.surface || 'Unknown';
 
-            const borderClass = isClosed ? 'border-red-900/40 bg-red-950/20 opacity-75' : 'border-slate-800/80 bg-slate-950/70';
-            const identColor = isClosed ? 'text-red-400' : 'text-cyan-300';
+            const cardClass = isClosed 
+                ? 'border border-slate-800 bg-slate-950/70 opacity-60' 
+                : 'border border-slate-800 bg-slate-950/70';
+            const identColor = isClosed ? 'text-slate-400' : 'text-cyan-300';
 
             return `
-                <div class="p-3 rounded-xl border ${borderClass} space-y-1.5 transition-all">
+                <div class="p-3 rounded-xl ${cardClass} space-y-1.5 transition-all">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-2">
-                            <span class="font-mono font-black text-sm ${identColor} px-2 py-0.5 rounded bg-slate-900 border border-slate-800 tracking-wider">
+                            <span class="font-mono font-black text-sm ${identColor} px-2 py-0.5 rounded bg-slate-800 tracking-wider">
                                 ${rwy.id}
                             </span>
-                            <span class="text-[11px] font-semibold text-slate-300 bg-slate-900/80 px-2 py-0.5 rounded border border-slate-800/60">
+                            <span class="text-[11px] font-semibold text-slate-300 bg-slate-800 px-2 py-0.5 rounded">
                                 ${surfaceName}
                             </span>
                         </div>
                         <div class="flex items-center gap-1.5">
                             ${isClosed ? `
-                                <span class="text-[10px] font-bold text-red-400 bg-red-900/30 px-2 py-0.5 rounded border border-red-700/50">
+                                <span class="text-[10px] font-mono font-bold text-slate-400 bg-slate-800 px-2 py-0.5 rounded">
                                     ${t('drawer.runway_closed', 'Closed')}
                                 </span>
                             ` : ''}
                             ${isLighted && !isClosed ? `
-                                <span class="text-[10px] font-bold text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20 flex items-center gap-1">
-                                    <i class="fa-regular fa-lightbulb text-[9px]"></i>
+                                <span class="text-[10px] font-mono font-bold text-amber-400 bg-slate-800 px-2 py-0.5 rounded">
                                     ${t('drawer.runway_lighted', 'Lighted')}
                                 </span>
                             ` : ''}
                         </div>
                     </div>
-                    <div class="flex items-center justify-between text-xs font-mono pt-1 border-t border-slate-900/80">
+                    <div class="flex items-center justify-between text-xs font-mono pt-1 border-t border-slate-900">
                         <div class="flex items-center gap-1.5 text-slate-300">
                             <span class="text-slate-500 text-[11px] font-sans">${t('drawer.runway_length', 'Length')}:</span>
                             <span class="font-bold text-white">${lenFt}</span>
@@ -5663,15 +5664,15 @@ function renderPaywareStoresList(stores, cleanIcao) {
         const isDev = st.type === 'dev';
         if (st.found) {
             const badgeHtml = isDev 
-                ? `<span class="px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 ml-2 uppercase">Official Dev</span>`
-                : `<span class="px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30 ml-2 uppercase">Store</span>`;
+                ? `<span class="px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-slate-800 text-amber-400 ml-2 uppercase">Official Dev</span>`
+                : `<span class="px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-slate-800 text-purple-400 ml-2 uppercase">Store</span>`;
 
             const iconBoxClass = isDev
-                ? `bg-amber-500/20 group-hover:bg-amber-500 text-amber-300 group-hover:text-slate-950`
-                : `bg-slate-800 group-hover:bg-purple-600 text-slate-400 group-hover:text-white`;
+                ? `bg-amber-500 text-slate-950`
+                : `bg-slate-800 group-hover:bg-purple-600 text-slate-300 group-hover:text-white`;
 
             const iconClass = isDev ? `fa-solid fa-crown` : `fa-solid fa-arrow-up-right-from-square`;
-            const borderClass = isDev ? `border-amber-500/30 hover:border-amber-400/80 bg-slate-900/95` : `border-slate-800 hover:border-purple-500/50 bg-slate-900/90 hover:bg-slate-800`;
+            const borderClass = isDev ? `border-amber-500/40 hover:border-amber-400 bg-slate-900/95` : `border-slate-800 hover:border-purple-500/50 bg-slate-900/90 hover:bg-slate-800`;
 
             return `
                 <button onclick="window.open('${st.url}', '_blank');"
@@ -5691,7 +5692,7 @@ function renderPaywareStoresList(stores, cleanIcao) {
                     <div class="flex items-center gap-3 shrink-0 ml-2">
                         ${st.formattedPrice ? `
                             <div class="flex flex-col items-end">
-                                <span class="px-2.5 py-1 rounded-xl text-xs font-mono font-black bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 shadow-sm">
+                                <span class="px-2.5 py-1 rounded-xl text-xs font-mono font-bold bg-emerald-600 text-white shadow-sm">
                                     ${st.formattedPrice}
                                 </span>
                                 ${st.origPriceFormatted ? `<span class="text-[9px] font-mono text-slate-400 mt-0.5">${st.origPriceFormatted}</span>` : ''}

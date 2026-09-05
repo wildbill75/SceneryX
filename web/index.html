@@ -210,11 +210,11 @@
             </button>
 
             <!-- SCENERY CONFLICT NAVIGATOR (IF ANY) -->
-            <div id="conflict-nav-pill" class="flex items-center gap-1.5 bg-red-500/15 border border-red-500/40 px-2.5 py-1 rounded-full text-xs font-mono hidden">
-                <i class="fa-solid fa-triangle-exclamation text-red-400 animate-pulse text-xs"></i>
-                <span id="conflict-nav-counter" class="font-bold text-red-400 text-xs">0</span>
-                <div class="flex items-center gap-0.5 ml-0.5 pl-1 border-l border-red-500/30">
-                    <button onclick="navigateConflict(-1)" title="Previous Conflict" class="w-4 h-4 rounded-full bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center text-[9px]">
+            <div id="conflict-nav-pill" class="flex items-center gap-1.5 bg-red-600 text-white px-2.5 py-1 rounded-full text-xs font-mono hidden shadow-sm">
+                <i class="fa-solid fa-triangle-exclamation text-white animate-pulse text-xs"></i>
+                <span id="conflict-nav-counter" class="font-bold text-white text-xs">0</span>
+                <div class="flex items-center gap-0.5 ml-0.5 pl-1 border-l border-red-400">
+                    <button onclick="navigateConflict(-1)" title="Previous Conflict" class="w-4 h-4 rounded-full bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center text-[9px]">
                         <i class="fa-solid fa-chevron-left"></i>
                     </button>
                     <span id="conflict-nav-index" class="text-[9px] text-slate-300 font-bold px-0.5">0/0</span>
@@ -524,7 +524,7 @@
                                     <span data-i18n="drawer.airport_info" class="text-xs font-bold text-slate-300 uppercase tracking-wider shrink-0 leading-tight">Airport Info</span>
                                 </div>
                                 <div class="flex items-center gap-2 shrink-0">
-                                    <span id="drawer-runways-count" class="text-xs font-mono font-bold text-white bg-indigo-600 px-2.5 py-1 rounded-full">0 Runways</span>
+                                    <span id="drawer-runways-count" class="text-xs font-mono font-bold text-slate-200 bg-slate-800 px-2.5 py-1 rounded-full">0 Runways</span>
                                     <i id="accordion-icon-airport_info" class="fa-solid fa-chevron-down text-slate-500 text-xs transition-transform duration-200"></i>
                                 </div>
                             </button>
