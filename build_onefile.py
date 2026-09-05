@@ -17,6 +17,7 @@ pyinstaller_cmd = [
     f"--add-data={os.path.join(BASE_DIR, 'airports.json')};.",
     f"--add-data={os.path.join(BASE_DIR, 'airport_airlines.json')};.",
     f"--add-data={os.path.join(BASE_DIR, 'airport_routes.json')};.",
+    f"--add-data={os.path.join(BASE_DIR, 'airport_runways.json')};.",
     f"--add-data={os.path.join(BASE_DIR, 'installed_airports.json')};.",
     f"--add-data={ICON_PATH};.",
     f"--add-data={os.path.join(BASE_DIR, 'web')};web",

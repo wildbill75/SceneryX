@@ -1467,6 +1467,15 @@ def run_scan():
         except Exception as e:
             print("Error loading airport_routes.json:", e)
 
+    RUNWAYS_DB = {}
+    RUNWAYS_DB_PATH = get_resource_file_path("airport_runways.json")
+    if os.path.exists(RUNWAYS_DB_PATH):
+        try:
+            with open(RUNWAYS_DB_PATH, 'r', encoding='utf-8') as f:
+                RUNWAYS_DB = json.load(f)
+        except Exception as e:
+            print("Error loading airport_runways.json:", e)
+
     # Scan GSX Profiles
     gsx_path_cfg = settings.get("gsx_profile_path", get_default_gsx_path())
     gsx_map = scan_gsx_profiles(gsx_path_cfg)
@@ -1533,6 +1542,7 @@ def run_scan():
     for icao, item in detected_map.items():
         item['operating_airlines'] = AIRLINES_DB.get(icao, [])
         item['routes'] = ROUTES_DB.get(icao, {})
+        item['runways'] = RUNWAYS_DB.get(icao, [])
         if icao in gsx_map:
             item['has_gsx_profile'] = True
             item['gsx_profile_filename'] = gsx_map[icao]['filename']

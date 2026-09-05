@@ -5,7 +5,7 @@ import re
 import urllib.request
 import webbrowser
 import webview
-from scanner import run_scan, get_settings, save_settings, load_ratings, save_rating, save_custom_price, save_custom_category, load_custom_prices, get_estimated_price, get_default_gsx_path, load_airport_database, SPECIAL_BUNDLE_MAP, OUTPUT_JSON_PATH, compute_scan_delta, build_library_snapshot, SNAPSHOT_JSON_PATH
+from scanner import run_scan, get_settings, save_settings, load_ratings, save_rating, save_custom_price, save_custom_category, load_custom_prices, get_estimated_price, get_default_gsx_path, load_airport_database, SPECIAL_BUNDLE_MAP, OUTPUT_JSON_PATH, compute_scan_delta, build_library_snapshot, SNAPSHOT_JSON_PATH, get_resource_file_path
 
 AIRPORTS_DB_CACHE = None
 
@@ -380,6 +380,21 @@ class Api:
         except Exception as e:
             print("Error returning world_airport_coords:", e)
             return json.dumps({})
+
+    def get_airport_runways(self, icao):
+        try:
+            if not hasattr(Api, '_RUNWAYS_CACHE') or Api._RUNWAYS_CACHE is None:
+                runways_path = get_resource_file_path("airport_runways.json")
+                if os.path.exists(runways_path):
+                    with open(runways_path, 'r', encoding='utf-8') as f:
+                        Api._RUNWAYS_CACHE = json.load(f)
+                else:
+                    Api._RUNWAYS_CACHE = {}
+            icao_clean = (icao or '').strip().upper()
+            return json.dumps(Api._RUNWAYS_CACHE.get(icao_clean, []))
+        except Exception as e:
+            print("Error in get_airport_runways:", e)
+            return json.dumps([])
 
     def rescan(self):
         airports = run_scan()

@@ -2,7 +2,7 @@
 SCENERYX — Next-Generation MSFS Scenery & Collection Manager
 ================================================================================
 
-Version   : 1.0.1-BETA
+Version   : 1.0.3-BETA
 Platform  : Windows 10 / Windows 11 (64-bit)
 Simulator : Microsoft Flight Simulator 2020 & 2024
 License   : Freeware / Personal Non-Commercial Use

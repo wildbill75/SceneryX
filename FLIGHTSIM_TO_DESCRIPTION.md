@@ -54,7 +54,7 @@ As flight simmers, our scenery libraries grow rapidly over time: hundreds of han
 
 ### 📦 Installation & Quick Start
 
-1. **Download** the `SceneryX_v1.0.1_BETA.zip` archive.
+1. **Download** the `SceneryX_v1.0.3_BETA.zip` archive.
 2. **Extract** the folder anywhere on your PC (e.g. `C:\Tools\SceneryX` or your desktop).
 3. **Launch** `SceneryX.exe`.
 4. On first launch, SceneryX will automatically detect your MSFS installation paths. Click **Scan** to catalog your airports in seconds!

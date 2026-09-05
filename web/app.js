@@ -2617,6 +2617,9 @@ function showAirportDetails(ap) {
         }
     }
 
+    // Render Runways Card (Designation, Length ft/m, Width, Surface, Lighting)
+    renderAirportRunways(ap);
+
     // Render Operating Airlines Card (3x3 Grid sorted by flight/route frequency)
     const airlinesListEl = document.getElementById('drawer-airlines-list');
     const airlinesCountEl = document.getElementById('drawer-airlines-count');
@@ -3228,6 +3231,95 @@ function exitCountryMode() {
 
 function closeDrawer() {
     exitCountryMode();
+}
+
+/* ================= AIRPORT RUNWAYS LOGIC (AIRPORT DETAIL) ================= */
+
+async function renderAirportRunways(ap) {
+    const runwaysListEl = document.getElementById('drawer-runways-list');
+    const runwaysCountEl = document.getElementById('drawer-runways-count');
+    if (!runwaysListEl || !runwaysCountEl) return;
+
+    let runways = ap.runways;
+    if (!runways || runways.length === 0) {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.get_airport_runways) {
+            try {
+                const raw = await window.pywebview.api.get_airport_runways(ap.icao);
+                runways = (typeof raw === 'string') ? JSON.parse(raw) : raw;
+                ap.runways = runways;
+            } catch (err) {
+                runways = [];
+            }
+        }
+    }
+
+    if (runways && runways.length > 0) {
+        const sortedRunways = runways.slice().sort((a, b) => {
+            const closedA = a.closed ? 1 : 0;
+            const closedB = b.closed ? 1 : 0;
+            if (closedA !== closedB) return closedA - closedB;
+            return (b.length_ft || 0) - (a.length_ft || 0);
+        });
+
+        runwaysCountEl.innerText = `${sortedRunways.length} ${t('drawer.runways_count', 'Runways')}`;
+        runwaysListEl.innerHTML = sortedRunways.map(rwy => {
+            const isClosed = !!rwy.closed;
+            const isLighted = !!rwy.lighted;
+            const lenFt = rwy.length_ft ? rwy.length_ft.toLocaleString() + ' ft' : '—';
+            const lenM = rwy.length_m ? rwy.length_m.toLocaleString() + ' m' : '—';
+            const widFt = rwy.width_ft ? rwy.width_ft.toLocaleString() + ' ft' : '';
+            const widM = rwy.width_m ? rwy.width_m.toLocaleString() + ' m' : '';
+            const widthStr = (widFt && widM) ? `${widFt} (${widM})` : (widFt || widM || '');
+            const surfaceName = rwy.surface || 'Unknown';
+
+            const borderClass = isClosed ? 'border-red-900/40 bg-red-950/20 opacity-75' : 'border-slate-800/80 bg-slate-950/70';
+            const identColor = isClosed ? 'text-red-400' : 'text-cyan-300';
+
+            return `
+                <div class="p-3 rounded-xl border ${borderClass} space-y-1.5 transition-all">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span class="font-mono font-black text-sm ${identColor} px-2 py-0.5 rounded bg-slate-900 border border-slate-800 tracking-wider">
+                                ${rwy.id}
+                            </span>
+                            <span class="text-[11px] font-semibold text-slate-300 bg-slate-900/80 px-2 py-0.5 rounded border border-slate-800/60">
+                                ${surfaceName}
+                            </span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            ${isClosed ? `
+                                <span class="text-[10px] font-bold text-red-400 bg-red-900/30 px-2 py-0.5 rounded border border-red-700/50">
+                                    ${t('drawer.runway_closed', 'Closed')}
+                                </span>
+                            ` : ''}
+                            ${isLighted && !isClosed ? `
+                                <span class="text-[10px] font-bold text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded border border-amber-400/20 flex items-center gap-1">
+                                    <i class="fa-regular fa-lightbulb text-[9px]"></i>
+                                    ${t('drawer.runway_lighted', 'Lighted')}
+                                </span>
+                            ` : ''}
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between text-xs font-mono pt-1 border-t border-slate-900/80">
+                        <div class="flex items-center gap-1.5 text-slate-300">
+                            <span class="text-slate-500 text-[11px] font-sans">${t('drawer.runway_length', 'Length')}:</span>
+                            <span class="font-bold text-white">${lenFt}</span>
+                            <span class="text-slate-400 text-[11px]">(${lenM})</span>
+                        </div>
+                        ${widthStr ? `
+                            <div class="flex items-center gap-1.5 text-slate-400 text-[11px]">
+                                <span class="text-slate-500 font-sans">${t('drawer.runway_width', 'Width')}:</span>
+                                <span>${widthStr}</span>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    } else {
+        runwaysCountEl.innerText = `0 ${t('drawer.runways_count', 'Runways')}`;
+        runwaysListEl.innerHTML = `<span class="text-xs text-slate-500 italic py-2 block text-center">${t('drawer.no_runways', 'No runway data available for this airport.')}</span>`;
+    }
 }
 
 /* ================= STAR RATING WIDGET LOGIC (AIRPORT DETAIL) ================= */
@@ -5418,6 +5510,7 @@ const DRAWER_ACCORDION_DEFAULTS = {
     'dev': true,
     'options': true,
     'gsx': true,
+    'runways': true,
     'airlines': true,
     'price': true
 };
@@ -5451,7 +5544,7 @@ function initDrawerAccordions() {
         saved = JSON.parse(localStorage.getItem('sceneryx_drawer_accordions_v2') || '{}');
     } catch (e) {}
 
-    ['dev', 'options', 'gsx', 'airlines', 'price'].forEach(key => {
+    ['dev', 'options', 'gsx', 'runways', 'airlines', 'price'].forEach(key => {
         const isOpen = (saved[key] !== undefined) ? saved[key] : DRAWER_ACCORDION_DEFAULTS[key];
         const content = document.getElementById(`accordion-content-${key}`);
         const icon = document.getElementById(`accordion-icon-${key}`);
