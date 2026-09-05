@@ -5400,7 +5400,7 @@ function initSidebarResize() {
 
         sidebar.classList.remove('transition-all', 'duration-300', 'ease-in-out');
         document.body.classList.add('select-none', 'cursor-col-resize');
-        handle.classList.add('bg-cyan-400', 'w-1.5');
+        handle.classList.add('bg-cyan-500/40');
 
         const onMouseMove = (moveEvent) => {
             if (!isResizing) return;
@@ -5418,7 +5418,7 @@ function initSidebarResize() {
             isResizing = false;
             sidebar.classList.add('transition-all', 'duration-300', 'ease-in-out');
             document.body.classList.remove('select-none', 'cursor-col-resize');
-            handle.classList.remove('bg-cyan-400', 'w-1.5');
+            handle.classList.remove('bg-cyan-500/40');
             window.removeEventListener('mousemove', onMouseMove);
             window.removeEventListener('mouseup', onMouseUp);
 
@@ -5468,7 +5468,7 @@ function initDrawerResize() {
 
         drawer.classList.remove('transition-transform', 'duration-300', 'ease-in-out');
         document.body.classList.add('select-none', 'cursor-col-resize');
-        handle.classList.add('bg-cyan-400', 'w-1.5');
+        handle.classList.add('bg-cyan-500/40');
 
         const onMouseMove = (moveEvent) => {
             if (!isResizing) return;
@@ -5487,7 +5487,7 @@ function initDrawerResize() {
             isResizing = false;
             drawer.classList.add('transition-transform', 'duration-300', 'ease-in-out');
             document.body.classList.remove('select-none', 'cursor-col-resize');
-            handle.classList.remove('bg-cyan-400', 'w-1.5');
+            handle.classList.remove('bg-cyan-500/40');
             window.removeEventListener('mousemove', onMouseMove);
             window.removeEventListener('mouseup', onMouseUp);
 
