@@ -1640,7 +1640,7 @@ class Api:
             'inibuilds': 'https://inibuilds.com/search?q={query}',
             'flightbeam': 'https://www.flightbeam.com/search?q={query}',
             'flytampa': 'https://www.flytampa.org/',
-            'pyreegue': 'https://pyreegue.dev/',
+            'pyreegue': 'https://contrail.shop/collections/pyreegue-dev-co',
             'fsdreamteam': 'https://www.fsdreamteam.com/',
             'fsdt': 'https://www.fsdreamteam.com/',
             'mk-studios': 'https://mkstudios.com/',
@@ -1653,15 +1653,22 @@ class Api:
             'digital design': 'https://secure.simmarket.com/advanced_search_result.php?keywords={query}',
             'nza': 'https://nzasimulations.com/',
             'nza simulations': 'https://nzasimulations.com/',
-            'verticalsim': 'https://verticalsim.com/shop/',
+            'verticalsim': 'https://verticalsims.com/shop/',
             'latinvfr': 'https://www.latinvfr.com/',
             'pilotplus': 'https://pilotplus.io/',
             'threshold': 'https://www.thresholdx.net/search?q={query}',
-            'tailstrike': 'https://tailstrikedesigns.com/',
-            'gaya': 'https://www.gaya-simulations.com/',
-            'gaya simulations': 'https://www.gaya-simulations.com/',
+            'tailstrike': 'https://secure.simmarket.com/advanced_search_result.php?keywords={query}',
+            'gaya': 'https://www.gaya-studios.com/',
+            'gaya simulations': 'https://www.gaya-studios.com/',
             'dominicdesignteam': 'https://secure.simmarket.com/advanced_search_result.php?keywords={query}',
-            'taimedia': 'https://secure.simmarket.com/advanced_search_result.php?keywords={query}'
+            'taimedia': 'https://secure.simmarket.com/advanced_search_result.php?keywords={query}',
+            'contrail': 'https://contrail.shop/search?q={query}',
+            'macco': 'https://contrail.shop/search?q={query}',
+            'bmworld': 'https://contrail.shop/search?q={query}',
+            'amsim': 'https://contrail.shop/search?q={query}',
+            'fly2high': 'https://contrail.shop/search?q={query}',
+            'northern sky': 'https://contrail.shop/search?q={query}',
+            'uk2000': 'https://www.uk2000scenery.com/'
         }
 
         clean_name = (name or '').strip()
@@ -2031,13 +2038,14 @@ class Api:
                 'NZWF': 'https://nzasimulations.com/'
             },
             'Pyreegue Dev Co.': {
-                'EGPH': 'https://pyreegue.dev/',
-                'EGAA': 'https://pyreegue.dev/',
-                'EGNX': 'https://pyreegue.dev/',
-                'EGSS': 'https://pyreegue.dev/',
-                'EGFF': 'https://pyreegue.dev/',
-                'EGPF': 'https://pyreegue.dev/',
-                'EGNM': 'https://pyreegue.dev/'
+                'EGBB': 'https://contrail.shop/products/pyreegue-egbb-birmingham-msfs-2020-2024',
+                'EGPH': 'https://contrail.shop/products/pyreegue-egph-edinburgh-airport-v2-msfs',
+                'EGPF': 'https://contrail.shop/products/egpf-glasgow-airport-msfs',
+                'EGAA': 'https://contrail.shop/products/egaa-belfast-airport-msfs',
+                'EGNX': 'https://contrail.shop/products/egnx-east-midlands-airport-msfs',
+                'LYTV': 'https://contrail.shop/products/lytv-tivat-airport-msfs',
+                'UKOO': 'https://contrail.shop/products/ukoo-odesa-airport-msfs',
+                'UKLL': 'https://contrail.shop/products/ukll-lviv-airport-msfs'
             },
             'Drzewiecki Design': {
                 'EPWA': 'https://drzewiecki-design.net/products.htm',
@@ -2053,15 +2061,60 @@ class Api:
                 'KPAE': 'https://drzewiecki-design.net/products.htm'
             },
             'LatinVFR': {
-                'KMIA': 'https://latinvfr.com/products/miami-kmia-v5-msfs',
-                'KFLL': 'https://latinvfr.com/products/fort-lauderdale-kfll-v2-msfs',
-                'LEBL': 'https://latinvfr.com/products/barcelona-lebl-msfs',
-                'LEMD': 'https://latinvfr.com/products/madrid-lemd-msfs',
-                'KRSW': 'https://latinvfr.com/products/fort-myers-krsw-msfs',
-                'KBDL': 'https://latinvfr.com/products/hartford-kbdl-msfs',
-                'KMSY': 'https://latinvfr.com/products/new-orleans-kmsy-msfs'
+                'KMIA': 'https://latinvfr.com/products/latinvfr-miami-kmia-msfs',
+                'KFLL': 'https://latinvfr.com/products/fort-lauderdale-hollywood-intl-kfll-for-msfs',
+                'LEBL': 'https://latinvfr.com/products/lvfr-barcelona-lebl-for-msfs',
+                'LEMD': 'https://latinvfr.com/products/madrid-barajas-airport-lemd-and-city-for-msfs',
+                'KMSY': 'https://latinvfr.com/products/new-orleans-international-airport-kmsy-for-msfs',
+                'KBDL': 'https://latinvfr.com/products/latinvfr-bradley-kbdl-msfs',
+                'KSAN': 'https://latinvfr.com/products/latinvfr-san-diego-intl-airport-ksan-msfs',
+                'KBWI': 'https://latinvfr.com/products/baltimore-washington-kbwi-for-msfs',
+                'KLSV': 'https://latinvfr.com/products/copy-of-madrid-barajas-airport-lemd-and-city-for-msfs',
+                'KNKX': 'https://latinvfr.com/products/copy-of-fort-lauderdale-hollywood-intl-kfll-for-msfs',
+                'SCEL': 'https://latinvfr.com/products/santiago-chile-scel-for-msfs',
+                'TJSJ': 'https://latinvfr.com/products/san-juan-tjsj-for-msfs'
             }
         }
+
+        PYREEGUE_PRICES = {
+            'EGBB': (23.68, 'EUR'),
+            'EGPH': (23.68, 'EUR'),
+            'EGPF': (15.39, 'EUR'),
+            'EGAA': (18.94, 'EUR'),
+            'EGNX': (18.94, 'EUR'),
+            'LYTV': (5.91, 'EUR'),
+            'UKOO': (9.47, 'EUR'),
+            'UKLL': (9.47, 'EUR')
+        }
+
+        LATINVFR_PRICES = {
+            'KMIA': 8.99,
+            'KFLL': 8.99,
+            'LEBL': 8.99,
+            'LEMD': 12.99,
+            'KMSY': 12.49,
+            'KBDL': 7.99,
+            'KSAN': 7.99,
+            'KBWI': 8.99,
+            'KLSV': 5.99,
+            'KNKX': 5.99,
+            'SCEL': 8.99,
+            'TJSJ': 8.99
+        }
+
+        def check_pyreegue(code):
+            prod_url = DEV_CATALOGS['Pyreegue Dev Co.'].get(code)
+            if prod_url:
+                p_info = PYREEGUE_PRICES.get(code, (18.99, "EUR"))
+                return True, prod_url, p_info[0], p_info[1]
+            return False, "https://contrail.shop/collections/pyreegue-dev-co", None, ""
+
+        def check_latinvfr(code):
+            prod_url = DEV_CATALOGS['LatinVFR'].get(code)
+            if prod_url:
+                price = LATINVFR_PRICES.get(code, 12.99)
+                return True, prod_url, price, "USD"
+            return False, f"https://latinvfr.com/search?q={code}", None, ""
 
         def check_flightbeam(code):
             prod_url = DEV_CATALOGS['Flightbeam'].get(code)
@@ -2115,13 +2168,23 @@ class Api:
             return False, u, None, ""
 
         def check_contrail(code):
-            u = f"https://contrail.shop/search?q={code}"
-            h = fetch_html(u)
-            if not h or "0 results" in h.lower() or "no results" in h.lower():
-                return False, u, None, ""
-            cards = re.findall(r'class=[\'"][^\'"]*product-card[^\'"]*[\'"][\s\S]*?</div>', h)
-            has_match = any(re.search(r'\b' + re.escape(code) + r'\b', c, re.IGNORECASE) for c in cards)
-            return has_match, u, None, ""
+            u = f"https://contrail.shop/search/suggest.json?q={code}&resources[type]=product"
+            fallback_u = f"https://contrail.shop/search?q={code}"
+            try:
+                req = urllib.request.Request(u, headers={'User-Agent': 'Mozilla/5.0'})
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    data = json.loads(resp.read().decode('utf-8'))
+                    products = data.get('resources', {}).get('results', {}).get('products', [])
+                    for p in products:
+                        title = p.get('title', '')
+                        handle = p.get('handle', '')
+                        if re.search(r'\b' + re.escape(code) + r'\b', title, re.IGNORECASE) or re.search(r'\b' + re.escape(code) + r'\b', handle, re.IGNORECASE):
+                            price = float(p.get('price')) if p.get('price') else None
+                            prod_url = f"https://contrail.shop/products/{handle}"
+                            return True, prod_url, price, "EUR"
+            except Exception:
+                pass
+            return False, fallback_u, None, ""
 
         stores_def = [
             ("France VFR", check_francevfr, "France VFR official scenery boutique & regional airports", "dev"),
@@ -2130,9 +2193,9 @@ class Api:
             ("FSDreamTeam", lambda c: (c in DEV_CATALOGS['FSDreamTeam'], DEV_CATALOGS['FSDreamTeam'].get(c, "https://www.fsdreamteam.com/products_msfs.html"), 19.99, "USD"), "FSDreamTeam official studio & GSX creator", "dev"),
             ("Jetstream Designs", lambda c: (c in DEV_CATALOGS['Jetstream Designs'], DEV_CATALOGS['Jetstream Designs'].get(c, "https://www.jetstream-designs.com/"), None, ""), "Jetstream Designs official creator showcase", "dev"),
             ("NZA Simulations", lambda c: (c in DEV_CATALOGS['NZA Simulations'], DEV_CATALOGS['NZA Simulations'].get(c, "https://nzasimulations.com/"), 24.99, "AUD"), "NZA Simulations official Australasia scenery store", "dev"),
-            ("Pyreegue Dev Co.", lambda c: (c in DEV_CATALOGS['Pyreegue Dev Co.'], DEV_CATALOGS['Pyreegue Dev Co.'].get(c, "https://pyreegue.dev/"), 16.99, "GBP"), "Pyreegue Dev Co. official studio & airports", "dev"),
+            ("Pyreegue Dev Co.", check_pyreegue, "Pyreegue Dev Co. official studio (via Contrail)", "dev"),
             ("Drzewiecki Design", lambda c: (c in DEV_CATALOGS['Drzewiecki Design'], DEV_CATALOGS['Drzewiecki Design'].get(c, "https://drzewiecki-design.net/products.htm"), 21.00, "EUR"), "Drzewiecki Design official airports catalog", "dev"),
-            ("LatinVFR", lambda c: (c in DEV_CATALOGS['LatinVFR'], DEV_CATALOGS['LatinVFR'].get(c, f"https://latinvfr.com/search?q={c}"), 16.99, "USD"), "LatinVFR official developer store & airports", "dev"),
+            ("LatinVFR", check_latinvfr, "LatinVFR official developer store & airports", "dev"),
             ("simMarket", check_sm, "Global flight simulation store & vendor marketplace", "market"),
             ("Orbx Direct", check_orbx, "OrbxDirect official MSFS scenery catalog", "market"),
             ("Flightsim.to Store", check_fsto, "Official payware marketplace on Flightsim.to", "market"),
