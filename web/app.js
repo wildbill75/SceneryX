@@ -1610,7 +1610,7 @@ function renderConflictModalStep(index) {
     }
 
     const ap = conflictAirports[index];
-    const counterBadge = document.getElementById('conflict-modal-counter-badge');
+    const titleStepEl = document.getElementById('conflict-modal-step-index-title');
     const stepIndexEl = document.getElementById('conflict-modal-step-index');
     const stepNavEl = document.getElementById('conflict-modal-step-nav');
     const icaoEl = document.getElementById('conflict-modal-icao');
@@ -1618,8 +1618,8 @@ function renderConflictModalStep(index) {
     const apLocEl = document.getElementById('conflict-modal-ap-location');
     const sourcesCont = document.getElementById('conflict-modal-sources-container');
 
-    if (counterBadge) {
-        counterBadge.innerText = `${t('conflict.step_count', 'Conflict')} ${index + 1} / ${conflictAirports.length}`;
+    if (titleStepEl) {
+        titleStepEl.innerText = `${index + 1}/${conflictAirports.length}`;
     }
     if (stepIndexEl) {
         stepIndexEl.innerText = `${index + 1}/${conflictAirports.length}`;
@@ -1634,7 +1634,15 @@ function renderConflictModalStep(index) {
         }
     }
 
-    if (icaoEl) icaoEl.innerText = ap.icao;
+    if (icaoEl) {
+        icaoEl.innerText = ap.icao;
+        const cat = getAirportCategory(ap);
+        let icaoColor = 'text-cyan-400';
+        if (cat === 'PAYWARE') icaoColor = 'text-purple-400';
+        else if (cat === 'ASOBO') icaoColor = 'text-amber-400';
+        else if (cat === 'DEFAULT') icaoColor = 'text-sky-400';
+        icaoEl.className = `font-mono font-black text-2xl lg:text-3xl tracking-tight shrink-0 ${icaoColor}`;
+    }
     if (apNameEl) apNameEl.innerText = ap.name || ap.icao;
     if (apLocEl) apLocEl.innerText = `${ap.city || 'Unknown City'}, ${ap.country || 'Unknown Country'}`;
 
@@ -1650,21 +1658,17 @@ function renderConflictModalStep(index) {
 
     if (sourcesCont) {
         const htmlSources = baseSources.map((src, i) => {
-            const isCurrentlyActive = !src.is_disabled;
             const isChecked = (i === 0);
             const safeAttrFolder = (src.folder_name || '').replace(/"/g, '&quot;');
             const titleLabel = src.vendor && src.vendor !== 'Unknown' ? src.vendor : src.folder_name;
-            const badgeLabel = isCurrentlyActive ? t('conflict.badge_active', 'Currently Active') : t('conflict.badge_conflicting', 'Conflicting Addon');
-            const badgeColor = isCurrentlyActive ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white';
-            const cardBorder = isChecked ? 'border-red-500/70 bg-slate-900 shadow-md shadow-red-500/10' : 'border-slate-800 bg-slate-900/60 hover:border-slate-700';
+            const cardBorder = isChecked ? 'border-cyan-500/60 bg-slate-900 shadow-md shadow-cyan-500/10' : 'border-slate-800 bg-slate-900/60 hover:border-slate-700';
 
             return `
                 <label id="conflict-card-${i}" onclick="selectConflictRadio(${i})" class="p-3.5 rounded-2xl border ${cardBorder} flex items-start gap-3.5 cursor-pointer transition-all group block">
-                    <input type="radio" name="conflict-pkg-choice" value="${safeAttrFolder}" id="conflict-radio-${i}" ${isChecked ? 'checked' : ''} class="w-4 h-4 accent-red-500 mt-1 cursor-pointer shrink-0">
+                    <input type="radio" name="conflict-pkg-choice" value="${safeAttrFolder}" id="conflict-radio-${i}" ${isChecked ? 'checked' : ''} class="w-4 h-4 accent-cyan-500 mt-1 cursor-pointer shrink-0">
                     <div class="min-w-0 flex-1 space-y-1.5">
                         <div class="flex items-center justify-between gap-2">
                             <span class="text-xs font-bold text-white group-hover:text-cyan-300 transition-colors truncate">${titleLabel}</span>
-                            <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${badgeColor} shrink-0">${badgeLabel}</span>
                         </div>
                         <div class="text-[11px] font-mono text-slate-300 bg-slate-950/70 border border-slate-800/80 p-2 rounded-xl break-all">
                             ${src.folder_name}
@@ -1690,7 +1694,7 @@ function selectConflictRadio(index) {
     const cards = document.querySelectorAll('[id^="conflict-card-"]');
     cards.forEach((card, i) => {
         if (i === index) {
-            card.className = "p-3.5 rounded-2xl border border-red-500/70 bg-slate-900 shadow-md shadow-red-500/10 flex items-start gap-3.5 cursor-pointer transition-all group block";
+            card.className = "p-3.5 rounded-2xl border border-cyan-500/60 bg-slate-900 shadow-md shadow-cyan-500/10 flex items-start gap-3.5 cursor-pointer transition-all group block";
         } else {
             card.className = "p-3.5 rounded-2xl border border-slate-800 bg-slate-900/60 hover:border-slate-700 flex items-start gap-3.5 cursor-pointer transition-all group block";
         }
@@ -1765,7 +1769,7 @@ async function applyConflictSelection() {
     } finally {
         if (submitBtn) {
             submitBtn.disabled = false;
-            submitBtn.innerHTML = `<span data-i18n="conflict.btn_apply">${t('conflict.btn_apply', 'OK - Apply Choice')}</span> <i class="fa-solid fa-check text-xs"></i>`;
+            submitBtn.innerHTML = `<span data-i18n="conflict.btn_apply">${t('conflict.btn_apply', 'Apply Choice')}</span>`;
         }
     }
 }
