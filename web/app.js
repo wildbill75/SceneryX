@@ -661,6 +661,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initSidebarResize();
     initDrawerResize();
     initDrawerAccordions();
+    initLeftFilterAccordions();
     renderStarRatingWidget(0);
     renderFilterStarWidget(0);
     ensureAppLoaded();
@@ -5813,6 +5814,63 @@ function initDrawerAccordions() {
         const isOpen = (saved[key] !== undefined) ? saved[key] : DRAWER_ACCORDION_DEFAULTS[key];
         const content = document.getElementById(`accordion-content-${key}`);
         const icon = document.getElementById(`accordion-icon-${key}`);
+        if (!content || !icon) return;
+
+        if (isOpen) {
+            content.classList.remove('hidden');
+            icon.classList.remove('-rotate-90');
+            icon.classList.add('rotate-0');
+        } else {
+            content.classList.add('hidden');
+            icon.classList.remove('rotate-0');
+            icon.classList.add('-rotate-90');
+        }
+    });
+}
+
+/* ================= LEFT SIDEBAR FILTER ACCORDIONS ================= */
+
+const LEFT_ACCORDION_DEFAULTS = {
+    'pricing_model': true,
+    'scenery_source': true,
+    'geographic_region': true,
+    'airport_type': true,
+    'gsx_profile': true
+};
+
+function toggleLeftFilterAccordion(sectionKey) {
+    const content = document.getElementById(`left-accordion-content-${sectionKey}`);
+    const icon = document.getElementById(`left-accordion-icon-${sectionKey}`);
+    if (!content || !icon) return;
+
+    const isHidden = content.classList.contains('hidden');
+    if (isHidden) {
+        content.classList.remove('hidden');
+        icon.classList.remove('-rotate-90');
+        icon.classList.add('rotate-0');
+    } else {
+        content.classList.add('hidden');
+        icon.classList.remove('rotate-0');
+        icon.classList.add('-rotate-90');
+    }
+
+    try {
+        const saved = JSON.parse(localStorage.getItem('sceneryx_left_accordions_v1') || '{}');
+        saved[sectionKey] = isHidden; // true if opened
+        localStorage.setItem('sceneryx_left_accordions_v1', JSON.stringify(saved));
+    } catch (e) {}
+}
+
+function initLeftFilterAccordions() {
+    let saved = {};
+    try {
+        saved = JSON.parse(localStorage.getItem('sceneryx_left_accordions_v1') || '{}');
+    } catch (e) {}
+
+    ['pricing_model', 'scenery_source', 'geographic_region', 'airport_type', 'gsx_profile'].forEach(key => {
+        const isOpen = (saved[key] !== undefined) ? saved[key] : LEFT_ACCORDION_DEFAULTS[key];
+        const content = document.getElementById(`left-accordion-content-${key}`);
+        const icon = document.getElementById(`left-accordion-icon-${key}`);
         if (!content || !icon) return;
 
         if (isOpen) {
