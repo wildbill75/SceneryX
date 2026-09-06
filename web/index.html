@@ -487,6 +487,34 @@
         <main class="flex-1 relative">
             <div id="map" class="w-full h-full z-10 bg-slate-950"></div>
 
+            <!-- FLOATING FLIGHT PLANNING BANNER (ACTIVATED VIA ALT+CLICK) -->
+            <div id="flight-planning-banner" class="hidden absolute top-4 left-1/2 -translate-x-1/2 z-[1000] glass-panel bg-slate-900/95 border border-purple-500/60 px-5 py-2.5 rounded-2xl shadow-2xl shadow-purple-950/60 items-center gap-3.5 animate-in fade-in slide-in-from-top-4 duration-200 pointer-events-auto">
+                <div class="flex items-center gap-2">
+                    <span class="relative flex h-2.5 w-2.5">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-purple-500"></span>
+                    </span>
+                    <span class="text-xs font-black font-mono uppercase tracking-wider text-purple-300">Flight Planning Mode ON</span>
+                </div>
+
+                <div class="h-4 w-px bg-slate-800"></div>
+
+                <div class="flex items-center gap-2 font-mono">
+                    <span id="fp-origin-tag" class="font-bold text-xs bg-slate-950 px-2.5 py-1 rounded-lg text-purple-300 border border-purple-500/40">DEP: ----</span>
+                    <i class="fa-solid fa-arrow-right text-slate-500 text-xs"></i>
+                    <span id="fp-dest-tag" class="font-bold text-xs bg-slate-950 px-2.5 py-1 rounded-lg text-slate-400 border border-slate-800">ARR: ----</span>
+                </div>
+
+                <div class="h-4 w-px bg-slate-800"></div>
+
+                <span id="fp-guide-text" class="text-xs text-slate-300 font-medium">Alt+Click an airport to set Destination</span>
+
+                <button onclick="exitFlightPlanningMode()" class="ml-1 px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-mono font-bold border border-slate-700 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95" title="Exit Flight Planning Mode (or press Escape)">
+                    <kbd class="text-[10px] bg-slate-900 px-1 py-0.5 rounded text-slate-400 border border-slate-700">Esc</kbd>
+                    <span>Exit</span>
+                </button>
+            </div>
+
             <!-- FLOATING FLIGHT OPTIMIZER BAR -->
             <div id="flight-optimizer-bar" class="hidden absolute bottom-6 left-1/2 -translate-x-1/2 z-[1000] bg-slate-900/95 backdrop-blur-xl border border-emerald-500/40 p-3 rounded-2xl shadow-2xl shadow-emerald-500/20 items-center gap-3 animate-in fade-in slide-in-from-bottom-4 duration-200">
                 <div class="flex items-center gap-2 border-r border-slate-800 pr-3">
