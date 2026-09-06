@@ -147,17 +147,17 @@
     </div>
 
     <!-- TOP HEADER NAVBAR (118px HEIGHT, AIRY CENTERING, NO OVERLAPS OR SCROLLBARS) -->
-    <header class="h-[118px] glass-panel z-30 flex items-center justify-between px-6 shrink-0 border-b border-slate-800/80 gap-4">
+    <header class="relative h-[118px] glass-panel z-30 flex items-center justify-between px-6 shrink-0 border-b border-slate-800/80">
         <!-- LEFT: BRANDING LOGO -->
-        <div class="flex items-center shrink-0">
+        <div class="flex items-center shrink-0 z-10">
             <div class="flex items-center gap-2.5">
                 <img src="header_logo.png" alt="SceneryX" class="h-8 lg:h-9 w-auto object-contain select-none pointer-events-none" />
                 <span class="text-xs font-mono font-semibold text-slate-400" title="SceneryX v1.0.3-BETA">v1.0.3-BETA</span>
             </div>
         </div>
 
-        <!-- CENTER: MAIN HERO STATS & INVESTMENT BANNER (PROMINENT CENTERPIECE) -->
-        <div class="flex-1 flex flex-col items-center justify-center text-center px-2 min-w-0 py-1.5 space-y-2">
+        <!-- CENTER: MAIN HERO STATS & INVESTMENT BANNER (PERFECTLY HORIZONTALLY CENTERED) -->
+        <div class="absolute left-1/2 -translate-x-1/2 flex flex-col items-center justify-center text-center py-1.5 space-y-2 pointer-events-auto">
             <!-- HERO STATS BAR (CLICKABLE INTERACTIVE BADGES FOR INSTANT FILTERING) -->
             <div class="flex items-center gap-2.5 justify-center flex-nowrap py-1">
                 <!-- TOTAL AIRPORTS BADGE (ELECTRIC SKY BLUE) -->
@@ -203,7 +203,7 @@
         </div>
 
         <!-- RIGHT: SUPPORT & CONFLICT NAVIGATOR -->
-        <div class="flex items-center gap-2.5 shrink-0">
+        <div class="flex items-center gap-2.5 shrink-0 z-10">
             <!-- SUPPORT PROJECT ICON BUTTON (BORDERLESS & ENLARGED) -->
             <button onclick="openSupportLink()" title="Support Project" class="p-1.5 text-slate-400 hover:text-white transition-all shrink-0 cursor-pointer hover:scale-110 active:scale-95 group">
                 <i class="fa-solid fa-mug-hot text-xl lg:text-2xl text-slate-400 group-hover:text-white transition-colors"></i>
