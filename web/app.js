@@ -33,8 +33,10 @@ let selectedCurrency = 'USD';
 const CURRENCY_SYMBOLS = { EUR: '€', USD: '$', GBP: '£', AUD: 'A$' };
 const CURRENCY_RATES = { EUR: 1.0, USD: 1.09, GBP: 0.85, AUD: 1.65 };
 
-// Conflict Navigation Engine
+// Conflict Resolution Engine
 let currentConflictIndex = 0;
+let pendingScanDelta = null;
+let pendingScanIsStartup = false;
 
 // Multi-select Sets
 const ALL_PRICING_LIST = ['Payware', 'Freeware / Flightsim.to', 'Asobo', 'Default'];
@@ -1526,26 +1528,60 @@ function updateConflictNavigator() {
     const conflictAirports = allAirportsData.filter(a => a.has_conflict);
     const pill = document.getElementById('conflict-nav-pill');
     const counter = document.getElementById('conflict-nav-counter');
-    const indexDisplay = document.getElementById('conflict-nav-index');
 
     if (!pill) return;
 
     if (conflictAirports.length > 0) {
         pill.classList.remove('hidden');
-        counter.innerText = conflictAirports.length;
-        if (currentConflictIndex >= conflictAirports.length) {
-            currentConflictIndex = 0;
-        }
-        indexDisplay.innerText = `${currentConflictIndex + 1}/${conflictAirports.length}`;
+        pill.classList.add('flex');
+        if (counter) counter.innerText = conflictAirports.length;
     } else {
         pill.classList.add('hidden');
+        pill.classList.remove('flex');
         currentConflictIndex = 0;
     }
 }
 
-function navigateConflict(direction) {
+function openConflictModal(index = 0) {
     const conflictAirports = allAirportsData.filter(a => a.has_conflict);
-    if (conflictAirports.length === 0) return;
+    const modal = document.getElementById('conflict-resolution-modal');
+    if (!modal) return;
+
+    if (conflictAirports.length === 0) {
+        closeConflictModal();
+        return;
+    }
+
+    if (index < 0) index = 0;
+    if (index >= conflictAirports.length) index = conflictAirports.length - 1;
+    currentConflictIndex = index;
+
+    renderConflictModalStep(currentConflictIndex);
+    modal.classList.remove('hidden');
+}
+
+function closeConflictModal() {
+    const modal = document.getElementById('conflict-resolution-modal');
+    if (modal) modal.classList.add('hidden');
+
+    // If there were pending scan results deferred because of conflicts,
+    // display them now if all conflicts are resolved
+    const remainingConflicts = allAirportsData.filter(a => a.has_conflict);
+    if (remainingConflicts.length === 0 && pendingScanDelta && pendingScanDelta.total_changes > 0) {
+        const deltaToDisplay = pendingScanDelta;
+        const isStartup = pendingScanIsStartup;
+        pendingScanDelta = null;
+        pendingScanIsStartup = false;
+        displayScanResults(deltaToDisplay, isStartup);
+    }
+}
+
+function navigateConflictStep(direction) {
+    const conflictAirports = allAirportsData.filter(a => a.has_conflict);
+    if (conflictAirports.length === 0) {
+        closeConflictModal();
+        return;
+    }
 
     currentConflictIndex += direction;
     if (currentConflictIndex >= conflictAirports.length) {
@@ -1554,10 +1590,184 @@ function navigateConflict(direction) {
         currentConflictIndex = conflictAirports.length - 1;
     }
 
-    const targetAp = conflictAirports[currentConflictIndex];
-    document.getElementById('conflict-nav-index').innerText = `${currentConflictIndex + 1}/${conflictAirports.length}`;
-    
-    focusAirportWithAnimation(targetAp);
+    renderConflictModalStep(currentConflictIndex);
+}
+
+function focusConflictAirportOnMap() {
+    const conflictAirports = allAirportsData.filter(a => a.has_conflict);
+    if (conflictAirports.length === 0) return;
+    const ap = conflictAirports[currentConflictIndex];
+    if (ap) {
+        focusAirportWithAnimation(ap);
+    }
+}
+
+function renderConflictModalStep(index) {
+    const conflictAirports = allAirportsData.filter(a => a.has_conflict);
+    if (index < 0 || index >= conflictAirports.length) {
+        closeConflictModal();
+        return;
+    }
+
+    const ap = conflictAirports[index];
+    const counterBadge = document.getElementById('conflict-modal-counter-badge');
+    const stepIndexEl = document.getElementById('conflict-modal-step-index');
+    const stepNavEl = document.getElementById('conflict-modal-step-nav');
+    const icaoEl = document.getElementById('conflict-modal-icao');
+    const apNameEl = document.getElementById('conflict-modal-ap-name');
+    const apLocEl = document.getElementById('conflict-modal-ap-location');
+    const sourcesCont = document.getElementById('conflict-modal-sources-container');
+
+    if (counterBadge) {
+        counterBadge.innerText = `${t('conflict.step_count', 'Conflict')} ${index + 1} / ${conflictAirports.length}`;
+    }
+    if (stepIndexEl) {
+        stepIndexEl.innerText = `${index + 1}/${conflictAirports.length}`;
+    }
+    if (stepNavEl) {
+        if (conflictAirports.length > 1) {
+            stepNavEl.classList.remove('hidden');
+            stepNavEl.classList.add('flex');
+        } else {
+            stepNavEl.classList.add('hidden');
+            stepNavEl.classList.remove('flex');
+        }
+    }
+
+    if (icaoEl) icaoEl.innerText = ap.icao;
+    if (apNameEl) apNameEl.innerText = ap.name || ap.icao;
+    if (apLocEl) apLocEl.innerText = `${ap.city || 'Unknown City'}, ${ap.country || 'Unknown Country'}`;
+
+    // Center map smoothly on the airport in background
+    if (map && ap.lat && ap.lon) {
+        try {
+            map.flyTo([ap.lat, ap.lon], Math.max(map.getZoom(), 11), { animate: true, duration: 1.0 });
+        } catch (e) {}
+    }
+
+    // Filter to base sceneries (excluding fixes/patches)
+    const baseSources = (ap.all_sources || []).filter(s => !isFixOrOverlay(s));
+
+    if (sourcesCont) {
+        const htmlSources = baseSources.map((src, i) => {
+            const isCurrentlyActive = !src.is_disabled;
+            const isChecked = (i === 0);
+            const safeAttrFolder = (src.folder_name || '').replace(/"/g, '&quot;');
+            const titleLabel = src.vendor && src.vendor !== 'Unknown' ? src.vendor : src.folder_name;
+            const badgeLabel = isCurrentlyActive ? t('conflict.badge_active', 'Currently Active') : t('conflict.badge_conflicting', 'Conflicting Addon');
+            const badgeColor = isCurrentlyActive ? 'bg-emerald-600 text-white' : 'bg-rose-600 text-white';
+            const cardBorder = isChecked ? 'border-red-500/70 bg-slate-900 shadow-md shadow-red-500/10' : 'border-slate-800 bg-slate-900/60 hover:border-slate-700';
+
+            return `
+                <label id="conflict-card-${i}" onclick="selectConflictRadio(${i})" class="p-3.5 rounded-2xl border ${cardBorder} flex items-start gap-3.5 cursor-pointer transition-all group block">
+                    <input type="radio" name="conflict-pkg-choice" value="${safeAttrFolder}" id="conflict-radio-${i}" ${isChecked ? 'checked' : ''} class="w-4 h-4 accent-red-500 mt-1 cursor-pointer shrink-0">
+                    <div class="min-w-0 flex-1 space-y-1.5">
+                        <div class="flex items-center justify-between gap-2">
+                            <span class="text-xs font-bold text-white group-hover:text-cyan-300 transition-colors truncate">${titleLabel}</span>
+                            <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${badgeColor} shrink-0">${badgeLabel}</span>
+                        </div>
+                        <div class="text-[11px] font-mono text-slate-300 bg-slate-950/70 border border-slate-800/80 p-2 rounded-xl break-all">
+                            ${src.folder_name}
+                        </div>
+                        <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 pt-0.5">
+                            <span><i class="fa-regular fa-folder text-slate-500 mr-1"></i>${src.source_folder || 'Community'}</span>
+                            <span>${src.size_str || ''}</span>
+                        </div>
+                    </div>
+                </label>
+            `;
+        }).join('');
+
+        sourcesCont.innerHTML = htmlSources;
+    }
+}
+
+function selectConflictRadio(index) {
+    const radio = document.getElementById(`conflict-radio-${index}`);
+    if (radio) {
+        radio.checked = true;
+    }
+    const cards = document.querySelectorAll('[id^="conflict-card-"]');
+    cards.forEach((card, i) => {
+        if (i === index) {
+            card.className = "p-3.5 rounded-2xl border border-red-500/70 bg-slate-900 shadow-md shadow-red-500/10 flex items-start gap-3.5 cursor-pointer transition-all group block";
+        } else {
+            card.className = "p-3.5 rounded-2xl border border-slate-800 bg-slate-900/60 hover:border-slate-700 flex items-start gap-3.5 cursor-pointer transition-all group block";
+        }
+    });
+}
+
+async function applyConflictSelection() {
+    const conflictAirports = allAirportsData.filter(a => a.has_conflict);
+    if (conflictAirports.length === 0) {
+        closeConflictModal();
+        return;
+    }
+
+    const ap = conflictAirports[currentConflictIndex];
+    if (!ap) {
+        closeConflictModal();
+        return;
+    }
+
+    const selectedRadio = document.querySelector('input[name="conflict-pkg-choice"]:checked');
+    if (!selectedRadio) return;
+
+    const chosenPkgName = selectedRadio.value;
+    const submitBtn = document.getElementById('conflict-modal-submit-btn');
+    if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin text-xs"></i> <span>Applying...</span>`;
+    }
+
+    try {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.select_scenery_option) {
+            const resStr = await window.pywebview.api.select_scenery_option(ap.icao, chosenPkgName);
+            const res = JSON.parse(resStr);
+            if (res.status === 'ok') {
+                allAirportsData = res.airports;
+                allAirportsData.forEach(item => {
+                    if (userRatingsMap[item.icao] !== undefined) {
+                        item.rating = userRatingsMap[item.icao];
+                    }
+                    item._searchKey = `${item.icao} ${item.name} ${item.city || ''} ${item.package_name || ''} ${item.vendor || ''}`.toLowerCase();
+                });
+
+                updateStats(allAirportsData);
+                filterAirports();
+
+                // If currently viewed in drawer, refresh drawer
+                if (selectedAirport && selectedAirport.icao === ap.icao) {
+                    const updatedAp = allAirportsData.find(a => a.icao === ap.icao);
+                    if (updatedAp) showAirportDetails(updatedAp);
+                }
+
+                showToast(`✓ Resolved conflict for ${ap.icao}`, 'success');
+
+                // Check remaining conflicts
+                const remainingConflicts = allAirportsData.filter(a => a.has_conflict);
+                if (remainingConflicts.length > 0) {
+                    if (currentConflictIndex >= remainingConflicts.length) {
+                        currentConflictIndex = 0;
+                    }
+                    renderConflictModalStep(currentConflictIndex);
+                } else {
+                    closeConflictModal();
+                    showToast(t('conflict.all_resolved', '✓ All scenery conflicts resolved!'), 'success');
+                }
+            } else {
+                showToast(`Error: ${res.message || 'Failed to apply scenery choice'}`, 'error');
+            }
+        }
+    } catch (err) {
+        console.error("Failed to apply conflict selection:", err);
+        showToast("An error occurred while applying scenery selection.", 'error');
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = `<span data-i18n="conflict.btn_apply">${t('conflict.btn_apply', 'OK - Apply Choice')}</span> <i class="fa-solid fa-check text-xs"></i>`;
+        }
+    }
 }
 
 // Currency carousel has been abandoned in favor of user-selected currency setting
@@ -4162,6 +4372,16 @@ async function checkStartupChanges() {
         if (!resStr) return;
         const delta = JSON.parse(resStr);
         console.log("Startup delta check:", delta);
+
+        // PRIORITY 1: Check if any scenery conflicts exist!
+        const conflictAirports = allAirportsData.filter(a => a.has_conflict);
+        if (conflictAirports.length > 0) {
+            pendingScanDelta = delta;
+            pendingScanIsStartup = true;
+            openConflictModal(0);
+            return;
+        }
+
         if (delta && delta.total_changes > 0) {
             displayScanResults(delta, true);
         }
@@ -4172,6 +4392,17 @@ async function checkStartupChanges() {
 
 function displayScanResults(delta, isStartup = false) {
     if (!delta) return;
+
+    // PRIORITY 1: Check if any scenery conflicts exist!
+    // The user wants conflicts to be resolved FIRST before showing newly detected addons!
+    const conflictAirports = allAirportsData.filter(a => a.has_conflict);
+    if (conflictAirports.length > 0) {
+        pendingScanDelta = delta;
+        pendingScanIsStartup = isStartup;
+        closeRescanModal();
+        openConflictModal(0);
+        return;
+    }
 
     const totalChanges = delta.total_changes || 0;
     const addedList = delta.added || [];

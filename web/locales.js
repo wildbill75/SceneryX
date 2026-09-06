@@ -178,6 +178,17 @@ const LOCALES = {
         "drawer.clear_rating": "Clear",
         "drawer.conflict_title": "SCENERY CONFLICT DETECTED",
         "drawer.conflict_msg": "active main sceneries are installed for this airport. You can disable one below to avoid sim overlaps!",
+        "conflict.pill_label": "Conflict",
+        "conflict.pill_tooltip": "Click to resolve scenery conflicts",
+        "conflict.modal_title": "Scenery Conflict Detected",
+        "conflict.modal_explainer": "Multiple active base sceneries are installed for this airport. Choose which scenery you want to keep active (the other will be safely disabled):",
+        "conflict.step_count": "Conflict",
+        "conflict.badge_active": "Currently Active",
+        "conflict.badge_conflicting": "Conflicting Addon",
+        "conflict.btn_apply": "OK - Apply Choice",
+        "conflict.btn_later": "Resolve Later",
+        "conflict.all_resolved": "All scenery conflicts resolved!",
+        "conflict.view_on_map": "Center on map",
         "badge.default_msfs": "Default MSFS",
         "badge.default_msfs_airport": "Default MSFS Airport",
         "badge.asobo": "Asobo",
@@ -414,6 +425,17 @@ const LOCALES = {
         "drawer.clear_rating": "Effacer",
         "drawer.conflict_title": "CONFLIT DE SCÈNES DÉTECTÉ",
         "drawer.conflict_msg": "scènes principales actives sont installées pour cet aéroport. Désactivez-en une ci-dessous pour éviter les chevauchements !",
+        "conflict.pill_label": "Conflit",
+        "conflict.pill_tooltip": "Cliquer pour résoudre les conflits de scènes",
+        "conflict.modal_title": "Conflit de Scènes Détecté",
+        "conflict.modal_explainer": "Plusieurs scènes de base actives sont installées pour cet aéroport. Choisissez la scène que vous souhaitez conserver (l'autre sera automatiquement désactivée) :",
+        "conflict.step_count": "Conflit",
+        "conflict.badge_active": "Actuellement Active",
+        "conflict.badge_conflicting": "Addon en Conflit",
+        "conflict.btn_apply": "OK - Valider le choix",
+        "conflict.btn_later": "Résoudre plus tard",
+        "conflict.all_resolved": "Tous les conflits de scènes ont été résolus !",
+        "conflict.view_on_map": "Centrer sur la carte",
         "badge.default_msfs": "MSFS par Défaut",
         "badge.default_msfs_airport": "Aéroport MSFS par Défaut",
         "badge.asobo": "Asobo",
@@ -650,6 +672,17 @@ const LOCALES = {
         "drawer.clear_rating": "Löschen",
         "drawer.conflict_title": "SZENERIE-KONFLIKT ERKANNT",
         "drawer.conflict_msg": "aktive Hauptszenerien sind für diesen Flughafen installiert. Deaktivieren Sie unten eine, um Überlappungen zu vermeiden!",
+        "conflict.pill_label": "Konflikt",
+        "conflict.pill_tooltip": "Klicken, um Szenerie-Konflikte zu lösen",
+        "conflict.modal_title": "Szenerie-Konflikt Erkannt",
+        "conflict.modal_explainer": "Für diesen Flughafen sind mehrere aktive Basiszenerien installiert. Wählen Sie die Szenerie aus, die aktiv bleiben soll (die andere wird deaktiviert):",
+        "conflict.step_count": "Konflikt",
+        "conflict.badge_active": "Derzeit Aktiv",
+        "conflict.badge_conflicting": "Konflikt-Addon",
+        "conflict.btn_apply": "OK - Auswahl übernehmen",
+        "conflict.btn_later": "Später lösen",
+        "conflict.all_resolved": "Alle Szenerie-Konflikte wurden gelöst!",
+        "conflict.view_on_map": "Auf Karte zentrieren",
         "badge.default_msfs": "Standard MSFS",
         "badge.default_msfs_airport": "Standard-MSFS-Flughafen",
         "badge.asobo": "Asobo",
@@ -901,6 +934,17 @@ const LOCALES = {
         "drawer.clear_rating": "Borrar",
         "drawer.conflict_title": "CONFLICTO DE ESCENARIOS DETECTADO",
         "drawer.conflict_msg": "escenarios principales activos están instalados para este aeropuerto. ¡Puede desactivar uno abajo para evitar solapamientos en el simulador!",
+        "conflict.pill_label": "Conflicto",
+        "conflict.pill_tooltip": "Haga clic para resolver conflictos de escenarios",
+        "conflict.modal_title": "Conflicto de Escenarios Detectado",
+        "conflict.modal_explainer": "Múltiples escenarios base activos están instalados para este aeropuerto. Seleccione el escenario que desea mantener activo (el otro se desactivará):",
+        "conflict.step_count": "Conflicto",
+        "conflict.badge_active": "Actualmente Activo",
+        "conflict.badge_conflicting": "Addon en Conflicto",
+        "conflict.btn_apply": "OK - Aplicar Selección",
+        "conflict.btn_later": "Resolver más tarde",
+        "conflict.all_resolved": "¡Todos los conflictos de escenarios han sido resueltos!",
+        "conflict.view_on_map": "Centrar en el mapa",
         "badge.default_msfs": "Por Defecto MSFS",
         "badge.default_msfs_airport": "Aeropuerto MSFS por Defecto",
         "badge.asobo": "Asobo",
@@ -1668,5 +1712,11 @@ function setAppLanguage(lang) {
     // Refresh right detail drawer if currently open in Country Mode
     if (typeof activeDrawerMode !== 'undefined' && activeDrawerMode === 'COUNTRY' && typeof selectedCountryCode !== 'undefined' && selectedCountryCode && typeof openCountryDrawer === 'function') {
         openCountryDrawer(selectedCountryCode, selectedCountryName);
+    }
+
+    // Refresh conflict resolution modal if currently open
+    const conflictModal = document.getElementById('conflict-resolution-modal');
+    if (conflictModal && !conflictModal.classList.contains('hidden') && typeof renderConflictModalStep === 'function' && typeof currentConflictIndex !== 'undefined') {
+        renderConflictModalStep(currentConflictIndex);
     }
 }
