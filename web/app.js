@@ -189,7 +189,7 @@ function getCountryFlagEmoji(iso) {
     return String.fromCodePoint(...codePoints);
 }
 
-let selectedCountryPricingFilters = new Set(['PAYWARE', 'FREEWARE', 'ASOBO']);
+let selectedCountryPricingFilters = new Set(['PAYWARE', 'FREEWARE', 'ASOBO', 'DEFAULT']);
 let selectedCountryTypeFilters = new Set(['INT', 'REG', 'GA', 'HW']);
 
 function toggleCountryPricingFilter(cat) {
@@ -999,9 +999,7 @@ function openCountryDrawer(iso, countryName) {
 
                 const cfg = COUNTRY_CATEGORY_CONFIG[catKey];
                 const containsExpanded = Boolean(expandedCountryIcao && items.some(a => a.icao === expandedCountryIcao));
-                const onlyDefaultExists = (items.length === filteredCountryAirports.length && catKey === 'Default');
-                const defaultState = onlyDefaultExists ? true : getCountryAccordionState(catKey);
-                const isOpen = containsExpanded || defaultState;
+                const isOpen = containsExpanded || getCountryAccordionState(catKey);
 
                 return `
                     <div class="rounded-2xl bg-slate-900/90 border ${cfg.borderClass} shadow-lg overflow-hidden transition-all">
@@ -1010,7 +1008,7 @@ function openCountryDrawer(iso, countryName) {
                             <div class="flex items-center gap-2.5 min-w-0">
                                 ${cfg.icon}
                                 <span class="text-xs font-bold ${cfg.textColor} uppercase tracking-wider">${t(cfg.titleKey, cfg.defaultTitle)}</span>
-                                <span class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${cfg.badgeClass}">${items.length}</span>
+                                <span class="min-w-[20px] text-center px-1.5 py-0.5 rounded-sm text-[10px] font-mono font-bold ${cfg.badgeClass}">${items.length}</span>
                             </div>
                             <i id="country-category-icon-${catKey}" class="fa-solid fa-chevron-down text-slate-500 text-xs transition-transform duration-200 shrink-0 ${isOpen ? 'rotate-0' : '-rotate-90'}"></i>
                         </button>
@@ -1049,7 +1047,7 @@ const COUNTRY_CATEGORY_CONFIG = {
         key: 'Freeware',
         titleKey: 'filter.price_freeware',
         defaultTitle: 'Freeware',
-        icon: '<i class="fa-solid fa-download text-xs text-cyan-400"></i>',
+        icon: '<i class="fa-solid fa-star text-xs text-cyan-400"></i>',
         badgeClass: 'bg-cyan-600 text-white shadow-sm',
         borderClass: 'border-cyan-500/30',
         headerHover: 'hover:bg-cyan-950/30',
@@ -1059,7 +1057,7 @@ const COUNTRY_CATEGORY_CONFIG = {
         key: 'Asobo',
         titleKey: 'filter.price_asobo',
         defaultTitle: 'Asobo Handcrafted',
-        icon: '<i class="fa-solid fa-crown text-xs text-amber-400"></i>',
+        icon: '<i class="fa-solid fa-star text-xs text-amber-400"></i>',
         badgeClass: 'bg-amber-500 text-slate-950 font-black shadow-sm',
         borderClass: 'border-amber-500/30',
         headerHover: 'hover:bg-amber-950/30',
@@ -1069,7 +1067,7 @@ const COUNTRY_CATEGORY_CONFIG = {
         key: 'Default',
         titleKey: 'filter.price_default',
         defaultTitle: 'Default MSFS',
-        icon: '<i class="fa-solid fa-plane text-xs text-blue-400"></i>',
+        icon: '<i class="fa-solid fa-circle text-[9px] text-blue-400"></i>',
         badgeClass: 'bg-slate-800 text-slate-300 border border-slate-700 shadow-sm',
         borderClass: 'border-slate-800',
         headerHover: 'hover:bg-slate-800/40',
@@ -1078,18 +1076,18 @@ const COUNTRY_CATEGORY_CONFIG = {
 };
 
 const COUNTRY_ACCORDION_DEFAULTS = {
-    'Payware': true,
-    'Freeware': true,
-    'Asobo': true,
+    'Payware': false,
+    'Freeware': false,
+    'Asobo': false,
     'Default': false
 };
 
 function getCountryAccordionState(catKey) {
     try {
-        const saved = JSON.parse(localStorage.getItem('sceneryx_country_accordions_v1') || '{}');
+        const saved = JSON.parse(localStorage.getItem('sceneryx_country_accordions_v2') || '{}');
         if (saved[catKey] !== undefined) return saved[catKey];
     } catch (e) {}
-    return COUNTRY_ACCORDION_DEFAULTS[catKey] !== undefined ? COUNTRY_ACCORDION_DEFAULTS[catKey] : true;
+    return COUNTRY_ACCORDION_DEFAULTS[catKey] !== undefined ? COUNTRY_ACCORDION_DEFAULTS[catKey] : false;
 }
 
 function toggleCountryCategoryAccordion(catKey) {
@@ -1113,9 +1111,9 @@ function toggleCountryCategoryAccordion(catKey) {
     }
 
     try {
-        const saved = JSON.parse(localStorage.getItem('sceneryx_country_accordions_v1') || '{}');
+        const saved = JSON.parse(localStorage.getItem('sceneryx_country_accordions_v2') || '{}');
         saved[catKey] = isHidden; // true if opened
-        localStorage.setItem('sceneryx_country_accordions_v1', JSON.stringify(saved));
+        localStorage.setItem('sceneryx_country_accordions_v2', JSON.stringify(saved));
     } catch (e) {}
 }
 
@@ -1278,9 +1276,9 @@ function selectCountryAirport(icao) {
             catIcon.classList.add('rotate-0');
         }
         try {
-            const saved = JSON.parse(localStorage.getItem('sceneryx_country_accordions_v1') || '{}');
+            const saved = JSON.parse(localStorage.getItem('sceneryx_country_accordions_v2') || '{}');
             saved[cat] = true;
-            localStorage.setItem('sceneryx_country_accordions_v1', JSON.stringify(saved));
+            localStorage.setItem('sceneryx_country_accordions_v2', JSON.stringify(saved));
         } catch (e) {}
     }
 
@@ -1378,7 +1376,7 @@ function toggleCountrySelection(iso, countryName, layer, forceSelect = false) {
 
     selectedCountryCode = isoUpper;
     selectedCountryName = countryName || isoUpper;
-    selectedCountryPricingFilters = new Set(['PAYWARE', 'FREEWARE', 'ASOBO']);
+    selectedCountryPricingFilters = new Set(['PAYWARE', 'FREEWARE', 'ASOBO', 'DEFAULT']);
     selectedCountryTypeFilters = new Set(['INT', 'REG', 'GA', 'HW']);
     resetConflictingFiltersForCountrySelection();
 
