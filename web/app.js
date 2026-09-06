@@ -4394,6 +4394,33 @@ async function checkStartupChanges() {
     }
 }
 
+function getScanItemCategoryColor(item) {
+    if (!item) return 'text-cyan-400';
+    const rawType = (item.type || item.pricing_type || '').toLowerCase();
+    if (rawType.includes('payware')) return 'text-purple-400';
+    if (rawType.includes('asobo')) return 'text-amber-400';
+    if (rawType.includes('default')) return 'text-sky-400';
+    if (rawType.includes('freeware')) return 'text-cyan-400';
+
+    const apMatch = (typeof allAirportsData !== 'undefined' && Array.isArray(allAirportsData))
+        ? allAirportsData.find(a => a.icao === item.icao)
+        : null;
+    if (apMatch) {
+        const cat = getAirportCategory(apMatch);
+        if (cat === 'PAYWARE') return 'text-purple-400';
+        if (cat === 'ASOBO') return 'text-amber-400';
+        if (cat === 'DEFAULT') return 'text-sky-400';
+        if (cat === 'FREEWARE') return 'text-cyan-400';
+    }
+
+    const vendor = (item.vendor || '').toLowerCase();
+    if (vendor && !['unknown', 'flightsim.to', 'freeware'].includes(vendor)) {
+        return 'text-purple-400';
+    }
+
+    return 'text-cyan-400';
+}
+
 function displayScanResults(delta, isStartup = false) {
     if (!delta) return;
 
@@ -4442,17 +4469,18 @@ function displayScanResults(delta, isStartup = false) {
         if (listCont) {
             const htmlItems = [];
 
-            // 1. Added items (Flat Emerald solid badge, clean fonts, no icons)
+            // 1. Added items (Category colored ICAO without pill, clean fonts)
             addedList.forEach(item => {
                 const displayName = item.name || item.icao;
                 const pkgName = item.folder_name || '';
+                const icaoColor = getScanItemCategoryColor(item);
 
                 htmlItems.push(`
                     <div onclick="closeRescanModal(); selectAirport('${item.icao}')"
                          title="${t('general.view_on_map', 'Click to view on map')}"
                          class="p-3 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800/80 flex items-center justify-between gap-4 transition-colors cursor-pointer">
-                        <div class="flex items-center gap-3 min-w-0 flex-1">
-                            <span class="px-2.5 py-1 rounded-lg bg-slate-800 text-emerald-400 font-mono font-bold text-sm shrink-0">
+                        <div class="flex items-center gap-3.5 min-w-0 flex-1">
+                            <span class="font-mono font-black text-lg sm:text-xl tracking-tight shrink-0 ${icaoColor}">
                                 ${item.icao}
                             </span>
                             <div class="min-w-0 flex-1">
@@ -4473,15 +4501,16 @@ function displayScanResults(delta, isStartup = false) {
                 `);
             });
 
-            // 2. Removed items (Flat Rose solid badge, clean fonts, no icons)
+            // 2. Removed items (Category colored ICAO without pill, clean fonts)
             removedList.forEach(item => {
                 const displayName = item.name || item.icao;
                 const pkgName = item.folder_name || '';
+                const icaoColor = getScanItemCategoryColor(item);
 
                 htmlItems.push(`
                     <div class="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-4">
-                        <div class="flex items-center gap-3 min-w-0 flex-1">
-                            <span class="px-2.5 py-1 rounded-lg bg-slate-800 text-rose-400 font-mono font-bold text-sm shrink-0">
+                        <div class="flex items-center gap-3.5 min-w-0 flex-1">
+                            <span class="font-mono font-black text-lg sm:text-xl tracking-tight shrink-0 ${icaoColor}">
                                 ${item.icao}
                             </span>
                             <div class="min-w-0 flex-1">
