@@ -351,24 +351,21 @@ function updateAirlinePillsUI(ap) {
 
         const isActive = selectedAirlines.has(alName) && (activeRouteOrigin && activeRouteOrigin.icao === ap.icao);
         const img = btn.querySelector('img');
-        const indicator = btn.querySelector('.airline-selected-dot');
 
         if (img) {
-            // Card with logo: keep clean white background, toggle discrete cyan border and indicator dot
+            // Card with logo: clean white background, thick bottle green border when active
             if (isActive) {
-                btn.className = 'group relative min-h-[50px] rounded-xl overflow-hidden transition-colors cursor-pointer flex items-center justify-center p-1.5 text-center bg-white border-2 border-cyan-400';
-                if (indicator) indicator.classList.remove('hidden');
+                btn.className = 'group relative min-h-[50px] rounded-xl overflow-hidden transition-all cursor-pointer flex items-center justify-center p-1.5 text-center bg-white border-4 border-emerald-700 shadow-md shadow-emerald-950/30';
             } else {
-                btn.className = 'group relative min-h-[50px] rounded-xl overflow-hidden transition-colors cursor-pointer flex items-center justify-center p-1.5 text-center bg-white border-2 border-transparent hover:border-cyan-400';
-                if (indicator) indicator.classList.add('hidden');
+                btn.className = 'group relative min-h-[50px] rounded-xl overflow-hidden transition-all cursor-pointer flex items-center justify-center p-1.5 text-center bg-white border-4 border-transparent hover:border-emerald-700/50';
             }
             img.className = 'w-full h-full object-contain object-center';
         } else {
             // Text-only fallback for airlines without logo
             if (isActive) {
-                btn.className = 'group relative min-h-[50px] rounded-xl overflow-hidden transition-colors cursor-pointer flex items-center justify-center p-1.5 text-center bg-cyan-600 text-white font-bold border-2 border-cyan-400';
+                btn.className = 'group relative min-h-[50px] rounded-xl overflow-hidden transition-all cursor-pointer flex items-center justify-center p-1.5 text-center bg-emerald-800 text-white font-bold border-4 border-emerald-600 shadow-md shadow-emerald-950/30';
             } else {
-                btn.className = 'group relative min-h-[50px] rounded-xl overflow-hidden transition-colors cursor-pointer flex items-center justify-center p-1.5 text-center bg-slate-800 text-slate-300 font-medium border-2 border-transparent hover:border-cyan-400';
+                btn.className = 'group relative min-h-[50px] rounded-xl overflow-hidden transition-all cursor-pointer flex items-center justify-center p-1.5 text-center bg-slate-800 text-slate-300 font-medium border-4 border-transparent hover:border-emerald-700/50';
             }
         }
     });
@@ -3021,27 +3018,26 @@ function showAirportDetails(ap) {
 
                 if (logoUrl) {
                     const btnClass = isActive 
-                        ? 'bg-white border-2 border-cyan-400' 
-                        : 'bg-white border-2 border-transparent hover:border-cyan-400';
+                        ? 'bg-white border-4 border-emerald-700 shadow-md shadow-emerald-950/30' 
+                        : 'bg-white border-4 border-transparent hover:border-emerald-700/50';
 
                     return `<button data-airline="${safeAttrAl}" onclick="filterByAirline('${safeAl}', this)" 
-                                    class="group relative min-h-[50px] rounded-xl overflow-hidden transition-colors cursor-pointer flex items-center justify-center p-1.5 text-center ${btnClass}" 
+                                    class="group relative min-h-[50px] rounded-xl overflow-hidden transition-all cursor-pointer flex items-center justify-center p-1.5 text-center ${btnClass}" 
                                     title="${tooltipText}">
                                 <div class="absolute inset-0 flex items-center justify-center pointer-events-none p-1.5 overflow-hidden rounded-xl">
                                     <img src="${logoUrl}" class="w-full h-full object-contain object-center" alt="${safeAttrAl}" onerror="if(this.src!=='${fallbackLogoUrl}'){this.src='${fallbackLogoUrl}'}else{this.style.display='none'; if(this.parentElement.nextElementSibling) this.parentElement.nextElementSibling.classList.remove('hidden');}" />
                                 </div>
-                                <div class="airline-selected-dot absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-cyan-400 ${isActive ? '' : 'hidden'} pointer-events-none"></div>
                                 <span class="relative z-10 text-[12px] sm:text-[13px] font-bold leading-tight text-center line-clamp-2 px-1 break-words text-slate-800 hidden">
                                     ${al}
                                 </span>
                             </button>`;
                 } else {
                     const btnClass = isActive 
-                        ? 'bg-cyan-600 text-white font-bold border-2 border-cyan-400' 
-                        : 'bg-slate-800 text-slate-300 font-medium border-2 border-transparent hover:border-cyan-400';
+                        ? 'bg-emerald-800 text-white font-bold border-4 border-emerald-600 shadow-md shadow-emerald-950/30' 
+                        : 'bg-slate-800 text-slate-300 font-medium border-4 border-transparent hover:border-emerald-700/50';
 
                     return `<button data-airline="${safeAttrAl}" onclick="filterByAirline('${safeAl}', this)" 
-                                    class="group relative min-h-[50px] rounded-xl overflow-hidden transition-colors cursor-pointer flex items-center justify-center p-1.5 text-center ${btnClass}" 
+                                    class="group relative min-h-[50px] rounded-xl overflow-hidden transition-all cursor-pointer flex items-center justify-center p-1.5 text-center ${btnClass}" 
                                     title="${tooltipText}">
                                 <span class="relative z-10 text-[12px] sm:text-[13px] font-bold leading-tight text-center line-clamp-2 px-1 break-words">
                                     ${al}
