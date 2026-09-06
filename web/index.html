@@ -539,10 +539,7 @@
                                 <div class="flex items-center gap-2 min-w-0">
                                     <span data-i18n="drawer.airport_info" class="text-xs font-bold text-slate-300 uppercase tracking-wider shrink-0 leading-tight">Airport Info</span>
                                 </div>
-                                <div class="flex items-center gap-2 shrink-0">
-                                    <span id="drawer-runways-count" class="text-xs font-mono font-bold text-slate-200 bg-slate-800 px-2.5 py-1 rounded-full">0 Runways</span>
-                                    <i id="accordion-icon-airport_info" class="fa-solid fa-chevron-down text-slate-500 text-xs transition-transform duration-200"></i>
-                                </div>
+                                <i id="accordion-icon-airport_info" class="fa-solid fa-chevron-down text-slate-500 text-xs transition-transform duration-200 shrink-0"></i>
                             </button>
 
                             <div id="accordion-content-airport_info" class="px-4 pb-4 pt-1 space-y-3.5 border-t border-slate-800/50">
@@ -583,7 +580,6 @@
                             <button type="button" onclick="toggleDrawerAccordion('dev')" class="w-full px-4 py-3.5 flex items-center justify-between gap-3 text-left hover:bg-slate-800/40 transition-colors cursor-pointer select-none">
                                 <div class="flex items-center gap-2 min-w-0">
                                     <span data-i18n="drawer.developer_publisher" class="text-xs font-bold text-slate-300 uppercase tracking-wider shrink-0 leading-tight">Active Developer / Publisher</span>
-                                    <span id="drawer-version" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 hidden">v1.0.0</span>
                                 </div>
                                 <i id="accordion-icon-dev" class="fa-solid fa-chevron-down text-slate-500 text-xs transition-transform duration-200 shrink-0"></i>
                             </button>
@@ -591,9 +587,12 @@
                             <div id="accordion-content-dev" class="px-4 pb-4 pt-1 space-y-3 border-t border-slate-800/50">
                                 <div class="flex items-center justify-between gap-2 pt-1">
                                     <div id="drawer-vendor" class="text-xl lg:text-2xl font-black tracking-wide text-cyan-300 truncate">Unknown Vendor</div>
-                                    <button onclick="triggerCheckSceneryUpdate()" id="btn-check-update" data-i18n-title="drawer.check_update_tooltip" class="px-3 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[10px] font-bold transition-colors flex items-center gap-1 shrink-0 cursor-pointer" title="Check for Scenery Updates">
-                                        <i class="fa-solid fa-arrows-rotate text-[10px] text-slate-400 group-hover:text-white transition-colors"></i> <span data-i18n="drawer.check_update">Check Update</span>
-                                    </button>
+                                    <div class="flex items-center gap-2 shrink-0">
+                                        <span id="drawer-version" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700 hidden">v1.0.0</span>
+                                        <button onclick="triggerCheckSceneryUpdate()" id="btn-check-update" data-i18n-title="drawer.check_update_tooltip" class="px-3 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[10px] font-bold transition-colors flex items-center gap-1 shrink-0 cursor-pointer" title="Check for Scenery Updates">
+                                            <i class="fa-solid fa-arrows-rotate text-[10px] text-slate-400 group-hover:text-white transition-colors"></i> <span data-i18n="drawer.check_update">Check Update</span>
+                                        </button>
+                                    </div>
                                 </div>
 
                                 <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between gap-2">
@@ -621,10 +620,7 @@
                                 <div class="flex items-center gap-2 min-w-0">
                                     <span data-i18n="drawer.scenery_options" class="text-xs font-bold text-slate-300 uppercase tracking-wider shrink-0 leading-tight">Available Scenery Options</span>
                                 </div>
-                                <div class="flex items-center gap-2 shrink-0">
-                                    <span id="drawer-options-count" class="text-[10px] font-mono text-slate-400 bg-slate-950 px-2 py-0.5 rounded border border-slate-800">1-Click Selection</span>
-                                    <i id="accordion-icon-options" class="fa-solid fa-chevron-down text-slate-500 text-xs transition-transform duration-200"></i>
-                                </div>
+                                <i id="accordion-icon-options" class="fa-solid fa-chevron-down text-slate-500 text-xs transition-transform duration-200 shrink-0"></i>
                             </button>
 
                             <div id="accordion-content-options" class="px-4 pb-4 pt-1 space-y-2 border-t border-slate-800/50">
@@ -640,10 +636,7 @@
                                 <div class="flex items-center gap-2 min-w-0">
                                     <span data-i18n="drawer.gsx_profile" class="text-xs font-bold text-slate-300 uppercase tracking-wider shrink-0 leading-tight">GSX Profile</span>
                                 </div>
-                                <div class="flex items-center gap-2 shrink-0">
-                                    <span id="drawer-gsx-badge" class="text-xs font-mono font-bold px-2.5 py-1 rounded-full bg-emerald-600 text-white">Profile Installed</span>
-                                    <i id="accordion-icon-gsx" class="fa-solid fa-chevron-down text-slate-500 text-xs transition-transform duration-200"></i>
-                                </div>
+                                <i id="accordion-icon-gsx" class="fa-solid fa-chevron-down text-slate-500 text-xs transition-transform duration-200 shrink-0"></i>
                             </button>
 
                             <div id="accordion-content-gsx" class="px-4 pb-4 pt-1 space-y-3 border-t border-slate-800/50">
@@ -659,13 +652,14 @@
                                 <div class="flex items-center gap-2 min-w-0">
                                     <span data-i18n="drawer.operating_airlines" class="text-xs font-bold text-slate-300 uppercase tracking-wider shrink-0 leading-tight">Operating Airlines</span>
                                 </div>
-                                <div class="flex items-center gap-2 shrink-0">
-                                    <span id="drawer-airlines-count" class="text-xs font-mono font-bold text-white bg-cyan-600 px-2.5 py-1 rounded-full">0 Airlines</span>
-                                    <i id="accordion-icon-airlines" class="fa-solid fa-chevron-down text-slate-500 text-xs transition-transform duration-200"></i>
-                                </div>
+                                <i id="accordion-icon-airlines" class="fa-solid fa-chevron-down text-slate-500 text-xs transition-transform duration-200 shrink-0"></i>
                             </button>
 
                             <div id="accordion-content-airlines" class="px-4 pb-4 pt-1 space-y-3 border-t border-slate-800/50">
+                                <div class="flex items-center justify-between pt-1">
+                                    <span id="drawer-airlines-count" class="text-xs font-mono font-bold text-cyan-400">0 Airlines</span>
+                                    <span class="text-[11px] text-slate-400">Click to filter routes</span>
+                                </div>
                                 <div id="drawer-airlines-list" class="grid grid-cols-3 gap-2 p-1 max-h-[440px] overflow-y-auto pr-1">
                                     <!-- Populated by app.js with 3-column grid cards -->
                                 </div>
@@ -678,20 +672,20 @@
                                 <div class="flex items-center gap-2 min-w-0">
                                     <span data-i18n="drawer.price_value" class="text-xs font-bold text-slate-300 uppercase tracking-wider shrink-0 leading-tight">Scenery Price / Value</span>
                                 </div>
-                                <div class="flex items-center gap-2 shrink-0">
-                                    <span id="drawer-price-tag" class="text-xs font-mono font-bold text-white bg-emerald-600 px-2.5 py-1 rounded-lg">~19.99 €</span>
-                                    <i id="accordion-icon-price" class="fa-solid fa-chevron-down text-slate-500 text-xs transition-transform duration-200"></i>
-                                </div>
+                                <i id="accordion-icon-price" class="fa-solid fa-chevron-down text-slate-500 text-xs transition-transform duration-200 shrink-0"></i>
                             </button>
 
                             <div id="accordion-content-price" class="px-4 pb-4 pt-1 space-y-3 border-t border-slate-800/50">
                                 <div class="flex items-center gap-2 pt-1">
-                                    <div class="relative flex-1">
+                                    <div class="relative w-36 shrink-0">
                                         <span id="drawer-price-curr-symbol" class="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-mono font-extrabold text-white">$</span>
-                                        <input type="number" step="any" id="drawer-price-input" data-i18n-placeholder="drawer.price_placeholder" placeholder="Price Paid (e.g. 14.50)" 
-                                               class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-3 py-2 text-sm font-mono font-bold text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500">
+                                        <input type="number" step="any" id="drawer-price-input" data-i18n-placeholder="drawer.price_placeholder" placeholder="Price Paid" 
+                                               class="w-full bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-2.5 py-2 text-xs sm:text-sm font-mono font-bold text-white placeholder:text-slate-500 focus:outline-none focus:border-emerald-500">
                                     </div>
-                                    <button onclick="saveCustomPriceForSelected()" data-i18n="drawer.save_price" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-colors cursor-pointer" title="Save Price">
+                                    <span id="drawer-price-tag" class="flex-1 text-center text-xs font-mono font-bold text-slate-200 bg-slate-800/80 border border-slate-700/60 px-2.5 py-2 rounded-xl truncate">
+                                        Est: €19.99
+                                    </span>
+                                    <button onclick="saveCustomPriceForSelected()" data-i18n="drawer.save_price" class="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold transition-colors cursor-pointer shrink-0" title="Save Price">
                                         Save
                                     </button>
                                     <button onclick="resetCustomPriceForSelected()" class="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition-colors flex items-center justify-center w-9 h-9 shrink-0 cursor-pointer" title="Reset to Estimated Catalog Price">

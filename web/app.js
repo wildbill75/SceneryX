@@ -2767,15 +2767,15 @@ function showAirportDetails(ap) {
         
         let tagText = "";
         if (ap.is_custom_price) {
-            tagText = `Paid: ${formattedP} (Custom)`;
+            tagText = `Paid: ${formattedP}`;
         } else if (ap.is_bundle || ap.bundle_total_price) {
             const bTotalFormatted = formatCurrency(ap.bundle_total_price || 39.00);
-            const apCount = ap.bundle_airport_count || 'several';
-            tagText = `Bundle Pack: ${bTotalFormatted} (${apCount} airports, ~${formattedP}/ap)`;
+            tagText = `Bundle: ${bTotalFormatted}`;
         } else {
-            tagText = `Est: ~${formattedP}`;
+            tagText = `Est: ${formattedP}`;
         }
-        document.getElementById('drawer-price-tag').innerText = tagText;
+        const priceTagEl = document.getElementById('drawer-price-tag');
+        if (priceTagEl) priceTagEl.innerText = tagText;
 
         const rate = CURRENCY_RATES[selectedCurrency] || 1.0;
         const valConverted = pValEur * rate;
@@ -2785,13 +2785,10 @@ function showAirportDetails(ap) {
     }
 
     // GSX Profile Card Logic
-    const gsxBadge = document.getElementById('drawer-gsx-badge');
     const gsxContainer = document.getElementById('drawer-gsx-container');
 
-    if (gsxBadge && gsxContainer) {
+    if (gsxContainer) {
         if (ap.has_gsx_profile) {
-            gsxBadge.className = "px-3 py-1 rounded-full text-xs font-mono font-bold bg-emerald-600 text-white";
-            gsxBadge.innerText = t('drawer.gsx_installed', 'Profile Installed');
             const safeGsxPath = encodeURIComponent(ap.gsx_profile_path || '');
             gsxContainer.innerHTML = `
                 <div class="space-y-2.5">
@@ -2811,10 +2808,12 @@ function showAirportDetails(ap) {
                 </div>
             `;
         } else {
-            gsxBadge.className = "px-3 py-1 rounded-full text-xs font-mono font-bold bg-slate-800 text-slate-400";
-            gsxBadge.innerText = t('drawer.gsx_none', 'No Profile');
             gsxContainer.innerHTML = `
                 <div class="space-y-2.5">
+                    <div class="p-3 rounded-xl bg-slate-950/80 border border-slate-800/80 flex items-center justify-between gap-2 text-xs lg:text-sm font-mono text-slate-400 shadow-sm">
+                        <span>${t('drawer.gsx_none', 'No GSX profile installed')}</span>
+                        <i class="fa-solid fa-circle-xmark text-slate-500 text-sm"></i>
+                    </div>
                     <button onclick="triggerSearchGsxProfile()" 
                             class="w-full p-3 rounded-xl bg-slate-900/60 hover:bg-slate-800 border border-slate-800/80 text-slate-300 hover:text-white text-xs lg:text-sm font-bold transition-colors flex items-center justify-center gap-2 shadow-sm cursor-pointer group">
                         <i class="fa-solid fa-magnifying-glass text-slate-400 group-hover:text-white text-xs transition-colors"></i>
@@ -3452,8 +3451,7 @@ function closeDrawer() {
 
 async function renderAirportRunways(ap) {
     const runwaysListEl = document.getElementById('drawer-runways-list');
-    const runwaysCountEl = document.getElementById('drawer-runways-count');
-    if (!runwaysListEl || !runwaysCountEl) return;
+    if (!runwaysListEl) return;
 
     let runways = ap.runways;
     if (!runways || runways.length === 0) {
@@ -3476,7 +3474,6 @@ async function renderAirportRunways(ap) {
             return (b.length_ft || 0) - (a.length_ft || 0);
         });
 
-        runwaysCountEl.innerText = `${sortedRunways.length} ${t('drawer.runways_count', 'Runways')}`;
         runwaysListEl.innerHTML = sortedRunways.map(rwy => {
             const isClosed = !!rwy.closed;
             const isLighted = !!rwy.lighted;
