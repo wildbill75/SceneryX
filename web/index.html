@@ -487,8 +487,13 @@
         <main class="flex-1 relative">
             <div id="map" class="w-full h-full z-10 bg-slate-950"></div>
 
-            <!-- FLOATING FLIGHT PLANNING BANNER (ACTIVATED VIA ALT+CLICK) -->
-            <div id="flight-planning-banner" class="hidden absolute top-4 left-1/2 -translate-x-1/2 z-[1000] glass-panel bg-slate-900/95 border border-purple-500/60 px-5 py-2.5 rounded-2xl shadow-2xl shadow-purple-950/60 items-center gap-3.5 animate-in fade-in slide-in-from-top-4 duration-200 pointer-events-auto">
+            <!-- FLOATING FLIGHT PLANNING BANNER (ACTIVATED VIA ALT+CLICK, DRAGGABLE) -->
+            <div id="flight-planning-banner" class="hidden absolute z-[1000] glass-panel bg-slate-900/95 border border-purple-500/60 px-4 py-2.5 rounded-2xl shadow-2xl shadow-purple-950/60 items-center gap-3.5 select-none cursor-grab active:cursor-grabbing pointer-events-auto transition-shadow hover:shadow-purple-500/20">
+                <!-- DRAG HANDLE GRIP -->
+                <div class="text-slate-500 hover:text-slate-300 flex items-center pr-1 cursor-grab active:cursor-grabbing" title="Click and drag banner to move">
+                    <i class="fa-solid fa-grip-vertical text-xs"></i>
+                </div>
+
                 <div class="flex items-center gap-2">
                     <span class="relative flex h-2.5 w-2.5">
                         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>

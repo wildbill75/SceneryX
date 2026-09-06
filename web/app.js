@@ -2284,6 +2284,111 @@ let flightPlanningDeparture = null;
 let flightPlanningDestination = null;
 let flightCorridorArrivalAirport = null;
 let flightCorridorLayerGroup = L.layerGroup();
+let isFlightPlanningDraggableInitialized = false;
+
+function positionFlightPlanningBanner(ap) {
+    const banner = document.getElementById('flight-planning-banner');
+    if (!banner || !map || !ap || !ap.lat || !ap.lon) return;
+
+    // Ensure banner is displayed to accurately compute its rendered dimensions
+    banner.classList.remove('hidden');
+    banner.classList.add('flex');
+
+    // Convert airport Lat/Lon to pixel coordinates inside the map container
+    const pt = map.latLngToContainerPoint([ap.lat, ap.lon]);
+
+    // Measure rendered banner dimensions
+    const bannerW = banner.offsetWidth || 480;
+    const bannerH = banner.offsetHeight || 44;
+
+    const mapEl = document.getElementById('map');
+    const containerW = mapEl ? mapEl.clientWidth : window.innerWidth;
+    const containerH = mapEl ? mapEl.clientHeight : window.innerHeight;
+
+    // Horizontally center banner exactly on the Alt+Click airport point
+    let targetLeft = Math.round(pt.x - (bannerW / 2));
+    // Vertically place just below the airport marker (24px below center)
+    let targetTop = Math.round(pt.y + 24);
+
+    // Clamp inside map container with padding so it never spawns outside visible bounds
+    const pad = 12;
+    targetLeft = Math.max(pad, Math.min(containerW - bannerW - pad, targetLeft));
+    targetTop = Math.max(pad, Math.min(containerH - bannerH - pad, targetTop));
+
+    banner.style.left = `${targetLeft}px`;
+    banner.style.top = `${targetTop}px`;
+    banner.style.transform = 'none';
+}
+
+function initDraggableFlightPlanningBanner() {
+    if (isFlightPlanningDraggableInitialized) return;
+    const banner = document.getElementById('flight-planning-banner');
+    if (!banner) return;
+    isFlightPlanningDraggableInitialized = true;
+
+    // Prevent map click and scroll events while interacting with the banner
+    if (typeof L !== 'undefined' && L.DomEvent) {
+        L.DomEvent.disableClickPropagation(banner);
+        L.DomEvent.disableScrollPropagation(banner);
+    }
+
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+    let origLeft = 0;
+    let origTop = 0;
+
+    banner.addEventListener('mousedown', function (e) {
+        // Do not initiate drag if clicking buttons, inputs or links
+        if (e.target.closest('button') || e.target.closest('input') || e.target.closest('a')) {
+            return;
+        }
+
+        isDragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        origLeft = banner.offsetLeft;
+        origTop = banner.offsetTop;
+
+        e.stopPropagation();
+        e.preventDefault();
+        banner.classList.add('cursor-grabbing');
+        banner.classList.remove('cursor-grab');
+    });
+
+    window.addEventListener('mousemove', function (e) {
+        if (!isDragging) return;
+        e.preventDefault();
+
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+
+        const mapEl = document.getElementById('map');
+        const maxW = mapEl ? mapEl.clientWidth : window.innerWidth;
+        const maxH = mapEl ? mapEl.clientHeight : window.innerHeight;
+        const bW = banner.offsetWidth;
+        const bH = banner.offsetHeight;
+
+        let newLeft = origLeft + dx;
+        let newTop = origTop + dy;
+
+        const pad = 8;
+        newLeft = Math.max(pad, Math.min(maxW - bW - pad, newLeft));
+        newTop = Math.max(pad, Math.min(maxH - bH - pad, newTop));
+
+        banner.style.left = `${newLeft}px`;
+        banner.style.top = `${newTop}px`;
+        banner.style.transform = 'none';
+    });
+
+    window.addEventListener('mouseup', function () {
+        if (isDragging) {
+            isDragging = false;
+            banner.classList.remove('cursor-grabbing');
+            banner.classList.add('cursor-grab');
+        }
+    });
+}
 
 function handleFlightPlanningAltClick(ap) {
     if (!ap) return;
@@ -2301,6 +2406,8 @@ function handleFlightPlanningAltClick(ap) {
         }
 
         updateFlightPlanningBannerUI();
+        positionFlightPlanningBanner(ap);
+        initDraggableFlightPlanningBanner();
         showToast(`✈ Flight Planning Mode ON: ${ap.icao} set as Departure. Alt+Click an airport to set Destination.`, 'info');
     } else {
         // 2. Already in Flight Planning Mode
@@ -2308,6 +2415,7 @@ function handleFlightPlanningAltClick(ap) {
             flightPlanningDeparture = ap;
             selectedAirport = ap;
             updateFlightPlanningBannerUI();
+            positionFlightPlanningBanner(ap);
         } else if (flightPlanningDeparture.icao === ap.icao) {
             showToast(`${ap.icao} is already set as Departure. Alt+Click another airport for Destination, or press Esc to exit.`, 'warning');
         } else {
