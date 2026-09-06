@@ -521,9 +521,9 @@
                         <!-- 1. HERO AIRPORT HEADER CARD -->
                         <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3 shadow-lg">
                             <div class="flex items-center justify-between">
-                                <div class="flex items-center gap-2.5">
-                                    <span id="drawer-icao" class="text-3xl lg:text-4xl font-black font-mono tracking-tight">ICAO</span>
-                                    <span id="drawer-iata" class="text-xs lg:text-sm font-mono bg-slate-800/90 px-2.5 py-0.5 rounded-lg text-slate-200 font-bold border border-slate-700/60">IATA</span>
+                                <div class="flex items-center gap-2.5 min-w-0">
+                                    <span id="drawer-icao" class="text-3xl lg:text-4xl font-black font-mono tracking-tight truncate">ICAO</span>
+                                    <span id="drawer-iata" class="hidden"></span>
                                 </div>
                                 <span id="drawer-pricing-badge" class="px-3 py-1 rounded-full text-xs font-mono font-bold">Badge</span>
                             </div>
@@ -551,7 +551,7 @@
                                     </div>
                                     <div class="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80">
                                         <span data-i18n="drawer.category" class="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Category</span>
-                                        <span id="drawer-type-badge" class="text-xs font-semibold">Type</span>
+                                        <span id="drawer-type-badge" class="text-sm font-bold uppercase tracking-wide block truncate">Type</span>
                                     </div>
                                     <div class="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80">
                                         <span data-i18n="drawer.latitude" class="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Latitude</span>

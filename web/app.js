@@ -2779,8 +2779,15 @@ function showAirportDetails(ap) {
     const drawer = document.getElementById('detail-drawer');
     if (drawer) drawer.classList.remove('translate-x-full');
 
-    document.getElementById('drawer-icao').innerText = ap.icao;
-    document.getElementById('drawer-iata').innerText = ap.iata ? ap.iata : '—';
+    const iataVal = (ap.iata && ap.iata.trim() && ap.iata.trim() !== '—' && ap.iata.trim() !== '-') ? ap.iata.trim() : '';
+    const codesStr = iataVal ? `${ap.icao}/${iataVal}` : ap.icao;
+    const icaoEl = document.getElementById('drawer-icao');
+    const iataEl = document.getElementById('drawer-iata');
+    if (icaoEl) icaoEl.innerText = codesStr;
+    if (iataEl) {
+        iataEl.innerText = '';
+        iataEl.classList.add('hidden');
+    }
     document.getElementById('drawer-name').innerText = ap.name;
     document.getElementById('drawer-city-country').innerText = `${ap.city || 'Unknown City'}, ${ap.country || 'Unknown Country'}`;
 
@@ -2803,7 +2810,6 @@ function showAirportDetails(ap) {
         }
     }
 
-    const icaoEl = document.getElementById('drawer-icao');
     const vendorEl = document.getElementById('drawer-vendor');
     const typeBadge = document.getElementById('drawer-type-badge');
     const pricingBadge = document.getElementById('drawer-pricing-badge');
@@ -2846,7 +2852,8 @@ function showAirportDetails(ap) {
     }
 
     if (typeBadge) {
-        typeBadge.innerText = (typeof getLocalizedAirportType === 'function') ? getLocalizedAirportType(ap.english_type || ap.type) : (ap.english_type || ap.type);
+        const localizedType = (typeof getLocalizedAirportType === 'function') ? getLocalizedAirportType(ap.english_type || ap.type) : (ap.english_type || ap.type);
+        typeBadge.innerText = (localizedType || '').toUpperCase();
     }
 
     // Update Activation Status Card in Drawer & Developer Info Visibility
@@ -3628,7 +3635,6 @@ async function renderAirportRunways(ap) {
 
         runwaysListEl.innerHTML = sortedRunways.map(rwy => {
             const isClosed = !!rwy.closed;
-            const isLighted = !!rwy.lighted;
             const lenFt = rwy.length_ft ? rwy.length_ft.toLocaleString() + ' ft' : '—';
             const lenM = rwy.length_m ? rwy.length_m.toLocaleString() + ' m' : '—';
             const widFt = rwy.width_ft ? rwy.width_ft.toLocaleString() + ' ft' : '';
@@ -3656,11 +3662,6 @@ async function renderAirportRunways(ap) {
                             ${isClosed ? `
                                 <span class="text-[10px] font-mono font-bold text-slate-400 bg-slate-800 px-2 py-0.5 rounded">
                                     ${t('drawer.runway_closed', 'Closed')}
-                                </span>
-                            ` : ''}
-                            ${isLighted && !isClosed ? `
-                                <span class="text-[10px] font-mono font-bold text-amber-400 bg-slate-800 px-2 py-0.5 rounded">
-                                    ${t('drawer.runway_lighted', 'Lighted')}
                                 </span>
                             ` : ''}
                         </div>
