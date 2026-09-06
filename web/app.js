@@ -2283,93 +2283,93 @@ function renderAirportsOnMap(airports) {
 // Global Recognized Oceanic ETOPS Diversion Gateways Database (NAT, SAT, NOPAC, Indian Ocean)
 const GLOBAL_ETOPS_ALTERNATES = {
     // North Atlantic (NAT Tracks)
-    "BIKF": { lat: 63.985, lon: -22.6056, name: "Keflavik International Airport", city: "Reykjavík", country: "IS" },
-    "BIRK": { lat: 64.1287, lon: -21.9376, name: "Reykjavík Domestic Airport", city: "Reykjavík", country: "IS" },
-    "BIAR": { lat: 65.6566, lon: -18.072, name: "Akureyri International Airport", city: "Akureyri", country: "IS" },
-    "BIIS": { lat: 66.0581, lon: -23.1353, name: "Ísafjörður Airport", city: "Ísafjörður", country: "IS" },
-    "BIEG": { lat: 65.2833, lon: -14.4014, name: "Egilsstaðir Airport", city: "Egilsstaðir", country: "IS" },
-    "BGBW": { lat: 61.1596, lon: -45.4247, name: "Narsarsuaq Airport", city: "Narsarsuaq", country: "GL" },
-    "BGGH": { lat: 64.1911, lon: -51.6791, name: "Nuuk International Airport", city: "Nuuk", country: "GL" },
-    "BGSF": { lat: 67.0104, lon: -50.7153, name: "Kangerlussuaq International Airport", city: "Kangerlussuaq", country: "GL" },
-    "BGKK": { lat: 65.5736, lon: -37.1236, name: "Kulusuk Airport", city: "Kulusuk", country: "GL" },
-    "CYQX": { lat: 48.9369, lon: -54.5681, name: "Gander International Airport", city: "Gander", country: "CA" },
-    "CYYT": { lat: 47.6186, lon: -52.7519, name: "St. John's International Airport", city: "St. John's", country: "CA" },
-    "CYDF": { lat: 49.2108, lon: -57.3914, name: "Deer Lake Airport", city: "Deer Lake", country: "CA" },
-    "CYYR": { lat: 53.3192, lon: -60.4258, name: "Goose Bay Airport", city: "Happy Valley-Goose Bay", country: "CA" },
-    "CYHZ": { lat: 44.8808, lon: -63.5086, name: "Halifax Stanfield International Airport", city: "Halifax", country: "CA" },
-    "CYQM": { lat: 46.1122, lon: -64.6786, name: "Greater Moncton Roméo LeBlanc International Airport", city: "Moncton", country: "CA" },
-    "CYFB": { lat: 63.7564, lon: -68.5558, name: "Iqaluit Airport", city: "Iqaluit", country: "CA" },
-    "LPPD": { lat: 37.7412, lon: -25.6979, name: "Ponta Delgada João Paulo II Airport", city: "Ponta Delgada", country: "PT" },
-    "LPAZ": { lat: 36.9714, lon: -25.1706, name: "Santa Maria Airport", city: "Vila do Porto", country: "PT" },
-    "LPLA": { lat: 38.7617, lon: -27.0908, name: "Lajes Airport", city: "Praia da Vitória", country: "PT" },
-    "LPPI": { lat: 38.5544, lon: -28.4414, name: "Pico Airport", city: "Madalena", country: "PT" },
-    "LPFL": { lat: 39.4553, lon: -31.1314, name: "Flores Airport", city: "Santa Cruz das Flores", country: "PT" },
-    "TXKF": { lat: 32.364, lon: -64.6787, name: "L.F. Wade International Airport", city: "St. George's", country: "BM" },
-    "EINN": { lat: 52.702, lon: -8.9248, name: "Shannon Airport", city: "Shannon", country: "IE" },
-    "EGPK": { lat: 55.5094, lon: -4.5947, name: "Glasgow Prestwick Airport", city: "Prestwick", country: "GB" },
-    "EGPO": { lat: 58.2156, lon: -6.3311, name: "Stornoway Airport", city: "Stornoway", country: "GB" },
+    "BIKF": { lat: 63.985, lon: -22.6056, name: "Keflavik International Airport", city: "Reykjavík", country: "IS", basin: "NAT" },
+    "BIRK": { lat: 64.1287, lon: -21.9376, name: "Reykjavík Domestic Airport", city: "Reykjavík", country: "IS", basin: "NAT" },
+    "BIAR": { lat: 65.6566, lon: -18.072, name: "Akureyri International Airport", city: "Akureyri", country: "IS", basin: "NAT" },
+    "BIIS": { lat: 66.0581, lon: -23.1353, name: "Ísafjörður Airport", city: "Ísafjörður", country: "IS", basin: "NAT" },
+    "BIEG": { lat: 65.2833, lon: -14.4014, name: "Egilsstaðir Airport", city: "Egilsstaðir", country: "IS", basin: "NAT" },
+    "BGBW": { lat: 61.1596, lon: -45.4247, name: "Narsarsuaq Airport", city: "Narsarsuaq", country: "GL", basin: "NAT" },
+    "BGGH": { lat: 64.1911, lon: -51.6791, name: "Nuuk International Airport", city: "Nuuk", country: "GL", basin: "NAT" },
+    "BGSF": { lat: 67.0104, lon: -50.7153, name: "Kangerlussuaq International Airport", city: "Kangerlussuaq", country: "GL", basin: "NAT" },
+    "BGKK": { lat: 65.5736, lon: -37.1236, name: "Kulusuk Airport", city: "Kulusuk", country: "GL", basin: "NAT" },
+    "CYQX": { lat: 48.9369, lon: -54.5681, name: "Gander International Airport", city: "Gander", country: "CA", basin: "NAT" },
+    "CYYT": { lat: 47.6186, lon: -52.7519, name: "St. John's International Airport", city: "St. John's", country: "CA", basin: "NAT" },
+    "CYDF": { lat: 49.2108, lon: -57.3914, name: "Deer Lake Airport", city: "Deer Lake", country: "CA", basin: "NAT" },
+    "CYYR": { lat: 53.3192, lon: -60.4258, name: "Goose Bay Airport", city: "Happy Valley-Goose Bay", country: "CA", basin: "NAT" },
+    "CYHZ": { lat: 44.8808, lon: -63.5086, name: "Halifax Stanfield International Airport", city: "Halifax", country: "CA", basin: "NAT" },
+    "CYQM": { lat: 46.1122, lon: -64.6786, name: "Greater Moncton Roméo LeBlanc International Airport", city: "Moncton", country: "CA", basin: "NAT" },
+    "CYFB": { lat: 63.7564, lon: -68.5558, name: "Iqaluit Airport", city: "Iqaluit", country: "CA", basin: "NAT" },
+    "LPPD": { lat: 37.7412, lon: -25.6979, name: "Ponta Delgada João Paulo II Airport", city: "Ponta Delgada", country: "PT", basin: "NAT,SAT" },
+    "LPAZ": { lat: 36.9714, lon: -25.1706, name: "Santa Maria Airport", city: "Vila do Porto", country: "PT", basin: "NAT,SAT" },
+    "LPLA": { lat: 38.7617, lon: -27.0908, name: "Lajes Airport", city: "Praia da Vitória", country: "PT", basin: "NAT,SAT" },
+    "LPPI": { lat: 38.5544, lon: -28.4414, name: "Pico Airport", city: "Madalena", country: "PT", basin: "NAT,SAT" },
+    "LPFL": { lat: 39.4553, lon: -31.1314, name: "Flores Airport", city: "Santa Cruz das Flores", country: "PT", basin: "NAT,SAT" },
+    "TXKF": { lat: 32.364, lon: -64.6787, name: "L.F. Wade International Airport", city: "St. George's", country: "BM", basin: "NAT" },
+    "EINN": { lat: 52.702, lon: -8.9248, name: "Shannon Airport", city: "Shannon", country: "IE", basin: "NAT" },
+    "EGPK": { lat: 55.5094, lon: -4.5947, name: "Glasgow Prestwick Airport", city: "Prestwick", country: "GB", basin: "NAT" },
+    "EGPO": { lat: 58.2156, lon: -6.3311, name: "Stornoway Airport", city: "Stornoway", country: "GB", basin: "NAT" },
 
     // South Atlantic (SAT Tracks)
-    "LPMA": { lat: 32.6979, lon: -16.7744, name: "Cristiano Ronaldo International Airport", city: "Funchal", country: "PT" },
-    "LPPS": { lat: 33.0786, lon: -16.35, name: "Porto Santo Airport", city: "Vila Baleira", country: "PT" },
-    "GCLP": { lat: 27.9319, lon: -15.3866, name: "Gran Canaria Airport", city: "Las Palmas", country: "ES" },
-    "GCTS": { lat: 28.0445, lon: -16.5725, name: "Tenerife South Airport", city: "Granadilla de Abona", country: "ES" },
-    "GCXO": { lat: 28.4827, lon: -16.3415, name: "Tenerife North-Ciudad de La Laguna Airport", city: "San Cristóbal de La Laguna", country: "ES" },
-    "GCLA": { lat: 28.6265, lon: -17.7556, name: "La Palma Airport", city: "Santa Cruz de La Palma", country: "ES" },
-    "GCFV": { lat: 28.4527, lon: -13.8638, name: "Fuerteventura Airport", city: "Puerto del Rosario", country: "ES" },
-    "GCRR": { lat: 28.9455, lon: -13.6052, name: "César Manrique-Lanzarote Airport", city: "San Bartolomé", country: "ES" },
-    "GVAC": { lat: 16.7414, lon: -22.9494, name: "Amílcar Cabral International Airport", city: "Espargos", country: "CV" },
-    "GVNP": { lat: 14.9453, lon: -23.4908, name: "Nelson Mandela International Airport", city: "Praia", country: "CV" },
-    "GVSV": { lat: 16.8333, lon: -25.0564, name: "Cesária Évora Airport", city: "São Pedro", country: "CV" },
-    "GVBA": { lat: 16.1378, lon: -22.8892, name: "Aristides Pereira International Airport", city: "Rabil", country: "CV" },
-    "SBFN": { lat: -3.8549, lon: -32.4233, name: "Fernando de Noronha Airport", city: "Fernando de Noronha", country: "BR" },
-    "SBNT": { lat: -5.7689, lon: -35.3725, name: "Governador Aluízio Alves International Airport", city: "Natal", country: "BR" },
-    "SBRF": { lat: -8.1258, lon: -34.9239, name: "Recife/Guararapes-Gilberto Freyre International Airport", city: "Recife", country: "BR" },
-    "SBFZ": { lat: -3.7763, lon: -38.5326, name: "Pinto Martins International Airport", city: "Fortaleza", country: "BR" },
-    "SBSV": { lat: -12.9111, lon: -38.3308, name: "Deputado Luís Eduardo Magalhães International Airport", city: "Salvador", country: "BR" },
-    "SBMO": { lat: -9.5108, lon: -35.7917, name: "Zumbi dos Palmares International Airport", city: "Maceió", country: "BR" },
-    "SBJP": { lat: -7.1483, lon: -34.9506, name: "Presidente Castro Pinto International Airport", city: "João Pessoa", country: "BR" },
-    "GOBD": { lat: 14.6711, lon: -17.0672, name: "Blaise Diagne International Airport", city: "Dakar", country: "SN" },
-    "GBYD": { lat: 13.338, lon: -16.6522, name: "Banjul International Airport", city: "Banjul", country: "GM" },
-    "DIAP": { lat: 5.2614, lon: -3.9263, name: "Félix-Houphouët-Boigny International Airport", city: "Abidjan", country: "CI" },
+    "LPMA": { lat: 32.6979, lon: -16.7744, name: "Cristiano Ronaldo International Airport", city: "Funchal", country: "PT", basin: "SAT" },
+    "LPPS": { lat: 33.0786, lon: -16.35, name: "Porto Santo Airport", city: "Vila Baleira", country: "PT", basin: "SAT" },
+    "GCLP": { lat: 27.9319, lon: -15.3866, name: "Gran Canaria Airport", city: "Las Palmas", country: "ES", basin: "SAT" },
+    "GCTS": { lat: 28.0445, lon: -16.5725, name: "Tenerife South Airport", city: "Granadilla de Abona", country: "ES", basin: "SAT" },
+    "GCXO": { lat: 28.4827, lon: -16.3415, name: "Tenerife North-Ciudad de La Laguna Airport", city: "San Cristóbal de La Laguna", country: "ES", basin: "SAT" },
+    "GCLA": { lat: 28.6265, lon: -17.7556, name: "La Palma Airport", city: "Santa Cruz de La Palma", country: "ES", basin: "SAT" },
+    "GCFV": { lat: 28.4527, lon: -13.8638, name: "Fuerteventura Airport", city: "Puerto del Rosario", country: "ES", basin: "SAT" },
+    "GCRR": { lat: 28.9455, lon: -13.6052, name: "César Manrique-Lanzarote Airport", city: "San Bartolomé", country: "ES", basin: "SAT" },
+    "GVAC": { lat: 16.7414, lon: -22.9494, name: "Amílcar Cabral International Airport", city: "Espargos", country: "CV", basin: "SAT" },
+    "GVNP": { lat: 14.9453, lon: -23.4908, name: "Nelson Mandela International Airport", city: "Praia", country: "CV", basin: "SAT" },
+    "GVSV": { lat: 16.8333, lon: -25.0564, name: "Cesária Évora Airport", city: "São Pedro", country: "CV", basin: "SAT" },
+    "GVBA": { lat: 16.1378, lon: -22.8892, name: "Aristides Pereira International Airport", city: "Rabil", country: "CV", basin: "SAT" },
+    "SBFN": { lat: -3.8549, lon: -32.4233, name: "Fernando de Noronha Airport", city: "Fernando de Noronha", country: "BR", basin: "SAT" },
+    "SBNT": { lat: -5.7689, lon: -35.3725, name: "Governador Aluízio Alves International Airport", city: "Natal", country: "BR", basin: "SAT" },
+    "SBRF": { lat: -8.1258, lon: -34.9239, name: "Recife/Guararapes-Gilberto Freyre International Airport", city: "Recife", country: "BR", basin: "SAT" },
+    "SBFZ": { lat: -3.7763, lon: -38.5326, name: "Pinto Martins International Airport", city: "Fortaleza", country: "BR", basin: "SAT" },
+    "SBSV": { lat: -12.9111, lon: -38.3308, name: "Deputado Luís Eduardo Magalhães International Airport", city: "Salvador", country: "BR", basin: "SAT" },
+    "SBMO": { lat: -9.5108, lon: -35.7917, name: "Zumbi dos Palmares International Airport", city: "Maceió", country: "BR", basin: "SAT" },
+    "SBJP": { lat: -7.1483, lon: -34.9506, name: "Presidente Castro Pinto International Airport", city: "João Pessoa", country: "BR", basin: "SAT" },
+    "GOBD": { lat: 14.6711, lon: -17.0672, name: "Blaise Diagne International Airport", city: "Dakar", country: "SN", basin: "SAT" },
+    "GBYD": { lat: 13.338, lon: -16.6522, name: "Banjul International Airport", city: "Banjul", country: "GM", basin: "SAT" },
+    "DIAP": { lat: 5.2614, lon: -3.9263, name: "Félix-Houphouët-Boigny International Airport", city: "Abidjan", country: "CI", basin: "SAT" },
 
     // North Pacific (NOPAC / Transpacific)
-    "PANC": { lat: 61.1744, lon: -149.9964, name: "Ted Stevens Anchorage International Airport", city: "Anchorage", country: "US" },
-    "PAFA": { lat: 64.8151, lon: -147.8561, name: "Fairbanks International Airport", city: "Fairbanks", country: "US" },
-    "PADK": { lat: 51.878, lon: -176.646, name: "Adak Airport", city: "Adak", country: "US" },
-    "PASN": { lat: 57.1672, lon: -170.2206, name: "St. Paul Island Airport", city: "St. Paul", country: "US" },
-    "PASY": { lat: 52.7122, lon: 174.1136, name: "Eareckson Air Station", city: "Shemya", country: "US" },
-    "PACD": { lat: 55.1997, lon: -162.7242, name: "Cold Bay Airport", city: "Cold Bay", country: "US" },
-    "PADQ": { lat: 57.75, lon: -152.4939, name: "Kodiak Airport", city: "Kodiak", country: "US" },
-    "PAKN": { lat: 58.6767, lon: -156.6492, name: "King Salmon Airport", city: "King Salmon", country: "US" },
-    "PAFR": { lat: 61.2663, lon: -149.6528, name: "Bryant Army Airfield", city: "Fort Richardson", country: "US" },
-    "PAVD": { lat: 61.1339, lon: -146.2483, name: "Valdez Airport", city: "Valdez", country: "US" },
-    "UHPP": { lat: 53.1678, lon: 158.4539, name: "Yelizovo Airport", city: "Petropavlovsk-Kamchatsky", country: "RU" },
-    "UHMD": { lat: 64.3803, lon: -173.2422, name: "Provideniya Bay Airport", city: "Provideniya", country: "RU" },
-    "UHMA": { lat: 64.735, lon: 177.7411, name: "Ugolny Airport", city: "Anadyr", country: "RU" },
-    "UHMM": { lat: 59.9111, lon: 150.7206, name: "Sokol Airport", city: "Magadan", country: "RU" },
-    "RJCC": { lat: 42.7752, lon: 141.6923, name: "New Chitose Airport", city: "Sapporo", country: "JP" },
-    "RJTT": { lat: 35.5523, lon: 139.7797, name: "Tokyo Haneda International Airport", city: "Tokyo", country: "JP" },
-    "RJAA": { lat: 35.7647, lon: 140.3864, name: "Narita International Airport", city: "Tokyo", country: "JP" },
-    "RJCK": { lat: 43.0411, lon: 144.1931, name: "Kushiro Airport", city: "Kushiro", country: "JP" },
-    "RJER": { lat: 45.2417, lon: 141.1867, name: "Rishiri Airport", city: "Rishiri", country: "JP" },
-    "PHNL": { lat: 21.3187, lon: -157.9225, name: "Daniel K. Inouye International Airport", city: "Honolulu", country: "US" },
-    "PHOG": { lat: 20.8986, lon: -156.4306, name: "Kahului Airport", city: "Kahului", country: "US" },
-    "PHTO": { lat: 19.7203, lon: -155.0485, name: "Hilo International Airport", city: "Hilo", country: "US" },
-    "PMDY": { lat: 28.2014, lon: -177.3811, name: "Henderson Field", city: "Midway Atoll", country: "UM" },
-    "PGUM": { lat: 13.4839, lon: 144.7964, name: "Antonio B. Won Pat International Airport", city: "Tamuning", country: "GU" },
-    "PGSN": { lat: 15.1192, lon: 145.7297, name: "Francisco C. Ada/Saipan International Airport", city: "Saipan", country: "MP" },
-    "PKWA": { lat: 8.7206, lon: 167.7314, name: "Bucholz Army Airfield", city: "Kwajalein", country: "MH" },
+    "PANC": { lat: 61.1744, lon: -149.9964, name: "Ted Stevens Anchorage International Airport", city: "Anchorage", country: "US", basin: "NOPAC" },
+    "PAFA": { lat: 64.8151, lon: -147.8561, name: "Fairbanks International Airport", city: "Fairbanks", country: "US", basin: "NOPAC" },
+    "PADK": { lat: 51.878, lon: -176.646, name: "Adak Airport", city: "Adak", country: "US", basin: "NOPAC" },
+    "PASN": { lat: 57.1672, lon: -170.2206, name: "St. Paul Island Airport", city: "St. Paul", country: "US", basin: "NOPAC" },
+    "PASY": { lat: 52.7122, lon: 174.1136, name: "Eareckson Air Station", city: "Shemya", country: "US", basin: "NOPAC" },
+    "PACD": { lat: 55.1997, lon: -162.7242, name: "Cold Bay Airport", city: "Cold Bay", country: "US", basin: "NOPAC" },
+    "PADQ": { lat: 57.75, lon: -152.4939, name: "Kodiak Airport", city: "Kodiak", country: "US", basin: "NOPAC" },
+    "PAKN": { lat: 58.6767, lon: -156.6492, name: "King Salmon Airport", city: "King Salmon", country: "US", basin: "NOPAC" },
+    "PAFR": { lat: 61.2663, lon: -149.6528, name: "Bryant Army Airfield", city: "Fort Richardson", country: "US", basin: "NOPAC" },
+    "PAVD": { lat: 61.1339, lon: -146.2483, name: "Valdez Airport", city: "Valdez", country: "US", basin: "NOPAC" },
+    "UHPP": { lat: 53.1678, lon: 158.4539, name: "Yelizovo Airport", city: "Petropavlovsk-Kamchatsky", country: "RU", basin: "NOPAC" },
+    "UHMD": { lat: 64.3803, lon: -173.2422, name: "Provideniya Bay Airport", city: "Provideniya", country: "RU", basin: "NOPAC" },
+    "UHMA": { lat: 64.735, lon: 177.7411, name: "Ugolny Airport", city: "Anadyr", country: "RU", basin: "NOPAC" },
+    "UHMM": { lat: 59.9111, lon: 150.7206, name: "Sokol Airport", city: "Magadan", country: "RU", basin: "NOPAC" },
+    "RJCC": { lat: 42.7752, lon: 141.6923, name: "New Chitose Airport", city: "Sapporo", country: "JP", basin: "NOPAC" },
+    "RJTT": { lat: 35.5523, lon: 139.7797, name: "Tokyo Haneda International Airport", city: "Tokyo", country: "JP", basin: "NOPAC" },
+    "RJAA": { lat: 35.7647, lon: 140.3864, name: "Narita International Airport", city: "Tokyo", country: "JP", basin: "NOPAC" },
+    "RJCK": { lat: 43.0411, lon: 144.1931, name: "Kushiro Airport", city: "Kushiro", country: "JP", basin: "NOPAC" },
+    "RJER": { lat: 45.2417, lon: 141.1867, name: "Rishiri Airport", city: "Rishiri", country: "JP", basin: "NOPAC" },
+    "PHNL": { lat: 21.3187, lon: -157.9225, name: "Daniel K. Inouye International Airport", city: "Honolulu", country: "US", basin: "NOPAC" },
+    "PHOG": { lat: 20.8986, lon: -156.4306, name: "Kahului Airport", city: "Kahului", country: "US", basin: "NOPAC" },
+    "PHTO": { lat: 19.7203, lon: -155.0485, name: "Hilo International Airport", city: "Hilo", country: "US", basin: "NOPAC" },
+    "PMDY": { lat: 28.2014, lon: -177.3811, name: "Henderson Field", city: "Midway Atoll", country: "UM", basin: "NOPAC" },
+    "PGUM": { lat: 13.4839, lon: 144.7964, name: "Antonio B. Won Pat International Airport", city: "Tamuning", country: "GU", basin: "NOPAC" },
+    "PGSN": { lat: 15.1192, lon: 145.7297, name: "Francisco C. Ada/Saipan International Airport", city: "Saipan", country: "MP", basin: "NOPAC" },
+    "PKWA": { lat: 8.7206, lon: 167.7314, name: "Bucholz Army Airfield", city: "Kwajalein", country: "MH", basin: "NOPAC" },
 
     // Indian Ocean & Middle East
-    "FMEE": { lat: -20.8872, lon: 55.5103, name: "Roland Garros Airport", city: "Saint-Denis", country: "RE" },
-    "FIMP": { lat: -20.4302, lon: 57.6836, name: "Sir Seewoosagur Ramgoolam International Airport", city: "Plaine Magnien", country: "MU" },
-    "FSIA": { lat: -4.6743, lon: 55.5219, name: "Seychelles International Airport", city: "Victoria", country: "SC" },
-    "FJDG": { lat: -7.3133, lon: 72.4111, name: "Diego Garcia Naval Support Facility", city: "Diego Garcia", country: "IO" },
-    "VRMM": { lat: 4.1918, lon: 73.5292, name: "Velana International Airport", city: "Malé", country: "MV" },
-    "VCBI": { lat: 7.1808, lon: 79.8841, name: "Bandaranaike International Colombo Airport", city: "Colombo", country: "LK" },
-    "OOMS": { lat: 23.5933, lon: 58.2844, name: "Muscat International Airport", city: "Muscat", country: "OM" },
-    "OOSA": { lat: 17.0389, lon: 54.0914, name: "Salalah Airport", city: "Salalah", country: "OM" }
+    "FMEE": { lat: -20.8872, lon: 55.5103, name: "Roland Garros Airport", city: "Saint-Denis", country: "RE", basin: "IND" },
+    "FIMP": { lat: -20.4302, lon: 57.6836, name: "Sir Seewoosagur Ramgoolam International Airport", city: "Plaine Magnien", country: "MU", basin: "IND" },
+    "FSIA": { lat: -4.6743, lon: 55.5219, name: "Seychelles International Airport", city: "Victoria", country: "SC", basin: "IND" },
+    "FJDG": { lat: -7.3133, lon: 72.4111, name: "Diego Garcia Naval Support Facility", city: "Diego Garcia", country: "IO", basin: "IND" },
+    "VRMM": { lat: 4.1918, lon: 73.5292, name: "Velana International Airport", city: "Malé", country: "MV", basin: "IND" },
+    "VCBI": { lat: 7.1808, lon: 79.8841, name: "Bandaranaike International Colombo Airport", city: "Colombo", country: "LK", basin: "IND" },
+    "OOMS": { lat: 23.5933, lon: 58.2844, name: "Muscat International Airport", city: "Muscat", country: "OM", basin: "IND" },
+    "OOSA": { lat: 17.0389, lon: 54.0914, name: "Salalah Airport", city: "Salalah", country: "OM", basin: "IND" }
 };
 
 let isFlightPlanningMode = false;
@@ -2551,7 +2551,7 @@ function updateFlightPlanningBannerUI() {
                 guideText.innerText = `Alt+Click an airport to set Destination`;
             } else {
                 const totalAirfields = currentlyFilteredAirports.length;
-                guideText.innerText = `Corridor active: ${flightPlanningDeparture.icao} ➔ ${flightPlanningDestination.icao} (${totalAirfields} En-Route & Alternates)`;
+                guideText.innerText = `Corridor active: ${flightPlanningDeparture.icao} ➔ ${flightPlanningDestination.icao} (${totalAirfields} Addon Sceneries En-Route)`;
             }
         }
     } else {
@@ -2762,13 +2762,21 @@ function isAirportInCorridor(ap, depAp, arrAp) {
     const lat2 = arrAp.lat;
     const lon2 = arrAp.lon;
 
-    const isTransatlantic = (
+    const isTransatlanticNAT = (
         ((lon1 > -15 && lon1 < 35 && lat1 > 35) && (lon2 < -50 && lat2 > 25)) ||
         ((lon2 > -15 && lon2 < 35 && lat2 > 35) && (lon1 < -50 && lat1 > 25))
     );
 
-    const isOceanic = isTransatlantic || (totalDist > 2800) || (
-        (lat1 > 20 && lat2 < -10) || (lat2 > 20 && lat1 < -10)
+    const isSouthAtlanticSAT = (
+        ((lat1 > 15 && lon1 > -20 && lon1 < 35) && (lat2 < 12 && lon2 < -30)) ||
+        ((lat2 > 15 && lon2 > -20 && lon2 < 35) && (lat1 < 12 && lon1 < -30)) ||
+        ((lat1 > 20 && lat2 < -10) || (lat2 > 20 && lat1 < -10))
+    );
+
+    const isPacificNOPAC = (
+        ((lon1 < -60 && lat1 > 25) && (lon2 > 60 && lon2 < 140)) ||
+        ((lon2 < -60 && lat2 > 25) && (lon1 > 60 && lon1 < 140)) ||
+        ((lon1 < -100 && lon2 > 120) || (lon2 < -100 && lon1 > 120))
     );
 
     const filterWaypoints = getCommercialCorridorFilterPoints(depAp, arrAp);
@@ -2830,9 +2838,14 @@ function isAirportInCorridor(ap, depAp, arrAp) {
         return true;
     }
 
-    // Oceanic ETOPS diversion alternate check (up to 1600 km / ~860 NM single-engine diversion circle)
-    if (isOceanic && ap.icao && GLOBAL_ETOPS_ALTERNATES[ap.icao] && minDist <= 1600.0) {
-        return true;
+    // Oceanic ETOPS diversion alternate check (up to 1600 km / ~860 NM single-engine diversion circle matching basin)
+    if (ap.icao && typeof GLOBAL_ETOPS_ALTERNATES !== 'undefined' && GLOBAL_ETOPS_ALTERNATES[ap.icao] && minDist <= 1600.0) {
+        const etopsInfo = GLOBAL_ETOPS_ALTERNATES[ap.icao];
+        const basin = etopsInfo.basin || '';
+        if (basin.includes('NAT') && isTransatlanticNAT) return true;
+        if (basin.includes('SAT') && isSouthAtlanticSAT) return true;
+        if (basin.includes('NOPAC') && isPacificNOPAC) return true;
+        if (basin.includes('IND') && (totalDist > 3000)) return true;
     }
 
     return false;
@@ -2892,16 +2905,16 @@ function renderFlightCorridor() {
     // Filter airports to display only sceneries/airports inside corridor
     filterAirports();
 
-    // Count custom sceneries along corridor
-    const customCount = currentlyFilteredAirports.filter(a => hasCustomAddonSources(a)).length;
-    const etopsCount = currentlyFilteredAirports.filter(a => a.is_etops_alternate || (typeof GLOBAL_ETOPS_ALTERNATES !== 'undefined' && GLOBAL_ETOPS_ALTERNATES[a.icao])).length;
+    // Count custom addon sceneries along corridor (only Payware, Freeware, Asobo)
+    const addonCount = currentlyFilteredAirports.length;
+    const etopsCount = currentlyFilteredAirports.filter(a => (typeof GLOBAL_ETOPS_ALTERNATES !== 'undefined' && GLOBAL_ETOPS_ALTERNATES[a.icao])).length;
 
     const isTransoceanic = distKm > 2000;
     const trackLabel = isTransoceanic ? 'Commercial Long-Haul Route' : 'Orthodromic Track';
 
-    let corridorMsg = `✈ Flight Corridor (${trackLabel}): ${dep.icao} → ${arr.icao} (${distNm.toLocaleString()} NM / ${Math.round(distKm).toLocaleString()} km) | ${customCount} Custom Sceneries En-Route`;
+    let corridorMsg = `✈ Flight Corridor (${trackLabel}): ${dep.icao} → ${arr.icao} (${distNm.toLocaleString()} NM / ${Math.round(distKm).toLocaleString()} km) | ${addonCount} Addon Sceneries En-Route`;
     if (etopsCount > 0) {
-        corridorMsg += ` | ${etopsCount} ETOPS Alternates`;
+        corridorMsg += ` (incl. ${etopsCount} ETOPS Alternates)`;
     }
 
     showToast(corridorMsg, 'success');
@@ -4464,6 +4477,13 @@ function filterAirports() {
 
         // Active Flight Corridor Filter (Alt + Click)
         if (selectedAirport && flightCorridorArrivalAirport) {
+            // Flight Corridor Optimizer: Only display custom addon sceneries (Payware, Freeware, Asobo).
+            // Exclude all Default MSFS base procedural airports as they cannot and will never be disabled.
+            const pt = getAirportPricingType(ap);
+            if (pt === 'Default' || ap.pricing_type === 'Default' || ap.is_default || ap.package_name === 'Default MSFS Base Airport' || (ap.package_name && ap.package_name.startsWith('msfs-default-'))) {
+                return false;
+            }
+
             if (!isAirportInCorridor(ap, selectedAirport, flightCorridorArrivalAirport)) {
                 return false;
             }
@@ -4623,46 +4643,6 @@ function filterAirports() {
                 }
             }
         });
-    }
-
-    // Inject ETOPS Alternates along active oceanic corridor if not already present in user addons
-    if (selectedAirport && flightCorridorArrivalAirport) {
-        const depAp = selectedAirport;
-        const arrAp = flightCorridorArrivalAirport;
-        const totalDist = getHaversineDistanceKm(depAp.lat, depAp.lon, arrAp.lat, arrAp.lon);
-        const lat1 = depAp.lat, lon1 = depAp.lon, lat2 = arrAp.lat, lon2 = arrAp.lon;
-        const isTransatlantic = (
-            ((lon1 > -15 && lon1 < 35 && lat1 > 35) && (lon2 < -50 && lat2 > 25)) ||
-            ((lon2 > -15 && lon2 < 35 && lat2 > 35) && (lon1 < -50 && lat1 > 25))
-        );
-        const isOceanic = isTransatlantic || (totalDist > 2800) || ((lat1 > 20 && lat2 < -10) || (lat2 > 20 && lat1 < -10));
-
-        if (isOceanic && typeof GLOBAL_ETOPS_ALTERNATES !== 'undefined') {
-            for (const [etopsIcao, etopsData] of Object.entries(GLOBAL_ETOPS_ALTERNATES)) {
-                if (!currentlyFilteredAirports.some(a => a.icao === etopsIcao)) {
-                    const wInfo = (window.worldAirportCoords && window.worldAirportCoords[etopsIcao]) ? window.worldAirportCoords[etopsIcao] : null;
-                    const candidateAp = {
-                        icao: etopsIcao,
-                        ident: etopsIcao,
-                        lat: wInfo ? wInfo.lat : etopsData.lat,
-                        lon: wInfo ? wInfo.lon : etopsData.lon,
-                        name: wInfo ? (wInfo.name || etopsData.name) : etopsData.name,
-                        city: wInfo ? (wInfo.city || etopsData.city || '') : (etopsData.city || ''),
-                        country: wInfo ? (wInfo.country || etopsData.country || '') : (etopsData.country || ''),
-                        type: 'large_airport',
-                        english_type: 'ETOPS En-Route Alternate',
-                        vendor: 'Microsoft Flight Simulator (Default)',
-                        pricing_type: 'Default',
-                        is_default: true,
-                        is_etops_alternate: true
-                    };
-
-                    if (isAirportInCorridor(candidateAp, depAp, arrAp)) {
-                        currentlyFilteredAirports.push(candidateAp);
-                    }
-                }
-            }
-        }
     }
 
     renderAirportsOnMap(currentlyFilteredAirports);
