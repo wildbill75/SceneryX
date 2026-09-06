@@ -970,145 +970,58 @@ function openCountryDrawer(iso, countryName) {
                 </div>
             `;
         } else {
-            // Sort sceneries: Payware first, then Freeware, then Asobo, then Default
-            filteredCountryAirports.sort((a, b) => {
-                const ptOrder = { 'Payware': 1, 'Freeware': 2, 'Asobo': 3, 'Default': 4 };
-                const ptA = getAirportPricingType(a);
-                const ptB = getAirportPricingType(b);
-                return (ptOrder[ptA] || 9) - (ptOrder[ptB] || 9);
+            const airportsByCat = {
+                'Payware': [],
+                'Freeware': [],
+                'Asobo': [],
+                'Default': []
+            };
+
+            filteredCountryAirports.forEach(ap => {
+                const cat = getNormalizedPricingCategory(ap);
+                if (airportsByCat[cat]) {
+                    airportsByCat[cat].push(ap);
+                } else {
+                    airportsByCat['Default'].push(ap);
+                }
             });
 
-            listEl.innerHTML = filteredCountryAirports.map(ap => {
-                const pt = getAirportPricingType(ap);
-                const isExpanded = (expandedCountryIcao === ap.icao);
-                let badgeHtml = '';
-                let borderClass = 'border-slate-800 hover:border-indigo-500/50';
+            // Sort airports within each category alphabetically by ICAO
+            Object.values(airportsByCat).forEach(list => {
+                list.sort((a, b) => (a.icao || '').localeCompare(b.icao || ''));
+            });
 
-                if (pt === 'Payware') {
-                    badgeHtml = `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-purple-600 text-white">${t('stat.payware', 'PAYWARE')}</span>`;
-                    borderClass = isExpanded ? 'border-purple-400 bg-purple-950/40 shadow-lg shadow-purple-950/30' : 'border-purple-500/30 hover:border-purple-400 bg-purple-950/20';
-                } else if (pt === 'Freeware') {
-                    badgeHtml = `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-cyan-600 text-white">${t('stat.freeware', 'FREEWARE')}</span>`;
-                    borderClass = isExpanded ? 'border-cyan-400 bg-cyan-950/40 shadow-lg shadow-cyan-950/30' : 'border-cyan-500/30 hover:border-cyan-400 bg-cyan-950/20';
-                } else if (pt === 'Asobo') {
-                    badgeHtml = `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-500 text-slate-950 font-black">${t('stat.asobo', 'ASOBO')}</span>`;
-                    borderClass = isExpanded ? 'border-amber-400 bg-amber-950/40 shadow-lg shadow-amber-950/30' : 'border-amber-500/30 hover:border-amber-400 bg-amber-950/20';
-                } else {
-                    badgeHtml = `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-800 text-slate-300 border border-slate-700">${t('stat.default', 'DEFAULT')}</span>`;
-                    borderClass = isExpanded ? 'border-blue-400 bg-blue-950/40 shadow-lg shadow-blue-950/30' : 'border-slate-800 hover:border-slate-700 bg-slate-900/60';
-                }
+            const categoryKeys = ['Payware', 'Freeware', 'Asobo', 'Default'];
 
-                const vendorStr = ap.vendor || (ap.is_asobo_official ? 'Microsoft / Asobo' : 'Community');
-                const activeSrc = getActiveSource(ap);
-                const safeFolder = activeSrc ? (activeSrc.folder_name || '') : (ap.package_name || '');
-                const sizeStr = (activeSrc && activeSrc.size_str) ? activeSrc.size_str : (ap.size_str || '');
-                const storeSearchUrl = `https://flightsim.to/sceneries?q=${encodeURIComponent(ap.icao)}`;
+            const categoriesHtml = categoryKeys.map(catKey => {
+                const items = airportsByCat[catKey];
+                if (!items || items.length === 0) return '';
 
-                let accordionHtml = '';
-                const sources = ap.all_sources || [];
-                const fsToSearchUrl = `https://flightsim.to/search?q=${encodeURIComponent(ap.icao)}&cat=airports,scenery&exclude_cat=static-aircraft,gsx-pro&sim=msfs2020,msfs2024`;
-                const simMarketSearchUrl = `https://secure.simmarket.com/advanced_search_result.php?keywords=${encodeURIComponent(ap.icao)}`;
-
-                let rowsHtml = '';
-                if (sources.length > 0) {
-                    rowsHtml = sources.map(s => {
-                        const isInst = !s.is_disabled;
-                        const devName = s.vendor || (s.is_asobo_official ? 'Microsoft / Asobo' : 'Community');
-                        const sPt = s.pricing_type || (s.is_payware ? 'Payware' : (s.is_asobo_official ? 'Asobo' : 'Freeware'));
-                        let pBadge = '';
-                        if (sPt === 'Payware') pBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-purple-600 text-white">PAYWARE</span>`;
-                        else if (sPt === 'Asobo') pBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-500 text-slate-950 font-black">ASOBO</span>`;
-                        else if (sPt === 'Default' || ap.pricing_type === 'Default') pBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-slate-800 text-slate-300 border border-slate-700">DEFAULT</span>`;
-                        else pBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-cyan-600 text-white">FREEWARE</span>`;
-
-                        return `
-                            <div onclick="event.stopPropagation(); ${sPt === 'Payware' ? `openPaywareStoresModal('${ap.icao}', '${(ap.name || '').replace(/'/g, "\\'")}')` : `window.open('${fsToSearchUrl}', '_blank')`}"
-                                 class="flex items-center justify-between p-2 rounded-lg bg-slate-900/70 hover:bg-slate-800/80 border border-slate-800/80 cursor-pointer transition-all group">
-                                <div class="flex items-center gap-2 min-w-0 flex-1">
-                                    <span class="text-xs font-mono font-black text-cyan-300 shrink-0">${ap.icao}</span>
-                                    <span class="text-xs font-bold text-slate-200 group-hover:text-white truncate min-w-0">${devName}</span>
-                                    ${pBadge}
-                                </div>
-                                <div class="shrink-0 pl-2">
-                                    ${isInst ? '<i class="fa-solid fa-circle-check text-emerald-400 text-sm" title="Installed"></i>' : '<i class="fa-regular fa-circle text-slate-600 text-sm group-hover:text-slate-400" title="Not Installed"></i>'}
-                                </div>
-                            </div>
-                        `;
-                    }).join('');
-                } else {
-                    rowsHtml = `
-                        <div onclick="event.stopPropagation(); window.open('${fsToSearchUrl}', '_blank')"
-                             class="flex items-center justify-between p-2 rounded-lg bg-slate-900/70 hover:bg-slate-800/80 border border-slate-800/80 cursor-pointer transition-all group">
-                            <div class="flex items-center gap-2 min-w-0 flex-1">
-                                <span class="text-xs font-mono font-black text-cyan-300 shrink-0">${ap.icao}</span>
-                                <span class="text-xs font-bold text-slate-300 group-hover:text-white truncate min-w-0">Microsoft / Asobo (Default)</span>
-                                <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-slate-800 text-slate-400 border border-slate-700">DEFAULT</span>
-                            </div>
-                            <div class="shrink-0 pl-2">
-                                <i class="fa-solid fa-circle-check text-emerald-400 text-sm" title="Installed Base Airport"></i>
-                            </div>
-                        </div>
-                    `;
-                }
-
-                const freewareSearchRow = `
-                    <div onclick="event.stopPropagation(); window.open('${fsToSearchUrl}', '_blank')"
-                         class="flex items-center justify-between p-2 rounded-lg bg-slate-900/40 hover:bg-slate-800/60 border border-slate-800/50 cursor-pointer transition-all group opacity-85 hover:opacity-100">
-                        <div class="flex items-center gap-2 min-w-0 flex-1">
-                            <span class="text-xs font-mono font-black text-slate-400 shrink-0">${ap.icao}</span>
-                            <span class="text-xs font-semibold text-slate-400 group-hover:text-cyan-300 truncate min-w-0">${t('country.search_freeware', 'Search Freeware on Flightsim.to')}</span>
-                            <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">FREEWARE</span>
-                        </div>
-                        <div class="shrink-0 pl-2">
-                            <i class="fa-regular fa-circle text-slate-600 text-sm group-hover:text-cyan-400" title="Search Freeware"></i>
-                        </div>
-                    </div>
-                `;
-
-                const safeAirportName = (ap.name || '').replace(/'/g, "\\'");
-                const paywareSearchRow = `
-                    <div onclick="event.stopPropagation(); openPaywareStoresModal('${ap.icao}', '${safeAirportName}')"
-                         class="flex items-center justify-between p-2 rounded-lg bg-slate-900/40 hover:bg-slate-800/60 border border-slate-800/50 cursor-pointer transition-all group opacity-85 hover:opacity-100">
-                        <div class="flex items-center gap-2 min-w-0 flex-1">
-                            <span class="text-xs font-mono font-black text-slate-400 shrink-0">${ap.icao}</span>
-                            <span class="text-xs font-semibold text-slate-400 group-hover:text-purple-300 truncate min-w-0">${t('country.search_payware', 'Search Payware Stores')}</span>
-                            <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20">PAYWARE</span>
-                        </div>
-                        <div class="shrink-0 pl-2">
-                            <i class="fa-regular fa-circle text-slate-600 text-sm group-hover:text-purple-400" title="Search Payware Stores"></i>
-                        </div>
-                    </div>
-                `;
-
-                accordionHtml = `
-                    <div id="country-accordion-${ap.icao}" class="mt-2.5 pt-2.5 border-t border-slate-800/80 ${isExpanded ? '' : 'hidden'}">
-                        <div class="p-2 rounded-xl bg-slate-950/80 border border-slate-800/80 space-y-1.5 font-mono">
-                            ${rowsHtml}
-                            ${freewareSearchRow}
-                            ${paywareSearchRow}
-                        </div>
-                    </div>
-                `;
+                const cfg = COUNTRY_CATEGORY_CONFIG[catKey];
+                const containsExpanded = Boolean(expandedCountryIcao && items.some(a => a.icao === expandedCountryIcao));
+                const onlyDefaultExists = (items.length === filteredCountryAirports.length && catKey === 'Default');
+                const defaultState = onlyDefaultExists ? true : getCountryAccordionState(catKey);
+                const isOpen = containsExpanded || defaultState;
 
                 return `
-                    <div id="country-ap-card-${ap.icao}"
-                         onclick="selectCountryAirport('${ap.icao}')" 
-                         class="p-3 rounded-xl bg-slate-900/90 border ${borderClass} shadow-md hover:bg-slate-850 cursor-pointer transition-all flex flex-col gap-1 group">
-                        <div class="flex items-center justify-between gap-2.5 min-w-0">
-                            <div class="min-w-0 flex-1">
-                                <div class="flex items-center gap-2 mb-0.5">
-                                    <span class="text-xs font-mono font-black text-white group-hover:text-cyan-300 transition-colors">${ap.icao}</span>
-                                    ${badgeHtml}
-                                </div>
-                                <h4 class="text-xs font-extrabold text-slate-200 truncate group-hover:text-white leading-tight">${ap.name}</h4>
-                                <p class="text-[10px] font-medium text-slate-400 truncate mt-0.5">${ap.city || 'Unknown City'} • <span class="text-slate-300 font-semibold">${vendorStr}</span></p>
+                    <div class="rounded-2xl bg-slate-900/90 border ${cfg.borderClass} shadow-lg overflow-hidden transition-all">
+                        <button type="button" onclick="toggleCountryCategoryAccordion('${catKey}')"
+                                class="w-full px-3.5 py-2.5 flex items-center justify-between gap-3 text-left ${cfg.headerHover} transition-colors cursor-pointer select-none bg-slate-900/95 border-0">
+                            <div class="flex items-center gap-2.5 min-w-0">
+                                ${cfg.icon}
+                                <span class="text-xs font-bold ${cfg.textColor} uppercase tracking-wider">${t(cfg.titleKey, cfg.defaultTitle)}</span>
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${cfg.badgeClass}">${items.length}</span>
                             </div>
-                            <i id="country-chevron-${ap.icao}" class="fa-solid ${isExpanded ? 'fa-chevron-down text-cyan-400' : 'fa-chevron-right text-slate-500'} text-xs group-hover:text-white transition-all shrink-0"></i>
+                            <i id="country-category-icon-${catKey}" class="fa-solid fa-chevron-down text-slate-500 text-xs transition-transform duration-200 shrink-0 ${isOpen ? 'rotate-0' : '-rotate-90'}"></i>
+                        </button>
+                        <div id="country-category-content-${catKey}" class="p-2 space-y-2 border-t border-slate-800/60 ${isOpen ? '' : 'hidden'}">
+                            ${items.map(ap => renderCountryAirportCard(ap)).join('')}
                         </div>
-                        ${accordionHtml}
                     </div>
                 `;
-            }).join('');
+            }).filter(Boolean).join('');
+
+            listEl.innerHTML = categoriesHtml;
         }
     }
 
@@ -1121,6 +1034,230 @@ function openCountryDrawer(iso, countryName) {
     if (drawer) drawer.classList.remove('translate-x-full');
 }
 
+const COUNTRY_CATEGORY_CONFIG = {
+    'Payware': {
+        key: 'Payware',
+        titleKey: 'filter.price_payware',
+        defaultTitle: 'Payware',
+        icon: '<i class="fa-solid fa-star text-xs text-purple-400"></i>',
+        badgeClass: 'bg-purple-600 text-white shadow-sm',
+        borderClass: 'border-purple-500/30',
+        headerHover: 'hover:bg-purple-950/30',
+        textColor: 'text-purple-300'
+    },
+    'Freeware': {
+        key: 'Freeware',
+        titleKey: 'filter.price_freeware',
+        defaultTitle: 'Freeware',
+        icon: '<i class="fa-solid fa-download text-xs text-cyan-400"></i>',
+        badgeClass: 'bg-cyan-600 text-white shadow-sm',
+        borderClass: 'border-cyan-500/30',
+        headerHover: 'hover:bg-cyan-950/30',
+        textColor: 'text-cyan-300'
+    },
+    'Asobo': {
+        key: 'Asobo',
+        titleKey: 'filter.price_asobo',
+        defaultTitle: 'Asobo Handcrafted',
+        icon: '<i class="fa-solid fa-crown text-xs text-amber-400"></i>',
+        badgeClass: 'bg-amber-500 text-slate-950 font-black shadow-sm',
+        borderClass: 'border-amber-500/30',
+        headerHover: 'hover:bg-amber-950/30',
+        textColor: 'text-amber-300'
+    },
+    'Default': {
+        key: 'Default',
+        titleKey: 'filter.price_default',
+        defaultTitle: 'Default MSFS',
+        icon: '<i class="fa-solid fa-plane text-xs text-blue-400"></i>',
+        badgeClass: 'bg-slate-800 text-slate-300 border border-slate-700 shadow-sm',
+        borderClass: 'border-slate-800',
+        headerHover: 'hover:bg-slate-800/40',
+        textColor: 'text-slate-300'
+    }
+};
+
+const COUNTRY_ACCORDION_DEFAULTS = {
+    'Payware': true,
+    'Freeware': true,
+    'Asobo': true,
+    'Default': false
+};
+
+function getCountryAccordionState(catKey) {
+    try {
+        const saved = JSON.parse(localStorage.getItem('sceneryx_country_accordions_v1') || '{}');
+        if (saved[catKey] !== undefined) return saved[catKey];
+    } catch (e) {}
+    return COUNTRY_ACCORDION_DEFAULTS[catKey] !== undefined ? COUNTRY_ACCORDION_DEFAULTS[catKey] : true;
+}
+
+function toggleCountryCategoryAccordion(catKey) {
+    const content = document.getElementById(`country-category-content-${catKey}`);
+    const icon = document.getElementById(`country-category-icon-${catKey}`);
+    if (!content) return;
+
+    const isHidden = content.classList.contains('hidden');
+    if (isHidden) {
+        content.classList.remove('hidden');
+        if (icon) {
+            icon.classList.remove('-rotate-90');
+            icon.classList.add('rotate-0');
+        }
+    } else {
+        content.classList.add('hidden');
+        if (icon) {
+            icon.classList.remove('rotate-0');
+            icon.classList.add('-rotate-90');
+        }
+    }
+
+    try {
+        const saved = JSON.parse(localStorage.getItem('sceneryx_country_accordions_v1') || '{}');
+        saved[catKey] = isHidden; // true if opened
+        localStorage.setItem('sceneryx_country_accordions_v1', JSON.stringify(saved));
+    } catch (e) {}
+}
+
+function getNormalizedPricingCategory(ap) {
+    if (!ap) return 'Default';
+    const pt = getAirportPricingType(ap);
+    if (pt === 'Payware') return 'Payware';
+    if (pt === 'Asobo') return 'Asobo';
+    if (pt === 'Default' || ap.pricing_type === 'Default' || ap.package_name === 'Default MSFS Base Airport') return 'Default';
+    return 'Freeware';
+}
+
+function renderCountryAirportCard(ap) {
+    const pt = getNormalizedPricingCategory(ap);
+    const isExpanded = (expandedCountryIcao === ap.icao);
+    let badgeHtml = '';
+    let borderClass = 'border-slate-800 hover:border-indigo-500/50';
+
+    if (pt === 'Payware') {
+        badgeHtml = `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-purple-600 text-white">${t('stat.payware', 'PAYWARE')}</span>`;
+        borderClass = isExpanded ? 'border-purple-400 bg-purple-950/40 shadow-lg shadow-purple-950/30' : 'border-purple-500/30 hover:border-purple-400 bg-purple-950/20';
+    } else if (pt === 'Freeware') {
+        badgeHtml = `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-cyan-600 text-white">${t('stat.freeware', 'FREEWARE')}</span>`;
+        borderClass = isExpanded ? 'border-cyan-400 bg-cyan-950/40 shadow-lg shadow-cyan-950/30' : 'border-cyan-500/30 hover:border-cyan-400 bg-cyan-950/20';
+    } else if (pt === 'Asobo') {
+        badgeHtml = `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-500 text-slate-950 font-black">${t('stat.asobo', 'ASOBO')}</span>`;
+        borderClass = isExpanded ? 'border-amber-400 bg-amber-950/40 shadow-lg shadow-amber-950/30' : 'border-amber-500/30 hover:border-amber-400 bg-amber-950/20';
+    } else {
+        badgeHtml = `<span class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-800 text-slate-300 border border-slate-700">${t('stat.default', 'DEFAULT')}</span>`;
+        borderClass = isExpanded ? 'border-blue-400 bg-blue-950/40 shadow-lg shadow-blue-950/30' : 'border-slate-800 hover:border-slate-700 bg-slate-900/60';
+    }
+
+    const vendorStr = ap.vendor || (ap.is_asobo_official ? 'Microsoft / Asobo' : 'Community');
+    const activeSrc = getActiveSource(ap);
+    const safeFolder = activeSrc ? (activeSrc.folder_name || '') : (ap.package_name || '');
+    const sizeStr = (activeSrc && activeSrc.size_str) ? activeSrc.size_str : (ap.size_str || '');
+
+    let accordionHtml = '';
+    const sources = ap.all_sources || [];
+    const fsToSearchUrl = `https://flightsim.to/search?q=${encodeURIComponent(ap.icao)}&cat=airports,scenery&exclude_cat=static-aircraft,gsx-pro&sim=msfs2020,msfs2024`;
+
+    let rowsHtml = '';
+    if (sources.length > 0) {
+        rowsHtml = sources.map(s => {
+            const isInst = !s.is_disabled;
+            const devName = s.vendor || (s.is_asobo_official ? 'Microsoft / Asobo' : 'Community');
+            const sPt = s.pricing_type || (s.is_payware ? 'Payware' : (s.is_asobo_official ? 'Asobo' : 'Freeware'));
+            let pBadge = '';
+            if (sPt === 'Payware') pBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-purple-600 text-white">PAYWARE</span>`;
+            else if (sPt === 'Asobo') pBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-500 text-slate-950 font-black">ASOBO</span>`;
+            else if (sPt === 'Default' || ap.pricing_type === 'Default') pBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-slate-800 text-slate-300 border border-slate-700">DEFAULT</span>`;
+            else pBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-cyan-600 text-white">FREEWARE</span>`;
+
+            return `
+                <div onclick="event.stopPropagation(); ${sPt === 'Payware' ? `openPaywareStoresModal('${ap.icao}', '${(ap.name || '').replace(/'/g, "\\'")}')` : `window.open('${fsToSearchUrl}', '_blank')`}"
+                     class="flex items-center justify-between p-2 rounded-lg bg-slate-900/70 hover:bg-slate-800/80 border border-slate-800/80 cursor-pointer transition-all group">
+                    <div class="flex items-center gap-2 min-w-0 flex-1">
+                        <span class="text-xs font-mono font-black text-cyan-300 shrink-0">${ap.icao}</span>
+                        <span class="text-xs font-bold text-slate-200 group-hover:text-white truncate min-w-0">${devName}</span>
+                        ${pBadge}
+                    </div>
+                    <div class="shrink-0 pl-2">
+                        ${isInst ? '<i class="fa-solid fa-circle-check text-emerald-400 text-sm" title="Installed"></i>' : '<i class="fa-regular fa-circle text-slate-600 text-sm group-hover:text-slate-400" title="Not Installed"></i>'}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    } else {
+        rowsHtml = `
+            <div onclick="event.stopPropagation(); window.open('${fsToSearchUrl}', '_blank')"
+                 class="flex items-center justify-between p-2 rounded-lg bg-slate-900/70 hover:bg-slate-800/80 border border-slate-800/80 cursor-pointer transition-all group">
+                <div class="flex items-center gap-2 min-w-0 flex-1">
+                    <span class="text-xs font-mono font-black text-cyan-300 shrink-0">${ap.icao}</span>
+                    <span class="text-xs font-bold text-slate-300 group-hover:text-white truncate min-w-0">Microsoft / Asobo (Default)</span>
+                    <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-slate-800 text-slate-400 border border-slate-700">DEFAULT</span>
+                </div>
+                <div class="shrink-0 pl-2">
+                    <i class="fa-solid fa-circle-check text-emerald-400 text-sm" title="Installed Base Airport"></i>
+                </div>
+            </div>
+        `;
+    }
+
+    const freewareSearchRow = `
+        <div onclick="event.stopPropagation(); window.open('${fsToSearchUrl}', '_blank')"
+             class="flex items-center justify-between p-2 rounded-lg bg-slate-900/40 hover:bg-slate-800/60 border border-slate-800/50 cursor-pointer transition-all group opacity-85 hover:opacity-100">
+            <div class="flex items-center gap-2 min-w-0 flex-1">
+                <span class="text-xs font-mono font-black text-slate-400 shrink-0">${ap.icao}</span>
+                <span class="text-xs font-semibold text-slate-400 group-hover:text-cyan-300 truncate min-w-0">${t('country.search_freeware', 'Search Freeware on Flightsim.to')}</span>
+                <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">FREEWARE</span>
+            </div>
+            <div class="shrink-0 pl-2">
+                <i class="fa-regular fa-circle text-slate-600 text-sm group-hover:text-cyan-400" title="Search Freeware"></i>
+            </div>
+        </div>
+    `;
+
+    const safeAirportName = (ap.name || '').replace(/'/g, "\\'");
+    const paywareSearchRow = `
+        <div onclick="event.stopPropagation(); openPaywareStoresModal('${ap.icao}', '${safeAirportName}')"
+             class="flex items-center justify-between p-2 rounded-lg bg-slate-900/40 hover:bg-slate-800/60 border border-slate-800/50 cursor-pointer transition-all group opacity-85 hover:opacity-100">
+            <div class="flex items-center gap-2 min-w-0 flex-1">
+                <span class="text-xs font-mono font-black text-slate-400 shrink-0">${ap.icao}</span>
+                <span class="text-xs font-semibold text-slate-400 group-hover:text-purple-300 truncate min-w-0">${t('country.search_payware', 'Search Payware Stores')}</span>
+                <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20">PAYWARE</span>
+            </div>
+            <div class="shrink-0 pl-2">
+                <i class="fa-regular fa-circle text-slate-600 text-sm group-hover:text-purple-400" title="Search Payware Stores"></i>
+            </div>
+        </div>
+    `;
+
+    accordionHtml = `
+        <div id="country-accordion-${ap.icao}" class="mt-2.5 pt-2.5 border-t border-slate-800/80 ${isExpanded ? '' : 'hidden'}">
+            <div class="p-2 rounded-xl bg-slate-950/80 border border-slate-800/80 space-y-1.5 font-mono">
+                ${rowsHtml}
+                ${freewareSearchRow}
+                ${paywareSearchRow}
+            </div>
+        </div>
+    `;
+
+    return `
+        <div id="country-ap-card-${ap.icao}"
+             onclick="selectCountryAirport('${ap.icao}')" 
+             class="p-3 rounded-xl bg-slate-900/90 border ${borderClass} shadow-md hover:bg-slate-850 cursor-pointer transition-all flex flex-col gap-1 group">
+            <div class="flex items-center justify-between gap-2.5 min-w-0">
+                <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2 mb-0.5">
+                        <span class="text-xs font-mono font-black text-white group-hover:text-cyan-300 transition-colors">${ap.icao}</span>
+                        ${badgeHtml}
+                    </div>
+                    <h4 class="text-xs font-extrabold text-slate-200 truncate group-hover:text-white leading-tight">${ap.name}</h4>
+                    <p class="text-[10px] font-medium text-slate-400 truncate mt-0.5">${ap.city || 'Unknown City'} • <span class="text-slate-300 font-semibold">${vendorStr}</span></p>
+                </div>
+                <i id="country-chevron-${ap.icao}" class="fa-solid ${isExpanded ? 'fa-chevron-down text-cyan-400' : 'fa-chevron-right text-slate-500'} text-xs group-hover:text-white transition-all shrink-0"></i>
+            </div>
+            ${accordionHtml}
+        </div>
+    `;
+}
+
 let expandedCountryIcao = null;
 
 function selectCountryAirport(icao) {
@@ -1129,6 +1266,23 @@ function selectCountryAirport(icao) {
     if (!ap) return;
 
     centerMapOnAirport(ap, 8);
+
+    // Ensure category accordion containing this airport is open
+    const cat = getNormalizedPricingCategory(ap);
+    const catContent = document.getElementById(`country-category-content-${cat}`);
+    const catIcon = document.getElementById(`country-category-icon-${cat}`);
+    if (catContent && catContent.classList.contains('hidden')) {
+        catContent.classList.remove('hidden');
+        if (catIcon) {
+            catIcon.classList.remove('-rotate-90');
+            catIcon.classList.add('rotate-0');
+        }
+        try {
+            const saved = JSON.parse(localStorage.getItem('sceneryx_country_accordions_v1') || '{}');
+            saved[cat] = true;
+            localStorage.setItem('sceneryx_country_accordions_v1', JSON.stringify(saved));
+        } catch (e) {}
+    }
 
     const targetCard = document.getElementById(`country-ap-card-${icao}`);
     const accordionEl = document.getElementById(`country-accordion-${icao}`);
