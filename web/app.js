@@ -2550,8 +2550,12 @@ function updateFlightPlanningBannerUI() {
             if (!flightPlanningDestination) {
                 guideText.innerText = `Alt+Click an airport to set Destination`;
             } else {
-                const totalAirfields = currentlyFilteredAirports.length;
-                guideText.innerText = `Corridor active: ${flightPlanningDeparture.icao} ➔ ${flightPlanningDestination.icao} (${totalAirfields} Addon Sceneries En-Route)`;
+                const enRouteAddons = currentlyFilteredAirports.filter(a => {
+                    if (flightPlanningDeparture && a.icao === flightPlanningDeparture.icao) return hasCustomAddonSources(a);
+                    if (flightPlanningDestination && a.icao === flightPlanningDestination.icao) return hasCustomAddonSources(a);
+                    return true;
+                });
+                guideText.innerText = `Corridor active: ${flightPlanningDeparture.icao} ➔ ${flightPlanningDestination.icao} (${enRouteAddons.length} Addon Sceneries En-Route)`;
             }
         }
     } else {
@@ -2906,7 +2910,13 @@ function renderFlightCorridor() {
     filterAirports();
 
     // Count custom addon sceneries along corridor (only Payware, Freeware, Asobo)
-    const addonCount = currentlyFilteredAirports.length;
+    const addonAirports = currentlyFilteredAirports.filter(a => {
+        if (a.icao === dep.icao || a.icao === arr.icao) {
+            return hasCustomAddonSources(a);
+        }
+        return true;
+    });
+    const addonCount = addonAirports.length;
     const etopsCount = currentlyFilteredAirports.filter(a => (typeof GLOBAL_ETOPS_ALTERNATES !== 'undefined' && GLOBAL_ETOPS_ALTERNATES[a.icao])).length;
 
     const isTransoceanic = distKm > 2000;
@@ -2918,6 +2928,9 @@ function renderFlightCorridor() {
     }
 
     showToast(corridorMsg, 'success');
+
+    // Update floating banner UI with the accurate filtered count
+    updateFlightPlanningBannerUI();
 
     // Smoothly zoom map to fit both departure & arrival airports
     map.fitBounds(arcPts, { padding: [60, 60], animate: true });
@@ -4477,7 +4490,17 @@ function filterAirports() {
 
         // Active Flight Corridor Filter (Alt + Click)
         if (selectedAirport && flightCorridorArrivalAirport) {
-            // Flight Corridor Optimizer: Only display custom addon sceneries (Payware, Freeware, Asobo).
+            const isCorridorEndpoint = (ap.icao === selectedAirport.icao || ap.icao === flightCorridorArrivalAirport.icao);
+
+            if (isCorridorEndpoint) {
+                // EXCEPTION TO THE RULE:
+                // Departure and Destination airports MUST ALWAYS remain visible on the map,
+                // even if they are Default MSFS procedural airports!
+                // They bypass all exclusion rules, pricing filters, and geographic restrictions.
+                return true;
+            }
+
+            // Flight Corridor Optimizer: For EN-ROUTE airports, only display custom addon sceneries (Payware, Freeware, Asobo).
             // Exclude all Default MSFS base procedural airports as they cannot and will never be disabled.
             const pt = getAirportPricingType(ap);
             if (pt === 'Default' || ap.pricing_type === 'Default' || ap.is_default || ap.package_name === 'Default MSFS Base Airport' || (ap.package_name && ap.package_name.startsWith('msfs-default-'))) {
@@ -4487,6 +4510,9 @@ function filterAirports() {
             if (!isAirportInCorridor(ap, selectedAirport, flightCorridorArrivalAirport)) {
                 return false;
             }
+        } else if (isFlightPlanningMode && flightPlanningDeparture && ap.icao === flightPlanningDeparture.icao) {
+            // While setting up flight plan (departure selected, waiting for arrival), keep departure airport visible
+            return true;
         }
 
         // Selected Country Overlay Filter
@@ -4643,6 +4669,20 @@ function filterAirports() {
                 }
             }
         });
+    }
+
+    // Exception to the rule: Always guarantee Departure & Destination endpoints are present on map
+    if (selectedAirport && flightCorridorArrivalAirport) {
+        if (!currentlyFilteredAirports.some(a => a.icao === selectedAirport.icao)) {
+            currentlyFilteredAirports.unshift(selectedAirport);
+        }
+        if (!currentlyFilteredAirports.some(a => a.icao === flightCorridorArrivalAirport.icao)) {
+            currentlyFilteredAirports.push(flightCorridorArrivalAirport);
+        }
+    } else if (isFlightPlanningMode && flightPlanningDeparture) {
+        if (!currentlyFilteredAirports.some(a => a.icao === flightPlanningDeparture.icao)) {
+            currentlyFilteredAirports.unshift(flightPlanningDeparture);
+        }
     }
 
     renderAirportsOnMap(currentlyFilteredAirports);
