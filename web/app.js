@@ -2610,9 +2610,9 @@ async function executeFlightCorridorOptimization() {
 
     // Immediate user feedback (0 ms latency)
     showCustomModal({
-        title: `Optimizing MSFS Sceneries (${modeLabel})... ⚡`,
+        title: '',
         message: `<div class="flex flex-col items-center justify-center py-2 text-center">` +
-                 `  <p class="text-sm text-slate-100 font-bold mb-1">Updating MSFS Scenery Library</p>` +
+                 `  <p class="text-sm text-slate-100 font-bold mb-1">Optimizing MSFS Scenery Library</p>` +
                  `  <p class="text-xs text-slate-400">Isolating non-flight sceneries & updating Content.xml...<br>Please wait a moment.</p>` +
                  `</div>`,
         type: 'loading'
@@ -6218,7 +6218,15 @@ function showCustomModal(titleOrObj, messageStr, typeStr = 'info') {
     const iconBg = document.getElementById('custom-modal-icon-bg');
     const iconEl = document.getElementById('custom-modal-icon');
 
-    if (titleEl) titleEl.innerText = title;
+    if (titleEl) {
+        if (title && title.trim().length > 0) {
+            titleEl.innerText = title;
+            titleEl.classList.remove('hidden');
+        } else {
+            titleEl.innerText = '';
+            titleEl.classList.add('hidden');
+        }
+    }
     if (msgEl) {
         if (typeof message === 'string' && (message.includes('<') || message.includes('\n'))) {
             msgEl.innerHTML = message.replace(/\n/g, '<br>');
