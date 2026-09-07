@@ -581,11 +581,14 @@ async function executeRestoreAllSceneries() {
     updateFlightOptimizerUI();
     filterAirports();
 
-    showCustomModal(
-        "Restoring All Sceneries...",
-        "Re-enabling all previously disabled scenery packages...",
-        "info"
-    );
+    showCustomModal({
+        title: 'Restoring MSFS Sceneries... ⚡',
+        message: `<div class="flex flex-col items-center justify-center py-2 text-center">` +
+                 `  <p class="text-sm text-slate-100 font-bold mb-1">Restoring Full Scenery Library</p>` +
+                 `  <p class="text-xs text-slate-400">Re-enabling all previously isolated sceneries and restoring Content.xml...<br>Please wait a moment.</p>` +
+                 `</div>`,
+        type: 'loading'
+    });
 
     try {
         if (window.pywebview) {
@@ -2665,7 +2668,15 @@ async function executeFlightCorridorOptimization() {
 }
 
 async function restoreFlightCorridorSceneries() {
-    showToast('Restoring all sceneries...', 'info');
+    showCustomModal({
+        title: 'Restoring MSFS Sceneries... ⚡',
+        message: `<div class="flex flex-col items-center justify-center py-2 text-center">` +
+                 `  <p class="text-sm text-slate-100 font-bold mb-1">Restoring Full Scenery Library</p>` +
+                 `  <p class="text-xs text-slate-400">Re-enabling all previously isolated sceneries and restoring Content.xml...<br>Please wait a moment.</p>` +
+                 `</div>`,
+        type: 'loading'
+    });
+
     try {
         if (window.pywebview && window.pywebview.api) {
             const apiFn = window.pywebview.api.restore_all_sceneries || window.pywebview.api.restore_all_flight_sceneries;
@@ -2683,7 +2694,15 @@ async function restoreFlightCorridorSceneries() {
                 updatePersistentFlightBannerUI({ active: false });
                 filterAirports();
 
-                showToast(`🟢 All sceneries restored (${res.re_enabled_count || 0} re-enabled)!`, 'success');
+                showCustomModal({
+                    title: 'Sceneries Restored Successfully! 🟢',
+                    message: `<div class="space-y-2 text-xs text-slate-300">` +
+                             `  <p>Successfully re-enabled <strong class="text-emerald-400">${res.re_enabled_count || 0} scenery packages</strong>.</p>` +
+                             `  <p>Your full MSFS scenery library has been restored to its active state.</p>` +
+                             `</div>`,
+                    type: 'success',
+                    confirmText: 'OK'
+                });
             } else {
                 showCustomModal('Restore Error', res.message || 'Failed to restore sceneries.', 'error');
             }
@@ -6518,6 +6537,16 @@ function updateFlightModeBannerUI(flightMode) {
 
 function restoreAllFlightSceneriesUI() {
     if (!window.pywebview) return;
+
+    showCustomModal({
+        title: 'Restoring MSFS Sceneries... ⚡',
+        message: `<div class="flex flex-col items-center justify-center py-2 text-center">` +
+                 `  <p class="text-sm text-slate-100 font-bold mb-1">Restoring Full Scenery Library</p>` +
+                 `  <p class="text-xs text-slate-400">Re-enabling all previously isolated sceneries and restoring Content.xml...<br>Please wait a moment.</p>` +
+                 `</div>`,
+        type: 'loading'
+    });
+
     const apiFn = window.pywebview.api.restore_all_sceneries || window.pywebview.api.restore_all_flight_sceneries;
     apiFn.call(window.pywebview.api).then(resStr => {
         try {
