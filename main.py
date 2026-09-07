@@ -158,17 +158,19 @@ def fast_update_airport_cache(icao_target, target_pkg_name=None, toggle_all=Fals
                 s['folder_name'] = fn[:-9] if fn.lower().endswith('.disabled') else fn
         elif target_pkg_name:
             t_clean = target_pkg_name[:-9] if target_pkg_name.lower().endswith('.disabled') else target_pkg_name
+            t_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', t_clean.lower())
             for s in all_srcs:
                 if s.get('is_fix_patch') or s.get('is_addon'):
                     continue
                 fn = s.get('folder_name', '')
                 fn_clean = fn[:-9] if fn.lower().endswith('.disabled') else fn
+                fn_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn_clean.lower())
                 s['folder_name'] = fn_clean
                 p = s.get('package_path', '')
                 clean_p = p[:-9] if p and p.endswith('.disabled') else p
                 dis_p = clean_p + '.disabled' if clean_p else None
 
-                if fn_clean.lower() == t_clean.lower() or t_clean.lower() in fn_clean.lower():
+                if fn_clean.lower() == t_clean.lower() or fn_norm == t_norm:
                     s['is_disabled'] = False
                     if clean_p:
                         s['package_path'] = clean_p
@@ -1138,23 +1140,31 @@ class Api:
                 changed = False
                 seen = set()
                 to_remove = []
+                folder_to_icaos, _ = get_folder_to_icaos_map()
+                target_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', target_clean.lower())
 
                 for p in list(root.findall('Package')):
                     name = p.get('name', '')
                     clean = name[:-9] if name.lower().endswith('.disabled') else name
+                    clean_lower = clean.lower()
+                    clean_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_lower)
                     p.set('name', clean)
 
-                    if clean.lower() in seen:
+                    if clean_lower in seen:
                         to_remove.append(p)
                         changed = True
                         continue
-                    seen.add(clean.lower())
+                    seen.add(clean_lower)
 
-                    if target_clean != 'DEFAULT' and (clean.lower() == target_clean.lower() or target_clean.lower() in clean.lower()):
-                        p.set('active', 'Activated')
-                        changed = True
-                    elif icao.lower() in clean.lower():
-                        p.set('active', 'UserDisabled')
+                    pkg_icaos = folder_to_icaos.get(clean_lower) or folder_to_icaos.get(clean_norm) or resolve_package_icaos(clean_norm)
+                    is_pkg_for_icao = (icao.upper() in [k.upper() for k in (pkg_icaos or [])]) or (icao.lower() in clean_lower)
+
+                    if is_pkg_for_icao:
+                        is_target = (target_clean != 'DEFAULT') and (clean_lower == target_clean.lower() or clean_norm == target_norm)
+                        if is_target:
+                            p.set('active', 'Activated')
+                        else:
+                            p.set('active', 'UserDisabled')
                         changed = True
 
                 for p in to_remove:
@@ -1167,14 +1177,17 @@ class Api:
                 scanned_airports = json.load(f)
             ap_obj = next((a for a in scanned_airports if a['icao'].upper() == icao.upper()), None)
             if ap_obj and ap_obj.get('all_sources'):
+                target_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', target_clean.lower())
                 for src in ap_obj['all_sources']:
                     if src.get('is_fix_patch') or src.get('is_addon'):
                         continue
                     fn = src.get('folder_name', '')
                     pkg_p = src.get('package_path', '')
                     fn_clean = fn[:-9] if fn.lower().endswith('.disabled') else fn
+                    fn_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn_clean.lower())
 
-                    if target_clean != 'DEFAULT' and (fn_clean.lower() == target_clean.lower() or target_clean.lower() in fn_clean.lower()):
+                    is_target = (target_clean != 'DEFAULT') and (fn_clean.lower() == target_clean.lower() or fn_norm == target_norm)
+                    if is_target:
                         set_package_state_for_icao(pkg_p, icao, should_enable=True)
                     else:
                         set_package_state_for_icao(pkg_p, icao, should_enable=False)
