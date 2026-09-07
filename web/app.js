@@ -582,7 +582,7 @@ async function executeRestoreAllSceneries() {
     filterAirports();
 
     showCustomModal({
-        title: 'Restoring MSFS Sceneries... ⚡',
+        title: '',
         message: `<div class="flex flex-col items-center justify-center py-2 text-center">` +
                  `  <p class="text-sm text-slate-100 font-bold mb-1">Restoring Full Scenery Library</p>` +
                  `  <p class="text-xs text-slate-400">Re-enabling all previously isolated sceneries and restoring Content.xml...<br>Please wait a moment.</p>` +
@@ -2669,7 +2669,7 @@ async function executeFlightCorridorOptimization() {
 
 async function restoreFlightCorridorSceneries() {
     showCustomModal({
-        title: 'Restoring MSFS Sceneries... ⚡',
+        title: '',
         message: `<div class="flex flex-col items-center justify-center py-2 text-center">` +
                  `  <p class="text-sm text-slate-100 font-bold mb-1">Restoring Full Scenery Library</p>` +
                  `  <p class="text-xs text-slate-400">Re-enabling all previously isolated sceneries and restoring Content.xml...<br>Please wait a moment.</p>` +
@@ -6190,7 +6190,7 @@ function showCustomModal(titleOrObj, messageStr, typeStr = 'info') {
     let showCancel = false;
 
     if (typeof titleOrObj === 'object' && titleOrObj !== null) {
-        title = titleOrObj.title || 'Notification';
+        title = titleOrObj.title !== undefined ? titleOrObj.title : '';
         message = titleOrObj.message || '';
         type = titleOrObj.type || 'info';
         confirmText = titleOrObj.confirmText || 'OK';
@@ -6199,7 +6199,7 @@ function showCustomModal(titleOrObj, messageStr, typeStr = 'info') {
         customModalConfirmCallback = titleOrObj.onConfirm || null;
         customModalCancelCallback = titleOrObj.onCancel || null;
     } else {
-        title = titleOrObj || 'Notification';
+        title = titleOrObj !== undefined && titleOrObj !== null ? titleOrObj : '';
         message = messageStr || '';
         type = typeStr || 'info';
         customModalConfirmCallback = null;
@@ -6546,7 +6546,7 @@ function restoreAllFlightSceneriesUI() {
     if (!window.pywebview) return;
 
     showCustomModal({
-        title: 'Restoring MSFS Sceneries... ⚡',
+        title: '',
         message: `<div class="flex flex-col items-center justify-center py-2 text-center">` +
                  `  <p class="text-sm text-slate-100 font-bold mb-1">Restoring Full Scenery Library</p>` +
                  `  <p class="text-xs text-slate-400">Re-enabling all previously isolated sceneries and restoring Content.xml...<br>Please wait a moment.</p>` +
