@@ -61,9 +61,22 @@ def get_folder_to_icaos_map(airports=None):
                 if fn:
                     fn_clean = fn[:-9] if fn.endswith('.disabled') else fn
                     fn_clean_lower = fn_clean.lower()
+                    fn_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn_clean_lower)
+
                     folder_to_icaos.setdefault(fn_clean_lower, set()).add(icao)
+                    folder_to_icaos.setdefault(fn_norm, set()).add(icao)
+                    folder_to_icaos.setdefault(f"fs20-{fn_norm}", set()).add(icao)
+                    folder_to_icaos.setdefault(f"fs24-{fn_norm}", set()).add(icao)
+                    folder_to_icaos.setdefault(f"communityfs20-{fn_norm}", set()).add(icao)
+                    folder_to_icaos.setdefault(f"communityfs24-{fn_norm}", set()).add(icao)
+
                     if pricing not in ['Asobo', 'Default'] and not src.get('is_asobo_official') and not src.get('is_default'):
                         third_party_airport_pkgs.add(fn_clean_lower)
+                        third_party_airport_pkgs.add(fn_norm)
+                        third_party_airport_pkgs.add(f"fs20-{fn_norm}")
+                        third_party_airport_pkgs.add(f"fs24-{fn_norm}")
+                        third_party_airport_pkgs.add(f"communityfs20-{fn_norm}")
+                        third_party_airport_pkgs.add(f"communityfs24-{fn_norm}")
 
     return folder_to_icaos, third_party_airport_pkgs
 
