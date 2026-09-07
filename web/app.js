@@ -1523,6 +1523,7 @@ async function loadAirportsData() {
                     const st = currentSettings.settings || currentSettings;
                     if (st && st.flight_mode) {
                         updateFlightModeBannerUI(st.flight_mode);
+                        updatePersistentFlightBannerUI(st.flight_mode);
                     }
                 }
             } catch(e) {
@@ -2604,7 +2605,15 @@ async function executeFlightCorridorOptimization() {
     const keepIcaos = Array.from(keepIcaosSet);
     const modeLabel = flightCorridorProfile === 'CORRIDOR' ? 'Corridor Mode' : 'Direct Mode';
 
-    showToast(`⚡ Optimizing MSFS Sceneries (${modeLabel})...`, 'info');
+    // Immediate user feedback (0 ms latency)
+    showCustomModal({
+        title: `Optimisation en cours (${modeLabel})... ⚡`,
+        message: `<div class="flex flex-col items-center justify-center py-2 text-center">` +
+                 `  <p class="text-sm text-slate-100 font-bold mb-1">Mise à jour de la bibliothèque MSFS</p>` +
+                 `  <p class="text-xs text-slate-400">Isolation des scènes hors vol et mise à jour de Content.xml...<br>Veuillez patienter quelques instants.</p>` +
+                 `</div>`,
+        type: 'loading'
+    });
 
     try {
         if (window.pywebview && window.pywebview.api) {
@@ -2622,24 +2631,36 @@ async function executeFlightCorridorOptimization() {
                 updateFlightPlanningBannerUI();
                 filterAirports();
 
-                showCustomModal(
-                    'MSFS Sceneries Optimized 🚀',
-                    `Profile: ${modeLabel}\n\n` +
-                    `• Active flight route: ${dep.icao} ➔ ${arr.icao}\n` +
-                    `• Kept active: ${keepIcaos.length} sceneries\n` +
-                    `• Disabled for performance: ${flightCorridorDisabledCount} non-flight sceneries\n\n` +
-                    `MSFS Content.xml & Community folder updated for maximum FPS and 0 stutters!`,
-                    'success'
-                );
+                const guideHtml = 
+                    `<div class="space-y-3">` +
+                    `  <div class="text-xs text-slate-300 space-y-1">` +
+                    `    <div>• <strong>Route de vol :</strong> ${dep.icao} ➔ ${arr.icao} (${modeLabel})</div>` +
+                    `    <div>• <strong>Scènes conservées :</strong> ${keepIcaos.length} aéroports actifs</div>` +
+                    `    <div>• <strong>Scènes isolées :</strong> <span class="text-emerald-400 font-bold">${flightCorridorDisabledCount} scènes</span> neutralisées pour le max de FPS</div>` +
+                    `  </div>` +
+                    `  <div class="p-3 bg-slate-900/90 rounded-xl border border-emerald-500/30 text-xs text-slate-300 space-y-1.5">` +
+                    `    <div class="font-bold text-amber-300 flex items-center gap-1.5"><i class="fa-solid fa-compass text-amber-400"></i> Instructions pour votre vol :</div>` +
+                    `    <div>1. Lancez <strong>MSFS</strong> : seules vos scènes de vol seront actives.</div>` +
+                    `    <div>2. Vous pouvez <strong>réduire ou fermer SceneryX</strong> pendant toute la durée de votre vol.</div>` +
+                    `    <div>3. À votre retour, cliquez simplement sur <strong>Restaurer</strong> pour retrouver tous vos aéroports.</div>` +
+                    `  </div>` +
+                    `</div>`;
+
+                showCustomModal({
+                    title: 'Vol Optimisé avec Succès ! 🚀',
+                    message: guideHtml,
+                    type: 'success',
+                    confirmText: 'Compris, bon vol !'
+                });
             } else {
-                showCustomModal('Optimization Error', res.message || 'Failed to optimize sceneries.', 'error');
+                showCustomModal('Erreur d\'optimisation', res.message || 'Échec de l\'optimisation des scènes.', 'error');
             }
         } else {
-            showToast('PyWebView API not available in browser preview.', 'warning');
+            showToast('PyWebView API non disponible en prévisualisation navigateur.', 'warning');
         }
     } catch (err) {
         console.error('Flight corridor optimization error:', err);
-        showCustomModal('Optimization Error', String(err), 'error');
+        showCustomModal('Erreur d\'optimisation', String(err), 'error');
     }
 }
 
@@ -2659,6 +2680,7 @@ async function restoreFlightCorridorSceneries() {
                 }
 
                 updateFlightPlanningBannerUI();
+                updatePersistentFlightBannerUI({ active: false });
                 filterAirports();
 
                 showToast(`🟢 All sceneries restored (${res.re_enabled_count || 0} re-enabled)!`, 'success');
@@ -2775,13 +2797,46 @@ function updateFlightPlanningBannerUI() {
     }
 }
 
-function exitFlightPlanningMode() {
-    if (!isFlightPlanningMode) return;
+function updatePersistentFlightBannerUI(flightMode) {
+    const banner = document.getElementById('persistent-flight-mode-banner');
+    if (!banner) return;
 
-    if (isFlightCorridorOptimized) {
-        restoreFlightCorridorSceneries();
+    const isActive = flightMode && flightMode.active;
+    if (isActive) {
+        const routeEl = document.getElementById('persistent-flight-route');
+        const countEl = document.getElementById('persistent-flight-count');
+        if (routeEl && flightMode.icaos && flightMode.icaos.length > 0) {
+            routeEl.innerText = flightMode.icaos.join(' ➔ ');
+        }
+        if (countEl) {
+            countEl.innerText = `${flightMode.disabled_count || 0} scènes isolées`;
+        }
+        banner.classList.remove('hidden');
+        banner.classList.add('flex');
+    } else {
+        banner.classList.add('hidden');
+        banner.classList.remove('flex');
     }
+}
 
+function closePlanningBannerKeepOptimization() {
+    const depIcao = flightPlanningDeparture?.icao || '';
+    const arrIcao = flightPlanningDestination?.icao || '';
+    const count = flightCorridorDisabledCount || 0;
+
+    isFlightPlanningMode = false;
+    clearFlightCorridor();
+    updateFlightPlanningBannerUI();
+
+    updatePersistentFlightBannerUI({
+        active: true,
+        icaos: [depIcao, arrIcao].filter(Boolean),
+        disabled_count: count
+    });
+    showToast('Mode Vol Actif — Simulateur prêt pour le vol !', 'success');
+}
+
+function closePlanningBannerClean() {
     isFlightPlanningMode = false;
     flightPlanningDeparture = null;
     flightPlanningDestination = null;
@@ -2791,7 +2846,39 @@ function exitFlightPlanningMode() {
 
     clearFlightCorridor();
     updateFlightPlanningBannerUI();
-    showToast('Flight Planning Mode OFF', 'info');
+    updatePersistentFlightBannerUI({ active: false });
+    showToast('Mode Planification désactivé', 'info');
+}
+
+function exitFlightPlanningMode(forceRestore = false) {
+    if (!isFlightPlanningMode) return;
+
+    if (isFlightCorridorOptimized && !forceRestore) {
+        const depIcao = flightPlanningDeparture?.icao || '';
+        const arrIcao = flightPlanningDestination?.icao || '';
+        showCustomModal({
+            title: 'Quitter la Planification ? ✈',
+            message: `<div class="space-y-2 text-xs text-slate-300">` +
+                     `  <p>Votre simulateur est actuellement optimisé pour le vol <strong>${depIcao} ➔ ${arrIcao}</strong> (<span class="text-emerald-400 font-bold">${flightCorridorDisabledCount} scènes isolées</span>).</p>` +
+                     `  <p>Que souhaitez-vous faire ?</p>` +
+                     `</div>`,
+            type: 'info',
+            confirmText: 'Garder l\'optimisation (Mode Vol)',
+            cancelText: 'Tout restaurer maintenant',
+            showCancel: true,
+            onConfirm: () => {
+                closePlanningBannerKeepOptimization();
+            },
+            onCancel: () => {
+                restoreFlightCorridorSceneries().then(() => {
+                    closePlanningBannerClean();
+                });
+            }
+        });
+        return;
+    }
+
+    closePlanningBannerClean();
 }
 
 // Global keyboard listener to exit Flight Planning Mode on Escape
@@ -6114,17 +6201,35 @@ function showCustomModal(titleOrObj, messageStr, typeStr = 'info') {
     const iconEl = document.getElementById('custom-modal-icon');
 
     if (titleEl) titleEl.innerText = title;
-    if (msgEl) msgEl.innerText = message;
-    if (confirmBtn) confirmBtn.innerText = confirmText;
-    if (cancelBtn) {
-        cancelBtn.innerText = cancelText;
-        cancelBtn.classList.toggle('hidden', !showCancel);
+    if (msgEl) {
+        if (typeof message === 'string' && (message.includes('<') || message.includes('\n'))) {
+            msgEl.innerHTML = message.replace(/\n/g, '<br>');
+        } else {
+            msgEl.innerText = message;
+        }
+    }
+
+    if (type === 'loading') {
+        if (confirmBtn) confirmBtn.classList.add('hidden');
+        if (cancelBtn) cancelBtn.classList.add('hidden');
+    } else {
+        if (confirmBtn) {
+            confirmBtn.innerText = confirmText;
+            confirmBtn.classList.remove('hidden');
+        }
+        if (cancelBtn) {
+            cancelBtn.innerText = cancelText;
+            cancelBtn.classList.toggle('hidden', !showCancel);
+        }
     }
 
     if (iconBg && iconEl) {
         iconBg.className = "w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-inner ";
         iconEl.className = "fa-solid text-lg ";
-        if (type === 'success') {
+        if (type === 'loading') {
+            iconBg.classList.add('bg-emerald-500/10', 'border', 'border-emerald-500/30');
+            iconEl.className = "fa-solid fa-spinner fa-spin text-lg text-emerald-400";
+        } else if (type === 'success') {
             iconBg.classList.add('bg-emerald-500/10', 'border', 'border-emerald-500/20');
             iconEl.classList.add('fa-circle-check', 'text-emerald-400');
         } else if (type === 'error') {
@@ -6422,7 +6527,10 @@ function restoreAllFlightSceneriesUI() {
                     allAirportsData = res.airports;
                 }
                 isFlightOptimizerActive = false;
+                isFlightCorridorOptimized = false;
                 updateFlightModeBannerUI({ active: false, icaos: [] });
+                updatePersistentFlightBannerUI({ active: false });
+                updateFlightPlanningBannerUI();
                 filterAirports();
                 showCustomModal(
                     'Sceneries Restored 🟢',

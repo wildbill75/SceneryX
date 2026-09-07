@@ -487,6 +487,24 @@
         <main class="flex-1 relative">
             <div id="map" class="w-full h-full z-10 bg-slate-950"></div>
 
+            <!-- PERSISTENT TOP FLIGHT MODE BANNER (Shown when Flight Mode is active outside planning drawer) -->
+            <div id="persistent-flight-mode-banner" class="hidden absolute top-4 left-1/2 -translate-x-1/2 z-[1002] bg-slate-900/95 backdrop-blur-xl border border-emerald-500/50 px-4 py-2 rounded-2xl shadow-2xl shadow-black/80 items-center gap-3.5 transition-all select-none">
+                <div class="relative flex h-2.5 w-2.5 shrink-0">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                </div>
+                <div class="flex items-center gap-2 text-xs font-mono">
+                    <span class="font-extrabold text-emerald-400 uppercase tracking-wider">FLIGHT MODE ACTIVE:</span>
+                    <span id="persistent-flight-route" class="font-black text-white">DEP ➔ ARR</span>
+                    <span class="text-slate-600">•</span>
+                    <span id="persistent-flight-count" class="text-slate-300 font-medium">0 sceneries isolated</span>
+                </div>
+                <button onclick="restoreAllFlightSceneriesUI()" class="ml-1 px-3 py-1 rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 text-amber-300 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-sm" title="Restore all sceneries back to normal">
+                    <i class="fa-solid fa-rotate-left text-amber-400 text-xs"></i>
+                    <span>Restore Library</span>
+                </button>
+            </div>
+
             <!-- FLOATING FLIGHT PLANNING BANNER (ACTIVATED VIA ALT+CLICK, DRAGGABLE) -->
             <div id="flight-planning-banner" class="hidden absolute z-[1000] glass-panel bg-slate-900/95 border border-purple-500/60 px-4 py-2.5 rounded-2xl shadow-2xl shadow-purple-950/60 items-center gap-3.5 select-none cursor-grab active:cursor-grabbing pointer-events-auto transition-shadow hover:shadow-purple-500/20">
                 <!-- DRAG HANDLE GRIP -->
