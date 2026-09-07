@@ -67,7 +67,15 @@ def get_folder_to_icaos_map(airports=None):
 
     return folder_to_icaos, third_party_airport_pkgs
 
-def update_msfs_content_xml(keep_icaos=None, restore_all=False, folder_to_icaos=None, third_party_airport_pkgs=None):
+def is_core_or_library_package(pkg_name):
+    nl = pkg_name.lower()
+    return any(k in nl for k in [
+        'modellib', 'commonlibrary', 'projectairports', 'genericairports',
+        'travelbook', 'worlddiscovery', 'bush-trip', 'activities',
+        'instruments', 'navdata', 'fs-base'
+    ])
+
+def update_msfs_content_xml(keep_icaos=None, restore_flight_mode=False, flight_disabled_xml=None, flight_added_xml=None, folder_to_icaos=None, third_party_airport_pkgs=None, all_airports=None):
     local_appdata = os.getenv('LOCALAPPDATA', '')
     appdata = os.getenv('APPDATA', '')
 
@@ -86,7 +94,34 @@ def update_msfs_content_xml(keep_icaos=None, restore_all=False, folder_to_icaos=
                 content_xml_paths.insert(0, found_xml)
 
     if folder_to_icaos is None or third_party_airport_pkgs is None:
-        folder_to_icaos, third_party_airport_pkgs = get_folder_to_icaos_map()
+        folder_to_icaos, third_party_airport_pkgs = get_folder_to_icaos_map(all_airports)
+
+    def get_package_icaos(pkg_name):
+        clean = pkg_name[:-9] if pkg_name.endswith('.disabled') else pkg_name
+        clean_lower = clean.lower()
+        norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_lower)
+
+        icaos = folder_to_icaos.get(clean_lower) or folder_to_icaos.get(norm)
+        if icaos:
+            return set(icaos)
+
+        res = resolve_package_icaos(clean) or resolve_package_icaos(norm)
+        if res:
+            return set(res)
+
+        m = re.search(r'[-_]airport[-_]([a-z0-9]{3,4})([-_]|$)', clean_lower)
+        if m:
+            return {m.group(1).upper()}
+
+        if clean_lower in third_party_airport_pkgs or norm in third_party_airport_pkgs:
+            return {'AIRPORT_UNKNOWN'}
+
+        return set()
+
+    flight_disabled_set = set(flight_disabled_xml or [])
+    flight_added_set = set(flight_added_xml or [])
+    disabled_xml_packages = set()
+    added_xml_packages = set()
 
     target_icaos = set(k.upper() for k in (keep_icaos or []))
 
@@ -99,37 +134,80 @@ def update_msfs_content_xml(keep_icaos=None, restore_all=False, folder_to_icaos=
                 content = f.read()
 
             tree = ET.fromstring(content)
+            changed = False
 
-            for elem in tree.findall('Package'):
-                name = elem.get('name', '')
-                name_clean = name[:-9] if name.endswith('.disabled') else name
-                name_clean_lower = name_clean.lower()
-                norm_name = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', name_clean_lower)
-
-                if restore_all:
-                    if elem.get('active') == 'UserDisabled':
-                        elem.set('active', 'Activated')
-                else:
-                    # ONLY toggle airport scenery packages in Content.xml
-                    # NEVER touch aircraft, navdata, GSX, liveries, or core MSFS packages!
-                    pkg_icaos = folder_to_icaos.get(name_clean_lower) or folder_to_icaos.get(norm_name) or resolve_package_icaos(norm_name)
-                    is_airport_pkg = bool(pkg_icaos) or (name_clean_lower in third_party_airport_pkgs) or (norm_name in third_party_airport_pkgs)
-
-                    if is_airport_pkg:
-                        if any(k in target_icaos for k in (pkg_icaos or [])):
+            if restore_flight_mode:
+                for elem in list(tree.findall('Package')):
+                    name = elem.get('name', '')
+                    if name in flight_added_set:
+                        tree.remove(elem)
+                        changed = True
+                    elif name in flight_disabled_set:
+                        if elem.get('active') == 'UserDisabled':
                             elem.set('active', 'Activated')
-                        else:
-                            elem.set('active', 'UserDisabled')
-                    else:
-                        # Ensure all non-airport packages (aircraft, navdata, utilities) remain 100% Activated
-                        elem.set('active', 'Activated')
+                            changed = True
+            else:
+                seen_xml_names = set()
+                for elem in tree.findall('Package'):
+                    name = elem.get('name', '')
+                    clean_lower = (name[:-9] if name.endswith('.disabled') else name).lower()
+                    seen_xml_names.add(clean_lower)
+                    norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_lower)
+                    seen_xml_names.add(norm)
 
-            xml_str = ET.tostring(tree, encoding='unicode')
-            with open(xml_path, 'w', encoding='utf-8') as f:
-                f.write('<?xml version="1.0" encoding="utf-8"?>\n' + xml_str)
-            print(f"Successfully updated MSFS Content.xml at {xml_path}")
+                    if is_core_or_library_package(name):
+                        continue
+
+                    pkg_icaos = get_package_icaos(name)
+                    if pkg_icaos:
+                        is_keep = any(k in target_icaos for k in pkg_icaos)
+                        if is_keep:
+                            pass
+                        else:
+                            if elem.get('active') == 'Activated':
+                                elem.set('active', 'UserDisabled')
+                                disabled_xml_packages.add(name)
+                                changed = True
+
+                if all_airports:
+                    for ap in all_airports:
+                        icao = ap.get('icao', '').upper()
+                        if icao and icao not in target_icaos:
+                            for src in ap.get('all_sources', []):
+                                if src.get('is_fix_patch') or src.get('is_addon') or src.get('is_default'):
+                                    continue
+                                fn = src.get('folder_name', '')
+                                if not fn:
+                                    continue
+                                fn_clean = fn[:-9] if fn.lower().endswith('.disabled') else fn
+                                fn_clean_lower = fn_clean.lower()
+                                fn_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn_clean_lower)
+                                if fn_clean_lower not in seen_xml_names and fn_norm not in seen_xml_names:
+                                    new_p = ET.SubElement(tree, 'Package')
+                                    new_p.set('name', fn_clean)
+                                    new_p.set('active', 'UserDisabled')
+                                    seen_xml_names.add(fn_clean_lower)
+                                    seen_xml_names.add(fn_norm)
+                                    added_xml_packages.add(fn_clean)
+                                    changed = True
+
+            if changed or not os.path.exists(xml_path):
+                xml_str = ET.tostring(tree, encoding='unicode')
+                with open(xml_path, 'w', encoding='utf-8') as f:
+                    f.write('<?xml version="1.0" encoding="utf-8"?>\n' + xml_str)
+                print(f"Successfully updated MSFS Content.xml at {xml_path}")
+
+                if 'ThirdBuk' in xml_path and os.path.exists(limitless_cache):
+                    mirror_path = os.path.join(limitless_cache, 'Content.xml')
+                    try:
+                        with open(mirror_path, 'w', encoding='utf-8') as mf:
+                            mf.write('<?xml version="1.0" encoding="utf-8"?>\n' + xml_str)
+                    except Exception as me:
+                        print(f"Could not mirror Content.xml to {mirror_path}: {me}")
         except Exception as e:
             print(f"Error updating Content.xml at {xml_path}: {e}")
+
+    return disabled_xml_packages, added_xml_packages
 
 def fast_update_airport_cache(icao_target, target_pkg_name=None, toggle_all=False):
     if not os.path.exists(OUTPUT_JSON_PATH):
@@ -1427,13 +1505,33 @@ class Api:
                         print(f"Error processing {td} during flight optimizer:", e)
 
             # Update MSFS Native Content.xml (UserDisabled / Activated)
-            update_msfs_content_xml(keep_icaos=keep_icaos, restore_all=False, folder_to_icaos=folder_to_icaos, third_party_airport_pkgs=third_party_airport_pkgs)
+            disabled_xml_pkgs, added_xml_pkgs = update_msfs_content_xml(
+                keep_icaos=keep_icaos,
+                restore_flight_mode=False,
+                folder_to_icaos=folder_to_icaos,
+                third_party_airport_pkgs=third_party_airport_pkgs,
+                all_airports=all_airports
+            )
+
+            # Merge with existing state if flight mode was already partially active
+            existing_flight_cfg = settings.get('flight_mode', {})
+            existing_folders = set(existing_flight_cfg.get('disabled_folders', []))
+            existing_xml = set(existing_flight_cfg.get('disabled_xml_packages', []))
+            existing_added = set(existing_flight_cfg.get('added_xml_packages', []))
+
+            all_disabled_folders = list(existing_folders.union(disabled_by_flight_mode))
+            all_disabled_xml = list(existing_xml.union(disabled_xml_pkgs))
+            all_added_xml = list(existing_added.union(added_xml_pkgs))
+
+            total_disabled_count = len(all_disabled_folders) + len(all_disabled_xml) + len(all_added_xml)
 
             settings['flight_mode'] = {
                 'active': True,
-                'disabled_count': disabled_count,
+                'disabled_count': total_disabled_count,
                 'icaos': list(keep_icaos),
-                'disabled_folders': disabled_by_flight_mode
+                'disabled_folders': all_disabled_folders,
+                'disabled_xml_packages': all_disabled_xml,
+                'added_xml_packages': all_added_xml
             }
             save_settings(settings)
 
@@ -1441,7 +1539,7 @@ class Api:
             return json.dumps({
                 "status": "ok",
                 "enabled_count": enabled_count,
-                "disabled_count": disabled_count,
+                "disabled_count": total_disabled_count,
                 "airports": airports
             }, ensure_ascii=False)
         except Exception as e:
@@ -1458,6 +1556,8 @@ class Api:
 
             flight_mode_cfg = settings.get('flight_mode', {})
             flight_disabled_folders = set(flight_mode_cfg.get('disabled_folders', []))
+            flight_disabled_xml = set(flight_mode_cfg.get('disabled_xml_packages', []))
+            flight_added_xml = set(flight_mode_cfg.get('added_xml_packages', []))
 
             for cfg in scan_paths_cfg:
                 dp = cfg.get('path', '')
@@ -1489,10 +1589,20 @@ class Api:
                     except Exception as e:
                         print(f"Error scanning {td} for restore:", e)
 
-            # Update MSFS Native Content.xml to restore UserDisabled packages back to Activated
-            update_msfs_content_xml(restore_all=True)
+            # Update MSFS Native Content.xml safely (restoring ONLY flight mode modifications)
+            update_msfs_content_xml(
+                restore_flight_mode=True,
+                flight_disabled_xml=flight_disabled_xml,
+                flight_added_xml=flight_added_xml
+            )
 
-            settings['flight_mode'] = {'active': False, 'icaos': [], 'disabled_folders': []}
+            settings['flight_mode'] = {
+                'active': False,
+                'icaos': [],
+                'disabled_folders': [],
+                'disabled_xml_packages': [],
+                'added_xml_packages': []
+            }
             save_settings(settings)
 
             airports = run_scan()
