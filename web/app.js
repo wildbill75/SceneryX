@@ -2193,12 +2193,12 @@ function getAirportPopupHtml(ap) {
                 <span>${ap.english_type || ap.type}</span>
                 ${(ap.is_etops_alternate || (typeof GLOBAL_ETOPS_ALTERNATES !== 'undefined' && GLOBAL_ETOPS_ALTERNATES[ap.icao])) ? '<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-950 text-indigo-300 border border-indigo-500/40">✈ ETOPS ALTERNATE</span>' : ''}
             </div>
-            <div class="text-[11px] text-slate-400 pt-1.5 border-t border-slate-800/60 flex items-center justify-between">
-                <span class="flex items-center gap-1.5">
-                    <kbd class="px-1.5 py-0.5 rounded bg-slate-800 border border-purple-500/40 text-purple-300 font-mono text-[10px] font-bold">Alt+Click</kbd>
-                    <span class="text-slate-300 text-[11px]">${isFlightPlanningMode && flightPlanningDeparture ? 'Set as Destination' : 'To plan a route (DEP / ARR)'}</span>
+            <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs">
+                <span class="flex items-center gap-2 text-slate-300 font-medium">
+                    <span class="font-mono font-bold text-cyan-400">Alt+Click</span>
+                    <span class="text-slate-300 text-xs">${isFlightPlanningMode && flightPlanningDeparture ? 'Set as Destination' : 'Optimize flight route (DEP / ARR)'}</span>
                 </span>
-                ${isFlightPlanningMode ? '<span class="text-[9px] font-mono text-purple-400 font-bold tracking-wider">PLANNING ON</span>' : ''}
+                ${isFlightPlanningMode ? '<span class="text-[10px] font-mono text-cyan-400 font-bold tracking-wide">ACTIVE</span>' : ''}
             </div>
         </div>
     `;
@@ -2538,7 +2538,7 @@ function handleFlightPlanningAltClick(ap) {
         updateFlightPlanningBannerUI();
         positionFlightPlanningBanner(ap);
         initDraggableFlightPlanningBanner();
-        showToast(`✈ Flight Planning Mode ON: ${ap.icao} set as Departure. Alt+Click an airport to set Destination.`, 'info');
+        showToast(`✈ Flight Optimizer: ${ap.icao} set as Departure. Alt+Click another airport to set Destination.`, 'info');
     } else {
         // 2. Already in Flight Planning Mode
         if (!flightPlanningDeparture) {
@@ -2764,7 +2764,7 @@ function updateFlightPlanningBannerUI() {
             // Style active profile button
             if (corridorBtn && directBtn) {
                 if (flightCorridorProfile === 'CORRIDOR') {
-                    corridorBtn.className = "px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer bg-purple-600 text-white shadow-sm shadow-purple-600/30";
+                    corridorBtn.className = "px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer bg-cyan-600 text-white shadow-sm shadow-cyan-600/30";
                     directBtn.className = "px-2.5 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 transition-all flex items-center gap-1.5 cursor-pointer";
                 } else {
                     directBtn.className = "px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer bg-cyan-600 text-white shadow-sm shadow-cyan-600/30";
@@ -2866,7 +2866,7 @@ function closePlanningBannerClean() {
     clearFlightCorridor();
     updateFlightPlanningBannerUI();
     updatePersistentFlightBannerUI({ active: false });
-    showToast('Flight Planning Mode closed', 'info');
+    showToast('Flight Optimizer closed', 'info');
 }
 
 function exitFlightPlanningMode(forceRestore = false) {
@@ -2876,7 +2876,7 @@ function exitFlightPlanningMode(forceRestore = false) {
         const depIcao = flightPlanningDeparture?.icao || '';
         const arrIcao = flightPlanningDestination?.icao || '';
         showCustomModal({
-            title: 'Exit Flight Planning? ✈',
+            title: 'Exit Flight Optimizer? ✈',
             message: `<div class="space-y-2 text-xs text-slate-300">` +
                      `  <p>Your simulator is currently optimized for flight <strong>${depIcao} ➔ ${arrIcao}</strong> (<span class="text-emerald-400 font-bold">${flightCorridorDisabledCount} sceneries isolated</span>).</p>` +
                      `  <p>What would you like to do?</p>` +

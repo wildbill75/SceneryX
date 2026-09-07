@@ -505,25 +505,25 @@
                 </button>
             </div>
 
-            <!-- FLOATING FLIGHT PLANNING BANNER (ACTIVATED VIA ALT+CLICK, DRAGGABLE) -->
-            <div id="flight-planning-banner" class="hidden absolute z-[1000] glass-panel bg-slate-900/95 border border-purple-500/60 px-4 py-2.5 rounded-2xl shadow-2xl shadow-purple-950/60 items-center gap-3.5 select-none cursor-grab active:cursor-grabbing pointer-events-auto transition-shadow hover:shadow-purple-500/20">
+            <!-- FLOATING FLIGHT OPTIMIZER BANNER (ACTIVATED VIA ALT+CLICK, DRAGGABLE) -->
+            <div id="flight-planning-banner" class="hidden absolute z-[1000] glass-panel bg-slate-900/95 border border-slate-700/80 px-4 py-2.5 rounded-2xl shadow-2xl shadow-black/80 items-center gap-3.5 select-none cursor-grab active:cursor-grabbing pointer-events-auto transition-shadow hover:shadow-cyan-500/10">
                 <!-- DRAG HANDLE GRIP -->
                 <div class="text-slate-500 hover:text-slate-300 flex items-center pr-1 cursor-grab active:cursor-grabbing" title="Click and drag banner to move">
                     <i class="fa-solid fa-grip-vertical text-xs"></i>
                 </div>
 
                 <div class="flex items-center gap-2">
-                    <span class="relative flex h-2.5 w-2.5">
-                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
-                        <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-purple-500"></span>
+                    <span class="relative flex h-2 w-2">
+                        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
                     </span>
-                    <span class="text-xs font-black font-mono uppercase tracking-wider text-purple-300">Flight Planning Mode ON</span>
+                    <span class="text-xs font-black font-mono uppercase tracking-wider text-slate-200">Flight Scenery Optimizer</span>
                 </div>
 
                 <div class="h-4 w-px bg-slate-800"></div>
 
                 <div class="flex items-center gap-2 font-mono">
-                    <span id="fp-origin-tag" class="font-bold text-xs bg-slate-950 px-2.5 py-1 rounded-lg text-purple-300 border border-purple-500/40">DEP: ----</span>
+                    <span id="fp-origin-tag" class="font-bold text-xs bg-slate-950 px-2.5 py-1 rounded-lg text-cyan-300 border border-cyan-500/40">DEP: ----</span>
                     <i class="fa-solid fa-arrow-right text-slate-500 text-xs"></i>
                     <span id="fp-dest-tag" class="font-bold text-xs bg-slate-950 px-2.5 py-1 rounded-lg text-slate-400 border border-slate-800">ARR: ----</span>
                 </div>
@@ -536,7 +536,7 @@
                 <div id="fp-actions" class="hidden items-center gap-2">
                     <!-- Segmented Profile Selector -->
                     <div class="flex items-center bg-slate-950/80 p-0.5 rounded-xl border border-slate-800">
-                        <button id="fp-btn-corridor" onclick="setFlightCorridorProfile('CORRIDOR')" class="px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer bg-purple-600 text-white shadow-sm shadow-purple-600/30">
+                        <button id="fp-btn-corridor" onclick="setFlightCorridorProfile('CORRIDOR')" class="px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer bg-cyan-600 text-white shadow-sm shadow-cyan-600/30">
                             <i class="fa-solid fa-route text-[11px]"></i>
                             <span id="fp-corridor-label">Corridor (0)</span>
                         </button>
