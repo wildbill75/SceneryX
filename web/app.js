@@ -2607,10 +2607,10 @@ async function executeFlightCorridorOptimization() {
 
     // Immediate user feedback (0 ms latency)
     showCustomModal({
-        title: `Optimisation en cours (${modeLabel})... ⚡`,
+        title: `Optimizing MSFS Sceneries (${modeLabel})... ⚡`,
         message: `<div class="flex flex-col items-center justify-center py-2 text-center">` +
-                 `  <p class="text-sm text-slate-100 font-bold mb-1">Mise à jour de la bibliothèque MSFS</p>` +
-                 `  <p class="text-xs text-slate-400">Isolation des scènes hors vol et mise à jour de Content.xml...<br>Veuillez patienter quelques instants.</p>` +
+                 `  <p class="text-sm text-slate-100 font-bold mb-1">Updating MSFS Scenery Library</p>` +
+                 `  <p class="text-xs text-slate-400">Isolating non-flight sceneries & updating Content.xml...<br>Please wait a moment.</p>` +
                  `</div>`,
         type: 'loading'
     });
@@ -2634,33 +2634,33 @@ async function executeFlightCorridorOptimization() {
                 const guideHtml = 
                     `<div class="space-y-3">` +
                     `  <div class="text-xs text-slate-300 space-y-1">` +
-                    `    <div>• <strong>Route de vol :</strong> ${dep.icao} ➔ ${arr.icao} (${modeLabel})</div>` +
-                    `    <div>• <strong>Scènes conservées :</strong> ${keepIcaos.length} aéroports actifs</div>` +
-                    `    <div>• <strong>Scènes isolées :</strong> <span class="text-emerald-400 font-bold">${flightCorridorDisabledCount} scènes</span> neutralisées pour le max de FPS</div>` +
+                    `    <div>• <strong>Flight Route:</strong> ${dep.icao} ➔ ${arr.icao} (${modeLabel})</div>` +
+                    `    <div>• <strong>Active Sceneries:</strong> ${keepIcaos.length} airport(s) enabled</div>` +
+                    `    <div>• <strong>Isolated Sceneries:</strong> <span class="text-emerald-400 font-bold">${flightCorridorDisabledCount} sceneries</span> disabled for maximum FPS</div>` +
                     `  </div>` +
                     `  <div class="p-3 bg-slate-900/90 rounded-xl border border-emerald-500/30 text-xs text-slate-300 space-y-1.5">` +
-                    `    <div class="font-bold text-amber-300 flex items-center gap-1.5"><i class="fa-solid fa-compass text-amber-400"></i> Instructions pour votre vol :</div>` +
-                    `    <div>1. Lancez <strong>MSFS</strong> : seules vos scènes de vol seront actives.</div>` +
-                    `    <div>2. Vous pouvez <strong>réduire ou fermer SceneryX</strong> pendant toute la durée de votre vol.</div>` +
-                    `    <div>3. À votre retour, cliquez simplement sur <strong>Restaurer</strong> pour retrouver tous vos aéroports.</div>` +
+                    `    <div class="font-bold text-amber-300 flex items-center gap-1.5"><i class="fa-solid fa-compass text-amber-400"></i> Pilot Instructions for Flight:</div>` +
+                    `    <div>1. Launch <strong>MSFS</strong>: only your flight route sceneries will load.</div>` +
+                    `    <div>2. You may <strong>minimize or close SceneryX</strong> during your flight.</div>` +
+                    `    <div>3. When your flight is complete, click <strong>Restore</strong> to re-enable your full library.</div>` +
                     `  </div>` +
                     `</div>`;
 
                 showCustomModal({
-                    title: 'Vol Optimisé avec Succès ! 🚀',
+                    title: 'Flight Optimized Successfully! 🚀',
                     message: guideHtml,
                     type: 'success',
-                    confirmText: 'Compris, bon vol !'
+                    confirmText: 'Got it, have a great flight!'
                 });
             } else {
-                showCustomModal('Erreur d\'optimisation', res.message || 'Échec de l\'optimisation des scènes.', 'error');
+                showCustomModal('Optimization Error', res.message || 'Failed to optimize sceneries.', 'error');
             }
         } else {
-            showToast('PyWebView API non disponible en prévisualisation navigateur.', 'warning');
+            showToast('PyWebView API not available in browser preview.', 'warning');
         }
     } catch (err) {
         console.error('Flight corridor optimization error:', err);
-        showCustomModal('Erreur d\'optimisation', String(err), 'error');
+        showCustomModal('Optimization Error', String(err), 'error');
     }
 }
 
@@ -2809,7 +2809,7 @@ function updatePersistentFlightBannerUI(flightMode) {
             routeEl.innerText = flightMode.icaos.join(' ➔ ');
         }
         if (countEl) {
-            countEl.innerText = `${flightMode.disabled_count || 0} scènes isolées`;
+            countEl.innerText = `${flightMode.disabled_count || 0} sceneries isolated`;
         }
         banner.classList.remove('hidden');
         banner.classList.add('flex');
@@ -2833,7 +2833,7 @@ function closePlanningBannerKeepOptimization() {
         icaos: [depIcao, arrIcao].filter(Boolean),
         disabled_count: count
     });
-    showToast('Mode Vol Actif — Simulateur prêt pour le vol !', 'success');
+    showToast('Flight Mode Active — MSFS ready for departure!', 'success');
 }
 
 function closePlanningBannerClean() {
@@ -2847,7 +2847,7 @@ function closePlanningBannerClean() {
     clearFlightCorridor();
     updateFlightPlanningBannerUI();
     updatePersistentFlightBannerUI({ active: false });
-    showToast('Mode Planification désactivé', 'info');
+    showToast('Flight Planning Mode closed', 'info');
 }
 
 function exitFlightPlanningMode(forceRestore = false) {
@@ -2857,14 +2857,14 @@ function exitFlightPlanningMode(forceRestore = false) {
         const depIcao = flightPlanningDeparture?.icao || '';
         const arrIcao = flightPlanningDestination?.icao || '';
         showCustomModal({
-            title: 'Quitter la Planification ? ✈',
+            title: 'Exit Flight Planning? ✈',
             message: `<div class="space-y-2 text-xs text-slate-300">` +
-                     `  <p>Votre simulateur est actuellement optimisé pour le vol <strong>${depIcao} ➔ ${arrIcao}</strong> (<span class="text-emerald-400 font-bold">${flightCorridorDisabledCount} scènes isolées</span>).</p>` +
-                     `  <p>Que souhaitez-vous faire ?</p>` +
+                     `  <p>Your simulator is currently optimized for flight <strong>${depIcao} ➔ ${arrIcao}</strong> (<span class="text-emerald-400 font-bold">${flightCorridorDisabledCount} sceneries isolated</span>).</p>` +
+                     `  <p>What would you like to do?</p>` +
                      `</div>`,
             type: 'info',
-            confirmText: 'Garder l\'optimisation (Mode Vol)',
-            cancelText: 'Tout restaurer maintenant',
+            confirmText: 'Keep Optimization (Flight Mode)',
+            cancelText: 'Restore All Sceneries Now',
             showCancel: true,
             onConfirm: () => {
                 closePlanningBannerKeepOptimization();
