@@ -2584,7 +2584,7 @@ function setFlightCorridorProfile(profile) {
     }
     filterAirports();
     updateFlightPlanningBannerUI();
-    const label = profile === 'CORRIDOR' ? 'Corridor (En-Route Addons)' : 'Direct (DEP + ARR Only)';
+    const label = profile === 'CORRIDOR' ? 'En-Route (Path Addons)' : 'Direct (DEP + ARR Only)';
     showToast(`Flight Profile: ${label}`, 'info');
 }
 
@@ -2606,7 +2606,7 @@ async function executeFlightCorridorOptimization() {
     }
 
     const keepIcaos = Array.from(keepIcaosSet);
-    const modeLabel = flightCorridorProfile === 'CORRIDOR' ? 'Corridor Mode' : 'Direct Mode';
+    const modeLabel = flightCorridorProfile === 'CORRIDOR' ? 'En-Route Mode' : 'Direct Mode';
 
     // Immediate user feedback (0 ms latency)
     showCustomModal({
@@ -2756,19 +2756,18 @@ function updateFlightPlanningBannerUI() {
                 actionsContainer.classList.add('flex');
             }
 
-            const corridorAddons = getCorridorAddonsList();
             if (corridorLabel) {
-                corridorLabel.innerText = `Corridor (${corridorAddons.length})`;
+                corridorLabel.innerText = `En-Route`;
             }
 
             // Style active profile button
             if (corridorBtn && directBtn) {
                 if (flightCorridorProfile === 'CORRIDOR') {
-                    corridorBtn.className = "px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer bg-cyan-600 text-white shadow-sm shadow-cyan-600/30";
-                    directBtn.className = "px-2.5 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 transition-all flex items-center gap-1.5 cursor-pointer";
+                    corridorBtn.className = "px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer bg-cyan-600 text-white shadow-sm shadow-cyan-600/30";
+                    directBtn.className = "px-3 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 transition-all cursor-pointer";
                 } else {
-                    directBtn.className = "px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer bg-cyan-600 text-white shadow-sm shadow-cyan-600/30";
-                    corridorBtn.className = "px-2.5 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 transition-all flex items-center gap-1.5 cursor-pointer";
+                    directBtn.className = "px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer bg-cyan-600 text-white shadow-sm shadow-cyan-600/30";
+                    corridorBtn.className = "px-3 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 transition-all cursor-pointer";
                 }
             }
 
