@@ -1342,10 +1342,12 @@ class Api:
             }
             save_settings(settings)
 
+            airports = run_scan()
             return json.dumps({
                 "status": "ok",
                 "enabled_count": enabled_count,
-                "disabled_count": disabled_count
+                "disabled_count": disabled_count,
+                "airports": airports
             }, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})

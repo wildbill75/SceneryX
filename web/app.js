@@ -2378,6 +2378,9 @@ let flightPlanningDestination = null;
 let flightCorridorArrivalAirport = null;
 let flightCorridorLayerGroup = L.layerGroup();
 let isFlightPlanningDraggableInitialized = false;
+let flightCorridorProfile = 'CORRIDOR'; // 'CORRIDOR' | 'DIRECT'
+let isFlightCorridorOptimized = false;
+let flightCorridorDisabledCount = 0;
 
 function positionFlightPlanningBanner(ap) {
     const banner = document.getElementById('flight-planning-banner');
@@ -2522,11 +2525,136 @@ function handleFlightPlanningAltClick(ap) {
     }
 }
 
+function getCorridorAddonsList() {
+    if (!flightPlanningDeparture || !flightPlanningDestination) return [];
+    const dep = flightPlanningDeparture;
+    const arr = flightPlanningDestination;
+    return allAirportsData.filter(ap => {
+        if (!ap || !ap.lat || !ap.lon) return false;
+        if (ap.icao === dep.icao || ap.icao === arr.icao) return false;
+
+        const pt = getAirportPricingType(ap);
+        if (pt === 'Default' || ap.pricing_type === 'Default' || ap.is_default || ap.package_name === 'Default MSFS Base Airport' || (ap.package_name && ap.package_name.startsWith('msfs-default-'))) {
+            return false;
+        }
+
+        return isAirportInCorridor(ap, dep, arr);
+    });
+}
+
+function setFlightCorridorProfile(profile) {
+    if (flightCorridorProfile === profile) return;
+    flightCorridorProfile = profile;
+    if (isFlightCorridorOptimized) {
+        isFlightCorridorOptimized = false;
+    }
+    filterAirports();
+    updateFlightPlanningBannerUI();
+    const label = profile === 'CORRIDOR' ? 'Corridor (En-Route Addons)' : 'Direct (DEP + ARR Only)';
+    showToast(`Flight Profile: ${label}`, 'info');
+}
+
+async function executeFlightCorridorOptimization() {
+    if (!flightPlanningDeparture || !flightPlanningDestination) {
+        showToast('Please set Departure and Destination before optimizing.', 'warning');
+        return;
+    }
+
+    const dep = flightPlanningDeparture;
+    const arr = flightPlanningDestination;
+    const keepIcaosSet = new Set();
+    keepIcaosSet.add(dep.icao);
+    keepIcaosSet.add(arr.icao);
+
+    if (flightCorridorProfile === 'CORRIDOR') {
+        const corridorAddons = getCorridorAddonsList();
+        corridorAddons.forEach(a => keepIcaosSet.add(a.icao));
+    }
+
+    const keepIcaos = Array.from(keepIcaosSet);
+    const modeLabel = flightCorridorProfile === 'CORRIDOR' ? 'Corridor Mode' : 'Direct Mode';
+
+    showToast(`⚡ Optimizing MSFS Sceneries (${modeLabel})...`, 'info');
+
+    try {
+        if (window.pywebview && window.pywebview.api) {
+            const apiFn = window.pywebview.api.optimize_flight_mode || window.pywebview.api.optimize_flight;
+            const resRaw = await apiFn.call(window.pywebview.api, JSON.stringify(keepIcaos));
+            const res = JSON.parse(resRaw);
+            if (res.status === 'ok' || res.status === 'success') {
+                isFlightCorridorOptimized = true;
+                flightCorridorDisabledCount = res.disabled_count !== undefined ? res.disabled_count : 0;
+
+                if (res.airports && res.airports.length > 0) {
+                    allAirportsData = res.airports;
+                }
+
+                updateFlightPlanningBannerUI();
+                filterAirports();
+
+                showCustomModal(
+                    'MSFS Sceneries Optimized 🚀',
+                    `Profile: ${modeLabel}\n\n` +
+                    `• Active flight route: ${dep.icao} ➔ ${arr.icao}\n` +
+                    `• Kept active: ${keepIcaos.length} sceneries\n` +
+                    `• Disabled for performance: ${flightCorridorDisabledCount} non-flight sceneries\n\n` +
+                    `MSFS Content.xml & Community folder updated for maximum FPS and 0 stutters!`,
+                    'success'
+                );
+            } else {
+                showCustomModal('Optimization Error', res.message || 'Failed to optimize sceneries.', 'error');
+            }
+        } else {
+            showToast('PyWebView API not available in browser preview.', 'warning');
+        }
+    } catch (err) {
+        console.error('Flight corridor optimization error:', err);
+        showCustomModal('Optimization Error', String(err), 'error');
+    }
+}
+
+async function restoreFlightCorridorSceneries() {
+    showToast('Restoring all sceneries...', 'info');
+    try {
+        if (window.pywebview && window.pywebview.api) {
+            const apiFn = window.pywebview.api.restore_all_sceneries || window.pywebview.api.restore_all_flight_sceneries;
+            const resRaw = await apiFn.call(window.pywebview.api);
+            const res = JSON.parse(resRaw);
+            if (res.status === 'ok' || res.status === 'success') {
+                isFlightCorridorOptimized = false;
+                flightCorridorDisabledCount = 0;
+
+                if (res.airports && res.airports.length > 0) {
+                    allAirportsData = res.airports;
+                }
+
+                updateFlightPlanningBannerUI();
+                filterAirports();
+
+                showToast(`🟢 All sceneries restored (${res.re_enabled_count || 0} re-enabled)!`, 'success');
+            } else {
+                showCustomModal('Restore Error', res.message || 'Failed to restore sceneries.', 'error');
+            }
+        }
+    } catch (err) {
+        console.error('Error restoring sceneries:', err);
+        showCustomModal('Restore Error', String(err), 'error');
+    }
+}
+
 function updateFlightPlanningBannerUI() {
     const banner = document.getElementById('flight-planning-banner');
     const originTag = document.getElementById('fp-origin-tag');
     const destTag = document.getElementById('fp-dest-tag');
     const guideText = document.getElementById('fp-guide-text');
+    const actionsContainer = document.getElementById('fp-actions');
+    const corridorBtn = document.getElementById('fp-btn-corridor');
+    const directBtn = document.getElementById('fp-btn-direct');
+    const corridorLabel = document.getElementById('fp-corridor-label');
+    const optimizeBtn = document.getElementById('fp-btn-optimize');
+    const restoreBtn = document.getElementById('fp-btn-restore');
+    const optimizedBadge = document.getElementById('fp-optimized-badge');
+    const optimizedText = document.getElementById('fp-optimized-text');
 
     if (!banner) return;
 
@@ -2546,29 +2674,90 @@ function updateFlightPlanningBannerUI() {
                 destTag.className = "font-bold text-xs bg-slate-950 px-2.5 py-1 rounded-lg text-slate-400 border border-slate-800";
             }
         }
-        if (guideText) {
-            if (!flightPlanningDestination) {
-                guideText.innerText = `Alt+Click an airport to set Destination`;
+
+        if (flightPlanningDestination) {
+            // Both Departure and Destination chosen: Show dual profile actions
+            if (guideText) {
+                guideText.classList.add('hidden');
+            }
+            if (actionsContainer) {
+                actionsContainer.classList.remove('hidden');
+                actionsContainer.classList.add('flex');
+            }
+
+            const corridorAddons = getCorridorAddonsList();
+            if (corridorLabel) {
+                corridorLabel.innerText = `Corridor (${corridorAddons.length})`;
+            }
+
+            // Style active profile button
+            if (corridorBtn && directBtn) {
+                if (flightCorridorProfile === 'CORRIDOR') {
+                    corridorBtn.className = "px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer bg-purple-600 text-white shadow-sm shadow-purple-600/30";
+                    directBtn.className = "px-2.5 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 transition-all flex items-center gap-1.5 cursor-pointer";
+                } else {
+                    directBtn.className = "px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer bg-cyan-600 text-white shadow-sm shadow-cyan-600/30";
+                    corridorBtn.className = "px-2.5 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 transition-all flex items-center gap-1.5 cursor-pointer";
+                }
+            }
+
+            // Optimization active status
+            if (isFlightCorridorOptimized) {
+                if (optimizeBtn) optimizeBtn.classList.add('hidden');
+                if (restoreBtn) restoreBtn.classList.remove('hidden');
+                if (optimizedBadge) {
+                    optimizedBadge.classList.remove('hidden');
+                    optimizedBadge.classList.add('flex');
+                }
+                if (optimizedText) {
+                    optimizedText.innerText = `ACTIVE: ${flightCorridorDisabledCount} disabled`;
+                }
             } else {
-                const enRouteAddons = currentlyFilteredAirports.filter(a => {
-                    if (flightPlanningDeparture && a.icao === flightPlanningDeparture.icao) return hasCustomAddonSources(a);
-                    if (flightPlanningDestination && a.icao === flightPlanningDestination.icao) return hasCustomAddonSources(a);
-                    return true;
-                });
-                guideText.innerText = `Corridor active: ${flightPlanningDeparture.icao} ➔ ${flightPlanningDestination.icao} (${enRouteAddons.length} Addon Sceneries En-Route)`;
+                if (optimizeBtn) optimizeBtn.classList.remove('hidden');
+                if (restoreBtn) restoreBtn.classList.add('hidden');
+                if (optimizedBadge) {
+                    optimizedBadge.classList.add('hidden');
+                    optimizedBadge.classList.remove('flex');
+                }
+            }
+        } else {
+            // Waiting for arrival selection
+            if (guideText) {
+                guideText.classList.remove('hidden');
+                guideText.innerText = `Alt+Click an airport to set Destination`;
+            }
+            if (actionsContainer) {
+                actionsContainer.classList.add('hidden');
+                actionsContainer.classList.remove('flex');
+            }
+            if (optimizedBadge) {
+                optimizedBadge.classList.add('hidden');
+                optimizedBadge.classList.remove('flex');
             }
         }
     } else {
         banner.classList.add('hidden');
         banner.classList.remove('flex');
+        if (actionsContainer) {
+            actionsContainer.classList.add('hidden');
+            actionsContainer.classList.remove('flex');
+        }
     }
 }
 
 function exitFlightPlanningMode() {
     if (!isFlightPlanningMode) return;
+
+    if (isFlightCorridorOptimized) {
+        restoreFlightCorridorSceneries();
+    }
+
     isFlightPlanningMode = false;
     flightPlanningDeparture = null;
     flightPlanningDestination = null;
+    flightCorridorProfile = 'CORRIDOR';
+    isFlightCorridorOptimized = false;
+    flightCorridorDisabledCount = 0;
 
     clearFlightCorridor();
     updateFlightPlanningBannerUI();
@@ -4498,6 +4687,11 @@ function filterAirports() {
                 // even if they are Default MSFS procedural airports!
                 // They bypass all exclusion rules, pricing filters, and geographic restrictions.
                 return true;
+            }
+
+            // If user selected 'DIRECT' profile: ONLY keep Departure & Destination, hide intermediate addons!
+            if (flightCorridorProfile === 'DIRECT') {
+                return false;
             }
 
             // Flight Corridor Optimizer: For EN-ROUTE airports, only display custom addon sceneries (Payware, Freeware, Asobo).
