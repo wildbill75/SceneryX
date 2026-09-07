@@ -909,6 +909,22 @@ class Api:
                 for p in to_remove:
                     root.remove(p)
 
+                # If target or other packages for this ICAO weren't in Content.xml, add them
+                if clean_pkg.lower() not in seen_packages:
+                    new_p = ET.SubElement(root, 'Package')
+                    new_p.set('name', clean_pkg)
+                    new_p.set('active', 'Activated' if should_enable else 'UserDisabled')
+                    seen_packages.add(clean_pkg.lower())
+                    changed = True
+
+                for fn_other, p_other in other_packages_to_disable:
+                    if fn_other.lower() not in seen_packages:
+                        new_p = ET.SubElement(root, 'Package')
+                        new_p.set('name', fn_other)
+                        new_p.set('active', 'UserDisabled')
+                        seen_packages.add(fn_other.lower())
+                        changed = True
+
                 if changed:
                     tree.write(content_xml_path, encoding='utf-8', xml_declaration=True)
 
@@ -926,7 +942,7 @@ class Api:
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
 
-    def disable_all_for_airport(self, icao):
+    def disable_single_airport(self, icao):
         try:
             if not icao:
                 return json.dumps({"status": "error", "message": "No ICAO provided"})
@@ -1014,24 +1030,39 @@ class Api:
                     else:
                         disable_physical_package(target_dir)
 
+            with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
+                scanned_airports = json.load(f)
+            ap_obj = next((a for a in scanned_airports if a['icao'].upper() == icao.upper()), None)
+
             if os.path.exists(content_xml_path):
                 import xml.etree.ElementTree as ET
                 tree = ET.parse(content_xml_path)
                 root = tree.getroot()
                 changed = False
+                seen_dis = set()
                 for p in root.findall('Package'):
                     name = p.get('name', '')
                     clean = name[:-9] if name.lower().endswith('.disabled') else name
                     p.set('name', clean)
+                    seen_dis.add(clean.lower())
                     if icao.lower() in clean.lower():
                         p.set('active', 'UserDisabled')
                         changed = True
+
+                if ap_obj and ap_obj.get('all_sources'):
+                    for src in ap_obj['all_sources']:
+                        fn = src.get('folder_name', '')
+                        fn_clean = fn[:-9] if fn.lower().endswith('.disabled') else fn
+                        if fn_clean.lower() not in seen_dis:
+                            new_p = ET.SubElement(root, 'Package')
+                            new_p.set('name', fn_clean)
+                            new_p.set('active', 'UserDisabled')
+                            seen_dis.add(fn_clean.lower())
+                            changed = True
+
                 if changed:
                     tree.write(content_xml_path, encoding='utf-8', xml_declaration=True)
 
-            with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
-                scanned_airports = json.load(f)
-            ap_obj = next((a for a in scanned_airports if a['icao'].upper() == icao.upper()), None)
             if ap_obj and ap_obj.get('all_sources'):
                 for src in ap_obj['all_sources']:
                     pkg_p = src.get('package_path', '')
@@ -1132,6 +1163,11 @@ class Api:
                         disable_physical_package(target_dir)
 
             target_clean = target_folder_name[:-9] if target_folder_name.lower().endswith('.disabled') else target_folder_name
+            target_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', target_clean.lower())
+
+            with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
+                scanned_airports = json.load(f)
+            ap_obj = next((a for a in scanned_airports if a['icao'].upper() == icao.upper()), None)
 
             if os.path.exists(content_xml_path):
                 import xml.etree.ElementTree as ET
@@ -1139,9 +1175,9 @@ class Api:
                 root = tree.getroot()
                 changed = False
                 seen = set()
+                seen_norms = set()
                 to_remove = []
                 folder_to_icaos, _ = get_folder_to_icaos_map()
-                target_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', target_clean.lower())
 
                 for p in list(root.findall('Package')):
                     name = p.get('name', '')
@@ -1155,6 +1191,7 @@ class Api:
                         changed = True
                         continue
                     seen.add(clean_lower)
+                    seen_norms.add(clean_norm)
 
                     pkg_icaos = folder_to_icaos.get(clean_lower) or folder_to_icaos.get(clean_norm) or resolve_package_icaos(clean_norm)
                     is_pkg_for_icao = (icao.upper() in [k.upper() for k in (pkg_icaos or [])]) or (icao.lower() in clean_lower)
@@ -1170,14 +1207,30 @@ class Api:
                 for p in to_remove:
                     root.remove(p)
 
+                # Ensure all sources for this airport (including streamed/Asobo) are represented in Content.xml
+                if ap_obj and ap_obj.get('all_sources'):
+                    for src in ap_obj['all_sources']:
+                        if src.get('is_fix_patch') or src.get('is_addon'):
+                            continue
+                        fn = src.get('folder_name', '')
+                        fn_clean = fn[:-9] if fn.lower().endswith('.disabled') else fn
+                        fn_clean_lower = fn_clean.lower()
+                        fn_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn_clean_lower)
+
+                        is_target = (target_clean != 'DEFAULT') and (fn_clean_lower == target_clean.lower() or fn_norm == target_norm)
+
+                        if fn_clean_lower not in seen and fn_norm not in seen_norms:
+                            new_p = ET.SubElement(root, 'Package')
+                            new_p.set('name', fn_clean)
+                            new_p.set('active', 'Activated' if is_target else 'UserDisabled')
+                            seen.add(fn_clean_lower)
+                            seen_norms.add(fn_norm)
+                            changed = True
+
                 if changed:
                     tree.write(content_xml_path, encoding='utf-8', xml_declaration=True)
 
-            with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
-                scanned_airports = json.load(f)
-            ap_obj = next((a for a in scanned_airports if a['icao'].upper() == icao.upper()), None)
             if ap_obj and ap_obj.get('all_sources'):
-                target_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', target_clean.lower())
                 for src in ap_obj['all_sources']:
                     if src.get('is_fix_patch') or src.get('is_addon'):
                         continue

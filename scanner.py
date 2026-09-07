@@ -1257,7 +1257,13 @@ def run_scan():
     for h_icao in dynamic_asobo_set:
         h_u = h_icao.upper()
         if h_u in airports:
-            is_asobo_dis = any(h_icao.lower() in d for d in disabled_in_xml)
+            is_asobo_dis = any(
+                d == f"fs24-asobo-airport-{h_icao.lower()}" 
+                or d == f"asobo-airport-{h_icao.lower()}" 
+                or d == f"microsoft-airport-{h_icao.lower()}"
+                or h_icao.lower() in re.split(r'[-_ ]+', d)
+                for d in disabled_in_xml
+            )
             asobo_src = {
                 "folder_name": f"fs24-asobo-airport-{h_icao.lower()}",
                 "package_path": "",
@@ -1288,33 +1294,39 @@ def run_scan():
                 else:
                     english_type = "General Aviation"
 
+                user_rating = ratings.get(h_u, 0.0)
+                price_eur, is_custom_price = get_estimated_price(
+                    h_u, f"fs24-asobo-airport-{h_icao.lower()}", "Microsoft / Asobo", "Asobo", english_type, True, custom_prices
+                )
                 detected_map[h_u] = {
                     "icao": h_u,
-                    "ident": h_u,
-                    "name": ap_info.get('name', ''),
-                    "city": ap_info.get('city', ''),
-                    "country": ap_info.get('country', ''),
-                    "lat": ap_info.get('lat', 0.0),
-                    "lon": ap_info.get('lon', 0.0),
-                    "type": raw_type,
+                    "name": ap_info.get('name', 'Unknown Airport'),
+                    "city": ap_info.get('municipality', ''),
+                    "country": ap_info.get('iso_country', ''),
+                    "lat": float(ap_info.get('latitude_deg', 0.0)),
+                    "lon": float(ap_info.get('longitude_deg', 0.0)),
+                    "type": ap_info.get('type', 'airport'),
                     "english_type": english_type,
+                    "elevation_ft": int(float(ap_info.get('elevation_ft', 0))) if ap_info.get('elevation_ft') else None,
+                    "has_custom_scenery": True,
+                    "package_name": f"fs24-asobo-airport-{h_icao.lower()}",
+                    "package_path": "",
+                    "source_folder": "MSFS 2024 - StreamedPackages",
+                    "match_source": "Default Asobo Handcrafted",
                     "vendor": "Microsoft / Asobo",
                     "pricing_type": "Asobo",
                     "is_payware": False,
                     "is_asobo_official": True,
-                    "is_custom_price": False,
-                    "price_eur": 0.0,
-                    "package_name": f"fs24-asobo-airport-{h_icao.lower()}",
-                    "package_path": "",
-                    "source_folder": "MSFS 2024 - StreamedPackages",
+                    "is_disabled": is_asobo_dis,
+                    "is_addon": False,
+                    "is_fix_patch": False,
+                    "rating": user_rating,
+                    "price_eur": price_eur,
+                    "is_custom_price": is_custom_price,
                     "version": "",
                     "size_str": "Streamed",
-                    "match_source": "Default Asobo Handcrafted",
-                    "all_sources": [asobo_src],
-                    "is_disabled": False,
-                    "has_conflict": False,
-                    "conflict_count": 1,
-                    "rating": ratings.get(h_u, 0.0)
+                    "world_update_name": get_world_update_name(h_u, f"fs24-asobo-airport-{h_icao.lower()}"),
+                    "all_sources": [asobo_src]
                 }
             else:
                 existing = detected_map[h_u]
@@ -1354,7 +1366,15 @@ def run_scan():
             for s in item['all_sources']
         )
 
-
+        # 3. Determine if this airport has an active Official Asobo/Microsoft package
+        active_asobo = any(
+            (s.get('is_asobo_official') 
+             or s.get('pricing_type') == 'Asobo' 
+             or s.get('vendor') == 'Microsoft / Asobo'
+             or s.get('folder_name', '').lower().startswith(('asobo-', 'microsoft-', 'fs20-asobo-', 'fs20-microsoft-', 'fs24-asobo-', 'fs24-microsoft-')))
+            and not s.get('is_disabled') and not s.get('is_fix_patch') and not s.get('is_addon')
+            for s in item['all_sources']
+        )
 
         if item['all_sources']:
             def get_package_score(s):
@@ -1364,8 +1384,8 @@ def run_scan():
                 if active_payware:
                     if s.get('is_payware') and not s.get('is_disabled'):
                         score += 500
-                elif has_asobo:
-                    if s.get('is_asobo_official') or s.get('pricing_type') == 'Asobo':
+                elif active_asobo:
+                    if (s.get('is_asobo_official') or s.get('pricing_type') == 'Asobo' or s.get('vendor') == 'Microsoft / Asobo') and not s.get('is_disabled'):
                         score += 500
                 
                 if s.get('is_fix_patch'):
@@ -1388,7 +1408,7 @@ def run_scan():
                 item['pricing_type'] = "Payware"
                 item['is_payware'] = True
                 item['is_asobo_official'] = False
-            elif has_asobo:
+            elif active_asobo:
                 item['vendor'] = "Microsoft / Asobo"
                 item['pricing_type'] = "Asobo"
                 item['is_payware'] = False
