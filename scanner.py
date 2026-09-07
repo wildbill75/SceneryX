@@ -696,10 +696,12 @@ def get_settings():
             pass
 
     default_paths = auto_detect_default_paths()
+    has_existing_db = os.path.exists(OUTPUT_JSON_PATH) and os.path.getsize(OUTPUT_JSON_PATH) > 1000
     settings = {
         "auto_scan_on_startup": True,
         "scan_paths": default_paths,
-        "gsx_profile_path": get_default_gsx_path()
+        "gsx_profile_path": get_default_gsx_path(),
+        "disclaimer_accepted": True if has_existing_db else False
     }
     save_settings(settings)
     return settings

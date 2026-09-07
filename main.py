@@ -321,6 +321,13 @@ class Api:
     def get_airports(self):
         settings = get_settings()
         disclaimer_accepted = settings.get("disclaimer_accepted", False)
+
+        # If installed_airports.json exists and has data, user is not on first launch
+        if not disclaimer_accepted and os.path.exists(OUTPUT_JSON_PATH) and os.path.getsize(OUTPUT_JSON_PATH) > 1000:
+            disclaimer_accepted = True
+            settings["disclaimer_accepted"] = True
+            save_settings(settings)
+
         if not disclaimer_accepted:
             # First launch before Terms of Use accepted: don't auto-scan yet, return empty
             self._startup_delta = {"added": [], "removed": [], "total_changes": 0}
@@ -330,7 +337,9 @@ class Api:
         if self._startup_scanned and self._startup_delta is not None and os.path.exists(OUTPUT_JSON_PATH):
             try:
                 with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
-                    return f.read()
+                    content = f.read()
+                    if content and len(content) > 100:
+                        return content
             except Exception:
                 pass
 
@@ -345,11 +354,13 @@ class Api:
             try:
                 with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
                     airports = json.load(f)
-                    self._startup_delta = {"added": [], "removed": [], "total_changes": 0}
-                    self._startup_scanned = True
-                    return json.dumps(airports, ensure_ascii=False)
+                    if airports and len(airports) > 0:
+                        self._startup_delta = {"added": [], "removed": [], "total_changes": 0}
+                        self._startup_scanned = True
+                        return json.dumps(airports, ensure_ascii=False)
             except Exception as e:
                 print("Error reading cached installed_airports.json, performing fresh scan:", e)
+
         airports = run_scan()
         self._startup_delta = compute_scan_delta(airports, update_snapshot=True)
         self._startup_scanned = True

@@ -636,8 +636,8 @@ async function ensureAppLoaded() {
     if (isAppLoading || isAppInitialized || (allAirportsData && allAirportsData.length > 0)) return;
     isAppLoading = true;
 
-    for (let i = 0; i < 50; i++) {
-        if (window.pywebview && window.pywebview.api) {
+    for (let i = 0; i < 60; i++) {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.get_airports) {
             isAppInitialized = true;
             await loadInitialAppData();
             isAppLoading = false;
@@ -1501,11 +1501,16 @@ async function loadAirportsData() {
         updateSplashProgress(25, "Loading airports database...", "Airports DB");
         let response;
         if (window.pywebview) {
+            for (let i = 0; i < 30 && (!window.pywebview.api || !window.pywebview.api.get_airports); i++) {
+                await new Promise(r => setTimeout(r, 100));
+            }
+        }
+        if (window.pywebview && window.pywebview.api) {
             updateSplashProgress(35, "Loading user configuration...", "Settings & Credentials");
             try {
                 const settingsStr = await window.pywebview.api.get_settings();
                 if (settingsStr) {
-                    currentSettings = JSON.parse(settingsStr);
+                    currentSettings = (typeof settingsStr === 'string') ? JSON.parse(settingsStr) : settingsStr;
                     if (currentSettings.language && typeof setAppLanguage === 'function') {
                         setAppLanguage(currentSettings.language);
                     }
@@ -1527,11 +1532,36 @@ async function loadAirportsData() {
             updateSplashProgress(55, "Scanning MSFS packages & GSX profiles...", "Community & OneStore");
             const dataStr = await window.pywebview.api.get_airports();
             updateSplashProgress(85, "Parsing scenery packages...", "Rendering Map");
-            allAirportsData = JSON.parse(dataStr);
+            if (typeof dataStr === 'string') {
+                try {
+                    allAirportsData = JSON.parse(dataStr);
+                } catch (pe) {
+                    console.error("JSON.parse error on get_airports:", pe);
+                    allAirportsData = [];
+                }
+            } else if (Array.isArray(dataStr)) {
+                allAirportsData = dataStr;
+            } else {
+                allAirportsData = [];
+            }
+
+            // Automated resilience check: If get_airports returned empty, auto-trigger a library scan
+            if ((!allAirportsData || allAirportsData.length === 0) && window.pywebview.api.rescan) {
+                console.warn("Airport database empty on startup. Triggering automated rescan to restore database...");
+                updateSplashProgress(65, "Restoring scenery database...", "Auto-Scanning");
+                const rescanRaw = await window.pywebview.api.rescan();
+                const rescanParsed = (typeof rescanRaw === 'string') ? JSON.parse(rescanRaw) : rescanRaw;
+                if (Array.isArray(rescanParsed)) {
+                    allAirportsData = rescanParsed;
+                } else if (rescanParsed && rescanParsed.airports) {
+                    allAirportsData = rescanParsed.airports;
+                }
+            }
+
             if (window.pywebview.api.get_world_airport_coords) {
                 try {
                     const coordsStr = await window.pywebview.api.get_world_airport_coords();
-                    window.worldAirportCoords = JSON.parse(coordsStr);
+                    window.worldAirportCoords = (typeof coordsStr === 'string') ? JSON.parse(coordsStr) : coordsStr;
                 } catch(e) {
                     console.warn("Could not load worldAirportCoords:", e);
                 }
