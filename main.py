@@ -78,6 +78,13 @@ def update_msfs_content_xml(keep_icaos=None, restore_all=False, folder_to_icaos=
         os.path.join(appdata, r'Microsoft Flight Simulator\Content.xml')
     ]
 
+    import glob
+    limitless_cache = os.path.join(local_appdata, r'Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache')
+    if os.path.exists(limitless_cache):
+        for found_xml in glob.glob(os.path.join(limitless_cache, '**', 'Content.xml'), recursive=True):
+            if found_xml not in content_xml_paths:
+                content_xml_paths.insert(0, found_xml)
+
     if folder_to_icaos is None or third_party_airport_pkgs is None:
         folder_to_icaos, third_party_airport_pkgs = get_folder_to_icaos_map()
 
@@ -95,17 +102,21 @@ def update_msfs_content_xml(keep_icaos=None, restore_all=False, folder_to_icaos=
 
             for elem in tree.findall('Package'):
                 name = elem.get('name', '')
-                name_clean_lower = (name[:-9] if name.endswith('.disabled') else name).lower()
+                name_clean = name[:-9] if name.endswith('.disabled') else name
+                name_clean_lower = name_clean.lower()
+                norm_name = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', name_clean_lower)
 
                 if restore_all:
                     if elem.get('active') == 'UserDisabled':
                         elem.set('active', 'Activated')
                 else:
-                    # ONLY toggle 3rd-party airport scenery packages in Content.xml
+                    # ONLY toggle airport scenery packages in Content.xml
                     # NEVER touch aircraft, navdata, GSX, liveries, or core MSFS packages!
-                    if name_clean_lower in third_party_airport_pkgs:
-                        pkg_icaos = folder_to_icaos.get(name_clean_lower, set())
-                        if any(k in target_icaos for k in pkg_icaos):
+                    pkg_icaos = folder_to_icaos.get(name_clean_lower) or folder_to_icaos.get(norm_name) or resolve_package_icaos(norm_name)
+                    is_airport_pkg = bool(pkg_icaos) or (name_clean_lower in third_party_airport_pkgs) or (norm_name in third_party_airport_pkgs)
+
+                    if is_airport_pkg:
+                        if any(k in target_icaos for k in (pkg_icaos or [])):
                             elem.set('active', 'Activated')
                         else:
                             elem.set('active', 'UserDisabled')
@@ -1307,9 +1318,16 @@ class Api:
                                 continue
 
                             item_clean = item[:-9] if item.endswith('.disabled') else item
-                            pkg_icaos = folder_to_icaos.get(item_clean.lower()) or resolve_package_icaos(item_clean)
+                            item_clean_lower = item_clean.lower()
+                            pkg_icaos = folder_to_icaos.get(item_clean_lower) or resolve_package_icaos(item_clean)
 
-                            is_keep = any(k in keep_icaos for k in pkg_icaos)
+                            # ONLY process packages that actually represent airport sceneries!
+                            # NEVER rename liveries, aircraft, tools, GSX, or utilities!
+                            is_airport_pkg = bool(pkg_icaos) or (item_clean_lower in third_party_airport_pkgs)
+                            if not is_airport_pkg:
+                                continue
+
+                            is_keep = any(k in keep_icaos for k in (pkg_icaos or []))
 
                             if is_community:
                                 try:
