@@ -585,7 +585,7 @@ async function executeRestoreAllSceneries() {
         title: '',
         message: `<div class="flex flex-col items-center justify-center py-2 text-center">` +
                  `  <p class="text-sm text-slate-100 font-bold mb-1">Restoring Full Scenery Library</p>` +
-                 `  <p class="text-xs text-slate-400">Re-enabling all previously isolated sceneries and restoring Content.xml...<br>Please wait a moment.</p>` +
+                 `  <p class="text-xs text-slate-400">Re-enabling all previously isolated sceneries and restoring Content.xml...<br>Please wait<span class="loading-dots ml-0.5"><span>.</span><span>.</span><span>.</span></span></p>` +
                  `</div>`,
         type: 'loading'
     });
@@ -2613,7 +2613,7 @@ async function executeFlightCorridorOptimization() {
         title: '',
         message: `<div class="flex flex-col items-center justify-center py-2 text-center">` +
                  `  <p class="text-sm text-slate-100 font-bold mb-1">Optimizing MSFS Scenery Library</p>` +
-                 `  <p class="text-xs text-slate-400">Isolating non-flight sceneries & updating Content.xml...<br>Please wait a moment.</p>` +
+                 `  <p class="text-xs text-slate-400">Isolating non-flight sceneries & updating Content.xml...<br>Please wait<span class="loading-dots ml-0.5"><span>.</span><span>.</span><span>.</span></span></p>` +
                  `</div>`,
         type: 'loading'
     });
@@ -2672,7 +2672,7 @@ async function restoreFlightCorridorSceneries() {
         title: '',
         message: `<div class="flex flex-col items-center justify-center py-2 text-center">` +
                  `  <p class="text-sm text-slate-100 font-bold mb-1">Restoring Full Scenery Library</p>` +
-                 `  <p class="text-xs text-slate-400">Re-enabling all previously isolated sceneries and restoring Content.xml...<br>Please wait a moment.</p>` +
+                 `  <p class="text-xs text-slate-400">Re-enabling all previously isolated sceneries and restoring Content.xml...<br>Please wait<span class="loading-dots ml-0.5"><span>.</span><span>.</span><span>.</span></span></p>` +
                  `</div>`,
         type: 'loading'
     });
@@ -6549,7 +6549,7 @@ function restoreAllFlightSceneriesUI() {
         title: '',
         message: `<div class="flex flex-col items-center justify-center py-2 text-center">` +
                  `  <p class="text-sm text-slate-100 font-bold mb-1">Restoring Full Scenery Library</p>` +
-                 `  <p class="text-xs text-slate-400">Re-enabling all previously isolated sceneries and restoring Content.xml...<br>Please wait a moment.</p>` +
+                 `  <p class="text-xs text-slate-400">Re-enabling all previously isolated sceneries and restoring Content.xml...<br>Please wait<span class="loading-dots ml-0.5"><span>.</span><span>.</span><span>.</span></span></p>` +
                  `</div>`,
         type: 'loading'
     });
