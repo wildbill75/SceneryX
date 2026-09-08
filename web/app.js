@@ -2581,11 +2581,9 @@ function getCorridorAddonsList() {
 }
 
 function setFlightCorridorProfile(profile) {
+    if (isFlightCorridorOptimized) return;
     if (flightCorridorProfile === profile) return;
     flightCorridorProfile = profile;
-    if (isFlightCorridorOptimized) {
-        isFlightCorridorOptimized = false;
-    }
     filterAirports();
     updateFlightPlanningBannerUI();
     const label = profile === 'CORRIDOR' ? 'En-Route (Path Addons)' : 'Direct (DEP + ARR Only)';
@@ -2688,8 +2686,11 @@ async function restoreFlightCorridorSceneries() {
                     allAirportsData = res.airports;
                 }
 
-                updateFlightPlanningBannerUI();
-                updatePersistentFlightBannerUI({ active: false });
+                if (res.airports && res.airports.length > 0) {
+                    allAirportsData = res.airports;
+                }
+
+                closePlanningBannerClean();
                 filterAirports();
 
                 showCustomModal({
@@ -2717,6 +2718,7 @@ function updateFlightPlanningBannerUI() {
     const destTag = document.getElementById('fp-dest-tag');
     const guideText = document.getElementById('fp-guide-text');
     const actionsContainer = document.getElementById('fp-actions');
+    const profileToggle = document.getElementById('fp-profile-toggle');
     const corridorBtn = document.getElementById('fp-btn-corridor');
     const directBtn = document.getElementById('fp-btn-direct');
     const corridorLabel = document.getElementById('fp-corridor-label');
@@ -2758,14 +2760,38 @@ function updateFlightPlanningBannerUI() {
                 corridorLabel.innerText = `En-Route`;
             }
 
-            // Style active profile button
+            // Style active profile button & lock if optimized
             if (corridorBtn && directBtn) {
-                if (flightCorridorProfile === 'CORRIDOR') {
-                    corridorBtn.className = "px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer bg-cyan-600 text-white shadow-sm shadow-cyan-600/30";
-                    directBtn.className = "px-3 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 transition-all cursor-pointer";
+                if (isFlightCorridorOptimized) {
+                    corridorBtn.disabled = true;
+                    directBtn.disabled = true;
+                    if (flightCorridorProfile === 'CORRIDOR') {
+                        corridorBtn.className = "px-3 py-1 rounded-lg text-xs font-bold bg-cyan-900/50 text-cyan-300/70 border border-cyan-500/30 cursor-not-allowed pointer-events-none";
+                        directBtn.className = "px-3 py-1 rounded-lg text-xs font-medium text-slate-600 cursor-not-allowed pointer-events-none";
+                    } else {
+                        directBtn.className = "px-3 py-1 rounded-lg text-xs font-bold bg-cyan-900/50 text-cyan-300/70 border border-cyan-500/30 cursor-not-allowed pointer-events-none";
+                        corridorBtn.className = "px-3 py-1 rounded-lg text-xs font-medium text-slate-600 cursor-not-allowed pointer-events-none";
+                    }
                 } else {
-                    directBtn.className = "px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer bg-cyan-600 text-white shadow-sm shadow-cyan-600/30";
-                    corridorBtn.className = "px-3 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 transition-all cursor-pointer";
+                    corridorBtn.disabled = false;
+                    directBtn.disabled = false;
+                    if (flightCorridorProfile === 'CORRIDOR') {
+                        corridorBtn.className = "px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer bg-cyan-600 text-white shadow-sm shadow-cyan-600/30";
+                        directBtn.className = "px-3 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 transition-all cursor-pointer";
+                    } else {
+                        directBtn.className = "px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer bg-cyan-600 text-white shadow-sm shadow-cyan-600/30";
+                        corridorBtn.className = "px-3 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 transition-all cursor-pointer";
+                    }
+                }
+            }
+
+            if (profileToggle) {
+                if (isFlightCorridorOptimized) {
+                    profileToggle.className = "flex items-center bg-slate-950/40 p-0.5 rounded-xl border border-slate-800/40 opacity-50 cursor-not-allowed pointer-events-none transition-all";
+                    profileToggle.title = "Profile mode is locked during flight. Click 'Restore' to reset your library.";
+                } else {
+                    profileToggle.className = "flex items-center bg-slate-950/80 p-0.5 rounded-xl border border-slate-800 transition-all";
+                    profileToggle.removeAttribute('title');
                 }
             }
 
@@ -2879,8 +2905,8 @@ function exitFlightPlanningMode(forceRestore = false) {
                      `  <p>What would you like to do?</p>` +
                      `</div>`,
             type: 'info',
-            confirmText: 'Keep Optimization (Flight Mode)',
-            cancelText: 'Restore All Sceneries Now',
+            confirmText: 'Keep Optimization',
+            cancelText: 'Restore All',
             showCancel: true,
             onConfirm: () => {
                 closePlanningBannerKeepOptimization();

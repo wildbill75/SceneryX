@@ -564,7 +564,7 @@
                 <!-- DUAL PROFILE ACTIONS & OPTIMIZATION (VISIBLE WHEN ARRIVAL IS SELECTED) -->
                 <div id="fp-actions" class="hidden items-center gap-2">
                     <!-- Segmented Profile Selector -->
-                    <div class="flex items-center bg-slate-950/80 p-0.5 rounded-xl border border-slate-800">
+                    <div id="fp-profile-toggle" class="flex items-center bg-slate-950/80 p-0.5 rounded-xl border border-slate-800 transition-all">
                         <button id="fp-btn-corridor" onclick="setFlightCorridorProfile('CORRIDOR')" class="px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer bg-cyan-600 text-white shadow-sm shadow-cyan-600/30" title="Keeps active your departure, arrival, and all custom sceneries along your flight path. Disables everything else.">
                             <span id="fp-corridor-label">En-Route</span>
                         </button>
