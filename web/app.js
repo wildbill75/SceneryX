@@ -536,12 +536,15 @@ async function executeFlightOptimizer() {
         return;
     }
 
-    const routeText = keepIcaos.join(' ➔ ');
-    showCustomModal(
-        `Optimizing Flight (${routeText})`,
-        `Disabling all other sceneries to maximize MSFS performance...`,
-        "info"
-    );
+    showCustomModal({
+        title: '',
+        message: `<div class="flex flex-col items-center justify-center py-2 text-center">` +
+                 `  <p class="text-sm text-slate-100 font-bold mb-1">Optimizing Flight (${routeText})</p>` +
+                 `  <p class="text-xs text-slate-400">Disabling non-flight sceneries to maximize MSFS performance...</p>` +
+                 `  <p class="mt-3.5 text-sm font-bold text-slate-100">Please wait<span class="loading-dots ml-1"><span>.</span><span>.</span><span>.</span></span></p>` +
+                 `</div>`,
+        type: 'loading'
+    });
 
     try {
         if (window.pywebview) {
@@ -585,7 +588,8 @@ async function executeRestoreAllSceneries() {
         title: '',
         message: `<div class="flex flex-col items-center justify-center py-2 text-center">` +
                  `  <p class="text-sm text-slate-100 font-bold mb-1">Restoring Full Scenery Library</p>` +
-                 `  <p class="text-xs text-slate-400">Re-enabling all previously isolated sceneries and restoring Content.xml...<br>Please wait<span class="loading-dots ml-0.5"><span>.</span><span>.</span><span>.</span></span></p>` +
+                 `  <p class="text-xs text-slate-400">Re-enabling all previously isolated sceneries and restoring Content.xml...</p>` +
+                 `  <p class="mt-3.5 text-sm font-bold text-slate-100">Please wait<span class="loading-dots ml-1"><span>.</span><span>.</span><span>.</span></span></p>` +
                  `</div>`,
         type: 'loading'
     });
@@ -2613,7 +2617,8 @@ async function executeFlightCorridorOptimization() {
         title: '',
         message: `<div class="flex flex-col items-center justify-center py-2 text-center">` +
                  `  <p class="text-sm text-slate-100 font-bold mb-1">Optimizing MSFS Scenery Library</p>` +
-                 `  <p class="text-xs text-slate-400">Isolating non-flight sceneries & updating Content.xml...<br>Please wait<span class="loading-dots ml-0.5"><span>.</span><span>.</span><span>.</span></span></p>` +
+                 `  <p class="text-xs text-slate-400">Isolating non-flight sceneries & updating Content.xml...</p>` +
+                 `  <p class="mt-3.5 text-sm font-bold text-slate-100">Please wait<span class="loading-dots ml-1"><span>.</span><span>.</span><span>.</span></span></p>` +
                  `</div>`,
         type: 'loading'
     });
@@ -2672,7 +2677,8 @@ async function restoreFlightCorridorSceneries() {
         title: '',
         message: `<div class="flex flex-col items-center justify-center py-2 text-center">` +
                  `  <p class="text-sm text-slate-100 font-bold mb-1">Restoring Full Scenery Library</p>` +
-                 `  <p class="text-xs text-slate-400">Re-enabling all previously isolated sceneries and restoring Content.xml...<br>Please wait<span class="loading-dots ml-0.5"><span>.</span><span>.</span><span>.</span></span></p>` +
+                 `  <p class="text-xs text-slate-400">Re-enabling all previously isolated sceneries and restoring Content.xml...</p>` +
+                 `  <p class="mt-3.5 text-sm font-bold text-slate-100">Please wait<span class="loading-dots ml-1"><span>.</span><span>.</span><span>.</span></span></p>` +
                  `</div>`,
         type: 'loading'
     });
@@ -4633,7 +4639,17 @@ function resetFullDatabase() {
         onConfirm: () => {
             closeSettingsModal();
             if (!window.pywebview) return;
+            showCustomModal({
+                title: '',
+                message: `<div class="flex flex-col items-center justify-center py-2 text-center">` +
+                         `  <p class="text-sm text-slate-100 font-bold mb-1">Resetting & Rescanning Scenery Database</p>` +
+                         `  <p class="text-xs text-slate-400">Re-enabling packages & refreshing Community & Official sceneries...</p>` +
+                         `  <p class="mt-3.5 text-sm font-bold text-slate-100">Please wait<span class="loading-dots ml-1"><span>.</span><span>.</span><span>.</span></span></p>` +
+                         `</div>`,
+                type: 'loading'
+            });
             window.pywebview.api.reset_full_database().then(resStr => {
+                closeCustomModal();
                 try {
                     const res = JSON.parse(resStr);
                     if (res.status === 'success') {
@@ -4643,7 +4659,7 @@ function resetFullDatabase() {
                         showToast('✓ Database reset & freshly scanned', 'success');
                     }
                 } catch(e){}
-            });
+            }).catch(() => { closeCustomModal(); });
         }
     });
 }
@@ -6466,6 +6482,16 @@ function confirmSimBriefOptimization() {
     const destStr = (currentSimBriefFlight.destination && currentSimBriefFlight.destination.icao) ? currentSimBriefFlight.destination.icao : (typeof currentSimBriefFlight.destination === 'string' ? currentSimBriefFlight.destination : '');
     const routeName = (origStr && destStr) ? `${origStr} ➔ ${destStr}` : 'SimBrief Route';
 
+    showCustomModal({
+        title: '',
+        message: `<div class="flex flex-col items-center justify-center py-2 text-center">` +
+                 `  <p class="text-sm text-slate-100 font-bold mb-1">Optimizing MSFS Scenery Library</p>` +
+                 `  <p class="text-xs text-slate-400">Isolating non-flight sceneries (${routeName}) & updating Content.xml...</p>` +
+                 `  <p class="mt-3.5 text-sm font-bold text-slate-100">Please wait<span class="loading-dots ml-1"><span>.</span><span>.</span><span>.</span></span></p>` +
+                 `</div>`,
+        type: 'loading'
+    });
+
     const apiFn = window.pywebview.api.optimize_flight_mode || window.pywebview.api.optimize_flight;
     apiFn.call(window.pywebview.api, JSON.stringify(flightIcaos)).then(resStr => {
         try {
@@ -6549,7 +6575,8 @@ function restoreAllFlightSceneriesUI() {
         title: '',
         message: `<div class="flex flex-col items-center justify-center py-2 text-center">` +
                  `  <p class="text-sm text-slate-100 font-bold mb-1">Restoring Full Scenery Library</p>` +
-                 `  <p class="text-xs text-slate-400">Re-enabling all previously isolated sceneries and restoring Content.xml...<br>Please wait<span class="loading-dots ml-0.5"><span>.</span><span>.</span><span>.</span></span></p>` +
+                 `  <p class="text-xs text-slate-400">Re-enabling all previously isolated sceneries and restoring Content.xml...</p>` +
+                 `  <p class="mt-3.5 text-sm font-bold text-slate-100">Please wait<span class="loading-dots ml-1"><span>.</span><span>.</span><span>.</span></span></p>` +
                  `</div>`,
         type: 'loading'
     });
