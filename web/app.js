@@ -2762,8 +2762,8 @@ function updateFlightPlanningBannerUI() {
 
         if (titleZone) {
             if (isFlightCorridorOptimized) {
-                const modeLabel = flightCorridorProfile === 'DIRECT' ? 'Direct' : 'En-route';
-                titleZone.title = `Optimization active : ${modeLabel}`;
+                const modeLabel = flightCorridorProfile === 'DIRECT' ? t('optimizer.direct', 'Direct') : t('optimizer.en_route', 'En-route');
+                titleZone.title = `${t('optimizer.active_tooltip_prefix', 'Optimization active :')} ${modeLabel}`;
             } else {
                 titleZone.removeAttribute('title');
             }
@@ -2800,7 +2800,7 @@ function updateFlightPlanningBannerUI() {
             }
 
             if (corridorLabel) {
-                corridorLabel.innerText = `En-Route`;
+                corridorLabel.innerText = t('optimizer.en_route', 'En-Route');
             }
 
             // Style active profile button & lock if optimized
@@ -2847,7 +2847,7 @@ function updateFlightPlanningBannerUI() {
                     optimizedBadge.classList.add('flex');
                 }
                 if (optimizedText) {
-                    optimizedText.innerText = `${flightCorridorDisabledCount} addons disabled`;
+                    optimizedText.innerText = `${flightCorridorDisabledCount} ${t('optimizer.addons_disabled', 'addons disabled')}`;
                     optimizedText.classList.remove('hidden');
                 }
             } else {
@@ -2865,7 +2865,7 @@ function updateFlightPlanningBannerUI() {
             // Waiting for arrival selection
             if (guideText) {
                 guideText.classList.remove('hidden');
-                guideText.innerText = `Alt+Click an airport to set Destination`;
+                guideText.innerText = t('optimizer.guide_destination', 'Alt+Click an airport to set Destination');
             }
             if (actionsContainer) {
                 actionsContainer.classList.add('hidden');
@@ -2908,7 +2908,7 @@ function updatePersistentFlightBannerUI(flightMode) {
             routeEl.innerText = flightMode.icaos.join(' ➔ ');
         }
         if (countEl) {
-            countEl.innerText = `${flightMode.disabled_count || 0} sceneries isolated`;
+            countEl.innerText = `${flightMode.disabled_count || 0} ${t('flight_mode.sceneries_isolated', 'sceneries isolated')}`;
         }
         banner.classList.remove('hidden');
         banner.classList.add('flex');
@@ -2962,8 +2962,8 @@ function exitFlightPlanningMode(forceRestore = false) {
                      `  <p>What would you like to do?</p>` +
                      `</div>`,
             type: 'info',
-            confirmText: 'Keep Optimization',
-            cancelText: 'Restore All',
+            confirmText: t('exit.keep_isolation', 'Keep Optimization'),
+            cancelText: t('exit.restore_sceneries', 'Restore All'),
             showCancel: true,
             onConfirm: () => {
                 closePlanningBannerKeepOptimization();
@@ -3732,12 +3732,12 @@ function showAirportDetails(ap) {
         
         let tagText = "";
         if (ap.is_custom_price) {
-            tagText = `Paid: ${formattedP}`;
+            tagText = `${t('drawer.paid_prefix', 'Paid:')} ${formattedP}`;
         } else if (ap.is_bundle || ap.bundle_total_price) {
             const bTotalFormatted = formatCurrency(ap.bundle_total_price || 39.00);
-            tagText = `Bundle: ${bTotalFormatted}`;
+            tagText = `${t('drawer.bundle_prefix', 'Bundle:')} ${bTotalFormatted}`;
         } else {
-            tagText = `Est: ${formattedP}`;
+            tagText = `${t('drawer.est_prefix', 'Est:')} ${formattedP}`;
         }
         const priceTagEl = document.getElementById('drawer-price-tag');
         if (priceTagEl) priceTagEl.innerText = tagText;
@@ -6195,9 +6195,9 @@ function openExportModal() {
     const scopeEl = document.querySelector('input[name="export-scope"]:checked');
     if (txtEl && scopeEl) {
         if (scopeEl.value === 'all') {
-            txtEl.innerText = `Exports all ${allAirportsData.length} installed sceneries (physical sceneries & streamed Marketplace).`;
+            txtEl.innerText = t('export.scope_all_desc', `Exports your entire scenery collection (physical sceneries & streamed Marketplace).`);
         } else {
-            txtEl.innerText = `Exports only the ${currentlyFilteredAirports.length} sceneries currently visible on the map based on active filters (Payware, GSX, etc.).`;
+            txtEl.innerText = t('export.scope_filtered_desc', `Exports only the sceneries currently matching your active sidebar filters.`);
         }
     }
 
@@ -6205,9 +6205,9 @@ function openExportModal() {
         radio.onclick = function() {
             if (!txtEl) return;
             if (this.value === 'all') {
-                txtEl.innerText = `Exports all ${allAirportsData.length} installed sceneries (physical sceneries & streamed Marketplace).`;
+                txtEl.innerText = t('export.scope_all_desc', `Exports your entire scenery collection (physical sceneries & streamed Marketplace).`);
             } else {
-                txtEl.innerText = `Exports only the ${currentlyFilteredAirports.length} sceneries currently visible on the map based on active filters (Payware, GSX, etc.).`;
+                txtEl.innerText = t('export.scope_filtered_desc', `Exports only the sceneries currently matching your active sidebar filters.`);
             }
         };
     });
@@ -6535,7 +6535,13 @@ function openSimBriefModal(flight) {
     const toKeep = thirdPartyAirports.filter(a => routeIcaos.includes(a.icao));
     const toDisableCount = thirdPartyAirports.length - toKeep.length;
 
-    document.getElementById('sb-modal-impact-text').innerText = `${toDisableCount} non-route 3rd-party sceneries will be disabled to boost FPS and stability. ${toKeep.length} installed route scenery package(s) (${toKeep.map(a=>a.icao).join(', ') || 'None'}) will remain 100% active.`;
+    const toKeepList = toKeep.map(a => a.icao).join(', ') || 'None';
+    const impactTemplate = t('simbrief_modal.impact_summary', '{toDisable} non-route 3rd-party sceneries will be disabled to boost FPS and stability. {toKeepCount} installed route scenery package(s) ({toKeepList}) will remain 100% active.');
+    const impactText = impactTemplate
+        .replace('{toDisable}', toDisableCount)
+        .replace('{toKeepCount}', toKeep.length)
+        .replace('{toKeepList}', toKeepList);
+    document.getElementById('sb-modal-impact-text').innerText = impactText;
 
     const modal = document.getElementById('simbrief-modal');
     if (modal) modal.classList.remove('hidden');
@@ -6947,8 +6953,9 @@ function openPaywareStoresModal(icao, airportName) {
     const subtitle = document.getElementById('payware-modal-subtitle');
     if (subtitle) {
         const titleText = airportName ? `${cleanIcao} - ${airportName}` : cleanIcao;
-        subtitle.innerText = `Results for "${titleText}"`;
-        subtitle.title = `Results for "${titleText}"`;
+        const localizedSubtitle = t('stores.results_for', 'Results for "{title}"').replace('{title}', titleText);
+        subtitle.innerText = localizedSubtitle;
+        subtitle.title = localizedSubtitle;
     }
 
     const listContainer = document.getElementById('payware-stores-list');

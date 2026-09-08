@@ -158,7 +158,7 @@
 
             <!-- App Subtitle -->
             <div class="space-y-1">
-                <p id="splash-status-text" class="text-xs text-slate-400 font-medium">Scanning MSFS 2024 Sceneries & GSX Profiles...</p>
+                <p id="splash-status-text" data-i18n="splash.status" class="text-xs text-slate-400 font-medium">Scanning MSFS 2024 Sceneries & GSX Profiles...</p>
             </div>
 
             <!-- Progress Bar -->
@@ -167,7 +167,7 @@
                     <div id="splash-progress-bar" class="bg-gradient-to-r from-cyan-500 via-indigo-500 to-cyan-400 h-full rounded-full transition-all duration-300 w-[10%]"></div>
                 </div>
                 <div class="flex justify-between items-center text-[10px] font-mono text-slate-500">
-                    <span id="splash-folder-text" class="truncate max-w-[200px]">Scanning packages...</span>
+                    <span id="splash-folder-text" data-i18n="splash.folder" class="truncate max-w-[200px]">Scanning packages...</span>
                     <span id="splash-percent-text" class="font-bold text-cyan-400">10%</span>
                 </div>
             </div>
@@ -439,26 +439,26 @@
                     <div class="flex items-center justify-between mb-2.5">
                         <label class="text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
                             <i class="fa-solid fa-plane-flight text-amber-400"></i>
-                            <span>SimBrief Flight Mode</span>
+                            <span data-i18n="simbrief.title">SimBrief Flight Mode</span>
                         </label>
-                        <span id="sb-status-badge" class="text-[9px] font-bold font-mono px-2 py-0.5 rounded-full bg-slate-900 text-slate-400 border border-slate-800">INACTIVE</span>
+                        <span id="sb-status-badge" data-i18n="simbrief.status_inactive" class="text-[9px] font-bold font-mono px-2 py-0.5 rounded-full bg-slate-900 text-slate-400 border border-slate-800">INACTIVE</span>
                     </div>
                     
                     <div class="space-y-2.5">
                         <div class="grid grid-cols-2 gap-2">
                             <div>
-                                <span class="text-[10px] text-slate-400 font-semibold block mb-1">SimBrief Username</span>
+                                <span data-i18n="simbrief.username_label" class="text-[10px] text-slate-400 font-semibold block mb-1">SimBrief Username</span>
                                 <input type="text" id="sb-username-input" onkeydown="if(event.key==='Enter') autoSyncSimBrief('username')" onblur="autoSyncSimBrief('username')" placeholder="Username" class="w-full bg-slate-900/90 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500 font-mono transition-all">
                             </div>
                             <div>
-                                <span class="text-[10px] text-slate-400 font-semibold block mb-1">Pilot ID</span>
+                                <span data-i18n="simbrief.pilot_id_label" class="text-[10px] text-slate-400 font-semibold block mb-1">Pilot ID</span>
                                 <input type="text" id="sb-userid-input" onkeydown="if(event.key==='Enter') autoSyncSimBrief('userid')" onblur="autoSyncSimBrief('userid')" placeholder="Pilot ID" class="w-full bg-slate-900/90 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500 font-mono transition-all">
                             </div>
                         </div>
 
                         <button id="sb-import-btn" onclick="triggerSimBriefImport()" class="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 text-amber-300 font-extrabold text-xs transition-all flex items-center justify-center gap-2 shadow-sm shadow-amber-500/10 active:scale-98">
                             <i id="sb-import-icon" class="fa-solid fa-cloud-arrow-down text-amber-400"></i>
-                            <span>Import Active SimBrief OFP</span>
+                            <span data-i18n="simbrief.import_btn">Import Active SimBrief OFP</span>
                         </button>
 
                         <div id="sb-route-info" class="hidden text-[11px] font-mono text-center p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 font-semibold space-y-0.5">
@@ -523,14 +523,14 @@
                     <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                 </div>
                 <div class="flex items-center gap-2 text-xs font-mono">
-                    <span class="font-extrabold text-emerald-400 uppercase tracking-wider">FLIGHT MODE ACTIVE:</span>
+                    <span data-i18n="flight_mode.banner_prefix" class="font-extrabold text-emerald-400 uppercase tracking-wider">FLIGHT MODE ACTIVE:</span>
                     <span id="persistent-flight-route" class="font-black text-white">DEP ➔ ARR</span>
                     <span class="text-slate-600">•</span>
                     <span id="persistent-flight-count" class="text-slate-300 font-medium">0 sceneries isolated</span>
                 </div>
                 <button onclick="restoreAllFlightSceneriesUI()" class="ml-1 px-3 py-1 rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 text-amber-300 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-sm" title="Restore all sceneries back to normal">
                     <i class="fa-solid fa-rotate-left text-amber-400 text-xs"></i>
-                    <span>Restore Library</span>
+                    <span data-i18n="flight_mode.btn_restore">Restore Library</span>
                 </button>
             </div>
 
@@ -546,7 +546,7 @@
                         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                         <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                     </span>
-                    <span class="text-xs font-black font-mono uppercase tracking-wider text-slate-200">Flight Scenery Optimizer</span>
+                    <span data-i18n="optimizer.title" class="text-xs font-black font-mono uppercase tracking-wider text-slate-200">Flight Scenery Optimizer</span>
                 </div>
 
                 <div class="h-4 w-px bg-slate-800"></div>
@@ -559,36 +559,36 @@
 
                 <div class="h-4 w-px bg-slate-800"></div>
 
-                <span id="fp-guide-text" class="text-xs text-slate-300 font-medium">Alt+Click an airport to set Destination</span>
+                <span id="fp-guide-text" data-i18n="optimizer.guide_destination" class="text-xs text-slate-300 font-medium">Alt+Click an airport to set Destination</span>
 
                 <!-- DUAL PROFILE ACTIONS & OPTIMIZATION (VISIBLE WHEN ARRIVAL IS SELECTED) -->
                 <div id="fp-actions" class="hidden items-center gap-2">
                     <!-- Segmented Profile Selector -->
                     <div id="fp-profile-toggle" class="flex items-center bg-slate-950/80 p-0.5 rounded-xl border border-slate-800 transition-all">
-                        <button id="fp-btn-corridor" onclick="setFlightCorridorProfile('CORRIDOR')" class="px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer bg-cyan-600 text-white shadow-sm shadow-cyan-600/30" title="Keeps active your departure, arrival, and all custom sceneries along your flight path. Disables everything else.">
-                            <span id="fp-corridor-label">En-Route</span>
+                        <button id="fp-btn-corridor" onclick="setFlightCorridorProfile(\'CORRIDOR\')" class="px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer bg-cyan-600 text-white shadow-sm shadow-cyan-600/30" data-i18n-title="optimizer.en_route_tooltip" title="Keeps active your departure, arrival, and all custom sceneries along your flight path. Disables everything else.">
+                            <span id="fp-corridor-label" data-i18n="optimizer.en_route">En-Route</span>
                         </button>
-                        <button id="fp-btn-direct" onclick="setFlightCorridorProfile('DIRECT')" class="px-3 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 transition-all cursor-pointer" title="Maximum FPS boost: only keeps active your departure and arrival airports. Disables all other 3rd-party sceneries.">
-                            <span>Direct</span>
+                        <button id="fp-btn-direct" onclick="setFlightCorridorProfile(\'DIRECT\')" class="px-3 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 transition-all cursor-pointer" data-i18n-title="optimizer.direct_tooltip" title="Maximum FPS boost: only keeps active your departure and arrival airports. Disables all other 3rd-party sceneries.">
+                            <span data-i18n="optimizer.direct">Direct</span>
                         </button>
                     </div>
 
                     <!-- Optimize Button -->
-                    <button id="fp-btn-optimize" onclick="executeFlightCorridorOptimization()" class="px-3.5 py-1 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs transition-all shadow-md shadow-emerald-500/20 cursor-pointer active:scale-95" title="Apply optimization: disables non-flight sceneries in MSFS to boost FPS and reduce loading times">
-                        <span>Optimize</span>
+                    <button id="fp-btn-optimize" onclick="executeFlightCorridorOptimization()" class="px-3.5 py-1 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs transition-all shadow-md shadow-emerald-500/20 cursor-pointer active:scale-95" data-i18n-title="optimizer.optimize_tooltip" title="Apply optimization: disables non-flight sceneries in MSFS to boost FPS and reduce loading times">
+                        <span data-i18n="optimizer.optimize">Optimize</span>
                     </button>
 
                     <!-- Restore Button (visible when flight mode active) -->
-                    <button id="fp-btn-restore" onclick="restoreFlightCorridorSceneries()" class="hidden px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all cursor-pointer active:scale-95 border-0 shadow-sm" title="Restore all previously disabled sceneries back to normal">
-                        <span>Restore</span>
+                    <button id="fp-btn-restore" onclick="restoreFlightCorridorSceneries()" class="hidden px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all cursor-pointer active:scale-95 border-0 shadow-sm" data-i18n-title="optimizer.restore_tooltip" title="Restore all previously disabled sceneries back to normal">
+                        <span data-i18n="optimizer.restore">Restore</span>
                     </button>
                 </div>
 
                 <!-- Active Optimization Status: Plain text in white, no pill -->
                 <span id="fp-optimized-text" class="hidden text-xs font-semibold text-white whitespace-nowrap">0 addons disabled</span>
 
-                <button onclick="exitFlightPlanningMode()" class="ml-1 px-3 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold border border-slate-700 transition-all cursor-pointer active:scale-95" title="Exit Flight Optimizer (or press Escape)">
-                    <span>Exit</span>
+                <button onclick="exitFlightPlanningMode()" class="ml-1 px-3 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold border border-slate-700 transition-all cursor-pointer active:scale-95" data-i18n-title="optimizer.exit_tooltip" title="Exit Flight Optimizer (or press Escape)">
+                    <span data-i18n="optimizer.exit">Exit</span>
                 </button>
             </div>
 
@@ -602,10 +602,10 @@
                 </div>
                 <div class="flex items-center gap-2">
                     <button onclick="executeFlightOptimizer()" id="btn-run-flight-opt" class="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs transition-all shadow-md shadow-emerald-500/20 flex items-center gap-1.5 cursor-pointer">
-                        <i class="fa-solid fa-bolt"></i> <span>Disable Rest (+FPS)</span>
+                        <i class="fa-solid fa-bolt"></i> <span data-i18n="optimizer.disable_rest">Disable Rest (+FPS)</span>
                     </button>
                     <button onclick="executeRestoreAllSceneries()" id="btn-restore-all" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs border border-slate-700 transition-all cursor-pointer flex items-center gap-1">
-                        <i class="fa-solid fa-rotate-left text-slate-400"></i> Restore All
+                        <i class="fa-solid fa-rotate-left text-slate-400"></i> <span data-i18n="optimizer.restore_all">Restore All</span>
                     </button>
                     <button onclick="clearFlightSelection()" class="text-slate-500 hover:text-white p-1 text-xs transition-colors" title="Clear Flight Selection">
                         <i class="fa-solid fa-xmark"></i>
@@ -763,7 +763,7 @@
                             <div id="accordion-content-airlines" class="px-4 pb-4 pt-1 space-y-3 border-t border-slate-800/50">
                                 <div class="flex items-center justify-between pt-1">
                                     <span id="drawer-airlines-count" class="text-xs font-mono font-bold text-cyan-400">0 Airlines</span>
-                                    <span class="text-[11px] text-slate-400">Click to filter routes</span>
+                                    <span data-i18n="drawer.routes_filter_hint" class="text-[11px] text-slate-400">Click to filter routes</span>
                                 </div>
                                 <div id="drawer-airlines-list" class="grid grid-cols-3 gap-2 p-1 max-h-[440px] overflow-y-auto pr-1">
                                     <!-- Populated by app.js with 3-column grid cards -->
@@ -1214,7 +1214,7 @@
                         <div class="w-7 h-7 rounded-lg bg-cyan-600 text-white flex items-center justify-center font-bold text-xs">
                             <i class="fa-solid fa-file-export"></i>
                         </div>
-                        <h2 class="text-base font-bold text-white">Export Scenery Collection</h2>
+                        <h2 data-i18n="export.title" class="text-base font-bold text-white">Export Scenery Collection</h2>
                     </div>
                 </div>
                 <button onclick="closeExportModal()" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-xs transition-all">
@@ -1224,19 +1224,19 @@
 
             <!-- Scope Selection with Tooltips -->
             <div class="space-y-2">
-                <label class="text-xs font-bold text-slate-400 uppercase tracking-wider block">Export Scope</label>
+                <label data-i18n="export.scope" class="text-xs font-bold text-slate-400 uppercase tracking-wider block">Export Scope</label>
                 <div class="grid grid-cols-2 gap-2 text-xs">
                     <label title="Export your entire scenery collection (Payware, Freeware & Asobo)." 
                            class="p-3 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center gap-2 cursor-pointer hover:border-cyan-500/50 transition-all group relative">
                         <input type="radio" name="export-scope" value="all" checked class="accent-cyan-500">
-                        <span class="font-bold text-slate-200 group-hover:text-cyan-300">All Sceneries</span>
+                        <span data-i18n="export.all" class="font-bold text-slate-200 group-hover:text-cyan-300">All Sceneries</span>
                         <i class="fa-solid fa-circle-info text-[10px] text-slate-500 group-hover:text-cyan-400 ml-auto"></i>
                     </label>
 
                     <label title="Export only the sceneries currently visible on the map based on active filters (e.g. Payware only, GSX profile, etc.)." 
                            class="p-3 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center gap-2 cursor-pointer hover:border-cyan-500/50 transition-all group relative">
                         <input type="radio" name="export-scope" value="filtered" class="accent-cyan-500">
-                        <span class="font-bold text-slate-200 group-hover:text-cyan-300">Filtered List</span>
+                        <span data-i18n="export.filtered" class="font-bold text-slate-200 group-hover:text-cyan-300">Filtered List</span>
                         <i class="fa-solid fa-circle-info text-[10px] text-slate-500 group-hover:text-cyan-400 ml-auto"></i>
                     </label>
                 </div>
@@ -1246,9 +1246,9 @@
             <div id="export-scope-desc" class="p-3 rounded-xl bg-slate-950/40 border border-slate-800/60 text-[11px] text-slate-400 space-y-1">
                 <div class="flex items-center gap-1.5 font-bold text-cyan-400">
                     <i class="fa-solid fa-circle-info text-xs"></i>
-                    <span>Scope Details</span>
+                    <span data-i18n="export.scope_details">Scope Details</span>
                 </div>
-                <p id="export-scope-text">Exports your entire scenery collection (physical sceneries & streamed Marketplace).</p>
+                <p id="export-scope-text" data-i18n="export.scope_all_desc">Exports your entire scenery collection (physical sceneries & streamed Marketplace).</p>
             </div>
 
             <!-- Export Actions with Tooltips -->
@@ -1261,8 +1261,8 @@
                             <i class="fa-solid fa-file-csv"></i>
                         </div>
                         <div class="text-left">
-                            <div class="text-slate-200 group-hover:text-cyan-300 transition-colors">Export CSV Spreadsheet</div>
-                            <div class="text-[10px] text-slate-400 font-normal">Excel, Volanta & Elevatex compatible</div>
+                            <div data-i18n="export.csv_title" class="text-slate-200 group-hover:text-cyan-300 transition-colors">Export CSV Spreadsheet</div>
+                            <div data-i18n="export.csv_subtitle" class="text-[10px] text-slate-400 font-normal">Excel, Volanta & Elevatex compatible</div>
                         </div>
                     </div>
                     <i class="fa-solid fa-arrow-down-to-line text-slate-400 group-hover:text-white transition-colors"></i>
@@ -1276,8 +1276,8 @@
                             <i class="fa-solid fa-code"></i>
                         </div>
                         <div class="text-left">
-                            <div class="text-slate-200 group-hover:text-cyan-300 transition-colors">Export JSON Backup</div>
-                            <div class="text-[10px] text-slate-400 font-normal">Structured backup for flight sim apps</div>
+                            <div data-i18n="export.json_title" class="text-slate-200 group-hover:text-cyan-300 transition-colors">Export JSON Backup</div>
+                            <div data-i18n="export.json_subtitle" class="text-[10px] text-slate-400 font-normal">Structured backup for flight sim apps</div>
                         </div>
                     </div>
                     <i class="fa-solid fa-arrow-down-to-line text-slate-400 group-hover:text-white transition-colors"></i>
@@ -1295,7 +1295,7 @@
                         <i class="fa-solid fa-store"></i>
                     </div>
                     <div class="min-w-0">
-                        <h2 class="text-base font-bold text-white leading-tight">Payware Stores</h2>
+                        <h2 data-i18n="stores.title" class="text-base font-bold text-white leading-tight">Payware Stores</h2>
                         <p id="payware-modal-subtitle" class="text-xs font-mono text-slate-400 mt-0.5 truncate">Results for "..."</p>
                     </div>
                 </div>
@@ -1329,10 +1329,10 @@
 
             <!-- Footer Action Buttons -->
             <div class="flex items-center justify-end gap-3 pt-1">
-                <button id="custom-modal-cancel-btn" onclick="cancelCustomModal()" class="px-4 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 hover:text-white text-xs font-bold transition-all hidden">
+                <button id="custom-modal-cancel-btn" onclick="cancelCustomModal()" data-i18n="modal.cancel" class="px-4 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 hover:text-white text-xs font-bold transition-all hidden">
                     Cancel
                 </button>
-                <button id="custom-modal-confirm-btn" onclick="confirmCustomModal()" class="px-6 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition-colors border-0 cursor-pointer">
+                <button id="custom-modal-confirm-btn" onclick="confirmCustomModal()" data-i18n="modal.ok" class="px-6 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition-colors border-0 cursor-pointer">
                     OK
                 </button>
             </div>
@@ -1350,7 +1350,7 @@
                             <i class="fa-solid fa-plane-departure"></i>
                         </div>
                         <div>
-                            <h3 class="text-base font-black text-slate-100">SimBrief Flight Scenery Optimizer</h3>
+                            <h3 data-i18n="simbrief_modal.title" class="text-base font-black text-slate-100">SimBrief Flight Scenery Optimizer</h3>
                             <p id="sb-modal-flight-info" class="text-xs text-amber-400/90 font-mono font-bold"></p>
                         </div>
                     </div>
@@ -1364,13 +1364,13 @@
             <div class="grid grid-cols-2 gap-3">
                 <!-- ORIGIN -->
                 <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800/80">
-                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Origin (Departure)</span>
+                    <span data-i18n="simbrief_modal.dep" class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Origin (Departure)</span>
                     <div id="sb-modal-origin-icao" class="text-xl font-black font-mono text-cyan-400"></div>
                     <div id="sb-modal-origin-name" class="text-xs text-slate-300 font-medium truncate mt-0.5"></div>
                 </div>
                 <!-- DESTINATION -->
                 <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800/80">
-                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Destination (Arrival)</span>
+                    <span data-i18n="simbrief_modal.arr" class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Destination (Arrival)</span>
                     <div id="sb-modal-dest-icao" class="text-xl font-black font-mono text-emerald-400"></div>
                     <div id="sb-modal-dest-name" class="text-xs text-slate-300 font-medium truncate mt-0.5"></div>
                 </div>
@@ -1378,7 +1378,7 @@
 
             <!-- ALTERNATES -->
             <div class="p-3.5 rounded-xl bg-slate-900/90 border border-slate-800/80 space-y-2">
-                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Alternate Airports (Kept Active)</span>
+                <span data-i18n="simbrief_modal.alts" class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Alternate Airports (Kept Active)</span>
                 <div id="sb-modal-alternates-list" class="flex flex-wrap gap-2 text-xs"></div>
             </div>
 
@@ -1386,19 +1386,19 @@
             <div class="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-start gap-3">
                 <i class="fa-solid fa-bolt-lightning text-amber-400 text-base mt-0.5 shrink-0"></i>
                 <div>
-                    <p class="font-extrabold text-slate-100">Scenery Isolation & Performance Boost</p>
+                    <p data-i18n="simbrief_modal.boost_desc" class="font-extrabold text-slate-100">Scenery Isolation & Performance Boost</p>
                     <p id="sb-modal-impact-text" class="text-amber-200/90 text-xs mt-1 leading-relaxed font-medium"></p>
                 </div>
             </div>
 
             <!-- MODAL ACTION BUTTONS -->
             <div class="flex items-center justify-end gap-3 pt-2">
-                <button onclick="closeSimBriefModal()" class="px-4 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white text-xs font-bold transition-all">
+                <button onclick="closeSimBriefModal()" data-i18n="modal.cancel" class="px-4 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white text-xs font-bold transition-all">
                     Cancel
                 </button>
                 <button id="sb-modal-confirm-btn" onclick="confirmSimBriefOptimization()" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs transition-all shadow-lg shadow-amber-500/25 flex items-center gap-2 active:scale-95">
                     <i class="fa-solid fa-check"></i>
-                    <span>OK - Optimize Sceneries</span>
+                    <span data-i18n="simbrief_modal.btn_optimize">OK - Optimize Sceneries</span>
                 </button>
             </div>
         </div>
@@ -1409,29 +1409,24 @@
         <div class="glass-modal w-full max-w-lg rounded-3xl border border-slate-700/80 shadow-2xl overflow-hidden p-6 space-y-5 bg-slate-900/95">
             <div class="border-b border-slate-800/80 pb-3">
                 <span class="text-[10px] font-mono text-cyan-400 font-bold uppercase tracking-wider block mb-1">SceneryX System</span>
-                <h3 class="text-base font-black text-slate-100 uppercase tracking-wider">Terms of Use & Disclaimer</h3>
+                <h3 data-i18n="disclaimer.title" class="text-base font-black text-slate-100 uppercase tracking-wider">Terms of Use & Disclaimer</h3>
             </div>
 
             <div class="p-4 rounded-2xl bg-slate-950/80 border border-slate-800/80 text-xs text-slate-300 leading-relaxed space-y-3 font-sans max-h-64 overflow-y-auto">
-                <p class="font-bold text-slate-200">Please read carefully before using SceneryX:</p>
-                <p>
+                <p data-i18n="disclaimer.subtitle" class="font-bold text-slate-200">Please read carefully before using SceneryX:</p>
+                <p data-i18n="disclaimer.p1">
                     SceneryX is a scenery management tool designed for Microsoft Flight Simulator (MSFS 2020 & MSFS 2024). 
                     The software interacts directly with your Community folder, Official folder, and Content.xml configuration.
                 </p>
-                <p>
-                    SceneryX is provided <strong>"AS IS"</strong> without warranty of any kind, express or implied. 
-                    The developers shall not be held liable or responsible for any simulator file corruption, data loss, scenery conflicts, or performance changes.
-                </p>
+                <p><span data-i18n="disclaimer.p2_prefix">SceneryX is provided</span> <strong data-i18n="disclaimer.as_is">"AS IS"</strong> <span data-i18n="disclaimer.p2_suffix">without warranty of any kind, express or implied. The developers shall not be held liable or responsible for any simulator file corruption, data loss, scenery conflicts, or performance changes.</span></p>
                 <p class="text-slate-400 text-[11px]">
-                    By clicking <strong>"Agree & Continue"</strong>, you acknowledge these terms and agree to use SceneryX at your own risk.
+                    <span data-i18n="disclaimer.p3_prefix">By clicking</span> <strong data-i18n="disclaimer.agree_btn_ref">"Agree & Continue"</strong><span data-i18n="disclaimer.p3_suffix">, you acknowledge these terms and agree to use SceneryX at your own risk.</span>
                 </p>
             </div>
 
             <div class="flex items-center justify-end gap-3 pt-1">
-                <button onclick="disagreeAndExitApp()" class="px-5 py-2.5 rounded-xl bg-slate-800/90 hover:bg-red-500/20 hover:text-red-300 border border-slate-700/80 text-slate-300 text-xs font-bold transition-all cursor-pointer">
-                    Disagree
-                </button>
-                <button onclick="agreeAndContinueApp()" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-xs shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 hover:scale-[1.02] active:scale-95 transition-all cursor-pointer">
+                <button onclick="disagreeAndExitApp()" data-i18n="disclaimer.disagree" class="px-5 py-2.5 rounded-xl bg-slate-800/90 hover:bg-red-500/20 hover:text-red-300 border border-slate-700/80 text-slate-300 text-xs font-bold transition-all cursor-pointer">Disagree</button>
+                <button onclick="agreeAndContinueApp()" data-i18n="disclaimer.agree" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-xs shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 hover:scale-[1.02] active:scale-95 transition-all cursor-pointer">
                     Agree & Continue
                 </button>
             </div>
