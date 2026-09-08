@@ -2712,8 +2712,24 @@ async function restoreFlightCorridorSceneries() {
     }
 }
 
+function getAirportPillClass(ap) {
+    if (!ap) return "font-bold text-xs bg-slate-800 px-2.5 py-1 rounded-lg text-slate-400 border-0";
+    const cat = getAirportCategory(ap);
+    if (cat === 'PAYWARE') {
+        return "font-bold text-xs bg-purple-600 px-2.5 py-1 rounded-lg text-white border-0 shadow-sm";
+    } else if (cat === 'FREEWARE') {
+        return "font-bold text-xs bg-cyan-600 px-2.5 py-1 rounded-lg text-white border-0 shadow-sm";
+    } else if (cat === 'ASOBO') {
+        return "font-bold text-xs bg-amber-600 px-2.5 py-1 rounded-lg text-white border-0 shadow-sm";
+    } else {
+        return "font-bold text-xs bg-blue-600 px-2.5 py-1 rounded-lg text-white border-0 shadow-sm";
+    }
+}
+
 function updateFlightPlanningBannerUI() {
     const banner = document.getElementById('flight-planning-banner');
+    const titleZone = document.getElementById('fp-title-zone');
+    const statusDot = document.getElementById('fp-status-dot');
     const originTag = document.getElementById('fp-origin-tag');
     const destTag = document.getElementById('fp-dest-tag');
     const guideText = document.getElementById('fp-guide-text');
@@ -2733,16 +2749,43 @@ function updateFlightPlanningBannerUI() {
         banner.classList.remove('hidden');
         banner.classList.add('flex');
 
+        // Status indicator dot & tooltip (only visible and pulsing green when filtering is active)
+        if (statusDot) {
+            if (isFlightCorridorOptimized) {
+                statusDot.classList.remove('hidden');
+                statusDot.classList.add('flex');
+            } else {
+                statusDot.classList.add('hidden');
+                statusDot.classList.remove('flex');
+            }
+        }
+
+        if (titleZone) {
+            if (isFlightCorridorOptimized) {
+                const modeLabel = flightCorridorProfile === 'DIRECT' ? 'Direct' : 'En-route';
+                titleZone.title = `Optimization active : ${modeLabel}`;
+            } else {
+                titleZone.removeAttribute('title');
+            }
+        }
+
+        // Airport Pills (Harmonized flat background according to addon type, no DEP/ARR prefix)
         if (originTag) {
-            originTag.innerText = `DEP: ${flightPlanningDeparture ? flightPlanningDeparture.icao : '----'}`;
+            if (flightPlanningDeparture) {
+                originTag.innerText = flightPlanningDeparture.icao;
+                originTag.className = getAirportPillClass(flightPlanningDeparture);
+            } else {
+                originTag.innerText = '----';
+                originTag.className = getAirportPillClass(null);
+            }
         }
         if (destTag) {
             if (flightPlanningDestination) {
-                destTag.innerText = `ARR: ${flightPlanningDestination.icao}`;
-                destTag.className = "font-bold text-xs bg-slate-950 px-2.5 py-1 rounded-lg text-cyan-300 border border-cyan-500/40";
+                destTag.innerText = flightPlanningDestination.icao;
+                destTag.className = getAirportPillClass(flightPlanningDestination);
             } else {
-                destTag.innerText = `ARR: ----`;
-                destTag.className = "font-bold text-xs bg-slate-950 px-2.5 py-1 rounded-lg text-slate-400 border border-slate-800";
+                destTag.innerText = '----';
+                destTag.className = getAirportPillClass(null);
             }
         }
 
@@ -2804,7 +2847,8 @@ function updateFlightPlanningBannerUI() {
                     optimizedBadge.classList.add('flex');
                 }
                 if (optimizedText) {
-                    optimizedText.innerText = `ACTIVE: ${flightCorridorDisabledCount} disabled`;
+                    optimizedText.innerText = `${flightCorridorDisabledCount} addons disabled`;
+                    optimizedText.classList.remove('hidden');
                 }
             } else {
                 if (optimizeBtn) optimizeBtn.classList.remove('hidden');
@@ -2812,6 +2856,9 @@ function updateFlightPlanningBannerUI() {
                 if (optimizedBadge) {
                     optimizedBadge.classList.add('hidden');
                     optimizedBadge.classList.remove('flex');
+                }
+                if (optimizedText) {
+                    optimizedText.classList.add('hidden');
                 }
             }
         } else {
@@ -2828,6 +2875,9 @@ function updateFlightPlanningBannerUI() {
                 optimizedBadge.classList.add('hidden');
                 optimizedBadge.classList.remove('flex');
             }
+            if (optimizedText) {
+                optimizedText.classList.add('hidden');
+            }
         }
     } else {
         banner.classList.add('hidden');
@@ -2835,6 +2885,13 @@ function updateFlightPlanningBannerUI() {
         if (actionsContainer) {
             actionsContainer.classList.add('hidden');
             actionsContainer.classList.remove('flex');
+        }
+        if (statusDot) {
+            statusDot.classList.add('hidden');
+            statusDot.classList.remove('flex');
+        }
+        if (titleZone) {
+            titleZone.removeAttribute('title');
         }
     }
 }
