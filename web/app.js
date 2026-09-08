@@ -604,7 +604,7 @@ async function executeRestoreAllSceneries() {
                 updateFlightOptimizerUI();
                 filterAirports();
                 showCustomModal(
-                    "All Sceneries Restored! 🟢",
+                    "All Sceneries Restored!",
                     `Successfully re-enabled ${res.re_enabled_count} sceneries. All your add-ons are now active.`,
                     "success"
                 );
@@ -2693,9 +2693,9 @@ async function restoreFlightCorridorSceneries() {
                 filterAirports();
 
                 showCustomModal({
-                    title: 'Sceneries Restored Successfully! 🟢',
+                    title: 'Sceneries Restored Successfully!',
                     message: `<div class="space-y-2 text-xs text-slate-300">` +
-                             `  <p>Successfully re-enabled <strong class="text-emerald-400">${res.re_enabled_count || 0} scenery packages</strong>.</p>` +
+                             `  <p>Successfully re-enabled <strong>${res.re_enabled_count || 0} scenery packages</strong>.</p>` +
                              `  <p>Your full MSFS scenery library has been restored to its active state.</p>` +
                              `</div>`,
                     type: 'success',
@@ -6588,7 +6588,7 @@ function restoreAllFlightSceneriesUI() {
                 updateFlightPlanningBannerUI();
                 filterAirports();
                 showCustomModal(
-                    'Sceneries Restored 🟢',
+                    'Sceneries Restored',
                     'All 3rd-party airport sceneries have been restored to their active state.',
                     'success'
                 );
