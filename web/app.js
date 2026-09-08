@@ -559,7 +559,7 @@ async function executeFlightOptimizer() {
                 updateFlightOptimizerUI();
                 filterAirports();
                 showCustomModal(
-                    "Flight Optimizer Active! 🚀",
+                    "Flight Optimizer Active",
                     `Kept ${keepIcaos.join(' & ')} active.\nDisabled ${res.disabled_count} other sceneries for maximum FPS during your flight!`,
                     "success"
                 );
@@ -2640,25 +2640,17 @@ async function executeFlightCorridorOptimization() {
                 filterAirports();
 
                 const guideHtml = 
-                    `<div class="space-y-3">` +
-                    `  <div class="text-xs text-slate-300 space-y-1">` +
-                    `    <div>• <strong>Flight Route:</strong> ${dep.icao} ➔ ${arr.icao} (${modeLabel})</div>` +
-                    `    <div>• <strong>Active Sceneries:</strong> ${keepIcaos.length} airport(s) enabled</div>` +
-                    `    <div>• <strong>Isolated Sceneries:</strong> <span class="text-emerald-400 font-bold">${flightCorridorDisabledCount} sceneries</span> disabled for maximum FPS</div>` +
-                    `  </div>` +
-                    `  <div class="p-3 bg-slate-900/90 rounded-xl border border-emerald-500/30 text-xs text-slate-300 space-y-1.5">` +
-                    `    <div class="font-bold text-amber-300 flex items-center gap-1.5"><i class="fa-solid fa-compass text-amber-400"></i> Pilot Instructions for Flight:</div>` +
-                    `    <div>1. Launch <strong>MSFS</strong>: only your flight route sceneries will load.</div>` +
-                    `    <div>2. You may <strong>minimize or close SceneryX</strong> during your flight.</div>` +
-                    `    <div>3. When your flight is complete, click <strong>Restore</strong> to re-enable your full library.</div>` +
-                    `  </div>` +
+                    `<div class="text-xs text-slate-300 space-y-1.5 py-1">` +
+                    `  <div>• <strong>Flight Route:</strong> ${dep.icao} ➔ ${arr.icao} (${modeLabel})</div>` +
+                    `  <div>• <strong>Active Sceneries:</strong> ${keepIcaos.length} airport(s) enabled</div>` +
+                    `  <div>• <strong>Isolated Sceneries:</strong> <strong>${flightCorridorDisabledCount} sceneries</strong> disabled for maximum FPS</div>` +
                     `</div>`;
 
                 showCustomModal({
-                    title: 'Flight Optimized Successfully! 🚀',
+                    title: 'Flight Optimized Successfully!',
                     message: guideHtml,
                     type: 'success',
-                    confirmText: 'Got it, have a great flight!'
+                    confirmText: 'OK'
                 });
             } else {
                 showCustomModal('Optimization Error', res.message || 'Failed to optimize sceneries.', 'error');
@@ -2881,9 +2873,9 @@ function exitFlightPlanningMode(forceRestore = false) {
         const depIcao = flightPlanningDeparture?.icao || '';
         const arrIcao = flightPlanningDestination?.icao || '';
         showCustomModal({
-            title: 'Exit Flight Optimizer? ✈',
+            title: 'Exit Flight Optimizer?',
             message: `<div class="space-y-2 text-xs text-slate-300">` +
-                     `  <p>Your simulator is currently optimized for flight <strong>${depIcao} ➔ ${arrIcao}</strong> (<span class="text-emerald-400 font-bold">${flightCorridorDisabledCount} sceneries isolated</span>).</p>` +
+                     `  <p>Your simulator is currently optimized for flight <strong>${depIcao} ➔ ${arrIcao}</strong> (<strong>${flightCorridorDisabledCount} sceneries isolated</strong>).</p>` +
                      `  <p>What would you like to do?</p>` +
                      `</div>`,
             type: 'info',
@@ -6514,7 +6506,7 @@ function confirmSimBriefOptimization() {
                 filterAirports();
 
                 showCustomModal(
-                    'Flight Scenery Optimization Active 🚀',
+                    'Flight Scenery Optimization Active',
                     `Successfully isolated sceneries for flight ${routeName}.\n\nNon-route 3rd-party sceneries are disabled & MSFS Content.xml updated. Enjoy your flight!`,
                     'success'
                 );
