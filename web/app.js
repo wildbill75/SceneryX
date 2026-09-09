@@ -779,9 +779,21 @@ let selectedCountryCode = null;
 let selectedCountryPolygonLayer = null;
 let countryClickTimeout = null;
 
+const STANDARD_DRAWER_WIDTH = 460;
+
+function ensureStandardDrawerWidth() {
+    const drawer = document.getElementById('detail-drawer');
+    if (!drawer) return;
+    drawer.style.width = `${STANDARD_DRAWER_WIDTH}px`;
+    try {
+        localStorage.setItem('sceneryx_drawer_width', STANDARD_DRAWER_WIDTH);
+    } catch(e) {}
+}
+
 function setDrawerSlidePosition(mode) {
     const track = document.getElementById('drawer-sliding-track');
     if (!track) return;
+    ensureStandardDrawerWidth();
     if (mode === 'COUNTRY') {
         track.style.transform = 'translateX(-50%)';
     } else {
