@@ -88,7 +88,7 @@ def is_core_or_library_package(pkg_name):
         'instruments', 'navdata', 'fs-base'
     ])
 
-def update_msfs_content_xml(keep_icaos=None, restore_flight_mode=False, flight_disabled_xml=None, flight_added_xml=None, folder_to_icaos=None, third_party_airport_pkgs=None, all_airports=None):
+def get_content_xml_paths():
     local_appdata = os.getenv('LOCALAPPDATA', '')
     appdata = os.getenv('APPDATA', '')
 
@@ -105,6 +105,170 @@ def update_msfs_content_xml(keep_icaos=None, restore_flight_mode=False, flight_d
         for found_xml in glob.glob(os.path.join(limitless_cache, '**', 'Content.xml'), recursive=True):
             if found_xml not in content_xml_paths:
                 content_xml_paths.insert(0, found_xml)
+
+    return content_xml_paths
+
+def get_content_xml_path():
+    paths = get_content_xml_paths()
+    for p in paths:
+        if os.path.exists(p):
+            return p
+    return paths[0]
+
+def safe_remove_path(p):
+    """Safely removes a file, symlink, junction or folder without affecting the junction target."""
+    if not p:
+        return
+    try:
+        if os.path.islink(p):
+            os.unlink(p)
+        elif hasattr(os.path, 'isjunction') and os.path.isjunction(p):
+            os.rmdir(p)
+        elif os.path.isfile(p):
+            os.remove(p)
+        elif os.path.isdir(p):
+            import shutil
+            shutil.rmtree(p)
+    except Exception as e:
+        print(f"Warning: safe_remove_path failed on {p}: {e}")
+
+def safe_rename_path(src, dst):
+    """Safely renames src to dst, handling existing symlinks, junctions, files, and directories to prevent WinError 183."""
+    if not src:
+        return False
+    src_exists = os.path.exists(src) or os.path.islink(src) or (hasattr(os.path, 'isjunction') and os.path.isjunction(src))
+    if not src_exists:
+        return False
+    if os.path.abspath(src).lower() == os.path.abspath(dst).lower():
+        return True
+
+    dst_exists = os.path.exists(dst) or os.path.islink(dst) or (hasattr(os.path, 'isjunction') and os.path.isjunction(dst))
+    if dst_exists:
+        if os.path.islink(dst) or (hasattr(os.path, 'isjunction') and os.path.isjunction(dst)):
+            safe_remove_path(dst)
+        elif os.path.isfile(dst):
+            os.remove(dst)
+        elif os.path.isdir(dst):
+            if os.path.islink(src) or (hasattr(os.path, 'isjunction') and os.path.isjunction(src)):
+                safe_remove_path(src)
+                return True
+            else:
+                safe_remove_path(dst)
+
+    try:
+        os.rename(src, dst)
+        return True
+    except Exception as e:
+        print(f"Error renaming {src} to {dst}: {e}")
+        raise
+
+def disable_physical_package(p_path):
+    """Disables a package on disk (folder.disabled, manifest.json.disabled, layout.json.disabled)."""
+    if not p_path:
+        return p_path
+    clean_p = p_path[:-9] if p_path.endswith('.disabled') else p_path
+    dis_p = clean_p + '.disabled'
+
+    clean_exists = os.path.exists(clean_p) or os.path.islink(clean_p) or (hasattr(os.path, 'isjunction') and os.path.isjunction(clean_p))
+    dis_exists = os.path.exists(dis_p) or os.path.islink(dis_p) or (hasattr(os.path, 'isjunction') and os.path.isjunction(dis_p))
+
+    if clean_exists:
+        if not dis_exists:
+            safe_rename_path(clean_p, dis_p)
+        else:
+            safe_remove_path(dis_p)
+            safe_rename_path(clean_p, dis_p)
+
+    new_p = dis_p
+    if os.path.exists(new_p):
+        for mf in ['manifest.json', 'layout.json']:
+            mf_norm = os.path.join(new_p, mf)
+            mf_dis = os.path.join(new_p, mf + '.disabled')
+            if os.path.exists(mf_norm):
+                if os.path.exists(mf_dis):
+                    safe_remove_path(mf_dis)
+                safe_rename_path(mf_norm, mf_dis)
+    return new_p
+
+def enable_physical_package(p_path):
+    """Enables a package on disk (removes .disabled suffix from folder and manifest/layout files)."""
+    if not p_path:
+        return p_path
+    clean_p = p_path[:-9] if p_path.endswith('.disabled') else p_path
+    dis_p = clean_p + '.disabled'
+
+    clean_exists = os.path.exists(clean_p) or os.path.islink(clean_p) or (hasattr(os.path, 'isjunction') and os.path.isjunction(clean_p))
+    dis_exists = os.path.exists(dis_p) or os.path.islink(dis_p) or (hasattr(os.path, 'isjunction') and os.path.isjunction(dis_p))
+
+    if dis_exists:
+        if not clean_exists:
+            safe_rename_path(dis_p, clean_p)
+        else:
+            safe_remove_path(dis_p)
+
+    new_p = clean_p
+    if os.path.exists(new_p):
+        for mf in ['manifest.json', 'layout.json']:
+            mf_dis = os.path.join(new_p, mf + '.disabled')
+            mf_norm = os.path.join(new_p, mf)
+            if os.path.exists(mf_dis):
+                if os.path.exists(mf_norm):
+                    safe_remove_path(mf_norm)
+                safe_rename_path(mf_dis, mf_norm)
+    return new_p
+
+def set_package_state_for_icao(p_path, target_icao, should_enable):
+    """Enables or disables a package for a specific ICAO, handling multi-airport packages (bgl renaming) and single airport packages."""
+    if not p_path:
+        return
+    clean_p = p_path[:-9] if p_path.endswith('.disabled') else p_path
+    dis_p = clean_p + '.disabled'
+    target_dir = clean_p if (os.path.exists(clean_p) or os.path.islink(clean_p)) else (dis_p if (os.path.exists(dis_p) or os.path.islink(dis_p)) else None)
+    if not target_dir:
+        return
+
+    icao_l = target_icao.lower() if target_icao else ""
+    matching_bgls = []
+    other_bgls = []
+
+    if os.path.exists(target_dir):
+        for root, dirs, files in os.walk(target_dir):
+            for f in files:
+                f_l = f.lower()
+                if f_l.endswith('.bgl') or f_l.endswith('.bgl.disabled'):
+                    f_path = os.path.join(root, f)
+                    if icao_l and icao_l in f_l:
+                        matching_bgls.append(f_path)
+                    else:
+                        other_bgls.append(f_path)
+
+    if matching_bgls and len(other_bgls) > 0:
+        if target_dir.endswith('.disabled'):
+            enable_physical_package(target_dir)
+            target_dir = clean_p
+            matching_bgls = []
+            for root, dirs, files in os.walk(target_dir):
+                for f in files:
+                    if icao_l and icao_l in f.lower() and (f.lower().endswith('.bgl') or f.lower().endswith('.bgl.disabled')):
+                        matching_bgls.append(os.path.join(root, f))
+
+        for bgl_p in matching_bgls:
+            if should_enable:
+                if bgl_p.endswith('.bgl.disabled'):
+                    new_bgl = bgl_p[:-9]
+                    safe_rename_path(bgl_p, new_bgl)
+            else:
+                if bgl_p.endswith('.bgl'):
+                    new_bgl = bgl_p + '.disabled'
+                    safe_rename_path(bgl_p, new_bgl)
+    else:
+        if should_enable:
+            enable_physical_package(target_dir)
+        else:
+            disable_physical_package(target_dir)
+
+def update_msfs_content_xml(keep_icaos=None, restore_flight_mode=False, flight_disabled_xml=None, flight_added_xml=None, folder_to_icaos=None, third_party_airport_pkgs=None, all_airports=None):
+    content_xml_paths = get_content_xml_paths()
 
     if folder_to_icaos is None or third_party_airport_pkgs is None:
         folder_to_icaos, third_party_airport_pkgs = get_folder_to_icaos_map(all_airports)
@@ -618,7 +782,7 @@ class Api:
             airports = run_scan()
 
             disabled_count = 0
-            content_xml_path = r'C:\Users\Bertrand\AppData\Local\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\ThirdBuk\Content.xml'
+            content_xml_path = get_content_xml_path()
             if os.path.exists(content_xml_path):
                 import xml.etree.ElementTree as ET
                 tree = ET.parse(content_xml_path)
@@ -676,7 +840,7 @@ class Api:
 
     def restore_all_flight_sceneries(self):
         try:
-            content_xml_path = r'C:\Users\Bertrand\AppData\Local\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\ThirdBuk\Content.xml'
+            content_xml_path = get_content_xml_path()
             if os.path.exists(content_xml_path):
                 import xml.etree.ElementTree as ET
                 tree = ET.parse(content_xml_path)
@@ -726,7 +890,7 @@ class Api:
     def toggle_airport_disabled(self, icao):
         try:
             icao_target = str(icao).strip().upper()
-            content_xml_path = r'C:\Users\Bertrand\AppData\Local\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\ThirdBuk\Content.xml'
+            content_xml_path = get_content_xml_path()
             if not os.path.exists(content_xml_path):
                 return json.dumps({"status": "error", "message": "Content.xml not found"})
 
@@ -851,7 +1015,7 @@ class Api:
 
     def toggle_package(self, package_path, icao=None):
         try:
-            content_xml_path = r'C:\Users\Bertrand\AppData\Local\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\ThirdBuk\Content.xml'
+            content_xml_path = get_content_xml_path()
             pkg_name = os.path.basename(package_path)
             clean_pkg = pkg_name[:-9] if pkg_name.endswith('.disabled') else pkg_name
             p_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_pkg.lower())
@@ -932,40 +1096,6 @@ class Api:
                     is_currently_disabled = True
 
             should_enable = is_currently_disabled
-
-            # Helper function to disable a physical package directory on disk
-            def disable_physical_package(p_path):
-                if not p_path or not os.path.exists(p_path):
-                    return p_path
-                new_p = p_path
-                if not p_path.endswith('.disabled'):
-                    new_p = p_path + '.disabled'
-                    os.rename(p_path, new_p)
-                for mf in ['manifest.json', 'layout.json']:
-                    mf_norm = os.path.join(new_p, mf)
-                    mf_dis = os.path.join(new_p, mf + '.disabled')
-                    if os.path.exists(mf_norm):
-                        if os.path.exists(mf_dis):
-                            os.remove(mf_dis)
-                        os.rename(mf_norm, mf_dis)
-                return new_p
-
-            # Helper function to enable a physical package directory on disk
-            def enable_physical_package(p_path):
-                if not p_path or not os.path.exists(p_path):
-                    return p_path
-                new_p = p_path
-                if p_path.endswith('.disabled'):
-                    new_p = p_path[:-9]
-                    os.rename(p_path, new_p)
-                for mf in ['manifest.json', 'layout.json']:
-                    mf_dis = os.path.join(new_p, mf + '.disabled')
-                    mf_norm = os.path.join(new_p, mf)
-                    if os.path.exists(mf_dis):
-                        if os.path.exists(mf_norm):
-                            os.remove(mf_norm)
-                        os.rename(mf_dis, mf_norm)
-                return new_p
 
             # If turning ON target package, find all other packages for this ICAO to disable them (Mutual Exclusion)
             other_packages_to_disable = []
@@ -1049,88 +1179,7 @@ class Api:
             if not icao:
                 return json.dumps({"status": "error", "message": "No ICAO provided"})
             
-            content_xml_path = r'C:\Users\Bertrand\AppData\Local\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\ThirdBuk\Content.xml'
-            
-            def disable_physical_package(p_path):
-                if not p_path or not os.path.exists(p_path):
-                    return
-                new_p = p_path
-                if not p_path.endswith('.disabled'):
-                    new_p = p_path + '.disabled'
-                    os.rename(p_path, new_p)
-                for mf in ['manifest.json', 'layout.json']:
-                    mf_norm = os.path.join(new_p, mf)
-                    mf_dis = os.path.join(new_p, mf + '.disabled')
-                    if os.path.exists(mf_norm):
-                        if os.path.exists(mf_dis):
-                            os.remove(mf_dis)
-                        os.rename(mf_norm, mf_dis)
-
-            def enable_physical_package(p_path):
-                if not p_path or not os.path.exists(p_path):
-                    return
-                new_p = p_path
-                if p_path.endswith('.disabled'):
-                    new_p = p_path[:-9]
-                    os.rename(p_path, new_p)
-                for mf in ['manifest.json', 'layout.json']:
-                    mf_dis = os.path.join(new_p, mf + '.disabled')
-                    mf_norm = os.path.join(new_p, mf)
-                    if os.path.exists(mf_dis):
-                        if os.path.exists(mf_norm):
-                            os.remove(mf_norm)
-                        os.rename(mf_dis, mf_norm)
-
-            def set_package_state_for_icao(p_path, target_icao, should_enable):
-                if not p_path:
-                    return
-                clean_p = p_path[:-9] if p_path.endswith('.disabled') else p_path
-                dis_p = clean_p + '.disabled'
-                target_dir = clean_p if os.path.exists(clean_p) else (dis_p if os.path.exists(dis_p) else None)
-                if not target_dir:
-                    return
-
-                icao_l = target_icao.lower() if target_icao else ""
-                matching_bgls = []
-                other_bgls = []
-
-                if os.path.exists(target_dir):
-                    for root, dirs, files in os.walk(target_dir):
-                        for f in files:
-                            f_l = f.lower()
-                            if f_l.endswith('.bgl') or f_l.endswith('.bgl.disabled'):
-                                f_path = os.path.join(root, f)
-                                if icao_l and icao_l in f_l:
-                                    matching_bgls.append(f_path)
-                                else:
-                                    other_bgls.append(f_path)
-
-                if matching_bgls and len(other_bgls) > 0:
-                    if target_dir.endswith('.disabled'):
-                        enable_physical_package(target_dir)
-                        target_dir = clean_p
-                        matching_bgls = []
-                        for root, dirs, files in os.walk(target_dir):
-                            for f in files:
-                                if icao_l and icao_l in f.lower() and (f.lower().endswith('.bgl') or f.lower().endswith('.bgl.disabled')):
-                                    matching_bgls.append(os.path.join(root, f))
-
-                    for bgl_p in matching_bgls:
-                        if should_enable:
-                            if bgl_p.endswith('.bgl.disabled'):
-                                new_bgl = bgl_p[:-9]
-                                if not os.path.exists(new_bgl):
-                                    os.rename(bgl_p, new_bgl)
-                        else:
-                            if bgl_p.endswith('.bgl'):
-                                new_bgl = bgl_p + '.disabled'
-                                if not os.path.exists(new_bgl):
-                                    os.rename(bgl_p, new_bgl)
-                else:
-                    if should_enable:
-                        enable_physical_package(target_dir)
-                    else:
-                        disable_physical_package(target_dir)
+            content_xml_path = get_content_xml_path()
 
             with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
                 scanned_airports = json.load(f)
@@ -1180,89 +1229,7 @@ class Api:
             if not icao or not target_folder_name:
                 return json.dumps({"status": "error", "message": "Missing arguments"})
 
-            content_xml_path = r'C:\Users\Bertrand\AppData\Local\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\ThirdBuk\Content.xml'
-
-            def disable_physical_package(p_path):
-                if not p_path or not os.path.exists(p_path):
-                    return
-                new_p = p_path
-                if not p_path.endswith('.disabled'):
-                    new_p = p_path + '.disabled'
-                    os.rename(p_path, new_p)
-                for mf in ['manifest.json', 'layout.json']:
-                    mf_dis = os.path.join(new_p, mf + '.disabled')
-                    mf_norm = os.path.join(new_p, mf)
-                    if os.path.exists(mf_dis):
-                        if os.path.exists(mf_norm):
-                            os.remove(mf_dis)
-                        else:
-                            os.rename(mf_dis, mf_norm)
-
-            def enable_physical_package(p_path):
-                if not p_path or not os.path.exists(p_path):
-                    return
-                new_p = p_path
-                if p_path.endswith('.disabled'):
-                    new_p = p_path[:-9]
-                    os.rename(p_path, new_p)
-                for mf in ['manifest.json', 'layout.json']:
-                    mf_dis = os.path.join(new_p, mf + '.disabled')
-                    mf_norm = os.path.join(new_p, mf)
-                    if os.path.exists(mf_dis):
-                        if os.path.exists(mf_norm):
-                            os.remove(mf_norm)
-                        os.rename(mf_dis, mf_norm)
-
-            def set_package_state_for_icao(p_path, target_icao, should_enable):
-                if not p_path:
-                    return
-                clean_p = p_path[:-9] if p_path.endswith('.disabled') else p_path
-                dis_p = clean_p + '.disabled'
-                target_dir = clean_p if os.path.exists(clean_p) else (dis_p if os.path.exists(dis_p) else None)
-                if not target_dir:
-                    return
-
-                icao_l = target_icao.lower() if target_icao else ""
-                matching_bgls = []
-                other_bgls = []
-
-                if os.path.exists(target_dir):
-                    for root, dirs, files in os.walk(target_dir):
-                        for f in files:
-                            f_l = f.lower()
-                            if f_l.endswith('.bgl') or f_l.endswith('.bgl.disabled'):
-                                f_path = os.path.join(root, f)
-                                if icao_l and icao_l in f_l:
-                                    matching_bgls.append(f_path)
-                                else:
-                                    other_bgls.append(f_path)
-
-                if matching_bgls and len(other_bgls) > 0:
-                    if target_dir.endswith('.disabled'):
-                        enable_physical_package(target_dir)
-                        target_dir = clean_p
-                        matching_bgls = []
-                        for root, dirs, files in os.walk(target_dir):
-                            for f in files:
-                                if icao_l and icao_l in f.lower() and (f.lower().endswith('.bgl') or f.lower().endswith('.bgl.disabled')):
-                                    matching_bgls.append(os.path.join(root, f))
-
-                    for bgl_p in matching_bgls:
-                        if should_enable:
-                            if bgl_p.endswith('.bgl.disabled'):
-                                new_bgl = bgl_p[:-9]
-                                if not os.path.exists(new_bgl):
-                                    os.rename(bgl_p, new_bgl)
-                        else:
-                            if bgl_p.endswith('.bgl'):
-                                new_bgl = bgl_p + '.disabled'
-                                if not os.path.exists(new_bgl):
-                                    os.rename(bgl_p, new_bgl)
-                else:
-                    if should_enable:
-                        enable_physical_package(target_dir)
-                    else:
-                        disable_physical_package(target_dir)
+            content_xml_path = get_content_xml_path()
 
             target_clean = target_folder_name[:-9] if target_folder_name.lower().endswith('.disabled') else target_folder_name
             target_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', target_clean.lower())
@@ -1357,46 +1324,11 @@ class Api:
             if not path:
                 return json.dumps({"status": "error", "message": "No path provided"})
 
-            content_xml_path = r'C:\Users\Bertrand\AppData\Local\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\ThirdBuk\Content.xml'
+            content_xml_path = get_content_xml_path()
             
             clean_name = os.path.basename(path)
             if clean_name.lower().endswith('.disabled'):
                 clean_name = clean_name[:-9]
-
-            target_path = path
-
-            def disable_physical_package(p_path):
-                if not p_path or not os.path.exists(p_path):
-                    return p_path
-                new_p = p_path
-                if not p_path.endswith('.disabled'):
-                    new_p = p_path + '.disabled'
-                    os.rename(p_path, new_p)
-                for mf in ['manifest.json', 'layout.json']:
-                    mf_dis = os.path.join(new_p, mf + '.disabled')
-                    mf_norm = os.path.join(new_p, mf)
-                    if os.path.exists(mf_dis):
-                        if os.path.exists(mf_norm):
-                            os.remove(mf_dis)
-                        else:
-                            os.rename(mf_dis, mf_norm)
-                return new_p
-
-            def enable_physical_package(p_path):
-                if not p_path or not os.path.exists(p_path):
-                    return p_path
-                new_p = p_path
-                if p_path.endswith('.disabled'):
-                    new_p = p_path[:-9]
-                    os.rename(p_path, new_p)
-                for mf in ['manifest.json', 'layout.json']:
-                    mf_dis = os.path.join(new_p, mf + '.disabled')
-                    mf_norm = os.path.join(new_p, mf)
-                    if os.path.exists(mf_dis):
-                        if os.path.exists(mf_norm):
-                            os.remove(mf_norm)
-                        os.rename(mf_dis, mf_norm)
-                return new_p
 
             target_path = path
             if not os.path.isabs(target_path) or not os.path.exists(target_path):
@@ -1502,14 +1434,12 @@ class Api:
                                     if is_keep:
                                         if item.endswith('.disabled'):
                                             orig_p = os.path.join(td, item[:-9])
-                                            if not os.path.exists(orig_p):
-                                                os.rename(item_p, orig_p)
+                                            if safe_rename_path(item_p, orig_p):
                                                 enabled_count += 1
                                     else:
                                         if not item.endswith('.disabled'):
                                             dis_p = item_p + '.disabled'
-                                            if not os.path.exists(dis_p):
-                                                os.rename(item_p, dis_p)
+                                            if safe_rename_path(item_p, dis_p):
                                                 disabled_count += 1
                                                 disabled_by_flight_mode.append(item)
                                 except Exception as rename_err:
@@ -1593,12 +1523,11 @@ class Api:
 
                                 dis_p = os.path.join(td, item)
                                 orig_p = os.path.join(td, item_clean)
-                                if os.path.isdir(dis_p) and not os.path.exists(orig_p):
-                                    try:
-                                        os.rename(dis_p, orig_p)
+                                try:
+                                    if safe_rename_path(dis_p, orig_p):
                                         re_enabled_count += 1
-                                    except Exception as e:
-                                        print(f"Error restoring {dis_p}:", e)
+                                except Exception as e:
+                                    print(f"Error restoring {dis_p}:", e)
                     except Exception as e:
                         print(f"Error scanning {td} for restore:", e)
 
