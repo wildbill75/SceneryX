@@ -1483,8 +1483,12 @@
                 <button onclick="agreeAndContinueApp()" data-i18n="disclaimer.agree" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-xs shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 hover:scale-[1.02] active:scale-95 transition-all cursor-pointer">
                     Agree & Continue
                 </button>
-            </div>
         </div>
+    </div>
+
+    <!-- GLOBAL TOAST NOTIFICATION CONTAINER (CENTERED AT BOTTOM OF MAIN WINDOW) -->
+    <div id="toast-container" class="fixed bottom-8 left-1/2 -translate-x-1/2 z-[99999] pointer-events-none flex flex-col items-center gap-2 max-w-[92vw] px-4 transition-all duration-200">
+        <div id="sceneryx-toast" class="opacity-0 pointer-events-none transition-all duration-300 transform scale-95 px-5 py-3 rounded-xl flex items-center gap-3 text-xs font-semibold shadow-2xl border backdrop-blur-md max-w-full text-center"></div>
     </div>
 
     <!-- LOCALES DICTIONARY SCRIPT -->

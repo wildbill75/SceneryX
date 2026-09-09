@@ -4563,30 +4563,61 @@ async function toggleSpecificPackage(path, icao) {
     }
 }
 
-function showToast(message, type = 'success') {
+let toastTimeout = null;
+
+function showToast(message, type = 'success', duration = 3200) {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        container.className = 'fixed bottom-8 left-1/2 -translate-x-1/2 z-[99999] pointer-events-none flex flex-col items-center gap-2 max-w-[92vw] px-4 transition-all duration-200';
+        document.body.appendChild(container);
+    }
+
+    // If flight optimizer bar is currently displayed, position slightly higher so they don't collide
+    const optBar = document.getElementById('flight-optimizer-bar');
+    const isOptBarVisible = optBar && !optBar.classList.contains('hidden');
+    if (isOptBarVisible) {
+        container.classList.remove('bottom-8');
+        container.classList.add('bottom-24');
+    } else {
+        container.classList.remove('bottom-24');
+        container.classList.add('bottom-8');
+    }
+
     let toast = document.getElementById('sceneryx-toast');
     if (!toast) {
         toast = document.createElement('div');
         toast.id = 'sceneryx-toast';
-        toast.className = 'fixed bottom-6 z-[9999] px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 border transition-all duration-300 transform translate-y-10 opacity-0 pointer-events-none font-semibold text-xs backdrop-blur-md';
-        document.body.appendChild(toast);
+        container.appendChild(toast);
     }
-    
-    const drawer = document.getElementById('detail-drawer');
-    const isDrawerOpen = drawer && !drawer.classList.contains('translate-x-full');
-    const rightPosClass = isDrawerOpen ? 'right-[440px]' : 'right-6';
-    
-    if (type === 'success') {
-        toast.className = `fixed bottom-6 ${rightPosClass} z-[9999] px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 border border-emerald-500/50 bg-slate-900/95 text-emerald-300 transition-all duration-300 transform translate-y-0 opacity-100 shadow-emerald-500/20 backdrop-blur-md`;
-        toast.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400 text-base"></i> <span>${message}</span>`;
-    } else {
-        toast.className = `fixed bottom-6 ${rightPosClass} z-[9999] px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 border border-cyan-500/50 bg-slate-900/95 text-cyan-300 transition-all duration-300 transform translate-y-0 opacity-100 shadow-cyan-500/20 backdrop-blur-md`;
-        toast.innerHTML = `<i class="fa-solid fa-circle-info text-cyan-400 text-base"></i> <span>${message}</span>`;
+
+    if (toastTimeout) {
+        clearTimeout(toastTimeout);
+        toastTimeout = null;
     }
-    
-    setTimeout(() => {
-        toast.classList.add('translate-y-10', 'opacity-0', 'pointer-events-none');
-    }, 3000);
+
+    let borderColor = 'border-emerald-500';
+    let iconClass = 'fa-solid fa-circle-check text-emerald-400';
+
+    if (type === 'error') {
+        borderColor = 'border-rose-500';
+        iconClass = 'fa-solid fa-circle-xmark text-rose-400';
+    } else if (type === 'warning') {
+        borderColor = 'border-amber-500';
+        iconClass = 'fa-solid fa-triangle-exclamation text-amber-400';
+    } else if (type === 'info') {
+        borderColor = 'border-cyan-500';
+        iconClass = 'fa-solid fa-circle-info text-cyan-400';
+    }
+
+    toast.className = `px-5 py-3 rounded-xl border ${borderColor} bg-slate-900 text-slate-100 shadow-2xl flex items-center gap-3 transition-all duration-300 transform opacity-100 scale-100 pointer-events-auto font-semibold text-xs tracking-wide select-none max-w-full text-center sm:text-left`;
+    toast.innerHTML = `<i class="${iconClass} text-base shrink-0"></i> <span class="leading-relaxed">${message}</span>`;
+
+    toastTimeout = setTimeout(() => {
+        toast.classList.remove('opacity-100', 'scale-100', 'pointer-events-auto');
+        toast.classList.add('opacity-0', 'scale-95', 'pointer-events-none');
+    }, duration);
 }
 
 function openSpecificPackageFolder(path) {
@@ -4758,7 +4789,8 @@ function exitCountryMode() {
 
         const toast = document.getElementById('sceneryx-toast');
         if (toast) {
-            try { toast.remove(); } catch(e) {}
+            toast.classList.remove('opacity-100', 'scale-100', 'pointer-events-auto');
+            toast.classList.add('opacity-0', 'scale-95', 'pointer-events-none');
         }
 
         // 5. Re-filter airports for Global Map View & Reset Camera
