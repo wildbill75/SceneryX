@@ -1,6 +1,14 @@
 // SceneryX Multi-Language Localization Engine
 const LOCALES = {
     en: {
+        "country.back_to": "Back to",
+        "drawer.activate_btn": "Activate",
+        "drawer.close_drawer": "Close details",
+        "drawer.scenery_selector_title": "Scenery Source & Variants",
+        "filter.collapse_tooltip": "Collapse filter panel (Full Map)",
+        "filter.expand_tooltip": "Open filter panel",
+        "filter.open_filters": "Filters",
+        "filter.sidebar_title": "Filters",
         "badge.asobo": "Asobo",
         "badge.asobo_fix": "Asobo + Fix",
         "badge.asobo_update": "Asobo Sim Update",
@@ -312,6 +320,14 @@ const LOCALES = {
         "stores.title": "Payware Stores"
     },
     fr: {
+        "country.back_to": "Retour à",
+        "drawer.activate_btn": "Activer",
+        "drawer.close_drawer": "Fermer la fiche",
+        "drawer.scenery_selector_title": "Source & Variantes de scène",
+        "filter.collapse_tooltip": "Masquer les filtres (Mode carte)",
+        "filter.expand_tooltip": "Afficher le panneau de filtres",
+        "filter.open_filters": "Filtres",
+        "filter.sidebar_title": "Filtres",
         "badge.asobo": "Asobo",
         "badge.asobo_fix": "Asobo + Correctif",
         "badge.asobo_update": "Mise à jour Asobo",
@@ -623,6 +639,14 @@ const LOCALES = {
         "stores.title": "Boutiques Payware"
     },
     de: {
+        "country.back_to": "Zurück zu",
+        "drawer.activate_btn": "Aktivieren",
+        "drawer.close_drawer": "Details schließen",
+        "drawer.scenery_selector_title": "Szenerie-Quelle & Varianten",
+        "filter.collapse_tooltip": "Filterbereich ausblenden (Vollkarte)",
+        "filter.expand_tooltip": "Filterbereich einblenden",
+        "filter.open_filters": "Filter",
+        "filter.sidebar_title": "Filter",
         "badge.asobo": "Asobo",
         "badge.asobo_fix": "Asobo + Fix",
         "badge.asobo_update": "Asobo Sim Update",
@@ -934,6 +958,14 @@ const LOCALES = {
         "stores.title": "Payware-Stores"
     },
     es: {
+        "country.back_to": "Volver a",
+        "drawer.activate_btn": "Activar",
+        "drawer.close_drawer": "Cerrar detalles",
+        "drawer.scenery_selector_title": "Fuente y Variantes de escenario",
+        "filter.collapse_tooltip": "Ocultar filtros (Mapa completo)",
+        "filter.expand_tooltip": "Mostrar panel de filtros",
+        "filter.open_filters": "Filtros",
+        "filter.sidebar_title": "Filtros",
         "badge.asobo": "Asobo",
         "badge.asobo_fix": "Asobo + Corrección",
         "badge.asobo_update": "Asobo Sim Update",

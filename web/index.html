@@ -181,7 +181,7 @@
         <div class="flex items-center shrink-0 z-10">
             <div class="flex items-center gap-2.5">
                 <img src="header_logo.png" alt="SceneryX" class="h-8 lg:h-9 w-auto object-contain select-none pointer-events-none" />
-                <span class="text-xs font-mono font-semibold text-slate-400" title="SceneryX v1.0.3-BETA">v1.0.3-BETA</span>
+                <span class="text-xs font-mono font-semibold text-slate-400" title="SceneryX v1.0.4-BETA">v1.0.4-BETA</span>
             </div>
         </div>
 
@@ -252,6 +252,17 @@
         <!-- LEFT SIDEBAR FILTERS -->
         <aside id="sidebar-panel" style="width: 360px;" class="min-w-[320px] max-w-[600px] glass-panel z-20 flex flex-col shrink-0 border-r border-slate-800/80 transition-all duration-300 ease-in-out">
 
+            <!-- SIDEBAR HEADER (COLLAPSIBLE TOGGLE) -->
+            <div class="px-4 py-2.5 flex items-center justify-between border-b border-slate-800/80 shrink-0 bg-slate-950/40">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-sliders text-cyan-400 text-xs"></i>
+                    <span data-i18n="filter.sidebar_title" class="text-xs font-bold uppercase tracking-wider text-slate-300">Filters</span>
+                </div>
+                <button id="btn-collapse-sidebar" onclick="toggleSidebarCollapse()" data-i18n-title="filter.collapse_tooltip" title="Collapse filter panel (Full Map)" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-xs transition-colors cursor-pointer border-0">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </button>
+            </div>
+
             <div class="p-4 space-y-6 overflow-y-auto flex-1">
 
                 <!-- PRICING FILTER -->
@@ -292,28 +303,28 @@
                             <button id="filter-src-all" onclick="toggleSourceFilter('all')" 
                                     data-i18n="filter.src_all"
                                     data-i18n-title="filter.src_all_tooltip"
-                                    class="py-2 px-2.5 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center shadow-sm shadow-cyan-500/10 cursor-pointer whitespace-nowrap"
+                                    class="py-2 px-3 rounded-xl text-xs font-bold bg-cyan-600 text-white transition-colors text-center flex items-center justify-center border-0 cursor-pointer whitespace-nowrap"
                                     title="Show all sceneries across all sources (Community, Marketplace, and Official)">
                                 All Sources
                             </button>
                             <button id="filter-src-Community" onclick="toggleSourceFilter('Community')" 
                                     data-i18n="filter.src_community"
                                     data-i18n-title="filter.src_community_tooltip"
-                                    class="py-2 px-2.5 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center shadow-sm shadow-cyan-500/10 cursor-pointer whitespace-nowrap"
+                                    class="py-2 px-3 rounded-xl text-xs font-bold bg-cyan-600 text-white transition-colors text-center flex items-center justify-center border-0 cursor-pointer whitespace-nowrap"
                                     title="Third-party sceneries and addons installed in Community folders or custom directories (+ Add Path, Addon Linker)">
                                 Community
                             </button>
                             <button id="filter-src-Marketplace" onclick="toggleSourceFilter('Marketplace')" 
                                     data-i18n="filter.src_marketplace"
                                     data-i18n-title="filter.src_marketplace_tooltip"
-                                    class="py-2 px-2.5 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center shadow-sm shadow-cyan-500/10 cursor-pointer whitespace-nowrap"
+                                    class="py-2 px-3 rounded-xl text-xs font-bold bg-cyan-600 text-white transition-colors text-center flex items-center justify-center border-0 cursor-pointer whitespace-nowrap"
                                     title="Third-party sceneries purchased directly from Microsoft's in-game Marketplace (iniBuilds, Aerosoft, France VFR...)">
                                 Marketplace
                             </button>
                             <button id="filter-src-Official" onclick="toggleSourceFilter('Official')" 
                                     data-i18n="filter.src_official"
                                     data-i18n-title="filter.src_official_tooltip"
-                                    class="py-2 px-2.5 rounded-xl border text-xs font-semibold bg-cyan-500/20 text-cyan-300 border-cyan-500/40 transition-all text-center flex items-center justify-center shadow-sm shadow-cyan-500/10 cursor-pointer whitespace-nowrap"
+                                    class="py-2 px-3 rounded-xl text-xs font-bold bg-cyan-600 text-white transition-colors text-center flex items-center justify-center border-0 cursor-pointer whitespace-nowrap"
                                     title="Official Microsoft & Asobo handcrafted content (World Updates, City Updates, Deluxe editions)">
                                 Official
                             </button>
@@ -516,6 +527,12 @@
         <main class="flex-1 relative">
             <div id="map" class="w-full h-full z-10 bg-slate-950"></div>
 
+            <!-- FLOATING EXPAND SIDEBAR BUTTON (VISIBLE WHEN SIDEBAR IS COLLAPSED) -->
+            <button id="btn-expand-sidebar" onclick="toggleSidebarCollapse()" data-i18n-title="filter.expand_tooltip" title="Open filter panel" class="hidden absolute top-4 left-4 z-[1001] bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white px-3.5 py-2 rounded-xl text-xs font-bold transition-all shadow-lg flex items-center gap-2 cursor-pointer border-0 active:scale-95">
+                <i class="fa-solid fa-sliders text-cyan-400"></i>
+                <span data-i18n="filter.open_filters">Filters</span>
+            </button>
+
             <!-- PERSISTENT TOP FLIGHT MODE BANNER (Shown when Flight Mode is active outside planning drawer) -->
             <div id="persistent-flight-mode-banner" class="hidden absolute top-4 left-1/2 -translate-x-1/2 z-[1002] bg-slate-900/95 backdrop-blur-xl border border-emerald-500/50 px-4 py-2 rounded-2xl shadow-2xl shadow-black/80 items-center gap-3.5 transition-all select-none">
                 <div class="relative flex h-2.5 w-2.5 shrink-0">
@@ -622,19 +639,56 @@
 
                 <div class="p-4 overflow-y-auto flex-1 flex flex-col min-h-0">
                     <!-- AIRPORT DETAIL MODE CONTAINER -->
-                    <div id="drawer-airport-mode" class="space-y-6">
+                    <div id="drawer-airport-mode" class="space-y-4">
+                        <!-- BACK TO COUNTRY BREADCRUMB BUTTON (WHEN IN COUNTRY CONTEXT) -->
+                        <button id="btn-back-to-country" onclick="returnToCountryMode()" class="hidden w-full px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-bold transition-all flex items-center justify-between border-0 cursor-pointer group shadow-md">
+                            <span class="flex items-center gap-2 min-w-0">
+                                <i class="fa-solid fa-arrow-left text-cyan-400 group-hover:-translate-x-0.5 transition-transform text-xs"></i>
+                                <span id="btn-back-to-country-text" class="truncate">Back to Country</span>
+                            </span>
+                            <span id="btn-back-to-country-count" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-900 text-slate-300 shrink-0">0 airports</span>
+                        </button>
+
                         <!-- 1. HERO AIRPORT HEADER CARD -->
-                        <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3 shadow-lg">
+                        <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2.5 shadow-lg">
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center gap-2.5 min-w-0">
                                     <span id="drawer-icao" class="text-3xl lg:text-4xl font-black font-mono tracking-tight truncate">ICAO</span>
                                     <span id="drawer-iata" class="hidden"></span>
                                 </div>
-                                <span id="drawer-pricing-badge" class="px-3 py-1 rounded-full text-xs font-mono font-bold">Badge</span>
+                                <div class="flex items-center gap-2 shrink-0">
+                                    <span id="drawer-pricing-badge" class="px-3 py-1 rounded-full text-xs font-mono font-bold">Badge</span>
+                                    <button onclick="closeDetailDrawer()" data-i18n-title="drawer.close_drawer" title="Close details" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition-colors cursor-pointer border-0">
+                                        <i class="fa-solid fa-xmark"></i>
+                                    </button>
+                                </div>
                             </div>
                             <div>
                                 <h3 id="drawer-name" class="text-lg lg:text-xl font-extrabold text-white leading-snug tracking-wide">Airport Full Name</h3>
-                                <p id="drawer-city-country" class="text-sm font-medium text-slate-300 mt-0.5">City, Country</p>
+                                <div class="flex items-center gap-2 mt-1.5 flex-wrap">
+                                    <span id="drawer-city" class="text-xs font-medium text-slate-300">City</span>
+                                    <span class="text-slate-600 text-xs">•</span>
+                                    <button id="drawer-country-pill-btn" onclick="openCountryFromAirport()" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold cursor-pointer border-0 transition-colors" title="View country overview">
+                                        <span id="drawer-country-flag">🌐</span>
+                                        <span id="drawer-country-name">Country</span>
+                                        <i class="fa-solid fa-chevron-right text-[9px] text-slate-400"></i>
+                                    </button>
+                                </div>
+                                <p id="drawer-city-country" class="hidden text-sm font-medium text-slate-300 mt-0.5">City, Country</p>
+                            </div>
+                        </div>
+
+                        <!-- UNIFIED SCENERY SELECTOR CARD (COMMUNITY / MARKETPLACE / ASOBO / DEFAULT) -->
+                        <div id="drawer-unified-scenery-card" class="rounded-2xl bg-slate-900/90 border border-slate-800 shadow-lg overflow-hidden transition-all">
+                            <div class="px-4 py-3 bg-slate-900 border-b border-slate-800/70 flex items-center justify-between">
+                                <div class="flex items-center gap-2 min-w-0">
+                                    <i class="fa-solid fa-layer-group text-cyan-400 text-xs"></i>
+                                    <span data-i18n="drawer.scenery_selector_title" class="text-xs font-bold text-slate-300 uppercase tracking-wider">Scenery Source & Variants</span>
+                                </div>
+                                <span id="drawer-variants-count" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-300">1 Variant</span>
+                            </div>
+                            <div id="drawer-unified-scenery-container" class="p-3 space-y-2.5">
+                                <!-- Rendered dynamically by app.js -->
                             </div>
                         </div>
 
@@ -719,8 +773,8 @@
                         <!-- CONFLICT ALERT BANNER -->
                         <div id="drawer-conflict-banner" class="hidden"></div>
 
-                        <!-- 2. AVAILABLE SCENERY OPTIONS ACCORDION -->
-                        <div id="drawer-options-card" class="rounded-2xl bg-slate-900/90 border border-slate-800 shadow-lg overflow-hidden transition-all">
+                        <!-- 2. AVAILABLE SCENERY OPTIONS ACCORDION (REPLACED BY TOP UNIFIED SCENERY SELECTOR) -->
+                        <div id="drawer-options-card" class="rounded-2xl bg-slate-900/90 border border-slate-800 shadow-lg overflow-hidden transition-all hidden">
                             <button type="button" onclick="toggleDrawerAccordion('options')" class="w-full px-4 py-3.5 flex items-center justify-between gap-3 text-left hover:bg-slate-800/40 transition-colors cursor-pointer select-none">
                                 <div class="flex items-center gap-2 min-w-0">
                                     <span data-i18n="drawer.scenery_options" class="text-xs font-bold text-slate-300 uppercase tracking-wider shrink-0 leading-tight">Available Scenery Options</span>
@@ -819,32 +873,32 @@
 
                     <!-- COUNTRY OVERVIEW MODE CONTAINER -->
                     <div id="drawer-country-mode" class="space-y-4 hidden flex-1 flex flex-col min-h-0">
-                        <!-- 1. HERO COUNTRY HEADER CARD WITH GRADIENT OPACITY FLAG -->
-                        <div class="p-4 rounded-2xl bg-gradient-to-br from-indigo-950/90 via-slate-900 to-slate-950 border border-indigo-500/30 space-y-3 shadow-xl relative overflow-hidden shrink-0">
+                        <!-- 1. HERO COUNTRY HEADER CARD -->
+                        <div class="p-4 rounded-2xl bg-slate-900/95 border border-slate-800 space-y-3 shadow-xl relative overflow-hidden shrink-0">
                             <!-- FULL-WIDTH COUNTRY FLAG IN SUBTLE OPACITY -->
                             <div class="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl">
-                                <img id="country-hero-flag-bg" src="" class="h-full w-full object-cover object-center opacity-20" alt="" />
-                                <div class="absolute inset-0 bg-gradient-to-r from-slate-950/60 via-slate-950/25 to-slate-950/40"></div>
+                                <img id="country-hero-flag-bg" src="" class="h-full w-full object-cover object-center opacity-15" alt="" />
+                                <div class="absolute inset-0 bg-slate-950/60"></div>
                             </div>
 
                             <div class="flex items-start justify-between gap-3 relative z-10">
                                 <div class="flex items-center gap-3 min-w-0 flex-1">
                                     <!-- RECTANGULAR FLAG BADGE WITH SLIGHTLY ROUNDED EDGES -->
-                                    <div id="country-drawer-flag-container" class="w-12 h-8 rounded-md overflow-hidden border border-indigo-400/40 flex items-center justify-center shadow-md shrink-0 relative bg-slate-950/80">
+                                    <div id="country-drawer-flag-container" class="w-12 h-8 rounded-md overflow-hidden border border-slate-700 flex items-center justify-center shadow-md shrink-0 relative bg-slate-950/80">
                                         <img id="country-drawer-flag-img" src="" alt="" class="w-full h-full object-cover" />
                                     </div>
                                     <div class="min-w-0 flex-1">
                                         <h3 id="country-drawer-name" class="text-xl lg:text-2xl font-black text-white leading-snug tracking-wide truncate">Country Name</h3>
-                                        <p id="country-drawer-subtitle" data-i18n="country.network_subtitle" class="text-xs font-semibold text-indigo-300/80 mt-0.5">Country Scenery & Airport Network</p>
+                                        <p id="country-drawer-subtitle" data-i18n="country.network_subtitle" class="text-xs font-semibold text-slate-400 mt-0.5">Country Scenery & Airport Network</p>
                                     </div>
                                 </div>
-                                <button onclick="exitCountryMode()" data-i18n-title="country.exit_mode" class="w-8 h-8 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-indigo-500/40 text-slate-300 hover:text-white flex items-center justify-center text-xs transition-all shadow-md shrink-0 cursor-pointer" title="Exit Country Mode">
+                                <button onclick="exitCountryMode()" data-i18n-title="country.exit_mode" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-xs transition-all shadow-md shrink-0 cursor-pointer border-0" title="Exit Country Mode">
                                     <i class="fa-solid fa-xmark"></i>
                                 </button>
                             </div>
 
                             <!-- STATS METRICS GRID -->
-                            <div class="grid grid-cols-2 gap-2.5 pt-3 border-t border-indigo-500/20 relative z-10">
+                            <div class="grid grid-cols-2 gap-2.5 pt-3 border-t border-slate-800 relative z-10">
                                 <div class="p-2.5 rounded-xl bg-slate-950/80 border border-slate-800">
                                     <span data-i18n="country.total_airports" class="text-[10px] text-slate-400 uppercase font-bold block mb-0.5">Total Airports</span>
                                     <span id="country-drawer-total-airports" class="text-sm font-mono font-black text-white">0</span>
@@ -1434,8 +1488,8 @@
     </div>
 
     <!-- LOCALES DICTIONARY SCRIPT -->
-    <script src="locales.js?v=1.0.3"></script>
+    <script src="locales.js?v=1.0.4"></script>
     <!-- MAIN APP JS SCRIPT -->
-    <script src="app.js?v=1.0.3"></script>
+    <script src="app.js?v=1.0.4"></script>
 </body>
 </html>

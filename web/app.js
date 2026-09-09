@@ -252,19 +252,19 @@ function updateCountryFilterButtonsUI() {
 
     if (pBtn) {
         const active = selectedCountryPricingFilters.has('PAYWARE');
-        pBtn.className = `p-3 rounded-xl border flex items-center justify-between transition-all cursor-pointer text-left group hover:scale-[1.02] ${active ? 'bg-purple-500/20 text-purple-200 border-purple-500/40 shadow-lg shadow-purple-500/10 font-bold' : 'bg-slate-950/40 text-slate-500 border-slate-800/80 opacity-60'}`;
+        pBtn.className = `p-3 rounded-xl border-0 flex items-center justify-between transition-all cursor-pointer text-left group ${active ? 'bg-purple-600 text-white font-bold' : 'bg-slate-800 text-slate-400'}`;
     }
     if (fBtn) {
         const active = selectedCountryPricingFilters.has('FREEWARE');
-        fBtn.className = `p-3 rounded-xl border flex items-center justify-between transition-all cursor-pointer text-left group hover:scale-[1.02] ${active ? 'bg-cyan-500/20 text-cyan-200 border-cyan-500/40 shadow-lg shadow-cyan-500/10 font-bold' : 'bg-slate-950/40 text-slate-500 border-slate-800/80 opacity-60'}`;
+        fBtn.className = `p-3 rounded-xl border-0 flex items-center justify-between transition-all cursor-pointer text-left group ${active ? 'bg-cyan-600 text-white font-bold' : 'bg-slate-800 text-slate-400'}`;
     }
     if (aBtn) {
         const active = selectedCountryPricingFilters.has('ASOBO');
-        aBtn.className = `p-3 rounded-xl border flex items-center justify-between transition-all cursor-pointer text-left group hover:scale-[1.02] ${active ? 'bg-amber-500/20 text-amber-200 border-amber-500/40 shadow-lg shadow-amber-500/10 font-bold' : 'bg-slate-950/40 text-slate-500 border-slate-800/80 opacity-60'}`;
+        aBtn.className = `p-3 rounded-xl border-0 flex items-center justify-between transition-all cursor-pointer text-left group ${active ? 'bg-amber-500 text-slate-950 font-black' : 'bg-slate-800 text-slate-400'}`;
     }
     if (dBtn) {
         const active = selectedCountryPricingFilters.has('DEFAULT');
-        dBtn.className = `p-3 rounded-xl border flex items-center justify-between transition-all cursor-pointer text-left group hover:scale-[1.02] ${active ? 'bg-slate-800/80 text-slate-200 border-slate-700 shadow-md font-bold' : 'bg-slate-950/40 text-slate-500 border-slate-800/80 opacity-60'}`;
+        dBtn.className = `p-3 rounded-xl border-0 flex items-center justify-between transition-all cursor-pointer text-left group ${active ? 'bg-blue-600 text-white font-bold' : 'bg-slate-800 text-slate-400'}`;
     }
 
     const intBtn = document.getElementById('country-btn-type-int');
@@ -274,19 +274,19 @@ function updateCountryFilterButtonsUI() {
 
     if (intBtn) {
         const active = selectedCountryTypeFilters.has('INT');
-        intBtn.className = `p-2.5 rounded-xl border flex items-center justify-between transition-all cursor-pointer text-left hover:scale-[1.02] ${active ? 'bg-indigo-500/20 text-indigo-200 border-indigo-500/40 font-bold' : 'bg-slate-950/40 text-slate-500 border-slate-800/80 opacity-60'}`;
+        intBtn.className = `p-2.5 rounded-xl border-0 flex items-center justify-between transition-all cursor-pointer text-left ${active ? 'bg-cyan-600 text-white font-bold' : 'bg-slate-800 text-slate-400'}`;
     }
     if (regBtn) {
         const active = selectedCountryTypeFilters.has('REG');
-        regBtn.className = `p-2.5 rounded-xl border flex items-center justify-between transition-all cursor-pointer text-left hover:scale-[1.02] ${active ? 'bg-indigo-500/20 text-indigo-200 border-indigo-500/40 font-bold' : 'bg-slate-950/40 text-slate-500 border-slate-800/80 opacity-60'}`;
+        regBtn.className = `p-2.5 rounded-xl border-0 flex items-center justify-between transition-all cursor-pointer text-left ${active ? 'bg-cyan-600 text-white font-bold' : 'bg-slate-800 text-slate-400'}`;
     }
     if (gaBtn) {
         const active = selectedCountryTypeFilters.has('GA');
-        gaBtn.className = `p-2.5 rounded-xl border flex items-center justify-between transition-all cursor-pointer text-left hover:scale-[1.02] ${active ? 'bg-indigo-500/20 text-indigo-200 border-indigo-500/40 font-bold' : 'bg-slate-950/40 text-slate-500 border-slate-800/80 opacity-60'}`;
+        gaBtn.className = `p-2.5 rounded-xl border-0 flex items-center justify-between transition-all cursor-pointer text-left ${active ? 'bg-cyan-600 text-white font-bold' : 'bg-slate-800 text-slate-400'}`;
     }
     if (hwBtn) {
         const active = selectedCountryTypeFilters.has('HW');
-        hwBtn.className = `p-2.5 rounded-xl border flex items-center justify-between transition-all cursor-pointer text-left hover:scale-[1.02] ${active ? 'bg-indigo-500/20 text-indigo-200 border-indigo-500/40 font-bold' : 'bg-slate-950/40 text-slate-500 border-slate-800/80 opacity-60'}`;
+        hwBtn.className = `p-2.5 rounded-xl border-0 flex items-center justify-between transition-all cursor-pointer text-left ${active ? 'bg-cyan-600 text-white font-bold' : 'bg-slate-800 text-slate-400'}`;
     }
 }
 
@@ -1298,46 +1298,86 @@ function selectCountryAirport(icao) {
     const ap = getAirportByIcao(icao);
     if (!ap) return;
 
-    centerMapOnAirport(ap, 8);
+    expandedCountryIcao = icao;
+    centerMapOnAirport(ap, 9);
+    showAirportDetails(ap, true);
+}
 
-    // Ensure category accordion containing this airport is open
-    const cat = getNormalizedPricingCategory(ap);
-    const catContent = document.getElementById(`country-category-content-${cat}`);
-    const catIcon = document.getElementById(`country-category-icon-${cat}`);
-    if (catContent && catContent.classList.contains('hidden')) {
-        catContent.classList.remove('hidden');
-        if (catIcon) {
-            catIcon.classList.remove('-rotate-90');
-            catIcon.classList.add('rotate-0');
+function returnToCountryMode() {
+    if (!selectedCountryCode) {
+        exitCountryMode();
+        return;
+    }
+    const apMode = document.getElementById('drawer-airport-mode');
+    if (apMode) apMode.classList.add('hidden');
+    const cMode = document.getElementById('drawer-country-mode');
+    if (cMode) cMode.classList.remove('hidden');
+    activeDrawerMode = 'COUNTRY';
+    selectedAirport = null;
+    if (activeRouteLinesGroup) activeRouteLinesGroup.clearLayers();
+
+    // Zoom back to country bounds smoothly
+    if (countryGeoJsonLayer) {
+        let targetLayer = null;
+        countryGeoJsonLayer.eachLayer(l => {
+            const lIso = getFeatureIso(l.feature);
+            if (lIso === selectedCountryCode) targetLayer = l;
+        });
+        if (selectedCountryCode === 'FR') {
+            const matchingLayers = [];
+            countryGeoJsonLayer.eachLayer(l => {
+                if (getFeatureIso(l.feature) === 'FR') matchingLayers.push(l);
+            });
+            const mainFrance = matchingLayers.find(l => {
+                const b = l.getBounds();
+                return b.getNorth() > 40 && b.getSouth() < 52 && b.getEast() > -5 && b.getWest() < 10;
+            });
+            if (mainFrance) targetLayer = mainFrance;
         }
-        try {
-            const saved = JSON.parse(localStorage.getItem('sceneryx_country_accordions_v2') || '{}');
-            saved[cat] = true;
-            localStorage.setItem('sceneryx_country_accordions_v2', JSON.stringify(saved));
-        } catch (e) {}
-    }
-
-    const targetCard = document.getElementById(`country-ap-card-${icao}`);
-    const accordionEl = document.getElementById(`country-accordion-${icao}`);
-    const iconEl = document.getElementById(`country-chevron-${icao}`);
-
-    if (accordionEl) {
-        const isHidden = accordionEl.classList.contains('hidden');
-        document.querySelectorAll('[id^="country-accordion-"]').forEach(el => el.classList.add('hidden'));
-        document.querySelectorAll('[id^="country-chevron-"]').forEach(el => el.className = 'fa-solid fa-chevron-right text-xs text-slate-500 group-hover:text-white transition-all shrink-0');
-
-        if (isHidden) {
-            accordionEl.classList.remove('hidden');
-            if (iconEl) iconEl.className = 'fa-solid fa-chevron-down text-xs text-cyan-400 transition-all shrink-0';
-            expandedCountryIcao = icao;
-        } else {
-            expandedCountryIcao = null;
+        if (targetLayer && targetLayer.getBounds) {
+            map.fitBounds(targetLayer.getBounds(), { padding: [40, 40], maxZoom: 7, animate: true, duration: 0.4 });
         }
     }
 
-    if (targetCard) {
-        targetCard.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    if (expandedCountryIcao) {
+        setTimeout(() => {
+            const card = document.getElementById(`country-ap-card-${expandedCountryIcao}`);
+            if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }, 120);
     }
+}
+
+function openCountryFromAirport() {
+    if (!selectedAirport) return;
+    let iso = ((selectedAirport.country || selectedAirport.iso_country || '').toString()).toUpperCase().trim();
+    if (!iso || iso.length !== 2) {
+        for (const [code, name] of Object.entries(ISO_TO_COUNTRY_NAME)) {
+            if (name.toLowerCase() === (selectedAirport.country || '').toLowerCase()) {
+                iso = code;
+                break;
+            }
+        }
+    }
+    if (iso && iso.length === 2) {
+        const countryName = ISO_TO_COUNTRY_NAME[iso] || selectedAirport.country || iso;
+        toggleCountrySelection(iso, countryName, null, true);
+    }
+}
+
+function closeDetailDrawer() {
+    const drawer = document.getElementById('detail-drawer');
+    if (drawer) drawer.classList.add('translate-x-full');
+    activeDrawerMode = 'MAP';
+    selectedAirport = null;
+    selectedCountryCode = null;
+    selectedCountryName = '';
+    expandedCountryIcao = null;
+    if (activeRouteLinesGroup) activeRouteLinesGroup.clearLayers();
+    if (countryGeoJsonLayer) {
+        countryGeoJsonLayer.eachLayer(l => countryGeoJsonLayer.resetStyle(l));
+    }
+    const btnBack = document.getElementById('btn-back-to-country');
+    if (btnBack) btnBack.classList.add('hidden');
 }
 
 async function toggleCountrySceneryInPlace(icao, folderName) {
@@ -3605,7 +3645,205 @@ function focusAirportWithAnimation(ap) {
     }
 }
 
-function showAirportDetails(ap) {
+let isSidebarCollapsed = false;
+
+function toggleSidebarCollapse() {
+    const sb = document.getElementById('sidebar-panel');
+    const sbHandle = document.getElementById('sidebar-resize-handle');
+    const expandBtn = document.getElementById('btn-expand-sidebar');
+    if (!sb) return;
+
+    isSidebarCollapsed = !isSidebarCollapsed;
+
+    if (isSidebarCollapsed) {
+        const w = sb.offsetWidth || 360;
+        sb.style.marginLeft = `-${w}px`;
+        sb.classList.add('opacity-0', 'pointer-events-none');
+        if (sbHandle) sbHandle.classList.add('hidden');
+        if (expandBtn) expandBtn.classList.remove('hidden');
+    } else {
+        sb.style.marginLeft = '0px';
+        sb.classList.remove('opacity-0', 'pointer-events-none');
+        if (sbHandle) sbHandle.classList.remove('hidden');
+        if (expandBtn) expandBtn.classList.add('hidden');
+    }
+
+    setTimeout(() => {
+        if (map && map.invalidateSize) {
+            map.invalidateSize();
+        }
+    }, 320);
+}
+
+function renderUnifiedScenerySelector(ap) {
+    const container = document.getElementById('drawer-unified-scenery-container');
+    const countBadge = document.getElementById('drawer-variants-count');
+    if (!container) return;
+
+    const sources = ap.all_sources || [];
+    const nonDefaultSources = sources.filter(s => !(s.pricing_type === 'Default' || (s.folder_name && s.folder_name.startsWith('msfs-default-'))));
+    const baseSources = nonDefaultSources.filter(s => !isFixOrOverlay(s));
+    const fixSources = nonDefaultSources.filter(s => isFixOrOverlay(s));
+
+    const isDefaultActive = (ap.pricing_type === 'Default' || ap.package_name === 'Default MSFS Base Airport' || baseSources.length === 0 || baseSources.every(s => s.is_disabled));
+
+    const totalVariants = baseSources.length + 1;
+    if (countBadge) {
+        countBadge.innerText = `${totalVariants} ${totalVariants > 1 ? 'Variants' : 'Variant'}`;
+    }
+
+    let html = '<div class="space-y-2">';
+
+    // 1. Installed Base Scenery Addons
+    baseSources.forEach(src => {
+        const idx = sources.indexOf(src);
+        const isActive = !src.is_disabled;
+        const isAsoboPkg = (src.is_asobo_official || src.vendor === 'Microsoft / Asobo' || (src.folder_name && (src.folder_name.toLowerCase().includes('asobo-airport-') || src.folder_name.toLowerCase().includes('microsoft-airport-'))));
+        const pType = src.pricing_type || (src.is_payware ? 'Payware' : (isAsoboPkg ? 'Asobo' : 'Freeware'));
+        const updateLabel = src.world_update_name || ap.world_update_name || "Asobo World Update";
+        const titleLabel = isAsoboPkg ? updateLabel : (src.vendor && src.vendor !== 'Unknown' ? src.vendor : src.folder_name);
+        const safePkgName = (src.folder_name || '').replace(/'/g, "\\'");
+
+        if (isActive) {
+            let activeBg = 'bg-cyan-600 text-white';
+            let pillBg = 'bg-black/30 text-white';
+            if (isAsoboPkg) {
+                activeBg = 'bg-amber-500 text-slate-950 font-black';
+                pillBg = 'bg-slate-950 text-amber-300';
+            } else if (pType === 'Payware') {
+                activeBg = 'bg-purple-600 text-white';
+                pillBg = 'bg-black/30 text-white';
+            }
+
+            html += `
+                <div class="p-3 rounded-xl ${activeBg} border-0 shadow-md space-y-2">
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2 min-w-0 flex-1">
+                            <i class="fa-solid fa-circle-check text-sm shrink-0"></i>
+                            <span class="text-xs font-black truncate uppercase tracking-wider">${titleLabel}</span>
+                        </div>
+                        <span class="text-[10px] font-mono font-black px-2.5 py-0.5 rounded-full ${pillBg} uppercase shrink-0">${t('drawer.active_badge', 'Active')}</span>
+                    </div>
+
+                    <div class="text-[11px] font-mono px-2.5 py-1.5 rounded-lg bg-black/25 text-white/90 break-all select-all">
+                        ${src.folder_name}
+                    </div>
+
+                    <div class="flex items-center justify-between text-xs pt-0.5">
+                        <span class="text-[10px] font-mono opacity-85 font-semibold">${src.source_folder} ${src.size_str ? `• ${src.size_str}` : ''}</span>
+                        <button onclick="event.stopPropagation(); openSpecificPackageFolderByIndex('${ap.icao}', ${idx})" class="px-2.5 py-1 rounded-lg bg-black/30 hover:bg-black/50 text-white text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer border-0 shadow-sm" title="${t('drawer.open_folder', 'Open Folder')}">
+                            <i class="fa-solid fa-folder"></i>
+                            <span>${t('drawer.open_folder', 'Folder')}</span>
+                        </button>
+                    </div>
+                </div>
+            `;
+        } else {
+            let badgeBg = 'bg-cyan-600 text-white';
+            if (isAsoboPkg) badgeBg = 'bg-amber-500 text-slate-950 font-black';
+            else if (pType === 'Payware') badgeBg = 'bg-purple-600 text-white';
+
+            html += `
+                <div onclick="selectSceneryPackageByName('${ap.icao}', '${safePkgName}')" class="p-3 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-200 border-0 cursor-pointer transition-colors space-y-2 group shadow-sm">
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2 min-w-0 flex-1">
+                            <i class="fa-regular fa-circle text-slate-400 group-hover:text-white text-sm shrink-0"></i>
+                            <span class="text-xs font-bold text-slate-200 group-hover:text-white truncate min-w-0">${titleLabel}</span>
+                            <span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded ${badgeBg} shrink-0">${pType}</span>
+                        </div>
+                        <button class="px-2.5 py-1 rounded-lg bg-slate-700 group-hover:bg-cyan-600 text-white text-xs font-bold transition-colors shrink-0 border-0 pointer-events-none">
+                            ${t('drawer.activate_btn', 'Activate')}
+                        </button>
+                    </div>
+
+                    <div class="text-[11px] font-mono text-slate-400 group-hover:text-slate-300 bg-slate-900/60 p-2 rounded-lg break-all">
+                        ${src.folder_name}
+                    </div>
+
+                    <div class="flex items-center justify-between text-[10px] font-mono text-slate-400">
+                        <span>${src.source_folder} ${src.size_str ? `• ${src.size_str}` : ''}</span>
+                    </div>
+                </div>
+            `;
+        }
+    });
+
+    // 2. Default MSFS Base Airport Variant Card
+    if (isDefaultActive) {
+        html += `
+            <div class="p-3 rounded-xl bg-blue-600 text-white border-0 shadow-md space-y-1">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2">
+                        <i class="fa-solid fa-circle-check text-sm shrink-0"></i>
+                        <span class="text-xs font-black uppercase tracking-wider">${t('drawer.default_airport', 'Default MSFS Base Airport')}</span>
+                    </div>
+                    <span class="text-[10px] font-mono font-black px-2.5 py-0.5 rounded-full bg-white text-blue-900 uppercase shrink-0">${t('drawer.active_badge', 'Active')}</span>
+                </div>
+                <p class="text-[11px] text-blue-100 pl-6">${t('drawer.default_procedural', 'Built-in Procedural MSFS Base Scenery')}</p>
+            </div>
+        `;
+    } else {
+        html += `
+            <div onclick="selectDefaultMSFSScenery('${ap.icao}')" class="p-3 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-200 border-0 cursor-pointer transition-colors space-y-1 group shadow-sm">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2 min-w-0 flex-1">
+                        <i class="fa-regular fa-circle text-slate-400 group-hover:text-white text-sm shrink-0"></i>
+                        <span class="text-xs font-bold text-slate-200 group-hover:text-white">${t('drawer.default_airport', 'Default MSFS Base Airport')}</span>
+                    </div>
+                    <button class="px-2.5 py-1 rounded-lg bg-slate-700 group-hover:bg-cyan-600 text-white text-xs font-bold transition-colors shrink-0 border-0 pointer-events-none">
+                        ${t('drawer.activate_btn', 'Activate')}
+                    </button>
+                </div>
+                <p class="text-[11px] text-slate-400 pl-6">${t('drawer.default_procedural', 'Built-in Procedural MSFS Base Scenery')}</p>
+            </div>
+        `;
+    }
+
+    html += '</div>';
+
+    // 3. Fixes & Overlays section if any
+    if (fixSources.length > 0) {
+        html += `
+            <div class="pt-3 border-t border-slate-800/80 space-y-2">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-300 block">${t('drawer.fixes_overlays', 'Available Fixes & Overlays')}</span>
+                <div class="space-y-2">
+        `;
+        fixSources.forEach(src => {
+            const idx = sources.indexOf(src);
+            const isActive = !src.is_disabled;
+            const pkgPath = (src.folder_name || '').replace(/'/g, "\\'");
+
+            html += `
+                <div onclick="toggleFixPatchPackage('${pkgPath}', '${ap.icao}')" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-200 border-0 cursor-pointer transition-colors space-y-1.5 group shadow-sm">
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2 min-w-0 flex-1">
+                            <span class="text-xs font-bold text-slate-200 group-hover:text-white truncate">${src.folder_name}</span>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md ${isActive ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-400'}">
+                                ${isActive ? t('drawer.active_fix', 'Active') : 'Disabled'}
+                            </span>
+                            <div class="w-8 h-4 rounded-full ${isActive ? 'bg-emerald-600' : 'bg-slate-700'} relative flex items-center px-0.5 transition-colors">
+                                <div class="w-3 h-3 rounded-full bg-white transition-transform ${isActive ? 'ml-auto' : 'mr-auto'}"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-between text-[10px] font-mono text-slate-400">
+                        <span>${src.source_folder} ${src.size_str ? `• ${src.size_str}` : ''}</span>
+                        <button onclick="event.stopPropagation(); openSpecificPackageFolderByIndex('${ap.icao}', ${idx})" class="text-slate-400 hover:text-white transition-colors cursor-pointer border-0 bg-transparent p-0">
+                            <i class="fa-solid fa-folder"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+        html += `</div></div>`;
+    }
+
+    container.innerHTML = html;
+}
+
+function showAirportDetails(ap, calledFromCountryMode = false) {
     const isDifferentAirport = !selectedAirport || selectedAirport.icao !== ap.icao;
     activeDrawerMode = 'AIRPORT';
     selectedAirport = ap;
@@ -3615,8 +3853,18 @@ function showAirportDetails(ap) {
         centerMapOnAirport(ap);
     }
 
-    // If transitioning from Country Mode to Airport Mode, cleanly deactivate country mode
-    if (selectedCountryCode) {
+    // Check if this airport belongs to currently selected country
+    const apIso = ((ap.country || ap.iso_country || '').toString()).toUpperCase().trim();
+    let isFromCurrentCountry = Boolean(selectedCountryCode && (calledFromCountryMode || apIso === selectedCountryCode));
+    if (!isFromCurrentCountry && selectedCountryCode) {
+        const cName = ISO_TO_COUNTRY_NAME[selectedCountryCode];
+        if (cName && ap.country && ap.country.toLowerCase() === cName.toLowerCase()) {
+            isFromCurrentCountry = true;
+        }
+    }
+
+    // Only clear country context if navigating to an airport in a DIFFERENT country and not in country mode
+    if (!isFromCurrentCountry && !calledFromCountryMode && selectedCountryCode) {
         selectedCountryCode = null;
         selectedCountryName = '';
         expandedCountryIcao = null;
@@ -3642,13 +3890,15 @@ function showAirportDetails(ap) {
         }
     }
 
-    const sb = document.getElementById('sidebar-panel');
-    const sbHandle = document.getElementById('sidebar-resize-handle');
-    if (sb) {
-        sb.style.marginLeft = '0px';
-        sb.classList.remove('opacity-0', 'pointer-events-none');
+    if (!isSidebarCollapsed) {
+        const sb = document.getElementById('sidebar-panel');
+        const sbHandle = document.getElementById('sidebar-resize-handle');
+        if (sb) {
+            sb.style.marginLeft = '0px';
+            sb.classList.remove('opacity-0', 'pointer-events-none');
+        }
+        if (sbHandle) sbHandle.classList.remove('hidden');
     }
-    if (sbHandle) sbHandle.classList.remove('hidden');
 
     const cMode = document.getElementById('drawer-country-mode');
     if (cMode) cMode.classList.add('hidden');
@@ -3656,6 +3906,25 @@ function showAirportDetails(ap) {
     if (apMode) apMode.classList.remove('hidden');
     const drawer = document.getElementById('detail-drawer');
     if (drawer) drawer.classList.remove('translate-x-full');
+
+    // Update Back to Country button
+    const backBtn = document.getElementById('btn-back-to-country');
+    const backText = document.getElementById('btn-back-to-country-text');
+    const backCount = document.getElementById('btn-back-to-country-count');
+    if (backBtn) {
+        if (selectedCountryCode) {
+            backBtn.classList.remove('hidden');
+            const cName = selectedCountryName || (ISO_TO_COUNTRY_NAME[selectedCountryCode] || selectedCountryCode);
+            const localizedCName = (typeof getLocalizedCountryName === 'function') ? getLocalizedCountryName(selectedCountryCode, cName) : cName;
+            if (backText) backText.innerText = `${t('country.back_to', 'Back to')} ${localizedCName}`;
+            if (backCount) {
+                const totalInCountry = allAirportsData.filter(a => ((a.country || a.iso_country || '').toString()).toUpperCase().trim() === selectedCountryCode).length;
+                backCount.innerText = `${totalInCountry} ${t('country.airports_count', 'airports')}`;
+            }
+        } else {
+            backBtn.classList.add('hidden');
+        }
+    }
 
     const iataVal = (ap.iata && ap.iata.trim() && ap.iata.trim() !== '—' && ap.iata.trim() !== '-') ? ap.iata.trim() : '';
     const codesStr = iataVal ? `${ap.icao}/${iataVal}` : ap.icao;
@@ -3667,7 +3936,27 @@ function showAirportDetails(ap) {
         iataEl.classList.add('hidden');
     }
     document.getElementById('drawer-name').innerText = ap.name;
-    document.getElementById('drawer-city-country').innerText = `${ap.city || 'Unknown City'}, ${ap.country || 'Unknown Country'}`;
+
+    // Populate City & Country Pill
+    const cityEl = document.getElementById('drawer-city');
+    if (cityEl) cityEl.innerText = ap.city || 'Unknown City';
+    const flagEl = document.getElementById('drawer-country-flag');
+    const cNameEl = document.getElementById('drawer-country-name');
+    let apIsoCode = ((ap.country || ap.iso_country || '').toString()).toUpperCase().trim();
+    if (!apIsoCode || apIsoCode.length !== 2) {
+        for (const [code, name] of Object.entries(ISO_TO_COUNTRY_NAME)) {
+            if (name.toLowerCase() === (ap.country || '').toLowerCase()) {
+                apIsoCode = code;
+                break;
+            }
+        }
+    }
+    const resolvedCountryName = (typeof getLocalizedCountryName === 'function') ? getLocalizedCountryName(apIsoCode, ap.country) : (ISO_TO_COUNTRY_NAME[apIsoCode] || ap.country || 'Unknown Country');
+    if (flagEl) flagEl.innerText = getCountryFlagEmoji(apIsoCode);
+    if (cNameEl) cNameEl.innerText = resolvedCountryName;
+
+    const cityCountryEl = document.getElementById('drawer-city-country');
+    if (cityCountryEl) cityCountryEl.innerText = `${ap.city || 'Unknown City'}, ${resolvedCountryName}`;
 
     document.getElementById('drawer-lat').innerText = ap.lat ? ap.lat.toFixed(4) : '0.0000';
     document.getElementById('drawer-lon').innerText = ap.lon ? ap.lon.toFixed(4) : '0.0000';
@@ -3955,6 +4244,9 @@ function showAirportDetails(ap) {
             conflictContainer.classList.add('hidden');
         }
     }
+
+    // Render Unified Scenery Selector in drawer
+    renderUnifiedScenerySelector(ap);
 
     const sourcesContainer = document.getElementById('drawer-sources-list');
     sourcesContainer.innerHTML = '';
