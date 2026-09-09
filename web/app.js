@@ -28,6 +28,30 @@ let userRatingsMap = {};
 let currentSettings = { auto_scan_on_startup: true, scan_paths: [] };
 let lastFocusedIcao = null;
 
+// Performance Caches & Indexing Engine
+const airportMarkerCache = new Map();
+const customDivIconCache = new Map();
+let airportsByIcao = new Map();
+
+function rebuildAirportsByIcaoIndex() {
+    airportsByIcao.clear();
+    for (let i = 0; i < allAirportsData.length; i++) {
+        const ap = allAirportsData[i];
+        if (ap && ap.icao) {
+            airportsByIcao.set(ap.icao, ap);
+        }
+    }
+}
+
+function getAirportByIcao(icao) {
+    if (!icao) return null;
+    if (airportsByIcao.size !== allAirportsData.length) {
+        rebuildAirportsByIcaoIndex();
+    }
+    return airportsByIcao.get(icao) || null;
+}
+
+
 // Currency & Investment Engine
 let selectedCurrency = 'USD';
 const CURRENCY_SYMBOLS = { EUR: '€', USD: '$', GBP: '£', AUD: 'A$' };
@@ -423,12 +447,12 @@ function setFlightDest(ap) {
 }
 
 function setFlightOriginByIcao(icao) {
-    const ap = allAirportsData.find(a => a.icao === icao);
+    const ap = getAirportByIcao(icao);
     if (ap) setFlightOrigin(ap);
 }
 
 function setFlightDestByIcao(icao) {
-    const ap = allAirportsData.find(a => a.icao === icao);
+    const ap = getAirportByIcao(icao);
     if (ap) setFlightDest(ap);
 }
 
@@ -681,7 +705,8 @@ function initMap() {
         zoom: 2.5,
         minZoom: 2,
         zoomControl: false,
-        worldCopyJump: true
+        worldCopyJump: true,
+        preferCanvas: true
     });
 
     L.control.zoom({ position: 'topright' }).addTo(map);
@@ -700,7 +725,13 @@ function initMap() {
 
     markerClusterGroup = L.markerClusterGroup({
         chunkedLoading: true,
-        maxClusterRadius: 25,
+        chunkInterval: 100,
+        chunkDelay: 10,
+        maxClusterRadius: function (zoom) {
+            if (zoom <= 3) return 45;
+            if (zoom <= 5) return 35;
+            return 25;
+        },
         disableClusteringAtZoom: 7,
         spiderfyOnMaxZoom: true,
         showCoverageOnHover: false,
@@ -1264,7 +1295,7 @@ let expandedCountryIcao = null;
 
 function selectCountryAirport(icao) {
     if (!icao) return;
-    const ap = allAirportsData.find(a => a.icao === icao);
+    const ap = getAirportByIcao(icao);
     if (!ap) return;
 
     centerMapOnAirport(ap, 8);
@@ -1567,12 +1598,11 @@ async function loadAirportsData() {
             }
 
             if (window.pywebview.api.get_world_airport_coords) {
-                try {
-                    const coordsStr = await window.pywebview.api.get_world_airport_coords();
+                window.pywebview.api.get_world_airport_coords().then(coordsStr => {
                     window.worldAirportCoords = (typeof coordsStr === 'string') ? JSON.parse(coordsStr) : coordsStr;
-                } catch(e) {
-                    console.warn("Could not load worldAirportCoords:", e);
-                }
+                }).catch(e => {
+                    console.warn("Could not load worldAirportCoords in background:", e);
+                });
             }
         } else {
             response = await fetch('/api/airports');
@@ -1591,6 +1621,8 @@ async function loadAirportsData() {
             }
             ap._searchKey = `${ap.icao} ${ap.name} ${ap.city || ''} ${ap.package_name || ''} ${ap.vendor || ''}`.toLowerCase();
         });
+
+        rebuildAirportsByIcaoIndex();
 
         updateStats(allAirportsData);
         updateFilterUI();
@@ -1932,7 +1964,7 @@ async function applyConflictSelection() {
 
                 // If currently viewed in drawer, refresh drawer
                 if (selectedAirport && selectedAirport.icao === ap.icao) {
-                    const updatedAp = allAirportsData.find(a => a.icao === ap.icao);
+                    const updatedAp = getAirportByIcao(ap.icao);
                     if (updatedAp) showAirportDetails(updatedAp);
                 }
 
@@ -2049,6 +2081,7 @@ function getAirportCategory(ap) {
 }
 
 function updateStats(airports) {
+    rebuildAirportsByIcaoIndex();
     document.getElementById('stat-total').innerText = airports.length.toLocaleString();
 
     let asoboCount = 0;
@@ -2082,7 +2115,21 @@ function updateStats(airports) {
 
 let currentFlightMode = { active: false, icaos: [] };
 
+function getCustomIconKey(ap) {
+    const cat = getAirportCategory(ap);
+    const nonDefaultSources = ap.all_sources ? ap.all_sources.filter(s => !(s.pricing_type === 'Default' || (s.folder_name && s.folder_name.startsWith('msfs-default-')))) : [];
+    const isApDisabled = cat !== 'DEFAULT' && (ap.is_disabled || (nonDefaultSources.length > 0 && nonDefaultSources.every(s => s.is_disabled)));
+    const hasActiveFix = !!(ap.all_sources && ap.all_sources.some(s => isFixOrOverlay(s) && !s.is_disabled));
+    const hasConflict = !!ap.has_conflict;
+    return `${cat}_${isApDisabled ? 1 : 0}_${hasActiveFix ? 1 : 0}_${hasConflict ? 1 : 0}`;
+}
+
 function createCustomIcon(ap) {
+    const iconKey = getCustomIconKey(ap);
+    if (customDivIconCache.has(iconKey)) {
+        return customDivIconCache.get(iconKey);
+    }
+
     const cat = getAirportCategory(ap);
     const nonDefaultSources = ap.all_sources ? ap.all_sources.filter(s => !(s.pricing_type === 'Default' || (s.folder_name && s.folder_name.startsWith('msfs-default-')))) : [];
     let isApDisabled = cat !== 'DEFAULT' && (ap.is_disabled || (nonDefaultSources.length > 0 && nonDefaultSources.every(s => s.is_disabled)));
@@ -2124,12 +2171,15 @@ function createCustomIcon(ap) {
         </svg>
     `;
 
-    return L.divIcon({
+    const icon = L.divIcon({
         html: svgIcon,
         className: `custom-map-marker ${isApDisabled && !hasActiveFix ? 'grayscale-[0.5]' : ''}`,
         iconSize: isCircleShape ? [22, 22] : [26, 26],
         iconAnchor: isCircleShape ? [11, 11] : [13, 13]
     });
+
+    customDivIconCache.set(iconKey, icon);
+    return icon;
 }
 
 function getAirportPopupHtml(ap) {
@@ -2219,9 +2269,10 @@ function toggleAirportScenery(icao) {
             const res = JSON.parse(resStr);
             if (res.status === 'success') {
                 allAirportsData = res.airports || [];
+                rebuildAirportsByIcaoIndex();
                 filterAirports();
                 if (selectedAirport && selectedAirport.icao === icao) {
-                    const updated = allAirportsData.find(a => a.icao === icao);
+                    const updated = getAirportByIcao(icao);
                     if (updated) showAirportDetails(updated);
                 }
             } else if (res.message) {
@@ -2246,10 +2297,11 @@ function renderAirportsOnMap(airports) {
 
     markerClusterGroup.clearLayers();
 
-    const markers = [];
+    const markersToDisplay = [];
 
-    airports.forEach(ap => {
-        if (!ap.lat || !ap.lon) return;
+    for (let i = 0; i < airports.length; i++) {
+        const ap = airports[i];
+        if (!ap.lat || !ap.lon) continue;
 
         let displayLon = ap.lon;
         // Normalize Chukotka / Russian far-east airports so they display attached to the continuous Russia map
@@ -2257,59 +2309,79 @@ function renderAirportsOnMap(airports) {
             displayLon = displayLon + 360;
         }
 
-        const icon = createCustomIcon(ap);
-        const marker = L.marker([ap.lat, displayLon], { icon: icon });
+        const iconKey = getCustomIconKey(ap);
+        let marker = airportMarkerCache.get(ap.icao);
 
-        // Bind default preview popup content
-        marker.bindPopup(getAirportPopupHtml(ap), {
-            maxWidth: 340,
-            minWidth: 250,
-            closeButton: false,
-            autoClose: true,
-            autoPan: false
-        });
-
-        // Hover events for quick popup preview (shows developer/publisher)
-        marker.on('mouseover', function () {
-            if (isSuppressingHoverPopups) return;
-            this.setPopupContent(getAirportPopupHtml(ap));
-            this.openPopup();
-        });
-
-        marker.on('mouseout', function () {
-            this.closePopup();
-        });
-
-        // Left-Click event: opens detailed drawer on right sidebar (or Alt+Click for Flight Planning Mode)
-        marker.on('click', function (e) {
-            if (e.originalEvent) {
-                L.DomEvent.stopPropagation(e.originalEvent);
+        if (marker) {
+            marker._airportData = ap;
+            const curLatLng = marker.getLatLng();
+            if (curLatLng.lat !== ap.lat || curLatLng.lng !== displayLon) {
+                marker.setLatLng([ap.lat, displayLon]);
             }
-            if (e.originalEvent && (e.originalEvent.altKey || e.originalEvent.metaKey)) {
-                handleFlightPlanningAltClick(ap);
-            } else {
-                if (activeDrawerMode === 'COUNTRY') {
-                    selectCountryAirport(ap.icao);
-                } else {
-                    centerMapOnAirport(ap);
-                    showAirportDetails(ap);
+            if (marker._iconKey !== iconKey) {
+                marker.setIcon(createCustomIcon(ap));
+                marker._iconKey = iconKey;
+            }
+        } else {
+            const icon = createCustomIcon(ap);
+            marker = L.marker([ap.lat, displayLon], { icon: icon });
+            marker._airportData = ap;
+            marker._iconKey = iconKey;
+
+            // Bind lazy preview popup content (evaluated ONLY on hover/open!)
+            marker.bindPopup(() => getAirportPopupHtml(marker._airportData), {
+                maxWidth: 340,
+                minWidth: 250,
+                closeButton: false,
+                autoClose: true,
+                autoPan: false
+            });
+
+            // Hover events for quick popup preview
+            marker.on('mouseover', function () {
+                if (isSuppressingHoverPopups) return;
+                this.openPopup();
+            });
+
+            marker.on('mouseout', function () {
+                this.closePopup();
+            });
+
+            // Left-Click event: opens detailed drawer on right sidebar (or Alt+Click for Flight Planning Mode)
+            marker.on('click', function (e) {
+                if (e.originalEvent) {
+                    L.DomEvent.stopPropagation(e.originalEvent);
                 }
-            }
-        });
+                const currentAp = this._airportData || ap;
+                if (e.originalEvent && (e.originalEvent.altKey || e.originalEvent.metaKey)) {
+                    handleFlightPlanningAltClick(currentAp);
+                } else {
+                    if (activeDrawerMode === 'COUNTRY') {
+                        selectCountryAirport(currentAp.icao);
+                    } else {
+                        centerMapOnAirport(currentAp);
+                        showAirportDetails(currentAp);
+                    }
+                }
+            });
 
-        // Right-Click event: toggles scenery activation state directly & changes star color!
-        marker.on('contextmenu', function (e) {
-            if (e.originalEvent) {
-                e.originalEvent.preventDefault();
-                e.originalEvent.stopPropagation();
-            }
-            toggleAirportScenery(ap.icao);
-        });
+            // Right-Click event: toggles scenery activation state directly & changes star color!
+            marker.on('contextmenu', function (e) {
+                if (e.originalEvent) {
+                    e.originalEvent.preventDefault();
+                    e.originalEvent.stopPropagation();
+                }
+                const currentAp = this._airportData || ap;
+                toggleAirportScenery(currentAp.icao);
+            });
 
-        markers.push(marker);
-    });
+            airportMarkerCache.set(ap.icao, marker);
+        }
 
-    markerClusterGroup.addLayers(markers);
+        markersToDisplay.push(marker);
+    }
+
+    markerClusterGroup.addLayers(markersToDisplay);
     const fcEl = document.getElementById('filtered-count');
     if (fcEl) fcEl.innerText = `${airports.length} visible`;
 
@@ -3405,7 +3477,7 @@ function renderRouteLines(filteredAirports) {
     allDestIcaos.forEach(destIcao => {
         if (destIcao === activeRouteOrigin.icao) return;
         
-        let ap = allAirportsData.find(a => a.icao === destIcao);
+        let ap = getAirportByIcao(destIcao);
         if (!ap && window.worldAirportCoords && window.worldAirportCoords[destIcao]) {
             const wInfo = window.worldAirportCoords[destIcao];
             ap = {
@@ -3470,7 +3542,7 @@ function renderRouteLines(filteredAirports) {
 }
 
 function selectAirport(icao) {
-    const ap = allAirportsData.find(a => a.icao === icao);
+    const ap = getAirportByIcao(icao);
     if (ap) {
         focusAirportWithAnimation(ap);
     }
@@ -4132,7 +4204,7 @@ async function saveCustomPriceForSelected() {
                 });
                 updateStats(allAirportsData);
                 filterAirports();
-                const updatedAp = allAirportsData.find(a => a.icao === selectedAirport.icao);
+                const updatedAp = getAirportByIcao(selectedAirport.icao);
                 if (updatedAp) showAirportDetails(updatedAp);
             }
         }
@@ -4159,7 +4231,7 @@ async function toggleUserCategoryOverride(newCategory) {
                 });
                 updateStats(allAirportsData);
                 filterAirports();
-                const updatedAp = allAirportsData.find(a => a.icao === icao);
+                const updatedAp = getAirportByIcao(icao);
                 if (updatedAp) showAirportDetails(updatedAp);
                 showToast(`✓ Pricing model changed to ${newCategory} for ${icao}`, 'success');
             }
@@ -4187,7 +4259,7 @@ async function toggleSpecificPackage(path, icao) {
             updateStats(allAirportsData);
             filterAirports();
             if (selectedAirport) {
-                const updatedAp = allAirportsData.find(a => a.icao === selectedAirport.icao);
+                const updatedAp = getAirportByIcao(selectedAirport.icao);
                 if (updatedAp) showAirportDetails(updatedAp);
             }
             showToast(`✓ ${icao || 'Scenery'} Activated & Saved to Disk`, 'success');
@@ -4253,7 +4325,7 @@ async function selectDefaultMSFSScenery(icao) {
             });
             updateStats(allAirportsData);
             const targetIcao = selectedAirport ? selectedAirport.icao : icao;
-            const updatedAp = allAirportsData.find(a => a.icao === targetIcao);
+            const updatedAp = getAirportByIcao(targetIcao);
             if (updatedAp) {
                 selectedAirport = updatedAp;
                 showAirportDetails(updatedAp);
@@ -4283,7 +4355,7 @@ async function selectSceneryPackageByName(icao, folderName) {
             });
             updateStats(allAirportsData);
             const targetIcao = selectedAirport ? selectedAirport.icao : icao;
-            const updatedAp = allAirportsData.find(a => a.icao === targetIcao);
+            const updatedAp = getAirportByIcao(targetIcao);
             if (updatedAp) {
                 selectedAirport = updatedAp;
                 showAirportDetails(updatedAp);
@@ -4314,7 +4386,7 @@ async function toggleFixPatchPackage(path, icao) {
             updateStats(allAirportsData);
             filterAirports();
             if (selectedAirport) {
-                const updatedAp = allAirportsData.find(a => a.icao === selectedAirport.icao);
+                const updatedAp = getAirportByIcao(selectedAirport.icao);
                 if (updatedAp) showAirportDetails(updatedAp);
             }
             const statusLabel = res.enabled ? 'Enabled' : 'Disabled';
@@ -4576,7 +4648,7 @@ async function handleStarClick(e, starIdx) {
 
     selectedAirport.rating = ratingVal;
     userRatingsMap[selectedAirport.icao] = ratingVal;
-    const apInAll = allAirportsData.find(a => a.icao === selectedAirport.icao);
+    const apInAll = getAirportByIcao(selectedAirport.icao);
     if (apInAll) apInAll.rating = ratingVal;
 
     renderStarRatingWidget(ratingVal);
@@ -4597,7 +4669,7 @@ async function clearCurrentRating() {
 
     selectedAirport.rating = 0;
     delete userRatingsMap[selectedAirport.icao];
-    const apInAll = allAirportsData.find(a => a.icao === selectedAirport.icao);
+    const apInAll = getAirportByIcao(selectedAirport.icao);
     if (apInAll) apInAll.rating = 0;
 
     renderStarRatingWidget(0);
@@ -4889,6 +4961,7 @@ function filterAirports() {
             dests.forEach(d => activeRouteDestIcaos.add(d));
         });
     }
+    const selectedAirlinesArr = selectedAirlines.size > 0 ? Array.from(selectedAirlines) : null;
 
     currentlyFilteredAirports = allAirportsData.filter(ap => {
         // High Priority: Origin Airport & Direct Airline Route Destinations (Bypasses global filters)
@@ -5003,22 +5076,17 @@ function filterAirports() {
         }
 
         // Operating Airline & Direct Route Filter
-        if (selectedAirlines.size > 0) {
+        if (selectedAirlinesArr) {
             if (activeRouteOrigin) {
                 // Specific origin airport route mode: Include origin AND all destination ICAOs (custom + default MSFS)
                 if (ap.icao === activeRouteOrigin.icao) {
                     return true;
                 }
-                let combinedDestIcaos = new Set();
-                selectedAirlines.forEach(al => {
-                    const dests = (activeRouteOrigin.routes && activeRouteOrigin.routes[al]) || [];
-                    dests.forEach(d => combinedDestIcaos.add(d));
-                });
-                if (!combinedDestIcaos.has(ap.icao)) return false;
+                if (activeRouteDestIcaos && !activeRouteDestIcaos.has(ap.icao)) return false;
             } else {
                 // Global airline filter mode
                 const airlines = ap.operating_airlines || [];
-                if (!Array.from(selectedAirlines).some(al => airlines.includes(al))) return false;
+                if (!selectedAirlinesArr.some(al => airlines.includes(al))) return false;
             }
         } else if (!selectedCountryCode) {
             // Global Pricing Filter (only applied when NOT in country mode and NOT in airline route mode)
@@ -5407,9 +5475,7 @@ function getScanItemCategoryColor(item) {
     if (rawType.includes('default')) return 'text-sky-400';
     if (rawType.includes('freeware')) return 'text-cyan-400';
 
-    const apMatch = (typeof allAirportsData !== 'undefined' && Array.isArray(allAirportsData))
-        ? allAirportsData.find(a => a.icao === item.icao)
-        : null;
+    const apMatch = item.icao ? getAirportByIcao(item.icao) : null;
     if (apMatch) {
         const cat = getAirportCategory(apMatch);
         if (cat === 'PAYWARE') return 'text-purple-400';
@@ -5633,7 +5699,7 @@ async function rescanMSFS() {
         filterAirports();
 
         if (selectedAirport) {
-            const updatedAp = allAirportsData.find(a => a.icao === selectedAirport.icao);
+            const updatedAp = getAirportByIcao(selectedAirport.icao);
             if (updatedAp) showAirportDetails(updatedAp);
         }
 
@@ -5876,7 +5942,7 @@ async function executeGsxInstallation({ filePath = '', base64Data = '', filename
                 });
                 updateStats(allAirportsData);
                 filterAirports();
-                const updatedAp = allAirportsData.find(a => a.icao === selectedAirport.icao);
+                const updatedAp = getAirportByIcao(selectedAirport.icao);
                 if (updatedAp) showAirportDetails(updatedAp);
                 showCustomModal({
                     title: t('modal.gsx_installed', 'GSX Profile Installed'),
