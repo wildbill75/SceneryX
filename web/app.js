@@ -1146,16 +1146,19 @@ function openCountryDrawer(iso, countryName) {
     }
 
     // 4. Slide Drawer Track to Country Pane and Open Drawer
-    const backApBtn = document.getElementById('btn-country-back-airport');
-    const backApIcao = document.getElementById('btn-country-back-airport-icao');
-    if (backApBtn && backApIcao) {
-        if (selectedAirport && selectedAirport.icao) {
-            backApIcao.innerText = selectedAirport.icao;
-            backApBtn.classList.remove('hidden');
-            backApBtn.classList.add('flex');
+    const backBtn = document.getElementById('btn-country-back-prev');
+    const backText = document.getElementById('btn-country-back-prev-text');
+    const backIcao = document.getElementById('btn-country-back-prev-icao');
+    if (backBtn) {
+        if (previousActiveAirport && previousActiveAirport.icao) {
+            const safeName = previousActiveAirport.name ? ` - ${previousActiveAirport.name}` : '';
+            if (backText) backText.innerText = `Back to ${previousActiveAirport.icao}${safeName}`;
+            if (backIcao) backIcao.innerText = previousActiveAirport.icao;
+            backBtn.classList.remove('hidden');
+            backBtn.classList.add('flex');
         } else {
-            backApBtn.classList.add('hidden');
-            backApBtn.classList.remove('flex');
+            backBtn.classList.add('hidden');
+            backBtn.classList.remove('flex');
         }
     }
 
@@ -1440,15 +1443,27 @@ function returnToCountryMode() {
     }
 }
 
-function returnToAirportMode() {
-    if (!selectedAirport) return;
+let previousActiveAirport = null;
+
+function returnToPreviousAirportMode() {
+    if (!previousActiveAirport) {
+        closeDrawerWithoutCameraChange();
+        return;
+    }
+    const ap = previousActiveAirport;
     activeDrawerMode = 'AIRPORT';
-    setDrawerSlidePosition('AIRPORT');
-    centerMapOnAirport(selectedAirport);
+    selectedAirport = ap;
+    centerMapOnAirport(ap);
+    showAirportDetails(ap, true);
+}
+
+function returnToAirportMode() {
+    returnToPreviousAirportMode();
 }
 
 function openCountryFromAirport() {
     if (!selectedAirport) return;
+    previousActiveAirport = selectedAirport;
     let iso = ((selectedAirport.country || selectedAirport.iso_country || '').toString()).toUpperCase().trim();
     if (!iso || iso.length !== 2) {
         for (const [code, name] of Object.entries(ISO_TO_COUNTRY_NAME)) {
@@ -3993,25 +4008,6 @@ function showAirportDetails(ap, calledFromCountryMode = false) {
     const drawer = document.getElementById('detail-drawer');
     if (drawer) drawer.classList.remove('translate-x-full');
 
-    // Update Back to Country button
-    const backBtn = document.getElementById('btn-back-to-country');
-    const backText = document.getElementById('btn-back-to-country-text');
-    const backCount = document.getElementById('btn-back-to-country-count');
-    if (backBtn) {
-        if (selectedCountryCode) {
-            backBtn.classList.remove('hidden');
-            const cName = selectedCountryName || (ISO_TO_COUNTRY_NAME[selectedCountryCode] || selectedCountryCode);
-            const localizedCName = (typeof getLocalizedCountryName === 'function') ? getLocalizedCountryName(selectedCountryCode, cName) : cName;
-            if (backText) backText.innerText = `${t('country.back_to', 'Back to')} ${localizedCName}`;
-            if (backCount) {
-                const totalInCountry = allAirportsData.filter(a => ((a.country || a.iso_country || '').toString()).toUpperCase().trim() === selectedCountryCode).length;
-                backCount.innerText = `${totalInCountry} ${t('country.airports_count', 'airports')}`;
-            }
-        } else {
-            backBtn.classList.add('hidden');
-        }
-    }
-
     const iataVal = (ap.iata && ap.iata.trim() && ap.iata.trim() !== '—' && ap.iata.trim() !== '-') ? ap.iata.trim() : '';
     const codesStr = iataVal ? `${ap.icao}/${iataVal}` : ap.icao;
     const icaoEl = document.getElementById('drawer-icao');
@@ -4833,13 +4829,12 @@ function exitCountryMode(flyCamera = false) {
         if (drawer) drawer.classList.add('translate-x-full');
         setDrawerSlidePosition('AIRPORT');
 
-        const btnBack = document.getElementById('btn-back-to-country');
-        if (btnBack) btnBack.classList.add('hidden');
-        const btnBackAp = document.getElementById('btn-country-back-airport');
-        if (btnBackAp) {
-            btnBackAp.classList.add('hidden');
-            btnBackAp.classList.remove('flex');
+        const btnBackCountry = document.getElementById('btn-country-back-prev');
+        if (btnBackCountry) {
+            btnBackCountry.classList.add('hidden');
+            btnBackCountry.classList.remove('flex');
         }
+        previousActiveAirport = null;
 
         const sb = document.getElementById('sidebar-panel');
         const sbHandle = document.getElementById('sidebar-resize-handle');
