@@ -706,7 +706,8 @@ function initMap() {
         minZoom: 2,
         zoomControl: false,
         worldCopyJump: true,
-        preferCanvas: true
+        preferCanvas: true,
+        doubleClickZoom: false
     });
 
     L.control.zoom({ position: 'topright' }).addTo(map);
@@ -747,11 +748,27 @@ function initMap() {
         }
     });
 
-    // Click map background (neutral area) to clear active mode/overlays and restore neutral global state
+    // Single click on neutral map area: closes drawer WITHOUT changing camera
     map.on('click', () => {
-        if (selectedCountryCode || activeDrawerMode !== 'MAP' || selectedAirport || flightCorridorArrivalAirport || selectedAirlines.size > 0 || selectedRegion) {
-            restoreMapToNeutralState(true);
+        if (countryClickTimeout) {
+            clearTimeout(countryClickTimeout);
+            countryClickTimeout = null;
         }
+        if (activeDrawerMode !== 'MAP' || selectedAirport || selectedCountryCode) {
+            closeDrawerWithoutCameraChange();
+        }
+    });
+
+    // Double click on neutral map area: resets camera according to priority hierarchy
+    map.on('dblclick', () => {
+        if (countryClickTimeout) {
+            clearTimeout(countryClickTimeout);
+            countryClickTimeout = null;
+        }
+        if (activeDrawerMode !== 'MAP' || selectedAirport || selectedCountryCode) {
+            closeDrawerWithoutCameraChange();
+        }
+        resetCameraToDefaultView();
     });
 
     loadCountryOverlays();
@@ -760,9 +777,43 @@ function initMap() {
 let countryGeoJsonLayer = null;
 let selectedCountryCode = null;
 let selectedCountryPolygonLayer = null;
+let countryClickTimeout = null;
 
-function restoreMapToNeutralState(flyCamera = true) {
-    exitCountryMode();
+function setDrawerSlidePosition(mode) {
+    const track = document.getElementById('drawer-sliding-track');
+    if (!track) return;
+    if (mode === 'COUNTRY') {
+        track.style.transform = 'translateX(-50%)';
+    } else {
+        track.style.transform = 'translateX(0%)';
+    }
+}
+
+function resetCameraToDefaultView() {
+    if (!map) return;
+    // Priority 1: Active filter region in sidebar (user's immediate working focus)
+    if (selectedRegion && REGION_VIEWPORTS[selectedRegion]) {
+        const vp = REGION_VIEWPORTS[selectedRegion];
+        map.flyTo(vp.center, vp.zoom, { animate: true, duration: 0.6 });
+        return;
+    }
+    // Priority 2: Startup camera region configured in user Settings
+    const regKey = currentSettings && currentSettings.camera_startup_region;
+    if (regKey && regKey !== 'world' && regKey !== 'default' && REGION_VIEWPORTS[regKey]) {
+        const vp = REGION_VIEWPORTS[regKey];
+        map.flyTo(vp.center, vp.zoom, { animate: true, duration: 0.6 });
+        return;
+    }
+    // Priority 3: Default global World view
+    map.flyTo([25.0, 10.0], 3.0, { animate: true, duration: 0.6 });
+}
+
+function closeDrawerWithoutCameraChange() {
+    exitCountryMode(false);
+}
+
+function restoreMapToNeutralState(flyCamera = false) {
+    exitCountryMode(flyCamera);
 }
 
 function getFeatureIso(feature) {
@@ -821,7 +872,31 @@ async function loadCountryOverlays() {
                     },
                     click: (e) => {
                         L.DomEvent.stopPropagation(e);
-                        toggleCountrySelection(iso, cName, layer);
+                        // Neutral area rule: If the detail drawer is currently open, clicking closes it without moving camera
+                        if (activeDrawerMode !== 'MAP' || selectedAirport || (selectedCountryCode && selectedCountryCode !== iso)) {
+                            closeDrawerWithoutCameraChange();
+                            return;
+                        }
+                        // If drawer is closed, debounce single click to allow double click detection
+                        if (countryClickTimeout) {
+                            clearTimeout(countryClickTimeout);
+                            countryClickTimeout = null;
+                        }
+                        countryClickTimeout = setTimeout(() => {
+                            countryClickTimeout = null;
+                            toggleCountrySelection(iso, cName, layer);
+                        }, 220);
+                    },
+                    dblclick: (e) => {
+                        L.DomEvent.stopPropagation(e);
+                        if (countryClickTimeout) {
+                            clearTimeout(countryClickTimeout);
+                            countryClickTimeout = null;
+                        }
+                        if (activeDrawerMode !== 'MAP' || selectedAirport || selectedCountryCode) {
+                            closeDrawerWithoutCameraChange();
+                        }
+                        resetCameraToDefaultView();
                     }
                 });
             }
@@ -1058,11 +1133,21 @@ function openCountryDrawer(iso, countryName) {
         }
     }
 
-    // 4. Switch Drawer Modes and Open Drawer
-    const apMode = document.getElementById('drawer-airport-mode');
-    if (apMode) apMode.classList.add('hidden');
-    const cMode = document.getElementById('drawer-country-mode');
-    if (cMode) cMode.classList.remove('hidden');
+    // 4. Slide Drawer Track to Country Pane and Open Drawer
+    const backApBtn = document.getElementById('btn-country-back-airport');
+    const backApIcao = document.getElementById('btn-country-back-airport-icao');
+    if (backApBtn && backApIcao) {
+        if (selectedAirport && selectedAirport.icao) {
+            backApIcao.innerText = selectedAirport.icao;
+            backApBtn.classList.remove('hidden');
+            backApBtn.classList.add('flex');
+        } else {
+            backApBtn.classList.add('hidden');
+            backApBtn.classList.remove('flex');
+        }
+    }
+
+    setDrawerSlidePosition('COUNTRY');
     const drawer = document.getElementById('detail-drawer');
     if (drawer) drawer.classList.remove('translate-x-full');
 }
@@ -1305,15 +1390,11 @@ function selectCountryAirport(icao) {
 
 function returnToCountryMode() {
     if (!selectedCountryCode) {
-        exitCountryMode();
+        closeDrawerWithoutCameraChange();
         return;
     }
-    const apMode = document.getElementById('drawer-airport-mode');
-    if (apMode) apMode.classList.add('hidden');
-    const cMode = document.getElementById('drawer-country-mode');
-    if (cMode) cMode.classList.remove('hidden');
     activeDrawerMode = 'COUNTRY';
-    selectedAirport = null;
+    setDrawerSlidePosition('COUNTRY');
     if (activeRouteLinesGroup) activeRouteLinesGroup.clearLayers();
 
     // Zoom back to country bounds smoothly
@@ -1347,6 +1428,13 @@ function returnToCountryMode() {
     }
 }
 
+function returnToAirportMode() {
+    if (!selectedAirport) return;
+    activeDrawerMode = 'AIRPORT';
+    setDrawerSlidePosition('AIRPORT');
+    centerMapOnAirport(selectedAirport);
+}
+
 function openCountryFromAirport() {
     if (!selectedAirport) return;
     let iso = ((selectedAirport.country || selectedAirport.iso_country || '').toString()).toUpperCase().trim();
@@ -1365,19 +1453,7 @@ function openCountryFromAirport() {
 }
 
 function closeDetailDrawer() {
-    const drawer = document.getElementById('detail-drawer');
-    if (drawer) drawer.classList.add('translate-x-full');
-    activeDrawerMode = 'MAP';
-    selectedAirport = null;
-    selectedCountryCode = null;
-    selectedCountryName = '';
-    expandedCountryIcao = null;
-    if (activeRouteLinesGroup) activeRouteLinesGroup.clearLayers();
-    if (countryGeoJsonLayer) {
-        countryGeoJsonLayer.eachLayer(l => countryGeoJsonLayer.resetStyle(l));
-    }
-    const btnBack = document.getElementById('btn-back-to-country');
-    if (btnBack) btnBack.classList.add('hidden');
+    closeDrawerWithoutCameraChange();
 }
 
 async function toggleCountrySceneryInPlace(icao, folderName) {
@@ -3900,10 +3976,8 @@ function showAirportDetails(ap, calledFromCountryMode = false) {
         if (sbHandle) sbHandle.classList.remove('hidden');
     }
 
-    const cMode = document.getElementById('drawer-country-mode');
-    if (cMode) cMode.classList.add('hidden');
-    const apMode = document.getElementById('drawer-airport-mode');
-    if (apMode) apMode.classList.remove('hidden');
+    // Slide Drawer Track to Airport Pane and Open Drawer
+    setDrawerSlidePosition('AIRPORT');
     const drawer = document.getElementById('detail-drawer');
     if (drawer) drawer.classList.remove('translate-x-full');
 
@@ -3937,10 +4011,10 @@ function showAirportDetails(ap, calledFromCountryMode = false) {
     }
     document.getElementById('drawer-name').innerText = ap.name;
 
-    // Populate City & Country Pill
+    // Populate City & Prominent Country Access Button with Real Flag
     const cityEl = document.getElementById('drawer-city');
     if (cityEl) cityEl.innerText = ap.city || 'Unknown City';
-    const flagEl = document.getElementById('drawer-country-flag');
+    const flagImgEl = document.getElementById('drawer-country-flag-img');
     const cNameEl = document.getElementById('drawer-country-name');
     let apIsoCode = ((ap.country || ap.iso_country || '').toString()).toUpperCase().trim();
     if (!apIsoCode || apIsoCode.length !== 2) {
@@ -3952,8 +4026,19 @@ function showAirportDetails(ap, calledFromCountryMode = false) {
         }
     }
     const resolvedCountryName = (typeof getLocalizedCountryName === 'function') ? getLocalizedCountryName(apIsoCode, ap.country) : (ISO_TO_COUNTRY_NAME[apIsoCode] || ap.country || 'Unknown Country');
-    if (flagEl) flagEl.innerText = getCountryFlagEmoji(apIsoCode);
+    
+    // Strict rule: Display clean country name ONLY (never prefix with ISO letters like "IT Italy")
     if (cNameEl) cNameEl.innerText = resolvedCountryName;
+    if (flagImgEl) {
+        if (apIsoCode && apIsoCode.length === 2) {
+            flagImgEl.src = `https://flagcdn.com/w80/${apIsoCode.toLowerCase()}.png`;
+            flagImgEl.alt = resolvedCountryName;
+            flagImgEl.style.display = 'block';
+            flagImgEl.onerror = () => { flagImgEl.style.display = 'none'; };
+        } else {
+            flagImgEl.style.display = 'none';
+        }
+    }
 
     const cityCountryEl = document.getElementById('drawer-city-country');
     if (cityCountryEl) cityCountryEl.innerText = `${ap.city || 'Unknown City'}, ${resolvedCountryName}`;
@@ -4722,7 +4807,7 @@ async function toggleFixPatchPackage(path, icao) {
     }
 }
 
-function exitCountryMode() {
+function exitCountryMode(flyCamera = false) {
     try {
         activeDrawerMode = 'MAP';
         selectedCountryCode = null;
@@ -4731,15 +4816,18 @@ function exitCountryMode() {
         selectedAirport = null;
         flightCorridorArrivalAirport = null;
 
-        // 1. Hide Drawers & Slide Left Sidebar Panel Back
+        // 1. Hide Drawer & Reset Slide Track to Airport pane (0%)
         const drawer = document.getElementById('detail-drawer');
         if (drawer) drawer.classList.add('translate-x-full');
+        setDrawerSlidePosition('AIRPORT');
 
-        const cMode = document.getElementById('drawer-country-mode');
-        if (cMode) cMode.classList.add('hidden');
-
-        const apMode = document.getElementById('drawer-airport-mode');
-        if (apMode) apMode.classList.add('hidden');
+        const btnBack = document.getElementById('btn-back-to-country');
+        if (btnBack) btnBack.classList.add('hidden');
+        const btnBackAp = document.getElementById('btn-country-back-airport');
+        if (btnBackAp) {
+            btnBackAp.classList.add('hidden');
+            btnBackAp.classList.remove('flex');
+        }
 
         const sb = document.getElementById('sidebar-panel');
         const sbHandle = document.getElementById('sidebar-resize-handle');
@@ -4793,10 +4881,10 @@ function exitCountryMode() {
             toast.classList.add('opacity-0', 'scale-95', 'pointer-events-none');
         }
 
-        // 5. Re-filter airports for Global Map View & Reset Camera
+        // 5. Re-filter airports for Global Map View & conditionally Reset Camera
         filterAirports();
-        if (map) {
-            map.flyTo([25.0, 10.0], 3.0, { animate: true, duration: 0.5 });
+        if (flyCamera && map) {
+            resetCameraToDefaultView();
         }
     } catch (e) {
         console.error("Error in exitCountryMode:", e);

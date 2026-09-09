@@ -631,52 +631,63 @@
             </div>
 
             <!-- RIGHT DETAIL DRAWER OVERLAY -->
-            <aside id="detail-drawer" style="width: 460px;" class="absolute right-0 top-0 bottom-0 min-w-[360px] max-w-[850px] glass-panel z-[1001] transform translate-x-full transition-transform duration-300 ease-in-out border-l border-slate-800/80 flex flex-col pointer-events-auto">
+            <aside id="detail-drawer" style="width: 460px;" class="absolute right-0 top-0 bottom-0 min-w-[360px] max-w-[850px] glass-panel z-[1001] transform translate-x-full transition-transform duration-300 ease-in-out border-l border-slate-800/80 flex flex-col pointer-events-auto overflow-hidden">
                 <!-- RESIZE HANDLE (LEFT EDGE) -->
                 <div id="drawer-resize-handle" class="absolute top-0 left-0 w-2 h-full cursor-col-resize hover:bg-cyan-500/30 transition-colors z-50 flex items-center justify-center group" title="Click and drag to resize panel">
                     <div class="w-0.5 h-8 bg-slate-700 group-hover:bg-cyan-400 rounded-full transition-colors"></div>
                 </div>
 
-                <div class="p-4 overflow-y-auto flex-1 flex flex-col min-h-0">
-                    <!-- AIRPORT DETAIL MODE CONTAINER -->
-                    <div id="drawer-airport-mode" class="space-y-4">
-                        <!-- BACK TO COUNTRY BREADCRUMB BUTTON (WHEN IN COUNTRY CONTEXT) -->
-                        <button id="btn-back-to-country" onclick="returnToCountryMode()" class="hidden w-full px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-bold transition-all flex items-center justify-between border-0 cursor-pointer group shadow-md">
-                            <span class="flex items-center gap-2 min-w-0">
-                                <i class="fa-solid fa-arrow-left text-cyan-400 group-hover:-translate-x-0.5 transition-transform text-xs"></i>
-                                <span id="btn-back-to-country-text" class="truncate">Back to Country</span>
-                            </span>
-                            <span id="btn-back-to-country-count" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-900 text-slate-300 shrink-0">0 airports</span>
-                        </button>
+                <!-- HORIZONTAL SLIDING VIEWPORT TRACK -->
+                <div class="flex-1 w-full h-full relative overflow-hidden flex min-h-0">
+                    <div id="drawer-sliding-track" class="flex flex-row w-[200%] h-full transition-transform duration-300 ease-in-out transform translate-x-0">
+                        <!-- AIRPORT DETAIL MODE CONTAINER (LEFT 50%) -->
+                        <div id="drawer-airport-mode" class="w-1/2 h-full overflow-y-auto p-4 space-y-4 shrink-0">
+                            <!-- BACK TO COUNTRY BREADCRUMB BUTTON (WHEN IN COUNTRY CONTEXT) -->
+                            <button id="btn-back-to-country" onclick="returnToCountryMode()" class="hidden w-full px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-bold transition-all flex items-center justify-between border-0 cursor-pointer group shadow-md">
+                                <span class="flex items-center gap-2 min-w-0">
+                                    <i class="fa-solid fa-arrow-left text-cyan-400 group-hover:-translate-x-0.5 transition-transform text-xs"></i>
+                                    <span id="btn-back-to-country-text" class="truncate">Back to Country</span>
+                                </span>
+                                <span id="btn-back-to-country-count" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-900 text-slate-300 shrink-0">0 airports</span>
+                            </button>
 
-                        <!-- 1. HERO AIRPORT HEADER CARD -->
-                        <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2.5 shadow-lg">
-                            <div class="flex items-center justify-between">
-                                <div class="flex items-center gap-2.5 min-w-0">
-                                    <span id="drawer-icao" class="text-3xl lg:text-4xl font-black font-mono tracking-tight truncate">ICAO</span>
-                                    <span id="drawer-iata" class="hidden"></span>
+                            <!-- 1. HERO AIRPORT HEADER CARD -->
+                            <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-2.5 shadow-lg">
+                                <div class="flex items-center justify-between">
+                                    <div class="flex items-center gap-2.5 min-w-0">
+                                        <span id="drawer-icao" class="text-3xl lg:text-4xl font-black font-mono tracking-tight truncate">ICAO</span>
+                                        <span id="drawer-iata" class="hidden"></span>
+                                    </div>
+                                    <div class="flex items-center gap-2 shrink-0">
+                                        <span id="drawer-pricing-badge" class="px-3 py-1 rounded-full text-xs font-mono font-bold">Badge</span>
+                                    </div>
                                 </div>
-                                <div class="flex items-center gap-2 shrink-0">
-                                    <span id="drawer-pricing-badge" class="px-3 py-1 rounded-full text-xs font-mono font-bold">Badge</span>
-                                    <button onclick="closeDetailDrawer()" data-i18n-title="drawer.close_drawer" title="Close details" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition-colors cursor-pointer border-0">
-                                        <i class="fa-solid fa-xmark"></i>
+                                <div>
+                                    <h3 id="drawer-name" class="text-lg lg:text-xl font-extrabold text-white leading-snug tracking-wide">Airport Full Name</h3>
+                                    <div class="flex items-center gap-2 mt-1">
+                                        <i class="fa-solid fa-location-dot text-slate-500 text-[11px]"></i>
+                                        <span id="drawer-city" class="text-xs font-semibold text-slate-300">City</span>
+                                    </div>
+
+                                    <!-- PROMINENT COUNTRY ACCESS BUTTON WITH REAL FLAG -->
+                                    <button id="drawer-country-pill-btn" onclick="openCountryFromAirport()" class="w-full mt-3 p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 flex items-center justify-between gap-3 text-left transition-all cursor-pointer group shadow-sm" title="View Country Network">
+                                        <div class="flex items-center gap-3 min-w-0">
+                                            <div class="w-8 h-5 rounded overflow-hidden border border-slate-600 bg-slate-950 shrink-0 shadow-sm flex items-center justify-center">
+                                                <img id="drawer-country-flag-img" src="" alt="" class="w-full h-full object-cover" />
+                                            </div>
+                                            <div class="min-w-0 flex flex-col">
+                                                <span data-i18n="country.network_subtitle" class="text-[9px] font-extrabold uppercase tracking-wider text-cyan-400">Country Network</span>
+                                                <span id="drawer-country-name" class="text-xs sm:text-sm font-black text-white truncate group-hover:text-cyan-200 transition-colors">Country</span>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center gap-1.5 text-xs text-slate-400 group-hover:text-white transition-colors shrink-0 font-bold">
+                                            <span class="text-[11px]">Explore</span>
+                                            <i class="fa-solid fa-arrow-right text-[10px] group-hover:translate-x-1 transition-transform text-cyan-400"></i>
+                                        </div>
                                     </button>
+                                    <p id="drawer-city-country" class="hidden text-sm font-medium text-slate-300 mt-0.5">City, Country</p>
                                 </div>
                             </div>
-                            <div>
-                                <h3 id="drawer-name" class="text-lg lg:text-xl font-extrabold text-white leading-snug tracking-wide">Airport Full Name</h3>
-                                <div class="flex items-center gap-2 mt-1.5 flex-wrap">
-                                    <span id="drawer-city" class="text-xs font-medium text-slate-300">City</span>
-                                    <span class="text-slate-600 text-xs">•</span>
-                                    <button id="drawer-country-pill-btn" onclick="openCountryFromAirport()" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold cursor-pointer border-0 transition-colors" title="View country overview">
-                                        <span id="drawer-country-flag">🌐</span>
-                                        <span id="drawer-country-name">Country</span>
-                                        <i class="fa-solid fa-chevron-right text-[9px] text-slate-400"></i>
-                                    </button>
-                                </div>
-                                <p id="drawer-city-country" class="hidden text-sm font-medium text-slate-300 mt-0.5">City, Country</p>
-                            </div>
-                        </div>
 
                         <!-- UNIFIED SCENERY SELECTOR CARD (COMMUNITY / MARKETPLACE / ASOBO / DEFAULT) -->
                         <div id="drawer-unified-scenery-card" class="rounded-2xl bg-slate-900/90 border border-slate-800 shadow-lg overflow-hidden transition-all">
@@ -871,8 +882,8 @@
                         </div>
                     </div>
 
-                    <!-- COUNTRY OVERVIEW MODE CONTAINER -->
-                    <div id="drawer-country-mode" class="space-y-4 hidden flex-1 flex flex-col min-h-0">
+                    <!-- COUNTRY OVERVIEW MODE CONTAINER (RIGHT 50%) -->
+                    <div id="drawer-country-mode" class="w-1/2 h-full overflow-y-auto p-4 space-y-4 flex flex-col min-h-0 shrink-0">
                         <!-- 1. HERO COUNTRY HEADER CARD -->
                         <div class="p-4 rounded-2xl bg-slate-900/95 border border-slate-800 space-y-3 shadow-xl relative overflow-hidden shrink-0">
                             <!-- FULL-WIDTH COUNTRY FLAG IN SUBTLE OPACITY -->
@@ -892,8 +903,10 @@
                                         <p id="country-drawer-subtitle" data-i18n="country.network_subtitle" class="text-xs font-semibold text-slate-400 mt-0.5">Country Scenery & Airport Network</p>
                                     </div>
                                 </div>
-                                <button onclick="exitCountryMode()" data-i18n-title="country.exit_mode" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-xs transition-all shadow-md shrink-0 cursor-pointer border-0" title="Exit Country Mode">
-                                    <i class="fa-solid fa-xmark"></i>
+                                <!-- RETURN TO AIRPORT BUTTON (WHEN NAVIGATED FROM AN AIRPORT) -->
+                                <button id="btn-country-back-airport" onclick="returnToAirportMode()" class="hidden px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-bold transition-all items-center gap-1.5 border border-slate-700 cursor-pointer shrink-0 shadow-sm" title="Back to Airport">
+                                    <i class="fa-solid fa-arrow-left text-cyan-400"></i>
+                                    <span id="btn-country-back-airport-icao" class="font-mono">ICAO</span>
                                 </button>
                             </div>
 
@@ -984,7 +997,8 @@
                         </div>
                     </div>
                 </div>
-            </aside>
+            </div>
+        </aside>
         </main>
 
     </div>
