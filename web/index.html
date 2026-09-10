@@ -68,6 +68,84 @@
         .custom-map-marker {
             overflow: visible !important;
         }
+
+        /* Progressive Disclosure of Airport Labels by Zoom Level */
+        .airport-map-label {
+            display: none !important;
+        }
+
+        /* Tier 1: Addons International (Zoom >= 4) */
+        #map[data-zoom-tier="1"] .airport-label-tier-1,
+        #map[data-zoom-tier="2"] .airport-label-tier-1,
+        #map[data-zoom-tier="3"] .airport-label-tier-1,
+        #map[data-zoom-tier="4"] .airport-label-tier-1,
+        #map[data-zoom-tier="5"] .airport-label-tier-1,
+        #map[data-zoom-tier="6"] .airport-label-tier-1,
+        #map[data-zoom-tier="7"] .airport-label-tier-1,
+        #map[data-zoom-tier="8"] .airport-label-tier-1 {
+            display: inline-flex !important;
+        }
+
+        /* Tier 2: Addons Regional (Zoom >= 5) */
+        #map[data-zoom-tier="2"] .airport-label-tier-2,
+        #map[data-zoom-tier="3"] .airport-label-tier-2,
+        #map[data-zoom-tier="4"] .airport-label-tier-2,
+        #map[data-zoom-tier="5"] .airport-label-tier-2,
+        #map[data-zoom-tier="6"] .airport-label-tier-2,
+        #map[data-zoom-tier="7"] .airport-label-tier-2,
+        #map[data-zoom-tier="8"] .airport-label-tier-2 {
+            display: inline-flex !important;
+        }
+
+        /* Tier 3: Addons General Aviation (Zoom >= 6) */
+        #map[data-zoom-tier="3"] .airport-label-tier-3,
+        #map[data-zoom-tier="4"] .airport-label-tier-3,
+        #map[data-zoom-tier="5"] .airport-label-tier-3,
+        #map[data-zoom-tier="6"] .airport-label-tier-3,
+        #map[data-zoom-tier="7"] .airport-label-tier-3,
+        #map[data-zoom-tier="8"] .airport-label-tier-3 {
+            display: inline-flex !important;
+        }
+
+        /* Tier 4: Addons Heli / Water (Zoom >= 7) */
+        #map[data-zoom-tier="4"] .airport-label-tier-4,
+        #map[data-zoom-tier="5"] .airport-label-tier-4,
+        #map[data-zoom-tier="6"] .airport-label-tier-4,
+        #map[data-zoom-tier="7"] .airport-label-tier-4,
+        #map[data-zoom-tier="8"] .airport-label-tier-4 {
+            display: inline-flex !important;
+        }
+
+        /* Tier 5: Default MSFS International (Zoom >= 8) */
+        #map[data-zoom-tier="5"] .airport-label-tier-5,
+        #map[data-zoom-tier="6"] .airport-label-tier-5,
+        #map[data-zoom-tier="7"] .airport-label-tier-5,
+        #map[data-zoom-tier="8"] .airport-label-tier-5 {
+            display: inline-flex !important;
+        }
+
+        /* Tier 6: Default MSFS Regional (Zoom >= 9) */
+        #map[data-zoom-tier="6"] .airport-label-tier-6,
+        #map[data-zoom-tier="7"] .airport-label-tier-6,
+        #map[data-zoom-tier="8"] .airport-label-tier-6 {
+            display: inline-flex !important;
+        }
+
+        /* Tier 7: Default MSFS General Aviation (Zoom >= 10) */
+        #map[data-zoom-tier="7"] .airport-label-tier-7,
+        #map[data-zoom-tier="8"] .airport-label-tier-7 {
+            display: inline-flex !important;
+        }
+
+        /* Tier 8: Default MSFS Heli / Water (Zoom >= 11) */
+        #map[data-zoom-tier="8"] .airport-label-tier-8 {
+            display: inline-flex !important;
+        }
+
+        /* Always display label when marker has focus or is selected */
+        .airport-map-label.label-force-visible {
+            display: inline-flex !important;
+        }
         /* Leaflet Dark Popup Customization */
         .leaflet-popup-content-wrapper {
             background: rgba(15, 23, 42, 0.95) !important;

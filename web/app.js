@@ -748,6 +748,10 @@ function initMap() {
         }
     });
 
+    // Hierarchical progressive disclosure of airport labels by zoom
+    map.on('zoom zoomend', updateMapZoomTier);
+    updateMapZoomTier();
+
     // Single click on neutral map area: closes drawer WITHOUT changing camera
     map.on('click', () => {
         if (countryClickTimeout) {
@@ -1398,6 +1402,7 @@ function focusAirportInCountryMode(ap) {
 
     // 1. Store as previousActiveAirport so clicking Back button opens this airport's details
     previousActiveAirport = ap;
+    setAirportMarkerLabelFocus(ap.icao);
 
     // 2. Update Back button in Country drawer header
     const backBtn = document.getElementById('btn-country-back-prev');
@@ -2313,6 +2318,66 @@ function updateStats(airports) {
 
 let currentFlightMode = { active: false, icaos: [] };
 
+function getAirportLabelTier(ap) {
+    if (!ap) return 8;
+    const cat = getAirportCategory(ap);
+    const isCustom = (cat === 'PAYWARE' || cat === 'FREEWARE' || cat === 'ASOBO');
+
+    const typeStr = (ap.english_type || ap.type || '').toLowerCase();
+    let typeRank = 3; // default: General Aviation
+    if (typeStr.includes('international') || typeStr.includes('large')) {
+        typeRank = 1; // International
+    } else if (typeStr.includes('regional') || typeStr.includes('medium')) {
+        typeRank = 2; // Regional
+    } else if (typeStr.includes('heli') || typeStr.includes('water') || typeStr.includes('seaplane')) {
+        typeRank = 4; // Heli / Water
+    } else {
+        typeRank = 3; // General Aviation
+    }
+
+    return isCustom ? typeRank : (4 + typeRank);
+}
+
+function updateMapZoomTier() {
+    if (!map) return;
+    const z = map.getZoom();
+    const mapEl = document.getElementById('map');
+    if (!mapEl) return;
+
+    let tier = 0;
+    if (z >= 11) tier = 8;
+    else if (z >= 10) tier = 7;
+    else if (z >= 9) tier = 6;
+    else if (z >= 8) tier = 5;
+    else if (z >= 7) tier = 4;
+    else if (z >= 6) tier = 3;
+    else if (z >= 5) tier = 2;
+    else if (z >= 4) tier = 1;
+    else tier = 0;
+
+    mapEl.setAttribute('data-zoom-tier', String(tier));
+}
+
+let currentlyHighlightedIcao = null;
+
+function setAirportMarkerLabelFocus(icao) {
+    if (currentlyHighlightedIcao && currentlyHighlightedIcao !== icao) {
+        const prevMarker = airportMarkerCache.get(currentlyHighlightedIcao);
+        if (prevMarker && prevMarker._icon) {
+            const lbl = prevMarker._icon.querySelector('.airport-map-label');
+            if (lbl) lbl.classList.remove('label-force-visible');
+        }
+    }
+    currentlyHighlightedIcao = icao || null;
+    if (currentlyHighlightedIcao) {
+        const marker = airportMarkerCache.get(currentlyHighlightedIcao);
+        if (marker && marker._icon) {
+            const lbl = marker._icon.querySelector('.airport-map-label');
+            if (lbl) lbl.classList.add('label-force-visible');
+        }
+    }
+}
+
 function getCustomIconKey(ap) {
     const cat = getAirportCategory(ap);
     const nonDefaultSources = ap.all_sources ? ap.all_sources.filter(s => !(s.pricing_type === 'Default' || (s.folder_name && s.folder_name.startsWith('msfs-default-')))) : [];
@@ -2387,6 +2452,7 @@ function createCustomIcon(ap) {
 
     let labelHtml = '';
     if (hasAnyLabel) {
+        const tier = getAirportLabelTier(ap);
         const safeIcao = (ap.icao || '').replace(/"/g, '&quot;');
         const safeName = (ap.name || '').replace(/"/g, '&quot;');
         const safeCity = (ap.city || '').replace(/"/g, '&quot;');
@@ -2395,8 +2461,10 @@ function createCustomIcon(ap) {
         const nameSpan = (showName && ap.name) ? `<span class="font-bold text-slate-200 text-[11px] truncate max-w-[150px]">${safeName}</span>` : '';
         const citySpan = (showCity && ap.city) ? `<span class="text-slate-400 font-medium text-[10px] truncate max-w-[110px]">• ${safeCity}</span>` : '';
 
+        const isForceVisible = (currentlyHighlightedIcao && currentlyHighlightedIcao === ap.icao);
+
         labelHtml = `
-            <div class="airport-map-label inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-950/85 border border-slate-700/80 shadow-md whitespace-nowrap leading-tight pointer-events-auto ml-1.5">
+            <div class="airport-map-label airport-label-tier-${tier} ${isForceVisible ? 'label-force-visible' : ''} inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-950/85 border border-slate-700/80 shadow-md whitespace-nowrap leading-tight pointer-events-auto ml-1.5">
                 ${icaoSpan}
                 ${nameSpan}
                 ${citySpan}
@@ -4047,6 +4115,7 @@ function showAirportDetails(ap, calledFromCountryMode = false) {
     const isDifferentAirport = !selectedAirport || selectedAirport.icao !== ap.icao;
     activeDrawerMode = 'AIRPORT';
     selectedAirport = ap;
+    setAirportMarkerLabelFocus(ap.icao);
     initDrawerAccordions();
 
     if (isDifferentAirport) {
@@ -4932,6 +5001,7 @@ function exitCountryMode(flyCamera = false) {
             btnBackCountry.classList.remove('flex');
         }
         previousActiveAirport = null;
+        setAirportMarkerLabelFocus(null);
 
         const sb = document.getElementById('sidebar-panel');
         const sbHandle = document.getElementById('sidebar-resize-handle');
