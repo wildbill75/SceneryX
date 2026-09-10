@@ -2825,10 +2825,11 @@ function closeAirportRadialMenu() {
     currentRadialOpenZoom = null;
 }
 
-function updateRadialMenuPosition() {
+function updateRadialMenuPosition(force = false) {
     if (!currentRadialAirport || !map) return;
     const radialEl = document.getElementById('airport-radial-menu');
-    if (!radialEl || radialEl.classList.contains('hidden')) return;
+    if (!radialEl) return;
+    if (!force && radialEl.classList.contains('hidden')) return;
 
     let point = null;
     if (currentRadialMarker && currentRadialMarker.getLatLng) {
@@ -2838,13 +2839,13 @@ function updateRadialMenuPosition() {
     }
     if (!point && currentRadialAirport.lat && currentRadialAirport.lon) {
         try {
-            point = map.latLngToContainerPoint([currentRadialAirport.lat, currentRadialAirport.lon]);
+            point = map.latLngToContainerPoint([parseFloat(currentRadialAirport.lat), parseFloat(currentRadialAirport.lon)]);
         } catch (err) {}
     }
     if (!point) return;
 
-    radialEl.style.left = `${point.x}px`;
-    radialEl.style.top = `${point.y}px`;
+    radialEl.style.left = `${Math.round(point.x)}px`;
+    radialEl.style.top = `${Math.round(point.y)}px`;
 
     // Dynamic scale adjustment:
     // Plafonne a 1.0 (taille de base 540px) lors du zoom avant
@@ -2873,8 +2874,8 @@ function openAirportRadialMenu(ap, marker, e) {
     const radialEl = document.getElementById('airport-radial-menu');
     if (!radialEl) return;
 
-    // Anchor exactly at airport coordinates with initial scale
-    updateRadialMenuPosition();
+    // Anchor exactly at airport coordinates with initial scale before revealing
+    updateRadialMenuPosition(true);
 
     // Populate STAGE 1 (Core Central Round Badge)
     const icaoEl = document.getElementById('radial-icao');
@@ -2964,8 +2965,9 @@ function openAirportRadialMenu(ap, marker, e) {
         vendorEl.style.display = 'none';
     }
 
-    // Reveal Radial Menu with smooth transition
+    // Reveal Radial Menu
     radialEl.classList.remove('hidden');
+    updateRadialMenuPosition(true);
 }
 
 function triggerRadialFlightPlan() {
