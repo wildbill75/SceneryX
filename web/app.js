@@ -2865,6 +2865,41 @@ function updateRadialMenuPosition(force = false) {
     radialEl.style.transform = `translate(-50%, -50%) scale(${scale.toFixed(3)})`;
 }
 
+function panMapToAirport(ap) {
+    if (!map || !ap || ap.lat === undefined || ap.lon === undefined) return;
+
+    let flyLon = ap.lon;
+    if (((ap.country === 'RU' || ap.iso_country === 'RU') || (ap.icao && ap.icao.startsWith('UH'))) && flyLon < -100) {
+        flyLon = flyLon + 360;
+    }
+
+    const PAN_DURATION = (currentSettings && currentSettings.camera_pan_duration !== undefined)
+        ? parseFloat(currentSettings.camera_pan_duration)
+        : 0.6;
+
+    let xOffset = 0;
+    const detailDrawer = document.getElementById('detail-drawer');
+    if (detailDrawer && !detailDrawer.classList.contains('translate-x-full') && !detailDrawer.classList.contains('hidden')) {
+        const drawerWidth = detailDrawer.offsetWidth || 460;
+        xOffset = drawerWidth / 2;
+    }
+
+    const currentZoom = (typeof map.getZoom === 'function') ? map.getZoom() : 8;
+
+    try {
+        if (xOffset !== 0) {
+            const targetPoint = map.project([ap.lat, flyLon], currentZoom);
+            const adjustedPoint = L.point(targetPoint.x + xOffset, targetPoint.y);
+            const adjustedLatLng = map.unproject(adjustedPoint, currentZoom);
+            map.panTo(adjustedLatLng, { animate: true, duration: PAN_DURATION });
+        } else {
+            map.panTo([parseFloat(ap.lat), parseFloat(flyLon)], { animate: true, duration: PAN_DURATION });
+        }
+    } catch (err) {
+        map.panTo([parseFloat(ap.lat), parseFloat(flyLon)], { animate: true, duration: PAN_DURATION });
+    }
+}
+
 function openAirportRadialMenu(ap, marker, e) {
     if (!ap) return;
     currentRadialAirport = ap;
@@ -2873,6 +2908,9 @@ function openAirportRadialMenu(ap, marker, e) {
 
     const radialEl = document.getElementById('airport-radial-menu');
     if (!radialEl) return;
+
+    // Pan camera to smoothly center on the newly selected airport
+    panMapToAirport(ap);
 
     // Anchor exactly at airport coordinates with initial scale before revealing
     updateRadialMenuPosition(true);
@@ -4232,7 +4270,7 @@ function centerMapOnAirport(ap, forcedZoom = null) {
     // Calculate horizontal offset so the airport is centered in the visible area between left sidebar and right drawer
     let xOffset = 0;
     const detailDrawer = document.getElementById('detail-drawer');
-    if (detailDrawer) {
+    if (detailDrawer && !detailDrawer.classList.contains('translate-x-full') && !detailDrawer.classList.contains('hidden')) {
         const drawerWidth = detailDrawer.offsetWidth || 460;
         xOffset = drawerWidth / 2;
     }
