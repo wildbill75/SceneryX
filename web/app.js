@@ -1393,14 +1393,69 @@ function renderCountryAirportCard(ap) {
 
 let expandedCountryIcao = null;
 
+function focusAirportInCountryMode(ap) {
+    if (!ap) return;
+
+    // 1. Store as previousActiveAirport so clicking Back button opens this airport's details
+    previousActiveAirport = ap;
+
+    // 2. Update Back button in Country drawer header
+    const backBtn = document.getElementById('btn-country-back-prev');
+    const backText = document.getElementById('btn-country-back-prev-text');
+    const backIcao = document.getElementById('btn-country-back-prev-icao');
+    if (backBtn) {
+        const safeName = ap.name ? ` - ${ap.name}` : '';
+        if (backText) backText.innerText = `Back to ${ap.icao}${safeName}`;
+        if (backIcao) backIcao.innerText = ap.icao;
+        backBtn.classList.remove('hidden');
+        backBtn.classList.add('flex');
+    }
+
+    // 3. Expand accordion & highlight card in country drawer list if present
+    expandedCountryIcao = ap.icao;
+    const card = document.getElementById(`country-ap-card-${ap.icao}`);
+    const accordion = document.getElementById(`country-accordion-${ap.icao}`);
+    const chevron = document.getElementById(`country-chevron-${ap.icao}`);
+
+    if (card) {
+        if (accordion) accordion.classList.remove('hidden');
+        if (chevron) {
+            chevron.className = 'fa-solid fa-chevron-down text-cyan-400 text-xs group-hover:text-white transition-all shrink-0';
+        }
+        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        card.classList.add('ring-2', 'ring-cyan-400/80');
+        setTimeout(() => {
+            card.classList.remove('ring-2', 'ring-cyan-400/80');
+        }, 1800);
+    }
+
+    // 4. Smoothly pan map to this airport without changing zoom or closing drawer
+    if (map && ap.lat && ap.lon) {
+        let displayLon = ap.lon;
+        if (((ap.country === 'RU' || ap.iso_country === 'RU') || (ap.icao && ap.icao.startsWith('UH'))) && displayLon < -100) {
+            displayLon = displayLon + 360;
+        }
+        map.panTo([ap.lat, displayLon], { animate: true, duration: 0.5 });
+    }
+}
+
 function selectCountryAirport(icao) {
     if (!icao) return;
     const ap = getAirportByIcao(icao);
     if (!ap) return;
 
-    expandedCountryIcao = icao;
-    centerMapOnAirport(ap, 9);
-    showAirportDetails(ap, true);
+    if (expandedCountryIcao === icao) {
+        const accordion = document.getElementById(`country-accordion-${icao}`);
+        const chevron = document.getElementById(`country-chevron-${icao}`);
+        if (accordion) {
+            const isHidden = accordion.classList.toggle('hidden');
+            if (chevron) {
+                chevron.className = `fa-solid ${isHidden ? 'fa-chevron-right text-slate-500' : 'fa-chevron-down text-cyan-400'} text-xs group-hover:text-white transition-all shrink-0`;
+            }
+        }
+    } else {
+        focusAirportInCountryMode(ap);
+    }
 }
 
 function returnToCountryMode() {
@@ -2264,7 +2319,17 @@ function getCustomIconKey(ap) {
     const isApDisabled = cat !== 'DEFAULT' && (ap.is_disabled || (nonDefaultSources.length > 0 && nonDefaultSources.every(s => s.is_disabled)));
     const hasActiveFix = !!(ap.all_sources && ap.all_sources.some(s => isFixOrOverlay(s) && !s.is_disabled));
     const hasConflict = !!ap.has_conflict;
-    return `${cat}_${isApDisabled ? 1 : 0}_${hasActiveFix ? 1 : 0}_${hasConflict ? 1 : 0}`;
+
+    const showIcao = !currentSettings || currentSettings.show_label_icao !== false;
+    const showName = !currentSettings || currentSettings.show_label_name !== false;
+    const showCity = !currentSettings || currentSettings.show_label_city !== false;
+    const hasAnyLabel = showIcao || showName || showCity;
+    const labelKey = `${showIcao ? 1 : 0}${showName ? 1 : 0}${showCity ? 1 : 0}`;
+
+    if (hasAnyLabel) {
+        return `${ap.icao}_${cat}_${isApDisabled ? 1 : 0}_${hasActiveFix ? 1 : 0}_${hasConflict ? 1 : 0}_${labelKey}`;
+    }
+    return `${cat}_${isApDisabled ? 1 : 0}_${hasActiveFix ? 1 : 0}_${hasConflict ? 1 : 0}_000`;
 }
 
 function createCustomIcon(ap) {
@@ -2303,19 +2368,51 @@ function createCustomIcon(ap) {
     const isCircleShape = (cat === 'DEFAULT');
 
     const svgIcon = isCircleShape ? `
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="block shrink-0">
             <circle cx="12" cy="12" r="7.5" fill="${color}" stroke="${strokeColor}" stroke-width="${strokeWidth}" />
             <circle cx="12" cy="12" r="2.5" fill="#ffffff" opacity="0.9" />
         </svg>
     ` : `
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" class="block shrink-0">
             <path d="M12 2l2.9 6.26 6.9.83-5.2 4.7 1.4 6.84L12 17.1 5.9 20.63l1.4-6.84-5.2-4.7 6.9-.83L12 2z" 
                   fill="${color}" stroke="${strokeColor}" stroke-width="${strokeWidth}" stroke-linejoin="round"/>
         </svg>
     `;
 
+    // Map Airport Labels (Configurable: ICAO, Name, City)
+    const showIcao = !currentSettings || currentSettings.show_label_icao !== false;
+    const showName = !currentSettings || currentSettings.show_label_name !== false;
+    const showCity = !currentSettings || currentSettings.show_label_city !== false;
+    const hasAnyLabel = showIcao || showName || showCity;
+
+    let labelHtml = '';
+    if (hasAnyLabel) {
+        const safeIcao = (ap.icao || '').replace(/"/g, '&quot;');
+        const safeName = (ap.name || '').replace(/"/g, '&quot;');
+        const safeCity = (ap.city || '').replace(/"/g, '&quot;');
+
+        const icaoSpan = (showIcao && ap.icao) ? `<span class="font-mono font-black text-white text-[11px] shrink-0 tracking-wide">${safeIcao}</span>` : '';
+        const nameSpan = (showName && ap.name) ? `<span class="font-bold text-slate-200 text-[11px] truncate max-w-[150px]">${safeName}</span>` : '';
+        const citySpan = (showCity && ap.city) ? `<span class="text-slate-400 font-medium text-[10px] truncate max-w-[110px]">• ${safeCity}</span>` : '';
+
+        labelHtml = `
+            <div class="airport-map-label inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-950/85 border border-slate-700/80 shadow-md whitespace-nowrap leading-tight pointer-events-auto ml-1.5">
+                ${icaoSpan}
+                ${nameSpan}
+                ${citySpan}
+            </div>
+        `;
+    }
+
+    const combinedHtml = `
+        <div class="custom-marker-wrapper flex items-center whitespace-nowrap">
+            <div class="shrink-0 flex items-center justify-center">${svgIcon}</div>
+            ${labelHtml}
+        </div>
+    `;
+
     const icon = L.divIcon({
-        html: svgIcon,
+        html: combinedHtml,
         className: `custom-map-marker ${isApDisabled && !hasActiveFix ? 'grayscale-[0.5]' : ''}`,
         iconSize: isCircleShape ? [22, 22] : [26, 26],
         iconAnchor: isCircleShape ? [11, 11] : [13, 13]
@@ -2500,7 +2597,7 @@ function renderAirportsOnMap(airports) {
                     handleFlightPlanningAltClick(currentAp);
                 } else {
                     if (activeDrawerMode === 'COUNTRY') {
-                        selectCountryAirport(currentAp.icao);
+                        focusAirportInCountryMode(currentAp);
                     } else {
                         centerMapOnAirport(currentAp);
                         showAirportDetails(currentAp);
@@ -6452,6 +6549,13 @@ async function openSettingsModal() {
         currSelect.value = currentSettings.currency || selectedCurrency || 'USD';
     }
 
+    const chkIcao = document.getElementById('cfg-label-icao');
+    if (chkIcao) chkIcao.checked = currentSettings.show_label_icao !== false;
+    const chkName = document.getElementById('cfg-label-name');
+    if (chkName) chkName.checked = currentSettings.show_label_name !== false;
+    const chkCity = document.getElementById('cfg-label-city');
+    if (chkCity) chkCity.checked = currentSettings.show_label_city !== false;
+
     renderSettingsPathsList();
     const modal = document.getElementById('settings-modal');
     if (modal) {
@@ -6591,7 +6695,21 @@ async function saveSettings() {
         setCurrency(currSelect.value);
     }
 
+    const chkIcao = document.getElementById('cfg-label-icao');
+    if (chkIcao) currentSettings.show_label_icao = chkIcao.checked;
+    const chkName = document.getElementById('cfg-label-name');
+    if (chkName) currentSettings.show_label_name = chkName.checked;
+    const chkCity = document.getElementById('cfg-label-city');
+    if (chkCity) currentSettings.show_label_city = chkCity.checked;
+
     applyStartupCameraSettings();
+
+    // Re-render map markers with updated label settings
+    airportMarkerCache.clear();
+    customDivIconCache.clear();
+    if (map && currentlyFilteredAirports && currentlyFilteredAirports.length > 0) {
+        renderAirportsOnMap(currentlyFilteredAirports);
+    }
 
     try {
         if (window.pywebview) {

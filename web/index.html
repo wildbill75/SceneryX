@@ -64,6 +64,10 @@
         ::-webkit-scrollbar-thumb:hover {
             background: rgba(6, 182, 212, 0.8);
         }
+        /* Custom map marker styling to allow labels to flow cleanly */
+        .custom-map-marker {
+            overflow: visible !important;
+        }
         /* Leaflet Dark Popup Customization */
         .leaflet-popup-content-wrapper {
             background: rgba(15, 23, 42, 0.95) !important;
@@ -1045,6 +1049,25 @@
                         <button onclick="browseGsxFolder()" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition-colors flex items-center gap-1.5 shrink-0 border-0 cursor-pointer group">
                             <i class="fa-solid fa-folder text-slate-400 group-hover:text-white transition-colors"></i> <span data-i18n="settings.browse">Browse</span>
                         </button>
+                    </div>
+                </div>
+
+                <!-- MAP AIRPORT LABELS SETTINGS -->
+                <div class="pt-4 border-t border-slate-800/80 space-y-3">
+                    <label data-i18n="settings.map_labels_section" class="text-xs font-bold text-slate-400 uppercase tracking-wider block">Map Airport Labels</label>
+                    <div class="space-y-2.5 bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
+                        <div class="flex items-center justify-between">
+                            <label data-i18n="settings.label_icao" for="cfg-label-icao" class="text-xs font-semibold text-slate-300 cursor-pointer">Show ICAO Code</label>
+                            <input type="checkbox" id="cfg-label-icao" class="w-4 h-4 accent-cyan-500 rounded cursor-pointer">
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <label data-i18n="settings.label_name" for="cfg-label-name" class="text-xs font-semibold text-slate-300 cursor-pointer">Show Airport Name</label>
+                            <input type="checkbox" id="cfg-label-name" class="w-4 h-4 accent-cyan-500 rounded cursor-pointer">
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <label data-i18n="settings.label_city" for="cfg-label-city" class="text-xs font-semibold text-slate-300 cursor-pointer">Show City</label>
+                            <input type="checkbox" id="cfg-label-city" class="w-4 h-4 accent-cyan-500 rounded cursor-pointer">
+                        </div>
                     </div>
                 </div>
 

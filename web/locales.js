@@ -317,7 +317,11 @@ const LOCALES = {
         "stat.tooltip_total": "Click to show all airports",
         "stores.results_for": "Results for \"{title}\"",
         "stores.subtitle": "Search on Contrail, SimMarket, Orbx, flightsim.to, Aerosoft, iniBuilds...",
-        "stores.title": "Payware Stores"
+        "stores.title": "Payware Stores",
+        "settings.map_labels_section": "Map Airport Labels",
+        "settings.label_icao": "Show ICAO Code",
+        "settings.label_name": "Show Airport Name",
+        "settings.label_city": "Show City"
     },
     fr: {
         "country.back_to": "Retour à",
@@ -636,7 +640,11 @@ const LOCALES = {
         "stat.tooltip_total": "Cliquer pour afficher tous les aéroports",
         "stores.results_for": "Résultats pour \"{title}\"",
         "stores.subtitle": "Rechercher sur Contrail, SimMarket, Orbx, flightsim.to, Aerosoft, iniBuilds...",
-        "stores.title": "Boutiques Payware"
+        "stores.title": "Boutiques Payware",
+        "settings.map_labels_section": "Étiquettes des aéroports sur la carte",
+        "settings.label_icao": "Afficher le code OACI",
+        "settings.label_name": "Afficher le nom de l'aéroport",
+        "settings.label_city": "Afficher la ville"
     },
     de: {
         "country.back_to": "Zurück zu",
@@ -955,7 +963,11 @@ const LOCALES = {
         "stat.tooltip_total": "Klicken, um alle Flughäfen anzuzeigen",
         "stores.results_for": "Ergebnisse für \"{title}\"",
         "stores.subtitle": "Suche auf Contrail, SimMarket, Orbx, flightsim.to, Aerosoft, iniBuilds...",
-        "stores.title": "Payware-Stores"
+        "stores.title": "Payware-Stores",
+        "settings.map_labels_section": "Flughafenbeschriftungen auf der Karte",
+        "settings.label_icao": "ICAO-Code anzeigen",
+        "settings.label_name": "Flughafennamen anzeigen",
+        "settings.label_city": "Stadt anzeigen"
     },
     es: {
         "country.back_to": "Volver a",
@@ -1274,7 +1286,11 @@ const LOCALES = {
         "stat.tooltip_total": "Hacer clic para mostrar todos los aeropuertos",
         "stores.results_for": "Resultados para \"{title}\"",
         "stores.subtitle": "Buscar en Contrail, SimMarket, Orbx, flightsim.to, Aerosoft, iniBuilds...",
-        "stores.title": "Tiendas Payware"
+        "stores.title": "Tiendas Payware",
+        "settings.map_labels_section": "Etiquetas de aeropuertos en el mapa",
+        "settings.label_icao": "Mostrar código OACI",
+        "settings.label_name": "Mostrar nombre del aeropuerto",
+        "settings.label_city": "Mostrar ciudad"
     }
 };
 
