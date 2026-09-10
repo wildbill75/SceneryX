@@ -2812,14 +2812,17 @@ function renderAirportsOnMap(airports) {
 /* ================= AIRPORT RADIAL MENU (CIRCULAR 4-QUADRANT WHEEL) ================= */
 let currentRadialAirport = null;
 let currentRadialMarker = null;
+let currentRadialOpenZoom = null;
 
 function closeAirportRadialMenu() {
     const radialEl = document.getElementById('airport-radial-menu');
     if (radialEl) {
         radialEl.classList.add('hidden');
+        radialEl.style.transform = 'translate(-50%, -50%)';
     }
     currentRadialAirport = null;
     currentRadialMarker = null;
+    currentRadialOpenZoom = null;
 }
 
 function updateRadialMenuPosition() {
@@ -2842,17 +2845,35 @@ function updateRadialMenuPosition() {
 
     radialEl.style.left = `${point.x}px`;
     radialEl.style.top = `${point.y}px`;
+
+    // Dynamic scale adjustment:
+    // Plafonne a 1.0 (taille de base 540px) lors du zoom avant
+    // Reduit doucement et progressivement lors du dezoom (plancher a 0.60)
+    const currentZoom = (typeof map.getZoom === 'function') ? map.getZoom() : 8;
+    const refZoom = (currentRadialOpenZoom !== null) ? Math.min(8.0, currentRadialOpenZoom) : 8.0;
+
+    let scale = 1.0;
+    if (currentZoom < refZoom) {
+        // Dezoom: reduction douce (~7% par cran de zoom, plancher a 0.60)
+        scale = Math.max(0.60, 1.0 - (refZoom - currentZoom) * 0.07);
+    } else {
+        // Zoom avant: strictement bloque a la taille de base (scale 1.0)
+        scale = 1.0;
+    }
+
+    radialEl.style.transform = `translate(-50%, -50%) scale(${scale.toFixed(3)})`;
 }
 
 function openAirportRadialMenu(ap, marker, e) {
     if (!ap) return;
     currentRadialAirport = ap;
     currentRadialMarker = marker || null;
+    currentRadialOpenZoom = (map && typeof map.getZoom === 'function') ? map.getZoom() : 8;
 
     const radialEl = document.getElementById('airport-radial-menu');
     if (!radialEl) return;
 
-    // Anchor exactly at airport coordinates
+    // Anchor exactly at airport coordinates with initial scale
     updateRadialMenuPosition();
 
     // Populate STAGE 1 (Core Central Round Badge)
