@@ -696,14 +696,20 @@
                     </svg>
 
                     <!-- STAGE 1: CENTRAL ROUND BADGE (PASTILLE RONDE CENTRALE - 2X SCALE) -->
-                    <div id="radial-core" onclick="triggerRadialFullDetails()" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[248px] h-[248px] rounded-full bg-slate-950/85 border-2 border-slate-700/80 shadow-2xl p-4 flex flex-col items-center justify-center text-center gap-1.5 backdrop-blur-xl pointer-events-auto cursor-pointer group hover:border-slate-500 transition-all" title="Cliquer pour ouvrir la fiche détaillée">
-                        <div class="flex items-center justify-center gap-2 w-full">
-                            <span id="radial-icao" class="font-mono font-black text-2xl text-white tracking-tight leading-none">ICAO</span>
-                            <span id="radial-badge" class="text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-full border-0">Badge</span>
-                        </div>
+                    <div id="radial-core" onclick="triggerRadialFullDetails()" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[248px] h-[248px] rounded-full bg-slate-950/85 border-2 border-slate-700/80 shadow-2xl p-5 flex flex-col items-center justify-center text-center gap-1.5 backdrop-blur-xl pointer-events-auto cursor-pointer group hover:border-slate-500 transition-all" title="Cliquer pour ouvrir la fiche détaillée">
+                        <!-- Ligne 1: ICAO / IATA en grand -->
+                        <span id="radial-icao" class="font-mono font-black text-3xl text-white tracking-tight leading-none">ICAO</span>
+
+                        <!-- Ligne 2: Nom d'aéroport épuré -->
                         <h4 id="radial-name" class="text-base font-bold text-white truncate max-w-[210px] leading-tight mt-0.5">Airport Name</h4>
+
+                        <!-- Ligne 3: Ville, Pays -->
                         <p id="radial-city" class="text-xs font-medium text-slate-400 truncate max-w-[210px] leading-tight">City, Country</p>
-                        <div id="radial-vendor" class="text-xs font-semibold text-cyan-400 truncate max-w-[200px] pt-1.5 border-t border-slate-800/80 mt-0.5 leading-tight">Publisher</div>
+
+                        <!-- Ligne 4: Catégorie & Éditeur sous forme de Pill en dernière ligne -->
+                        <div class="pt-2 border-t border-slate-800/80 mt-1 flex items-center justify-center w-full">
+                            <span id="radial-badge" class="text-[11px] font-mono font-black px-3 py-1 rounded-full border-0 tracking-wide uppercase truncate max-w-[210px] shadow-sm">Badge</span>
+                        </div>
                     </div>
                 </div>
             </div>

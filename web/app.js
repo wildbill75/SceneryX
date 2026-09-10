@@ -2857,7 +2857,9 @@ function openAirportRadialMenu(ap, marker, e) {
     const flagImgEl = document.getElementById('radial-country-flag');
     const flagIconEl = document.getElementById('radial-country-icon');
 
-    if (icaoEl) icaoEl.innerText = ap.icao || '';
+    // Format ICAO / IATA codes: "LFPG/CDG" or "LFPG"
+    const iataVal = (ap.iata && ap.iata.trim() && ap.iata.trim() !== '—' && ap.iata.trim() !== '-') ? ap.iata.trim().toUpperCase() : '';
+    const codesStr = iataVal ? `${ap.icao}/${iataVal}` : (ap.icao || '');
     if (nameEl) nameEl.innerText = getCleanAirportName(ap.name, ap.city) || ap.icao;
 
     // Country name and flag
@@ -2890,56 +2892,48 @@ function openAirportRadialMenu(ap, marker, e) {
         }
     }
 
-    // Badge and Category styling (Pure solid flat colors per UI rules)
+    // Badge and Category styling (Pure solid flat colors per UI rules, bottom pill)
     const cat = getAirportCategory(ap);
     let badgeLabel = 'FREEWARE';
     let badgeClass = 'bg-cyan-600 text-white font-bold';
     let icaoColor = 'text-cyan-400';
 
     if (ap.has_conflict) {
-        badgeLabel = 'CONFLICT';
-        badgeClass = 'bg-red-600 text-white font-bold animate-pulse';
+        badgeLabel = `⚠️ CONFLIT (${ap.conflict_count || 2})`;
+        badgeClass = 'bg-red-600 text-white font-black animate-pulse';
         icaoColor = 'text-red-400';
     } else if (ap.is_disabled) {
-        badgeLabel = 'DISABLED';
+        badgeLabel = 'DÉSACTIVÉ';
         badgeClass = 'bg-slate-600 text-white font-bold';
         icaoColor = 'text-slate-400';
-    } else if (cat === 'PAYWARE') {
-        badgeLabel = 'PAYWARE';
-        badgeClass = 'bg-purple-600 text-white font-bold';
-        icaoColor = 'text-purple-400';
     } else if (cat === 'ASOBO') {
-        badgeLabel = 'ASOBO';
+        badgeLabel = 'ASOBO / MICROSOFT';
         badgeClass = 'bg-amber-500 text-slate-950 font-black';
         icaoColor = 'text-amber-400';
+    } else if (cat === 'PAYWARE') {
+        badgeLabel = ap.vendor ? `PAYWARE • ${ap.vendor}` : 'PAYWARE';
+        badgeClass = 'bg-purple-600 text-white font-bold';
+        icaoColor = 'text-purple-400';
     } else if (cat === 'DEFAULT') {
-        badgeLabel = 'DEFAULT';
+        badgeLabel = 'DEFAULT • BASE';
         badgeClass = 'bg-blue-600 text-white font-bold';
         icaoColor = 'text-sky-400';
+    } else {
+        badgeLabel = ap.vendor ? `FREEWARE • ${ap.vendor}` : 'FREEWARE';
+        badgeClass = 'bg-cyan-600 text-white font-bold';
+        icaoColor = 'text-cyan-400';
     }
 
     if (badgeEl) {
         badgeEl.innerText = badgeLabel;
-        badgeEl.className = `text-[11px] font-mono px-2.5 py-0.5 rounded-full ${badgeClass}`;
+        badgeEl.className = `text-[11px] font-mono font-black px-3 py-1 rounded-full border-0 tracking-wide uppercase truncate max-w-[210px] shadow-sm ${badgeClass}`;
     }
     if (icaoEl) {
-        icaoEl.className = `font-mono font-black text-2xl tracking-tight leading-none ${icaoColor}`;
+        icaoEl.innerText = codesStr;
+        icaoEl.className = `font-mono font-black text-3xl tracking-tight leading-none ${icaoColor}`;
     }
-
     if (vendorEl) {
-        if (ap.has_conflict) {
-            vendorEl.innerText = `⚠️ ${ap.conflict_count || 2} Conflits`;
-            vendorEl.className = 'text-xs font-semibold text-red-400 truncate max-w-[200px] pt-1.5 border-t border-slate-800/80 mt-0.5 leading-tight';
-        } else if (ap.vendor) {
-            vendorEl.innerText = ap.vendor;
-            vendorEl.className = 'text-xs font-semibold text-slate-300 truncate max-w-[200px] pt-1.5 border-t border-slate-800/80 mt-0.5 leading-tight';
-        } else if (cat === 'DEFAULT') {
-            vendorEl.innerText = 'Microsoft / Asobo';
-            vendorEl.className = 'text-xs font-semibold text-slate-400 truncate max-w-[200px] pt-1.5 border-t border-slate-800/80 mt-0.5 leading-tight';
-        } else {
-            vendorEl.innerText = ap.english_type || ap.type || 'Standard Airport';
-            vendorEl.className = 'text-xs font-semibold text-cyan-400 truncate max-w-[200px] pt-1.5 border-t border-slate-800/80 mt-0.5 leading-tight';
-        }
+        vendorEl.style.display = 'none';
     }
 
     // Reveal Radial Menu with smooth transition
