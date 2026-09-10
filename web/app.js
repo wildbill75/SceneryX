@@ -71,9 +71,20 @@ function getCleanCityName(rawCity) {
 function getCleanAirportName(rawName) {
     if (!rawName) return '';
     let name = String(rawName).trim();
-    // Remove variations of 'international' (e.g. International, Internationnal, Internationale, Internacional, Internazionale, Intl, Int'l)
+    
+    // 1. Remove prefixes like 'Aéroport de', 'Aérodrome de', 'Aérodrome d\'', 'Airport of ', etc.
+    name = name.replace(/^(?:a[eé]rodromes?|a[eé]roports?|airports?|aeropuertos?|aeroportos?)\s+(?:de\s+|d['’]\s*|of\s+)/gi, '');
+    
+    // 2. Remove compound military/specialized base types
+    name = name.replace(/\b(?:air force base|air base|seaplane base|seaplane port|water aerodrome|floatplane base|hydrobase|hydroa[eé]rodrome)\b/gi, '');
+    
+    // 3. Remove facility descriptors: airport, airfield, aerodrome, airstrip, heliport, etc.
+    name = name.replace(/\b(?:airports?|arpt|airfields?|afld|a[eé]rodromes?|a[eé]roports?|aeropuertos?|aeroportos?|aerodromos?|flughafen|flugplatz|airstrips?|altiports?|altisurfaces?|helistops?|helipads?|h[eé]liports?|gliderport|ultralightport)\b/gi, '');
+    
+    // 4. Remove variations of 'international' (e.g. International, Internationnal, Internationale, Internacional, Internazionale, Intl, Int'l)
     name = name.replace(/\b(?:internationnal[es]?|international[es]?|internacional|internazionale|int'?l)\b\.?/gi, '');
-    // Clean up emptied parentheses/brackets or slashes left behind
+    
+    // 5. Clean up emptied parentheses/brackets or slashes left behind
     name = name.replace(/\(\s*\)/g, '');
     name = name.replace(/\[\s*\]/g, '');
     name = name.replace(/\/\s*\//g, '/');
