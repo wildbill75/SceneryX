@@ -325,8 +325,7 @@ const LOCALES = {
         "radial.flight_plan": "Flight Plan",
         "radial.sceneries": "Sceneries",
         "radial.details": "Details",
-        "radial.country": "Country",
-        "radial.tooltip_core": "Click to view detailed airport info"
+        "radial.country": "Country"
     },
     fr: {
         "country.back_to": "Retour à",
@@ -653,8 +652,7 @@ const LOCALES = {
         "radial.flight_plan": "Plan de vol",
         "radial.sceneries": "Scènes",
         "radial.details": "Détails",
-        "radial.country": "Pays",
-        "radial.tooltip_core": "Cliquer pour ouvrir la fiche détaillée"
+        "radial.country": "Pays"
     },
     de: {
         "country.back_to": "Zurück zu",
@@ -981,8 +979,7 @@ const LOCALES = {
         "radial.flight_plan": "Flugplan",
         "radial.sceneries": "Szenerien",
         "radial.details": "Details",
-        "radial.country": "Land",
-        "radial.tooltip_core": "Klicken, um detaillierte Flughafeninfos anzuzeigen"
+        "radial.country": "Land"
     },
     es: {
         "country.back_to": "Volver a",
@@ -1309,8 +1306,7 @@ const LOCALES = {
         "radial.flight_plan": "Plan de vuelo",
         "radial.sceneries": "Escenarios",
         "radial.details": "Detalles",
-        "radial.country": "País",
-        "radial.tooltip_core": "Haga clic para ver información detallada del aeropuerto"
+        "radial.country": "País"
     }
 };
 
