@@ -862,7 +862,7 @@ let countryGeoJsonLayer = null;
 let selectedCountryCode = null;
 let selectedCountryPolygonLayer = null;
 let countryClickTimeout = null;
-const MAX_COUNTRY_INTERACTION_ZOOM = 5.2;
+const MAX_COUNTRY_INTERACTION_ZOOM = 6.5;
 
 function updateCountryInteractivityState() {
     const mapEl = document.getElementById('map');
