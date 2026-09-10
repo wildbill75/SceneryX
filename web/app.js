@@ -761,6 +761,8 @@ window.addEventListener('pywebviewready', async () => {
     await ensureAppLoaded();
 });
 
+let isMapDragging = false;
+
 function initMap() {
     map = L.map('map', {
         center: [20.0, 0.0], // Global world view (Screenshot 3)
@@ -814,8 +816,19 @@ function initMap() {
     map.on('zoom zoomend', updateMapZoomTier);
     updateMapZoomTier();
 
-    // Single click on neutral map area: closes radial menu & drawer WITHOUT changing camera
+    // Map drag tracking to distinguish panning from clean left-clicks
+    map.on('dragstart movestart', () => {
+        isMapDragging = true;
+    });
+    map.on('dragend moveend', () => {
+        setTimeout(() => {
+            isMapDragging = false;
+        }, 100);
+    });
+
+    // Single click on neutral map area: closes radial menu & drawer WITHOUT changing camera (ignored on drag/pan)
     map.on('click', () => {
+        if (isMapDragging) return;
         closeAirportRadialMenu();
         if (countryClickTimeout) {
             clearTimeout(countryClickTimeout);
@@ -826,9 +839,8 @@ function initMap() {
         }
     });
 
-    map.on('movestart zoomstart', () => {
-        closeAirportRadialMenu();
-    });
+    // Dynamically update radial menu position during pan/zoom so it stays locked to airport
+    map.on('move zoom viewreset', updateRadialMenuPosition);
 
     // Double click on neutral map area: resets camera according to priority hierarchy
     map.on('dblclick', () => {
@@ -957,6 +969,7 @@ async function loadCountryOverlays() {
                     },
                     click: (e) => {
                         L.DomEvent.stopPropagation(e);
+                        if (isMapDragging) return;
                         // Priority Guard: If radial menu is open or an airport is currently selected, clicking anywhere on a country simply closes it and blocks country mode!
                         if (currentRadialAirport || selectedAirport || activeDrawerMode === 'AIRPORT') {
                             closeAirportRadialMenu();
@@ -2809,6 +2822,28 @@ function closeAirportRadialMenu() {
     currentRadialMarker = null;
 }
 
+function updateRadialMenuPosition() {
+    if (!currentRadialAirport || !map) return;
+    const radialEl = document.getElementById('airport-radial-menu');
+    if (!radialEl || radialEl.classList.contains('hidden')) return;
+
+    let point = null;
+    if (currentRadialMarker && currentRadialMarker.getLatLng) {
+        try {
+            point = map.latLngToContainerPoint(currentRadialMarker.getLatLng());
+        } catch (err) {}
+    }
+    if (!point && currentRadialAirport.lat && currentRadialAirport.lon) {
+        try {
+            point = map.latLngToContainerPoint([currentRadialAirport.lat, currentRadialAirport.lon]);
+        } catch (err) {}
+    }
+    if (!point) return;
+
+    radialEl.style.left = `${point.x}px`;
+    radialEl.style.top = `${point.y}px`;
+}
+
 function openAirportRadialMenu(ap, marker, e) {
     if (!ap) return;
     currentRadialAirport = ap;
@@ -2817,36 +2852,8 @@ function openAirportRadialMenu(ap, marker, e) {
     const radialEl = document.getElementById('airport-radial-menu');
     if (!radialEl) return;
 
-    // Determine screen position from marker coordinates or event
-    let point = null;
-    if (marker && map) {
-        try {
-            const latLng = marker.getLatLng ? marker.getLatLng() : [ap.lat, ap.lon];
-            point = map.latLngToContainerPoint(latLng);
-        } catch (err) {}
-    }
-    if (!point && e && e.containerPoint) {
-        point = e.containerPoint;
-    }
-    if (!point && map && ap.lat && ap.lon) {
-        try {
-            point = map.latLngToContainerPoint([ap.lat, ap.lon]);
-        } catch (err) {}
-    }
-    if (!point) return;
-
-    // Viewport clamping so the circular wheel (540x540) remains 100% on-screen
-    const mapContainer = document.getElementById('map');
-    const width = mapContainer ? mapContainer.clientWidth : window.innerWidth;
-    const height = mapContainer ? mapContainer.clientHeight : window.innerHeight;
-    const clampMarginX = 275; // radius of 540px circular wheel + breathing room
-    const clampMarginY = 275;
-
-    const clampedX = Math.max(clampMarginX, Math.min(width - clampMarginX, point.x));
-    const clampedY = Math.max(clampMarginY, Math.min(height - clampMarginY, point.y));
-
-    radialEl.style.left = `${clampedX}px`;
-    radialEl.style.top = `${clampedY}px`;
+    // Anchor exactly at airport coordinates
+    updateRadialMenuPosition();
 
     // Populate STAGE 1 (Core Central Round Badge)
     const icaoEl = document.getElementById('radial-icao');
@@ -2991,16 +2998,30 @@ function triggerRadialFullDetails() {
     showAirportDetails(targetAp);
 }
 
-// Global outside click listener to dismiss radial menu cleanly
-window.addEventListener('mousedown', function (e) {
+// Dismiss radial menu ONLY on clean left-click outside
+window.addEventListener('click', function (e) {
+    if (e.button !== 0) return; // Strict Left-Click ONLY
+    if (isMapDragging) return; // Do NOT dismiss on drag / pan release
     if (!currentRadialAirport) return;
+
     const radialEl = document.getElementById('airport-radial-menu');
     if (radialEl && !radialEl.classList.contains('hidden')) {
+        // If click was outside radial menu and not on an airport marker
         if (!radialEl.contains(e.target) && !e.target.closest('.custom-map-marker')) {
             closeAirportRadialMenu();
         }
     }
 });
+
+// Forward wheel events over radial menu to map container so zooming works smoothly everywhere
+const radialContainerEl = document.getElementById('airport-radial-menu');
+if (radialContainerEl) {
+    radialContainerEl.addEventListener('wheel', function (e) {
+        if (map && map.getContainer()) {
+            map.getContainer().dispatchEvent(new WheelEvent('wheel', e));
+        }
+    }, { passive: true });
+}
 
 /* ================= FLIGHT CORRIDOR & FLIGHT PLANNING MODE (ALT + CLICK) ================= */
 
