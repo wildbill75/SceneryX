@@ -2457,14 +2457,40 @@ function createCustomIcon(ap) {
         const safeName = (ap.name || '').replace(/"/g, '&quot;');
         const safeCity = (ap.city || '').replace(/"/g, '&quot;');
 
+        // Match background & border colors with airport category (Payware, Freeware, Asobo, Default)
+        let labelBgBorderClass = 'bg-cyan-950/90 border-cyan-500/80';
+        let labelNameColorClass = 'text-cyan-100';
+
+        if (isApDisabled) {
+            labelBgBorderClass = 'bg-slate-900/90 border-slate-600/80';
+            labelNameColorClass = 'text-slate-300';
+        } else if (cat === 'PAYWARE') {
+            labelBgBorderClass = 'bg-purple-950/90 border-purple-500/80';
+            labelNameColorClass = 'text-purple-100';
+        } else if (cat === 'ASOBO') {
+            labelBgBorderClass = 'bg-amber-950/90 border-amber-500/80';
+            labelNameColorClass = 'text-amber-100';
+        } else if (cat === 'DEFAULT') {
+            labelBgBorderClass = 'bg-blue-950/90 border-blue-500/80';
+            labelNameColorClass = 'text-blue-100';
+        } else {
+            // Freeware (default)
+            labelBgBorderClass = 'bg-cyan-950/90 border-cyan-500/80';
+            labelNameColorClass = 'text-cyan-100';
+        }
+
+        if (ap.has_conflict) {
+            labelBgBorderClass = labelBgBorderClass.replace(/border-[a-z0-9\/-]+/, 'border-red-500');
+        }
+
         const icaoSpan = (showIcao && ap.icao) ? `<span class="font-mono font-black text-white text-[11px] shrink-0 tracking-wide">${safeIcao}</span>` : '';
-        const nameSpan = (showName && ap.name) ? `<span class="font-bold text-slate-200 text-[11px] truncate max-w-[150px]">${safeName}</span>` : '';
-        const citySpan = (showCity && ap.city) ? `<span class="text-slate-400 font-medium text-[10px] truncate max-w-[110px]">• ${safeCity}</span>` : '';
+        const nameSpan = (showName && ap.name) ? `<span class="font-bold ${labelNameColorClass} text-[11px] truncate max-w-[150px]">${safeName}</span>` : '';
+        const citySpan = (showCity && ap.city) ? `<span class="text-slate-300 font-medium text-[10px] truncate max-w-[110px]">• ${safeCity}</span>` : '';
 
         const isForceVisible = (currentlyHighlightedIcao && currentlyHighlightedIcao === ap.icao);
 
         labelHtml = `
-            <div class="airport-map-label airport-label-tier-${tier} ${isForceVisible ? 'label-force-visible' : ''} inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-slate-950/85 border border-slate-700/80 shadow-md whitespace-nowrap leading-tight pointer-events-auto ml-1.5">
+            <div class="airport-map-label airport-label-tier-${tier} ${isForceVisible ? 'label-force-visible' : ''} inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md ${labelBgBorderClass} border shadow-md whitespace-nowrap leading-tight pointer-events-auto ml-1.5">
                 ${icaoSpan}
                 ${nameSpan}
                 ${citySpan}
