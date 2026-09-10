@@ -937,6 +937,8 @@ async function loadCountryOverlays() {
 
                 layer.on({
                     mouseover: (e) => {
+                        // Do not show hover highlight on countries if radial menu is open or an airport is active
+                        if (currentRadialAirport || selectedAirport) return;
                         const l = e.target;
                         if (!selectedCountryCode || selectedCountryCode !== iso) {
                             l.setStyle({
@@ -955,8 +957,17 @@ async function loadCountryOverlays() {
                     },
                     click: (e) => {
                         L.DomEvent.stopPropagation(e);
-                        // Neutral area rule: If the detail drawer is currently open, clicking closes it without moving camera
-                        if (activeDrawerMode !== 'MAP' || selectedAirport || (selectedCountryCode && selectedCountryCode !== iso)) {
+                        // Priority Guard: If radial menu is open or an airport is currently selected, clicking anywhere on a country simply closes it and blocks country mode!
+                        if (currentRadialAirport || selectedAirport || activeDrawerMode === 'AIRPORT') {
+                            closeAirportRadialMenu();
+                            selectedAirport = null;
+                            if (activeDrawerMode !== 'MAP') {
+                                closeDrawerWithoutCameraChange();
+                            }
+                            return;
+                        }
+                        // Neutral area rule: If the detail drawer is currently open or another country is selected, clicking closes it without moving camera
+                        if (activeDrawerMode !== 'MAP' || (selectedCountryCode && selectedCountryCode !== iso)) {
                             closeDrawerWithoutCameraChange();
                             return;
                         }
@@ -972,6 +983,7 @@ async function loadCountryOverlays() {
                     },
                     dblclick: (e) => {
                         L.DomEvent.stopPropagation(e);
+                        closeAirportRadialMenu();
                         if (countryClickTimeout) {
                             clearTimeout(countryClickTimeout);
                             countryClickTimeout = null;
@@ -2742,7 +2754,7 @@ function renderAirportsOnMap(airports) {
             marker._airportData = ap;
             marker._iconKey = iconKey;
 
-            // Left-Click event: Alt+Click for Flight Planning, or focus in Country Mode, or open Radial Menu
+            // Left-Click event: Alt+Click for Flight Planning, or focus in Country Mode, or open/toggle Radial Menu
             marker.on('click', function (e) {
                 if (e.originalEvent) {
                     L.DomEvent.stopPropagation(e.originalEvent);
@@ -2753,11 +2765,15 @@ function renderAirportsOnMap(airports) {
                 } else if (activeDrawerMode === 'COUNTRY') {
                     focusAirportInCountryMode(currentAp);
                 } else {
-                    openAirportRadialMenu(currentAp, this, e);
+                    if (currentRadialAirport && currentRadialAirport.icao === currentAp.icao) {
+                        closeAirportRadialMenu();
+                    } else {
+                        openAirportRadialMenu(currentAp, this, e);
+                    }
                 }
             });
 
-            // Right-Click event: opens the sleek 2-Stage Radial Menu directly
+            // Right-Click event: opens the sleek circular Radial Menu directly
             marker.on('contextmenu', function (e) {
                 if (e.originalEvent) {
                     e.originalEvent.preventDefault();
@@ -2780,7 +2796,7 @@ function renderAirportsOnMap(airports) {
     renderRouteLines(airports);
 }
 
-/* ================= AIRPORT RADIAL MENU (2-STAGE WHEEL) ================= */
+/* ================= AIRPORT RADIAL MENU (CIRCULAR 4-QUADRANT WHEEL) ================= */
 let currentRadialAirport = null;
 let currentRadialMarker = null;
 
@@ -2819,12 +2835,12 @@ function openAirportRadialMenu(ap, marker, e) {
     }
     if (!point) return;
 
-    // Viewport clamping so all radial action pedals remain 100% on-screen
+    // Viewport clamping so the circular wheel (280x280) remains 100% on-screen
     const mapContainer = document.getElementById('map');
     const width = mapContainer ? mapContainer.clientWidth : window.innerWidth;
     const height = mapContainer ? mapContainer.clientHeight : window.innerHeight;
-    const clampMarginX = 140; // half-width of radial menu with pedals
-    const clampMarginY = 125; // half-height of radial menu with pedals
+    const clampMarginX = 145; // radius of 280px circular wheel + breathing room
+    const clampMarginY = 145;
 
     const clampedX = Math.max(clampMarginX, Math.min(width - clampMarginX, point.x));
     const clampedY = Math.max(clampMarginY, Math.min(height - clampMarginY, point.y));
@@ -2832,13 +2848,14 @@ function openAirportRadialMenu(ap, marker, e) {
     radialEl.style.left = `${clampedX}px`;
     radialEl.style.top = `${clampedY}px`;
 
-    // Populate STAGE 1 (Core Briefing Card)
+    // Populate STAGE 1 (Core Central Round Badge)
     const icaoEl = document.getElementById('radial-icao');
     const badgeEl = document.getElementById('radial-badge');
     const nameEl = document.getElementById('radial-name');
     const cityEl = document.getElementById('radial-city');
     const vendorEl = document.getElementById('radial-vendor');
     const flagImgEl = document.getElementById('radial-country-flag');
+    const flagIconEl = document.getElementById('radial-country-icon');
 
     if (icaoEl) icaoEl.innerText = ap.icao || '';
     if (nameEl) nameEl.innerText = getCleanAirportName(ap.name, ap.city) || ap.icao;
@@ -2862,9 +2879,14 @@ function openAirportRadialMenu(ap, marker, e) {
             flagImgEl.src = `https://flagcdn.com/w80/${apIsoCode.toLowerCase()}.png`;
             flagImgEl.alt = resolvedCountryName;
             flagImgEl.style.display = 'block';
-            flagImgEl.onerror = () => { flagImgEl.style.display = 'none'; };
+            if (flagIconEl) flagIconEl.classList.add('hidden');
+            flagImgEl.onerror = () => {
+                flagImgEl.style.display = 'none';
+                if (flagIconEl) flagIconEl.classList.remove('hidden');
+            };
         } else {
             flagImgEl.style.display = 'none';
+            if (flagIconEl) flagIconEl.classList.remove('hidden');
         }
     }
 
@@ -2898,29 +2920,29 @@ function openAirportRadialMenu(ap, marker, e) {
 
     if (badgeEl) {
         badgeEl.innerText = badgeLabel;
-        badgeEl.className = `text-[9px] font-mono px-2 py-0.5 rounded-full ${badgeClass}`;
+        badgeEl.className = `text-[8px] font-mono px-1.5 py-0.5 rounded-full ${badgeClass}`;
     }
     if (icaoEl) {
-        icaoEl.className = `font-mono font-black text-xl tracking-tight leading-none ${icaoColor}`;
+        icaoEl.className = `font-mono font-black text-base tracking-tight leading-none ${icaoColor}`;
     }
 
     if (vendorEl) {
         if (ap.has_conflict) {
-            vendorEl.innerText = `⚠️ ${ap.conflict_count || 2} Scènes en Conflit`;
-            vendorEl.className = 'text-[10px] font-bold text-red-400 truncate w-full pt-1 border-t border-slate-800/80 mt-0.5';
+            vendorEl.innerText = `⚠️ ${ap.conflict_count || 2} Conflits`;
+            vendorEl.className = 'text-[8.5px] font-semibold text-red-400 truncate max-w-[105px] pt-1 border-t border-slate-800/80 mt-0.5 leading-tight';
         } else if (ap.vendor) {
             vendorEl.innerText = ap.vendor;
-            vendorEl.className = 'text-[10px] font-bold text-slate-300 truncate w-full pt-1 border-t border-slate-800/80 mt-0.5';
+            vendorEl.className = 'text-[8.5px] font-semibold text-slate-300 truncate max-w-[105px] pt-1 border-t border-slate-800/80 mt-0.5 leading-tight';
         } else if (cat === 'DEFAULT') {
-            vendorEl.innerText = 'Microsoft / Asobo (Base)';
-            vendorEl.className = 'text-[10px] font-bold text-slate-400 truncate w-full pt-1 border-t border-slate-800/80 mt-0.5';
+            vendorEl.innerText = 'Microsoft / Asobo';
+            vendorEl.className = 'text-[8.5px] font-semibold text-slate-400 truncate max-w-[105px] pt-1 border-t border-slate-800/80 mt-0.5 leading-tight';
         } else {
             vendorEl.innerText = ap.english_type || ap.type || 'Standard Airport';
-            vendorEl.className = 'text-[10px] font-bold text-cyan-400 truncate w-full pt-1 border-t border-slate-800/80 mt-0.5';
+            vendorEl.className = 'text-[8.5px] font-semibold text-cyan-400 truncate max-w-[105px] pt-1 border-t border-slate-800/80 mt-0.5 leading-tight';
         }
     }
 
-    // Reveal Radial Menu with scale animation
+    // Reveal Radial Menu with smooth transition
     radialEl.classList.remove('hidden');
 }
 
@@ -2974,6 +2996,17 @@ function triggerRadialFullDetails() {
     centerMapOnAirport(targetAp);
     showAirportDetails(targetAp);
 }
+
+// Global outside click listener to dismiss radial menu cleanly
+window.addEventListener('mousedown', function (e) {
+    if (!currentRadialAirport) return;
+    const radialEl = document.getElementById('airport-radial-menu');
+    if (radialEl && !radialEl.classList.contains('hidden')) {
+        if (!radialEl.contains(e.target) && !e.target.closest('.custom-map-marker')) {
+            closeAirportRadialMenu();
+        }
+    }
+});
 
 /* ================= FLIGHT CORRIDOR & FLIGHT PLANNING MODE (ALT + CLICK) ================= */
 

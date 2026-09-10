@@ -225,6 +225,41 @@
                 transform: translateY(0);
             }
         }
+
+        /* Tactical Circular Radial Menu Styling */
+        .radial-sector-path {
+            fill: rgba(11, 17, 32, 0.94);
+            stroke: rgba(51, 65, 85, 0.85);
+            stroke-width: 1.5px;
+            transition: all 0.16s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+        }
+        .radial-sector:hover .radial-sector-path {
+            stroke-width: 2px;
+        }
+        .radial-sector-flight:hover .radial-sector-path {
+            fill: rgba(6, 78, 59, 0.96);
+            stroke: #10b981;
+            filter: drop-shadow(0 0 10px rgba(16, 185, 129, 0.5));
+        }
+        .radial-sector-scenery:hover .radial-sector-path {
+            fill: rgba(88, 28, 135, 0.96);
+            stroke: #c084fc;
+            filter: drop-shadow(0 0 10px rgba(192, 132, 252, 0.5));
+        }
+        .radial-sector-details:hover .radial-sector-path {
+            fill: rgba(12, 74, 110, 0.96);
+            stroke: #38bdf8;
+            filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.5));
+        }
+        .radial-sector-country:hover .radial-sector-path {
+            fill: rgba(21, 94, 117, 0.96);
+            stroke: #06b6d4;
+            filter: drop-shadow(0 0 10px rgba(6, 182, 212, 0.5));
+        }
+        .radial-sector:active .radial-sector-path {
+            filter: brightness(1.2);
+        }
     </style>
 </head>
 <body class="h-full overflow-hidden flex flex-col select-none bg-slate-950">
@@ -609,46 +644,67 @@
         <main class="flex-1 relative">
             <div id="map" class="w-full h-full z-10 bg-slate-950"></div>
 
-            <!-- AIRPORT RADIAL MENU (FLUID 2-STAGE WHEEL) -->
+            <!-- AIRPORT RADIAL MENU (STRICTLY CIRCULAR 4-QUADRANT WHEEL) -->
             <div id="airport-radial-menu" class="hidden absolute z-[1500] select-none pointer-events-none transition-all duration-150 transform -translate-x-1/2 -translate-y-1/2">
-                <!-- Radial Core Wrapper -->
-                <div class="relative flex items-center justify-center">
-                    
-                    <!-- STAGE 1: CORE BRIEFING CARD (CENTER) -->
-                    <div id="radial-core" class="w-44 p-3 rounded-2xl bg-slate-950/95 border border-slate-700/80 shadow-2xl flex flex-col items-center text-center gap-1 backdrop-blur-xl pointer-events-auto transition-all">
-                        <div class="flex items-center justify-between w-full gap-2">
-                            <span id="radial-icao" class="font-mono font-black text-xl text-white tracking-tight leading-none">ICAO</span>
-                            <span id="radial-badge" class="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full border-0">Badge</span>
+                <div class="relative w-[280px] h-[280px] flex items-center justify-center pointer-events-none">
+                    <!-- SVG Ring with 4 Annular Quadrants -->
+                    <svg class="absolute inset-0 w-full h-full filter drop-shadow-2xl overflow-visible pointer-events-none" viewBox="0 0 280 280">
+                        <!-- NORTH SECTOR: FLIGHT PLAN -->
+                        <g id="radial-sector-flight" onclick="triggerRadialFlightPlan()" class="radial-sector radial-sector-flight group cursor-pointer pointer-events-auto" role="button" aria-label="Plan de vol">
+                            <path class="radial-sector-path" d="M 46.38 41.35 A 136.00 136.00 0 0 1 233.62 41.35 L 186.81 90.67 A 68.00 68.00 0 0 0 93.19 90.67 Z" />
+                            <foreignObject x="80" y="14" width="120" height="50" class="pointer-events-none">
+                                <div class="w-full h-full flex flex-col items-center justify-center text-center">
+                                    <i class="fa-solid fa-plane-departure text-emerald-400 text-sm group-hover:scale-110 transition-transform"></i>
+                                    <span class="text-[9px] font-bold tracking-wider text-slate-300 group-hover:text-emerald-300 uppercase mt-1 leading-none">Plan de vol</span>
+                                </div>
+                            </foreignObject>
+                        </g>
+
+                        <!-- EAST SECTOR: SCENERIES -->
+                        <g id="radial-sector-scenery" onclick="triggerRadialScenerySelector()" class="radial-sector radial-sector-scenery group cursor-pointer pointer-events-auto" role="button" aria-label="Scènes & Variantes">
+                            <path class="radial-sector-path" d="M 238.65 46.38 A 136.00 136.00 0 0 1 238.65 233.62 L 189.33 186.81 A 68.00 68.00 0 0 0 189.33 93.19 Z" />
+                            <foreignObject x="210" y="115" width="64" height="50" class="pointer-events-none">
+                                <div class="w-full h-full flex flex-col items-center justify-center text-center">
+                                    <i class="fa-solid fa-layer-group text-purple-400 text-sm group-hover:scale-110 transition-transform"></i>
+                                    <span class="text-[9px] font-bold tracking-wider text-slate-300 group-hover:text-purple-300 uppercase mt-1 leading-none">Scènes</span>
+                                </div>
+                            </foreignObject>
+                        </g>
+
+                        <!-- SOUTH SECTOR: DETAILS -->
+                        <g id="radial-sector-details" onclick="triggerRadialFullDetails()" class="radial-sector radial-sector-details group cursor-pointer pointer-events-auto" role="button" aria-label="Fiche complète">
+                            <path class="radial-sector-path" d="M 233.62 238.65 A 136.00 136.00 0 0 1 46.38 238.65 L 93.19 189.33 A 68.00 68.00 0 0 0 186.81 189.33 Z" />
+                            <foreignObject x="80" y="216" width="120" height="50" class="pointer-events-none">
+                                <div class="w-full h-full flex flex-col items-center justify-center text-center">
+                                    <i class="fa-solid fa-circle-info text-sky-400 text-sm group-hover:scale-110 transition-transform"></i>
+                                    <span class="text-[9px] font-bold tracking-wider text-slate-300 group-hover:text-sky-300 uppercase mt-1 leading-none">Détails</span>
+                                </div>
+                            </foreignObject>
+                        </g>
+
+                        <!-- WEST SECTOR: COUNTRY MODE -->
+                        <g id="radial-sector-country" onclick="triggerRadialCountry()" class="radial-sector radial-sector-country group cursor-pointer pointer-events-auto" role="button" aria-label="Mode Pays">
+                            <path class="radial-sector-path" d="M 41.35 233.62 A 136.00 136.00 0 0 1 41.35 46.38 L 90.67 93.19 A 68.00 68.00 0 0 0 90.67 186.81 Z" />
+                            <foreignObject x="6" y="115" width="64" height="50" class="pointer-events-none">
+                                <div class="w-full h-full flex flex-col items-center justify-center text-center">
+                                    <img id="radial-country-flag" src="" alt="" class="w-4 h-3 rounded object-cover shadow-sm group-hover:scale-110 transition-transform mb-0.5" />
+                                    <i id="radial-country-icon" class="fa-solid fa-earth-americas text-cyan-400 text-sm group-hover:scale-110 transition-transform mb-0.5 hidden"></i>
+                                    <span class="text-[9px] font-bold tracking-wider text-slate-300 group-hover:text-cyan-300 uppercase leading-none">Pays</span>
+                                </div>
+                            </foreignObject>
+                        </g>
+                    </svg>
+
+                    <!-- STAGE 1: CENTRAL ROUND BADGE (PASTILLE RONDE CENTRALE) -->
+                    <div id="radial-core" onclick="triggerRadialFullDetails()" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[132px] h-[132px] rounded-full bg-slate-950/98 border border-slate-700/80 shadow-2xl p-2.5 flex flex-col items-center justify-center text-center gap-0.5 backdrop-blur-xl pointer-events-auto cursor-pointer group hover:border-slate-500 transition-all" title="Cliquer pour ouvrir la fiche détaillée">
+                        <div class="flex items-center justify-center gap-1.5 w-full">
+                            <span id="radial-icao" class="font-mono font-black text-base text-white tracking-tight leading-none">ICAO</span>
+                            <span id="radial-badge" class="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded-full border-0">Badge</span>
                         </div>
-                        <h4 id="radial-name" class="text-xs font-black text-white truncate w-full mt-0.5 leading-snug">Airport Name</h4>
-                        <p id="radial-city" class="text-[10px] font-semibold text-slate-400 truncate w-full">City, Country</p>
-                        <div id="radial-vendor" class="text-[10px] font-bold text-cyan-400 truncate w-full pt-1 border-t border-slate-800/80 mt-0.5">Publisher</div>
+                        <h4 id="radial-name" class="text-[11px] font-bold text-white truncate max-w-[110px] leading-tight mt-0.5">Airport Name</h4>
+                        <p id="radial-city" class="text-[9px] font-medium text-slate-400 truncate max-w-[110px] leading-tight">City, Country</p>
+                        <div id="radial-vendor" class="text-[8.5px] font-semibold text-cyan-400 truncate max-w-[105px] pt-1 border-t border-slate-800/80 mt-0.5 leading-tight">Publisher</div>
                     </div>
-
-                    <!-- STAGE 2: ACTION PEDALS (ORBITING SATELLITES) -->
-                    <!-- Top Pedal: Flight Plan -->
-                    <button id="radial-btn-flight" onclick="triggerRadialFlightPlan()" class="group absolute -top-[68px] left-1/2 -translate-x-1/2 w-10 h-10 rounded-full bg-slate-900/95 hover:bg-emerald-600 border border-slate-700 hover:border-emerald-400 text-slate-200 hover:text-white shadow-xl flex items-center justify-center cursor-pointer pointer-events-auto transition-all active:scale-95" title="Plan de vol">
-                        <i class="fa-solid fa-plane-departure text-xs group-hover:scale-110 transition-transform"></i>
-                        <span class="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-6 text-[9px] font-bold px-2 py-0.5 rounded bg-slate-950 text-emerald-300 border border-emerald-500/40 whitespace-nowrap shadow-md pointer-events-none">Plan de vol</span>
-                    </button>
-
-                    <!-- Right Pedal: Scenery Selector -->
-                    <button id="radial-btn-scenery" onclick="triggerRadialScenerySelector()" class="group absolute top-1/2 -right-[64px] -translate-y-1/2 w-10 h-10 rounded-full bg-slate-900/95 hover:bg-purple-600 border border-slate-700 hover:border-purple-400 text-slate-200 hover:text-white shadow-xl flex items-center justify-center cursor-pointer pointer-events-auto transition-all active:scale-95" title="Scènes & Variantes">
-                        <i class="fa-solid fa-layer-group text-xs group-hover:scale-110 transition-transform"></i>
-                        <span class="opacity-0 group-hover:opacity-100 transition-opacity absolute -bottom-6 left-1/2 -translate-x-1/2 text-[9px] font-bold px-2 py-0.5 rounded bg-slate-950 text-purple-300 border border-purple-500/40 whitespace-nowrap shadow-md pointer-events-none">Scènes</span>
-                    </button>
-
-                    <!-- Bottom Pedal: Full Technical Details -->
-                    <button id="radial-btn-details" onclick="triggerRadialFullDetails()" class="group absolute -bottom-[68px] left-1/2 -translate-x-1/2 w-10 h-10 rounded-full bg-slate-900/95 hover:bg-blue-600 border border-slate-700 hover:border-blue-400 text-slate-200 hover:text-white shadow-xl flex items-center justify-center cursor-pointer pointer-events-auto transition-all active:scale-95" title="Fiche complète">
-                        <i class="fa-solid fa-circle-info text-xs group-hover:scale-110 transition-transform"></i>
-                        <span class="opacity-0 group-hover:opacity-100 transition-opacity absolute -bottom-6 text-[9px] font-bold px-2 py-0.5 rounded bg-slate-950 text-blue-300 border border-blue-500/40 whitespace-nowrap shadow-md pointer-events-none">Fiche complète</span>
-                    </button>
-
-                    <!-- Left Pedal: Country Network -->
-                    <button id="radial-btn-country" onclick="triggerRadialCountry()" class="group absolute top-1/2 -left-[64px] -translate-y-1/2 w-10 h-10 rounded-full bg-slate-900/95 hover:bg-cyan-600 border border-slate-700 hover:border-cyan-400 text-slate-200 hover:text-white shadow-xl flex items-center justify-center cursor-pointer pointer-events-auto transition-all active:scale-95" title="Mode Pays">
-                        <img id="radial-country-flag" src="" alt="" class="w-4 h-3 rounded object-cover shadow-sm group-hover:scale-110 transition-transform" />
-                        <span class="opacity-0 group-hover:opacity-100 transition-opacity absolute -bottom-6 left-1/2 -translate-x-1/2 text-[9px] font-bold px-2 py-0.5 rounded bg-slate-950 text-cyan-300 border border-cyan-500/40 whitespace-nowrap shadow-md pointer-events-none">Mode Pays</span>
-                    </button>
                 </div>
             </div>
 
