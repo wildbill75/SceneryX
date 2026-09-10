@@ -2819,6 +2819,7 @@ function closeAirportRadialMenu() {
     if (radialEl) {
         radialEl.classList.add('hidden');
         radialEl.style.transform = 'translate(-50%, -50%)';
+        radialEl.style.opacity = '1';
     }
     currentRadialAirport = null;
     currentRadialMarker = null;
@@ -2830,6 +2831,15 @@ function updateRadialMenuPosition(force = false) {
     const radialEl = document.getElementById('airport-radial-menu');
     if (!radialEl) return;
     if (!force && radialEl.classList.contains('hidden')) return;
+
+    const currentZoom = (typeof map.getZoom === 'function') ? map.getZoom() : 8;
+
+    // Disparition automatique quand on est trop dezoome (seuil optimal : zoom 5.0)
+    const MIN_RADIAL_ZOOM = 5.0;
+    if (currentZoom < MIN_RADIAL_ZOOM) {
+        closeAirportRadialMenu();
+        return;
+    }
 
     let point = null;
     if (currentRadialMarker && currentRadialMarker.getLatLng) {
@@ -2847,19 +2857,24 @@ function updateRadialMenuPosition(force = false) {
     radialEl.style.left = `${Math.round(point.x)}px`;
     radialEl.style.top = `${Math.round(point.y)}px`;
 
-    // Dynamic scale adjustment:
-    // Plafonne a 1.0 (taille de base 540px) lors du zoom avant
-    // Reduit doucement et progressivement lors du dezoom (plancher a 0.60)
-    const currentZoom = (typeof map.getZoom === 'function') ? map.getZoom() : 8;
-    const refZoom = (currentRadialOpenZoom !== null) ? Math.min(8.0, currentRadialOpenZoom) : 8.0;
-
+    // Dynamic scale & opacity curve :
+    // - Plafonne a 1.0 (540px) lors du zoom avant (currentZoom >= 8.0)
+    // - Reduit beaucoup plus rapidement lors du dezoom (zoom 8.0 -> 5.0)
+    //   ex: zoom 8.0 = 1.0 (540px), zoom 7.0 = 0.77 (417px), zoom 6.0 = 0.55 (295px), zoom 5.0 = 0.32 (173px)
+    // - Fondu d'opacite a l'approche du seuil de disparition (5.4 -> 5.0)
     let scale = 1.0;
-    if (currentZoom < refZoom) {
-        // Dezoom: reduction douce (~7% par cran de zoom, plancher a 0.60)
-        scale = Math.max(0.60, 1.0 - (refZoom - currentZoom) * 0.07);
+    if (currentZoom < 8.0) {
+        const progress = Math.max(0.0, Math.min(1.0, (currentZoom - MIN_RADIAL_ZOOM) / (8.0 - MIN_RADIAL_ZOOM)));
+        scale = 0.32 + progress * 0.68;
     } else {
-        // Zoom avant: strictement bloque a la taille de base (scale 1.0)
         scale = 1.0;
+    }
+
+    if (currentZoom < 5.4) {
+        const opacity = Math.max(0.0, Math.min(1.0, (currentZoom - MIN_RADIAL_ZOOM) / 0.4));
+        radialEl.style.opacity = opacity.toFixed(2);
+    } else {
+        radialEl.style.opacity = '1';
     }
 
     radialEl.style.transform = `translate(-50%, -50%) scale(${scale.toFixed(3)})`;
@@ -2885,15 +2900,27 @@ function panMapToAirport(ap) {
     }
 
     const currentZoom = (typeof map.getZoom === 'function') ? map.getZoom() : 8;
+    // Si la carte est trop dezoomee (< 6.0), voler doucement jusqu'a 6.0 pour que le menu soit visible
+    // Si deja a zoom >= 6.0, preserver le zoom utilisateur
+    const targetZoom = (currentZoom < 6.0) ? 6.0 : currentZoom;
 
     try {
         if (xOffset !== 0) {
-            const targetPoint = map.project([ap.lat, flyLon], currentZoom);
+            const targetPoint = map.project([ap.lat, flyLon], targetZoom);
             const adjustedPoint = L.point(targetPoint.x + xOffset, targetPoint.y);
-            const adjustedLatLng = map.unproject(adjustedPoint, currentZoom);
-            map.panTo(adjustedLatLng, { animate: true, duration: PAN_DURATION });
+            const adjustedLatLng = map.unproject(adjustedPoint, targetZoom);
+            if (targetZoom !== currentZoom) {
+                map.flyTo(adjustedLatLng, targetZoom, { animate: true, duration: PAN_DURATION });
+            } else {
+                map.panTo(adjustedLatLng, { animate: true, duration: PAN_DURATION });
+            }
         } else {
-            map.panTo([parseFloat(ap.lat), parseFloat(flyLon)], { animate: true, duration: PAN_DURATION });
+            const targetLatLng = [parseFloat(ap.lat), parseFloat(flyLon)];
+            if (targetZoom !== currentZoom) {
+                map.flyTo(targetLatLng, targetZoom, { animate: true, duration: PAN_DURATION });
+            } else {
+                map.panTo(targetLatLng, { animate: true, duration: PAN_DURATION });
+            }
         }
     } catch (err) {
         map.panTo([parseFloat(ap.lat), parseFloat(flyLon)], { animate: true, duration: PAN_DURATION });
