@@ -92,17 +92,17 @@ function getCleanAirportName(rawName, rawCity = '') {
     name = name.replace(/\s+-\s+/g, ' - ');
     name = name.replace(/\s+\/\s+/g, ' / ');
     name = name.replace(/\s{2,}/g, ' ');
-    name = name.replace(/^[\s\-\/,\.]+|[\s\-\/,\.]+$/g, '').trim();
+    name = name.replace(/^[\s\-\u0096\u2010-\u2015\/,\.]+|[\s\-\u0096\u2010-\u2015\/,\.]+$/g, '').trim();
 
     // 6. Remove city name from airport name if present and if remaining string is a distinct proper name
     if (rawCity) {
         const cleanCity = getCleanCityName(rawCity);
         if (cleanCity && cleanCity.length >= 3) {
             const escapedCity = cleanCity.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const cityRegex = new RegExp('(?:^|\\b|\\s*-\\s*)' + escapedCity + '(?:\\s*-\\s*|\\b|$)', 'gi');
+            const cityRegex = new RegExp('(?:^|\\b|[\\s\\-\\u0096\\u2010-\\u2015])' + escapedCity + '(?:[\\s\\-\\u0096\\u2010-\\u2015]|\\b|$)', 'gi');
             let candidate = name.replace(cityRegex, ' ');
             candidate = candidate.replace(/\s{2,}/g, ' ');
-            candidate = candidate.replace(/^[\s\-\/,\.]+|[\s\-\/,\.]+$/g, '').trim();
+            candidate = candidate.replace(/^[\s\-\u0096\u2010-\u2015\/,\.]+|[\s\-\u0096\u2010-\u2015\/,\.]+$/g, '').trim();
             
             const genericWords = new Set(['municipal', 'regional', 'national', 'metropolitan', 'county', 'memorial', 'city', 'centre', 'center', 'public', 'private']);
             if (candidate && candidate.length >= 3 && !genericWords.has(candidate.toLowerCase())) {
@@ -814,8 +814,9 @@ function initMap() {
     map.on('zoom zoomend', updateMapZoomTier);
     updateMapZoomTier();
 
-    // Single click on neutral map area: closes drawer WITHOUT changing camera
+    // Single click on neutral map area: closes radial menu & drawer WITHOUT changing camera
     map.on('click', () => {
+        closeAirportRadialMenu();
         if (countryClickTimeout) {
             clearTimeout(countryClickTimeout);
             countryClickTimeout = null;
@@ -823,6 +824,10 @@ function initMap() {
         if (activeDrawerMode !== 'MAP' || selectedAirport || selectedCountryCode) {
             closeDrawerWithoutCameraChange();
         }
+    });
+
+    map.on('movestart zoomstart', () => {
+        closeAirportRadialMenu();
     });
 
     // Double click on neutral map area: resets camera according to priority hierarchy
@@ -2737,26 +2742,7 @@ function renderAirportsOnMap(airports) {
             marker._airportData = ap;
             marker._iconKey = iconKey;
 
-            // Bind lazy preview popup content (evaluated ONLY on hover/open!)
-            marker.bindPopup(() => getAirportPopupHtml(marker._airportData), {
-                maxWidth: 340,
-                minWidth: 250,
-                closeButton: false,
-                autoClose: true,
-                autoPan: false
-            });
-
-            // Hover events for quick popup preview
-            marker.on('mouseover', function () {
-                if (isSuppressingHoverPopups) return;
-                this.openPopup();
-            });
-
-            marker.on('mouseout', function () {
-                this.closePopup();
-            });
-
-            // Left-Click event: opens detailed drawer on right sidebar (or Alt+Click for Flight Planning Mode)
+            // Left-Click event: Alt+Click for Flight Planning, or focus in Country Mode, or open Radial Menu
             marker.on('click', function (e) {
                 if (e.originalEvent) {
                     L.DomEvent.stopPropagation(e.originalEvent);
@@ -2764,24 +2750,21 @@ function renderAirportsOnMap(airports) {
                 const currentAp = this._airportData || ap;
                 if (e.originalEvent && (e.originalEvent.altKey || e.originalEvent.metaKey)) {
                     handleFlightPlanningAltClick(currentAp);
+                } else if (activeDrawerMode === 'COUNTRY') {
+                    focusAirportInCountryMode(currentAp);
                 } else {
-                    if (activeDrawerMode === 'COUNTRY') {
-                        focusAirportInCountryMode(currentAp);
-                    } else {
-                        centerMapOnAirport(currentAp);
-                        showAirportDetails(currentAp);
-                    }
+                    openAirportRadialMenu(currentAp, this, e);
                 }
             });
 
-            // Right-Click event: toggles scenery activation state directly & changes star color!
+            // Right-Click event: opens the sleek 2-Stage Radial Menu directly
             marker.on('contextmenu', function (e) {
                 if (e.originalEvent) {
                     e.originalEvent.preventDefault();
                     e.originalEvent.stopPropagation();
                 }
                 const currentAp = this._airportData || ap;
-                toggleAirportScenery(currentAp.icao);
+                openAirportRadialMenu(currentAp, this, e);
             });
 
             airportMarkerCache.set(ap.icao, marker);
@@ -2795,6 +2778,201 @@ function renderAirportsOnMap(airports) {
     if (fcEl) fcEl.innerText = `${airports.length} visible`;
 
     renderRouteLines(airports);
+}
+
+/* ================= AIRPORT RADIAL MENU (2-STAGE WHEEL) ================= */
+let currentRadialAirport = null;
+let currentRadialMarker = null;
+
+function closeAirportRadialMenu() {
+    const radialEl = document.getElementById('airport-radial-menu');
+    if (radialEl) {
+        radialEl.classList.add('hidden');
+    }
+    currentRadialAirport = null;
+    currentRadialMarker = null;
+}
+
+function openAirportRadialMenu(ap, marker, e) {
+    if (!ap) return;
+    currentRadialAirport = ap;
+    currentRadialMarker = marker || null;
+
+    const radialEl = document.getElementById('airport-radial-menu');
+    if (!radialEl) return;
+
+    // Determine screen position from marker coordinates or event
+    let point = null;
+    if (marker && map) {
+        try {
+            const latLng = marker.getLatLng ? marker.getLatLng() : [ap.lat, ap.lon];
+            point = map.latLngToContainerPoint(latLng);
+        } catch (err) {}
+    }
+    if (!point && e && e.containerPoint) {
+        point = e.containerPoint;
+    }
+    if (!point && map && ap.lat && ap.lon) {
+        try {
+            point = map.latLngToContainerPoint([ap.lat, ap.lon]);
+        } catch (err) {}
+    }
+    if (!point) return;
+
+    // Viewport clamping so all radial action pedals remain 100% on-screen
+    const mapContainer = document.getElementById('map');
+    const width = mapContainer ? mapContainer.clientWidth : window.innerWidth;
+    const height = mapContainer ? mapContainer.clientHeight : window.innerHeight;
+    const clampMarginX = 140; // half-width of radial menu with pedals
+    const clampMarginY = 125; // half-height of radial menu with pedals
+
+    const clampedX = Math.max(clampMarginX, Math.min(width - clampMarginX, point.x));
+    const clampedY = Math.max(clampMarginY, Math.min(height - clampMarginY, point.y));
+
+    radialEl.style.left = `${clampedX}px`;
+    radialEl.style.top = `${clampedY}px`;
+
+    // Populate STAGE 1 (Core Briefing Card)
+    const icaoEl = document.getElementById('radial-icao');
+    const badgeEl = document.getElementById('radial-badge');
+    const nameEl = document.getElementById('radial-name');
+    const cityEl = document.getElementById('radial-city');
+    const vendorEl = document.getElementById('radial-vendor');
+    const flagImgEl = document.getElementById('radial-country-flag');
+
+    if (icaoEl) icaoEl.innerText = ap.icao || '';
+    if (nameEl) nameEl.innerText = getCleanAirportName(ap.name, ap.city) || ap.icao;
+
+    // Country name and flag
+    let apIsoCode = ((ap.country || ap.iso_country || '').toString()).toUpperCase().trim();
+    if (!apIsoCode || apIsoCode.length !== 2) {
+        for (const [code, name] of Object.entries(ISO_TO_COUNTRY_NAME)) {
+            if (name.toLowerCase() === (ap.country || '').toLowerCase()) {
+                apIsoCode = code;
+                break;
+            }
+        }
+    }
+    const resolvedCountryName = (typeof getLocalizedCountryName === 'function') ? getLocalizedCountryName(apIsoCode, ap.country) : (ISO_TO_COUNTRY_NAME[apIsoCode] || ap.country || 'Unknown Country');
+    const cleanCity = getCleanCityName(ap.city);
+    if (cityEl) cityEl.innerText = `${cleanCity || 'Unknown City'}, ${resolvedCountryName}`;
+
+    if (flagImgEl) {
+        if (apIsoCode && apIsoCode.length === 2) {
+            flagImgEl.src = `https://flagcdn.com/w80/${apIsoCode.toLowerCase()}.png`;
+            flagImgEl.alt = resolvedCountryName;
+            flagImgEl.style.display = 'block';
+            flagImgEl.onerror = () => { flagImgEl.style.display = 'none'; };
+        } else {
+            flagImgEl.style.display = 'none';
+        }
+    }
+
+    // Badge and Category styling (Pure solid flat colors per UI rules)
+    const cat = getAirportCategory(ap);
+    let badgeLabel = 'FREEWARE';
+    let badgeClass = 'bg-cyan-600 text-white font-bold';
+    let icaoColor = 'text-cyan-400';
+
+    if (ap.has_conflict) {
+        badgeLabel = 'CONFLICT';
+        badgeClass = 'bg-red-600 text-white font-bold animate-pulse';
+        icaoColor = 'text-red-400';
+    } else if (ap.is_disabled) {
+        badgeLabel = 'DISABLED';
+        badgeClass = 'bg-slate-600 text-white font-bold';
+        icaoColor = 'text-slate-400';
+    } else if (cat === 'PAYWARE') {
+        badgeLabel = 'PAYWARE';
+        badgeClass = 'bg-purple-600 text-white font-bold';
+        icaoColor = 'text-purple-400';
+    } else if (cat === 'ASOBO') {
+        badgeLabel = 'ASOBO';
+        badgeClass = 'bg-amber-500 text-slate-950 font-black';
+        icaoColor = 'text-amber-400';
+    } else if (cat === 'DEFAULT') {
+        badgeLabel = 'DEFAULT';
+        badgeClass = 'bg-blue-600 text-white font-bold';
+        icaoColor = 'text-sky-400';
+    }
+
+    if (badgeEl) {
+        badgeEl.innerText = badgeLabel;
+        badgeEl.className = `text-[9px] font-mono px-2 py-0.5 rounded-full ${badgeClass}`;
+    }
+    if (icaoEl) {
+        icaoEl.className = `font-mono font-black text-xl tracking-tight leading-none ${icaoColor}`;
+    }
+
+    if (vendorEl) {
+        if (ap.has_conflict) {
+            vendorEl.innerText = `⚠️ ${ap.conflict_count || 2} Scènes en Conflit`;
+            vendorEl.className = 'text-[10px] font-bold text-red-400 truncate w-full pt-1 border-t border-slate-800/80 mt-0.5';
+        } else if (ap.vendor) {
+            vendorEl.innerText = ap.vendor;
+            vendorEl.className = 'text-[10px] font-bold text-slate-300 truncate w-full pt-1 border-t border-slate-800/80 mt-0.5';
+        } else if (cat === 'DEFAULT') {
+            vendorEl.innerText = 'Microsoft / Asobo (Base)';
+            vendorEl.className = 'text-[10px] font-bold text-slate-400 truncate w-full pt-1 border-t border-slate-800/80 mt-0.5';
+        } else {
+            vendorEl.innerText = ap.english_type || ap.type || 'Standard Airport';
+            vendorEl.className = 'text-[10px] font-bold text-cyan-400 truncate w-full pt-1 border-t border-slate-800/80 mt-0.5';
+        }
+    }
+
+    // Reveal Radial Menu with scale animation
+    radialEl.classList.remove('hidden');
+}
+
+function triggerRadialFlightPlan() {
+    if (!currentRadialAirport) return;
+    const targetAp = currentRadialAirport;
+    closeAirportRadialMenu();
+    handleFlightPlanningAltClick(targetAp);
+}
+
+function triggerRadialCountry() {
+    if (!currentRadialAirport) return;
+    const targetAp = currentRadialAirport;
+    closeAirportRadialMenu();
+    let apIsoCode = ((targetAp.country || targetAp.iso_country || '').toString()).toUpperCase().trim();
+    if (!apIsoCode || apIsoCode.length !== 2) {
+        for (const [code, name] of Object.entries(ISO_TO_COUNTRY_NAME)) {
+            if (name.toLowerCase() === (targetAp.country || '').toLowerCase()) {
+                apIsoCode = code;
+                break;
+            }
+        }
+    }
+    if (apIsoCode && apIsoCode.length === 2) {
+        const countryName = ISO_TO_COUNTRY_NAME[apIsoCode] || targetAp.country || apIsoCode;
+        previousActiveAirport = targetAp;
+        toggleCountrySelection(apIsoCode, countryName, null, true);
+    }
+}
+
+function triggerRadialScenerySelector() {
+    if (!currentRadialAirport) return;
+    const targetAp = currentRadialAirport;
+    closeAirportRadialMenu();
+    centerMapOnAirport(targetAp);
+    showAirportDetails(targetAp);
+    setTimeout(() => {
+        const card = document.getElementById('drawer-unified-scenery-card');
+        if (card) {
+            card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            card.classList.add('ring-2', 'ring-cyan-400');
+            setTimeout(() => card.classList.remove('ring-2', 'ring-cyan-400'), 1500);
+        }
+    }, 150);
+}
+
+function triggerRadialFullDetails() {
+    if (!currentRadialAirport) return;
+    const targetAp = currentRadialAirport;
+    closeAirportRadialMenu();
+    centerMapOnAirport(targetAp);
+    showAirportDetails(targetAp);
 }
 
 /* ================= FLIGHT CORRIDOR & FLIGHT PLANNING MODE (ALT + CLICK) ================= */
@@ -3464,6 +3642,7 @@ function exitFlightPlanningMode(forceRestore = false) {
 // Global keyboard listener to exit Flight Planning Mode on Escape
 window.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' || e.key === 'Esc') {
+        closeAirportRadialMenu();
         if (isFlightPlanningMode) {
             exitFlightPlanningMode();
         }
