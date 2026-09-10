@@ -68,7 +68,7 @@ function getCleanCityName(rawCity) {
     return city || String(rawCity).trim();
 }
 
-function getCleanAirportName(rawName) {
+function getCleanAirportName(rawName, rawCity = '') {
     if (!rawName) return '';
     let name = String(rawName).trim();
     
@@ -93,6 +93,24 @@ function getCleanAirportName(rawName) {
     name = name.replace(/\s+\/\s+/g, ' / ');
     name = name.replace(/\s{2,}/g, ' ');
     name = name.replace(/^[\s\-\/,\.]+|[\s\-\/,\.]+$/g, '').trim();
+
+    // 6. Remove city name from airport name if present and if remaining string is a distinct proper name
+    if (rawCity) {
+        const cleanCity = getCleanCityName(rawCity);
+        if (cleanCity && cleanCity.length >= 3) {
+            const escapedCity = cleanCity.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const cityRegex = new RegExp('(?:^|\\b|\\s*-\\s*)' + escapedCity + '(?:\\s*-\\s*|\\b|$)', 'gi');
+            let candidate = name.replace(cityRegex, ' ');
+            candidate = candidate.replace(/\s{2,}/g, ' ');
+            candidate = candidate.replace(/^[\s\-\/,\.]+|[\s\-\/,\.]+$/g, '').trim();
+            
+            const genericWords = new Set(['municipal', 'regional', 'national', 'metropolitan', 'county', 'memorial', 'city', 'centre', 'center', 'public', 'private']);
+            if (candidate && candidate.length >= 3 && !genericWords.has(candidate.toLowerCase())) {
+                name = candidate;
+            }
+        }
+    }
+
     return name || String(rawName).trim();
 }
 
@@ -1199,7 +1217,7 @@ function openCountryDrawer(iso, countryName) {
     const backIcao = document.getElementById('btn-country-back-prev-icao');
     if (backBtn) {
         if (previousActiveAirport && previousActiveAirport.icao) {
-            const safeName = previousActiveAirport.name ? ` - ${getCleanAirportName(previousActiveAirport.name)}` : '';
+            const safeName = previousActiveAirport.name ? ` - ${getCleanAirportName(previousActiveAirport.name, previousActiveAirport.city)}` : '';
             if (backText) backText.innerText = `Back to ${previousActiveAirport.icao}${safeName}`;
             if (backIcao) backIcao.innerText = previousActiveAirport.icao;
             backBtn.classList.remove('hidden');
@@ -1429,7 +1447,7 @@ function renderCountryAirportCard(ap) {
                         <span class="text-xs font-mono font-black text-white group-hover:text-cyan-300 transition-colors">${ap.icao}</span>
                         ${badgeHtml}
                     </div>
-                    <h4 class="text-xs font-extrabold text-slate-200 truncate group-hover:text-white leading-tight">${getCleanAirportName(ap.name)}</h4>
+                    <h4 class="text-xs font-extrabold text-slate-200 truncate group-hover:text-white leading-tight">${getCleanAirportName(ap.name, ap.city)}</h4>
                     <p class="text-[10px] font-medium text-slate-400 truncate mt-0.5">${getCleanCityName(ap.city) || 'Unknown City'} • <span class="text-slate-300 font-semibold">${vendorStr}</span></p>
                 </div>
                 <i id="country-chevron-${ap.icao}" class="fa-solid ${isExpanded ? 'fa-chevron-down text-cyan-400' : 'fa-chevron-right text-slate-500'} text-xs group-hover:text-white transition-all shrink-0"></i>
@@ -1453,7 +1471,7 @@ function focusAirportInCountryMode(ap) {
     const backText = document.getElementById('btn-country-back-prev-text');
     const backIcao = document.getElementById('btn-country-back-prev-icao');
     if (backBtn) {
-        const safeName = ap.name ? ` - ${getCleanAirportName(ap.name)}` : '';
+        const safeName = ap.name ? ` - ${getCleanAirportName(ap.name, ap.city)}` : '';
         if (backText) backText.innerText = `Back to ${ap.icao}${safeName}`;
         if (backIcao) backIcao.innerText = ap.icao;
         backBtn.classList.remove('hidden');
@@ -2112,7 +2130,7 @@ function renderConflictModalStep(index) {
         else if (cat === 'DEFAULT') icaoColor = 'text-sky-400';
         icaoEl.className = `font-mono font-black text-2xl lg:text-3xl tracking-tight shrink-0 ${icaoColor}`;
     }
-    if (apNameEl) apNameEl.innerText = getCleanAirportName(ap.name) || ap.icao;
+    if (apNameEl) apNameEl.innerText = getCleanAirportName(ap.name, ap.city) || ap.icao;
     if (apLocEl) apLocEl.innerText = `${getCleanCityName(ap.city) || 'Unknown City'}, ${ap.country || 'Unknown Country'}`;
 
     // Center map smoothly on the airport in background
@@ -2498,7 +2516,7 @@ function createCustomIcon(ap) {
     if (hasAnyLabel) {
         const tier = getAirportLabelTier(ap);
         const safeIcao = (ap.icao || '').replace(/"/g, '&quot;');
-        const safeName = getCleanAirportName(ap.name).replace(/"/g, '&quot;');
+        const safeName = getCleanAirportName(ap.name, ap.city).replace(/"/g, '&quot;');
         const safeCity = getCleanCityName(ap.city).replace(/"/g, '&quot;');
 
         // Pure solid flat colors, no borders, no opacity
@@ -2628,7 +2646,7 @@ function getAirportPopupHtml(ap) {
                 <span class="text-xs font-mono font-bold px-3 py-1 rounded-full border ${badgeClass} shrink-0">${badgeLabel}</span>
             </div>
             <div>
-                <div class="text-sm lg:text-base font-extrabold text-white leading-snug line-clamp-2">${getCleanAirportName(ap.name)}</div>
+                <div class="text-sm lg:text-base font-extrabold text-white leading-snug line-clamp-2">${getCleanAirportName(ap.name, ap.city)}</div>
                 <div class="text-xs font-medium text-slate-300 mt-0.5 truncate">${getCleanCityName(ap.city) || ''} ${ap.country ? '(' + ap.country + ')' : ''}</div>
             </div>
             ${publisherHtml}
@@ -4266,7 +4284,7 @@ function showAirportDetails(ap, calledFromCountryMode = false) {
         iataEl.innerText = '';
         iataEl.classList.add('hidden');
     }
-    document.getElementById('drawer-name').innerText = getCleanAirportName(ap.name);
+    document.getElementById('drawer-name').innerText = getCleanAirportName(ap.name, ap.city);
 
     // Populate City & Prominent Country Access Button with Real Flag
     const cleanCity = getCleanCityName(ap.city);
