@@ -738,53 +738,53 @@
                     <!-- SVG Ring with 4 Annular Quadrants -->
                     <svg class="absolute inset-0 w-full h-full filter drop-shadow-2xl overflow-visible pointer-events-none" viewBox="0 0 540 540">
                         <!-- NORTH SECTOR: FLIGHT PLAN -->
-                        <g id="radial-sector-flight" onclick="triggerRadialFlightPlan()" class="radial-sector radial-sector-flight group cursor-pointer pointer-events-auto" role="button" aria-label="Plan de vol">
+                        <g id="radial-sector-flight" onclick="triggerRadialFlightPlan()" class="radial-sector radial-sector-flight group cursor-pointer pointer-events-auto" role="button" aria-label="Flight Plan">
                             <path class="radial-sector-path" d="M 87.59 77.78 A 265.00 265.00 0 0 1 452.41 77.78 L 359.49 175.70 A 130.00 130.00 0 0 0 180.51 175.70 Z" />
                             <foreignObject x="170" y="32" width="200" height="85" class="pointer-events-none">
                                 <div class="w-full h-full flex flex-col items-center justify-center text-center">
                                     <i class="fa-solid fa-plane-departure text-emerald-400 text-2xl group-hover:scale-110 transition-transform"></i>
-                                    <span class="text-xs font-black tracking-widest text-slate-200 group-hover:text-emerald-300 uppercase mt-2 leading-none">Plan de vol</span>
+                                    <span data-i18n="radial.flight_plan" class="text-xs font-black tracking-widest text-slate-200 group-hover:text-emerald-300 uppercase mt-2 leading-none">Flight Plan</span>
                                 </div>
                             </foreignObject>
                         </g>
 
                         <!-- EAST SECTOR: SCENERIES -->
-                        <g id="radial-sector-scenery" onclick="triggerRadialScenerySelector()" class="radial-sector radial-sector-scenery group cursor-pointer pointer-events-auto" role="button" aria-label="Scènes & Variantes">
+                        <g id="radial-sector-scenery" onclick="triggerRadialScenerySelector()" class="radial-sector radial-sector-scenery group cursor-pointer pointer-events-auto" role="button" aria-label="Sceneries">
                             <path class="radial-sector-path" d="M 462.22 87.59 A 265.00 265.00 0 0 1 462.22 452.41 L 364.30 359.49 A 130.00 130.00 0 0 0 364.30 180.51 Z" />
                             <foreignObject x="405" y="220" width="125" height="100" class="pointer-events-none">
                                 <div class="w-full h-full flex flex-col items-center justify-center text-center">
                                     <i class="fa-solid fa-layer-group text-purple-400 text-2xl group-hover:scale-110 transition-transform"></i>
-                                    <span class="text-xs font-black tracking-widest text-slate-200 group-hover:text-purple-300 uppercase mt-2 leading-none">Scènes</span>
+                                    <span data-i18n="radial.sceneries" class="text-xs font-black tracking-widest text-slate-200 group-hover:text-purple-300 uppercase mt-2 leading-none">Sceneries</span>
                                 </div>
                             </foreignObject>
                         </g>
 
                         <!-- SOUTH SECTOR: DETAILS -->
-                        <g id="radial-sector-details" onclick="triggerRadialFullDetails()" class="radial-sector radial-sector-details group cursor-pointer pointer-events-auto" role="button" aria-label="Fiche complète">
+                        <g id="radial-sector-details" onclick="triggerRadialFullDetails()" class="radial-sector radial-sector-details group cursor-pointer pointer-events-auto" role="button" aria-label="Airport Details">
                             <path class="radial-sector-path" d="M 452.41 462.22 A 265.00 265.00 0 0 1 87.59 462.22 L 180.51 364.30 A 130.00 130.00 0 0 0 359.49 364.30 Z" />
                             <foreignObject x="170" y="425" width="200" height="85" class="pointer-events-none">
                                 <div class="w-full h-full flex flex-col items-center justify-center text-center">
                                     <i class="fa-solid fa-circle-info text-sky-400 text-2xl group-hover:scale-110 transition-transform"></i>
-                                    <span class="text-xs font-black tracking-widest text-slate-200 group-hover:text-sky-300 uppercase mt-2 leading-none">Détails</span>
+                                    <span data-i18n="radial.details" class="text-xs font-black tracking-widest text-slate-200 group-hover:text-sky-300 uppercase mt-2 leading-none">Details</span>
                                 </div>
                             </foreignObject>
                         </g>
 
                         <!-- WEST SECTOR: COUNTRY MODE -->
-                        <g id="radial-sector-country" onclick="triggerRadialCountry()" class="radial-sector radial-sector-country group cursor-pointer pointer-events-auto" role="button" aria-label="Mode Pays">
+                        <g id="radial-sector-country" onclick="triggerRadialCountry()" class="radial-sector radial-sector-country group cursor-pointer pointer-events-auto" role="button" aria-label="Country Mode">
                             <path class="radial-sector-path" d="M 77.78 452.41 A 265.00 265.00 0 0 1 77.78 87.59 L 175.70 180.51 A 130.00 130.00 0 0 0 175.70 359.49 Z" />
                             <foreignObject x="10" y="220" width="125" height="100" class="pointer-events-none">
                                 <div class="w-full h-full flex flex-col items-center justify-center text-center">
                                     <img id="radial-country-flag" src="" alt="" class="w-7 h-5 rounded object-cover shadow-md group-hover:scale-110 transition-transform mb-1.5" />
                                     <i id="radial-country-icon" class="fa-solid fa-earth-americas text-cyan-400 text-2xl group-hover:scale-110 transition-transform mb-1.5 hidden"></i>
-                                    <span class="text-xs font-black tracking-widest text-slate-200 group-hover:text-cyan-300 uppercase leading-none">Pays</span>
+                                    <span data-i18n="radial.country" class="text-xs font-black tracking-widest text-slate-200 group-hover:text-cyan-300 uppercase leading-none">Country</span>
                                 </div>
                             </foreignObject>
                         </g>
                     </svg>
 
                     <!-- STAGE 1: CENTRAL ROUND BADGE (PASTILLE RONDE CENTRALE - 2X SCALE) -->
-                    <div id="radial-core" onclick="triggerRadialFullDetails()" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[248px] h-[248px] rounded-full bg-slate-950/85 border-2 border-slate-700/80 shadow-2xl p-5 flex flex-col items-center justify-center text-center gap-1.5 backdrop-blur-xl pointer-events-auto cursor-pointer group hover:border-slate-500 transition-all" title="Cliquer pour ouvrir la fiche détaillée">
+                    <div id="radial-core" onclick="triggerRadialFullDetails()" data-i18n-title="radial.tooltip_core" class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[248px] h-[248px] rounded-full bg-slate-950/85 border-2 border-slate-700/80 shadow-2xl p-5 flex flex-col items-center justify-center text-center gap-1.5 backdrop-blur-xl pointer-events-auto cursor-pointer group hover:border-slate-500 transition-all" title="Click to view detailed airport info">
                         <!-- Ligne 1: ICAO / IATA en grand -->
                         <span id="radial-icao" class="font-mono font-black text-3xl text-white tracking-tight leading-none">ICAO</span>
 

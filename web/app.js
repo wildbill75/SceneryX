@@ -2994,11 +2994,11 @@ function openAirportRadialMenu(ap, marker, e) {
     let icaoColor = 'text-cyan-400';
 
     if (ap.has_conflict) {
-        badgeLabel = `⚠️ CONFLIT (${ap.conflict_count || 2})`;
+        badgeLabel = `⚠️ CONFLICT (${ap.conflict_count || 2})`;
         badgeClass = 'bg-red-600 text-white font-black animate-pulse';
         icaoColor = 'text-red-400';
     } else if (ap.is_disabled) {
-        badgeLabel = 'DÉSACTIVÉ';
+        badgeLabel = 'DISABLED';
         badgeClass = 'bg-slate-600 text-white font-bold';
         icaoColor = 'text-slate-400';
     } else if (cat === 'ASOBO') {

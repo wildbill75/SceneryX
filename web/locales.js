@@ -321,7 +321,12 @@ const LOCALES = {
         "settings.map_labels_section": "Map Airport Labels",
         "settings.label_icao": "Show ICAO Code",
         "settings.label_name": "Show Airport Name",
-        "settings.label_city": "Show City"
+        "settings.label_city": "Show City",
+        "radial.flight_plan": "Flight Plan",
+        "radial.sceneries": "Sceneries",
+        "radial.details": "Details",
+        "radial.country": "Country",
+        "radial.tooltip_core": "Click to view detailed airport info"
     },
     fr: {
         "country.back_to": "Retour à",
@@ -644,7 +649,12 @@ const LOCALES = {
         "settings.map_labels_section": "Étiquettes des aéroports sur la carte",
         "settings.label_icao": "Afficher le code OACI",
         "settings.label_name": "Afficher le nom de l'aéroport",
-        "settings.label_city": "Afficher la ville"
+        "settings.label_city": "Afficher la ville",
+        "radial.flight_plan": "Plan de vol",
+        "radial.sceneries": "Scènes",
+        "radial.details": "Détails",
+        "radial.country": "Pays",
+        "radial.tooltip_core": "Cliquer pour ouvrir la fiche détaillée"
     },
     de: {
         "country.back_to": "Zurück zu",
@@ -967,7 +977,12 @@ const LOCALES = {
         "settings.map_labels_section": "Flughafenbeschriftungen auf der Karte",
         "settings.label_icao": "ICAO-Code anzeigen",
         "settings.label_name": "Flughafennamen anzeigen",
-        "settings.label_city": "Stadt anzeigen"
+        "settings.label_city": "Stadt anzeigen",
+        "radial.flight_plan": "Flugplan",
+        "radial.sceneries": "Szenerien",
+        "radial.details": "Details",
+        "radial.country": "Land",
+        "radial.tooltip_core": "Klicken, um detaillierte Flughafeninfos anzuzeigen"
     },
     es: {
         "country.back_to": "Volver a",
@@ -1290,7 +1305,12 @@ const LOCALES = {
         "settings.map_labels_section": "Etiquetas de aeropuertos en el mapa",
         "settings.label_icao": "Mostrar código OACI",
         "settings.label_name": "Mostrar nombre del aeropuerto",
-        "settings.label_city": "Mostrar ciudad"
+        "settings.label_city": "Mostrar ciudad",
+        "radial.flight_plan": "Plan de vuelo",
+        "radial.sceneries": "Escenarios",
+        "radial.details": "Detalles",
+        "radial.country": "País",
+        "radial.tooltip_core": "Haga clic para ver información detallada del aeropuerto"
     }
 };
 
