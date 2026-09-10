@@ -67,6 +67,24 @@ function getCleanCityName(rawCity) {
     city = city.replace(/[\/,\-]+$/, '').trim();
     return city || String(rawCity).trim();
 }
+
+function getCleanAirportName(rawName) {
+    if (!rawName) return '';
+    let name = String(rawName).trim();
+    // Remove variations of 'international' (e.g. International, Internationnal, Internationale, Internacional, Internazionale, Intl, Int'l)
+    name = name.replace(/\b(?:internationnal[es]?|international[es]?|internacional|internazionale|int'?l)\b\.?/gi, '');
+    // Clean up emptied parentheses/brackets or slashes left behind
+    name = name.replace(/\(\s*\)/g, '');
+    name = name.replace(/\[\s*\]/g, '');
+    name = name.replace(/\/\s*\//g, '/');
+    name = name.replace(/\s+,/g, ',');
+    name = name.replace(/\s+-\s+/g, ' - ');
+    name = name.replace(/\s+\/\s+/g, ' / ');
+    name = name.replace(/\s{2,}/g, ' ');
+    name = name.replace(/^[\s\-\/,\.]+|[\s\-\/,\.]+$/g, '').trim();
+    return name || String(rawName).trim();
+}
+
 // Currency & Investment Engine
 let selectedCurrency = 'USD';
 const CURRENCY_SYMBOLS = { EUR: '€', USD: '$', GBP: '£', AUD: 'A$' };
@@ -1170,7 +1188,7 @@ function openCountryDrawer(iso, countryName) {
     const backIcao = document.getElementById('btn-country-back-prev-icao');
     if (backBtn) {
         if (previousActiveAirport && previousActiveAirport.icao) {
-            const safeName = previousActiveAirport.name ? ` - ${previousActiveAirport.name}` : '';
+            const safeName = previousActiveAirport.name ? ` - ${getCleanAirportName(previousActiveAirport.name)}` : '';
             if (backText) backText.innerText = `Back to ${previousActiveAirport.icao}${safeName}`;
             if (backIcao) backIcao.innerText = previousActiveAirport.icao;
             backBtn.classList.remove('hidden');
@@ -1400,7 +1418,7 @@ function renderCountryAirportCard(ap) {
                         <span class="text-xs font-mono font-black text-white group-hover:text-cyan-300 transition-colors">${ap.icao}</span>
                         ${badgeHtml}
                     </div>
-                    <h4 class="text-xs font-extrabold text-slate-200 truncate group-hover:text-white leading-tight">${ap.name}</h4>
+                    <h4 class="text-xs font-extrabold text-slate-200 truncate group-hover:text-white leading-tight">${getCleanAirportName(ap.name)}</h4>
                     <p class="text-[10px] font-medium text-slate-400 truncate mt-0.5">${getCleanCityName(ap.city) || 'Unknown City'} • <span class="text-slate-300 font-semibold">${vendorStr}</span></p>
                 </div>
                 <i id="country-chevron-${ap.icao}" class="fa-solid ${isExpanded ? 'fa-chevron-down text-cyan-400' : 'fa-chevron-right text-slate-500'} text-xs group-hover:text-white transition-all shrink-0"></i>
@@ -1424,7 +1442,7 @@ function focusAirportInCountryMode(ap) {
     const backText = document.getElementById('btn-country-back-prev-text');
     const backIcao = document.getElementById('btn-country-back-prev-icao');
     if (backBtn) {
-        const safeName = ap.name ? ` - ${ap.name}` : '';
+        const safeName = ap.name ? ` - ${getCleanAirportName(ap.name)}` : '';
         if (backText) backText.innerText = `Back to ${ap.icao}${safeName}`;
         if (backIcao) backIcao.innerText = ap.icao;
         backBtn.classList.remove('hidden');
@@ -2083,7 +2101,7 @@ function renderConflictModalStep(index) {
         else if (cat === 'DEFAULT') icaoColor = 'text-sky-400';
         icaoEl.className = `font-mono font-black text-2xl lg:text-3xl tracking-tight shrink-0 ${icaoColor}`;
     }
-    if (apNameEl) apNameEl.innerText = ap.name || ap.icao;
+    if (apNameEl) apNameEl.innerText = getCleanAirportName(ap.name) || ap.icao;
     if (apLocEl) apLocEl.innerText = `${getCleanCityName(ap.city) || 'Unknown City'}, ${ap.country || 'Unknown Country'}`;
 
     // Center map smoothly on the airport in background
@@ -2469,7 +2487,7 @@ function createCustomIcon(ap) {
     if (hasAnyLabel) {
         const tier = getAirportLabelTier(ap);
         const safeIcao = (ap.icao || '').replace(/"/g, '&quot;');
-        const safeName = (ap.name || '').replace(/"/g, '&quot;');
+        const safeName = getCleanAirportName(ap.name).replace(/"/g, '&quot;');
         const safeCity = getCleanCityName(ap.city).replace(/"/g, '&quot;');
 
         // Pure solid flat colors, no borders, no opacity
@@ -2512,7 +2530,7 @@ function createCustomIcon(ap) {
         }
 
         const icaoSpan = (showIcao && ap.icao) ? `<span class="font-mono font-black ${icaoColorClass} text-[11px] shrink-0 tracking-wide">${safeIcao}</span>` : '';
-        const nameSpan = (showName && ap.name) ? `<span class="font-bold ${nameColorClass} text-[11px] truncate max-w-[150px]">${safeName}</span>` : '';
+        const nameSpan = (showName && safeName) ? `<span class="font-bold ${nameColorClass} text-[11px] truncate max-w-[150px]">${safeName}</span>` : '';
         const citySpan = (showCity && safeCity) ? `<span class="${cityColorClass} font-semibold text-[10px] truncate max-w-[110px]">• ${safeCity}</span>` : '';
 
         const isForceVisible = (currentlyHighlightedIcao && currentlyHighlightedIcao === ap.icao);
@@ -2599,7 +2617,7 @@ function getAirportPopupHtml(ap) {
                 <span class="text-xs font-mono font-bold px-3 py-1 rounded-full border ${badgeClass} shrink-0">${badgeLabel}</span>
             </div>
             <div>
-                <div class="text-sm lg:text-base font-extrabold text-white leading-snug line-clamp-2">${ap.name}</div>
+                <div class="text-sm lg:text-base font-extrabold text-white leading-snug line-clamp-2">${getCleanAirportName(ap.name)}</div>
                 <div class="text-xs font-medium text-slate-300 mt-0.5 truncate">${getCleanCityName(ap.city) || ''} ${ap.country ? '(' + ap.country + ')' : ''}</div>
             </div>
             ${publisherHtml}
@@ -4237,7 +4255,7 @@ function showAirportDetails(ap, calledFromCountryMode = false) {
         iataEl.innerText = '';
         iataEl.classList.add('hidden');
     }
-    document.getElementById('drawer-name').innerText = ap.name;
+    document.getElementById('drawer-name').innerText = getCleanAirportName(ap.name);
 
     // Populate City & Prominent Country Access Button with Real Flag
     const cleanCity = getCleanCityName(ap.city);
