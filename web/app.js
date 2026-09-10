@@ -2835,12 +2835,12 @@ function openAirportRadialMenu(ap, marker, e) {
     }
     if (!point) return;
 
-    // Viewport clamping so the circular wheel (280x280) remains 100% on-screen
+    // Viewport clamping so the circular wheel (540x540) remains 100% on-screen
     const mapContainer = document.getElementById('map');
     const width = mapContainer ? mapContainer.clientWidth : window.innerWidth;
     const height = mapContainer ? mapContainer.clientHeight : window.innerHeight;
-    const clampMarginX = 145; // radius of 280px circular wheel + breathing room
-    const clampMarginY = 145;
+    const clampMarginX = 275; // radius of 540px circular wheel + breathing room
+    const clampMarginY = 275;
 
     const clampedX = Math.max(clampMarginX, Math.min(width - clampMarginX, point.x));
     const clampedY = Math.max(clampMarginY, Math.min(height - clampMarginY, point.y));
@@ -2920,25 +2920,25 @@ function openAirportRadialMenu(ap, marker, e) {
 
     if (badgeEl) {
         badgeEl.innerText = badgeLabel;
-        badgeEl.className = `text-[8px] font-mono px-1.5 py-0.5 rounded-full ${badgeClass}`;
+        badgeEl.className = `text-[11px] font-mono px-2.5 py-0.5 rounded-full ${badgeClass}`;
     }
     if (icaoEl) {
-        icaoEl.className = `font-mono font-black text-base tracking-tight leading-none ${icaoColor}`;
+        icaoEl.className = `font-mono font-black text-2xl tracking-tight leading-none ${icaoColor}`;
     }
 
     if (vendorEl) {
         if (ap.has_conflict) {
             vendorEl.innerText = `⚠️ ${ap.conflict_count || 2} Conflits`;
-            vendorEl.className = 'text-[8.5px] font-semibold text-red-400 truncate max-w-[105px] pt-1 border-t border-slate-800/80 mt-0.5 leading-tight';
+            vendorEl.className = 'text-xs font-semibold text-red-400 truncate max-w-[200px] pt-1.5 border-t border-slate-800/80 mt-0.5 leading-tight';
         } else if (ap.vendor) {
             vendorEl.innerText = ap.vendor;
-            vendorEl.className = 'text-[8.5px] font-semibold text-slate-300 truncate max-w-[105px] pt-1 border-t border-slate-800/80 mt-0.5 leading-tight';
+            vendorEl.className = 'text-xs font-semibold text-slate-300 truncate max-w-[200px] pt-1.5 border-t border-slate-800/80 mt-0.5 leading-tight';
         } else if (cat === 'DEFAULT') {
             vendorEl.innerText = 'Microsoft / Asobo';
-            vendorEl.className = 'text-[8.5px] font-semibold text-slate-400 truncate max-w-[105px] pt-1 border-t border-slate-800/80 mt-0.5 leading-tight';
+            vendorEl.className = 'text-xs font-semibold text-slate-400 truncate max-w-[200px] pt-1.5 border-t border-slate-800/80 mt-0.5 leading-tight';
         } else {
             vendorEl.innerText = ap.english_type || ap.type || 'Standard Airport';
-            vendorEl.className = 'text-[8.5px] font-semibold text-cyan-400 truncate max-w-[105px] pt-1 border-t border-slate-800/80 mt-0.5 leading-tight';
+            vendorEl.className = 'text-xs font-semibold text-cyan-400 truncate max-w-[200px] pt-1.5 border-t border-slate-800/80 mt-0.5 leading-tight';
         }
     }
 
