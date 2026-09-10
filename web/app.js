@@ -841,6 +841,7 @@ function initMap() {
 
     // Dynamically update radial menu position during pan/zoom so it stays locked to airport
     map.on('move zoom viewreset', updateRadialMenuPosition);
+    map.on('zoom viewreset zoomend', updateCountryInteractivityState);
 
     // Double click on neutral map area: resets camera according to priority hierarchy
     map.on('dblclick', () => {
@@ -861,6 +862,27 @@ let countryGeoJsonLayer = null;
 let selectedCountryCode = null;
 let selectedCountryPolygonLayer = null;
 let countryClickTimeout = null;
+const MAX_COUNTRY_INTERACTION_ZOOM = 5.2;
+
+function updateCountryInteractivityState() {
+    const mapEl = document.getElementById('map');
+    if (!mapEl || !map) return;
+    const isZoomedIn = (typeof map.getZoom === 'function') && map.getZoom() > MAX_COUNTRY_INTERACTION_ZOOM;
+    if (isZoomedIn) {
+        mapEl.classList.add('countries-inactive');
+        if (countryGeoJsonLayer) {
+            countryGeoJsonLayer.eachLayer(layer => {
+                const iso = getFeatureIso(layer.feature);
+                const isSelected = (selectedCountryCode && iso && selectedCountryCode === iso);
+                if (!isSelected) {
+                    countryGeoJsonLayer.resetStyle(layer);
+                }
+            });
+        }
+    } else {
+        mapEl.classList.remove('countries-inactive');
+    }
+}
 
 const STANDARD_DRAWER_WIDTH = 460;
 
@@ -949,6 +971,8 @@ async function loadCountryOverlays() {
 
                 layer.on({
                     mouseover: (e) => {
+                        // Only active at country/regional zoom level
+                        if (map && typeof map.getZoom === 'function' && map.getZoom() > MAX_COUNTRY_INTERACTION_ZOOM) return;
                         // Do not show hover highlight on countries if radial menu is open or an airport is active
                         if (currentRadialAirport || selectedAirport) return;
                         const l = e.target;
@@ -970,6 +994,17 @@ async function loadCountryOverlays() {
                     click: (e) => {
                         L.DomEvent.stopPropagation(e);
                         if (isMapDragging) return;
+                        // When zoomed in, country clicks are completely disabled
+                        if (map && typeof map.getZoom === 'function' && map.getZoom() > MAX_COUNTRY_INTERACTION_ZOOM) {
+                            if (currentRadialAirport || selectedAirport || activeDrawerMode !== 'MAP') {
+                                closeAirportRadialMenu();
+                                selectedAirport = null;
+                                if (activeDrawerMode !== 'MAP') {
+                                    closeDrawerWithoutCameraChange();
+                                }
+                            }
+                            return;
+                        }
                         // Priority Guard: If radial menu is open or an airport is currently selected, clicking anywhere on a country simply closes it and blocks country mode!
                         if (currentRadialAirport || selectedAirport || activeDrawerMode === 'AIRPORT') {
                             closeAirportRadialMenu();
@@ -1009,6 +1044,7 @@ async function loadCountryOverlays() {
                 });
             }
         }).addTo(map);
+        updateCountryInteractivityState();
     } catch (err) {
         console.error("Failed to load country overlay GeoJSON:", err);
     }
