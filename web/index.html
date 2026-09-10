@@ -227,6 +227,10 @@
         }
 
         /* Tactical Circular Radial Menu Styling (Frosted Blur & Deep Opacity) */
+        .radial-sector {
+            transform-box: view-box;
+            transform-origin: 270px 270px;
+        }
         .radial-sector-path {
             fill: rgba(15, 23, 42, 0.85);
             stroke: rgba(100, 116, 139, 0.65);
@@ -261,6 +265,85 @@
         }
         .radial-sector:active .radial-sector-path {
             filter: brightness(1.25);
+        }
+
+        /* Snappy Bounce & Circular Cascade Keyframes */
+        @keyframes radialCoreBounce {
+            0% {
+                transform: translate(-50%, -50%) scale(0.12);
+                opacity: 0;
+            }
+            60% {
+                transform: translate(-50%, -50%) scale(1.08);
+                opacity: 1;
+            }
+            82% {
+                transform: translate(-50%, -50%) scale(0.97);
+            }
+            100% {
+                transform: translate(-50%, -50%) scale(1);
+                opacity: 1;
+            }
+        }
+
+        @keyframes radialBackdropPop {
+            0% {
+                transform: scale(0.15);
+                opacity: 0;
+            }
+            65% {
+                transform: scale(1.05);
+                opacity: 0.9;
+            }
+            85% {
+                transform: scale(0.98);
+            }
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        @keyframes radialSectorCircularBounce {
+            0% {
+                transform: scale(0.25) rotate(-22deg);
+                opacity: 0;
+            }
+            60% {
+                transform: scale(1.08) rotate(2deg);
+                opacity: 1;
+            }
+            80% {
+                transform: scale(0.97) rotate(-0.5deg);
+            }
+            100% {
+                transform: scale(1) rotate(0deg);
+                opacity: 1;
+            }
+        }
+
+        .animate-radial-open #radial-core {
+            animation: radialCoreBounce 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+
+        .animate-radial-open #radial-backdrop-disc {
+            animation: radialBackdropPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+        }
+
+        .animate-radial-open .radial-sector-flight {
+            animation: radialSectorCircularBounce 0.36s cubic-bezier(0.34, 1.56, 0.64, 1) 0.04s both;
+        }
+
+        .animate-radial-open .radial-sector-scenery {
+            animation: radialSectorCircularBounce 0.36s cubic-bezier(0.34, 1.56, 0.64, 1) 0.09s both;
+        }
+
+        .animate-radial-open .radial-sector-details {
+            animation: radialSectorCircularBounce 0.36s cubic-bezier(0.34, 1.56, 0.64, 1) 0.14s both;
+        }
+
+        .animate-radial-open .radial-sector-country {
+            animation: radialSectorCircularBounce 0.36s cubic-bezier(0.34, 1.56, 0.64, 1) 0.19s both;
         }
     </style>
 </head>
@@ -650,7 +733,7 @@
             <div id="airport-radial-menu" class="hidden absolute z-[1500] select-none pointer-events-none transform -translate-x-1/2 -translate-y-1/2" style="transform-origin: center center;">
                 <div class="relative w-[540px] h-[540px] flex items-center justify-center pointer-events-none">
                     <!-- FROSTED BLURRED CIRCULAR BACKDROP FOR QUADRANTS -->
-                    <div class="absolute w-[530px] h-[530px] rounded-full backdrop-blur-2xl bg-slate-950/60 border border-slate-700/60 shadow-2xl pointer-events-none"></div>
+                    <div id="radial-backdrop-disc" class="absolute w-[530px] h-[530px] rounded-full backdrop-blur-2xl bg-slate-950/60 border border-slate-700/60 shadow-2xl pointer-events-none" style="transform-origin: center center;"></div>
 
                     <!-- SVG Ring with 4 Annular Quadrants -->
                     <svg class="absolute inset-0 w-full h-full filter drop-shadow-2xl overflow-visible pointer-events-none" viewBox="0 0 540 540">

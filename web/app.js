@@ -2818,6 +2818,7 @@ function closeAirportRadialMenu() {
     const radialEl = document.getElementById('airport-radial-menu');
     if (radialEl) {
         radialEl.classList.add('hidden');
+        radialEl.classList.remove('animate-radial-open');
         radialEl.style.transform = 'translate(-50%, -50%)';
         radialEl.style.opacity = '1';
     }
@@ -3030,9 +3031,13 @@ function openAirportRadialMenu(ap, marker, e) {
         vendorEl.style.display = 'none';
     }
 
-    // Reveal Radial Menu
+    // Reveal Radial Menu with snappy bounce & circular cascade animation
     radialEl.classList.remove('hidden');
     updateRadialMenuPosition(true);
+
+    radialEl.classList.remove('animate-radial-open');
+    void radialEl.offsetWidth; // Force reflow to retrigger animation reliably
+    radialEl.classList.add('animate-radial-open');
 }
 
 function triggerRadialFlightPlan() {
