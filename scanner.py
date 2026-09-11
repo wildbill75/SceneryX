@@ -442,6 +442,15 @@ BUNDLE_PACKAGE_PRICES = {
 # Known Real Retail Prices Catalog in EUR (€)
 # Known Real Retail Prices Catalog in EUR (€)
 KNOWN_PAYWARE_PRICES = {
+    # Free official releases from payware vendors (remain in Payware category with 0.00€)
+    'inibuilds-airport-at98-wolfsfang': 0.0,
+    'inibuilds-airport-kmke-milwaukee': 0.0,
+    'at98-wolfsfang': 0.0,
+    'kmke-milwaukee': 0.0,
+    'inibuilds-at98': 0.0,
+    'inibuilds-kmke': 0.0,
+    'wolfsfang': 0.0,
+
     # Specific Package Folder Patterns
     'francevfr-airport-apt1': 7.47, 'francevfr-airport-pidf': 5.00,
     'scenerytr-airport-ltfm-istanbul': 21.99,
@@ -594,6 +603,11 @@ def get_estimated_price(icao, folder_name, vendor, pricing_type, english_type, i
         return 0.0, False
 
     fn_lower = folder_name.lower()
+    v_lower = str(vendor).lower()
+
+    # Free official promotional releases from payware vendors (remain in Payware category with 0.00€)
+    if icao in ['KMKE', 'AT98'] and ('inibuilds' in fn_lower or 'inibuilds' in v_lower or 'wolf' in fn_lower):
+        return 0.0, False
 
     if fn_lower in KNOWN_PAYWARE_PRICES:
         return KNOWN_PAYWARE_PRICES[fn_lower], False
@@ -1425,6 +1439,13 @@ def run_scan():
             item['version'] = primary.get('version', '')
             item['size_str'] = primary.get('size_str', '')
             item['world_update_name'] = primary.get('world_update_name') or get_world_update_name(icao, primary['folder_name'])
+
+            if not item.get('is_custom_price'):
+                p_price, p_cust = get_estimated_price(
+                    icao, primary['folder_name'], item['vendor'], item['pricing_type'], item['english_type'], item['is_asobo_official'], custom_prices
+                )
+                item['price_eur'] = p_price
+                item['is_custom_price'] = p_cust
 
         # Active sources calculation
         active_sources = [s for s in item['all_sources'] if not s.get('is_disabled')]

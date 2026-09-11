@@ -6633,16 +6633,27 @@ function displayScanResults(delta, isStartup = false) {
         if (listCont) {
             const htmlItems = [];
 
-            // 1. Added items (Category colored ICAO without pill, clean fonts)
-            addedList.forEach(item => {
+            const addedSceneries = addedList.filter(item => item.kind !== 'gsx');
+            const addedGsx = addedList.filter(item => item.kind === 'gsx');
+            const removedSceneries = removedList.filter(item => item.kind !== 'gsx');
+            const removedGsx = removedList.filter(item => item.kind === 'gsx');
+
+            const totalSceneries = addedSceneries.length + removedSceneries.length;
+            const totalGsx = addedGsx.length + removedGsx.length;
+
+            const renderSceneryCard = (item, isAdded) => {
                 const displayName = item.name || item.icao;
                 const pkgName = item.folder_name || '';
                 const icaoColor = getScanItemCategoryColor(item);
+                const statusBadge = isAdded
+                    ? `<span class="text-xs font-bold px-3 py-1 rounded-full bg-emerald-600 text-white">${t('rescan.status_added', 'Added')}</span>`
+                    : `<span class="text-xs font-bold px-3 py-1 rounded-full bg-rose-600 text-white">${t('rescan.status_removed', 'Removed')}</span>`;
+                const clickAttr = isAdded
+                    ? `onclick="closeRescanModal(); selectAirport('${item.icao}')" title="${t('general.view_on_map', 'Click to view on map')}" class="p-3 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800/80 flex items-center justify-between gap-4 transition-colors cursor-pointer"`
+                    : `class="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-4"`;
 
-                htmlItems.push(`
-                    <div onclick="closeRescanModal(); selectAirport('${item.icao}')"
-                         title="${t('general.view_on_map', 'Click to view on map')}"
-                         class="p-3 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800/80 flex items-center justify-between gap-4 transition-colors cursor-pointer">
+                return `
+                    <div ${clickAttr}>
                         <div class="flex items-center gap-3.5 min-w-0 flex-1">
                             <span class="font-mono font-black text-lg sm:text-xl tracking-tight shrink-0 ${icaoColor}">
                                 ${item.icao}
@@ -6657,43 +6668,79 @@ function displayScanResults(delta, isStartup = false) {
                             </div>
                         </div>
                         <div class="shrink-0">
-                            <span class="text-xs font-bold px-3 py-1 rounded-full bg-emerald-600 text-white">
-                                ${t('rescan.status_added', 'Added')}
-                            </span>
+                            ${statusBadge}
                         </div>
                     </div>
-                `);
-            });
+                `;
+            };
 
-            // 2. Removed items (Category colored ICAO without pill, clean fonts)
-            removedList.forEach(item => {
+            const renderGsxCard = (item, isAdded) => {
                 const displayName = item.name || item.icao;
-                const pkgName = item.folder_name || '';
-                const icaoColor = getScanItemCategoryColor(item);
+                const iniName = item.folder_name || '';
+                const statusBadge = isAdded
+                    ? `<span class="text-xs font-bold px-3 py-1 rounded-full bg-emerald-600 text-white">${t('rescan.status_added', 'Added')}</span>`
+                    : `<span class="text-xs font-bold px-3 py-1 rounded-full bg-rose-600 text-white">${t('rescan.status_removed', 'Removed')}</span>`;
+                const clickAttr = isAdded
+                    ? `onclick="closeRescanModal(); selectAirport('${item.icao}')" title="${t('general.view_on_map', 'Click to view on map')}" class="p-3 rounded-xl bg-slate-900 border border-purple-900/40 hover:bg-slate-800/80 hover:border-purple-700/60 flex items-center justify-between gap-4 transition-colors cursor-pointer"`
+                    : `class="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-4"`;
 
-                htmlItems.push(`
-                    <div class="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-4">
+                return `
+                    <div ${clickAttr}>
                         <div class="flex items-center gap-3.5 min-w-0 flex-1">
-                            <span class="font-mono font-black text-lg sm:text-xl tracking-tight shrink-0 ${icaoColor}">
+                            <span class="font-mono font-black text-lg sm:text-xl tracking-tight shrink-0 text-purple-400">
                                 ${item.icao}
                             </span>
                             <div class="min-w-0 flex-1">
-                                <div class="text-sm font-semibold text-slate-200 truncate">
-                                    ${displayName}
+                                <div class="flex items-center gap-2">
+                                    <span class="text-sm font-bold text-white truncate">${displayName}</span>
+                                    <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 shrink-0">GSX Profile</span>
                                 </div>
-                                <div class="text-xs font-mono text-slate-400 truncate mt-0.5">
-                                    ${pkgName}
+                                <div class="text-xs font-mono text-slate-400 truncate mt-0.5 flex items-center gap-1.5">
+                                    <i class="fa-solid fa-square-parking text-purple-400/80 text-[11px]"></i>
+                                    <span>${iniName}</span>
                                 </div>
                             </div>
                         </div>
                         <div class="shrink-0">
-                            <span class="text-xs font-bold px-3 py-1 rounded-full bg-rose-600 text-white">
-                                ${t('rescan.status_removed', 'Removed')}
-                            </span>
+                            ${statusBadge}
                         </div>
                     </div>
+                `;
+            };
+
+            // 1. Scenery Packages Section
+            if (totalSceneries > 0) {
+                htmlItems.push(`
+                    <div class="flex items-center justify-between pb-1.5 pt-1 border-b border-slate-800/80 mb-2">
+                        <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300">
+                            <i class="fa-solid fa-layer-group text-sky-400"></i>
+                            <span>${t('rescan.section_sceneries', 'Scenery Packages')}</span>
+                        </div>
+                        <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700/60">${totalSceneries}</span>
+                    </div>
+                    <div class="space-y-2 mb-4">
+                        ${addedSceneries.map(item => renderSceneryCard(item, true)).join('')}
+                        ${removedSceneries.map(item => renderSceneryCard(item, false)).join('')}
+                    </div>
                 `);
-            });
+            }
+
+            // 2. GSX Profiles Section
+            if (totalGsx > 0) {
+                htmlItems.push(`
+                    <div class="flex items-center justify-between pb-1.5 pt-1 border-b border-slate-800/80 mb-2">
+                        <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-purple-300">
+                            <i class="fa-solid fa-square-parking text-purple-400"></i>
+                            <span>${t('rescan.section_gsx', 'GSX Profiles')}</span>
+                        </div>
+                        <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-purple-950/60 text-purple-300 border border-purple-800/40">${totalGsx}</span>
+                    </div>
+                    <div class="space-y-2">
+                        ${addedGsx.map(item => renderGsxCard(item, true)).join('')}
+                        ${removedGsx.map(item => renderGsxCard(item, false)).join('')}
+                    </div>
+                `);
+            }
 
             listCont.innerHTML = htmlItems.join('');
             listCont.classList.remove('hidden');
