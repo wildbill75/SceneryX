@@ -72,6 +72,9 @@ function getCleanAirportName(rawName, rawCity = '') {
     if (!rawName) return '';
     let name = String(rawName).trim();
     
+    // 0. Remove duplicate/closed prefixes e.g. '[Duplicate] Wolf\'s Fang Runway' -> 'Wolf\'s Fang Runway'
+    name = name.replace(/^\[(?:duplicate|closed|x)\]\s*/gi, '');
+
     // 1. Remove prefixes like 'Aéroport de', 'Aérodrome de', 'Aérodrome d\'', 'Airport of ', etc.
     name = name.replace(/^(?:a[eé]rodromes?|a[eé]roports?|airports?|aeropuertos?|aeroportos?)\s+(?:de\s+|d['’]\s*|of\s+)/gi, '');
     
@@ -141,6 +144,7 @@ let activeRouteOrigin = null;
 let activeRouteLinesGroup = null;
 // Global Country Name to ISO Lookup Map
 const COUNTRY_NAME_TO_ISO = {
+    'antarctica': 'AQ', 'antarctique': 'AQ', 'antartida': 'AQ', 'antarktis': 'AQ',
     'afghanistan': 'AF', 'albania': 'AL', 'algeria': 'DZ', 'andorra': 'AD', 'angola': 'AO',
     'argentina': 'AR', 'armenia': 'AM', 'australia': 'AU', 'austria': 'AT', 'azerbaijan': 'AZ',
     'bahamas': 'BS', 'bahrain': 'BH', 'bangladesh': 'BD', 'barbados': 'BB', 'belarus': 'BY',
@@ -198,6 +202,7 @@ const COUNTRY_NAME_TO_ISO = {
 
 // Authoritative ISO to Full English Country Name Map
 const ISO_TO_COUNTRY_NAME = {
+    'AQ': 'Antarctica',
     'AF': 'Afghanistan', 'AL': 'Albania', 'DZ': 'Algeria', 'AD': 'Andorra', 'AO': 'Angola',
     'AR': 'Argentina', 'AM': 'Armenia', 'AU': 'Australia', 'AT': 'Austria', 'AZ': 'Azerbaijan',
     'BS': 'Bahamas', 'BH': 'Bahrain', 'BD': 'Bangladesh', 'BB': 'Barbados', 'BY': 'Belarus',
@@ -840,7 +845,7 @@ function initMap() {
     });
 
     // Dynamically update radial menu position during pan/zoom so it stays locked to airport
-    map.on('move zoom viewreset', updateRadialMenuPosition);
+    map.on('move zoom viewreset moveend', updateRadialMenuPosition);
     map.on('zoom viewreset zoomend', updateCountryInteractivityState);
 
     // Double click on neutral map area: resets camera according to priority hierarchy
@@ -2849,6 +2854,7 @@ function renderAirportsOnMap(airports) {
 let currentRadialAirport = null;
 let currentRadialMarker = null;
 let currentRadialOpenZoom = null;
+let isCameraPanningToRadial = false;
 
 function closeAirportRadialMenu() {
     const radialEl = document.getElementById('airport-radial-menu');
@@ -2861,6 +2867,31 @@ function closeAirportRadialMenu() {
     currentRadialAirport = null;
     currentRadialMarker = null;
     currentRadialOpenZoom = null;
+    isCameraPanningToRadial = false;
+}
+
+function getWrappedAirportLatLng(ap, marker) {
+    if (!map) return null;
+    let lat = null;
+    let lon = null;
+
+    if (marker && marker.getLatLng) {
+        const ll = marker.getLatLng();
+        lat = ll.lat;
+        lon = ll.lng;
+    } else if (ap && ap.lat !== undefined && ap.lon !== undefined) {
+        lat = parseFloat(ap.lat);
+        lon = parseFloat(ap.lon);
+    }
+
+    if (lat === null || lon === null || isNaN(lat) || isNaN(lon)) return null;
+
+    // Wrap longitude to the world copy closest to current map center (essential for polar regions / continuous panning)
+    const centerLon = (typeof map.getCenter === 'function') ? map.getCenter().lng : 0;
+    while (lon - centerLon > 180) lon -= 360;
+    while (lon - centerLon < -180) lon += 360;
+
+    return L.latLng(lat, lon);
 }
 
 function updateRadialMenuPosition(force = false) {
@@ -2872,23 +2903,20 @@ function updateRadialMenuPosition(force = false) {
     const currentZoom = (typeof map.getZoom === 'function') ? map.getZoom() : 8;
 
     // Disparition automatique quand on est trop dezoome (seuil optimal : zoom 5.0)
+    // Ne jamais fermer automatiquement pendant que la camera est en cours de vol/pan vers l'aeroport
     const MIN_RADIAL_ZOOM = 5.0;
-    if (currentZoom < MIN_RADIAL_ZOOM) {
+    if (!isCameraPanningToRadial && currentZoom < MIN_RADIAL_ZOOM) {
         closeAirportRadialMenu();
         return;
     }
 
+    const wrappedLatLng = getWrappedAirportLatLng(currentRadialAirport, currentRadialMarker);
+    if (!wrappedLatLng) return;
+
     let point = null;
-    if (currentRadialMarker && currentRadialMarker.getLatLng) {
-        try {
-            point = map.latLngToContainerPoint(currentRadialMarker.getLatLng());
-        } catch (err) {}
-    }
-    if (!point && currentRadialAirport.lat && currentRadialAirport.lon) {
-        try {
-            point = map.latLngToContainerPoint([parseFloat(currentRadialAirport.lat), parseFloat(currentRadialAirport.lon)]);
-        } catch (err) {}
-    }
+    try {
+        point = map.latLngToContainerPoint(wrappedLatLng);
+    } catch (err) {}
     if (!point) return;
 
     radialEl.style.left = `${Math.round(point.x)}px`;
@@ -2907,7 +2935,7 @@ function updateRadialMenuPosition(force = false) {
         scale = 1.0;
     }
 
-    if (currentZoom < 5.4) {
+    if (currentZoom < 5.4 && !isCameraPanningToRadial) {
         const opacity = Math.max(0.0, Math.min(1.0, (currentZoom - MIN_RADIAL_ZOOM) / 0.4));
         radialEl.style.opacity = opacity.toFixed(2);
     } else {
@@ -2920,10 +2948,16 @@ function updateRadialMenuPosition(force = false) {
 function panMapToAirport(ap) {
     if (!map || !ap || ap.lat === undefined || ap.lon === undefined) return;
 
-    let flyLon = ap.lon;
+    let flyLat = parseFloat(ap.lat);
+    let flyLon = parseFloat(ap.lon);
     if (((ap.country === 'RU' || ap.iso_country === 'RU') || (ap.icao && ap.icao.startsWith('UH'))) && flyLon < -100) {
         flyLon = flyLon + 360;
     }
+
+    // Wrap longitude closest to map center for shortest path pan & avoid polar/date-line spinning
+    const mapCenterLon = (typeof map.getCenter === 'function') ? map.getCenter().lng : 0;
+    while (flyLon - mapCenterLon > 180) flyLon -= 360;
+    while (flyLon - mapCenterLon < -180) flyLon += 360;
 
     const PAN_DURATION = (currentSettings && currentSettings.camera_pan_duration !== undefined)
         ? parseFloat(currentSettings.camera_pan_duration)
@@ -2941,9 +2975,24 @@ function panMapToAirport(ap) {
     // Si deja a zoom >= 6.0, preserver le zoom utilisateur
     const targetZoom = (currentZoom < 6.0) ? 6.0 : currentZoom;
 
+    isCameraPanningToRadial = true;
+
+    const onPanFinish = () => {
+        isCameraPanningToRadial = false;
+        updateRadialMenuPosition(true);
+    };
+    map.once('moveend', onPanFinish);
+
+    // Fallback timer in case moveend doesn't fire
+    setTimeout(() => {
+        if (isCameraPanningToRadial) {
+            onPanFinish();
+        }
+    }, Math.round((PAN_DURATION + 0.3) * 1000));
+
     try {
         if (xOffset !== 0) {
-            const targetPoint = map.project([ap.lat, flyLon], targetZoom);
+            const targetPoint = map.project([flyLat, flyLon], targetZoom);
             const adjustedPoint = L.point(targetPoint.x + xOffset, targetPoint.y);
             const adjustedLatLng = map.unproject(adjustedPoint, targetZoom);
             if (targetZoom !== currentZoom) {
@@ -2952,7 +3001,7 @@ function panMapToAirport(ap) {
                 map.panTo(adjustedLatLng, { animate: true, duration: PAN_DURATION });
             }
         } else {
-            const targetLatLng = [parseFloat(ap.lat), parseFloat(flyLon)];
+            const targetLatLng = [flyLat, flyLon];
             if (targetZoom !== currentZoom) {
                 map.flyTo(targetLatLng, targetZoom, { animate: true, duration: PAN_DURATION });
             } else {
@@ -2960,7 +3009,7 @@ function panMapToAirport(ap) {
             }
         }
     } catch (err) {
-        map.panTo([parseFloat(ap.lat), parseFloat(flyLon)], { animate: true, duration: PAN_DURATION });
+        map.panTo([flyLat, flyLon], { animate: true, duration: PAN_DURATION });
     }
 }
 
