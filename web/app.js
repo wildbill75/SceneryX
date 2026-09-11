@@ -2864,6 +2864,15 @@ function closeAirportRadialMenu() {
         radialEl.style.transform = 'translate(-50%, -50%)';
         radialEl.style.opacity = '1';
     }
+    const extEl = document.getElementById('radial-sceneries-extension');
+    if (extEl) {
+        extEl.classList.add('hidden');
+        extEl.innerHTML = '';
+    }
+    const sectorScenery = document.getElementById('radial-sector-scenery');
+    if (sectorScenery) {
+        sectorScenery.classList.remove('active-radial-sector');
+    }
     currentRadialAirport = null;
     currentRadialMarker = null;
     currentRadialOpenZoom = null;
@@ -2943,6 +2952,19 @@ function updateRadialMenuPosition(force = false) {
     }
 
     radialEl.style.transform = `translate(-50%, -50%) scale(${scale.toFixed(3)})`;
+
+    // Smart screen boundary check for Sceneries Extension pills
+    const extEl = document.getElementById('radial-sceneries-extension');
+    if (extEl && !extEl.classList.contains('hidden')) {
+        const isNearRightEdge = (point.x + (270 + 365) * scale > window.innerWidth - 20);
+        if (isNearRightEdge) {
+            extEl.style.left = 'auto';
+            extEl.style.right = '542px';
+        } else {
+            extEl.style.left = '542px';
+            extEl.style.right = 'auto';
+        }
+    }
 }
 
 function panMapToAirport(ap) {
@@ -3021,6 +3043,16 @@ function openAirportRadialMenu(ap, marker, e) {
 
     const radialEl = document.getElementById('airport-radial-menu');
     if (!radialEl) return;
+
+    const extEl = document.getElementById('radial-sceneries-extension');
+    if (extEl) {
+        extEl.classList.add('hidden');
+        extEl.innerHTML = '';
+    }
+    const sectorScenery = document.getElementById('radial-sector-scenery');
+    if (sectorScenery) {
+        sectorScenery.classList.remove('active-radial-sector');
+    }
 
     // Pan camera to smoothly center on the newly selected airport
     panMapToAirport(ap);
@@ -3154,18 +3186,369 @@ function triggerRadialCountry() {
 
 function triggerRadialScenerySelector() {
     if (!currentRadialAirport) return;
-    const targetAp = currentRadialAirport;
-    closeAirportRadialMenu();
-    centerMapOnAirport(targetAp);
-    showAirportDetails(targetAp);
-    setTimeout(() => {
-        const card = document.getElementById('drawer-unified-scenery-card');
-        if (card) {
-            card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            card.classList.add('ring-2', 'ring-cyan-400');
-            setTimeout(() => card.classList.remove('ring-2', 'ring-cyan-400'), 1500);
+    const extEl = document.getElementById('radial-sceneries-extension');
+    const sectorScenery = document.getElementById('radial-sector-scenery');
+    if (!extEl) return;
+
+    if (!extEl.classList.contains('hidden')) {
+        // Toggle OFF
+        extEl.classList.add('hidden');
+        extEl.innerHTML = '';
+        if (sectorScenery) sectorScenery.classList.remove('active-radial-sector');
+    } else {
+        // Toggle ON: Render autonomous pills and trigger snappy spring bounce animation
+        renderRadialSceneriesExtension(currentRadialAirport);
+        extEl.classList.remove('hidden');
+        if (sectorScenery) sectorScenery.classList.add('active-radial-sector');
+        updateRadialMenuPosition(true);
+    }
+}
+
+function renderRadialSceneriesExtension(ap) {
+    const extEl = document.getElementById('radial-sceneries-extension');
+    if (!extEl || !ap) return;
+
+    const sources = ap.all_sources || [];
+    const nonDefaultSources = sources.filter(s => !(s.pricing_type === 'Default' || (s.folder_name && s.folder_name.startsWith('msfs-default-'))));
+    const baseSources = nonDefaultSources.filter(s => !isFixOrOverlay(s));
+    const fixSources = nonDefaultSources.filter(s => isFixOrOverlay(s));
+
+    const isDefaultActive = (ap.pricing_type === 'Default' || ap.package_name === 'Default MSFS Base Airport' || baseSources.length === 0 || baseSources.every(s => s.is_disabled));
+
+    let html = '';
+    let pillIndex = 0;
+
+    // 1. Installed Base Scenery Addons
+    baseSources.forEach(src => {
+        const idx = sources.indexOf(src);
+        const isActive = !src.is_disabled;
+        const isAsoboPkg = (src.is_asobo_official || src.vendor === 'Microsoft / Asobo' || (src.folder_name && (src.folder_name.toLowerCase().includes('asobo-airport-') || src.folder_name.toLowerCase().includes('microsoft-airport-'))));
+        const pType = src.pricing_type || (src.is_payware ? 'Payware' : (isAsoboPkg ? 'Asobo' : 'Freeware'));
+        const updateLabel = src.world_update_name || ap.world_update_name || "Asobo World Update";
+        const titleLabel = isAsoboPkg ? updateLabel : (src.vendor && src.vendor !== 'Unknown' ? src.vendor : src.folder_name);
+        const safePkgName = (src.folder_name || '').replace(/'/g, "\\'");
+
+        let badgeBg = 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30';
+        if (isAsoboPkg) badgeBg = 'bg-amber-500/20 text-amber-300 border border-amber-500/30';
+        else if (pType === 'Payware') badgeBg = 'bg-purple-500/20 text-purple-300 border border-purple-500/30';
+
+        const borderClass = isActive
+            ? 'border-2 border-emerald-500/80 shadow-xl shadow-emerald-950/50 bg-slate-950/90 ring-1 ring-emerald-500/30'
+            : 'border border-slate-700/60 hover:border-slate-500/80 bg-slate-950/75 hover:bg-slate-900/90 shadow-lg';
+
+        const animDelay = (pillIndex * 0.05).toFixed(2);
+        pillIndex++;
+
+        html += `
+            <div onclick="activateRadialSceneryVariant('${ap.icao}', '${safePkgName}')"
+                 style="animation-delay: ${animDelay}s;"
+                 class="animate-pill-bounce p-3.5 rounded-2xl ${borderClass} backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1.5 w-[360px]">
+                
+                <!-- Row 1: Switch toggle + Developer Title + Badge + Folder Button -->
+                <div class="flex items-center justify-between gap-2.5">
+                    <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                        <!-- Preflightly-style Switch Toggle -->
+                        <div class="relative inline-flex items-center shrink-0">
+                            <div class="w-10 h-5 rounded-full transition-colors duration-200 ease-in-out p-0.5 ${isActive ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-slate-700/80'}">
+                                <div class="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out ${isActive ? 'translate-x-5' : 'translate-x-0'}"></div>
+                            </div>
+                        </div>
+
+                        <span class="text-xs font-bold text-white truncate min-w-0">${titleLabel}</span>
+                        <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded ${badgeBg} shrink-0 uppercase">${pType}</span>
+                    </div>
+
+                    <button onclick="event.stopPropagation(); openSpecificPackageFolderByIndex('${ap.icao}', ${idx})"
+                            title="${t('drawer.open_folder', 'Open Folder')}"
+                            class="w-6 h-6 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-amber-400 flex items-center justify-center text-xs transition-colors border border-slate-700/50 shrink-0 shadow-sm">
+                        <i class="fa-solid fa-folder-open"></i>
+                    </button>
+                </div>
+
+                <!-- Row 2: MSFS Version, Location & Size -->
+                <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 pl-[50px]">
+                    <span class="truncate">${src.source_folder}</span>
+                    <span class="shrink-0 text-slate-300 font-semibold ml-2">${src.size_str || ''}</span>
+                </div>
+
+                <!-- Row 3: Mouse Over Package Name Reveal -->
+                <div class="max-h-0 opacity-0 group-hover:max-h-12 group-hover:opacity-100 transition-all duration-200 overflow-hidden mt-0 group-hover:mt-1 pl-[50px]">
+                    <div class="text-[10px] font-mono text-slate-300 bg-slate-900/95 border border-slate-700/70 px-2 py-1 rounded truncate flex items-center gap-1.5 shadow-inner">
+                        <i class="fa-regular fa-folder text-slate-400 text-[10px] shrink-0"></i>
+                        <span class="truncate">${src.folder_name}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    // 2. Default MSFS Base Airport
+    const defaultBorderClass = isDefaultActive
+        ? 'border-2 border-emerald-500/80 shadow-xl shadow-emerald-950/50 bg-slate-950/90 ring-1 ring-emerald-500/30'
+        : 'border border-slate-700/60 hover:border-slate-500/80 bg-slate-950/75 hover:bg-slate-900/90 shadow-lg';
+
+    const defaultAnimDelay = (pillIndex * 0.05).toFixed(2);
+    pillIndex++;
+
+    html += `
+        <div onclick="activateRadialDefaultScenery('${ap.icao}')"
+             style="animation-delay: ${defaultAnimDelay}s;"
+             class="animate-pill-bounce p-3.5 rounded-2xl ${defaultBorderClass} backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1.5 w-[360px]">
+            
+            <!-- Row 1: Switch toggle + Title + Badge -->
+            <div class="flex items-center justify-between gap-2.5">
+                <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                    <!-- Preflightly-style Switch Toggle -->
+                    <div class="relative inline-flex items-center shrink-0">
+                        <div class="w-10 h-5 rounded-full transition-colors duration-200 ease-in-out p-0.5 ${isDefaultActive ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-slate-700/80'}">
+                            <div class="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out ${isDefaultActive ? 'translate-x-5' : 'translate-x-0'}"></div>
+                        </div>
+                    </div>
+
+                    <span class="text-xs font-bold text-white truncate min-w-0">${t('drawer.default_airport', 'Default MSFS Base Airport')}</span>
+                    <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30 shrink-0 uppercase">DEFAULT</span>
+                </div>
+            </div>
+
+            <!-- Row 2: Description -->
+            <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 pl-[50px]">
+                <span class="truncate">${t('drawer.default_procedural', 'Built-in Procedural MSFS Base Scenery')}</span>
+                <span class="shrink-0 text-slate-500 ml-2">Built-in</span>
+            </div>
+
+            <!-- Row 3: Mouse Over Package Name Reveal -->
+            <div class="max-h-0 opacity-0 group-hover:max-h-12 group-hover:opacity-100 transition-all duration-200 overflow-hidden mt-0 group-hover:mt-1 pl-[50px]">
+                <div class="text-[10px] font-mono text-slate-400 bg-slate-900/95 border border-slate-700/70 px-2 py-1 rounded truncate flex items-center gap-1.5 shadow-inner">
+                    <i class="fa-solid fa-cube text-slate-500 text-[10px] shrink-0"></i>
+                    <span class="truncate">msfs-procedural-base</span>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // 3. Fixes & Overlays (if any)
+    if (fixSources.length > 0) {
+        html += `
+            <div class="flex items-center gap-2 pt-1 px-1">
+                <span class="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">${t('drawer.fixes_overlays', 'Fixes & Overlays')}</span>
+                <div class="flex-1 border-t border-slate-800"></div>
+            </div>
+        `;
+
+        fixSources.forEach(src => {
+            const idx = sources.indexOf(src);
+            const isActive = !src.is_disabled;
+            const pkgPath = (src.folder_name || '').replace(/'/g, "\\'");
+            const fixBorderClass = isActive
+                ? 'border-2 border-emerald-500/80 shadow-xl shadow-emerald-950/50 bg-slate-950/90 ring-1 ring-emerald-500/30'
+                : 'border border-slate-700/60 hover:border-slate-500/80 bg-slate-950/75 hover:bg-slate-900/90 shadow-lg';
+
+            const fixAnimDelay = (pillIndex * 0.05).toFixed(2);
+            pillIndex++;
+
+            html += `
+                <div onclick="activateRadialFixPackage('${pkgPath}', '${ap.icao}')"
+                     style="animation-delay: ${fixAnimDelay}s;"
+                     class="animate-pill-bounce p-3.5 rounded-2xl ${fixBorderClass} backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1.5 w-[360px]">
+                    
+                    <div class="flex items-center justify-between gap-2.5">
+                        <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                            <div class="relative inline-flex items-center shrink-0">
+                                <div class="w-10 h-5 rounded-full transition-colors duration-200 ease-in-out p-0.5 ${isActive ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-slate-700/80'}">
+                                    <div class="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out ${isActive ? 'translate-x-5' : 'translate-x-0'}"></div>
+                                </div>
+                            </div>
+                            <span class="text-xs font-bold text-white truncate min-w-0">${src.folder_name}</span>
+                            <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0 uppercase">FIX</span>
+                        </div>
+                        <button onclick="event.stopPropagation(); openSpecificPackageFolderByIndex('${ap.icao}', ${idx})"
+                                title="${t('drawer.open_folder', 'Open Folder')}"
+                                class="w-6 h-6 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-amber-400 flex items-center justify-center text-xs transition-colors border border-slate-700/50 shrink-0 shadow-sm">
+                            <i class="fa-solid fa-folder-open"></i>
+                        </button>
+                    </div>
+
+                    <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 pl-[50px]">
+                        <span class="truncate">${src.source_folder}</span>
+                        <span class="shrink-0 text-slate-300 font-semibold ml-2">${src.size_str || ''}</span>
+                    </div>
+
+                    <div class="max-h-0 opacity-0 group-hover:max-h-12 group-hover:opacity-100 transition-all duration-200 overflow-hidden mt-0 group-hover:mt-1 pl-[50px]">
+                        <div class="text-[10px] font-mono text-slate-300 bg-slate-900/95 border border-slate-700/70 px-2 py-1 rounded truncate flex items-center gap-1.5 shadow-inner">
+                            <i class="fa-regular fa-file-lines text-slate-500 text-[10px] shrink-0"></i>
+                            <span class="truncate">${src.folder_name}</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    extEl.innerHTML = html;
+}
+
+function updateRadialCoreBadge(ap) {
+    if (!ap) return;
+    const badgeEl = document.getElementById('radial-badge');
+    const icaoEl = document.getElementById('radial-icao');
+
+    const cat = getAirportCategory(ap);
+    let badgeLabel = 'FREEWARE';
+    let badgeClass = 'bg-cyan-600 text-white font-bold';
+    let icaoColor = 'text-cyan-400';
+
+    if (ap.has_conflict) {
+        badgeLabel = `⚠️ CONFLICT (${ap.conflict_count || 2})`;
+        badgeClass = 'bg-red-600 text-white font-black animate-pulse';
+        icaoColor = 'text-red-400';
+    } else if (ap.is_disabled) {
+        badgeLabel = 'DISABLED';
+        badgeClass = 'bg-slate-600 text-white font-bold';
+        icaoColor = 'text-slate-400';
+    } else if (cat === 'ASOBO') {
+        badgeLabel = 'ASOBO / MICROSOFT';
+        badgeClass = 'bg-amber-500 text-slate-950 font-black';
+        icaoColor = 'text-amber-400';
+    } else if (cat === 'PAYWARE') {
+        badgeLabel = ap.vendor ? `PAYWARE • ${ap.vendor}` : 'PAYWARE';
+        badgeClass = 'bg-purple-600 text-white font-bold';
+        icaoColor = 'text-purple-400';
+    } else if (cat === 'DEFAULT') {
+        badgeLabel = 'DEFAULT • BASE';
+        badgeClass = 'bg-blue-600 text-white font-bold';
+        icaoColor = 'text-sky-400';
+    } else {
+        badgeLabel = ap.vendor ? `FREEWARE • ${ap.vendor}` : 'FREEWARE';
+        badgeClass = 'bg-cyan-600 text-white font-bold';
+        icaoColor = 'text-cyan-400';
+    }
+
+    if (badgeEl) {
+        badgeEl.innerText = badgeLabel;
+        badgeEl.className = `text-[11px] font-mono font-black px-3 py-1 rounded-full border-0 tracking-wide uppercase truncate max-w-[210px] shadow-sm ${badgeClass}`;
+    }
+    if (icaoEl) {
+        const iataVal = (ap.iata && ap.iata.trim() && ap.iata.trim() !== '—' && ap.iata.trim() !== '-') ? ap.iata.trim().toUpperCase() : '';
+        const codesStr = iataVal ? `${ap.icao}/${iataVal}` : (ap.icao || '');
+        icaoEl.innerText = codesStr;
+        icaoEl.className = `font-mono font-black text-3xl tracking-tight leading-none ${icaoColor}`;
+    }
+}
+
+async function activateRadialSceneryVariant(icao, folderName) {
+    if (!window.pywebview || isToggleInProgress || !icao || !folderName) return;
+    if (currentRadialAirport && currentRadialAirport.package_name === folderName && !currentRadialAirport.is_disabled) {
+        return;
+    }
+    isToggleInProgress = true;
+    try {
+        const resStr = await window.pywebview.api.select_scenery_option(icao, folderName);
+        const res = JSON.parse(resStr);
+        if (res.status === 'ok') {
+            allAirportsData = res.airports;
+            allAirportsData.forEach(ap => {
+                if (userRatingsMap[ap.icao] !== undefined) {
+                    ap.rating = userRatingsMap[ap.icao];
+                }
+            });
+            updateStats(allAirportsData);
+            filterAirports();
+            const updatedAp = getAirportByIcao(icao);
+            if (updatedAp) {
+                currentRadialAirport = updatedAp;
+                if (selectedAirport && selectedAirport.icao === icao) {
+                    selectedAirport = updatedAp;
+                }
+                renderRadialSceneriesExtension(updatedAp);
+                updateRadialCoreBadge(updatedAp);
+                const detailDrawer = document.getElementById('detail-drawer');
+                if (detailDrawer && !detailDrawer.classList.contains('translate-x-full')) {
+                    renderUnifiedScenerySelector(updatedAp);
+                }
+            }
+            showToast(`✓ ${folderName} Activated`, 'success');
         }
-    }, 150);
+    } catch (e) {
+        console.error("Failed to activate radial scenery variant:", e);
+    } finally {
+        isToggleInProgress = false;
+    }
+}
+
+async function activateRadialDefaultScenery(icao) {
+    if (!window.pywebview || isToggleInProgress || !icao) return;
+    if (currentRadialAirport && (currentRadialAirport.pricing_type === 'Default' || currentRadialAirport.package_name === 'Default MSFS Base Airport')) {
+        return;
+    }
+    isToggleInProgress = true;
+    try {
+        const resStr = await window.pywebview.api.select_scenery_option(icao, 'DEFAULT');
+        const res = JSON.parse(resStr);
+        if (res.status === 'ok') {
+            allAirportsData = res.airports;
+            allAirportsData.forEach(ap => {
+                if (userRatingsMap[ap.icao] !== undefined) {
+                    ap.rating = userRatingsMap[ap.icao];
+                }
+            });
+            updateStats(allAirportsData);
+            filterAirports();
+            const updatedAp = getAirportByIcao(icao);
+            if (updatedAp) {
+                currentRadialAirport = updatedAp;
+                if (selectedAirport && selectedAirport.icao === icao) {
+                    selectedAirport = updatedAp;
+                }
+                renderRadialSceneriesExtension(updatedAp);
+                updateRadialCoreBadge(updatedAp);
+                const detailDrawer = document.getElementById('detail-drawer');
+                if (detailDrawer && !detailDrawer.classList.contains('translate-x-full')) {
+                    renderUnifiedScenerySelector(updatedAp);
+                }
+            }
+            showToast(`✓ Reverted to Default MSFS Base Airport`, 'info');
+        }
+    } catch (e) {
+        console.error("Failed to activate default scenery:", e);
+    } finally {
+        isToggleInProgress = false;
+    }
+}
+
+async function activateRadialFixPackage(path, icao) {
+    if (!window.pywebview || isToggleInProgress || !path) return;
+    isToggleInProgress = true;
+    try {
+        const resStr = await window.pywebview.api.toggle_fix_patch(path, icao || '');
+        const res = JSON.parse(resStr);
+        if (res.status === 'ok') {
+            allAirportsData = res.airports;
+            allAirportsData.forEach(ap => {
+                if (userRatingsMap[ap.icao] !== undefined) {
+                    ap.rating = userRatingsMap[ap.icao];
+                }
+            });
+            updateStats(allAirportsData);
+            filterAirports();
+            const updatedAp = getAirportByIcao(icao);
+            if (updatedAp) {
+                currentRadialAirport = updatedAp;
+                if (selectedAirport && selectedAirport.icao === icao) {
+                    selectedAirport = updatedAp;
+                }
+                renderRadialSceneriesExtension(updatedAp);
+                const detailDrawer = document.getElementById('detail-drawer');
+                if (detailDrawer && !detailDrawer.classList.contains('translate-x-full')) {
+                    renderUnifiedScenerySelector(updatedAp);
+                }
+            }
+            showToast(`✓ Fix/Overlay Toggled`, 'success');
+        }
+    } catch (e) {
+        console.error("Failed to toggle fix patch:", e);
+    } finally {
+        isToggleInProgress = false;
+    }
 }
 
 function triggerRadialFullDetails() {
@@ -4480,23 +4863,28 @@ function renderUnifiedScenerySelector(ap) {
 
         if (isActive) {
             let activeBg = 'bg-cyan-600 text-white';
-            let pillBg = 'bg-black/30 text-white';
+            let badgeClass = 'bg-black/30 text-white';
             if (isAsoboPkg) {
                 activeBg = 'bg-amber-500 text-slate-950 font-black';
-                pillBg = 'bg-slate-950 text-amber-300';
+                badgeClass = 'bg-slate-950 text-amber-300';
             } else if (pType === 'Payware') {
                 activeBg = 'bg-purple-600 text-white';
-                pillBg = 'bg-black/30 text-white';
+                badgeClass = 'bg-black/30 text-white';
             }
 
             html += `
                 <div class="p-3 rounded-xl ${activeBg} border-0 shadow-md space-y-2">
                     <div class="flex items-center justify-between gap-2">
-                        <div class="flex items-center gap-2 min-w-0 flex-1">
-                            <i class="fa-solid fa-circle-check text-sm shrink-0"></i>
+                        <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                            <!-- Preflightly-style Switch Toggle (ACTIVE) -->
+                            <div class="relative inline-flex items-center shrink-0">
+                                <div class="w-10 h-5 rounded-full transition-colors duration-200 ease-in-out p-0.5 bg-emerald-500 shadow-sm shadow-emerald-500/50">
+                                    <div class="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out translate-x-5"></div>
+                                </div>
+                            </div>
                             <span class="text-xs font-black truncate uppercase tracking-wider">${titleLabel}</span>
                         </div>
-                        <span class="text-[10px] font-mono font-black px-2.5 py-0.5 rounded-full ${pillBg} uppercase shrink-0">${t('drawer.active_badge', 'Active')}</span>
+                        <span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full ${badgeClass} uppercase shrink-0">${pType}</span>
                     </div>
 
                     <div class="text-[11px] font-mono px-2.5 py-1.5 rounded-lg bg-black/25 text-white/90 break-all select-all">
@@ -4520,14 +4908,16 @@ function renderUnifiedScenerySelector(ap) {
             html += `
                 <div onclick="selectSceneryPackageByName('${ap.icao}', '${safePkgName}')" class="p-3 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-200 border-0 cursor-pointer transition-colors space-y-2 group shadow-sm">
                     <div class="flex items-center justify-between gap-2">
-                        <div class="flex items-center gap-2 min-w-0 flex-1">
-                            <i class="fa-regular fa-circle text-slate-400 group-hover:text-white text-sm shrink-0"></i>
+                        <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                            <!-- Preflightly-style Switch Toggle (INACTIVE) -->
+                            <div class="relative inline-flex items-center shrink-0">
+                                <div class="w-10 h-5 rounded-full transition-colors duration-200 ease-in-out p-0.5 bg-slate-700 group-hover:bg-slate-600">
+                                    <div class="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out translate-x-0"></div>
+                                </div>
+                            </div>
                             <span class="text-xs font-bold text-slate-200 group-hover:text-white truncate min-w-0">${titleLabel}</span>
-                            <span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded ${badgeBg} shrink-0">${pType}</span>
                         </div>
-                        <button class="px-2.5 py-1 rounded-lg bg-slate-700 group-hover:bg-cyan-600 text-white text-xs font-bold transition-colors shrink-0 border-0 pointer-events-none">
-                            ${t('drawer.activate_btn', 'Activate')}
-                        </button>
+                        <span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded ${badgeBg} shrink-0 uppercase">${pType}</span>
                     </div>
 
                     <div class="text-[11px] font-mono text-slate-400 group-hover:text-slate-300 bg-slate-900/60 p-2 rounded-lg break-all">
@@ -4547,28 +4937,34 @@ function renderUnifiedScenerySelector(ap) {
         html += `
             <div class="p-3 rounded-xl bg-blue-600 text-white border-0 shadow-md space-y-1">
                 <div class="flex items-center justify-between gap-2">
-                    <div class="flex items-center gap-2">
-                        <i class="fa-solid fa-circle-check text-sm shrink-0"></i>
+                    <div class="flex items-center gap-2.5">
+                        <div class="relative inline-flex items-center shrink-0">
+                            <div class="w-10 h-5 rounded-full transition-colors duration-200 ease-in-out p-0.5 bg-emerald-500 shadow-sm shadow-emerald-500/50">
+                                <div class="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out translate-x-5"></div>
+                            </div>
+                        </div>
                         <span class="text-xs font-black uppercase tracking-wider">${t('drawer.default_airport', 'Default MSFS Base Airport')}</span>
                     </div>
-                    <span class="text-[10px] font-mono font-black px-2.5 py-0.5 rounded-full bg-white text-blue-900 uppercase shrink-0">${t('drawer.active_badge', 'Active')}</span>
+                    <span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-white text-blue-900 uppercase shrink-0">DEFAULT</span>
                 </div>
-                <p class="text-[11px] text-blue-100 pl-6">${t('drawer.default_procedural', 'Built-in Procedural MSFS Base Scenery')}</p>
+                <p class="text-[11px] text-blue-100 pl-[48px]">${t('drawer.default_procedural', 'Built-in Procedural MSFS Base Scenery')}</p>
             </div>
         `;
     } else {
         html += `
             <div onclick="selectDefaultMSFSScenery('${ap.icao}')" class="p-3 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-200 border-0 cursor-pointer transition-colors space-y-1 group shadow-sm">
                 <div class="flex items-center justify-between gap-2">
-                    <div class="flex items-center gap-2 min-w-0 flex-1">
-                        <i class="fa-regular fa-circle text-slate-400 group-hover:text-white text-sm shrink-0"></i>
-                        <span class="text-xs font-bold text-slate-200 group-hover:text-white">${t('drawer.default_airport', 'Default MSFS Base Airport')}</span>
+                    <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                        <div class="relative inline-flex items-center shrink-0">
+                            <div class="w-10 h-5 rounded-full transition-colors duration-200 ease-in-out p-0.5 bg-slate-700 group-hover:bg-slate-600">
+                                <div class="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out translate-x-0"></div>
+                            </div>
+                        </div>
+                        <span class="text-xs font-bold text-slate-200 group-hover:text-white truncate">${t('drawer.default_airport', 'Default MSFS Base Airport')}</span>
                     </div>
-                    <button class="px-2.5 py-1 rounded-lg bg-slate-700 group-hover:bg-cyan-600 text-white text-xs font-bold transition-colors shrink-0 border-0 pointer-events-none">
-                        ${t('drawer.activate_btn', 'Activate')}
-                    </button>
+                    <span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30 shrink-0 uppercase">DEFAULT</span>
                 </div>
-                <p class="text-[11px] text-slate-400 pl-6">${t('drawer.default_procedural', 'Built-in Procedural MSFS Base Scenery')}</p>
+                <p class="text-[11px] text-slate-400 pl-[48px]">${t('drawer.default_procedural', 'Built-in Procedural MSFS Base Scenery')}</p>
             </div>
         `;
     }
@@ -4590,21 +4986,19 @@ function renderUnifiedScenerySelector(ap) {
             html += `
                 <div onclick="toggleFixPatchPackage('${pkgPath}', '${ap.icao}')" class="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-750 text-slate-200 border-0 cursor-pointer transition-colors space-y-1.5 group shadow-sm">
                     <div class="flex items-center justify-between gap-2">
-                        <div class="flex items-center gap-2 min-w-0 flex-1">
+                        <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                            <div class="relative inline-flex items-center shrink-0">
+                                <div class="w-10 h-5 rounded-full transition-colors duration-200 ease-in-out p-0.5 ${isActive ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-slate-700'}">
+                                    <div class="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out ${isActive ? 'translate-x-5' : 'translate-x-0'}"></div>
+                                </div>
+                            </div>
                             <span class="text-xs font-bold text-slate-200 group-hover:text-white truncate">${src.folder_name}</span>
                         </div>
-                        <div class="flex items-center gap-2 shrink-0">
-                            <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md ${isActive ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-400'}">
-                                ${isActive ? t('drawer.active_fix', 'Active') : 'Disabled'}
-                            </span>
-                            <div class="w-8 h-4 rounded-full ${isActive ? 'bg-emerald-600' : 'bg-slate-700'} relative flex items-center px-0.5 transition-colors">
-                                <div class="w-3 h-3 rounded-full bg-white transition-transform ${isActive ? 'ml-auto' : 'mr-auto'}"></div>
-                            </div>
-                        </div>
+                        <span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0 uppercase">FIX</span>
                     </div>
-                    <div class="flex items-center justify-between text-[10px] font-mono text-slate-400">
+                    <div class="flex items-center justify-between text-[10px] font-mono text-slate-400 pl-[48px]">
                         <span>${src.source_folder} ${src.size_str ? `• ${src.size_str}` : ''}</span>
-                        <button onclick="event.stopPropagation(); openSpecificPackageFolderByIndex('${ap.icao}', ${idx})" class="text-slate-400 hover:text-white transition-colors cursor-pointer border-0 bg-transparent p-0">
+                        <button onclick="event.stopPropagation(); openSpecificPackageFolderByIndex('${ap.icao}', ${idx})" class="text-slate-400 hover:text-white transition-colors cursor-pointer border-0 bg-transparent p-0" title="${t('drawer.open_folder', 'Open Folder')}">
                             <i class="fa-solid fa-folder"></i>
                         </button>
                     </div>
@@ -5393,8 +5787,11 @@ function openSpecificPackageFolder(path) {
 }
 
 function openSpecificPackageFolderByIndex(icao, idx) {
-    if (!selectedAirport || !selectedAirport.all_sources || !selectedAirport.all_sources[idx]) return;
-    const src = selectedAirport.all_sources[idx];
+    const targetAp = (currentRadialAirport && currentRadialAirport.icao === icao)
+        ? currentRadialAirport
+        : ((selectedAirport && selectedAirport.icao === icao) ? selectedAirport : getAirportByIcao(icao));
+    if (!targetAp || !targetAp.all_sources || !targetAp.all_sources[idx]) return;
+    const src = targetAp.all_sources[idx];
     const path = src.package_path || src.folder_name;
     if (path) openSpecificPackageFolder(path);
 }
@@ -5413,11 +5810,19 @@ async function selectDefaultMSFSScenery(icao) {
                 }
             });
             updateStats(allAirportsData);
-            const targetIcao = selectedAirport ? selectedAirport.icao : icao;
+            const targetIcao = (selectedAirport && selectedAirport.icao) ? selectedAirport.icao : icao;
             const updatedAp = getAirportByIcao(targetIcao);
             if (updatedAp) {
-                selectedAirport = updatedAp;
-                showAirportDetails(updatedAp);
+                if (selectedAirport) selectedAirport = updatedAp;
+                if (currentRadialAirport && currentRadialAirport.icao === icao) {
+                    currentRadialAirport = updatedAp;
+                    renderRadialSceneriesExtension(updatedAp);
+                    updateRadialCoreBadge(updatedAp);
+                }
+                const detailDrawer = document.getElementById('detail-drawer');
+                if (detailDrawer && !detailDrawer.classList.contains('translate-x-full')) {
+                    showAirportDetails(updatedAp);
+                }
             }
             filterAirports();
             showToast(`✓ Reverted to Default MSFS Base Airport`, 'info');
@@ -5443,11 +5848,19 @@ async function selectSceneryPackageByName(icao, folderName) {
                 }
             });
             updateStats(allAirportsData);
-            const targetIcao = selectedAirport ? selectedAirport.icao : icao;
+            const targetIcao = (selectedAirport && selectedAirport.icao) ? selectedAirport.icao : icao;
             const updatedAp = getAirportByIcao(targetIcao);
             if (updatedAp) {
-                selectedAirport = updatedAp;
-                showAirportDetails(updatedAp);
+                if (selectedAirport) selectedAirport = updatedAp;
+                if (currentRadialAirport && currentRadialAirport.icao === icao) {
+                    currentRadialAirport = updatedAp;
+                    renderRadialSceneriesExtension(updatedAp);
+                    updateRadialCoreBadge(updatedAp);
+                }
+                const detailDrawer = document.getElementById('detail-drawer');
+                if (detailDrawer && !detailDrawer.classList.contains('translate-x-full')) {
+                    showAirportDetails(updatedAp);
+                }
             }
             filterAirports();
             showToast(`✓ ${icao} Scenery Activated & Saved to Disk`, 'success');
@@ -5473,16 +5886,24 @@ async function toggleFixPatchPackage(path, icao) {
                 }
             });
             updateStats(allAirportsData);
-            filterAirports();
-            if (selectedAirport) {
-                const updatedAp = getAirportByIcao(selectedAirport.icao);
-                if (updatedAp) showAirportDetails(updatedAp);
+            const targetIcao = (selectedAirport && selectedAirport.icao) ? selectedAirport.icao : icao;
+            const updatedAp = getAirportByIcao(targetIcao);
+            if (updatedAp) {
+                if (selectedAirport) selectedAirport = updatedAp;
+                if (currentRadialAirport && currentRadialAirport.icao === icao) {
+                    currentRadialAirport = updatedAp;
+                    renderRadialSceneriesExtension(updatedAp);
+                }
+                const detailDrawer = document.getElementById('detail-drawer');
+                if (detailDrawer && !detailDrawer.classList.contains('translate-x-full')) {
+                    showAirportDetails(updatedAp);
+                }
             }
-            const statusLabel = res.enabled ? 'Enabled' : 'Disabled';
-            showToast(`✓ Fix / Overlay ${statusLabel} & Saved to Disk`, res.enabled ? 'success' : 'info');
+            filterAirports();
+            showToast(`✓ Fix/Overlay Updated & Saved to Disk`, 'success');
         }
     } catch (e) {
-        console.error("Failed to toggle fix/patch package:", e);
+        console.error("Failed to toggle fix patch:", e);
     } finally {
         isToggleInProgress = false;
     }
