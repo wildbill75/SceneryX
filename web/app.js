@@ -844,9 +844,17 @@ function initMap() {
         }
     });
 
-    // Dynamically update radial menu position during pan/zoom so it stays locked to airport
-    map.on('move zoom viewreset moveend', updateRadialMenuPosition);
-    map.on('zoom viewreset zoomend', updateCountryInteractivityState);
+    // Prevent clicks inside radial menu and sceneries extension from bubbling to Leaflet map
+    const radialMenuEl = document.getElementById('airport-radial-menu');
+    if (radialMenuEl) {
+        L.DomEvent.disableClickPropagation(radialMenuEl);
+        L.DomEvent.disableScrollPropagation(radialMenuEl);
+    }
+    const radialExtEl = document.getElementById('radial-sceneries-extension');
+    if (radialExtEl) {
+        L.DomEvent.disableClickPropagation(radialExtEl);
+        L.DomEvent.disableScrollPropagation(radialExtEl);
+    }
 
     // Double click on neutral map area: resets camera according to priority hierarchy
     map.on('dblclick', () => {
@@ -3043,9 +3051,19 @@ function openAirportRadialMenu(ap, marker, e) {
 
     const radialEl = document.getElementById('airport-radial-menu');
     if (!radialEl) return;
+    if (!radialEl._clickPropagationDisabled) {
+        L.DomEvent.disableClickPropagation(radialEl);
+        L.DomEvent.disableScrollPropagation(radialEl);
+        radialEl._clickPropagationDisabled = true;
+    }
 
     const extEl = document.getElementById('radial-sceneries-extension');
     if (extEl) {
+        if (!extEl._clickPropagationDisabled) {
+            L.DomEvent.disableClickPropagation(extEl);
+            L.DomEvent.disableScrollPropagation(extEl);
+            extEl._clickPropagationDisabled = true;
+        }
         extEl.classList.add('hidden');
         extEl.innerHTML = '';
     }
@@ -3247,11 +3265,13 @@ function renderRadialSceneriesExtension(ap) {
         pillIndex++;
 
         html += `
-            <div onclick="activateRadialSceneryVariant('${ap.icao}', '${safePkgName}')"
+            <div onclick="event.stopPropagation(); activateRadialSceneryVariant(event, '${ap.icao}', '${safePkgName}')"
+                 onmousedown="event.stopPropagation();"
+                 onpointerdown="event.stopPropagation();"
                  style="animation-delay: ${animDelay}s;"
                  class="animate-pill-bounce p-3.5 rounded-2xl ${borderClass} backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1.5 w-[360px]">
                 
-                <!-- Row 1: Switch toggle + Title with Mouseover Folder Tooltip + Category Badge + Folder Button -->
+                <!-- Row 1: Switch toggle + Title with Native Mouseover Folder Tooltip + Category Badge + Folder Button -->
                 <div class="flex items-center justify-between gap-2.5">
                     <div class="flex items-center gap-2.5 min-w-0 flex-1">
                         <!-- Preflightly-style Switch Toggle -->
@@ -3261,13 +3281,9 @@ function renderRadialSceneriesExtension(ap) {
                             </div>
                         </div>
 
-                        <!-- Title with hover reveal of folder name on the title -->
-                        <div class="group/title relative min-w-0 flex-1" title="${safePkgName}">
-                            <span class="text-xs font-bold text-white truncate block hover:text-cyan-300 transition-colors cursor-help">${titleLabel}</span>
-                            <div class="absolute left-0 bottom-full mb-2 hidden group-hover/title:flex items-center gap-1.5 z-[1600] px-2.5 py-1 bg-slate-900/95 backdrop-blur-md border border-slate-700 text-[11px] font-mono text-slate-200 rounded-lg shadow-2xl whitespace-nowrap pointer-events-none">
-                                <i class="fa-regular fa-folder text-amber-400 text-xs shrink-0"></i>
-                                <span class="truncate max-w-[280px]">${src.folder_name}</span>
-                            </div>
+                        <!-- Title with native mouseover hover tooltip -->
+                        <div class="min-w-0 flex-1" title="${safePkgName}">
+                            <span class="text-xs font-bold text-white truncate block hover:text-cyan-300 transition-colors cursor-help" title="${safePkgName}">${titleLabel}</span>
                         </div>
 
                         <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded ${badgeBg} shrink-0 uppercase">${pType}</span>
@@ -3298,7 +3314,9 @@ function renderRadialSceneriesExtension(ap) {
     pillIndex++;
 
     html += `
-        <div onclick="activateRadialDefaultScenery('${ap.icao}')"
+        <div onclick="event.stopPropagation(); activateRadialDefaultScenery(event, '${ap.icao}')"
+             onmousedown="event.stopPropagation();"
+             onpointerdown="event.stopPropagation();"
              style="animation-delay: ${defaultAnimDelay}s;"
              class="animate-pill-bounce p-3.5 rounded-2xl ${defaultBorderClass} backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1.5 w-[360px]">
             
@@ -3345,7 +3363,9 @@ function renderRadialSceneriesExtension(ap) {
             pillIndex++;
 
             html += `
-                <div onclick="activateRadialFixPackage('${pkgPath}', '${ap.icao}')"
+                <div onclick="event.stopPropagation(); activateRadialFixPackage(event, '${pkgPath}', '${ap.icao}')"
+                     onmousedown="event.stopPropagation();"
+                     onpointerdown="event.stopPropagation();"
                      style="animation-delay: ${fixAnimDelay}s;"
                      class="animate-pill-bounce p-3.5 rounded-2xl ${fixBorderClass} backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1.5 w-[360px]">
                     
@@ -3357,12 +3377,8 @@ function renderRadialSceneriesExtension(ap) {
                                 </div>
                             </div>
 
-                            <div class="group/title relative min-w-0 flex-1" title="${pkgPath}">
-                                <span class="text-xs font-bold text-white truncate block hover:text-emerald-300 transition-colors cursor-help">${src.folder_name}</span>
-                                <div class="absolute left-0 bottom-full mb-2 hidden group-hover/title:flex items-center gap-1.5 z-[1600] px-2.5 py-1 bg-slate-900/95 backdrop-blur-md border border-slate-700 text-[11px] font-mono text-slate-200 rounded-lg shadow-2xl whitespace-nowrap pointer-events-none">
-                                    <i class="fa-regular fa-folder text-emerald-400 text-xs shrink-0"></i>
-                                    <span class="truncate max-w-[280px]">${src.folder_name}</span>
-                                </div>
+                            <div class="min-w-0 flex-1" title="${pkgPath}">
+                                <span class="text-xs font-bold text-white truncate block hover:text-emerald-300 transition-colors cursor-help" title="${pkgPath}">${src.folder_name}</span>
                             </div>
 
                             <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0 uppercase">FIX</span>
@@ -3447,7 +3463,15 @@ function updateSingleAirportMarker(ap) {
     }
 }
 
-async function activateRadialSceneryVariant(icao, folderName) {
+async function activateRadialSceneryVariant(e, icao, folderName) {
+    if (e && e.stopPropagation) {
+        e.stopPropagation();
+    } else if (typeof e === 'string') {
+        folderName = icao;
+        icao = e;
+    }
+    if (window.event) window.event.cancelBubble = true;
+
     if (!window.pywebview || isToggleInProgress || !icao || !folderName) return;
     if (currentRadialAirport && currentRadialAirport.package_name === folderName && !currentRadialAirport.is_disabled) {
         return;
@@ -3506,7 +3530,14 @@ async function activateRadialSceneryVariant(icao, folderName) {
     }
 }
 
-async function activateRadialDefaultScenery(icao) {
+async function activateRadialDefaultScenery(e, icao) {
+    if (e && e.stopPropagation) {
+        e.stopPropagation();
+    } else if (typeof e === 'string') {
+        icao = e;
+    }
+    if (window.event) window.event.cancelBubble = true;
+
     if (!window.pywebview || isToggleInProgress || !icao) return;
     if (currentRadialAirport && (currentRadialAirport.pricing_type === 'Default' || currentRadialAirport.package_name === 'Default MSFS Base Airport')) {
         return;
@@ -3565,7 +3596,15 @@ async function activateRadialDefaultScenery(icao) {
     }
 }
 
-async function activateRadialFixPackage(path, icao) {
+async function activateRadialFixPackage(e, path, icao) {
+    if (e && e.stopPropagation) {
+        e.stopPropagation();
+    } else if (typeof e === 'string') {
+        icao = path;
+        path = e;
+    }
+    if (window.event) window.event.cancelBubble = true;
+
     if (!window.pywebview || isToggleInProgress || !path) return;
 
     // 1. Immediate OPTIMISTIC UI update
