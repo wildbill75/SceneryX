@@ -88,32 +88,34 @@ def is_core_or_library_package(pkg_name):
         'instruments', 'navdata', 'fs-base'
     ])
 
+_CACHED_CONTENT_XML_PATH = None
+
 def get_content_xml_paths():
     local_appdata = os.getenv('LOCALAPPDATA', '')
     appdata = os.getenv('APPDATA', '')
+    limitless_cache = os.path.join(local_appdata, r'Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache')
 
-    content_xml_paths = [
-        r'C:\Users\Bertrand\AppData\Local\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\ThirdBuk\Content.xml',
-        os.path.join(local_appdata, r'Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\Content.xml'),
+    return [
+        os.path.join(limitless_cache, 'Content.xml'),
+        os.path.join(limitless_cache, 'ThirdBuk', 'Content.xml'),
         os.path.join(local_appdata, r'Packages\Microsoft.FlightSimulator_8wekyb3d8bbwe\LocalCache\Content.xml'),
-        os.path.join(appdata, r'Microsoft Flight Simulator\Content.xml')
+        os.path.join(appdata, r'Microsoft Flight Simulator\Content.xml'),
+        os.path.join(appdata, r'Microsoft Flight Simulator 2024\Content.xml'),
+        r'C:\Users\Bertrand\AppData\Local\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\ThirdBuk\Content.xml'
     ]
 
-    import glob
-    limitless_cache = os.path.join(local_appdata, r'Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache')
-    if os.path.exists(limitless_cache):
-        for found_xml in glob.glob(os.path.join(limitless_cache, '**', 'Content.xml'), recursive=True):
-            if found_xml not in content_xml_paths:
-                content_xml_paths.insert(0, found_xml)
-
-    return content_xml_paths
-
 def get_content_xml_path():
+    global _CACHED_CONTENT_XML_PATH
+    if _CACHED_CONTENT_XML_PATH and os.path.exists(_CACHED_CONTENT_XML_PATH):
+        return _CACHED_CONTENT_XML_PATH
+
     paths = get_content_xml_paths()
     for p in paths:
         if os.path.exists(p):
+            _CACHED_CONTENT_XML_PATH = p
             return p
-    return paths[0]
+    _CACHED_CONTENT_XML_PATH = paths[0]
+    return _CACHED_CONTENT_XML_PATH
 
 def safe_remove_path(p):
     """Safely removes a file, symlink, junction or folder without affecting the junction target."""
@@ -223,8 +225,25 @@ def set_package_state_for_icao(p_path, target_icao, should_enable):
         return
     clean_p = p_path[:-9] if p_path.endswith('.disabled') else p_path
     dis_p = clean_p + '.disabled'
-    target_dir = clean_p if (os.path.exists(clean_p) or os.path.islink(clean_p)) else (dis_p if (os.path.exists(dis_p) or os.path.islink(dis_p)) else None)
+    target_dir = clean_p if (os.path.exists(clean_p) or os.path.islink(clean_p) or (hasattr(os.path, 'isjunction') and os.path.isjunction(clean_p))) else (dis_p if (os.path.exists(dis_p) or os.path.islink(dis_p)) else None)
     if not target_dir:
+        return
+
+    # Official / Streamed packages must NEVER be renamed physically on disk (managed via Content.xml)
+    td_lower = target_dir.lower()
+    if any(k in td_lower for k in ['official', 'streamed', 'asobo-', 'microsoft-']):
+        return
+
+    # Check if package is potentially a multi-airport bundle
+    folder_base = os.path.basename(clean_p).lower()
+    is_potential_bundle = any(k in folder_base for k in ['pack', 'bundle', 'airports', 'vfr', 'airfields']) or folder_base in SPECIAL_BUNDLE_MAP
+
+    if not is_potential_bundle:
+        # Fast path for standard single-airport packages: instant folder rename
+        if should_enable:
+            enable_physical_package(target_dir)
+        else:
+            disable_physical_package(target_dir)
         return
 
     icao_l = target_icao.lower() if target_icao else ""
@@ -233,6 +252,7 @@ def set_package_state_for_icao(p_path, target_icao, should_enable):
 
     if os.path.exists(target_dir):
         for root, dirs, files in os.walk(target_dir):
+            dirs[:] = [d for d in dirs if d.lower() not in ('texture', 'textures', 'materiallibs', 'sound', 'modellib', 'html_ui', 'model', 'effects', 'weather', 'visualeffects', 'ai')]
             for f in files:
                 f_l = f.lower()
                 if f_l.endswith('.bgl') or f_l.endswith('.bgl.disabled'):
@@ -248,6 +268,7 @@ def set_package_state_for_icao(p_path, target_icao, should_enable):
             target_dir = clean_p
             matching_bgls = []
             for root, dirs, files in os.walk(target_dir):
+                dirs[:] = [d for d in dirs if d.lower() not in ('texture', 'textures', 'materiallibs', 'sound', 'modellib', 'html_ui', 'model', 'effects', 'weather', 'visualeffects', 'ai')]
                 for f in files:
                     if icao_l and icao_l in f.lower() and (f.lower().endswith('.bgl') or f.lower().endswith('.bgl.disabled')):
                         matching_bgls.append(os.path.join(root, f))
@@ -386,12 +407,19 @@ def update_msfs_content_xml(keep_icaos=None, restore_flight_mode=False, flight_d
 
     return disabled_xml_packages, added_xml_packages
 
+AIRPORTS_CACHE = None
+
 def fast_update_airport_cache(icao_target, target_pkg_name=None, toggle_all=False):
+    global AIRPORTS_CACHE
     if not os.path.exists(OUTPUT_JSON_PATH):
-        return run_scan()
+        airports = run_scan()
+        AIRPORTS_CACHE = airports
+        return airports
     try:
-        with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
-            airports = json.load(f)
+        if AIRPORTS_CACHE is None:
+            with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
+                AIRPORTS_CACHE = json.load(f)
+        airports = AIRPORTS_CACHE
 
         target_ap = None
         for ap in airports:
@@ -551,10 +579,18 @@ def fast_update_airport_cache(icao_target, target_pkg_name=None, toggle_all=Fals
             target_ap['price_eur'] = 0.0
             target_ap['is_custom_price'] = False
 
-        with open(OUTPUT_JSON_PATH, 'w', encoding='utf-8') as f:
-            json.dump(airports, f, ensure_ascii=False, indent=2)
+        tmp_path = OUTPUT_JSON_PATH + '.tmp'
+        with open(tmp_path, 'w', encoding='utf-8') as f:
+            json.dump(airports, f, ensure_ascii=False)
+        try:
+            os.replace(tmp_path, OUTPUT_JSON_PATH)
+        except Exception:
+            if os.path.exists(OUTPUT_JSON_PATH):
+                os.remove(OUTPUT_JSON_PATH)
+            os.rename(tmp_path, OUTPUT_JSON_PATH)
 
-        sync_library_snapshot(airports)
+        import threading
+        threading.Thread(target=sync_library_snapshot, args=(airports,), daemon=True).start()
         return airports
     except Exception as e:
         print("Error fast updating cache:", e)
@@ -1234,9 +1270,27 @@ class Api:
             target_clean = target_folder_name[:-9] if target_folder_name.lower().endswith('.disabled') else target_folder_name
             target_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', target_clean.lower())
 
-            with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
-                scanned_airports = json.load(f)
+            global AIRPORTS_CACHE
+            if AIRPORTS_CACHE is None:
+                if os.path.exists(OUTPUT_JSON_PATH):
+                    with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
+                        AIRPORTS_CACHE = json.load(f)
+                else:
+                    AIRPORTS_CACHE = run_scan()
+            scanned_airports = AIRPORTS_CACHE
             ap_obj = next((a for a in scanned_airports if a['icao'].upper() == icao.upper()), None)
+
+            # Build set of package names belonging to THIS specific airport
+            airport_pkg_names = set()
+            airport_pkg_norms = set()
+            if ap_obj and ap_obj.get('all_sources'):
+                for src in ap_obj['all_sources']:
+                    fn = src.get('folder_name', '')
+                    fn_c = fn[:-9] if fn.lower().endswith('.disabled') else fn
+                    fn_c_lower = fn_c.lower()
+                    airport_pkg_names.add(fn_c_lower)
+                    fn_n = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn_c_lower)
+                    airport_pkg_norms.add(fn_n)
 
             if os.path.exists(content_xml_path):
                 import xml.etree.ElementTree as ET
@@ -1246,7 +1300,6 @@ class Api:
                 seen = set()
                 seen_norms = set()
                 to_remove = []
-                folder_to_icaos, _ = get_folder_to_icaos_map()
 
                 for p in list(root.findall('Package')):
                     name = p.get('name', '')
@@ -1262,8 +1315,8 @@ class Api:
                     seen.add(clean_lower)
                     seen_norms.add(clean_norm)
 
-                    pkg_icaos = folder_to_icaos.get(clean_lower) or folder_to_icaos.get(clean_norm) or resolve_package_icaos(clean_norm)
-                    is_pkg_for_icao = (icao.upper() in [k.upper() for k in (pkg_icaos or [])]) or (icao.lower() in clean_lower)
+                    # Only update package if it belongs to this airport
+                    is_pkg_for_icao = (clean_lower in airport_pkg_names) or (clean_norm in airport_pkg_norms) or (icao.lower() in clean_lower)
 
                     if is_pkg_for_icao:
                         is_target = (target_clean != 'DEFAULT') and (clean_lower == target_clean.lower() or clean_norm == target_norm)
@@ -1315,7 +1368,8 @@ class Api:
                         set_package_state_for_icao(pkg_p, icao, should_enable=False)
 
             airports = fast_update_airport_cache(icao, target_pkg_name=target_clean)
-            return json.dumps({"status": "ok", "airports": airports}, ensure_ascii=False)
+            target_ap = next((a for a in airports if a['icao'].upper() == icao.upper()), None)
+            return json.dumps({"status": "ok", "updated_airport": target_ap, "airports": airports}, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
 
@@ -1332,7 +1386,11 @@ class Api:
 
             target_path = path
             if not os.path.isabs(target_path) or not os.path.exists(target_path):
-                scanned_airports = run_scan()
+                if os.path.exists(OUTPUT_JSON_PATH):
+                    with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
+                        scanned_airports = json.load(f)
+                else:
+                    scanned_airports = run_scan()
                 found_path = None
                 for ap in scanned_airports:
                     for src in ap.get('all_sources', []):
@@ -1370,9 +1428,9 @@ class Api:
             else:
                 disable_physical_package(target_path)
 
-            airports = run_scan()
-            sync_library_snapshot(airports)
-            return json.dumps({"status": "ok", "enabled": should_enable, "airports": airports}, ensure_ascii=False)
+            airports = fast_update_airport_cache(icao) if icao else run_scan()
+            target_ap = next((a for a in airports if a['icao'].upper() == (icao or '').upper()), None) if icao else None
+            return json.dumps({"status": "ok", "enabled": should_enable, "updated_airport": target_ap, "airports": airports}, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
 
