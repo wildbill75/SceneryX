@@ -1766,9 +1766,12 @@ function toggleCountrySelection(iso, countryName, layer, forceSelect = false) {
 
     selectedCountryCode = isoUpper;
     selectedCountryName = countryName || isoUpper;
-    selectedCountryPricingFilters = new Set(['PAYWARE', 'FREEWARE', 'ASOBO', 'DEFAULT']);
-    selectedCountryTypeFilters = new Set(['INT', 'REG', 'GA', 'HW']);
     resetConflictingFiltersForCountrySelection();
+
+    // Ensure right drawer is closed (Country Mode is map-only filter now)
+    activeDrawerMode = 'MAP';
+    const drawer = document.getElementById('detail-drawer');
+    if (drawer) drawer.classList.add('translate-x-full');
 
     // Smooth zoom to country bounds
     if (countryGeoJsonLayer) {
@@ -1805,8 +1808,6 @@ function toggleCountrySelection(iso, countryName, layer, forceSelect = false) {
             map.fitBounds(layer.getBounds(), { padding: [40, 40], maxZoom: 7, animate: true, duration: 0.5 });
         }
     }
-
-    openCountryDrawer(isoUpper, countryName);
 
     if (countryGeoJsonLayer) {
         countryGeoJsonLayer.eachLayer(l => countryGeoJsonLayer.resetStyle(l));
@@ -2882,6 +2883,7 @@ function closeAirportRadialMenu() {
     if (radialEl) {
         radialEl.classList.add('hidden');
         radialEl.classList.remove('animate-radial-open');
+        radialEl.classList.remove('radial-quadrants-collapsed');
         radialEl.style.transform = 'translate(-50%, -50%)';
         radialEl.style.opacity = '1';
     }
@@ -2890,9 +2892,17 @@ function closeAirportRadialMenu() {
         extEl.classList.add('hidden');
         extEl.innerHTML = '';
     }
+    const airlinesModal = document.getElementById('radial-airlines-modal');
+    if (airlinesModal) {
+        airlinesModal.classList.add('hidden');
+    }
     const sectorScenery = document.getElementById('radial-sector-scenery');
     if (sectorScenery) {
         sectorScenery.classList.remove('active-radial-sector');
+    }
+    const sectorAirlines = document.getElementById('radial-sector-airlines');
+    if (sectorAirlines) {
+        sectorAirlines.classList.remove('active-radial-sector');
     }
     currentRadialAirport = null;
     currentRadialMarker = null;
@@ -2984,6 +2994,21 @@ function updateRadialMenuPosition(force = false) {
         } else {
             extEl.style.left = '542px';
             extEl.style.right = 'auto';
+        }
+    }
+
+    // Smart screen boundary check for Operating Airlines Modal
+    const airlinesModal = document.getElementById('radial-airlines-modal');
+    if (airlinesModal && !airlinesModal.classList.contains('hidden')) {
+        const isCollapsed = radialEl.classList.contains('radial-quadrants-collapsed');
+        const normalOffset = isCollapsed ? 405 : 542;
+        const isNearLeftEdge = (point.x - (normalOffset + 390) * scale < 20);
+        if (isNearLeftEdge) {
+            airlinesModal.style.right = 'auto';
+            airlinesModal.style.left = isCollapsed ? '405px' : '542px';
+        } else {
+            airlinesModal.style.right = `${normalOffset}px`;
+            airlinesModal.style.left = 'auto';
         }
     }
 }
@@ -3106,6 +3131,20 @@ function openAirportRadialMenu(ap, marker, e) {
     if (sectorScenery) {
         sectorScenery.classList.remove('active-radial-sector');
     }
+    const airlinesModal = document.getElementById('radial-airlines-modal');
+    if (airlinesModal) {
+        if (!airlinesModal._clickPropagationDisabled) {
+            L.DomEvent.disableClickPropagation(airlinesModal);
+            L.DomEvent.disableScrollPropagation(airlinesModal);
+            airlinesModal._clickPropagationDisabled = true;
+        }
+        airlinesModal.classList.add('hidden');
+    }
+    const sectorAirlines = document.getElementById('radial-sector-airlines');
+    if (sectorAirlines) {
+        sectorAirlines.classList.remove('active-radial-sector');
+    }
+    radialEl.classList.remove('radial-quadrants-collapsed');
 
     // Pan camera to smoothly center on the newly selected airport
     panMapToAirport(ap);
@@ -3195,24 +3234,223 @@ function triggerRadialFlightPlan() {
     handleFlightPlanningAltClick(targetAp);
 }
 
-function triggerRadialCountry() {
+function triggerRadialOperatingAirlines() {
     if (!currentRadialAirport) return;
-    const targetAp = currentRadialAirport;
-    closeAirportRadialMenu();
-    let apIsoCode = ((targetAp.country || targetAp.iso_country || '').toString()).toUpperCase().trim();
-    if (!apIsoCode || apIsoCode.length !== 2) {
-        for (const [code, name] of Object.entries(ISO_TO_COUNTRY_NAME)) {
-            if (name.toLowerCase() === (targetAp.country || '').toLowerCase()) {
-                apIsoCode = code;
-                break;
-            }
+    const modal = document.getElementById('radial-airlines-modal');
+    const sectorAirlines = document.getElementById('radial-sector-airlines');
+    if (!modal) return;
+
+    // If Sceneries extension is open, close it
+    const sceneriesExt = document.getElementById('radial-sceneries-extension');
+    if (sceneriesExt && !sceneriesExt.classList.contains('hidden')) {
+        triggerRadialScenerySelector();
+    }
+
+    if (!modal.classList.contains('hidden')) {
+        // Toggle OFF
+        closeRadialAirlinesModal();
+    } else {
+        // Toggle ON
+        renderRadialOperatingAirlines(currentRadialAirport);
+        modal.classList.remove('hidden');
+        if (sectorAirlines) sectorAirlines.classList.add('active-radial-sector');
+        updateRadialMenuPosition(true);
+    }
+}
+
+function closeRadialAirlinesModal(event) {
+    if (event) event.stopPropagation();
+    const modal = document.getElementById('radial-airlines-modal');
+    const sectorAirlines = document.getElementById('radial-sector-airlines');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+    if (sectorAirlines) {
+        sectorAirlines.classList.remove('active-radial-sector');
+    }
+    // If an airline was selected and quadrants were collapsed, restore them
+    const radialEl = document.getElementById('airport-radial-menu');
+    if (radialEl && radialEl.classList.contains('radial-quadrants-collapsed')) {
+        restoreRadialQuadrants();
+    }
+}
+
+function restoreRadialQuadrants() {
+    const radialEl = document.getElementById('airport-radial-menu');
+    if (!radialEl) return;
+    radialEl.classList.remove('radial-quadrants-collapsed');
+
+    // Trigger spring bounce animation on sectors and backdrop disc
+    const disc = document.getElementById('radial-backdrop-disc');
+    const sectors = radialEl.querySelectorAll('.radial-sector');
+    if (disc) {
+        disc.style.animation = 'none';
+        void disc.offsetWidth;
+        disc.style.animation = 'radialBackdropPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards';
+    }
+    sectors.forEach((sec, idx) => {
+        sec.style.animation = 'none';
+        void sec.offsetWidth;
+        sec.style.animation = `radialSectorCircularBounce 0.36s cubic-bezier(0.34, 1.56, 0.64, 1) ${(idx * 0.05).toFixed(2)}s both`;
+    });
+
+    updateRadialMenuPosition(true);
+}
+
+function renderRadialOperatingAirlines(ap) {
+    const listEl = document.getElementById('radial-airlines-list');
+    const countEl = document.getElementById('radial-airlines-count');
+    const clearBtn = document.getElementById('radial-airlines-clear-btn');
+    const hintEl = document.getElementById('radial-airlines-hint');
+    if (!listEl || !ap) return;
+
+    const getFlightCount = (al) => (ap.routes && ap.routes[al]) ? ap.routes[al].length : 0;
+    const airlines = (ap.operating_airlines || []).slice().sort((a, b) => {
+        const countA = getFlightCount(a);
+        const countB = getFlightCount(b);
+        if (countB !== countA) {
+            return countB - countA;
+        }
+        return a.localeCompare(b);
+    });
+
+    if (countEl) {
+        countEl.innerText = `${airlines.length} ${t('drawer.airlines_count', 'Airlines')}`;
+    }
+
+    const hasActiveAirline = selectedAirlines.size > 0 && (activeRouteOrigin && activeRouteOrigin.icao === ap.icao);
+    if (clearBtn && hintEl) {
+        if (hasActiveAirline) {
+            clearBtn.classList.remove('hidden');
+            hintEl.classList.add('hidden');
+        } else {
+            clearBtn.classList.add('hidden');
+            hintEl.classList.remove('hidden');
         }
     }
-    if (apIsoCode && apIsoCode.length === 2) {
-        const countryName = ISO_TO_COUNTRY_NAME[apIsoCode] || targetAp.country || apIsoCode;
-        previousActiveAirport = targetAp;
-        toggleCountrySelection(apIsoCode, countryName, null, true);
+
+    if (airlines.length === 0) {
+        listEl.innerHTML = `<div class="col-span-3 text-xs text-slate-400 italic py-8 text-center">${t('drawer.no_airlines', 'No scheduled airlines data available for this airport.')}</div>`;
+        return;
     }
+
+    listEl.innerHTML = airlines.map(al => {
+        const isActive = selectedAirlines.has(al) && (activeRouteOrigin && activeRouteOrigin.icao === ap.icao);
+        const iata = getAirlineIata(al);
+        const logoUrl = iata ? `https://pics.avs.io/300/100/${iata}.png` : '';
+        const fallbackLogoUrl = iata ? `https://images.kiwi.com/airlines/128x128/${iata}.png` : '';
+        const safeAl = al.replace(/'/g, "\\'");
+        const safeAttrAl = al.replace(/"/g, '&quot;');
+        const dests = getFlightCount(al);
+        const tooltipText = dests > 0 ? `Show ${dests} direct flight connections from ${ap.icao} on ${al}` : `Filter map by ${al}`;
+
+        if (logoUrl) {
+            const btnClass = isActive
+                ? 'bg-white border-4 border-emerald-600 shadow-lg shadow-emerald-950/60 scale-[1.03] ring-2 ring-emerald-500/40'
+                : 'bg-white border-2 border-slate-200/80 hover:border-emerald-500/60 hover:shadow-md hover:scale-[1.02]';
+
+            return `
+                <button data-airline="${safeAttrAl}"
+                        onclick="radialFilterByAirline('${safeAl}', this, event)"
+                        class="group relative min-h-[50px] rounded-xl overflow-hidden transition-all cursor-pointer flex items-center justify-center p-1.5 text-center ${btnClass}"
+                        title="${tooltipText}">
+                    <div class="absolute inset-0 flex items-center justify-center pointer-events-none p-1.5 overflow-hidden rounded-xl">
+                        <img src="${logoUrl}"
+                             class="w-full h-full object-contain object-center"
+                             alt="${safeAttrAl}"
+                             onerror="if(this.src!=='${fallbackLogoUrl}'){this.src='${fallbackLogoUrl}'}else{this.style.display='none'; if(this.parentElement.nextElementSibling) this.parentElement.nextElementSibling.classList.remove('hidden');}" />
+                    </div>
+                    <span class="relative z-10 text-[11px] sm:text-xs font-bold leading-tight text-center line-clamp-2 px-1 break-words text-slate-800 hidden">
+                        ${al}
+                    </span>
+                </button>
+            `;
+        } else {
+            const btnClass = isActive
+                ? 'bg-emerald-800 text-white font-bold border-4 border-emerald-600 shadow-lg shadow-emerald-950/60 scale-[1.03]'
+                : 'bg-slate-800/90 text-slate-300 font-medium border border-slate-700 hover:border-emerald-500/60 hover:text-white';
+
+            return `
+                <button data-airline="${safeAttrAl}"
+                        onclick="radialFilterByAirline('${safeAl}', this, event)"
+                        class="group relative min-h-[50px] rounded-xl overflow-hidden transition-all cursor-pointer flex items-center justify-center p-1.5 text-center ${btnClass}"
+                        title="${tooltipText}">
+                    <span class="relative z-10 text-[11px] sm:text-xs font-bold leading-tight text-center line-clamp-2 px-1 break-words">
+                        ${al}
+                    </span>
+                </button>
+            `;
+        }
+    }).join('');
+}
+
+function radialFilterByAirline(airlineName, btnEl, event) {
+    if (event) event.stopPropagation();
+    if (!currentRadialAirport) return;
+
+    const originAp = currentRadialAirport;
+    selectedAirport = originAp;
+
+    if (!activeRouteOrigin || activeRouteOrigin.icao !== originAp.icao) {
+        selectedAirlines.clear();
+        activeRouteOrigin = originAp;
+    }
+
+    if (selectedAirlines.has(airlineName)) {
+        selectedAirlines.delete(airlineName);
+        if (selectedAirlines.size === 0) {
+            activeRouteOrigin = null;
+            selectedAirline = null;
+        } else {
+            selectedAirline = Array.from(selectedAirlines)[selectedAirlines.size - 1];
+        }
+    } else {
+        const destIcaos = (originAp.routes && originAp.routes[airlineName]) || [];
+        if (destIcaos.length === 0 && selectedAirlines.size === 0) {
+            showToast(`No scheduled route destinations for ${airlineName} from ${originAp.icao}`, 'info');
+            return;
+        }
+        selectedAirlines.add(airlineName);
+        selectedAirline = airlineName;
+        activeRouteOrigin = originAp;
+    }
+
+    // Filter map routes
+    filterAirports();
+    updateFilterUI();
+
+    // Re-render modal UI
+    renderRadialOperatingAirlines(originAp);
+
+    // Also update drawer if open
+    updateAirlinePillsUI(originAp);
+
+    // Dynamic Quadrant and Modal shifting
+    const radialEl = document.getElementById('airport-radial-menu');
+    if (selectedAirlines.size > 0) {
+        // Quadrants disappear for maximum visibility, central circle stays
+        if (radialEl) radialEl.classList.add('radial-quadrants-collapsed');
+        updateRadialMenuPosition(true);
+    } else {
+        // No airline selected -> quadrants reappear in spring bounce motion!
+        restoreRadialQuadrants();
+    }
+}
+
+function clearRadialAirlineFilter(event) {
+    if (event) event.stopPropagation();
+    selectedAirlines.clear();
+    selectedAirline = null;
+    activeRouteOrigin = null;
+    if (activeRouteLinesGroup) {
+        activeRouteLinesGroup.clearLayers();
+    }
+    filterAirports();
+    updateFilterUI();
+    if (currentRadialAirport) {
+        renderRadialOperatingAirlines(currentRadialAirport);
+    }
+    restoreRadialQuadrants();
 }
 
 function triggerRadialScenerySelector() {
@@ -6847,24 +7085,6 @@ function filterAirports() {
             if (apIso !== selectedCountryCode) {
                 return false;
             }
-
-            // Apply Country Pricing Breakdown Filter
-            const pt = getAirportPricingType(ap);
-            let catKey = 'FREEWARE';
-            if (pt === 'Payware') catKey = 'PAYWARE';
-            else if (pt === 'Asobo') catKey = 'ASOBO';
-            else if (pt === 'Default' || ap.pricing_type === 'Default' || ap.package_name === 'Default MSFS Base Airport') catKey = 'DEFAULT';
-
-            if (!selectedCountryPricingFilters.has(catKey)) return false;
-
-            // Apply Country Airport Type Filter
-            const typeStr = (ap.english_type || ap.type || '').toLowerCase();
-            let typeKey = 'REG';
-            if (typeStr.includes('international')) typeKey = 'INT';
-            else if (typeStr.includes('general') || typeStr.includes('ga')) typeKey = 'GA';
-            else if (typeStr.includes('heli') || typeStr.includes('water')) typeKey = 'HW';
-
-            if (!selectedCountryTypeFilters.has(typeKey)) return false;
         } else {
             // Global Geographic Region Filter (only applied when NOT in country mode)
             if (selectedRegion) {
@@ -6876,17 +7096,17 @@ function filterAirports() {
                     return false;
                 }
             }
+        }
 
-            // Global Scenery Source Filter (only applied when NOT in country mode)
-            if (!airportMatchesSourceFilter(ap)) {
-                return false;
-            }
+        // Global Scenery Source Filter (from left filter panel)
+        if (!airportMatchesSourceFilter(ap)) {
+            return false;
+        }
 
-            // Global Airport Type Filter (only applied when NOT in country mode)
-            const apType = ap.english_type || ap.type || 'General Aviation';
-            if (!selectedTypes.has(apType)) {
-                return false;
-            }
+        // Global Airport Type Filter (from left filter panel)
+        const apType = ap.english_type || ap.type || 'General Aviation';
+        if (!selectedTypes.has(apType)) {
+            return false;
         }
 
         // GSX Profile Filter (all, with, none)
@@ -6921,8 +7141,8 @@ function filterAirports() {
                 const airlines = ap.operating_airlines || [];
                 if (!selectedAirlinesArr.some(al => airlines.includes(al))) return false;
             }
-        } else if (!selectedCountryCode) {
-            // Global Pricing Filter (only applied when NOT in country mode and NOT in airline route mode)
+        } else {
+            // Global Pricing Filter (from left filter panel)
             const pt = getAirportPricingType(ap);
             const isPureDefault = !hasCustomAddonSources(ap);
 

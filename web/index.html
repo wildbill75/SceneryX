@@ -332,8 +332,21 @@
             animation: radialSectorCircularBounce 0.36s cubic-bezier(0.34, 1.56, 0.64, 1) 0.14s both;
         }
 
-        .animate-radial-open .radial-sector-country {
+        .animate-radial-open .radial-sector-airlines {
             animation: radialSectorCircularBounce 0.36s cubic-bezier(0.34, 1.56, 0.64, 1) 0.19s both;
+        }
+
+        /* Radial Quadrants Collapsed State (when an operating airline route is filtered) */
+        .radial-quadrants-collapsed #radial-backdrop-disc,
+        .radial-quadrants-collapsed #radial-sectors-svg {
+            opacity: 0 !important;
+            transform: scale(0.65) !important;
+            pointer-events: none !important;
+            transition: opacity 0.25s ease-in, transform 0.25s cubic-bezier(0.4, 0, 1, 1) !important;
+        }
+
+        .radial-quadrants-collapsed #radial-airlines-modal {
+            right: 405px !important;
         }
 
         /* Tactical Scenery Pill Cascade & Spring Bounce Animation */
@@ -770,7 +783,7 @@
                     <div id="radial-backdrop-disc" class="absolute w-[530px] h-[530px] rounded-full backdrop-blur-xl border border-slate-700/30 shadow-2xl pointer-events-none" style="transform-origin: center center;"></div>
 
                     <!-- SVG Ring with 4 Annular Quadrants -->
-                    <svg class="absolute inset-0 w-full h-full filter drop-shadow-2xl overflow-visible pointer-events-none" viewBox="0 0 540 540">
+                    <svg id="radial-sectors-svg" class="absolute inset-0 w-full h-full filter drop-shadow-2xl overflow-visible pointer-events-none transition-all duration-300" viewBox="0 0 540 540" style="transform-origin: 270px 270px;">
                         <!-- NORTH SECTOR: FLIGHT PLAN -->
                         <g id="radial-sector-flight" onclick="triggerRadialFlightPlan()" class="radial-sector radial-sector-flight group cursor-pointer pointer-events-auto" role="button" aria-label="Flight Plan">
                             <path class="radial-sector-path" d="M 87.59 77.78 A 265.00 265.00 0 0 1 452.41 77.78 L 359.49 175.70 A 130.00 130.00 0 0 0 180.51 175.70 Z" />
@@ -801,12 +814,12 @@
                             </foreignObject>
                         </g>
 
-                        <!-- WEST SECTOR: COUNTRY MODE -->
-                        <g id="radial-sector-country" onclick="triggerRadialCountry()" class="radial-sector radial-sector-country group cursor-pointer pointer-events-auto" role="button" aria-label="Country Mode">
+                        <!-- WEST SECTOR: OPERATING AIRLINES -->
+                        <g id="radial-sector-airlines" onclick="triggerRadialOperatingAirlines()" class="radial-sector radial-sector-airlines group cursor-pointer pointer-events-auto" role="button" aria-label="Operating Airlines">
                             <path class="radial-sector-path" d="M 77.78 452.41 A 265.00 265.00 0 0 1 77.78 87.59 L 175.70 180.51 A 130.00 130.00 0 0 0 175.70 359.49 Z" />
-                            <foreignObject x="5" y="227" width="135" height="86" class="pointer-events-none">
-                                <div class="w-full h-full flex items-center justify-center text-center filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
-                                    <span data-i18n="radial.country" class="text-xs font-black tracking-widest text-slate-200 group-hover:text-white uppercase leading-none">Country</span>
+                            <foreignObject x="5" y="215" width="135" height="110" class="pointer-events-none">
+                                <div class="w-full h-full flex flex-col items-center justify-center text-center filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] px-1">
+                                    <span data-i18n="radial.operating_airlines" class="text-[11px] sm:text-xs font-black tracking-wider text-slate-200 group-hover:text-white uppercase leading-tight">Operating Airlines</span>
                                 </div>
                             </foreignObject>
                         </g>
@@ -831,6 +844,41 @@
 
                     <!-- SCENERY EXTENSION PILLS (Stacked vertically to the right of Sceneries quadrant) -->
                     <div id="radial-sceneries-extension" onclick="event.stopPropagation();" onmousedown="event.stopPropagation();" onpointerdown="event.stopPropagation();" class="hidden absolute left-[542px] top-1/2 -translate-y-1/2 flex flex-col gap-2.5 pointer-events-auto z-[1510] max-h-[600px] overflow-y-auto overflow-x-hidden custom-scrollbar p-1 select-none bg-transparent border-0 shadow-none" style="width: 375px; max-width: 375px;">
+                    </div>
+
+                    <!-- OPERATING AIRLINES MODAL (Placed to the left of the radial menu, dynamic shift on selection) -->
+                    <div id="radial-airlines-modal"
+                         onclick="event.stopPropagation();"
+                         onmousedown="event.stopPropagation();"
+                         onpointerdown="event.stopPropagation();"
+                         class="hidden absolute top-1/2 -translate-y-1/2 flex flex-col glass-modal rounded-3xl border border-slate-700/80 shadow-2xl p-5 select-none w-[390px] max-h-[600px] pointer-events-auto z-[1510] transition-all duration-300 ease-out"
+                         style="right: 542px;">
+                        
+                        <!-- Modal Header -->
+                        <div class="flex items-center justify-between pb-3 border-b border-slate-800 shrink-0">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-black font-mono tracking-wider text-white uppercase" data-i18n="drawer.operating_airlines">Operating Airlines</span>
+                            </div>
+                            <button onclick="closeRadialAirlinesModal(event)" title="Close" class="w-7 h-7 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition-colors border border-slate-700/50 cursor-pointer">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+
+                        <!-- Sub-header: Count + Instruction / Clear Button -->
+                        <div class="flex items-center justify-between py-2.5 shrink-0 text-xs font-mono">
+                            <span id="radial-airlines-count" class="font-bold text-cyan-400">0 Airlines</span>
+                            <div class="flex items-center gap-2">
+                                <button id="radial-airlines-clear-btn" onclick="clearRadialAirlineFilter(event)" class="hidden text-[10px] text-amber-400 hover:text-amber-300 font-bold px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 transition-colors cursor-pointer">
+                                    Clear Selection
+                                </button>
+                                <span id="radial-airlines-hint" class="text-[11px] text-slate-400">Click to filter routes</span>
+                            </div>
+                        </div>
+
+                        <!-- Scrollable Airlines Logo Grid -->
+                        <div id="radial-airlines-list" class="grid grid-cols-3 gap-2 overflow-y-auto custom-scrollbar pr-1 flex-1 py-1">
+                            <!-- Dynamic airline cards rendered here -->
+                        </div>
                     </div>
                 </div>
             </div>

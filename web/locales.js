@@ -329,7 +329,8 @@ const LOCALES = {
         "radial.flight_plan": "Flight Plan",
         "radial.sceneries": "Sceneries",
         "radial.details": "Details",
-        "radial.country": "Country"
+        "radial.country": "Country",
+        "radial.operating_airlines": "Operating Airlines"
     },
     fr: {
         "country.back_to": "Retour à",
@@ -660,7 +661,8 @@ const LOCALES = {
         "radial.flight_plan": "Plan de vol",
         "radial.sceneries": "Scènes",
         "radial.details": "Détails",
-        "radial.country": "Pays"
+        "radial.country": "Pays",
+        "radial.operating_airlines": "Operating Airlines"
     },
     de: {
         "country.back_to": "Zurück zu",
@@ -991,7 +993,8 @@ const LOCALES = {
         "radial.flight_plan": "Flugplan",
         "radial.sceneries": "Szenerien",
         "radial.details": "Details",
-        "radial.country": "Land"
+        "radial.country": "Land",
+        "radial.operating_airlines": "Operating Airlines"
     },
     es: {
         "country.back_to": "Volver a",
@@ -1322,7 +1325,8 @@ const LOCALES = {
         "radial.flight_plan": "Plan de vuelo",
         "radial.sceneries": "Escenarios",
         "radial.details": "Detalles",
-        "radial.country": "País"
+        "radial.country": "País",
+        "radial.operating_airlines": "Operating Airlines"
     }
 };
 
