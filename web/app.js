@@ -3896,7 +3896,56 @@ function renderRadialSceneriesExtension(ap, animate = false) {
         });
     }
 
-    // 4. Available Addons Downloads Container
+    // 4. Available Freeware Addons (Flightsim.to)
+    const fsToSearchUrl = `https://flightsim.to/search?q=${encodeURIComponent(ap.icao)}&cat=airports,scenery&exclude_cat=static-aircraft,gsx-pro&sim=msfs2020,msfs2024`;
+    const freewareAnimClass = animate ? 'animate-pill-bounce' : '';
+    const freewareAnimDelay = animate ? `style="animation-delay: ${(pillIndex * 0.05).toFixed(2)}s;"` : '';
+    pillIndex++;
+
+    html += `
+        <div class="flex items-center gap-2 pt-1 px-1">
+            <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300">${t('drawer.freeware_addons', 'Available Freeware Addons')}</span>
+        </div>
+        <div onclick="event.stopPropagation(); window.open('${fsToSearchUrl}', '_blank');"
+             onmousedown="event.stopPropagation();"
+             onpointerdown="event.stopPropagation();"
+             ${freewareAnimDelay}
+             class="${freewareAnimClass} py-2 px-3 rounded-xl border border-slate-700/60 hover:border-cyan-400/80 bg-slate-950/75 hover:bg-slate-900/90 shadow-lg backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1 w-[356px]">
+            
+            <!-- Row 1: Flightsim.to Icon + Title + FREEWARE Badge + FREE Pill + External Link Icon -->
+            <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2 min-w-0 flex-1">
+                    <div class="w-5.5 h-5.5 rounded-lg bg-cyan-500 text-slate-950 flex items-center justify-center shrink-0 shadow-sm">
+                        <i class="fa-solid fa-cloud-arrow-down text-xs"></i>
+                    </div>
+                    <div class="min-w-0 flex-1" title="Flightsim.to">
+                        <span class="text-xs font-bold text-white truncate block group-hover:text-cyan-300 transition-colors">Flightsim.to</span>
+                    </div>
+                    <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 shrink-0 uppercase">FREEWARE</span>
+                </div>
+
+                <div class="flex items-center gap-1.5 shrink-0">
+                    <span class="px-2 py-0.5 rounded-md text-[11px] font-mono font-bold bg-cyan-600 text-white shadow-sm">
+                        FREE
+                    </span>
+                    <div class="w-5.5 h-5.5 rounded-lg bg-slate-800/80 group-hover:bg-cyan-600 text-slate-400 group-hover:text-white flex items-center justify-center text-[10px] transition-colors border border-slate-700/50 shrink-0 shadow-sm">
+                        <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Row 2: Description + Available Status -->
+            <div class="flex items-center justify-between text-[10px] font-mono text-slate-400 pl-[30px] leading-tight">
+                <span class="truncate pr-2">Community freeware sceneries on Flightsim.to</span>
+                <div class="flex items-center gap-1 shrink-0 text-cyan-400 font-semibold text-[10px]">
+                    <span>Available</span>
+                    <i class="fa-solid fa-circle-check text-[11px]"></i>
+                </div>
+            </div>
+        </div>
+    `;
+
+    // 5. Available Payware Addons Container
     html += `<div id="radial-addon-downloads-container" class="flex flex-col gap-1.5"></div>`;
 
     extEl.innerHTML = html;
@@ -3972,7 +4021,7 @@ function renderRadialAddonDownloads(ap, stores, animate = false, basePillIndex =
 
     let html = `
         <div class="flex items-center gap-2 pt-1 px-1">
-            <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300">${t('drawer.addon_downloads', 'Available Addons Downloads')}</span>
+            <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300">${t('drawer.payware_addons', 'Available Payware Addons')}</span>
         </div>
     `;
 
