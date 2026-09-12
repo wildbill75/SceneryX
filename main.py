@@ -453,7 +453,14 @@ def fast_update_airport_cache(icao_target, target_pkg_name=None, toggle_all=Fals
                 clean_p = p[:-9] if p and p.endswith('.disabled') else p
                 dis_p = clean_p + '.disabled' if clean_p else None
 
-                if fn_clean.lower() == t_clean.lower() or fn_norm == t_norm:
+                is_match = (
+                    fn_clean.lower() == t_clean.lower() 
+                    or fn_norm == t_norm 
+                    or (fn_norm and t_norm and (fn_norm in t_norm or t_norm in fn_norm))
+                    or (s.get('is_asobo_official') and ('asobo' in t_clean.lower() or 'microsoft' in t_clean.lower()))
+                )
+
+                if is_match:
                     s['is_disabled'] = False
                     if clean_p:
                         s['package_path'] = clean_p
@@ -1319,7 +1326,12 @@ class Api:
                     is_pkg_for_icao = (clean_lower in airport_pkg_names) or (clean_norm in airport_pkg_norms) or (icao.lower() in clean_lower)
 
                     if is_pkg_for_icao:
-                        is_target = (target_clean != 'DEFAULT') and (clean_lower == target_clean.lower() or clean_norm == target_norm)
+                        is_target = (target_clean != 'DEFAULT') and (
+                            clean_lower == target_clean.lower() 
+                            or clean_norm == target_norm
+                            or (clean_norm and target_norm and (clean_norm in target_norm or target_norm in clean_norm))
+                            or ((clean_lower.startswith('fs20-asobo-') or clean_lower.startswith('fs24-asobo-') or clean_lower.startswith('fs20-microsoft-') or clean_lower.startswith('fs24-microsoft-')) and ('asobo' in target_clean.lower() or 'microsoft' in target_clean.lower()))
+                        )
                         if is_target:
                             p.set('active', 'Activated')
                         else:
@@ -1339,7 +1351,12 @@ class Api:
                         fn_clean_lower = fn_clean.lower()
                         fn_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn_clean_lower)
 
-                        is_target = (target_clean != 'DEFAULT') and (fn_clean_lower == target_clean.lower() or fn_norm == target_norm)
+                        is_target = (target_clean != 'DEFAULT') and (
+                            fn_clean_lower == target_clean.lower() 
+                            or fn_norm == target_norm
+                            or (fn_norm and target_norm and (fn_norm in target_norm or target_norm in fn_norm))
+                            or (src.get('is_asobo_official') and ('asobo' in target_clean.lower() or 'microsoft' in target_clean.lower()))
+                        )
 
                         if fn_clean_lower not in seen and fn_norm not in seen_norms:
                             new_p = ET.SubElement(root, 'Package')
@@ -1361,7 +1378,12 @@ class Api:
                     fn_clean = fn[:-9] if fn.lower().endswith('.disabled') else fn
                     fn_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn_clean.lower())
 
-                    is_target = (target_clean != 'DEFAULT') and (fn_clean.lower() == target_clean.lower() or fn_norm == target_norm)
+                    is_target = (target_clean != 'DEFAULT') and (
+                        fn_clean.lower() == target_clean.lower() 
+                        or fn_norm == target_norm
+                        or (fn_norm and target_norm and (fn_norm in target_norm or target_norm in fn_norm))
+                        or (src.get('is_asobo_official') and ('asobo' in target_clean.lower() or 'microsoft' in target_clean.lower()))
+                    )
                     if is_target:
                         set_package_state_for_icao(pkg_p, icao, should_enable=True)
                     else:

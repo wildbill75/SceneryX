@@ -3483,6 +3483,21 @@ function updateSingleAirportMarker(ap) {
     }
 }
 
+function isMatchingScenerySource(s, folderName) {
+    if (!s || !folderName) return false;
+    const fn1 = (s.folder_name || '').toLowerCase().replace(/\.disabled$/, '');
+    const fn2 = folderName.toLowerCase().replace(/\.disabled$/, '');
+    if (fn1 === fn2) return true;
+    const n1 = fn1.replace(/^(community|official)?(fs20|fs24)?-?/, '');
+    const n2 = fn2.replace(/^(community|official)?(fs20|fs24)?-?/, '');
+    if (n1 === n2) return true;
+    if (n1 && n2 && (n1.includes(n2) || n2.includes(n1))) return true;
+    if ((s.is_asobo_official || fn1.includes('asobo') || fn1.includes('microsoft')) && (fn2.includes('asobo') || fn2.includes('microsoft'))) {
+        return true;
+    }
+    return false;
+}
+
 async function activateRadialSceneryVariant(e, icao, folderName) {
     if (e && e.stopPropagation) {
         e.stopPropagation();
@@ -3493,7 +3508,14 @@ async function activateRadialSceneryVariant(e, icao, folderName) {
     if (window.event) window.event.cancelBubble = true;
 
     if (!window.pywebview || isToggleInProgress || !icao || !folderName) return;
-    if (currentRadialAirport && currentRadialAirport.package_name === folderName && !currentRadialAirport.is_disabled) {
+
+    // Never block activation if airport is in Default mode
+    const isAlreadyActive = currentRadialAirport 
+        && currentRadialAirport.pricing_type !== 'Default' 
+        && currentRadialAirport.package_name !== 'Default MSFS Base Airport'
+        && isMatchingScenerySource({ folder_name: currentRadialAirport.package_name }, folderName)
+        && !currentRadialAirport.is_disabled;
+    if (isAlreadyActive) {
         return;
     }
 
@@ -3502,16 +3524,16 @@ async function activateRadialSceneryVariant(e, icao, folderName) {
         if (currentRadialAirport.all_sources) {
             currentRadialAirport.all_sources.forEach(s => {
                 if (!isFixOrOverlay(s)) {
-                    s.is_disabled = (s.folder_name !== folderName);
+                    s.is_disabled = !isMatchingScenerySource(s, folderName);
                 }
             });
         }
-        const targetSrc = currentRadialAirport.all_sources ? currentRadialAirport.all_sources.find(s => s.folder_name === folderName) : null;
+        const targetSrc = currentRadialAirport.all_sources ? currentRadialAirport.all_sources.find(s => isMatchingScenerySource(s, folderName)) : null;
         const isAsobo = targetSrc && (targetSrc.is_asobo_official || targetSrc.vendor === 'Microsoft / Asobo' || (targetSrc.folder_name && (targetSrc.folder_name.toLowerCase().includes('asobo-') || targetSrc.folder_name.toLowerCase().includes('microsoft-'))));
-        currentRadialAirport.pricing_type = targetSrc ? (targetSrc.pricing_type || (targetSrc.is_payware ? 'Payware' : (isAsobo ? 'Asobo' : 'Freeware'))) : 'Freeware';
+        currentRadialAirport.pricing_type = targetSrc ? (targetSrc.pricing_type || (targetSrc.is_payware ? 'Payware' : (isAsobo ? 'Asobo' : 'Freeware'))) : (isAsobo ? 'Asobo' : 'Freeware');
         currentRadialAirport.is_asobo_official = !!isAsobo;
         currentRadialAirport.is_payware = !!(targetSrc && targetSrc.is_payware);
-        currentRadialAirport.package_name = folderName;
+        currentRadialAirport.package_name = targetSrc ? targetSrc.folder_name : folderName;
         currentRadialAirport.is_disabled = false;
         renderRadialSceneriesExtension(currentRadialAirport, false);
         updateRadialCoreBadge(currentRadialAirport);
@@ -3564,7 +3586,10 @@ async function activateRadialDefaultScenery(e, icao) {
     if (window.event) window.event.cancelBubble = true;
 
     if (!window.pywebview || isToggleInProgress || !icao) return;
-    if (currentRadialAirport && (currentRadialAirport.pricing_type === 'Default' || currentRadialAirport.package_name === 'Default MSFS Base Airport')) {
+    const isAlreadyDefault = currentRadialAirport 
+        && (currentRadialAirport.pricing_type === 'Default' || currentRadialAirport.package_name === 'Default MSFS Base Airport')
+        && (!currentRadialAirport.all_sources || currentRadialAirport.all_sources.filter(s => !isFixOrOverlay(s)).every(s => s.is_disabled));
+    if (isAlreadyDefault) {
         return;
     }
 
