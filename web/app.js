@@ -3238,7 +3238,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
 
     // Header: Available Addon Variants
     html += `
-        <div class="flex items-center gap-2 pt-0.5 px-1">
+        <div class="flex items-center gap-2 pt-1 px-1">
             <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300">${t('drawer.addon_variants', 'Available Addon Variants')}</span>
         </div>
     `;
@@ -3354,7 +3354,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
     // 3. Fixes & Overlays (Green liseret only here!)
     if (fixSources.length > 0) {
         html += `
-            <div class="flex items-center gap-2 pt-2 px-1">
+            <div class="flex items-center gap-2 pt-1 px-1">
                 <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300">${t('drawer.fixes_overlays', 'Available Fixes & Overlays')}</span>
             </div>
         `;
