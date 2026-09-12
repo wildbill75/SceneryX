@@ -24,6 +24,29 @@ RATINGS_JSON_PATH = os.path.join(USER_DATA_DIR, "ratings.json")
 CUSTOM_PRICES_JSON_PATH = os.path.join(USER_DATA_DIR, "custom_prices.json")
 SNAPSHOT_JSON_PATH = os.path.join(USER_DATA_DIR, "library_snapshot.json")
 
+_CACHED_CONTENT_XML_PATH = None
+
+def get_content_xml_path():
+    global _CACHED_CONTENT_XML_PATH
+    if _CACHED_CONTENT_XML_PATH and os.path.exists(_CACHED_CONTENT_XML_PATH):
+        return _CACHED_CONTENT_XML_PATH
+
+    local_appdata = os.getenv('LOCALAPPDATA', '')
+    appdata = os.getenv('APPDATA', '')
+    limitless_cache = os.path.join(local_appdata, r'Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache')
+    candidates = [
+        os.path.join(limitless_cache, 'Content.xml'),
+        os.path.join(local_appdata, r'Packages\Microsoft.FlightSimulator_8wekyb3d8bbwe\LocalCache\Content.xml'),
+        os.path.join(appdata, r'Microsoft Flight Simulator 2024\Content.xml'),
+        os.path.join(appdata, r'Microsoft Flight Simulator\Content.xml'),
+    ]
+    for c in candidates:
+        if os.path.exists(c):
+            _CACHED_CONTENT_XML_PATH = c
+            return c
+    _CACHED_CONTENT_XML_PATH = candidates[0]
+    return _CACHED_CONTENT_XML_PATH
+
 # Auto-migrate any existing legacy config files from local executable folder to %APPDATA%/SceneryX/
 for filename, target_path in [
     ("settings.json", SETTINGS_JSON_PATH),
@@ -855,7 +878,7 @@ def run_scan():
 
     content_xml_status = {}
     content_xml_packages = []
-    content_xml_path = r'C:\Users\Bertrand\AppData\Local\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\ThirdBuk\Content.xml'
+    content_xml_path = get_content_xml_path()
     if os.path.exists(content_xml_path):
         try:
             import xml.etree.ElementTree as ET
@@ -929,7 +952,7 @@ def run_scan():
     detected_map = {}
 
     disabled_in_xml = set()
-    content_xml_path = r'C:\Users\Bertrand\AppData\Local\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\ThirdBuk\Content.xml'
+    content_xml_path = get_content_xml_path()
     if os.path.exists(content_xml_path):
         try:
             import xml.etree.ElementTree as ET
@@ -1247,7 +1270,7 @@ def run_scan():
 
     # Scan package names from Content.xml and physical/streamed folders for new official airports
     pkg_names_scanned = set()
-    content_xml_path = r'C:\Users\Bertrand\AppData\Local\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\ThirdBuk\Content.xml'
+    content_xml_path = get_content_xml_path()
     if os.path.exists(content_xml_path):
         try:
             import xml.etree.ElementTree as ET

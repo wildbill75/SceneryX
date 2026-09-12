@@ -97,11 +97,9 @@ def get_content_xml_paths():
 
     return [
         os.path.join(limitless_cache, 'Content.xml'),
-        os.path.join(limitless_cache, 'ThirdBuk', 'Content.xml'),
         os.path.join(local_appdata, r'Packages\Microsoft.FlightSimulator_8wekyb3d8bbwe\LocalCache\Content.xml'),
-        os.path.join(appdata, r'Microsoft Flight Simulator\Content.xml'),
         os.path.join(appdata, r'Microsoft Flight Simulator 2024\Content.xml'),
-        r'C:\Users\Bertrand\AppData\Local\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\ThirdBuk\Content.xml'
+        os.path.join(appdata, r'Microsoft Flight Simulator\Content.xml')
     ]
 
 def get_content_xml_path():
