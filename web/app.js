@@ -3156,9 +3156,6 @@ function openAirportRadialMenu(ap, marker, e) {
         icaoEl.innerText = codesStr;
         icaoEl.className = `font-mono font-black text-3xl tracking-tight leading-none ${icaoColor}`;
     }
-    if (vendorEl) {
-        vendorEl.style.display = 'none';
-    }
 
     // Reveal Radial Menu with snappy bounce & circular cascade animation
     radialEl.classList.remove('hidden');
