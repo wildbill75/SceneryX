@@ -3096,16 +3096,13 @@ function openAirportRadialMenu(ap, marker, e) {
     const badgeEl = document.getElementById('radial-badge');
     const nameEl = document.getElementById('radial-name');
     const cityEl = document.getElementById('radial-city');
-    const vendorEl = document.getElementById('radial-vendor');
-    const flagImgEl = document.getElementById('radial-country-flag');
-    const flagIconEl = document.getElementById('radial-country-icon');
-
     // Format ICAO / IATA codes: "LFPG/CDG" or "LFPG"
     const iataVal = (ap.iata && ap.iata.trim() && ap.iata.trim() !== '—' && ap.iata.trim() !== '-') ? ap.iata.trim().toUpperCase() : '';
     const codesStr = iataVal ? `${ap.icao}/${iataVal}` : (ap.icao || '');
+    if (icaoEl) icaoEl.innerText = codesStr;
     if (nameEl) nameEl.innerText = getCleanAirportName(ap.name, ap.city) || ap.icao;
 
-    // Country name and flag
+    // Country name
     let apIsoCode = ((ap.country || ap.iso_country || '').toString()).toUpperCase().trim();
     if (!apIsoCode || apIsoCode.length !== 2) {
         for (const [code, name] of Object.entries(ISO_TO_COUNTRY_NAME)) {
@@ -3118,22 +3115,6 @@ function openAirportRadialMenu(ap, marker, e) {
     const resolvedCountryName = (typeof getLocalizedCountryName === 'function') ? getLocalizedCountryName(apIsoCode, ap.country) : (ISO_TO_COUNTRY_NAME[apIsoCode] || ap.country || 'Unknown Country');
     const cleanCity = getCleanCityName(ap.city);
     if (cityEl) cityEl.innerText = `${cleanCity || 'Unknown City'}, ${resolvedCountryName}`;
-
-    if (flagImgEl) {
-        if (apIsoCode && apIsoCode.length === 2) {
-            flagImgEl.src = `https://flagcdn.com/w80/${apIsoCode.toLowerCase()}.png`;
-            flagImgEl.alt = resolvedCountryName;
-            flagImgEl.style.display = 'block';
-            if (flagIconEl) flagIconEl.classList.add('hidden');
-            flagImgEl.onerror = () => {
-                flagImgEl.style.display = 'none';
-                if (flagIconEl) flagIconEl.classList.remove('hidden');
-            };
-        } else {
-            flagImgEl.style.display = 'none';
-            if (flagIconEl) flagIconEl.classList.remove('hidden');
-        }
-    }
 
     // Badge and Category styling (Pure solid flat colors per UI rules, bottom pill)
     const cat = getAirportCategory(ap);
@@ -3258,6 +3239,13 @@ function renderRadialSceneriesExtension(ap, animate = false) {
     let html = '';
     let pillIndex = 0;
 
+    // Header: Available Addon Variants
+    html += `
+        <div class="flex items-center gap-2 pt-0.5 px-1">
+            <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300">${t('drawer.addon_variants', 'Available Addon Variants')}</span>
+        </div>
+    `;
+
     // 1. Installed Base Scenery Addons
     baseSources.forEach(src => {
         const idx = sources.indexOf(src);
@@ -3369,9 +3357,8 @@ function renderRadialSceneriesExtension(ap, animate = false) {
     // 3. Fixes & Overlays (Green liseret only here!)
     if (fixSources.length > 0) {
         html += `
-            <div class="flex items-center gap-2 pt-1 px-1">
-                <span class="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400">${t('drawer.fixes_overlays', 'Fixes & Overlays')}</span>
-                <div class="flex-1 border-t border-slate-800"></div>
+            <div class="flex items-center gap-2 pt-2 px-1">
+                <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300">${t('drawer.fixes_overlays', 'Available Fixes & Overlays')}</span>
             </div>
         `;
 

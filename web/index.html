@@ -244,29 +244,26 @@
             cursor: pointer;
         }
         .radial-sector:hover .radial-sector-path {
-            stroke-width: 2.5px;
-        }
-        .radial-sector-flight:hover .radial-sector-path {
-            fill: rgba(6, 78, 59, 0.52);
-            stroke: #10b981;
-            filter: drop-shadow(0 0 16px rgba(16, 185, 129, 0.60));
-        }
-        .radial-sector-scenery:hover .radial-sector-path,
-        .radial-sector-scenery.active-radial-sector .radial-sector-path {
-            fill: rgba(88, 28, 135, 0.58) !important;
-            stroke: #c084fc !important;
+            fill: rgba(255, 255, 255, 0.50) !important;
+            stroke: rgba(255, 255, 255, 0.90) !important;
             stroke-width: 2.5px !important;
-            filter: drop-shadow(0 0 18px rgba(192, 132, 252, 0.70)) !important;
+            filter: drop-shadow(0 0 16px rgba(255, 255, 255, 0.50)) !important;
         }
-        .radial-sector-details:hover .radial-sector-path {
-            fill: rgba(12, 74, 110, 0.52);
-            stroke: #38bdf8;
-            filter: drop-shadow(0 0 16px rgba(56, 189, 248, 0.60));
+        .radial-sector-scenery.active-radial-sector .radial-sector-path {
+            fill: rgba(88, 28, 135, 0.58);
+            stroke: #c084fc;
+            stroke-width: 2.5px;
+            filter: drop-shadow(0 0 18px rgba(192, 132, 252, 0.70));
         }
-        .radial-sector-country:hover .radial-sector-path {
-            fill: rgba(21, 94, 117, 0.52);
-            stroke: #06b6d4;
-            filter: drop-shadow(0 0 16px rgba(6, 182, 212, 0.60));
+        .radial-sector-scenery.active-radial-sector:hover .radial-sector-path {
+            fill: rgba(255, 255, 255, 0.50) !important;
+            stroke: rgba(255, 255, 255, 0.90) !important;
+            stroke-width: 2.5px !important;
+            filter: drop-shadow(0 0 16px rgba(255, 255, 255, 0.50)) !important;
+        }
+        .radial-sector:hover span {
+            color: #ffffff !important;
+            text-shadow: 0 0 10px rgba(0, 0, 0, 0.9);
         }
         .radial-sector:active .radial-sector-path {
             filter: brightness(1.35);
@@ -790,9 +787,8 @@
                         <g id="radial-sector-flight" onclick="triggerRadialFlightPlan()" class="radial-sector radial-sector-flight group cursor-pointer pointer-events-auto" role="button" aria-label="Flight Plan">
                             <path class="radial-sector-path" d="M 87.59 77.78 A 265.00 265.00 0 0 1 452.41 77.78 L 359.49 175.70 A 130.00 130.00 0 0 0 180.51 175.70 Z" />
                             <foreignObject x="170" y="32" width="200" height="85" class="pointer-events-none">
-                                <div class="w-full h-full flex flex-col items-center justify-center text-center filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
-                                    <i class="fa-solid fa-plane-departure text-emerald-400 text-2xl group-hover:scale-110 transition-transform"></i>
-                                    <span data-i18n="radial.flight_plan" class="text-xs font-black tracking-widest text-slate-200 group-hover:text-emerald-300 uppercase mt-2 leading-none">Flight Plan</span>
+                                <div class="w-full h-full flex items-center justify-center text-center filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
+                                    <span data-i18n="radial.flight_plan" class="text-xs font-black tracking-widest text-slate-200 group-hover:text-white uppercase leading-none">Flight Plan</span>
                                 </div>
                             </foreignObject>
                         </g>
@@ -800,10 +796,9 @@
                         <!-- EAST SECTOR: SCENERIES -->
                         <g id="radial-sector-scenery" onclick="triggerRadialScenerySelector()" class="radial-sector radial-sector-scenery group cursor-pointer pointer-events-auto" role="button" aria-label="Sceneries">
                             <path class="radial-sector-path" d="M 462.22 87.59 A 265.00 265.00 0 0 1 462.22 452.41 L 364.30 359.49 A 130.00 130.00 0 0 0 364.30 180.51 Z" />
-                            <foreignObject x="405" y="220" width="125" height="100" class="pointer-events-none">
-                                <div class="w-full h-full flex flex-col items-center justify-center text-center filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
-                                    <i class="fa-solid fa-layer-group text-purple-400 text-2xl group-hover:scale-110 transition-transform"></i>
-                                    <span data-i18n="radial.sceneries" class="text-xs font-black tracking-widest text-slate-200 group-hover:text-purple-300 uppercase mt-2 leading-none">Sceneries</span>
+                            <foreignObject x="400" y="227" width="135" height="86" class="pointer-events-none">
+                                <div class="w-full h-full flex items-center justify-center text-center filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
+                                    <span data-i18n="radial.sceneries" class="text-xs font-black tracking-widest text-slate-200 group-hover:text-white uppercase leading-none">Sceneries</span>
                                 </div>
                             </foreignObject>
                         </g>
@@ -812,9 +807,8 @@
                         <g id="radial-sector-details" onclick="triggerRadialFullDetails()" class="radial-sector radial-sector-details group cursor-pointer pointer-events-auto" role="button" aria-label="Airport Details">
                             <path class="radial-sector-path" d="M 452.41 462.22 A 265.00 265.00 0 0 1 87.59 462.22 L 180.51 364.30 A 130.00 130.00 0 0 0 359.49 364.30 Z" />
                             <foreignObject x="170" y="425" width="200" height="85" class="pointer-events-none">
-                                <div class="w-full h-full flex flex-col items-center justify-center text-center filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
-                                    <i class="fa-solid fa-circle-info text-sky-400 text-2xl group-hover:scale-110 transition-transform"></i>
-                                    <span data-i18n="radial.details" class="text-xs font-black tracking-widest text-slate-200 group-hover:text-sky-300 uppercase mt-2 leading-none">Details</span>
+                                <div class="w-full h-full flex items-center justify-center text-center filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
+                                    <span data-i18n="radial.details" class="text-xs font-black tracking-widest text-slate-200 group-hover:text-white uppercase leading-none">Details</span>
                                 </div>
                             </foreignObject>
                         </g>
@@ -822,11 +816,9 @@
                         <!-- WEST SECTOR: COUNTRY MODE -->
                         <g id="radial-sector-country" onclick="triggerRadialCountry()" class="radial-sector radial-sector-country group cursor-pointer pointer-events-auto" role="button" aria-label="Country Mode">
                             <path class="radial-sector-path" d="M 77.78 452.41 A 265.00 265.00 0 0 1 77.78 87.59 L 175.70 180.51 A 130.00 130.00 0 0 0 175.70 359.49 Z" />
-                            <foreignObject x="10" y="220" width="125" height="100" class="pointer-events-none">
-                                <div class="w-full h-full flex flex-col items-center justify-center text-center filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
-                                    <img id="radial-country-flag" src="" alt="" class="w-7 h-5 rounded object-cover shadow-md group-hover:scale-110 transition-transform mb-1.5" />
-                                    <i id="radial-country-icon" class="fa-solid fa-earth-americas text-cyan-400 text-2xl group-hover:scale-110 transition-transform mb-1.5 hidden"></i>
-                                    <span data-i18n="radial.country" class="text-xs font-black tracking-widest text-slate-200 group-hover:text-cyan-300 uppercase leading-none">Country</span>
+                            <foreignObject x="5" y="227" width="135" height="86" class="pointer-events-none">
+                                <div class="w-full h-full flex items-center justify-center text-center filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
+                                    <span data-i18n="radial.country" class="text-xs font-black tracking-widest text-slate-200 group-hover:text-white uppercase leading-none">Country</span>
                                 </div>
                             </foreignObject>
                         </g>
@@ -844,7 +836,7 @@
                         <p id="radial-city" class="text-xs font-medium text-slate-400 truncate max-w-[210px] leading-tight">City, Country</p>
 
                         <!-- Ligne 4: Catégorie & Éditeur sous forme de Pill en dernière ligne -->
-                        <div class="pt-2 border-t border-slate-800/80 mt-1 flex items-center justify-center w-full">
+                        <div class="pt-1 mt-0.5 flex items-center justify-center w-full">
                             <span id="radial-badge" class="text-[11px] font-mono font-black px-3 py-1 rounded-full border-0 tracking-wide uppercase truncate max-w-[210px] shadow-sm">Badge</span>
                         </div>
                     </div>
