@@ -3129,7 +3129,7 @@ function updateRadialDetailsModalPosition(force = false) {
 
     const mapSize = (typeof map.getSize === 'function') ? map.getSize() : null;
     const containerW = mapSize ? mapSize.x : (modal.offsetParent ? modal.offsetParent.offsetWidth : window.innerWidth);
-    const modalWidth = modal.offsetWidth || 540;
+    const modalWidth = modal.offsetWidth || 840;
     const halfWidth = modalWidth / 2;
     const minLeft = halfWidth + 12;
     const maxLeft = Math.max(minLeft, containerW - halfWidth - 12);
@@ -4615,6 +4615,33 @@ function initDraggableDetailsModal() {
     });
 }
 
+function formatAirportCategoryDisplay(ap) {
+    if (!ap) return 'REGIONAL';
+    const raw = (ap.category || ap.type || ap.airport_type || '').toLowerCase().trim();
+    if (raw === 'large_airport' || raw === 'international' || raw === 'large') {
+        return 'INTERNATIONAL';
+    }
+    if (raw === 'medium_airport' || raw === 'national' || raw === 'medium') {
+        return 'NATIONAL';
+    }
+    if (raw === 'small_airport' || raw === 'regional' || raw === 'small') {
+        return 'REGIONAL';
+    }
+    if (raw === 'heliport') {
+        return 'HELIPORT';
+    }
+    if (raw === 'seaplane_base') {
+        return 'SEAPLANE BASE';
+    }
+    if (raw === 'closed') {
+        return 'CLOSED';
+    }
+    if (raw) {
+        return raw.replace(/_/g, ' ').toUpperCase();
+    }
+    return 'REGIONAL';
+}
+
 function renderRadialAirportDetails(ap) {
     if (!ap) return;
     initDraggableDetailsModal();
@@ -4626,7 +4653,7 @@ function renderRadialAirportDetails(ap) {
     const elevEl = document.getElementById('radial-detail-elevation');
     if (latEl) latEl.innerText = parseFloat(ap.lat || 0).toFixed(4);
     if (lonEl) lonEl.innerText = parseFloat(ap.lon || 0).toFixed(4);
-    if (catEl) catEl.innerText = ap.category || ap.type || 'Commercial';
+    if (catEl) catEl.innerText = formatAirportCategoryDisplay(ap);
     if (elevEl) elevEl.innerText = (ap.elevation_ft !== undefined && ap.elevation_ft !== null) ? `${ap.elevation_ft.toLocaleString()} ft` : '0 ft';
 
     // PILL 2: RUNWAYS
@@ -4729,9 +4756,9 @@ function renderRadialGsx(ap) {
     if (ap.has_gsx_profile) {
         const safeGsxPath = encodeURIComponent(ap.gsx_profile_path || '');
         container.innerHTML = `
-            <div class="space-y-2">
+            <div class="space-y-1.5">
                 <div onclick="openGsxProfileInExplorer(decodeURIComponent('${safeGsxPath}'))"
-                     class="p-2.5 rounded-xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 hover:border-slate-700 cursor-pointer flex items-center justify-between gap-2 text-xs font-mono font-bold text-slate-200 hover:text-cyan-300 transition-all shadow-sm"
+                     class="p-2 rounded-xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 hover:border-slate-700 cursor-pointer flex items-center justify-between gap-2 text-xs font-mono font-bold text-slate-200 hover:text-cyan-300 transition-all shadow-sm"
                      title="Click to reveal GSX INI file in Explorer">
                     <span class="truncate">${ap.gsx_profile_filename}</span>
                     <span class="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 hover:text-white px-2 py-0.5 rounded bg-slate-800 border border-slate-700/60 shrink-0">Reveal</span>
@@ -4741,7 +4768,7 @@ function renderRadialGsx(ap) {
                      ondragleave="handleRadialGsxDragLeave(event)"
                      ondrop="handleRadialGsxDrop(event)"
                      onclick="triggerRadialInstallGsxProfile()"
-                     class="p-3 rounded-xl bg-slate-950/40 border-2 border-dashed border-slate-800 hover:border-cyan-500/60 flex flex-col items-center justify-center gap-1 text-center transition-all cursor-pointer">
+                     class="p-2 rounded-xl bg-slate-950/40 border-2 border-dashed border-slate-800 hover:border-cyan-500/60 flex flex-col items-center justify-center gap-0.5 text-center transition-all cursor-pointer">
                     <span class="text-xs font-bold text-slate-300 uppercase tracking-wide">Drop .zip or .ini here to replace</span>
                     <span class="text-[10px] text-slate-500 uppercase font-mono">or click to browse file</span>
                 </div>
@@ -4749,13 +4776,13 @@ function renderRadialGsx(ap) {
         `;
     } else {
         container.innerHTML = `
-            <div class="space-y-2">
-                <div class="p-2.5 rounded-xl bg-slate-900/40 border border-slate-800/80 flex items-center justify-between text-xs font-mono text-slate-400">
+            <div class="space-y-1.5">
+                <div class="p-2 rounded-xl bg-slate-900/40 border border-slate-800/80 flex items-center justify-between text-xs font-mono text-slate-400">
                     <span>No GSX profile installed</span>
                     <span class="text-[10px] font-mono font-bold text-slate-500 uppercase px-1.5 py-0.5 rounded bg-slate-800/60 border border-slate-700/40">None</span>
                 </div>
                 <button onclick="triggerRadialSearchGsxProfile()"
-                        class="w-full p-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-cyan-400 hover:text-white text-xs font-mono font-bold uppercase tracking-wider transition-colors flex items-center justify-center cursor-pointer shadow-sm">
+                        class="w-full p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-cyan-400 hover:text-white text-xs font-mono font-bold uppercase tracking-wider transition-colors flex items-center justify-center cursor-pointer shadow-sm">
                     Search on Flightsim.to
                 </button>
                 <div id="radial-gsx-drop-zone"
@@ -4763,7 +4790,7 @@ function renderRadialGsx(ap) {
                      ondragleave="handleRadialGsxDragLeave(event)"
                      ondrop="handleRadialGsxDrop(event)"
                      onclick="triggerRadialInstallGsxProfile()"
-                     class="p-3 rounded-xl bg-slate-950/40 border-2 border-dashed border-slate-800 hover:border-cyan-500/60 flex flex-col items-center justify-center gap-1 text-center transition-all cursor-pointer">
+                     class="p-2 rounded-xl bg-slate-950/40 border-2 border-dashed border-slate-800 hover:border-cyan-500/60 flex flex-col items-center justify-center gap-0.5 text-center transition-all cursor-pointer">
                     <span class="text-xs font-bold text-slate-300 uppercase tracking-wide">Drop .zip or .ini here</span>
                     <span class="text-[10px] text-slate-500 uppercase font-mono">or click to browse file</span>
                 </div>
