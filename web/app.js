@@ -2945,13 +2945,13 @@ function getWrappedAirportLatLng(ap, marker) {
     let lat = null;
     let lon = null;
 
-    if (marker && marker.getLatLng) {
+    if (ap && ap.lat !== undefined && ap.lon !== undefined) {
+        lat = parseFloat(ap.lat);
+        lon = parseFloat(ap.lon);
+    } else if (marker && marker.getLatLng) {
         const ll = marker.getLatLng();
         lat = ll.lat;
         lon = ll.lng;
-    } else if (ap && ap.lat !== undefined && ap.lon !== undefined) {
-        lat = parseFloat(ap.lat);
-        lon = parseFloat(ap.lon);
     }
 
     if (lat === null || lon === null || isNaN(lat) || isNaN(lon)) return null;
@@ -3046,17 +3046,30 @@ function updateRadialAirlinesModalPosition(force = false) {
     if (!modal || (!force && modal.classList.contains('hidden'))) return;
     if (!currentRadialAirport || !map) return;
 
-    const latLng = getWrappedAirportLatLng(currentRadialAirport, currentRadialMarker);
+    // Use currentRadialAirport coordinates directly
+    const latLng = getWrappedAirportLatLng(currentRadialAirport);
     if (!latLng) return;
     const point = (typeof map.latLngToContainerPoint === 'function') ? map.latLngToContainerPoint(latLng) : null;
     if (!point) return;
 
-    modal.style.left = `${Math.round(point.x)}px`;
+    // Center horizontally on airport, clamped so the wide modal does not overflow screen boundaries
+    const modalWidth = modal.offsetWidth || 820;
+    const halfWidth = modalWidth / 2;
+    const minLeft = halfWidth + 16;
+    const maxLeft = window.innerWidth - halfWidth - 16;
+    const clampedX = Math.max(minLeft, Math.min(maxLeft, Math.round(point.x)));
+    modal.style.left = `${clampedX}px`;
 
     if (!hasUserDraggedAirlinesModal) {
-        // Place systématiquement sous l'aéroport (écart propre de 32px sous le repère)
-        const desiredTop = Math.round(point.y) + 32;
-        modal.style.top = `${desiredTop}px`;
+        // Place systematically BELOW the airport pin & label:
+        // Gap of 48px below point.y leaves full clearance for the marker star and LFPG label
+        const desiredTop = Math.round(point.y) + 48;
+        // Never allow modal to overlap or climb over the airport (must remain >= point.y + 44)
+        const modalHeight = modal.offsetHeight || 300;
+        const maxTop = Math.max(Math.round(point.y) + 44, window.innerHeight - modalHeight - 16);
+        const actualTop = Math.max(Math.round(point.y) + 44, Math.min(maxTop, desiredTop));
+
+        modal.style.top = `${actualTop}px`;
         modal.style.transform = 'translateX(-50%)';
     } else {
         modal.style.transform = `translate(calc(-50% + ${airlinesModalUserOffset.x}px), ${airlinesModalUserOffset.y}px)`;
@@ -3082,17 +3095,23 @@ function panMapToAirport(ap) {
         : 0.6;
 
     let xOffset = 0;
-    const detailDrawer = document.getElementById('detail-drawer');
-    if (detailDrawer && !detailDrawer.classList.contains('translate-x-full') && !detailDrawer.classList.contains('hidden')) {
-        const drawerWidth = detailDrawer.offsetWidth || 460;
-        xOffset = drawerWidth / 2;
+    // In airlines mode: strictly enforce xOffset = 0 so the airport is centered horizontally for the wide 820px modal
+    if (!isAirlinesModalOpen()) {
+        const detailDrawer = document.getElementById('detail-drawer');
+        if (detailDrawer && !detailDrawer.classList.contains('translate-x-full') && !detailDrawer.classList.contains('hidden')) {
+            const drawerWidth = detailDrawer.offsetWidth || 460;
+            xOffset = drawerWidth / 2;
+        }
     }
 
     let yOffset = 0;
     if (isAirlinesModalOpen()) {
-        // En mode Airlines : décaler le centre vertical pour que l'aéroport se positionne dans le tiers supérieur de l'écran (~25-30%),
-        // laissant systématiquement toute la place nécessaire à la modale en dessous, exactement comme sur le screen 1.
-        yOffset = Math.round(window.innerHeight * 0.20);
+        // En mode Airlines : positionner l'aéroport dans le tiers supérieur de l'écran (~24%, min 115px, max 220px)
+        // pour laisser systématiquement toute la place nécessaire à la modale en dessous sans jamais masquer l'aéroport (conforme au Screen 2)
+        const mapH = (map && typeof map.getSize === 'function') ? map.getSize().y : window.innerHeight;
+        const cy = mapH / 2;
+        const desiredApY = Math.max(115, Math.min(220, Math.round(mapH * 0.24)));
+        yOffset = Math.round(cy - desiredApY);
     }
 
     const currentZoom = (typeof map.getZoom === 'function') ? map.getZoom() : 8;
@@ -3215,6 +3234,12 @@ function openAirportRadialMenu(ap, marker, e) {
             airlinesModalUserOffset = { x: 0, y: 0 };
             isAirlinesModalDragging = false;
             airlinesModal.classList.remove('user-dragged');
+
+            // Close detail drawer if open so modal has full screen width
+            const detailDrawer = document.getElementById('detail-drawer');
+            if (detailDrawer && !detailDrawer.classList.contains('translate-x-full')) {
+                closeDrawerWithoutCameraChange();
+            }
 
             // 3. Render new airport's operating airlines
             renderRadialOperatingAirlines(ap);
@@ -3351,6 +3376,18 @@ function triggerRadialOperatingAirlines() {
         if (radialEl) {
             radialEl.classList.add('hidden');
         }
+
+        // Close detail drawer if open so modal has full screen width
+        const detailDrawer = document.getElementById('detail-drawer');
+        if (detailDrawer && !detailDrawer.classList.contains('translate-x-full')) {
+            closeDrawerWithoutCameraChange();
+        }
+
+        hasUserDraggedAirlinesModal = false;
+        airlinesModalUserOffset = { x: 0, y: 0 };
+        isAirlinesModalDragging = false;
+        modal.classList.remove('user-dragged');
+
         renderRadialOperatingAirlines(currentRadialAirport);
         modal.classList.remove('hidden');
 
