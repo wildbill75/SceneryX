@@ -852,11 +852,11 @@
                  onclick="event.stopPropagation();"
                  onmousedown="event.stopPropagation();"
                  onpointerdown="event.stopPropagation();"
-                 class="hidden absolute flex flex-col glass-modal rounded-3xl border border-slate-700/80 shadow-2xl p-4 select-none w-[820px] max-w-[96vw] pointer-events-auto z-[1550] transition-all duration-300 ease-out"
+                 class="hidden absolute flex flex-col glass-modal rounded-3xl border border-slate-700/80 shadow-2xl p-4 select-none w-[820px] max-w-[96vw] pointer-events-auto z-[1550] transition-opacity duration-200 ease-out"
                  style="transform: translateX(-50%);">
                 
                 <!-- Drag Handle & Modal Header -->
-                <div id="radial-airlines-modal-header" class="flex items-center justify-between pb-2.5 border-b border-slate-800 shrink-0 cursor-grab active:cursor-grabbing">
+                <div id="radial-airlines-modal-header" class="h-9 flex items-center justify-between pb-2 border-b border-slate-800 shrink-0 cursor-grab active:cursor-grabbing">
                     <div class="flex items-center gap-2 pointer-events-none">
                         <i class="fa-solid fa-grip-vertical text-xs text-slate-400 mr-1 opacity-75"></i>
                         <span class="text-xs font-black font-mono tracking-wider text-white uppercase" data-i18n="drawer.operating_airlines">Operating Airlines</span>
@@ -867,9 +867,9 @@
                 </div>
 
                 <!-- Sub-header: Count (MAJUSCULE & PLUS GROS) + Clear Selection (GREY like hint) -->
-                <div class="flex items-center justify-between py-2 px-0.5 shrink-0">
-                    <span id="radial-airlines-count" class="text-sm font-black font-mono tracking-wider text-cyan-400 uppercase">0 AIRLINES</span>
-                    <div class="flex items-center gap-2 text-xs font-mono">
+                <div class="h-8 flex items-center justify-between px-0.5 shrink-0">
+                    <span id="radial-airlines-count" class="text-sm font-black font-mono tracking-wider text-cyan-400 uppercase truncate pr-2">0 AIRLINES</span>
+                    <div class="flex items-center gap-2 text-xs font-mono shrink-0">
                         <button id="radial-airlines-clear-btn" onclick="clearRadialAirlineFilter(event)" class="hidden text-slate-400 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5 bg-transparent border-0 p-0 text-[11px]">
                             <i class="fa-solid fa-rotate-left text-[10px]"></i>
                             <span class="underline">Clear selection</span>
@@ -879,7 +879,7 @@
                 </div>
 
                 <!-- Horizontal Multi-Column Grid (8 columns, 3 rows visible, scrollable) -->
-                <div id="radial-airlines-list" class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2 overflow-y-auto custom-scrollbar pr-1 max-h-[188px] py-1">
+                <div id="radial-airlines-list" class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2 overflow-y-auto custom-scrollbar pr-1 h-[188px] shrink-0 py-1">
                     <!-- Dynamic airline cards rendered here -->
                 </div>
             </div>

@@ -3177,25 +3177,52 @@ function openAirportRadialMenu(ap, marker, e) {
     if (sectorScenery) {
         sectorScenery.classList.remove('active-radial-sector');
     }
+    const isAirlinesOpen = isAirlinesModalOpen();
     const airlinesModal = document.getElementById('radial-airlines-modal');
+    const sectorAirlines = document.getElementById('radial-sector-airlines');
+
     if (airlinesModal) {
         if (!airlinesModal._clickPropagationDisabled) {
             L.DomEvent.disableClickPropagation(airlinesModal);
             L.DomEvent.disableScrollPropagation(airlinesModal);
             airlinesModal._clickPropagationDisabled = true;
         }
-        airlinesModal.classList.add('hidden');
-        airlinesModal.classList.remove('user-dragged', 'is-inverted');
-        airlinesModal.style.transform = 'translateX(-50%)';
-        airlinesModal.style.top = '545px';
-        airlinesModal.style.bottom = 'auto';
-    }
-    hasUserDraggedAirlinesModal = false;
-    airlinesModalUserOffset = { x: 0, y: 0 };
-    isAirlinesModalDragging = false;
-    const sectorAirlines = document.getElementById('radial-sector-airlines');
-    if (sectorAirlines) {
-        sectorAirlines.classList.remove('active-radial-sector');
+
+        if (isAirlinesOpen) {
+            // Persist Operating Airlines mode across airport selections:
+            // 1. Clear previous airport route selection
+            if (selectedAirlines.size > 0 || activeRouteOrigin) {
+                selectedAirlines.clear();
+                selectedAirline = null;
+                activeRouteOrigin = null;
+                if (activeRouteLinesGroup) activeRouteLinesGroup.clearLayers();
+                filterAirports();
+                updateFilterUI();
+            }
+            // 2. Reset manual drag offsets so the modal cleanly re-anchors below the new airport
+            hasUserDraggedAirlinesModal = false;
+            airlinesModalUserOffset = { x: 0, y: 0 };
+            isAirlinesModalDragging = false;
+            airlinesModal.classList.remove('user-dragged');
+
+            // 3. Render new airport's operating airlines
+            renderRadialOperatingAirlines(ap);
+            if (sectorAirlines) {
+                sectorAirlines.classList.add('active-radial-sector');
+            }
+        } else {
+            airlinesModal.classList.add('hidden');
+            airlinesModal.classList.remove('user-dragged', 'is-inverted');
+            airlinesModal.style.transform = 'translateX(-50%)';
+            airlinesModal.style.top = '545px';
+            airlinesModal.style.bottom = 'auto';
+            hasUserDraggedAirlinesModal = false;
+            airlinesModalUserOffset = { x: 0, y: 0 };
+            isAirlinesModalDragging = false;
+            if (sectorAirlines) {
+                sectorAirlines.classList.remove('active-radial-sector');
+            }
+        }
     }
     radialEl.classList.remove('radial-quadrants-collapsed');
 
@@ -3273,11 +3300,18 @@ function openAirportRadialMenu(ap, marker, e) {
 
     // Reveal Radial Menu with snappy bounce & circular cascade animation
     radialEl.classList.remove('hidden');
+    if (isAirlinesOpen && sectorAirlines) {
+        sectorAirlines.classList.add('active-radial-sector');
+    }
     updateRadialMenuPosition(true);
 
     radialEl.classList.remove('animate-radial-open');
     void radialEl.offsetWidth; // Force reflow to retrigger animation reliably
     radialEl.classList.add('animate-radial-open');
+
+    if (isAirlinesOpen) {
+        updateRadialAirlinesModalPosition(true);
+    }
 }
 
 function triggerRadialFlightPlan() {
@@ -3291,6 +3325,7 @@ function triggerRadialOperatingAirlines() {
     if (!currentRadialAirport) return;
     const modal = document.getElementById('radial-airlines-modal');
     const radialEl = document.getElementById('airport-radial-menu');
+    const sectorAirlines = document.getElementById('radial-sector-airlines');
     if (!modal) return;
 
     // If Sceneries extension is open, close it
@@ -3300,15 +3335,18 @@ function triggerRadialOperatingAirlines() {
     }
 
     if (!modal.classList.contains('hidden')) {
-        // Toggle OFF
+        // Toggle OFF (exit Operating Airlines mode)
         closeRadialAirlinesModal();
     } else {
-        // Toggle ON: Entire radial menu wheel disappears as requested!
-        if (radialEl) {
-            radialEl.classList.add('hidden');
-        }
+        // Toggle ON: Show airlines modal and keep radial menu visible with active highlight
         renderRadialOperatingAirlines(currentRadialAirport);
         modal.classList.remove('hidden');
+        if (sectorAirlines) {
+            sectorAirlines.classList.add('active-radial-sector');
+        }
+        if (radialEl) {
+            radialEl.classList.remove('hidden', 'radial-quadrants-collapsed');
+        }
         updateRadialAirlinesModalPosition(true);
     }
 }
@@ -3316,7 +3354,6 @@ function triggerRadialOperatingAirlines() {
 function closeRadialAirlinesModal(event) {
     if (event) event.stopPropagation();
     const modal = document.getElementById('radial-airlines-modal');
-    const radialEl = document.getElementById('airport-radial-menu');
     const sectorAirlines = document.getElementById('radial-sector-airlines');
     if (modal) {
         modal.classList.add('hidden');
@@ -3330,7 +3367,7 @@ function closeRadialAirlinesModal(event) {
         sectorAirlines.classList.remove('active-radial-sector');
     }
     // Clear active airline filter and routes upon closing airlines modal
-    if (selectedAirlines.size > 0) {
+    if (selectedAirlines.size > 0 || activeRouteOrigin) {
         selectedAirlines.clear();
         selectedAirline = null;
         activeRouteOrigin = null;
@@ -3339,29 +3376,6 @@ function closeRadialAirlinesModal(event) {
         }
         filterAirports();
         updateFilterUI();
-    }
-    // Restore the full radial menu wheel with bounce animation
-    if (radialEl && currentRadialAirport) {
-        radialEl.classList.remove('hidden', 'radial-quadrants-collapsed');
-        const disc = document.getElementById('radial-backdrop-disc');
-        const sectors = radialEl.querySelectorAll('.radial-sector');
-        const core = document.getElementById('radial-core');
-        if (disc) {
-            disc.style.animation = 'none';
-            void disc.offsetWidth;
-            disc.style.animation = 'radialBackdropPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards';
-        }
-        if (core) {
-            core.style.animation = 'none';
-            void core.offsetWidth;
-            core.style.animation = 'radialCoreBounce 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards';
-        }
-        sectors.forEach((sec, idx) => {
-            sec.style.animation = 'none';
-            void sec.offsetWidth;
-            sec.style.animation = `radialSectorCircularBounce 0.36s cubic-bezier(0.34, 1.56, 0.64, 1) ${(idx * 0.05).toFixed(2)}s both`;
-        });
-        updateRadialMenuPosition(true);
     }
 }
 
@@ -3460,7 +3474,7 @@ function renderRadialOperatingAirlines(ap) {
     });
 
     if (countEl) {
-        countEl.innerText = `${airlines.length} ${t('drawer.airlines_count', 'Airlines')}`.toUpperCase();
+        countEl.innerText = `${airlines.length} ${t('drawer.airlines_operating_from', 'Airlines operating from')} ${ap.icao}`.toUpperCase();
     }
 
     const hasActiveAirline = selectedAirlines.size > 0 && (activeRouteOrigin && activeRouteOrigin.icao === ap.icao);
@@ -3491,13 +3505,13 @@ function renderRadialOperatingAirlines(ap) {
 
         if (logoUrl) {
             const btnClass = isActive
-                ? 'bg-white border-4 border-emerald-600 shadow-lg shadow-emerald-950/60 scale-[1.03] ring-2 ring-emerald-500/40'
-                : 'bg-white border-2 border-slate-200/80 hover:border-emerald-500/60 hover:shadow-md hover:scale-[1.02]';
+                ? 'bg-white border-2 border-emerald-500 shadow-lg shadow-emerald-950/60 ring-2 ring-emerald-500/40'
+                : 'bg-white border-2 border-slate-200/80 hover:border-emerald-500/60 hover:shadow-md';
 
             return `
                 <button data-airline="${safeAttrAl}"
                         onclick="radialFilterByAirline('${safeAl}', this, event)"
-                        class="group relative min-h-[50px] rounded-xl overflow-hidden transition-all cursor-pointer flex items-center justify-center p-1.5 text-center ${btnClass}"
+                        class="group relative h-[50px] rounded-xl overflow-hidden cursor-pointer flex items-center justify-center p-1.5 text-center ${btnClass}"
                         title="${tooltipText}">
                     <div class="absolute inset-0 flex items-center justify-center pointer-events-none p-1.5 overflow-hidden rounded-xl">
                         <img src="${logoUrl}"
@@ -3512,13 +3526,13 @@ function renderRadialOperatingAirlines(ap) {
             `;
         } else {
             const btnClass = isActive
-                ? 'bg-emerald-800 text-white font-bold border-4 border-emerald-600 shadow-lg shadow-emerald-950/60 scale-[1.03]'
-                : 'bg-slate-800/90 text-slate-300 font-medium border border-slate-700 hover:border-emerald-500/60 hover:text-white';
+                ? 'bg-emerald-800 text-white font-bold border-2 border-emerald-500 shadow-lg shadow-emerald-950/60 ring-2 ring-emerald-500/40'
+                : 'bg-slate-800/90 text-slate-300 font-medium border-2 border-slate-700/80 hover:border-emerald-500/60 hover:text-white';
 
             return `
                 <button data-airline="${safeAttrAl}"
                         onclick="radialFilterByAirline('${safeAl}', this, event)"
-                        class="group relative min-h-[50px] rounded-xl overflow-hidden transition-all cursor-pointer flex items-center justify-center p-1.5 text-center ${btnClass}"
+                        class="group relative h-[50px] rounded-xl overflow-hidden cursor-pointer flex items-center justify-center p-1.5 text-center ${btnClass}"
                         title="${tooltipText}">
                     <span class="relative z-10 text-[11px] sm:text-xs font-bold leading-tight text-center line-clamp-2 px-1 break-words">
                         ${al}
@@ -3564,22 +3578,11 @@ function radialFilterByAirline(airlineName, btnEl, event) {
     filterAirports();
     updateFilterUI();
 
-    // Re-render modal UI
+    // Re-render modal UI (updates card borders/highlights and clear button)
     renderRadialOperatingAirlines(originAp);
 
     // Also update drawer if open
     updateAirlinePillsUI(originAp);
-
-    // Dynamic Quadrant and Modal shifting
-    const radialEl = document.getElementById('airport-radial-menu');
-    if (selectedAirlines.size > 0) {
-        // Quadrants disappear for maximum visibility, central circle stays
-        if (radialEl) radialEl.classList.add('radial-quadrants-collapsed');
-        updateRadialMenuPosition(true);
-    } else {
-        // No airline selected -> quadrants reappear in spring bounce motion!
-        restoreRadialQuadrants();
-    }
 }
 
 function clearRadialAirlineFilter(event) {
@@ -3595,7 +3598,6 @@ function clearRadialAirlineFilter(event) {
     if (currentRadialAirport) {
         renderRadialOperatingAirlines(currentRadialAirport);
     }
-    restoreRadialQuadrants();
 }
 
 function triggerRadialScenerySelector() {
