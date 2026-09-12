@@ -3024,10 +3024,12 @@ function updateRadialMenuPosition(force = false) {
 
     radialEl.style.transform = `translate(-50%, -50%) scale(${scale.toFixed(3)})`;
 
-    // Smart screen boundary check for Sceneries Extension pills
+    // Smart screen boundary check (horizontal & vertical) for Sceneries Extension pills
     const extEl = document.getElementById('radial-sceneries-extension');
     if (extEl && !extEl.classList.contains('hidden')) {
-        const isNearRightEdge = (point.x + (270 + 365) * scale > window.innerWidth - 20);
+        const extWidth = extEl.offsetWidth || 366;
+        const mapW = (map && typeof map.getSize === 'function') ? map.getSize().x : window.innerWidth;
+        const isNearRightEdge = (point.x + (270 + extWidth) * scale > mapW - 16);
         if (isNearRightEdge) {
             extEl.style.left = 'auto';
             extEl.style.right = '542px';
@@ -3035,6 +3037,16 @@ function updateRadialMenuPosition(force = false) {
             extEl.style.left = '542px';
             extEl.style.right = 'auto';
         }
+
+        // Smart vertical clamping: prevents any pills from bleeding off the top or bottom of the screen
+        const mapH = (map && typeof map.getSize === 'function') ? map.getSize().y : window.innerHeight;
+        const extHeight = extEl.offsetHeight || 380;
+        const idealTop = point.y - (extHeight / 2) * scale;
+        const minTop = 16;
+        const maxTop = Math.max(minTop, mapH - (extHeight * scale) - 16);
+        const clampedTop = Math.max(minTop, Math.min(maxTop, idealTop));
+        const dy = (clampedTop - idealTop) / (scale || 1.0);
+        extEl.style.transform = `translateY(calc(-50% + ${Math.round(dy)}px))`;
     }
 
     // Operating Airlines Modal (Anchored directly under airport, independent of radial scale)
@@ -3753,15 +3765,15 @@ function renderRadialSceneriesExtension(ap, animate = false) {
                  onmousedown="event.stopPropagation();"
                  onpointerdown="event.stopPropagation();"
                  ${animDelay}
-                 class="${animClass} p-3.5 rounded-2xl ${borderClass} backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1.5 w-[360px]">
+                 class="${animClass} py-2 px-3 rounded-xl ${borderClass} backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1 w-[356px]">
                 
                 <!-- Row 1: Switch toggle + Title with Native Mouseover Folder Tooltip + Category Badge + Folder Button -->
-                <div class="flex items-center justify-between gap-2.5">
-                    <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2 min-w-0 flex-1">
                         <!-- Preflightly-style Switch Toggle -->
                         <div class="relative inline-flex items-center shrink-0">
-                            <div class="w-10 h-5 rounded-full transition-colors duration-200 ease-in-out p-0.5 ${isActive ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-slate-700/80'}">
-                                <div class="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out ${isActive ? 'translate-x-5' : 'translate-x-0'}"></div>
+                            <div class="w-9 h-4.5 rounded-full transition-colors duration-200 ease-in-out p-0.5 ${isActive ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-slate-700/80'}">
+                                <div class="w-3.5 h-3.5 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out ${isActive ? 'translate-x-4.5' : 'translate-x-0'}"></div>
                             </div>
                         </div>
 
@@ -3775,13 +3787,13 @@ function renderRadialSceneriesExtension(ap, animate = false) {
 
                     <button onclick="event.stopPropagation(); openSpecificPackageFolderByIndex('${ap.icao}', ${idx})"
                             title="${t('drawer.open_folder', 'Open Folder')}"
-                            class="w-6 h-6 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-amber-400 flex items-center justify-center text-xs transition-colors border border-slate-700/50 shrink-0 shadow-sm">
+                            class="w-5.5 h-5.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-amber-400 flex items-center justify-center text-[11px] transition-colors border border-slate-700/50 shrink-0 shadow-sm">
                         <i class="fa-solid fa-folder-open"></i>
                     </button>
                 </div>
 
                 <!-- Row 2: MSFS Version, Location & Size -->
-                <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 pl-[50px]">
+                <div class="flex items-center justify-between text-[10px] font-mono text-slate-400 pl-[44px] leading-tight">
                     <span class="truncate">${src.source_folder}</span>
                     <span class="shrink-0 text-slate-300 font-semibold ml-2">${src.size_str || ''}</span>
                 </div>
@@ -3803,15 +3815,15 @@ function renderRadialSceneriesExtension(ap, animate = false) {
              onmousedown="event.stopPropagation();"
              onpointerdown="event.stopPropagation();"
              ${defaultAnimDelay}
-             class="${defaultAnimClass} p-3.5 rounded-2xl ${defaultBorderClass} backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1.5 w-[360px]">
+             class="${defaultAnimClass} py-2 px-3 rounded-xl ${defaultBorderClass} backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1 w-[356px]">
             
             <!-- Row 1: Switch toggle + Title + Badge -->
-            <div class="flex items-center justify-between gap-2.5">
-                <div class="flex items-center gap-2.5 min-w-0 flex-1">
+            <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2 min-w-0 flex-1">
                     <!-- Preflightly-style Switch Toggle -->
                     <div class="relative inline-flex items-center shrink-0">
-                        <div class="w-10 h-5 rounded-full transition-colors duration-200 ease-in-out p-0.5 ${isDefaultActive ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-slate-700/80'}">
-                            <div class="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out ${isDefaultActive ? 'translate-x-5' : 'translate-x-0'}"></div>
+                        <div class="w-9 h-4.5 rounded-full transition-colors duration-200 ease-in-out p-0.5 ${isDefaultActive ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-slate-700/80'}">
+                            <div class="w-3.5 h-3.5 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out ${isDefaultActive ? 'translate-x-4.5' : 'translate-x-0'}"></div>
                         </div>
                     </div>
 
@@ -3821,7 +3833,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
             </div>
 
             <!-- Row 2: Clean Base Scenery Description without 'built-in' -->
-            <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 pl-[50px]">
+            <div class="flex items-center justify-between text-[10px] font-mono text-slate-400 pl-[44px] leading-tight">
                 <span class="truncate">MSFS Base Scenery</span>
             </div>
         </div>
@@ -3852,13 +3864,13 @@ function renderRadialSceneriesExtension(ap, animate = false) {
                      onmousedown="event.stopPropagation();"
                      onpointerdown="event.stopPropagation();"
                      ${fixAnimDelay}
-                     class="${fixAnimClass} p-3.5 rounded-2xl ${fixBorderClass} backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1.5 w-[360px]">
+                     class="${fixAnimClass} py-2 px-3 rounded-xl ${fixBorderClass} backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1 w-[356px]">
                     
-                    <div class="flex items-center justify-between gap-2.5">
-                        <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="flex items-center gap-2 min-w-0 flex-1">
                             <div class="relative inline-flex items-center shrink-0">
-                                <div class="w-10 h-5 rounded-full transition-colors duration-200 ease-in-out p-0.5 ${isActive ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-slate-700/80'}">
-                                    <div class="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out ${isActive ? 'translate-x-5' : 'translate-x-0'}"></div>
+                                <div class="w-9 h-4.5 rounded-full transition-colors duration-200 ease-in-out p-0.5 ${isActive ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-slate-700/80'}">
+                                    <div class="w-3.5 h-3.5 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out ${isActive ? 'translate-x-4.5' : 'translate-x-0'}"></div>
                                 </div>
                             </div>
 
@@ -3870,12 +3882,12 @@ function renderRadialSceneriesExtension(ap, animate = false) {
                         </div>
                         <button onclick="event.stopPropagation(); openSpecificPackageFolderByIndex('${ap.icao}', ${idx})"
                                 title="${t('drawer.open_folder', 'Open Folder')}"
-                                class="w-6 h-6 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-amber-400 flex items-center justify-center text-xs transition-colors border border-slate-700/50 shrink-0 shadow-sm">
+                                class="w-5.5 h-5.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-amber-400 flex items-center justify-center text-[11px] transition-colors border border-slate-700/50 shrink-0 shadow-sm">
                             <i class="fa-solid fa-folder-open"></i>
                         </button>
                     </div>
 
-                    <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 pl-[50px]">
+                    <div class="flex items-center justify-between text-[10px] font-mono text-slate-400 pl-[44px] leading-tight">
                         <span class="truncate">${src.source_folder}</span>
                         <span class="shrink-0 text-slate-300 font-semibold ml-2">${src.size_str || ''}</span>
                     </div>
@@ -3885,19 +3897,21 @@ function renderRadialSceneriesExtension(ap, animate = false) {
     }
 
     // 4. Available Addons Downloads Container
-    html += `<div id="radial-addon-downloads-container" class="flex flex-col gap-2.5"></div>`;
+    html += `<div id="radial-addon-downloads-container" class="flex flex-col gap-1.5"></div>`;
 
     extEl.innerHTML = html;
 
     // Populate or query available store downloads
     if (radialStoreCache[ap.icao]) {
         renderRadialAddonDownloads(ap, radialStoreCache[ap.icao], animate, pillIndex);
+        updateRadialMenuPosition(true);
     } else if (window.pywebview && window.pywebview.api && window.pywebview.api.check_payware_stores) {
         window.pywebview.api.check_payware_stores(ap.icao, ap.name || '').then(raw => {
             const stores = typeof raw === 'string' ? JSON.parse(raw) : raw;
             radialStoreCache[ap.icao] = stores;
             if (currentRadialAirport && currentRadialAirport.icao === ap.icao) {
                 renderRadialAddonDownloads(ap, stores, false, pillIndex);
+                updateRadialMenuPosition(true);
             }
         }).catch(err => {
             console.error("Error loading stores for radial scenery drawer:", err);
@@ -3986,12 +4000,12 @@ function renderRadialAddonDownloads(ap, stores, animate = false, basePillIndex =
                  onmousedown="event.stopPropagation();"
                  onpointerdown="event.stopPropagation();"
                  ${animDelay}
-                 class="${animClass} p-3.5 rounded-2xl ${borderClass} backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1.5 w-[360px]">
+                 class="${animClass} py-2 px-3 rounded-xl ${borderClass} backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1 w-[356px]">
                 
                 <!-- Row 1: Store Icon + Store Name + Store/Dev Badge + Price & Link Button -->
-                <div class="flex items-center justify-between gap-2.5">
-                    <div class="flex items-center gap-2.5 min-w-0 flex-1">
-                        <div class="w-6 h-6 rounded-lg ${iconBoxClass} flex items-center justify-center shrink-0 shadow-sm">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="flex items-center gap-2 min-w-0 flex-1">
+                        <div class="w-5.5 h-5.5 rounded-lg ${iconBoxClass} flex items-center justify-center shrink-0 shadow-sm">
                             <i class="${iconClass}"></i>
                         </div>
                         <div class="min-w-0 flex-1" title="${st.name}">
@@ -4000,24 +4014,24 @@ function renderRadialAddonDownloads(ap, stores, animate = false, basePillIndex =
                         ${badgeHtml}
                     </div>
 
-                    <div class="flex items-center gap-2 shrink-0">
+                    <div class="flex items-center gap-1.5 shrink-0">
                         ${st.formattedPrice ? `
-                            <span class="px-2 py-0.5 rounded-md text-xs font-mono font-bold bg-emerald-600 text-white shadow-sm">
+                            <span class="px-2 py-0.5 rounded-md text-[11px] font-mono font-bold bg-emerald-600 text-white shadow-sm">
                                 ${st.formattedPrice}
                             </span>
                         ` : ''}
-                        <div class="w-6 h-6 rounded-lg bg-slate-800/80 group-hover:bg-purple-600 text-slate-400 group-hover:text-white flex items-center justify-center text-xs transition-colors border border-slate-700/50 shrink-0 shadow-sm">
-                            <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                        <div class="w-5.5 h-5.5 rounded-lg bg-slate-800/80 group-hover:bg-purple-600 text-slate-400 group-hover:text-white flex items-center justify-center text-[10px] transition-colors border border-slate-700/50 shrink-0 shadow-sm">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i>
                         </div>
                     </div>
                 </div>
 
                 <!-- Row 2: Store Description + Available Status -->
-                <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 pl-[34px]">
+                <div class="flex items-center justify-between text-[10px] font-mono text-slate-400 pl-[30px] leading-tight">
                     <span class="truncate pr-2">${st.desc || ''}</span>
                     <div class="flex items-center gap-1 shrink-0 text-emerald-400 font-semibold text-[10px]">
                         <span>Available</span>
-                        <i class="fa-solid fa-circle-check text-xs"></i>
+                        <i class="fa-solid fa-circle-check text-[11px]"></i>
                     </div>
                 </div>
             </div>
