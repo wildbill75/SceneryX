@@ -371,6 +371,21 @@
             animation: radialPillBounce 0.38s cubic-bezier(0.34, 1.56, 0.64, 1) both;
         }
 
+        @keyframes radialPillExit {
+            0% {
+                opacity: 1;
+                transform: translateX(0) scale(1);
+            }
+            100% {
+                opacity: 0;
+                transform: translateX(-16px) scale(0.92);
+            }
+        }
+
+        .animate-pill-exit {
+            animation: radialPillExit 0.16s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+
         /* Country Hover & Click Deactivation when Zoomed In */
         #map.countries-inactive .leaflet-overlay-pane path {
             cursor: inherit !important;

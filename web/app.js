@@ -1692,13 +1692,17 @@ async function toggleCountrySceneryInPlace(icao, folderName) {
         const resStr = await window.pywebview.api.select_scenery_option(icao, targetPkg);
         const res = JSON.parse(resStr);
         if (res.status === 'ok') {
-            allAirportsData = res.airports;
-            allAirportsData.forEach(ap => {
-                if (userRatingsMap[ap.icao] !== undefined) {
-                    ap.rating = userRatingsMap[ap.icao];
+            const updatedAp = res.updated_airport || (res.airports ? res.airports.find(a => a.icao === icao) : null);
+            if (updatedAp) {
+                if (userRatingsMap[updatedAp.icao] !== undefined) {
+                    updatedAp.rating = userRatingsMap[updatedAp.icao];
                 }
-            });
-            updateStats(allAirportsData);
+                const idx = allAirportsData.findIndex(a => a.icao === updatedAp.icao);
+                if (idx !== -1) allAirportsData[idx] = updatedAp;
+            } else if (res.airports) {
+                allAirportsData = res.airports;
+            }
+            setTimeout(() => updateStats(allAirportsData), 0);
             filterAirports();
             if (selectedCountryCode) {
                 expandedCountryIcao = icao;
@@ -2295,15 +2299,19 @@ async function applyConflictSelection() {
             const resStr = await window.pywebview.api.select_scenery_option(ap.icao, chosenPkgName);
             const res = JSON.parse(resStr);
             if (res.status === 'ok') {
-                allAirportsData = res.airports;
-                allAirportsData.forEach(item => {
-                    if (userRatingsMap[item.icao] !== undefined) {
-                        item.rating = userRatingsMap[item.icao];
+                const updatedAp = res.updated_airport || (res.airports ? res.airports.find(a => a.icao === ap.icao) : null);
+                if (updatedAp) {
+                    if (userRatingsMap[updatedAp.icao] !== undefined) {
+                        updatedAp.rating = userRatingsMap[updatedAp.icao];
                     }
-                    item._searchKey = `${item.icao} ${item.name} ${item.city || ''} ${item.package_name || ''} ${item.vendor || ''}`.toLowerCase();
-                });
+                    updatedAp._searchKey = `${updatedAp.icao} ${updatedAp.name} ${updatedAp.city || ''} ${updatedAp.package_name || ''} ${updatedAp.vendor || ''}`.toLowerCase();
+                    const idx = allAirportsData.findIndex(a => a.icao === updatedAp.icao);
+                    if (idx !== -1) allAirportsData[idx] = updatedAp;
+                } else if (res.airports) {
+                    allAirportsData = res.airports;
+                }
 
-                updateStats(allAirportsData);
+                setTimeout(() => updateStats(allAirportsData), 0);
                 filterAirports();
 
                 // If currently viewed in drawer, refresh drawer
@@ -3209,20 +3217,27 @@ function triggerRadialScenerySelector() {
     if (!extEl) return;
 
     if (!extEl.classList.contains('hidden')) {
-        // Toggle OFF
-        extEl.classList.add('hidden');
-        extEl.innerHTML = '';
+        // Toggle OFF with smooth exit animation
+        const pills = extEl.querySelectorAll('[onclick*="activateRadial"]');
+        pills.forEach(p => {
+            p.classList.remove('animate-pill-bounce');
+            p.classList.add('animate-pill-exit');
+        });
         if (sectorScenery) sectorScenery.classList.remove('active-radial-sector');
+        setTimeout(() => {
+            extEl.classList.add('hidden');
+            extEl.innerHTML = '';
+        }, 160);
     } else {
-        // Toggle ON: Render autonomous pills and trigger snappy spring bounce animation
-        renderRadialSceneriesExtension(currentRadialAirport);
+        // Toggle ON: Render autonomous pills with bounce animation ONLY on opening!
+        renderRadialSceneriesExtension(currentRadialAirport, true);
         extEl.classList.remove('hidden');
         if (sectorScenery) sectorScenery.classList.add('active-radial-sector');
         updateRadialMenuPosition(true);
     }
 }
 
-function renderRadialSceneriesExtension(ap) {
+function renderRadialSceneriesExtension(ap, animate = false) {
     const extEl = document.getElementById('radial-sceneries-extension');
     if (!extEl || !ap) return;
 
@@ -3231,7 +3246,9 @@ function renderRadialSceneriesExtension(ap) {
     const baseSources = nonDefaultSources.filter(s => !isFixOrOverlay(s));
     const fixSources = nonDefaultSources.filter(s => isFixOrOverlay(s));
 
-    const isDefaultActive = (ap.pricing_type === 'Default' || ap.package_name === 'Default MSFS Base Airport' || baseSources.length === 0 || baseSources.every(s => s.is_disabled));
+    // Strict Mutual Exclusion: Default is active ONLY IF NO custom base package is active
+    const hasActiveCustomBase = baseSources.some(s => !s.is_disabled);
+    const isDefaultActive = !hasActiveCustomBase;
 
     let html = '';
     let pillIndex = 0;
@@ -3261,15 +3278,16 @@ function renderRadialSceneriesExtension(ap) {
             ? activeBorderClass
             : 'border border-slate-700/60 hover:border-slate-500/80 bg-slate-950/75 hover:bg-slate-900/90 shadow-lg';
 
-        const animDelay = (pillIndex * 0.05).toFixed(2);
+        const animClass = animate ? 'animate-pill-bounce' : '';
+        const animDelay = animate ? `style="animation-delay: ${(pillIndex * 0.05).toFixed(2)}s;"` : '';
         pillIndex++;
 
         html += `
             <div onclick="event.stopPropagation(); activateRadialSceneryVariant(event, '${ap.icao}', '${safePkgName}')"
                  onmousedown="event.stopPropagation();"
                  onpointerdown="event.stopPropagation();"
-                 style="animation-delay: ${animDelay}s;"
-                 class="animate-pill-bounce p-3.5 rounded-2xl ${borderClass} backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1.5 w-[360px]">
+                 ${animDelay}
+                 class="${animClass} p-3.5 rounded-2xl ${borderClass} backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1.5 w-[360px]">
                 
                 <!-- Row 1: Switch toggle + Title with Native Mouseover Folder Tooltip + Category Badge + Folder Button -->
                 <div class="flex items-center justify-between gap-2.5">
@@ -3310,15 +3328,16 @@ function renderRadialSceneriesExtension(ap) {
         ? 'border-2 border-sky-500 shadow-xl shadow-sky-950/50 bg-slate-950/90 ring-1 ring-sky-500/30'
         : 'border border-slate-700/60 hover:border-slate-500/80 bg-slate-950/75 hover:bg-slate-900/90 shadow-lg';
 
-    const defaultAnimDelay = (pillIndex * 0.05).toFixed(2);
+    const defaultAnimClass = animate ? 'animate-pill-bounce' : '';
+    const defaultAnimDelay = animate ? `style="animation-delay: ${(pillIndex * 0.05).toFixed(2)}s;"` : '';
     pillIndex++;
 
     html += `
         <div onclick="event.stopPropagation(); activateRadialDefaultScenery(event, '${ap.icao}')"
              onmousedown="event.stopPropagation();"
              onpointerdown="event.stopPropagation();"
-             style="animation-delay: ${defaultAnimDelay}s;"
-             class="animate-pill-bounce p-3.5 rounded-2xl ${defaultBorderClass} backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1.5 w-[360px]">
+             ${defaultAnimDelay}
+             class="${defaultAnimClass} p-3.5 rounded-2xl ${defaultBorderClass} backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1.5 w-[360px]">
             
             <!-- Row 1: Switch toggle + Title + Badge -->
             <div class="flex items-center justify-between gap-2.5">
@@ -3359,15 +3378,16 @@ function renderRadialSceneriesExtension(ap) {
                 ? 'border-2 border-emerald-500 shadow-xl shadow-emerald-950/50 bg-slate-950/90 ring-1 ring-emerald-500/30'
                 : 'border border-slate-700/60 hover:border-slate-500/80 bg-slate-950/75 hover:bg-slate-900/90 shadow-lg';
 
-            const fixAnimDelay = (pillIndex * 0.05).toFixed(2);
+            const fixAnimClass = animate ? 'animate-pill-bounce' : '';
+            const fixAnimDelay = animate ? `style="animation-delay: ${(pillIndex * 0.05).toFixed(2)}s;"` : '';
             pillIndex++;
 
             html += `
                 <div onclick="event.stopPropagation(); activateRadialFixPackage(event, '${pkgPath}', '${ap.icao}')"
                      onmousedown="event.stopPropagation();"
                      onpointerdown="event.stopPropagation();"
-                     style="animation-delay: ${fixAnimDelay}s;"
-                     class="animate-pill-bounce p-3.5 rounded-2xl ${fixBorderClass} backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1.5 w-[360px]">
+                     ${fixAnimDelay}
+                     class="${fixAnimClass} p-3.5 rounded-2xl ${fixBorderClass} backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1.5 w-[360px]">
                     
                     <div class="flex items-center justify-between gap-2.5">
                         <div class="flex items-center gap-2.5 min-w-0 flex-1">
@@ -3486,9 +3506,14 @@ async function activateRadialSceneryVariant(e, icao, folderName) {
                 }
             });
         }
+        const targetSrc = currentRadialAirport.all_sources ? currentRadialAirport.all_sources.find(s => s.folder_name === folderName) : null;
+        const isAsobo = targetSrc && (targetSrc.is_asobo_official || targetSrc.vendor === 'Microsoft / Asobo' || (targetSrc.folder_name && (targetSrc.folder_name.toLowerCase().includes('asobo-') || targetSrc.folder_name.toLowerCase().includes('microsoft-'))));
+        currentRadialAirport.pricing_type = targetSrc ? (targetSrc.pricing_type || (targetSrc.is_payware ? 'Payware' : (isAsobo ? 'Asobo' : 'Freeware'))) : 'Freeware';
+        currentRadialAirport.is_asobo_official = !!isAsobo;
+        currentRadialAirport.is_payware = !!(targetSrc && targetSrc.is_payware);
         currentRadialAirport.package_name = folderName;
         currentRadialAirport.is_disabled = false;
-        renderRadialSceneriesExtension(currentRadialAirport);
+        renderRadialSceneriesExtension(currentRadialAirport, false);
         updateRadialCoreBadge(currentRadialAirport);
     }
 
@@ -3509,7 +3534,7 @@ async function activateRadialSceneryVariant(e, icao, folderName) {
                 if (selectedAirport && selectedAirport.icao === icao) {
                     selectedAirport = updatedAp;
                 }
-                renderRadialSceneriesExtension(updatedAp);
+                renderRadialSceneriesExtension(updatedAp, false);
                 updateRadialCoreBadge(updatedAp);
                 updateSingleAirportMarker(updatedAp);
 
@@ -3520,7 +3545,7 @@ async function activateRadialSceneryVariant(e, icao, folderName) {
             } else if (res.airports) {
                 allAirportsData = res.airports;
             }
-            updateStats(allAirportsData);
+            setTimeout(() => updateStats(allAirportsData), 0);
             showToast(`✓ ${folderName} Activated`, 'success');
         }
     } catch (e) {
@@ -3554,7 +3579,10 @@ async function activateRadialDefaultScenery(e, icao) {
         }
         currentRadialAirport.pricing_type = 'Default';
         currentRadialAirport.package_name = 'Default MSFS Base Airport';
-        renderRadialSceneriesExtension(currentRadialAirport);
+        currentRadialAirport.is_asobo_official = false;
+        currentRadialAirport.is_payware = false;
+        currentRadialAirport.is_disabled = false;
+        renderRadialSceneriesExtension(currentRadialAirport, false);
         updateRadialCoreBadge(currentRadialAirport);
     }
 
@@ -3575,7 +3603,7 @@ async function activateRadialDefaultScenery(e, icao) {
                 if (selectedAirport && selectedAirport.icao === icao) {
                     selectedAirport = updatedAp;
                 }
-                renderRadialSceneriesExtension(updatedAp);
+                renderRadialSceneriesExtension(updatedAp, false);
                 updateRadialCoreBadge(updatedAp);
                 updateSingleAirportMarker(updatedAp);
 
@@ -3586,7 +3614,7 @@ async function activateRadialDefaultScenery(e, icao) {
             } else if (res.airports) {
                 allAirportsData = res.airports;
             }
-            updateStats(allAirportsData);
+            setTimeout(() => updateStats(allAirportsData), 0);
             showToast(`✓ Reverted to Default MSFS Base Airport`, 'info');
         }
     } catch (e) {
@@ -3612,7 +3640,7 @@ async function activateRadialFixPackage(e, path, icao) {
         const src = currentRadialAirport.all_sources.find(s => s.folder_name === path || s.package_path === path || (s.folder_name && path.includes(s.folder_name)));
         if (src) {
             src.is_disabled = !src.is_disabled;
-            renderRadialSceneriesExtension(currentRadialAirport);
+            renderRadialSceneriesExtension(currentRadialAirport, false);
         }
     }
 
@@ -3633,7 +3661,7 @@ async function activateRadialFixPackage(e, path, icao) {
                 if (selectedAirport && selectedAirport.icao === icao) {
                     selectedAirport = updatedAp;
                 }
-                renderRadialSceneriesExtension(updatedAp);
+                renderRadialSceneriesExtension(updatedAp, false);
                 updateSingleAirportMarker(updatedAp);
 
                 const detailDrawer = document.getElementById('detail-drawer');
@@ -3643,7 +3671,7 @@ async function activateRadialFixPackage(e, path, icao) {
             } else if (res.airports) {
                 allAirportsData = res.airports;
             }
-            updateStats(allAirportsData);
+            setTimeout(() => updateStats(allAirportsData), 0);
             const statusLabel = res.enabled ? 'Enabled' : 'Disabled';
             showToast(`✓ Fix/Overlay ${statusLabel}`, 'success');
         }
@@ -5984,20 +6012,24 @@ async function toggleFixPatchPackage(path, icao) {
         const resStr = await window.pywebview.api.toggle_fix_patch(path, icao || '');
         const res = JSON.parse(resStr);
         if (res.status === 'ok') {
-            allAirportsData = res.airports;
-            allAirportsData.forEach(ap => {
-                if (userRatingsMap[ap.icao] !== undefined) {
-                    ap.rating = userRatingsMap[ap.icao];
-                }
-            });
-            updateStats(allAirportsData);
-            const targetIcao = (selectedAirport && selectedAirport.icao) ? selectedAirport.icao : icao;
-            const updatedAp = getAirportByIcao(targetIcao);
+            const updatedAp = res.updated_airport || (res.airports ? res.airports.find(a => a.icao === icao) : null);
             if (updatedAp) {
-                if (selectedAirport) selectedAirport = updatedAp;
+                if (userRatingsMap[updatedAp.icao] !== undefined) {
+                    updatedAp.rating = userRatingsMap[updatedAp.icao];
+                }
+                const idx = allAirportsData.findIndex(a => a.icao === updatedAp.icao);
+                if (idx !== -1) allAirportsData[idx] = updatedAp;
+            } else if (res.airports) {
+                allAirportsData = res.airports;
+            }
+            setTimeout(() => updateStats(allAirportsData), 0);
+            const targetIcao = (selectedAirport && selectedAirport.icao) ? selectedAirport.icao : icao;
+            const targetAp = updatedAp || getAirportByIcao(targetIcao);
+            if (targetAp) {
+                if (selectedAirport) selectedAirport = targetAp;
                 if (currentRadialAirport && currentRadialAirport.icao === icao) {
-                    currentRadialAirport = updatedAp;
-                    renderRadialSceneriesExtension(updatedAp);
+                    currentRadialAirport = targetAp;
+                    renderRadialSceneriesExtension(targetAp, false);
                 }
                 const detailDrawer = document.getElementById('detail-drawer');
                 if (detailDrawer && !detailDrawer.classList.contains('translate-x-full')) {

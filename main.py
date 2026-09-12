@@ -1369,7 +1369,7 @@ class Api:
 
             airports = fast_update_airport_cache(icao, target_pkg_name=target_clean)
             target_ap = next((a for a in airports if a['icao'].upper() == icao.upper()), None)
-            return json.dumps({"status": "ok", "updated_airport": target_ap, "airports": airports}, ensure_ascii=False)
+            return json.dumps({"status": "ok", "updated_airport": target_ap}, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
 
@@ -1430,7 +1430,7 @@ class Api:
 
             airports = fast_update_airport_cache(icao) if icao else run_scan()
             target_ap = next((a for a in airports if a['icao'].upper() == (icao or '').upper()), None) if icao else None
-            return json.dumps({"status": "ok", "enabled": should_enable, "updated_airport": target_ap, "airports": airports}, ensure_ascii=False)
+            return json.dumps({"status": "ok", "enabled": should_enable, "updated_airport": target_ap}, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
 
