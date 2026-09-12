@@ -384,6 +384,13 @@
             animation: radialPillExit 0.16s cubic-bezier(0.4, 0, 0.2, 1) forwards;
         }
 
+        #radial-sceneries-extension {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1.75px solid rgba(148, 163, 184, 0.40);
+        }
+
         /* Country Hover & Click Deactivation when Zoomed In */
         #map.countries-inactive .leaflet-overlay-pane path {
             cursor: inherit !important;
@@ -839,8 +846,8 @@
                         </div>
                     </div>
 
-                    <!-- SCENERY EXTENSION PILLS (Stacked vertically to the right of Sceneries quadrant) -->
-                    <div id="radial-sceneries-extension" onclick="event.stopPropagation();" onmousedown="event.stopPropagation();" onpointerdown="event.stopPropagation();" class="hidden absolute left-[542px] top-1/2 -translate-y-1/2 flex flex-col gap-1.5 pointer-events-auto z-[1510] p-1 select-none bg-transparent border-0 shadow-none" style="width: 366px; max-width: 366px;">
+                    <!-- SCENERY EXTENSION PILLS (Framed card panel matching radial quadrant glass & border) -->
+                    <div id="radial-sceneries-extension" onclick="event.stopPropagation();" onmousedown="event.stopPropagation();" onpointerdown="event.stopPropagation();" class="hidden absolute left-[542px] top-1/2 -translate-y-1/2 flex flex-col gap-2 pointer-events-auto z-[1510] p-3 rounded-3xl shadow-2xl shadow-black/80 select-none transition-all duration-200 ease-out" style="width: 380px; max-width: 380px;">
                     </div>
 
                     </div>

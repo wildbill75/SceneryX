@@ -3027,7 +3027,7 @@ function updateRadialMenuPosition(force = false) {
     // Smart screen boundary check (horizontal & vertical) for Sceneries Extension pills
     const extEl = document.getElementById('radial-sceneries-extension');
     if (extEl && !extEl.classList.contains('hidden')) {
-        const extWidth = extEl.offsetWidth || 366;
+        const extWidth = extEl.offsetWidth || 380;
         const mapW = (map && typeof map.getSize === 'function') ? map.getSize().x : window.innerWidth;
         const isNearRightEdge = (point.x + (270 + extWidth) * scale > mapW - 16);
         if (isNearRightEdge) {
@@ -3694,14 +3694,17 @@ function triggerRadialScenerySelector() {
             p.classList.remove('animate-pill-bounce');
             p.classList.add('animate-pill-exit');
         });
+        extEl.style.opacity = '0';
         if (sectorScenery) sectorScenery.classList.remove('active-radial-sector');
         setTimeout(() => {
             extEl.classList.add('hidden');
+            extEl.style.opacity = '';
             extEl.innerHTML = '';
         }, 160);
     } else {
         // Toggle ON: Render autonomous pills with bounce animation ONLY on opening!
         renderRadialSceneriesExtension(currentRadialAirport, true);
+        extEl.style.opacity = '1';
         extEl.classList.remove('hidden');
         if (sectorScenery) sectorScenery.classList.add('active-radial-sector');
         updateRadialMenuPosition(true);
@@ -3754,7 +3757,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
 
         const borderClass = isActive
             ? activeBorderClass
-            : 'border border-slate-700/60 hover:border-slate-500/80 bg-slate-950/75 hover:bg-slate-900/90 shadow-lg';
+            : 'border border-slate-700/70 hover:border-slate-500/80 bg-slate-900/80 hover:bg-slate-800/90 shadow-md';
 
         const animClass = animate ? 'animate-pill-bounce' : '';
         const animDelay = animate ? `style="animation-delay: ${(pillIndex * 0.05).toFixed(2)}s;"` : '';
@@ -3765,7 +3768,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
                  onmousedown="event.stopPropagation();"
                  onpointerdown="event.stopPropagation();"
                  ${animDelay}
-                 class="${animClass} py-2 px-3 rounded-xl ${borderClass} backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1 w-[356px]">
+                 class="${animClass} py-2 px-3 rounded-xl ${borderClass} backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1 w-full">
                 
                 <!-- Row 1: Switch toggle + Title with Native Mouseover Folder Tooltip + Category Badge + Folder Button -->
                 <div class="flex items-center justify-between gap-2">
@@ -3804,7 +3807,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
     // 2. Default MSFS Base Airport (Clean, no "built-in", no filename sub-box, Sky color liseret)
     const defaultBorderClass = isDefaultActive
         ? 'border-2 border-sky-500 shadow-xl shadow-sky-950/50 bg-slate-950/90 ring-1 ring-sky-500/30'
-        : 'border border-slate-700/60 hover:border-slate-500/80 bg-slate-950/75 hover:bg-slate-900/90 shadow-lg';
+        : 'border border-slate-700/70 hover:border-slate-500/80 bg-slate-900/80 hover:bg-slate-800/90 shadow-md';
 
     const defaultAnimClass = animate ? 'animate-pill-bounce' : '';
     const defaultAnimDelay = animate ? `style="animation-delay: ${(pillIndex * 0.05).toFixed(2)}s;"` : '';
@@ -3815,7 +3818,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
              onmousedown="event.stopPropagation();"
              onpointerdown="event.stopPropagation();"
              ${defaultAnimDelay}
-             class="${defaultAnimClass} py-2 px-3 rounded-xl ${defaultBorderClass} backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1 w-[356px]">
+             class="${defaultAnimClass} py-2 px-3 rounded-xl ${defaultBorderClass} backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1 w-full">
             
             <!-- Row 1: Switch toggle + Title + Badge -->
             <div class="flex items-center justify-between gap-2">
@@ -3853,7 +3856,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
             const pkgPath = (src.folder_name || '').replace(/'/g, "\\'");
             const fixBorderClass = isActive
                 ? 'border-2 border-emerald-500 shadow-xl shadow-emerald-950/50 bg-slate-950/90 ring-1 ring-emerald-500/30'
-                : 'border border-slate-700/60 hover:border-slate-500/80 bg-slate-950/75 hover:bg-slate-900/90 shadow-lg';
+                : 'border border-slate-700/70 hover:border-slate-500/80 bg-slate-900/80 hover:bg-slate-800/90 shadow-md';
 
             const fixAnimClass = animate ? 'animate-pill-bounce' : '';
             const fixAnimDelay = animate ? `style="animation-delay: ${(pillIndex * 0.05).toFixed(2)}s;"` : '';
@@ -3864,7 +3867,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
                      onmousedown="event.stopPropagation();"
                      onpointerdown="event.stopPropagation();"
                      ${fixAnimDelay}
-                     class="${fixAnimClass} py-2 px-3 rounded-xl ${fixBorderClass} backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1 w-[356px]">
+                     class="${fixAnimClass} py-2 px-3 rounded-xl ${fixBorderClass} backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1 w-full">
                     
                     <div class="flex items-center justify-between gap-2">
                         <div class="flex items-center gap-2 min-w-0 flex-1">
@@ -3910,7 +3913,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
              onmousedown="event.stopPropagation();"
              onpointerdown="event.stopPropagation();"
              ${freewareAnimDelay}
-             class="${freewareAnimClass} py-2 px-3 rounded-xl border border-slate-700/60 hover:border-cyan-400/80 bg-slate-950/75 hover:bg-slate-900/90 shadow-lg backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1 w-[356px]">
+             class="${freewareAnimClass} py-2 px-3 rounded-xl border border-slate-700/70 hover:border-cyan-400/80 bg-slate-900/80 hover:bg-slate-800/90 shadow-md backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1 w-full">
             
             <!-- Row 1: Flightsim.to Icon + Title + FREEWARE Badge + FREE Pill + External Link Icon -->
             <div class="flex items-center justify-between gap-2">
@@ -4039,8 +4042,8 @@ function renderRadialAddonDownloads(ap, stores, animate = false, basePillIndex =
             : '<span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 shrink-0 uppercase">STORE</span>';
 
         const borderClass = isDev
-            ? 'border border-slate-700/60 hover:border-amber-400/80 bg-slate-950/75 hover:bg-slate-900/90 shadow-lg'
-            : 'border border-slate-700/60 hover:border-purple-500/80 bg-slate-950/75 hover:bg-slate-900/90 shadow-lg';
+            ? 'border border-slate-700/70 hover:border-amber-400/80 bg-slate-900/80 hover:bg-slate-800/90 shadow-md'
+            : 'border border-slate-700/70 hover:border-purple-500/80 bg-slate-900/80 hover:bg-slate-800/90 shadow-md';
 
         const safeUrl = (st.url || '').replace(/'/g, "\\'");
 
@@ -4049,7 +4052,7 @@ function renderRadialAddonDownloads(ap, stores, animate = false, basePillIndex =
                  onmousedown="event.stopPropagation();"
                  onpointerdown="event.stopPropagation();"
                  ${animDelay}
-                 class="${animClass} py-2 px-3 rounded-xl ${borderClass} backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1 w-[356px]">
+                 class="${animClass} py-2 px-3 rounded-xl ${borderClass} backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1 w-full">
                 
                 <!-- Row 1: Store Icon + Store Name + Store/Dev Badge + Price & Link Button -->
                 <div class="flex items-center justify-between gap-2">
