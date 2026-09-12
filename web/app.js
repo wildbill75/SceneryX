@@ -856,6 +856,11 @@ function initMap() {
         L.DomEvent.disableScrollPropagation(radialExtEl);
     }
 
+    // Dynamically update radial menu position and scale during pan/zoom/resize so it stays anchored and resizes
+    map.on('move zoom viewreset moveend', () => updateRadialMenuPosition(false));
+    map.on('zoom viewreset zoomend', updateCountryInteractivityState);
+    window.addEventListener('resize', () => updateRadialMenuPosition(false));
+
     // Double click on neutral map area: resets camera according to priority hierarchy
     map.on('dblclick', () => {
         if (countryClickTimeout) {
