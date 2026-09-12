@@ -385,7 +385,8 @@
         }
 
         #radial-sceneries-extension,
-        #radial-airlines-modal {
+        #radial-airlines-modal,
+        #flight-planning-banner {
             background: rgba(15, 23, 42, 0.38);
             backdrop-filter: blur(18px);
             -webkit-backdrop-filter: blur(18px);
@@ -916,9 +917,9 @@
             </div>
 
             <!-- FLOATING FLIGHT OPTIMIZER BANNER (ACTIVATED VIA ALT+CLICK, DRAGGABLE) -->
-            <div id="flight-planning-banner" class="hidden absolute z-[1000] glass-panel bg-slate-900/95 border border-slate-700/80 px-4 py-2.5 rounded-2xl shadow-2xl shadow-black/80 items-center gap-3.5 select-none cursor-grab active:cursor-grabbing pointer-events-auto transition-shadow hover:shadow-cyan-500/10">
+            <div id="flight-planning-banner" class="hidden absolute z-[1000] px-4 py-2.5 rounded-2xl shadow-xl shadow-black/50 items-center gap-3.5 select-none cursor-grab active:cursor-grabbing pointer-events-auto transition-all">
                 <!-- DRAG HANDLE GRIP -->
-                <div class="text-slate-500 hover:text-slate-300 flex items-center pr-1 cursor-grab active:cursor-grabbing" title="Click and drag banner to move">
+                <div class="text-slate-400 opacity-75 hover:opacity-100 flex items-center pr-1 cursor-grab active:cursor-grabbing" title="Click and drag banner to move">
                     <i class="fa-solid fa-grip-vertical text-xs"></i>
                 </div>
 
@@ -927,25 +928,25 @@
                         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                         <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                     </span>
-                    <span data-i18n="optimizer.title" class="text-xs font-black font-mono uppercase tracking-wider text-slate-200">Flight Scenery Optimizer</span>
+                    <span data-i18n="optimizer.title" class="text-xs font-black font-mono uppercase tracking-wider text-slate-200 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">Flight Scenery Optimizer</span>
                 </div>
 
-                <div class="h-4 w-px bg-slate-800"></div>
+                <div class="h-4 w-px bg-slate-700/40"></div>
 
                 <div class="flex items-center gap-2 font-mono">
-                    <span id="fp-origin-tag" class="font-bold text-xs bg-slate-800 px-2.5 py-1 rounded-lg text-slate-400 border-0">----</span>
+                    <span id="fp-origin-tag" class="font-bold text-xs bg-slate-900/60 px-2.5 py-1 rounded-lg text-slate-300 border border-slate-700/40">----</span>
                     <span class="text-slate-500 text-xs">➔</span>
-                    <span id="fp-dest-tag" class="font-bold text-xs bg-slate-800 px-2.5 py-1 rounded-lg text-slate-400 border-0">----</span>
+                    <span id="fp-dest-tag" class="font-bold text-xs bg-slate-900/60 px-2.5 py-1 rounded-lg text-slate-300 border border-slate-700/40">----</span>
                 </div>
 
-                <div class="h-4 w-px bg-slate-800"></div>
+                <div class="h-4 w-px bg-slate-700/40"></div>
 
-                <span id="fp-guide-text" data-i18n="optimizer.guide_destination" class="text-xs text-slate-300 font-medium">Alt+Click an airport to set Destination</span>
+                <span id="fp-guide-text" data-i18n="optimizer.guide_destination" class="text-xs text-slate-300 font-medium drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">Alt+Click an airport to set Destination</span>
 
                 <!-- DUAL PROFILE ACTIONS & OPTIMIZATION (VISIBLE WHEN ARRIVAL IS SELECTED) -->
                 <div id="fp-actions" class="hidden items-center gap-2">
                     <!-- Segmented Profile Selector -->
-                    <div id="fp-profile-toggle" class="flex items-center bg-slate-950/80 p-0.5 rounded-xl border border-slate-800 transition-all">
+                    <div id="fp-profile-toggle" class="flex items-center bg-slate-950/60 p-0.5 rounded-xl border border-slate-700/50 transition-all">
                         <button id="fp-btn-corridor" onclick="setFlightCorridorProfile(\'CORRIDOR\')" class="px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer bg-cyan-600 text-white shadow-sm shadow-cyan-600/30" data-i18n-title="optimizer.en_route_tooltip" title="Keeps active your departure, arrival, and all custom sceneries along your flight path. Disables everything else.">
                             <span id="fp-corridor-label" data-i18n="optimizer.en_route">En-Route</span>
                         </button>
@@ -966,9 +967,9 @@
                 </div>
 
                 <!-- Active Optimization Status: Plain text in white, no pill -->
-                <span id="fp-optimized-text" class="hidden text-xs font-semibold text-white whitespace-nowrap">0 addons disabled</span>
+                <span id="fp-optimized-text" class="hidden text-xs font-semibold text-white whitespace-nowrap drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">0 addons disabled</span>
 
-                <button onclick="exitFlightPlanningMode()" class="ml-1 px-3 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold border border-slate-700 transition-all cursor-pointer active:scale-95" data-i18n-title="optimizer.exit_tooltip" title="Exit Flight Optimizer (or press Escape)">
+                <button onclick="exitFlightPlanningMode()" class="ml-1 px-3 py-1 rounded-xl bg-slate-800/60 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold border border-slate-700/50 transition-all cursor-pointer active:scale-95" data-i18n-title="optimizer.exit_tooltip" title="Exit Flight Optimizer (or press Escape)">
                     <span data-i18n="optimizer.exit">Exit</span>
                 </button>
             </div>
