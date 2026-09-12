@@ -834,6 +834,10 @@ function initMap() {
     // Single click on neutral map area: closes radial menu & drawer WITHOUT changing camera (ignored on drag/pan)
     map.on('click', () => {
         if (isMapDragging) return;
+        if (isAirlinesModalOpen()) {
+            // In airlines mode: map clicks MUST NOT dismiss or exit airlines mode. Only close button does.
+            return;
+        }
         closeAirportRadialMenu();
         if (countryClickTimeout) {
             clearTimeout(countryClickTimeout);
@@ -1012,6 +1016,10 @@ async function loadCountryOverlays() {
                     click: (e) => {
                         L.DomEvent.stopPropagation(e);
                         if (isMapDragging) return;
+                        if (isAirlinesModalOpen()) {
+                            // In airlines mode: clicking on map/country MUST NOT exit airlines mode. Only close button does.
+                            return;
+                        }
                         // When zoomed in, country clicks are completely disabled
                         if (map && typeof map.getZoom === 'function' && map.getZoom() > MAX_COUNTRY_INTERACTION_ZOOM) {
                             if (currentRadialAirport || selectedAirport || activeDrawerMode !== 'MAP') {
@@ -1049,6 +1057,10 @@ async function loadCountryOverlays() {
                     },
                     dblclick: (e) => {
                         L.DomEvent.stopPropagation(e);
+                        if (isAirlinesModalOpen()) {
+                            // In airlines mode: clicking on map/country MUST NOT exit airlines mode. Only close button does.
+                            return;
+                        }
                         closeAirportRadialMenu();
                         if (countryClickTimeout) {
                             clearTimeout(countryClickTimeout);
@@ -2882,6 +2894,11 @@ let airlinesModalUserOffset = { x: 0, y: 0 };
 let hasUserDraggedAirlinesModal = false;
 let airlinesModalDragStart = { x: 0, y: 0 };
 
+function isAirlinesModalOpen() {
+    const modal = document.getElementById('radial-airlines-modal');
+    return !!(modal && !modal.classList.contains('hidden'));
+}
+
 function closeAirportRadialMenu() {
     const radialEl = document.getElementById('airport-radial-menu');
     if (radialEl) {
@@ -2957,6 +2974,10 @@ function updateRadialMenuPosition(force = false) {
     // Ne jamais fermer automatiquement pendant que la camera est en cours de vol/pan vers l'aeroport
     const MIN_RADIAL_ZOOM = 5.0;
     if (!isCameraPanningToRadial && currentZoom < MIN_RADIAL_ZOOM) {
+        if (isAirlinesModalOpen()) {
+            // In airlines mode: do not auto-close on zoom out so user can view world-wide routes
+            return;
+        }
         closeAirportRadialMenu();
         return;
     }
@@ -3291,6 +3312,17 @@ function closeRadialAirlinesModal(event) {
     isAirlinesModalDragging = false;
     if (sectorAirlines) {
         sectorAirlines.classList.remove('active-radial-sector');
+    }
+    // Clear active airline filter and routes upon closing airlines modal
+    if (selectedAirlines.size > 0) {
+        selectedAirlines.clear();
+        selectedAirline = null;
+        activeRouteOrigin = null;
+        if (activeRouteLinesGroup) {
+            activeRouteLinesGroup.clearLayers();
+        }
+        filterAirports();
+        updateFilterUI();
     }
     // If an airline was selected and quadrants were collapsed, restore them
     const radialEl = document.getElementById('airport-radial-menu');
@@ -4194,6 +4226,10 @@ window.addEventListener('click', function (e) {
     if (e.button !== 0) return; // Strict Left-Click ONLY
     if (isMapDragging) return; // Do NOT dismiss on drag / pan release
     if (!currentRadialAirport) return;
+    if (isAirlinesModalOpen()) {
+        // In airlines mode: clicking outside on map MUST NOT exit airlines mode. Only close button does.
+        return;
+    }
 
     const radialEl = document.getElementById('airport-radial-menu');
     if (radialEl && !radialEl.classList.contains('hidden')) {
