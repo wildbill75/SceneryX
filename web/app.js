@@ -2966,6 +2966,12 @@ function getWrappedAirportLatLng(ap, marker) {
 
 function updateRadialMenuPosition(force = false) {
     if (!currentRadialAirport || !map) return;
+
+    // Operating Airlines Modal: keep it systematically anchored under the airport regardless of radial wheel state!
+    if (isAirlinesModalOpen()) {
+        updateRadialAirlinesModalPosition(true);
+    }
+
     const radialEl = document.getElementById('airport-radial-menu');
     if (!radialEl) return;
     if (!force && radialEl.classList.contains('hidden')) return;
@@ -3048,13 +3054,9 @@ function updateRadialAirlinesModalPosition(force = false) {
     modal.style.left = `${Math.round(point.x)}px`;
 
     if (!hasUserDraggedAirlinesModal) {
-        // Place directly below the airport pin/marker, clamped to avoid cropping at bottom of viewport
-        const modalHeight = modal.offsetHeight || 260;
-        const desiredTop = Math.round(point.y) + 28;
-        const maxTop = window.innerHeight - modalHeight - 15;
-        const actualTop = Math.max(15, Math.min(maxTop, desiredTop));
-
-        modal.style.top = `${actualTop}px`;
+        // Place systématiquement sous l'aéroport (écart propre de 32px sous le repère)
+        const desiredTop = Math.round(point.y) + 32;
+        modal.style.top = `${desiredTop}px`;
         modal.style.transform = 'translateX(-50%)';
     } else {
         modal.style.transform = `translate(calc(-50% + ${airlinesModalUserOffset.x}px), ${airlinesModalUserOffset.y}px)`;
@@ -3086,6 +3088,13 @@ function panMapToAirport(ap) {
         xOffset = drawerWidth / 2;
     }
 
+    let yOffset = 0;
+    if (isAirlinesModalOpen()) {
+        // En mode Airlines : décaler le centre vertical pour que l'aéroport se positionne dans le tiers supérieur de l'écran (~25-30%),
+        // laissant systématiquement toute la place nécessaire à la modale en dessous, exactement comme sur le screen 1.
+        yOffset = Math.round(window.innerHeight * 0.20);
+    }
+
     const currentZoom = (typeof map.getZoom === 'function') ? map.getZoom() : 8;
     // Si la carte est trop dezoomee (< 6.0), voler doucement jusqu'a 6.0 pour que le menu soit visible
     // Si deja a zoom >= 6.0, preserver le zoom utilisateur
@@ -3107,9 +3116,9 @@ function panMapToAirport(ap) {
     }, Math.round((PAN_DURATION + 0.3) * 1000));
 
     try {
-        if (xOffset !== 0) {
+        if (xOffset !== 0 || yOffset !== 0) {
             const targetPoint = map.project([flyLat, flyLon], targetZoom);
-            const adjustedPoint = L.point(targetPoint.x + xOffset, targetPoint.y);
+            const adjustedPoint = L.point(targetPoint.x + xOffset, targetPoint.y + yOffset);
             const adjustedLatLng = map.unproject(adjustedPoint, targetZoom);
             if (targetZoom !== currentZoom) {
                 map.flyTo(adjustedLatLng, targetZoom, { animate: true, duration: PAN_DURATION });
@@ -3344,6 +3353,9 @@ function triggerRadialOperatingAirlines() {
         }
         renderRadialOperatingAirlines(currentRadialAirport);
         modal.classList.remove('hidden');
+
+        // Smoothly adjust camera so airport sits in upper portion with modal systematically below it!
+        panMapToAirport(currentRadialAirport);
         updateRadialAirlinesModalPosition(true);
     }
 }
@@ -3377,6 +3389,9 @@ function closeRadialAirlinesModal(event) {
     }
     // Restore the full radial menu wheel on the last selected airport with bounce animation
     if (radialEl && currentRadialAirport) {
+        // Re-center camera on airport for radial wheel (since isAirlinesModalOpen() is now false, yOffset = 0)
+        panMapToAirport(currentRadialAirport);
+
         radialEl.classList.remove('hidden', 'radial-quadrants-collapsed');
         const disc = document.getElementById('radial-backdrop-disc');
         const sectors = radialEl.querySelectorAll('.radial-sector');
