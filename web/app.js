@@ -3008,22 +3008,12 @@ function updateRadialMenuPosition(force = false) {
         }
     }
 
-    // Smart screen boundary check for Operating Airlines Modal (Bottom horizontal placement)
+    // Operating Airlines Modal (Positioned directly under DETAILS quadrant, centered)
     const airlinesModal = document.getElementById('radial-airlines-modal');
     if (airlinesModal && !airlinesModal.classList.contains('hidden')) {
         if (!hasUserDraggedAirlinesModal) {
-            const isCollapsed = radialEl.classList.contains('radial-quadrants-collapsed');
-            const normalOffset = isCollapsed ? 405 : 545;
-            const isNearBottom = (point.y + (normalOffset + 220) * scale > window.innerHeight - 20);
-            if (isNearBottom) {
-                airlinesModal.classList.add('is-inverted');
-                airlinesModal.style.top = 'auto';
-                airlinesModal.style.bottom = `${normalOffset}px`;
-            } else {
-                airlinesModal.classList.remove('is-inverted');
-                airlinesModal.style.bottom = 'auto';
-                airlinesModal.style.top = `${normalOffset}px`;
-            }
+            airlinesModal.style.top = '545px';
+            airlinesModal.style.bottom = 'auto';
             airlinesModal.style.left = '50%';
             airlinesModal.style.right = 'auto';
             airlinesModal.style.transform = 'translateX(-50%)';
@@ -3361,13 +3351,19 @@ function restoreRadialQuadrants() {
     if (!radialEl) return;
     radialEl.classList.remove('radial-quadrants-collapsed');
 
-    // Trigger spring bounce animation on sectors and backdrop disc
+    // Trigger spring bounce animation on sectors, backdrop disc, and central core
     const disc = document.getElementById('radial-backdrop-disc');
     const sectors = radialEl.querySelectorAll('.radial-sector');
+    const core = document.getElementById('radial-core');
     if (disc) {
         disc.style.animation = 'none';
         void disc.offsetWidth;
         disc.style.animation = 'radialBackdropPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards';
+    }
+    if (core) {
+        core.style.animation = 'none';
+        void core.offsetWidth;
+        core.style.animation = 'radialCoreBounce 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards';
     }
     sectors.forEach((sec, idx) => {
         sec.style.animation = 'none';

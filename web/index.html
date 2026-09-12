@@ -338,20 +338,12 @@
 
         /* Radial Quadrants Collapsed State (when an operating airline route is filtered) */
         .radial-quadrants-collapsed #radial-backdrop-disc,
-        .radial-quadrants-collapsed #radial-sectors-svg {
+        .radial-quadrants-collapsed #radial-sectors-svg,
+        .radial-quadrants-collapsed #radial-core {
             opacity: 0 !important;
             transform: scale(0.65) !important;
             pointer-events: none !important;
             transition: opacity 0.25s ease-in, transform 0.25s cubic-bezier(0.4, 0, 1, 1) !important;
-        }
-
-        .radial-quadrants-collapsed #radial-airlines-modal:not(.user-dragged):not(.is-inverted) {
-            top: 405px !important;
-        }
-
-        .radial-quadrants-collapsed #radial-airlines-modal.is-inverted:not(.user-dragged) {
-            bottom: 405px !important;
-            top: auto !important;
         }
 
         /* Tactical Scenery Pill Cascade & Spring Bounce Animation */
@@ -851,21 +843,18 @@
                     <div id="radial-sceneries-extension" onclick="event.stopPropagation();" onmousedown="event.stopPropagation();" onpointerdown="event.stopPropagation();" class="hidden absolute left-[542px] top-1/2 -translate-y-1/2 flex flex-col gap-2.5 pointer-events-auto z-[1510] max-h-[600px] overflow-y-auto overflow-x-hidden custom-scrollbar p-1 select-none bg-transparent border-0 shadow-none" style="width: 375px; max-width: 375px;">
                     </div>
 
-                    <!-- OPERATING AIRLINES MODAL (Horizontal presentation at bottom of radial menu, draggable) -->
+                    <!-- OPERATING AIRLINES MODAL (Horizontal presentation under DETAILS quadrant, draggable) -->
                     <div id="radial-airlines-modal"
                          onclick="event.stopPropagation();"
                          onmousedown="event.stopPropagation();"
                          onpointerdown="event.stopPropagation();"
-                         class="hidden absolute left-1/2 -translate-x-1/2 flex flex-col glass-modal rounded-3xl border border-slate-700/80 shadow-2xl p-4 select-none w-[660px] max-w-[94vw] pointer-events-auto z-[1510] transition-all duration-300 ease-out"
+                         class="hidden absolute left-1/2 -translate-x-1/2 flex flex-col glass-modal rounded-3xl border border-slate-700/80 shadow-2xl p-4 select-none w-[820px] max-w-[96vw] pointer-events-auto z-[1510] transition-all duration-300 ease-out"
                          style="top: 545px;">
                         
                         <!-- Drag Handle & Modal Header -->
                         <div id="radial-airlines-modal-header" class="flex items-center justify-between pb-2.5 border-b border-slate-800 shrink-0 cursor-grab active:cursor-grabbing">
                             <div class="flex items-center gap-2 pointer-events-none">
-                                <div class="flex items-center gap-1 text-slate-500 mr-1">
-                                    <i class="fa-solid fa-grip-vertical text-[10px]"></i>
-                                    <i class="fa-solid fa-grip-vertical text-[10px]"></i>
-                                </div>
+                                <i class="fa-solid fa-grip-vertical text-xs text-slate-400 mr-1 opacity-75"></i>
                                 <span class="text-xs font-black font-mono tracking-wider text-white uppercase" data-i18n="drawer.operating_airlines">Operating Airlines</span>
                             </div>
                             <button onclick="closeRadialAirlinesModal(event)" title="Close" class="w-7 h-7 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition-colors border border-slate-700/50 cursor-pointer">
@@ -885,8 +874,8 @@
                             </div>
                         </div>
 
-                        <!-- Horizontal Multi-Column Grid (6 columns, scrollable) -->
-                        <div id="radial-airlines-list" class="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-2 overflow-y-auto custom-scrollbar pr-1 max-h-[190px] py-1">
+                        <!-- Horizontal Multi-Column Grid (8 columns, 3 rows visible, scrollable) -->
+                        <div id="radial-airlines-list" class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2 overflow-y-auto custom-scrollbar pr-1 max-h-[188px] py-1">
                             <!-- Dynamic airline cards rendered here -->
                         </div>
                     </div>
