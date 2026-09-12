@@ -3662,7 +3662,12 @@ async function activateRadialFixPackage(e, path, icao) {
 
     // 1. Immediate OPTIMISTIC UI update
     if (currentRadialAirport && currentRadialAirport.all_sources) {
-        const src = currentRadialAirport.all_sources.find(s => s.folder_name === path || s.package_path === path || (s.folder_name && path.includes(s.folder_name)));
+        const cleanPath = (path || '').toLowerCase().replace(/\.disabled$/, '');
+        const src = currentRadialAirport.all_sources.find(s => {
+            const fn = (s.folder_name || '').toLowerCase().replace(/\.disabled$/, '');
+            const pp = (s.package_path || '').toLowerCase().replace(/\.disabled$/, '');
+            return fn === cleanPath || pp.endsWith(cleanPath) || cleanPath.includes(fn) || fn.includes(cleanPath);
+        });
         if (src) {
             src.is_disabled = !src.is_disabled;
             renderRadialSceneriesExtension(currentRadialAirport, false);
@@ -3687,6 +3692,7 @@ async function activateRadialFixPackage(e, path, icao) {
                     selectedAirport = updatedAp;
                 }
                 renderRadialSceneriesExtension(updatedAp, false);
+                updateRadialCoreBadge(updatedAp);
                 updateSingleAirportMarker(updatedAp);
 
                 const detailDrawer = document.getElementById('detail-drawer');

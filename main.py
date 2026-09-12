@@ -232,6 +232,8 @@ def set_package_state_for_icao(p_path, target_icao, should_enable):
     # Official / Streamed packages must NEVER be renamed physically on disk (managed via Content.xml)
     td_lower = target_dir.lower()
     if any(k in td_lower for k in ['official', 'streamed', 'asobo-', 'microsoft-']):
+        if should_enable and dis_p and (os.path.exists(dis_p) or os.path.islink(dis_p)):
+            enable_physical_package(dis_p)
         return
 
     # Check if package is potentially a multi-airport bundle
@@ -409,7 +411,7 @@ def update_msfs_content_xml(keep_icaos=None, restore_flight_mode=False, flight_d
 
 AIRPORTS_CACHE = None
 
-def fast_update_airport_cache(icao_target, target_pkg_name=None, toggle_all=False):
+def fast_update_airport_cache(icao_target, target_pkg_name=None, toggle_all=False, fix_path_toggled=None, fix_enabled=None):
     global AIRPORTS_CACHE
     if not os.path.exists(OUTPUT_JSON_PATH):
         airports = run_scan()
@@ -468,11 +470,61 @@ def fast_update_airport_cache(icao_target, target_pkg_name=None, toggle_all=Fals
                     s['is_disabled'] = True
                     if dis_p and os.path.exists(dis_p):
                         s['package_path'] = dis_p
-        else:
+        elif fix_path_toggled is not None:
+            clean_fix_path = fix_path_toggled[:-9] if fix_path_toggled.lower().endswith('.disabled') else fix_path_toggled
+            clean_fix_name = os.path.basename(clean_fix_path).lower()
+            clean_fix_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_fix_name)
             for s in all_srcs:
+                fn = s.get('folder_name', '')
+                clean_fn = fn[:-9] if fn.lower().endswith('.disabled') else fn
+                clean_fn_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_fn.lower())
+                pkg_p = s.get('package_path', '')
+                clean_p = pkg_p[:-9] if pkg_p and pkg_p.endswith('.disabled') else pkg_p
+
+                is_this_fix = (
+                    clean_fn.lower() == clean_fix_name 
+                    or clean_fn_norm == clean_fix_norm
+                    or (clean_p and clean_p.lower() == clean_fix_path.lower())
+                    or (clean_fix_norm and clean_fn_norm and (clean_fix_norm in clean_fn_norm or clean_fn_norm in clean_fix_norm))
+                )
+                if is_this_fix:
+                    s['is_disabled'] = not fix_enabled
+                    s['folder_name'] = clean_fn if fix_enabled else (clean_fn + '.disabled')
+                    if clean_p:
+                        s['package_path'] = clean_p if fix_enabled else (clean_p + '.disabled')
+        else:
+            content_xml_path = get_content_xml_path()
+            content_xml_status = {}
+            if os.path.exists(content_xml_path):
+                try:
+                    import xml.etree.ElementTree as ET
+                    tree = ET.parse(content_xml_path)
+                    for p in tree.getroot().findall('Package'):
+                        p_name = p.get('name', '')
+                        p_clean = p_name[:-9] if p_name.lower().endswith('.disabled') else p_name
+                        content_xml_status[p_clean.lower()] = (p.get('active') == 'Activated')
+                except Exception:
+                    pass
+
+            for s in all_srcs:
+                is_official = s.get('is_asobo_official') or any(k in (s.get('source_folder', '') or '').lower() for k in ['streamed', 'official']) or any(k in (s.get('folder_name', '') or '').lower() for k in ['asobo-', 'microsoft-'])
+                fn = s.get('folder_name', '')
+                fn_clean = fn[:-9] if fn.lower().endswith('.disabled') else fn
                 p = s.get('package_path', '')
                 clean_p = p[:-9] if p and p.endswith('.disabled') else p
                 dis_p = clean_p + '.disabled' if clean_p else None
+
+                if is_official:
+                    found_in_xml = None
+                    for xml_pkg, is_act in content_xml_status.items():
+                        if xml_pkg == fn_clean.lower() or xml_pkg in fn_clean.lower() or fn_clean.lower() in xml_pkg:
+                            found_in_xml = is_act
+                            break
+                    if found_in_xml is not None:
+                        s['is_disabled'] = not found_in_xml
+                        if found_in_xml and dis_p and (os.path.exists(dis_p) or os.path.islink(dis_p)):
+                            enable_physical_package(dis_p)
+                        continue
 
                 folder_exists = clean_p and os.path.exists(clean_p)
                 dis_folder_exists = dis_p and os.path.exists(dis_p)
@@ -1450,7 +1502,7 @@ class Api:
             else:
                 disable_physical_package(target_path)
 
-            airports = fast_update_airport_cache(icao) if icao else run_scan()
+            airports = fast_update_airport_cache(icao, fix_path_toggled=clean_name, fix_enabled=should_enable) if icao else run_scan()
             target_ap = next((a for a in airports if a['icao'].upper() == (icao or '').upper()), None) if icao else None
             return json.dumps({"status": "ok", "enabled": should_enable, "updated_airport": target_ap}, ensure_ascii=False)
         except Exception as e:
