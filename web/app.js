@@ -3052,24 +3052,20 @@ function updateRadialAirlinesModalPosition(force = false) {
     const point = (typeof map.latLngToContainerPoint === 'function') ? map.latLngToContainerPoint(latLng) : null;
     if (!point) return;
 
-    // Center horizontally on airport, clamped so the wide modal does not overflow screen boundaries
+    // Center horizontally on airport, clamped so the wide modal does not overflow map boundaries
+    const mapSize = (typeof map.getSize === 'function') ? map.getSize() : null;
+    const containerW = mapSize ? mapSize.x : (modal.offsetParent ? modal.offsetParent.offsetWidth : window.innerWidth);
     const modalWidth = modal.offsetWidth || 820;
     const halfWidth = modalWidth / 2;
-    const minLeft = halfWidth + 16;
-    const maxLeft = window.innerWidth - halfWidth - 16;
+    const minLeft = halfWidth + 12;
+    const maxLeft = Math.max(minLeft, containerW - halfWidth - 12);
     const clampedX = Math.max(minLeft, Math.min(maxLeft, Math.round(point.x)));
     modal.style.left = `${clampedX}px`;
 
     if (!hasUserDraggedAirlinesModal) {
-        // Place systematically BELOW the airport pin & label:
-        // Gap of 48px below point.y leaves full clearance for the marker star and LFPG label
-        const desiredTop = Math.round(point.y) + 48;
-        // Never allow modal to overlap or climb over the airport (must remain >= point.y + 44)
-        const modalHeight = modal.offsetHeight || 300;
-        const maxTop = Math.max(Math.round(point.y) + 44, window.innerHeight - modalHeight - 16);
-        const actualTop = Math.max(Math.round(point.y) + 44, Math.min(maxTop, desiredTop));
-
-        modal.style.top = `${actualTop}px`;
+        // Place strictly UNDER the airport marker & label (with a clean 44px clearance below point.y)
+        const desiredTop = Math.round(point.y) + 44;
+        modal.style.top = `${desiredTop}px`;
         modal.style.transform = 'translateX(-50%)';
     } else {
         modal.style.transform = `translate(calc(-50% + ${airlinesModalUserOffset.x}px), ${airlinesModalUserOffset.y}px)`;
@@ -3106,11 +3102,11 @@ function panMapToAirport(ap) {
 
     let yOffset = 0;
     if (isAirlinesModalOpen()) {
-        // En mode Airlines : positionner l'aéroport dans le tiers supérieur de l'écran (~24%, min 115px, max 220px)
+        // En mode Airlines : positionner l'aéroport dans le quart supérieur de l'écran (~20-22%, min 100px, max 180px)
         // pour laisser systématiquement toute la place nécessaire à la modale en dessous sans jamais masquer l'aéroport (conforme au Screen 2)
         const mapH = (map && typeof map.getSize === 'function') ? map.getSize().y : window.innerHeight;
         const cy = mapH / 2;
-        const desiredApY = Math.max(115, Math.min(220, Math.round(mapH * 0.24)));
+        const desiredApY = Math.max(100, Math.min(180, Math.round(mapH * 0.20)));
         yOffset = Math.round(cy - desiredApY);
     }
 
