@@ -3029,18 +3029,33 @@ function updateRadialMenuPosition(force = false) {
         }
     }
 
-    // Operating Airlines Modal (Positioned directly under DETAILS quadrant, centered)
-    const airlinesModal = document.getElementById('radial-airlines-modal');
-    if (airlinesModal && !airlinesModal.classList.contains('hidden')) {
-        if (!hasUserDraggedAirlinesModal) {
-            airlinesModal.style.top = '545px';
-            airlinesModal.style.bottom = 'auto';
-            airlinesModal.style.left = '50%';
-            airlinesModal.style.right = 'auto';
-            airlinesModal.style.transform = 'translateX(-50%)';
-        } else {
-            airlinesModal.style.transform = `translate(calc(-50% + ${airlinesModalUserOffset.x}px), ${airlinesModalUserOffset.y}px)`;
-        }
+    // Operating Airlines Modal (Anchored directly under airport, independent of radial scale)
+    updateRadialAirlinesModalPosition(force);
+}
+
+function updateRadialAirlinesModalPosition(force = false) {
+    const modal = document.getElementById('radial-airlines-modal');
+    if (!modal || (!force && modal.classList.contains('hidden'))) return;
+    if (!currentRadialAirport || !map) return;
+
+    const latLng = getWrappedAirportLatLng(currentRadialAirport, currentRadialMarker);
+    if (!latLng) return;
+    const point = (typeof map.latLngToContainerPoint === 'function') ? map.latLngToContainerPoint(latLng) : null;
+    if (!point) return;
+
+    modal.style.left = `${Math.round(point.x)}px`;
+
+    if (!hasUserDraggedAirlinesModal) {
+        // Place directly below the airport pin/marker, clamped to avoid cropping at bottom of viewport
+        const modalHeight = modal.offsetHeight || 260;
+        const desiredTop = Math.round(point.y) + 28;
+        const maxTop = window.innerHeight - modalHeight - 15;
+        const actualTop = Math.max(15, Math.min(maxTop, desiredTop));
+
+        modal.style.top = `${actualTop}px`;
+        modal.style.transform = 'translateX(-50%)';
+    } else {
+        modal.style.transform = `translate(calc(-50% + ${airlinesModalUserOffset.x}px), ${airlinesModalUserOffset.y}px)`;
     }
 }
 
@@ -3275,7 +3290,7 @@ function triggerRadialFlightPlan() {
 function triggerRadialOperatingAirlines() {
     if (!currentRadialAirport) return;
     const modal = document.getElementById('radial-airlines-modal');
-    const sectorAirlines = document.getElementById('radial-sector-airlines');
+    const radialEl = document.getElementById('airport-radial-menu');
     if (!modal) return;
 
     // If Sceneries extension is open, close it
@@ -3288,24 +3303,25 @@ function triggerRadialOperatingAirlines() {
         // Toggle OFF
         closeRadialAirlinesModal();
     } else {
-        // Toggle ON
+        // Toggle ON: Entire radial menu wheel disappears as requested!
+        if (radialEl) {
+            radialEl.classList.add('hidden');
+        }
         renderRadialOperatingAirlines(currentRadialAirport);
         modal.classList.remove('hidden');
-        if (sectorAirlines) sectorAirlines.classList.add('active-radial-sector');
-        updateRadialMenuPosition(true);
+        updateRadialAirlinesModalPosition(true);
     }
 }
 
 function closeRadialAirlinesModal(event) {
     if (event) event.stopPropagation();
     const modal = document.getElementById('radial-airlines-modal');
+    const radialEl = document.getElementById('airport-radial-menu');
     const sectorAirlines = document.getElementById('radial-sector-airlines');
     if (modal) {
         modal.classList.add('hidden');
-        modal.classList.remove('user-dragged', 'is-inverted');
+        modal.classList.remove('user-dragged');
         modal.style.transform = 'translateX(-50%)';
-        modal.style.top = '545px';
-        modal.style.bottom = 'auto';
     }
     hasUserDraggedAirlinesModal = false;
     airlinesModalUserOffset = { x: 0, y: 0 };
@@ -3324,10 +3340,28 @@ function closeRadialAirlinesModal(event) {
         filterAirports();
         updateFilterUI();
     }
-    // If an airline was selected and quadrants were collapsed, restore them
-    const radialEl = document.getElementById('airport-radial-menu');
-    if (radialEl && radialEl.classList.contains('radial-quadrants-collapsed')) {
-        restoreRadialQuadrants();
+    // Restore the full radial menu wheel with bounce animation
+    if (radialEl && currentRadialAirport) {
+        radialEl.classList.remove('hidden', 'radial-quadrants-collapsed');
+        const disc = document.getElementById('radial-backdrop-disc');
+        const sectors = radialEl.querySelectorAll('.radial-sector');
+        const core = document.getElementById('radial-core');
+        if (disc) {
+            disc.style.animation = 'none';
+            void disc.offsetWidth;
+            disc.style.animation = 'radialBackdropPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards';
+        }
+        if (core) {
+            core.style.animation = 'none';
+            void core.offsetWidth;
+            core.style.animation = 'radialCoreBounce 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards';
+        }
+        sectors.forEach((sec, idx) => {
+            sec.style.animation = 'none';
+            void sec.offsetWidth;
+            sec.style.animation = `radialSectorCircularBounce 0.36s cubic-bezier(0.34, 1.56, 0.64, 1) ${(idx * 0.05).toFixed(2)}s both`;
+        });
+        updateRadialMenuPosition(true);
     }
 }
 
