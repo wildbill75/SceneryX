@@ -25,7 +25,7 @@ let currentlyFilteredAirports = [];
 let selectedAirport = null;
 let activeDrawerMode = 'MAP'; // 'MAP', 'COUNTRY', 'AIRPORT'
 let userRatingsMap = {};
-let currentSettings = { auto_scan_on_startup: true, scan_paths: [] };
+let currentSettings = { auto_scan_on_startup: true, scan_paths: [], camera_airport_zoom: 6.0, camera_pan_duration: 0.8 };
 let lastFocusedIcao = null;
 
 // Performance Caches & Indexing Engine
@@ -930,21 +930,24 @@ function setDrawerSlidePosition(mode) {
 
 function resetCameraToDefaultView() {
     if (!map) return;
+    const PAN_DURATION = (currentSettings && currentSettings.camera_pan_duration !== undefined)
+        ? parseFloat(currentSettings.camera_pan_duration)
+        : 0.8;
     // Priority 1: Active filter region in sidebar (user's immediate working focus)
     if (selectedRegion && REGION_VIEWPORTS[selectedRegion]) {
         const vp = REGION_VIEWPORTS[selectedRegion];
-        map.flyTo(vp.center, vp.zoom, { animate: true, duration: 0.6 });
+        map.flyTo(vp.center, vp.zoom, { animate: true, duration: PAN_DURATION });
         return;
     }
     // Priority 2: Startup camera region configured in user Settings
     const regKey = currentSettings && currentSettings.camera_startup_region;
     if (regKey && regKey !== 'world' && regKey !== 'default' && REGION_VIEWPORTS[regKey]) {
         const vp = REGION_VIEWPORTS[regKey];
-        map.flyTo(vp.center, vp.zoom, { animate: true, duration: 0.6 });
+        map.flyTo(vp.center, vp.zoom, { animate: true, duration: PAN_DURATION });
         return;
     }
     // Priority 3: Default global World view
-    map.flyTo([25.0, 10.0], 3.0, { animate: true, duration: 0.6 });
+    map.flyTo([25.0, 10.0], 3.0, { animate: true, duration: PAN_DURATION });
 }
 
 function closeDrawerWithoutCameraChange() {
@@ -1598,7 +1601,10 @@ function focusAirportInCountryMode(ap) {
         if (((ap.country === 'RU' || ap.iso_country === 'RU') || (ap.icao && ap.icao.startsWith('UH'))) && displayLon < -100) {
             displayLon = displayLon + 360;
         }
-        map.panTo([ap.lat, displayLon], { animate: true, duration: 0.5 });
+        const PAN_DURATION = (currentSettings && currentSettings.camera_pan_duration !== undefined)
+            ? parseFloat(currentSettings.camera_pan_duration)
+            : 0.8;
+        map.panTo([ap.lat, displayLon], { animate: true, duration: PAN_DURATION });
     }
 }
 
@@ -3084,7 +3090,7 @@ function updateRadialAirlinesModalPosition(force = false) {
     }
 }
 
-function panMapToAirport(ap) {
+function panMapToAirport(ap, forcedZoom = null) {
     if (!map || !ap || ap.lat === undefined || ap.lon === undefined) return;
 
     let flyLat = parseFloat(ap.lat);
@@ -3100,7 +3106,11 @@ function panMapToAirport(ap) {
 
     const PAN_DURATION = (currentSettings && currentSettings.camera_pan_duration !== undefined)
         ? parseFloat(currentSettings.camera_pan_duration)
-        : 0.6;
+        : 0.8;
+
+    const TARGET_AIRPORT_ZOOM = (currentSettings && currentSettings.camera_airport_zoom !== undefined)
+        ? parseFloat(currentSettings.camera_airport_zoom)
+        : 6.0;
 
     let xOffset = 0;
     // In airlines mode: strictly enforce xOffset = 0 so the airport is centered horizontally for the wide 820px modal
@@ -3123,9 +3133,14 @@ function panMapToAirport(ap) {
     }
 
     const currentZoom = (typeof map.getZoom === 'function') ? map.getZoom() : 8;
-    // Si la carte est trop dezoomee (< 6.0), voler doucement jusqu'a 6.0 pour que le menu soit visible
-    // Si deja a zoom >= 6.0, preserver le zoom utilisateur
-    const targetZoom = (currentZoom < 6.0) ? 6.0 : currentZoom;
+    let targetZoom;
+    if (forcedZoom !== null) {
+        targetZoom = forcedZoom;
+    } else if (isAirlinesModalOpen()) {
+        targetZoom = (currentZoom < 4.0) ? 4.0 : Math.min(currentZoom, 7.0);
+    } else {
+        targetZoom = TARGET_AIRPORT_ZOOM;
+    }
 
     isCameraPanningToRadial = true;
 
@@ -5599,10 +5614,7 @@ function centerMapOnAirport(ap, forcedZoom = null) {
 
     const currentZoom = map.getZoom();
 
-    // If forcedZoom is specified (e.g. 8 for country mode), use it.
-    // Otherwise: if current zoom is below target, gently zoom in to TARGET_AIRPORT_ZOOM.
-    // If already at or above TARGET_AIRPORT_ZOOM, maintain current zoom without changing it.
-    let targetZoom = forcedZoom !== null ? forcedZoom : (currentZoom < TARGET_AIRPORT_ZOOM ? TARGET_AIRPORT_ZOOM : currentZoom);
+    let targetZoom = forcedZoom !== null ? forcedZoom : TARGET_AIRPORT_ZOOM;
 
     // Calculate horizontal offset so the airport is centered in the visible area between left sidebar and right drawer
     let xOffset = 0;
@@ -5617,15 +5629,29 @@ function centerMapOnAirport(ap, forcedZoom = null) {
         const adjustedPoint = L.point(targetPoint.x + xOffset, targetPoint.y);
         const adjustedLatLng = map.unproject(adjustedPoint, targetZoom);
 
-        map.flyTo(adjustedLatLng, targetZoom, {
-            animate: true,
-            duration: PAN_DURATION
-        });
+        if (targetZoom !== currentZoom) {
+            map.flyTo(adjustedLatLng, targetZoom, {
+                animate: true,
+                duration: PAN_DURATION
+            });
+        } else {
+            map.panTo(adjustedLatLng, {
+                animate: true,
+                duration: PAN_DURATION
+            });
+        }
     } catch (err) {
-        map.flyTo([ap.lat, flyLon], targetZoom, {
-            animate: true,
-            duration: PAN_DURATION
-        });
+        if (targetZoom !== currentZoom) {
+            map.flyTo([ap.lat, flyLon], targetZoom, {
+                animate: true,
+                duration: PAN_DURATION
+            });
+        } else {
+            map.panTo([ap.lat, flyLon], {
+                animate: true,
+                duration: PAN_DURATION
+            });
+        }
     }
 }
 
@@ -8603,13 +8629,17 @@ function updateCameraSettingsPreview() {
     const zoomSlider = document.getElementById('cfg-camera-zoom');
     const zoomDisp = document.getElementById('cfg-zoom-display');
     if (zoomSlider && zoomDisp) {
-        zoomDisp.innerText = parseFloat(zoomSlider.value).toFixed(1);
+        const zVal = parseFloat(zoomSlider.value);
+        zoomDisp.innerText = zVal.toFixed(1);
+        currentSettings.camera_airport_zoom = zVal;
     }
 
     const durSlider = document.getElementById('cfg-camera-duration');
     const durDisp = document.getElementById('cfg-duration-display');
     if (durSlider && durDisp) {
-        durDisp.innerText = `${parseFloat(durSlider.value).toFixed(1)}s`;
+        const dVal = parseFloat(durSlider.value);
+        durDisp.innerText = `${dVal.toFixed(1)}s`;
+        currentSettings.camera_pan_duration = dVal;
     }
 }
 
@@ -8648,9 +8678,10 @@ async function saveCameraSettingsOnly() {
         }
         const btnText = document.getElementById('btn-save-camera-text');
         if (btnText) {
-            btnText.innerText = "Saved";
+            const originalText = (typeof getTranslation === 'function' ? getTranslation('settings.save_camera') : null) || "Save Camera";
+            btnText.innerText = "✓";
             setTimeout(() => {
-                btnText.innerText = "Save Camera";
+                btnText.innerText = originalText;
             }, 1500);
         }
     } catch (e) {
