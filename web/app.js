@@ -2877,6 +2877,10 @@ let currentRadialAirport = null;
 let currentRadialMarker = null;
 let currentRadialOpenZoom = null;
 let isCameraPanningToRadial = false;
+let isAirlinesModalDragging = false;
+let airlinesModalUserOffset = { x: 0, y: 0 };
+let hasUserDraggedAirlinesModal = false;
+let airlinesModalDragStart = { x: 0, y: 0 };
 
 function closeAirportRadialMenu() {
     const radialEl = document.getElementById('airport-radial-menu');
@@ -2895,7 +2899,14 @@ function closeAirportRadialMenu() {
     const airlinesModal = document.getElementById('radial-airlines-modal');
     if (airlinesModal) {
         airlinesModal.classList.add('hidden');
+        airlinesModal.classList.remove('user-dragged', 'is-inverted');
+        airlinesModal.style.transform = 'translateX(-50%)';
+        airlinesModal.style.top = '545px';
+        airlinesModal.style.bottom = 'auto';
     }
+    hasUserDraggedAirlinesModal = false;
+    airlinesModalUserOffset = { x: 0, y: 0 };
+    isAirlinesModalDragging = false;
     const sectorScenery = document.getElementById('radial-sector-scenery');
     if (sectorScenery) {
         sectorScenery.classList.remove('active-radial-sector');
@@ -2997,18 +3008,27 @@ function updateRadialMenuPosition(force = false) {
         }
     }
 
-    // Smart screen boundary check for Operating Airlines Modal
+    // Smart screen boundary check for Operating Airlines Modal (Bottom horizontal placement)
     const airlinesModal = document.getElementById('radial-airlines-modal');
     if (airlinesModal && !airlinesModal.classList.contains('hidden')) {
-        const isCollapsed = radialEl.classList.contains('radial-quadrants-collapsed');
-        const normalOffset = isCollapsed ? 405 : 542;
-        const isNearLeftEdge = (point.x - (normalOffset + 390) * scale < 20);
-        if (isNearLeftEdge) {
+        if (!hasUserDraggedAirlinesModal) {
+            const isCollapsed = radialEl.classList.contains('radial-quadrants-collapsed');
+            const normalOffset = isCollapsed ? 405 : 545;
+            const isNearBottom = (point.y + (normalOffset + 220) * scale > window.innerHeight - 20);
+            if (isNearBottom) {
+                airlinesModal.classList.add('is-inverted');
+                airlinesModal.style.top = 'auto';
+                airlinesModal.style.bottom = `${normalOffset}px`;
+            } else {
+                airlinesModal.classList.remove('is-inverted');
+                airlinesModal.style.bottom = 'auto';
+                airlinesModal.style.top = `${normalOffset}px`;
+            }
+            airlinesModal.style.left = '50%';
             airlinesModal.style.right = 'auto';
-            airlinesModal.style.left = isCollapsed ? '405px' : '542px';
+            airlinesModal.style.transform = 'translateX(-50%)';
         } else {
-            airlinesModal.style.right = `${normalOffset}px`;
-            airlinesModal.style.left = 'auto';
+            airlinesModal.style.transform = `translate(calc(-50% + ${airlinesModalUserOffset.x}px), ${airlinesModalUserOffset.y}px)`;
         }
     }
 }
@@ -3139,7 +3159,14 @@ function openAirportRadialMenu(ap, marker, e) {
             airlinesModal._clickPropagationDisabled = true;
         }
         airlinesModal.classList.add('hidden');
+        airlinesModal.classList.remove('user-dragged', 'is-inverted');
+        airlinesModal.style.transform = 'translateX(-50%)';
+        airlinesModal.style.top = '545px';
+        airlinesModal.style.bottom = 'auto';
     }
+    hasUserDraggedAirlinesModal = false;
+    airlinesModalUserOffset = { x: 0, y: 0 };
+    isAirlinesModalDragging = false;
     const sectorAirlines = document.getElementById('radial-sector-airlines');
     if (sectorAirlines) {
         sectorAirlines.classList.remove('active-radial-sector');
@@ -3264,7 +3291,14 @@ function closeRadialAirlinesModal(event) {
     const sectorAirlines = document.getElementById('radial-sector-airlines');
     if (modal) {
         modal.classList.add('hidden');
+        modal.classList.remove('user-dragged', 'is-inverted');
+        modal.style.transform = 'translateX(-50%)';
+        modal.style.top = '545px';
+        modal.style.bottom = 'auto';
     }
+    hasUserDraggedAirlinesModal = false;
+    airlinesModalUserOffset = { x: 0, y: 0 };
+    isAirlinesModalDragging = false;
     if (sectorAirlines) {
         sectorAirlines.classList.remove('active-radial-sector');
     }
@@ -3273,6 +3307,53 @@ function closeRadialAirlinesModal(event) {
     if (radialEl && radialEl.classList.contains('radial-quadrants-collapsed')) {
         restoreRadialQuadrants();
     }
+}
+
+function initDraggableAirlinesModal() {
+    const modal = document.getElementById('radial-airlines-modal');
+    const header = document.getElementById('radial-airlines-modal-header');
+    if (!modal || !header || header._dragInitialized) return;
+
+    header._dragInitialized = true;
+
+    header.addEventListener('mousedown', (e) => {
+        if (e.target.closest('button')) return;
+        e.preventDefault();
+        e.stopPropagation();
+
+        isAirlinesModalDragging = true;
+        airlinesModalDragStart = { x: e.clientX, y: e.clientY };
+        modal.style.transition = 'none';
+
+        const onMouseMove = (moveEvent) => {
+            if (!isAirlinesModalDragging) return;
+            moveEvent.preventDefault();
+            moveEvent.stopPropagation();
+
+            const dx = moveEvent.clientX - airlinesModalDragStart.x;
+            const dy = moveEvent.clientY - airlinesModalDragStart.y;
+            airlinesModalDragStart = { x: moveEvent.clientX, y: moveEvent.clientY };
+
+            airlinesModalUserOffset.x += dx;
+            airlinesModalUserOffset.y += dy;
+            hasUserDraggedAirlinesModal = true;
+
+            modal.classList.add('user-dragged');
+            modal.style.transform = `translate(calc(-50% + ${airlinesModalUserOffset.x}px), ${airlinesModalUserOffset.y}px)`;
+        };
+
+        const onMouseUp = (upEvent) => {
+            if (isAirlinesModalDragging) {
+                isAirlinesModalDragging = false;
+                modal.style.transition = '';
+                window.removeEventListener('mousemove', onMouseMove, true);
+                window.removeEventListener('mouseup', onMouseUp, true);
+            }
+        };
+
+        window.addEventListener('mousemove', onMouseMove, true);
+        window.addEventListener('mouseup', onMouseUp, true);
+    });
 }
 
 function restoreRadialQuadrants() {
@@ -3304,6 +3385,8 @@ function renderRadialOperatingAirlines(ap) {
     const hintEl = document.getElementById('radial-airlines-hint');
     if (!listEl || !ap) return;
 
+    initDraggableAirlinesModal();
+
     const getFlightCount = (al) => (ap.routes && ap.routes[al]) ? ap.routes[al].length : 0;
     const airlines = (ap.operating_airlines || []).slice().sort((a, b) => {
         const countA = getFlightCount(a);
@@ -3315,7 +3398,7 @@ function renderRadialOperatingAirlines(ap) {
     });
 
     if (countEl) {
-        countEl.innerText = `${airlines.length} ${t('drawer.airlines_count', 'Airlines')}`;
+        countEl.innerText = `${airlines.length} ${t('drawer.airlines_count', 'Airlines')}`.toUpperCase();
     }
 
     const hasActiveAirline = selectedAirlines.size > 0 && (activeRouteOrigin && activeRouteOrigin.icao === ap.icao);
@@ -3330,7 +3413,7 @@ function renderRadialOperatingAirlines(ap) {
     }
 
     if (airlines.length === 0) {
-        listEl.innerHTML = `<div class="col-span-3 text-xs text-slate-400 italic py-8 text-center">${t('drawer.no_airlines', 'No scheduled airlines data available for this airport.')}</div>`;
+        listEl.innerHTML = `<div class="col-span-full text-xs text-slate-400 italic py-8 text-center">${t('drawer.no_airlines', 'No scheduled airlines data available for this airport.')}</div>`;
         return;
     }
 
