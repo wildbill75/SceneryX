@@ -333,7 +333,9 @@ const LOCALES = {
         "radial.sceneries": "Sceneries",
         "radial.details": "Details",
         "radial.country": "Country",
-        "radial.operating_airlines": "Operating Airlines"
+        "radial.operating_airlines": "Operating Airlines",
+        "radial.details_title": "Airport Details",
+        "radial.info_title": "Airport Info"
     },
     fr: {
         "country.back_to": "Retour à",
@@ -668,7 +670,9 @@ const LOCALES = {
         "radial.sceneries": "Scènes",
         "radial.details": "Détails",
         "radial.country": "Pays",
-        "radial.operating_airlines": "Operating Airlines"
+        "radial.operating_airlines": "Operating Airlines",
+        "radial.details_title": "Détails de l'aéroport",
+        "radial.info_title": "Infos aéroport"
     },
     de: {
         "country.back_to": "Zurück zu",
@@ -1003,7 +1007,9 @@ const LOCALES = {
         "radial.sceneries": "Szenerien",
         "radial.details": "Details",
         "radial.country": "Land",
-        "radial.operating_airlines": "Operating Airlines"
+        "radial.operating_airlines": "Operating Airlines",
+        "radial.details_title": "Flughafendetails",
+        "radial.info_title": "Flughafen-Info"
     },
     es: {
         "country.back_to": "Volver a",
@@ -1338,7 +1344,9 @@ const LOCALES = {
         "radial.sceneries": "Escenarios",
         "radial.details": "Detalles",
         "radial.country": "País",
-        "radial.operating_airlines": "Operating Airlines"
+        "radial.operating_airlines": "Operating Airlines",
+        "radial.details_title": "Detalles del aeropuerto",
+        "radial.info_title": "Información del aeropuerto"
     }
 };
 

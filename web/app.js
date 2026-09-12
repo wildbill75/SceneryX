@@ -834,8 +834,8 @@ function initMap() {
     // Single click on neutral map area: closes radial menu & drawer WITHOUT changing camera (ignored on drag/pan)
     map.on('click', () => {
         if (isMapDragging) return;
-        if (isAirlinesModalOpen()) {
-            // In airlines mode: map clicks MUST NOT dismiss or exit airlines mode. Only close button does.
+        if (isAirlinesModalOpen() || isDetailsModalOpen()) {
+            // In airlines or details mode: map clicks MUST NOT dismiss or exit. Only close button does.
             return;
         }
         closeAirportRadialMenu();
@@ -1019,8 +1019,8 @@ async function loadCountryOverlays() {
                     click: (e) => {
                         L.DomEvent.stopPropagation(e);
                         if (isMapDragging) return;
-                        if (isAirlinesModalOpen()) {
-                            // In airlines mode: clicking on map/country MUST NOT exit airlines mode. Only close button does.
+                        if (isAirlinesModalOpen() || isDetailsModalOpen()) {
+                            // In airlines or details mode: clicking on map/country MUST NOT exit mode. Only close button does.
                             return;
                         }
                         // When zoomed in, country clicks are completely disabled
@@ -1060,8 +1060,8 @@ async function loadCountryOverlays() {
                     },
                     dblclick: (e) => {
                         L.DomEvent.stopPropagation(e);
-                        if (isAirlinesModalOpen()) {
-                            // In airlines mode: clicking on map/country MUST NOT exit airlines mode. Only close button does.
+                        if (isAirlinesModalOpen() || isDetailsModalOpen()) {
+                            // In airlines or details mode: clicking on map/country MUST NOT exit mode. Only close button does.
                             return;
                         }
                         closeAirportRadialMenu();
@@ -2859,7 +2859,7 @@ function renderAirportsOnMap(airports) {
                 } else if (activeDrawerMode === 'COUNTRY') {
                     focusAirportInCountryMode(currentAp);
                 } else {
-                    if (isAirlinesModalOpen()) {
+                    if (isAirlinesModalOpen() || isDetailsModalOpen()) {
                         openAirportRadialMenu(currentAp, this, e);
                     } else if (currentRadialAirport && currentRadialAirport.icao === currentAp.icao) {
                         closeAirportRadialMenu();
@@ -2902,8 +2902,18 @@ let airlinesModalUserOffset = { x: 0, y: 0 };
 let hasUserDraggedAirlinesModal = false;
 let airlinesModalDragStart = { x: 0, y: 0 };
 
+let isDetailsModalDragging = false;
+let detailsModalUserOffset = { x: 0, y: 0 };
+let hasUserDraggedDetailsModal = false;
+let detailsModalDragStart = { x: 0, y: 0 };
+
 function isAirlinesModalOpen() {
     const modal = document.getElementById('radial-airlines-modal');
+    return !!(modal && !modal.classList.contains('hidden'));
+}
+
+function isDetailsModalOpen() {
+    const modal = document.getElementById('radial-details-modal');
     return !!(modal && !modal.classList.contains('hidden'));
 }
 
@@ -2939,6 +2949,19 @@ function closeAirportRadialMenu() {
     const sectorAirlines = document.getElementById('radial-sector-airlines');
     if (sectorAirlines) {
         sectorAirlines.classList.remove('active-radial-sector');
+    }
+    const detailsModal = document.getElementById('radial-details-modal');
+    if (detailsModal) {
+        detailsModal.classList.add('hidden');
+        detailsModal.classList.remove('user-dragged');
+        detailsModal.style.transform = 'translateX(-50%)';
+    }
+    hasUserDraggedDetailsModal = false;
+    detailsModalUserOffset = { x: 0, y: 0 };
+    isDetailsModalDragging = false;
+    const sectorDetails = document.getElementById('radial-sector-details');
+    if (sectorDetails) {
+        sectorDetails.classList.remove('active-radial-sector');
     }
     currentRadialAirport = null;
     currentRadialMarker = null;
@@ -2977,6 +3000,9 @@ function updateRadialMenuPosition(force = false) {
     if (isAirlinesModalOpen()) {
         updateRadialAirlinesModalPosition(true);
     }
+    if (isDetailsModalOpen()) {
+        updateRadialDetailsModalPosition(true);
+    }
 
     const radialEl = document.getElementById('airport-radial-menu');
     if (!radialEl) return;
@@ -2988,8 +3014,8 @@ function updateRadialMenuPosition(force = false) {
     // Ne jamais fermer automatiquement pendant que la camera est en cours de vol/pan vers l'aeroport
     const MIN_RADIAL_ZOOM = 5.0;
     if (!isCameraPanningToRadial && currentZoom < MIN_RADIAL_ZOOM) {
-        if (isAirlinesModalOpen()) {
-            // In airlines mode: do not auto-close on zoom out so user can view world-wide routes
+        if (isAirlinesModalOpen() || isDetailsModalOpen()) {
+            // In airlines/details mode: do not auto-close on zoom out
             return;
         }
         closeAirportRadialMenu();
@@ -3057,6 +3083,7 @@ function updateRadialMenuPosition(force = false) {
 
     // Operating Airlines Modal (Anchored directly under airport, independent of radial scale)
     updateRadialAirlinesModalPosition(force);
+    updateRadialDetailsModalPosition(force);
 }
 
 function updateRadialAirlinesModalPosition(force = false) {
@@ -3090,6 +3117,37 @@ function updateRadialAirlinesModalPosition(force = false) {
     }
 }
 
+function updateRadialDetailsModalPosition(force = false) {
+    const modal = document.getElementById('radial-details-modal');
+    if (!modal || (!force && modal.classList.contains('hidden'))) return;
+    if (!currentRadialAirport || !map) return;
+
+    const latLng = getWrappedAirportLatLng(currentRadialAirport);
+    if (!latLng) return;
+    const point = (typeof map.latLngToContainerPoint === 'function') ? map.latLngToContainerPoint(latLng) : null;
+    if (!point) return;
+
+    const mapSize = (typeof map.getSize === 'function') ? map.getSize() : null;
+    const containerW = mapSize ? mapSize.x : (modal.offsetParent ? modal.offsetParent.offsetWidth : window.innerWidth);
+    const modalWidth = modal.offsetWidth || 540;
+    const halfWidth = modalWidth / 2;
+    const minLeft = halfWidth + 12;
+    const maxLeft = Math.max(minLeft, containerW - halfWidth - 12);
+    const clampedX = Math.max(minLeft, Math.min(maxLeft, Math.round(point.x)));
+    modal.style.left = `${clampedX}px`;
+
+    if (!hasUserDraggedDetailsModal) {
+        const currentZoom = (typeof map.getZoom === 'function') ? map.getZoom() : 8;
+        const scale = Math.max(0.65, Math.min(1.05, currentZoom / 8.0));
+        // South edge of the 540px radial wheel is point.y + 270 * scale
+        const desiredTop = Math.round(point.y) + Math.round(270 * scale) + 12;
+        modal.style.top = `${desiredTop}px`;
+        modal.style.transform = 'translateX(-50%)';
+    } else {
+        modal.style.transform = `translate(calc(-50% + ${detailsModalUserOffset.x}px), ${detailsModalUserOffset.y}px)`;
+    }
+}
+
 function panMapToAirport(ap, forcedZoom = null) {
     if (!map || !ap || ap.lat === undefined || ap.lon === undefined) return;
 
@@ -3113,8 +3171,8 @@ function panMapToAirport(ap, forcedZoom = null) {
         : 6.0;
 
     let xOffset = 0;
-    // In airlines mode: strictly enforce xOffset = 0 so the airport is centered horizontally for the wide 820px modal
-    if (!isAirlinesModalOpen()) {
+    // In airlines/details mode: strictly enforce xOffset = 0 so the airport is centered horizontally
+    if (!isAirlinesModalOpen() && !isDetailsModalOpen()) {
         const detailDrawer = document.getElementById('detail-drawer');
         if (detailDrawer && !detailDrawer.classList.contains('translate-x-full') && !detailDrawer.classList.contains('hidden')) {
             const drawerWidth = detailDrawer.offsetWidth || 460;
@@ -3125,10 +3183,15 @@ function panMapToAirport(ap, forcedZoom = null) {
     let yOffset = 0;
     if (isAirlinesModalOpen()) {
         // En mode Airlines : positionner l'aéroport dans le quart supérieur de l'écran (~20-22%, min 100px, max 180px)
-        // pour laisser systématiquement toute la place nécessaire à la modale en dessous sans jamais masquer l'aéroport (conforme au Screen 2)
         const mapH = (map && typeof map.getSize === 'function') ? map.getSize().y : window.innerHeight;
         const cy = mapH / 2;
         const desiredApY = Math.max(100, Math.min(180, Math.round(mapH * 0.20)));
+        yOffset = Math.round(cy - desiredApY);
+    } else if (isDetailsModalOpen()) {
+        // En mode Details : positionner l'aéroport dans la partie supérieure (~22%) pour laisser la place à la modale en dessous
+        const mapH = (map && typeof map.getSize === 'function') ? map.getSize().y : window.innerHeight;
+        const cy = mapH / 2;
+        const desiredApY = Math.max(120, Math.min(220, Math.round(mapH * 0.22)));
         yOffset = Math.round(cy - desiredApY);
     }
 
@@ -3283,6 +3346,40 @@ function openAirportRadialMenu(ap, marker, e) {
             }
         }
     }
+
+    const isDetailsOpen = isDetailsModalOpen();
+    const detailsModal = document.getElementById('radial-details-modal');
+    const sectorDetails = document.getElementById('radial-sector-details');
+
+    if (detailsModal) {
+        if (!detailsModal._clickPropagationDisabled) {
+            L.DomEvent.disableClickPropagation(detailsModal);
+            L.DomEvent.disableScrollPropagation(detailsModal);
+            detailsModal._clickPropagationDisabled = true;
+        }
+
+        if (isDetailsOpen) {
+            hasUserDraggedDetailsModal = false;
+            detailsModalUserOffset = { x: 0, y: 0 };
+            isDetailsModalDragging = false;
+            detailsModal.classList.remove('user-dragged');
+
+            renderRadialAirportDetails(ap);
+            if (sectorDetails) {
+                sectorDetails.classList.add('active-radial-sector');
+            }
+        } else {
+            detailsModal.classList.add('hidden');
+            detailsModal.classList.remove('user-dragged');
+            detailsModal.style.transform = 'translateX(-50%)';
+            hasUserDraggedDetailsModal = false;
+            detailsModalUserOffset = { x: 0, y: 0 };
+            isDetailsModalDragging = false;
+            if (sectorDetails) {
+                sectorDetails.classList.remove('active-radial-sector');
+            }
+        }
+    }
     radialEl.classList.remove('radial-quadrants-collapsed');
 
     // Pan camera to smoothly center on the newly selected airport
@@ -3389,6 +3486,11 @@ function triggerRadialOperatingAirlines() {
     const sceneriesExt = document.getElementById('radial-sceneries-extension');
     if (sceneriesExt && !sceneriesExt.classList.contains('hidden')) {
         triggerRadialScenerySelector();
+    }
+
+    // If Details modal is open, close it
+    if (isDetailsModalOpen()) {
+        closeRadialDetailsModal();
     }
 
     if (!modal.classList.contains('hidden')) {
@@ -3717,6 +3819,10 @@ function triggerRadialScenerySelector() {
             extEl.innerHTML = '';
         }, 160);
     } else {
+        // If Details modal is open, close it
+        if (isDetailsModalOpen()) {
+            closeRadialDetailsModal();
+        }
         // Toggle ON: Render autonomous pills with bounce animation ONLY on opening!
         renderRadialSceneriesExtension(currentRadialAirport, true);
         extEl.style.opacity = '1';
@@ -4401,10 +4507,551 @@ async function activateRadialFixPackage(e, path, icao) {
 
 function triggerRadialFullDetails() {
     if (!currentRadialAirport) return;
-    const targetAp = currentRadialAirport;
-    closeAirportRadialMenu();
-    centerMapOnAirport(targetAp);
-    showAirportDetails(targetAp);
+    const modal = document.getElementById('radial-details-modal');
+    const sectorDetails = document.getElementById('radial-sector-details');
+    if (!modal) return;
+
+    // If Sceneries extension is open, close it
+    const sceneriesExt = document.getElementById('radial-sceneries-extension');
+    if (sceneriesExt && !sceneriesExt.classList.contains('hidden')) {
+        triggerRadialScenerySelector();
+    }
+    // If Airlines modal is open, close it
+    if (isAirlinesModalOpen()) {
+        closeRadialAirlinesModal();
+    }
+
+    if (!modal.classList.contains('hidden')) {
+        // Toggle OFF
+        closeRadialDetailsModal();
+    } else {
+        // Close detail drawer if open so modal has full view
+        const detailDrawer = document.getElementById('detail-drawer');
+        if (detailDrawer && !detailDrawer.classList.contains('translate-x-full')) {
+            closeDrawerWithoutCameraChange();
+        }
+
+        hasUserDraggedDetailsModal = false;
+        detailsModalUserOffset = { x: 0, y: 0 };
+        isDetailsModalDragging = false;
+        modal.classList.remove('user-dragged');
+
+        renderRadialAirportDetails(currentRadialAirport);
+        modal.classList.remove('hidden');
+        if (sectorDetails) {
+            sectorDetails.classList.add('active-radial-sector');
+        }
+
+        panMapToAirport(currentRadialAirport);
+        updateRadialDetailsModalPosition(true);
+    }
+}
+
+function closeRadialDetailsModal(event) {
+    if (event) event.stopPropagation();
+    const modal = document.getElementById('radial-details-modal');
+    const sectorDetails = document.getElementById('radial-sector-details');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('user-dragged');
+        modal.style.transform = 'translateX(-50%)';
+    }
+    hasUserDraggedDetailsModal = false;
+    detailsModalUserOffset = { x: 0, y: 0 };
+    isDetailsModalDragging = false;
+    if (sectorDetails) {
+        sectorDetails.classList.remove('active-radial-sector');
+    }
+    if (currentRadialAirport) {
+        panMapToAirport(currentRadialAirport);
+        updateRadialMenuPosition(true);
+    }
+}
+
+function initDraggableDetailsModal() {
+    const modal = document.getElementById('radial-details-modal');
+    const header = document.getElementById('radial-details-modal-header');
+    if (!modal || !header || header._dragInitialized) return;
+
+    header._dragInitialized = true;
+
+    header.addEventListener('mousedown', (e) => {
+        if (e.target.closest('button')) return;
+        e.preventDefault();
+        e.stopPropagation();
+
+        isDetailsModalDragging = true;
+        detailsModalDragStart = { x: e.clientX, y: e.clientY };
+        modal.style.transition = 'none';
+
+        const onMouseMove = (moveEvent) => {
+            if (!isDetailsModalDragging) return;
+            moveEvent.preventDefault();
+            moveEvent.stopPropagation();
+
+            const dx = moveEvent.clientX - detailsModalDragStart.x;
+            const dy = moveEvent.clientY - detailsModalDragStart.y;
+            detailsModalDragStart = { x: moveEvent.clientX, y: moveEvent.clientY };
+
+            detailsModalUserOffset.x += dx;
+            detailsModalUserOffset.y += dy;
+            hasUserDraggedDetailsModal = true;
+
+            modal.classList.add('user-dragged');
+            modal.style.transform = `translate(calc(-50% + ${detailsModalUserOffset.x}px), ${detailsModalUserOffset.y}px)`;
+        };
+
+        const onMouseUp = (upEvent) => {
+            if (isDetailsModalDragging) {
+                isDetailsModalDragging = false;
+                modal.style.transition = '';
+                window.removeEventListener('mousemove', onMouseMove, true);
+                window.removeEventListener('mouseup', onMouseUp, true);
+            }
+        };
+
+        window.addEventListener('mousemove', onMouseMove, true);
+        window.addEventListener('mouseup', onMouseUp, true);
+    });
+}
+
+function renderRadialAirportDetails(ap) {
+    if (!ap) return;
+    initDraggableDetailsModal();
+
+    // PILL 1: AIRPORT INFO
+    const latEl = document.getElementById('radial-detail-lat');
+    const lonEl = document.getElementById('radial-detail-lon');
+    const catEl = document.getElementById('radial-detail-category');
+    const elevEl = document.getElementById('radial-detail-elevation');
+    if (latEl) latEl.innerText = parseFloat(ap.lat || 0).toFixed(4);
+    if (lonEl) lonEl.innerText = parseFloat(ap.lon || 0).toFixed(4);
+    if (catEl) catEl.innerText = ap.category || ap.type || 'Commercial';
+    if (elevEl) elevEl.innerText = (ap.elevation_ft !== undefined && ap.elevation_ft !== null) ? `${ap.elevation_ft.toLocaleString()} ft` : '0 ft';
+
+    // PILL 2: RUNWAYS
+    renderRadialRunways(ap);
+
+    // PILL 3: GSX PROFILE
+    renderRadialGsx(ap);
+
+    // PILL 4: MY RATING
+    renderRadialStarRating(ap.rating || 0);
+
+    // PILL 5: PRICE
+    renderRadialPrice(ap);
+}
+
+async function renderRadialRunways(ap) {
+    const listEl = document.getElementById('radial-runways-list');
+    const countEl = document.getElementById('radial-runways-count');
+    if (!listEl) return;
+
+    let runways = ap.runways;
+    if (!runways || runways.length === 0) {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.get_airport_runways) {
+            try {
+                const raw = await window.pywebview.api.get_airport_runways(ap.icao);
+                runways = (typeof raw === 'string') ? JSON.parse(raw) : raw;
+                ap.runways = runways;
+            } catch (err) {
+                runways = [];
+            }
+        }
+    }
+
+    if (countEl) {
+        countEl.innerText = `${(runways || []).length} Runways`;
+    }
+
+    if (runways && runways.length > 0) {
+        const sortedRunways = runways.slice().sort((a, b) => {
+            const closedA = a.closed ? 1 : 0;
+            const closedB = b.closed ? 1 : 0;
+            if (closedA !== closedB) return closedA - closedB;
+            return (b.length_ft || 0) - (a.length_ft || 0);
+        });
+
+        listEl.innerHTML = sortedRunways.map(rwy => {
+            const isClosed = !!rwy.closed;
+            const lenFt = rwy.length_ft ? rwy.length_ft.toLocaleString() + ' ft' : '—';
+            const lenM = rwy.length_m ? rwy.length_m.toLocaleString() + ' m' : '—';
+            const widFt = rwy.width_ft ? rwy.width_ft.toLocaleString() + ' ft' : '';
+            const widM = rwy.width_m ? rwy.width_m.toLocaleString() + ' m' : '';
+            const widthStr = (widFt && widM) ? `${widFt} (${widM})` : (widFt || widM || '');
+            const surfaceName = rwy.surface || 'Unknown';
+
+            const cardBg = isClosed ? 'bg-slate-950/40 border border-slate-800 opacity-60' : 'bg-slate-900/60 border border-slate-800/90';
+            const identColor = isClosed ? 'text-slate-400' : 'text-cyan-400';
+
+            return `
+                <div class="p-2 rounded-xl ${cardBg} space-y-1">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-1.5">
+                            <span class="font-mono font-black text-xs ${identColor} px-2 py-0.5 rounded bg-slate-800/80 border border-slate-700/50">
+                                ${rwy.id}
+                            </span>
+                            <span class="text-[10px] font-semibold text-slate-300 bg-slate-800/60 px-1.5 py-0.5 rounded border border-slate-700/40">
+                                ${surfaceName}
+                            </span>
+                        </div>
+                        ${isClosed ? `
+                            <span class="text-[9px] font-mono font-bold text-red-400 bg-red-950/40 border border-red-800/60 px-1.5 py-0.5 rounded uppercase">
+                                Closed
+                            </span>
+                        ` : ''}
+                    </div>
+                    <div class="flex items-center justify-between text-[11px] font-mono pt-1 border-t border-slate-800/60">
+                        <div class="flex items-center gap-1 text-slate-300">
+                            <span class="text-slate-500 text-[10px] uppercase font-bold">Length:</span>
+                            <span class="font-bold text-white">${lenFt}</span>
+                            <span class="text-slate-400 text-[10px]">(${lenM})</span>
+                        </div>
+                        ${widthStr ? `
+                            <div class="flex items-center gap-1 text-slate-400 text-[10px]">
+                                <span class="text-slate-500 uppercase font-bold">Width:</span>
+                                <span>${widthStr}</span>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    } else {
+        listEl.innerHTML = `<span class="text-xs font-mono text-slate-500 italic py-2 block text-center">No runway data available for this airport.</span>`;
+    }
+}
+
+function renderRadialGsx(ap) {
+    const container = document.getElementById('radial-gsx-container');
+    if (!container || !ap) return;
+
+    if (ap.has_gsx_profile) {
+        const safeGsxPath = encodeURIComponent(ap.gsx_profile_path || '');
+        container.innerHTML = `
+            <div class="space-y-2">
+                <div onclick="openGsxProfileInExplorer(decodeURIComponent('${safeGsxPath}'))"
+                     class="p-2.5 rounded-xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 hover:border-slate-700 cursor-pointer flex items-center justify-between gap-2 text-xs font-mono font-bold text-slate-200 hover:text-cyan-300 transition-all shadow-sm"
+                     title="Click to reveal GSX INI file in Explorer">
+                    <span class="truncate">${ap.gsx_profile_filename}</span>
+                    <span class="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 hover:text-white px-2 py-0.5 rounded bg-slate-800 border border-slate-700/60 shrink-0">Reveal</span>
+                </div>
+                <div id="radial-gsx-drop-zone"
+                     ondragover="handleRadialGsxDragOver(event)"
+                     ondragleave="handleRadialGsxDragLeave(event)"
+                     ondrop="handleRadialGsxDrop(event)"
+                     onclick="triggerRadialInstallGsxProfile()"
+                     class="p-3 rounded-xl bg-slate-950/40 border-2 border-dashed border-slate-800 hover:border-cyan-500/60 flex flex-col items-center justify-center gap-1 text-center transition-all cursor-pointer">
+                    <span class="text-xs font-bold text-slate-300 uppercase tracking-wide">Drop .zip or .ini here to replace</span>
+                    <span class="text-[10px] text-slate-500 uppercase font-mono">or click to browse file</span>
+                </div>
+            </div>
+        `;
+    } else {
+        container.innerHTML = `
+            <div class="space-y-2">
+                <div class="p-2.5 rounded-xl bg-slate-900/40 border border-slate-800/80 flex items-center justify-between text-xs font-mono text-slate-400">
+                    <span>No GSX profile installed</span>
+                    <span class="text-[10px] font-mono font-bold text-slate-500 uppercase px-1.5 py-0.5 rounded bg-slate-800/60 border border-slate-700/40">None</span>
+                </div>
+                <button onclick="triggerRadialSearchGsxProfile()"
+                        class="w-full p-2.5 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-cyan-400 hover:text-white text-xs font-mono font-bold uppercase tracking-wider transition-colors flex items-center justify-center cursor-pointer shadow-sm">
+                    Search on Flightsim.to
+                </button>
+                <div id="radial-gsx-drop-zone"
+                     ondragover="handleRadialGsxDragOver(event)"
+                     ondragleave="handleRadialGsxDragLeave(event)"
+                     ondrop="handleRadialGsxDrop(event)"
+                     onclick="triggerRadialInstallGsxProfile()"
+                     class="p-3 rounded-xl bg-slate-950/40 border-2 border-dashed border-slate-800 hover:border-cyan-500/60 flex flex-col items-center justify-center gap-1 text-center transition-all cursor-pointer">
+                    <span class="text-xs font-bold text-slate-300 uppercase tracking-wide">Drop .zip or .ini here</span>
+                    <span class="text-[10px] text-slate-500 uppercase font-mono">or click to browse file</span>
+                </div>
+            </div>
+        `;
+    }
+}
+
+function handleRadialGsxDragOver(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const zone = document.getElementById('radial-gsx-drop-zone');
+    if (zone) {
+        zone.classList.add('border-cyan-500', 'bg-cyan-500/10');
+    }
+}
+
+function handleRadialGsxDragLeave(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const zone = document.getElementById('radial-gsx-drop-zone');
+    if (zone) {
+        zone.classList.remove('border-cyan-500', 'bg-cyan-500/10');
+    }
+}
+
+async function handleRadialGsxDrop(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const zone = document.getElementById('radial-gsx-drop-zone');
+    if (zone) {
+        zone.classList.remove('border-cyan-500', 'bg-cyan-500/10');
+    }
+
+    if (!e.dataTransfer || !e.dataTransfer.files || e.dataTransfer.files.length === 0) return;
+    const file = e.dataTransfer.files[0];
+    const path = file.path || '';
+
+    if (currentRadialAirport) {
+        selectedAirport = currentRadialAirport;
+    }
+
+    if (path) {
+        await executeGsxInstallation({ filePath: path });
+    } else {
+        const reader = new FileReader();
+        reader.onload = async function(event) {
+            const base64Data = event.target.result;
+            await executeGsxInstallation({ base64Data: base64Data, filename: file.name });
+        };
+        reader.onerror = function() {
+            showCustomModal({ title: 'File Read Error', message: 'Unable to read the dropped file.', type: 'error' });
+        };
+        reader.readAsDataURL(file);
+    }
+    if (currentRadialAirport) {
+        const updatedAp = getAirportByIcao(currentRadialAirport.icao);
+        if (updatedAp) {
+            currentRadialAirport = updatedAp;
+            renderRadialGsx(currentRadialAirport);
+        }
+    }
+}
+
+async function triggerRadialInstallGsxProfile() {
+    if (currentRadialAirport) {
+        selectedAirport = currentRadialAirport;
+    }
+    await executeGsxInstallation({ filePath: '' });
+    if (currentRadialAirport) {
+        const updatedAp = getAirportByIcao(currentRadialAirport.icao);
+        if (updatedAp) {
+            currentRadialAirport = updatedAp;
+            renderRadialGsx(currentRadialAirport);
+        }
+    }
+}
+
+async function triggerRadialSearchGsxProfile() {
+    if (!currentRadialAirport) return;
+    try {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.search_gsx_profile) {
+            await window.pywebview.api.search_gsx_profile(currentRadialAirport.icao, currentRadialAirport.name || '');
+        }
+    } catch (e) {
+        console.error("Failed to search GSX profile:", e);
+    }
+}
+
+function renderRadialStarRating(rating) {
+    const container = document.getElementById('radial-interactive-star-widget');
+    const scoreDisplay = document.getElementById('radial-rating-score-display');
+    if (!container || !scoreDisplay) return;
+
+    container.innerHTML = '';
+
+    if (rating > 0) {
+        scoreDisplay.innerText = `★ ${rating.toFixed(1)} / 5.0`;
+        scoreDisplay.className = "text-xs font-mono font-black text-amber-400";
+    } else {
+        scoreDisplay.innerText = "Unrated";
+        scoreDisplay.className = "text-xs font-mono font-bold text-slate-500";
+    }
+
+    for (let starIdx = 1; starIdx <= 5; starIdx++) {
+        const starEl = document.createElement('span');
+        starEl.className = 'radial-star-item text-lg cursor-pointer select-none transition-transform hover:scale-110';
+
+        if (rating >= starIdx) {
+            starEl.innerText = '★';
+            starEl.classList.add('text-amber-400');
+        } else if (rating >= starIdx - 0.5) {
+            starEl.innerText = '★';
+            starEl.classList.add('text-amber-300', 'opacity-70');
+        } else {
+            starEl.innerText = '☆';
+            starEl.classList.add('text-slate-600');
+        }
+
+        starEl.addEventListener('mousemove', (e) => handleRadialStarMouseMove(e, starIdx));
+        starEl.addEventListener('click', (e) => handleRadialStarClick(e, starIdx));
+
+        container.appendChild(starEl);
+    }
+}
+
+function handleRadialStarMouseMove(e, starIdx) {
+    const rect = e.target.getBoundingClientRect();
+    const isLeftHalf = (e.clientX - rect.left) < (rect.width / 2);
+    const hoverVal = isLeftHalf ? (starIdx - 0.5) : starIdx;
+
+    renderRadialStarRatingPreview(hoverVal);
+}
+
+function renderRadialStarRatingPreview(val) {
+    const container = document.getElementById('radial-interactive-star-widget');
+    const scoreDisplay = document.getElementById('radial-rating-score-display');
+    if (!container || !scoreDisplay) return;
+
+    const stars = container.querySelectorAll('.radial-star-item');
+
+    scoreDisplay.innerText = `★ ${val.toFixed(1)}+`;
+    scoreDisplay.className = "text-xs font-mono font-black text-amber-300";
+
+    stars.forEach((starEl, index) => {
+        const starIdx = index + 1;
+        starEl.className = 'radial-star-item text-lg cursor-pointer select-none transition-transform hover:scale-110';
+        if (val >= starIdx) {
+            starEl.innerText = '★';
+            starEl.classList.add('text-amber-400');
+        } else if (val >= starIdx - 0.5) {
+            starEl.innerText = '★';
+            starEl.classList.add('text-amber-300', 'opacity-70');
+        } else {
+            starEl.innerText = '☆';
+            starEl.classList.add('text-slate-600');
+        }
+    });
+}
+
+function resetRadialStarHover() {
+    if (currentRadialAirport) {
+        renderRadialStarRating(currentRadialAirport.rating || 0);
+    } else {
+        renderRadialStarRating(0);
+    }
+}
+
+async function handleRadialStarClick(e, starIdx) {
+    if (!currentRadialAirport) return;
+
+    const rect = e.target.getBoundingClientRect();
+    const isLeftHalf = (e.clientX - rect.left) < (rect.width / 2);
+    const ratingVal = isLeftHalf ? (starIdx - 0.5) : starIdx;
+
+    currentRadialAirport.rating = ratingVal;
+    userRatingsMap[currentRadialAirport.icao] = ratingVal;
+    const apInAll = getAirportByIcao(currentRadialAirport.icao);
+    if (apInAll) apInAll.rating = ratingVal;
+
+    renderRadialStarRating(ratingVal);
+
+    try {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.set_rating) {
+            await window.pywebview.api.set_rating(currentRadialAirport.icao, ratingVal);
+        }
+    } catch (err) {
+        console.error("Failed to save rating:", err);
+    }
+
+    filterAirports();
+}
+
+async function clearRadialRating() {
+    if (!currentRadialAirport) return;
+
+    currentRadialAirport.rating = 0;
+    delete userRatingsMap[currentRadialAirport.icao];
+    const apInAll = getAirportByIcao(currentRadialAirport.icao);
+    if (apInAll) apInAll.rating = 0;
+
+    renderRadialStarRating(0);
+
+    try {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.set_rating) {
+            await window.pywebview.api.set_rating(currentRadialAirport.icao, 0);
+        }
+    } catch (err) {
+        console.error("Failed to clear rating:", err);
+    }
+
+    filterAirports();
+}
+
+function renderRadialPrice(ap) {
+    if (!ap) return;
+    const currSymEl = document.getElementById('radial-price-curr-symbol');
+    const priceInputEl = document.getElementById('radial-price-input');
+    const priceTagEl = document.getElementById('radial-price-tag');
+
+    const currSymbols = { 'USD': '$', 'EUR': '€', 'GBP': '£', 'JPY': '¥', 'CAD': 'CA$', 'AUD': 'A$' };
+    const curSymbol = currSymbols[selectedCurrency] || '$';
+    if (currSymEl) currSymEl.innerText = curSymbol;
+
+    const pValEur = ap.price_eur || 0;
+    const formattedP = formatCurrency(pValEur);
+
+    let tagText = "";
+    if (ap.is_custom_price) {
+        tagText = `Paid: ${formattedP}`;
+    } else if (ap.is_bundle || ap.bundle_total_price) {
+        const bTotalFormatted = formatCurrency(ap.bundle_total_price || 39.00);
+        tagText = `Bundle: ${bTotalFormatted}`;
+    } else {
+        tagText = `Est: ${formattedP}`;
+    }
+    if (priceTagEl) priceTagEl.innerText = tagText;
+
+    const rate = CURRENCY_RATES[selectedCurrency] || 1.0;
+    const valConverted = pValEur * rate;
+    if (priceInputEl) {
+        priceInputEl.value = ap.is_custom_price ? valConverted.toFixed(2) : '';
+    }
+}
+
+async function saveRadialCustomPrice() {
+    if (!currentRadialAirport) return;
+    const inputEl = document.getElementById('radial-price-input');
+    if (!inputEl) return;
+    const inputVal = inputEl.value;
+    const rate = CURRENCY_RATES[selectedCurrency] || 1.0;
+
+    let valInEur = null;
+    if (inputVal !== '' && !isNaN(inputVal)) {
+        valInEur = parseFloat(inputVal) / rate;
+    }
+
+    try {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.set_custom_price) {
+            const resStr = await window.pywebview.api.set_custom_price(currentRadialAirport.icao, valInEur);
+            const res = JSON.parse(resStr);
+            if (res.status === 'ok') {
+                allAirportsData = res.airports;
+                allAirportsData.forEach(ap => {
+                    if (userRatingsMap[ap.icao] !== undefined) {
+                        ap.rating = userRatingsMap[ap.icao];
+                    }
+                });
+                updateStats(allAirportsData);
+                filterAirports();
+                const updatedAp = getAirportByIcao(currentRadialAirport.icao);
+                if (updatedAp) {
+                    currentRadialAirport = updatedAp;
+                    renderRadialPrice(currentRadialAirport);
+                }
+                showToast("✓ Custom price saved", "success");
+            }
+        }
+    } catch (e) {
+        console.error("Failed to save custom price:", e);
+    }
+}
+
+async function resetRadialCustomPrice() {
+    if (!currentRadialAirport) return;
+    const inputEl = document.getElementById('radial-price-input');
+    if (inputEl) inputEl.value = '';
+    await saveRadialCustomPrice();
 }
 
 // Dismiss radial menu ONLY on clean left-click outside
@@ -4412,8 +5059,8 @@ window.addEventListener('click', function (e) {
     if (e.button !== 0) return; // Strict Left-Click ONLY
     if (isMapDragging) return; // Do NOT dismiss on drag / pan release
     if (!currentRadialAirport) return;
-    if (isAirlinesModalOpen()) {
-        // In airlines mode: clicking outside on map MUST NOT exit airlines mode. Only close button does.
+    if (isAirlinesModalOpen() || isDetailsModalOpen()) {
+        // In airlines or details mode: clicking outside on map MUST NOT exit mode. Only close button does.
         return;
     }
 

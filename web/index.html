@@ -386,6 +386,7 @@
 
         #radial-sceneries-extension,
         #radial-airlines-modal,
+        #radial-details-modal,
         #flight-planning-banner {
             background: rgba(15, 23, 42, 0.38);
             backdrop-filter: blur(18px);
@@ -889,6 +890,107 @@
                 <!-- Horizontal Multi-Column Grid (8 columns, 3 rows visible, scrollable) -->
                 <div id="radial-airlines-list" class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2 overflow-y-auto custom-scrollbar pr-1 h-[188px] shrink-0 py-1">
                     <!-- Dynamic airline cards rendered here -->
+                </div>
+            </div>
+
+            <!-- AIRPORT DETAILS MODAL (Floating modal matching radial quadrant glass & border, anchored under airport DETAILS) -->
+            <div id="radial-details-modal"
+                 onclick="event.stopPropagation();"
+                 onmousedown="event.stopPropagation();"
+                 onpointerdown="event.stopPropagation();"
+                 class="hidden absolute flex flex-col rounded-3xl shadow-xl shadow-black/50 p-4 select-none w-[540px] max-w-[96vw] pointer-events-auto z-[1550] transition-opacity duration-200 ease-out"
+                 style="transform: translateX(-50%);">
+                
+                <!-- Drag Handle & Modal Header (No icons, clean uppercase typography) -->
+                <div id="radial-details-modal-header" class="h-9 flex items-center justify-between pb-2 border-b border-slate-700/40 shrink-0 cursor-grab active:cursor-grabbing">
+                    <span class="text-xs font-black font-mono tracking-wider text-white uppercase drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" data-i18n="radial.details_title">Airport Details</span>
+                    <button onclick="closeRadialDetailsModal(event)" title="Close" class="w-7 h-7 rounded-xl bg-slate-800/60 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition-colors border border-slate-700/50 cursor-pointer">
+                        ✕
+                    </button>
+                </div>
+
+                <!-- Scrollable Cards Container -->
+                <div class="space-y-2.5 overflow-y-auto custom-scrollbar max-h-[60vh] pr-1 pt-2.5">
+                    
+                    <!-- PILL 1: AIRPORT INFO (Elevation, Category, Lat, Lon) -->
+                    <div class="p-3 rounded-2xl bg-slate-950/40 border border-slate-700/50 space-y-2">
+                        <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] block" data-i18n="radial.info_title">Airport Info</span>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                            <div class="p-2 rounded-xl bg-slate-900/60 border border-slate-800/80">
+                                <span class="text-[10px] text-slate-400 uppercase font-bold block mb-0.5" data-i18n="drawer.latitude">Latitude</span>
+                                <span id="radial-detail-lat" class="text-xs font-mono font-bold text-white truncate block">0.0000</span>
+                            </div>
+                            <div class="p-2 rounded-xl bg-slate-900/60 border border-slate-800/80">
+                                <span class="text-[10px] text-slate-400 uppercase font-bold block mb-0.5" data-i18n="drawer.longitude">Longitude</span>
+                                <span id="radial-detail-lon" class="text-xs font-mono font-bold text-white truncate block">0.0000</span>
+                            </div>
+                            <div class="p-2 rounded-xl bg-slate-900/60 border border-slate-800/80">
+                                <span class="text-[10px] text-slate-400 uppercase font-bold block mb-0.5" data-i18n="drawer.category">Category</span>
+                                <span id="radial-detail-category" class="text-xs font-mono font-bold text-cyan-400 truncate block">Commercial</span>
+                            </div>
+                            <div class="p-2 rounded-xl bg-slate-900/60 border border-slate-800/80">
+                                <span class="text-[10px] text-slate-400 uppercase font-bold block mb-0.5" data-i18n="drawer.elevation">Elevation</span>
+                                <span id="radial-detail-elevation" class="text-xs font-mono font-bold text-slate-200 truncate block">0 ft</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- PILL 2: RUNWAYS -->
+                    <div class="p-3 rounded-2xl bg-slate-950/40 border border-slate-700/50 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" data-i18n="drawer.runways">Runways</span>
+                            <span id="radial-runways-count" class="text-[10px] font-mono font-bold text-slate-400 bg-slate-900/80 border border-slate-800 px-2 py-0.5 rounded-full">0 Runways</span>
+                        </div>
+                        <div id="radial-runways-list" class="space-y-1.5 max-h-[150px] overflow-y-auto custom-scrollbar pr-1">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- PILL 3: GSX PROFILE & DROP ZONE -->
+                    <div class="p-3 rounded-2xl bg-slate-950/40 border border-slate-700/50 space-y-2">
+                        <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] block" data-i18n="drawer.gsx_profile">GSX Profile</span>
+                        <div id="radial-gsx-container">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- PILL 4: MY RATING -->
+                    <div class="p-3 rounded-2xl bg-slate-950/40 border border-slate-700/50 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" data-i18n="drawer.my_rating">My Rating</span>
+                            <span id="radial-rating-score-display" class="text-xs font-mono font-black text-amber-400">★ 0.0</span>
+                        </div>
+                        <div class="flex items-center justify-between pt-1">
+                            <div id="radial-interactive-star-widget" class="flex items-center gap-1.5" onmouseleave="resetRadialStarHover()">
+                                <!-- 5 stars rendered dynamically -->
+                            </div>
+                            <button onclick="clearRadialRating()" class="text-xs text-slate-400 hover:text-red-400 font-bold transition-colors cursor-pointer bg-transparent border-0" data-i18n="drawer.clear_rating">
+                                Clear
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- PILL 5: SCENERY PRICE / VALUE -->
+                    <div class="p-3 rounded-2xl bg-slate-950/40 border border-slate-700/50 space-y-2">
+                        <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] block" data-i18n="drawer.price_value">Scenery Price / Value</span>
+                        <div class="flex items-center gap-2 pt-1">
+                            <div class="relative w-32 shrink-0">
+                                <span id="radial-price-curr-symbol" class="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-mono font-extrabold text-white">$</span>
+                                <input type="number" step="any" id="radial-price-input" data-i18n-placeholder="drawer.price_placeholder" placeholder="Price Paid"
+                                       class="w-full bg-slate-950/90 border border-slate-800 rounded-xl pl-8 pr-2.5 py-1.5 text-xs font-mono font-bold text-white placeholder:text-slate-500 focus:outline-none focus:border-slate-600">
+                            </div>
+                            <span id="radial-price-tag" class="flex-1 text-center text-xs font-mono font-bold text-slate-200 bg-slate-900/80 border border-slate-800 px-2.5 py-1.5 rounded-xl truncate">
+                                Est: €19.99
+                            </span>
+                            <button onclick="saveRadialCustomPrice()" data-i18n="drawer.save_price" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 hover:text-white border border-slate-700/60 text-xs font-bold font-mono transition-colors cursor-pointer shrink-0" title="Save Price">
+                                Save
+                            </button>
+                            <button onclick="resetRadialCustomPrice()" class="px-2.5 py-1.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white text-xs font-mono font-bold transition-colors flex items-center justify-center shrink-0 cursor-pointer border border-slate-700/50" title="Reset to Estimated Catalog Price">
+                                Reset
+                            </button>
+                        </div>
+                    </div>
+
                 </div>
             </div>
 
