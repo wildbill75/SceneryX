@@ -3056,11 +3056,33 @@ function panMapToAirport(ap) {
     }
 }
 
+let radialStoreCache = {};
+
+function prefetchRadialStores(ap) {
+    if (!ap || !ap.icao) return;
+    if (radialStoreCache[ap.icao]) return;
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.check_payware_stores) {
+        window.pywebview.api.check_payware_stores(ap.icao, ap.name || '').then(raw => {
+            const stores = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            radialStoreCache[ap.icao] = stores;
+            const container = document.getElementById('radial-addon-downloads-container');
+            if (container && currentRadialAirport && currentRadialAirport.icao === ap.icao) {
+                renderRadialAddonDownloads(ap, stores, false, 0);
+            }
+        }).catch(err => {
+            console.error("Error prefetching stores for radial menu:", err);
+        });
+    }
+}
+
 function openAirportRadialMenu(ap, marker, e) {
     if (!ap) return;
     currentRadialAirport = ap;
     currentRadialMarker = marker || null;
     currentRadialOpenZoom = (map && typeof map.getZoom === 'function') ? map.getZoom() : 8;
+
+    // Prefetch store downloads in background so they are ready instantly if Sceneries is clicked
+    prefetchRadialStores(ap);
 
     const radialEl = document.getElementById('airport-radial-menu');
     if (!radialEl) return;
@@ -3201,7 +3223,7 @@ function triggerRadialScenerySelector() {
 
     if (!extEl.classList.contains('hidden')) {
         // Toggle OFF with smooth exit animation
-        const pills = extEl.querySelectorAll('[onclick*="activateRadial"]');
+        const pills = extEl.querySelectorAll('[onclick*="activateRadial"], [onclick*="window.open"]');
         pills.forEach(p => {
             p.classList.remove('animate-pill-bounce');
             p.classList.add('animate-pill-exit');
@@ -3408,7 +3430,147 @@ function renderRadialSceneriesExtension(ap, animate = false) {
         });
     }
 
+    // 4. Available Addons Downloads Container
+    html += `<div id="radial-addon-downloads-container" class="flex flex-col gap-2.5"></div>`;
+
     extEl.innerHTML = html;
+
+    // Populate or query available store downloads
+    if (radialStoreCache[ap.icao]) {
+        renderRadialAddonDownloads(ap, radialStoreCache[ap.icao], animate, pillIndex);
+    } else if (window.pywebview && window.pywebview.api && window.pywebview.api.check_payware_stores) {
+        window.pywebview.api.check_payware_stores(ap.icao, ap.name || '').then(raw => {
+            const stores = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            radialStoreCache[ap.icao] = stores;
+            if (currentRadialAirport && currentRadialAirport.icao === ap.icao) {
+                renderRadialAddonDownloads(ap, stores, false, pillIndex);
+            }
+        }).catch(err => {
+            console.error("Error loading stores for radial scenery drawer:", err);
+        });
+    }
+}
+
+function renderRadialAddonDownloads(ap, stores, animate = false, basePillIndex = 0) {
+    const container = document.getElementById('radial-addon-downloads-container');
+    if (!container) return;
+    if (!stores || !Array.isArray(stores)) {
+        container.innerHTML = '';
+        return;
+    }
+
+    // Strictly filter to stores that returned found === true and have a valid URL
+    const positiveStores = stores.filter(st => st && st.found && st.url);
+    if (positiveStores.length === 0) {
+        container.innerHTML = '';
+        return;
+    }
+
+    // Calculate converted prices in user-selected currency
+    positiveStores.forEach(st => {
+        if (st.price !== null && st.price !== undefined) {
+            const fromCurr = st.currency || 'USD';
+            const rateFrom = CURRENCY_RATES[fromCurr] || 1.0;
+            const priceEur = parseFloat(st.price) / rateFrom;
+            const rateTo = CURRENCY_RATES[selectedCurrency] || 1.0;
+            const priceTarget = priceEur * rateTo;
+            st.convertedPrice = priceTarget;
+
+            const sym = CURRENCY_SYMBOLS[selectedCurrency] || '$';
+            st.formattedPrice = `${sym}${priceTarget.toFixed(2)}`;
+
+            if (fromCurr !== selectedCurrency) {
+                const origSym = CURRENCY_SYMBOLS[fromCurr] || '';
+                st.origPriceFormatted = `${origSym}${parseFloat(st.price).toFixed(2)} ${fromCurr}`;
+            } else {
+                st.origPriceFormatted = null;
+            }
+        } else {
+            st.convertedPrice = null;
+            st.formattedPrice = null;
+            st.origPriceFormatted = null;
+        }
+    });
+
+    // Sort: Available stores with price sorted LOWEST PRICE FIRST!
+    // Followed by available without explicit price
+    positiveStores.sort((a, b) => {
+        const pA = a.convertedPrice !== null ? a.convertedPrice : 999999;
+        const pB = b.convertedPrice !== null ? b.convertedPrice : 999999;
+        if (pA !== pB) return pA - pB;
+        if (a.type !== b.type) return a.type === 'dev' ? -1 : 1;
+        return 0;
+    });
+
+    let html = `
+        <div class="flex items-center gap-2 pt-1 px-1">
+            <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300">${t('drawer.addon_downloads', 'Available Addons Downloads')}</span>
+        </div>
+    `;
+
+    let pillIdx = basePillIndex;
+    positiveStores.forEach(st => {
+        const isDev = st.type === 'dev';
+        const animClass = animate ? 'animate-pill-bounce' : '';
+        const animDelay = animate ? `style="animation-delay: ${(pillIdx * 0.05).toFixed(2)}s;"` : '';
+        pillIdx++;
+
+        const iconBoxClass = isDev ? 'bg-amber-500 text-slate-950' : 'bg-purple-600 text-white';
+        const iconClass = isDev ? 'fa-solid fa-crown text-xs' : 'fa-solid fa-cart-shopping text-[11px]';
+        const badgeHtml = isDev
+            ? '<span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0 uppercase">DEV</span>'
+            : '<span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 shrink-0 uppercase">STORE</span>';
+
+        const borderClass = isDev
+            ? 'border border-slate-700/60 hover:border-amber-400/80 bg-slate-950/75 hover:bg-slate-900/90 shadow-lg'
+            : 'border border-slate-700/60 hover:border-purple-500/80 bg-slate-950/75 hover:bg-slate-900/90 shadow-lg';
+
+        const safeUrl = (st.url || '').replace(/'/g, "\\'");
+
+        html += `
+            <div onclick="event.stopPropagation(); window.open('${safeUrl}', '_blank');"
+                 onmousedown="event.stopPropagation();"
+                 onpointerdown="event.stopPropagation();"
+                 ${animDelay}
+                 class="${animClass} p-3.5 rounded-2xl ${borderClass} backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1.5 w-[360px]">
+                
+                <!-- Row 1: Store Icon + Store Name + Store/Dev Badge + Price & Link Button -->
+                <div class="flex items-center justify-between gap-2.5">
+                    <div class="flex items-center gap-2.5 min-w-0 flex-1">
+                        <div class="w-6 h-6 rounded-lg ${iconBoxClass} flex items-center justify-center shrink-0 shadow-sm">
+                            <i class="${iconClass}"></i>
+                        </div>
+                        <div class="min-w-0 flex-1" title="${st.name}">
+                            <span class="text-xs font-bold text-white truncate block group-hover:text-cyan-300 transition-colors">${st.name}</span>
+                        </div>
+                        ${badgeHtml}
+                    </div>
+
+                    <div class="flex items-center gap-2 shrink-0">
+                        ${st.formattedPrice ? `
+                            <span class="px-2 py-0.5 rounded-md text-xs font-mono font-bold bg-emerald-600 text-white shadow-sm">
+                                ${st.formattedPrice}
+                            </span>
+                        ` : ''}
+                        <div class="w-6 h-6 rounded-lg bg-slate-800/80 group-hover:bg-purple-600 text-slate-400 group-hover:text-white flex items-center justify-center text-xs transition-colors border border-slate-700/50 shrink-0 shadow-sm">
+                            <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Row 2: Store Description + Available Status -->
+                <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 pl-[34px]">
+                    <span class="truncate pr-2">${st.desc || ''}</span>
+                    <div class="flex items-center gap-1 shrink-0 text-emerald-400 font-semibold text-[10px]">
+                        <span>Available</span>
+                        <i class="fa-solid fa-circle-check text-xs"></i>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
 }
 
 function updateRadialCoreBadge(ap) {
