@@ -384,7 +384,8 @@
             animation: radialPillExit 0.16s cubic-bezier(0.4, 0, 0.2, 1) forwards;
         }
 
-        #radial-sceneries-extension {
+        #radial-sceneries-extension,
+        #radial-airlines-modal {
             background: rgba(15, 23, 42, 0.38);
             backdrop-filter: blur(18px);
             -webkit-backdrop-filter: blur(18px);
@@ -858,29 +859,29 @@
                  onclick="event.stopPropagation();"
                  onmousedown="event.stopPropagation();"
                  onpointerdown="event.stopPropagation();"
-                 class="hidden absolute flex flex-col glass-modal rounded-3xl border border-slate-700/80 shadow-2xl p-4 select-none w-[820px] max-w-[96vw] pointer-events-auto z-[1550] transition-opacity duration-200 ease-out"
+                 class="hidden absolute flex flex-col rounded-3xl shadow-xl shadow-black/50 p-4 select-none w-[820px] max-w-[96vw] pointer-events-auto z-[1550] transition-opacity duration-200 ease-out"
                  style="transform: translateX(-50%);">
                 
                 <!-- Drag Handle & Modal Header -->
-                <div id="radial-airlines-modal-header" class="h-9 flex items-center justify-between pb-2 border-b border-slate-800 shrink-0 cursor-grab active:cursor-grabbing">
+                <div id="radial-airlines-modal-header" class="h-9 flex items-center justify-between pb-2 border-b border-slate-700/40 shrink-0 cursor-grab active:cursor-grabbing">
                     <div class="flex items-center gap-2 pointer-events-none">
                         <i class="fa-solid fa-grip-vertical text-xs text-slate-400 mr-1 opacity-75"></i>
-                        <span class="text-xs font-black font-mono tracking-wider text-white uppercase" data-i18n="drawer.operating_airlines">Operating Airlines</span>
+                        <span class="text-xs font-black font-mono tracking-wider text-white uppercase drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" data-i18n="drawer.operating_airlines">Operating Airlines</span>
                     </div>
-                    <button onclick="closeRadialAirlinesModal(event)" title="Close" class="w-7 h-7 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition-colors border border-slate-700/50 cursor-pointer">
+                    <button onclick="closeRadialAirlinesModal(event)" title="Close" class="w-7 h-7 rounded-xl bg-slate-800/60 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition-colors border border-slate-700/50 cursor-pointer">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
                 </div>
 
                 <!-- Sub-header: Count (MAJUSCULE & PLUS GROS) + Clear Selection (GREY like hint) -->
                 <div class="h-8 flex items-center justify-between px-0.5 shrink-0">
-                    <span id="radial-airlines-count" class="text-sm font-black font-mono tracking-wider text-cyan-400 uppercase truncate pr-2">0 AIRLINES</span>
+                    <span id="radial-airlines-count" class="text-sm font-black font-mono tracking-wider text-cyan-400 uppercase truncate pr-2 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">0 AIRLINES</span>
                     <div class="flex items-center gap-2 text-xs font-mono shrink-0">
-                        <button id="radial-airlines-clear-btn" onclick="clearRadialAirlineFilter(event)" class="hidden text-slate-400 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5 bg-transparent border-0 p-0 text-[11px]">
+                        <button id="radial-airlines-clear-btn" onclick="clearRadialAirlineFilter(event)" class="hidden text-slate-300 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5 bg-transparent border-0 p-0 text-[11px] drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
                             <i class="fa-solid fa-rotate-left text-[10px]"></i>
                             <span class="underline">Clear selection</span>
                         </button>
-                        <span id="radial-airlines-hint" class="text-[11px] text-slate-400">Click to filter routes</span>
+                        <span id="radial-airlines-hint" class="text-[11px] text-slate-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">Click to filter routes</span>
                     </div>
                 </div>
 
