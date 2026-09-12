@@ -2853,7 +2853,9 @@ function renderAirportsOnMap(airports) {
                 } else if (activeDrawerMode === 'COUNTRY') {
                     focusAirportInCountryMode(currentAp);
                 } else {
-                    if (currentRadialAirport && currentRadialAirport.icao === currentAp.icao) {
+                    if (isAirlinesModalOpen()) {
+                        openAirportRadialMenu(currentAp, this, e);
+                    } else if (currentRadialAirport && currentRadialAirport.icao === currentAp.icao) {
                         closeAirportRadialMenu();
                     } else {
                         openAirportRadialMenu(currentAp, this, e);
@@ -3298,19 +3300,18 @@ function openAirportRadialMenu(ap, marker, e) {
         icaoEl.className = `font-mono font-black text-3xl tracking-tight leading-none ${icaoColor}`;
     }
 
-    // Reveal Radial Menu with snappy bounce & circular cascade animation
-    radialEl.classList.remove('hidden');
-    if (isAirlinesOpen && sectorAirlines) {
-        sectorAirlines.classList.add('active-radial-sector');
-    }
-    updateRadialMenuPosition(true);
-
-    radialEl.classList.remove('animate-radial-open');
-    void radialEl.offsetWidth; // Force reflow to retrigger animation reliably
-    radialEl.classList.add('animate-radial-open');
-
     if (isAirlinesOpen) {
+        // En mode Operating Airlines : le menu radial doit complètement disparaître !
+        radialEl.classList.add('hidden');
         updateRadialAirlinesModalPosition(true);
+    } else {
+        // Reveal Radial Menu with snappy bounce & circular cascade animation
+        radialEl.classList.remove('hidden', 'radial-quadrants-collapsed');
+        updateRadialMenuPosition(true);
+
+        radialEl.classList.remove('animate-radial-open');
+        void radialEl.offsetWidth; // Force reflow to retrigger animation reliably
+        radialEl.classList.add('animate-radial-open');
     }
 }
 
@@ -3325,7 +3326,6 @@ function triggerRadialOperatingAirlines() {
     if (!currentRadialAirport) return;
     const modal = document.getElementById('radial-airlines-modal');
     const radialEl = document.getElementById('airport-radial-menu');
-    const sectorAirlines = document.getElementById('radial-sector-airlines');
     if (!modal) return;
 
     // If Sceneries extension is open, close it
@@ -3338,15 +3338,12 @@ function triggerRadialOperatingAirlines() {
         // Toggle OFF (exit Operating Airlines mode)
         closeRadialAirlinesModal();
     } else {
-        // Toggle ON: Show airlines modal and keep radial menu visible with active highlight
+        // Toggle ON: Entire radial menu wheel completely disappears!
+        if (radialEl) {
+            radialEl.classList.add('hidden');
+        }
         renderRadialOperatingAirlines(currentRadialAirport);
         modal.classList.remove('hidden');
-        if (sectorAirlines) {
-            sectorAirlines.classList.add('active-radial-sector');
-        }
-        if (radialEl) {
-            radialEl.classList.remove('hidden', 'radial-quadrants-collapsed');
-        }
         updateRadialAirlinesModalPosition(true);
     }
 }
@@ -3354,6 +3351,7 @@ function triggerRadialOperatingAirlines() {
 function closeRadialAirlinesModal(event) {
     if (event) event.stopPropagation();
     const modal = document.getElementById('radial-airlines-modal');
+    const radialEl = document.getElementById('airport-radial-menu');
     const sectorAirlines = document.getElementById('radial-sector-airlines');
     if (modal) {
         modal.classList.add('hidden');
@@ -3376,6 +3374,29 @@ function closeRadialAirlinesModal(event) {
         }
         filterAirports();
         updateFilterUI();
+    }
+    // Restore the full radial menu wheel on the last selected airport with bounce animation
+    if (radialEl && currentRadialAirport) {
+        radialEl.classList.remove('hidden', 'radial-quadrants-collapsed');
+        const disc = document.getElementById('radial-backdrop-disc');
+        const sectors = radialEl.querySelectorAll('.radial-sector');
+        const core = document.getElementById('radial-core');
+        if (disc) {
+            disc.style.animation = 'none';
+            void disc.offsetWidth;
+            disc.style.animation = 'radialBackdropPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards';
+        }
+        if (core) {
+            core.style.animation = 'none';
+            void core.offsetWidth;
+            core.style.animation = 'radialCoreBounce 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards';
+        }
+        sectors.forEach((sec, idx) => {
+            sec.style.animation = 'none';
+            void sec.offsetWidth;
+            sec.style.animation = `radialSectorCircularBounce 0.36s cubic-bezier(0.34, 1.56, 0.64, 1) ${(idx * 0.05).toFixed(2)}s both`;
+        });
+        updateRadialMenuPosition(true);
     }
 }
 
