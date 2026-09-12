@@ -3730,7 +3730,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
     // Header: Available Addon Variants
     html += `
         <div class="flex items-center gap-2 pt-1 px-1">
-            <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300">${t('drawer.addon_variants', 'Available Addon Variants')}</span>
+            <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">${t('drawer.addon_variants', 'Available Addon Variants')}</span>
         </div>
     `;
 
@@ -3745,19 +3745,19 @@ function renderRadialSceneriesExtension(ap, animate = false) {
         const safePkgName = (src.folder_name || '').replace(/'/g, "\\'");
 
         let badgeBg = 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30';
-        let activeBorderClass = 'border-2 border-cyan-500 shadow-xl shadow-cyan-950/50 bg-slate-950/90 ring-1 ring-cyan-500/30';
+        let activeBorderClass = 'border-2 border-cyan-500 shadow-lg shadow-cyan-950/40 bg-slate-950/60 ring-1 ring-cyan-500/30';
 
         if (isAsoboPkg) {
             badgeBg = 'bg-amber-500/20 text-amber-300 border border-amber-500/30';
-            activeBorderClass = 'border-2 border-amber-500 shadow-xl shadow-amber-950/50 bg-slate-950/90 ring-1 ring-amber-500/30';
+            activeBorderClass = 'border-2 border-amber-500 shadow-lg shadow-amber-950/40 bg-slate-950/60 ring-1 ring-amber-500/30';
         } else if (pType === 'Payware') {
             badgeBg = 'bg-purple-500/20 text-purple-300 border border-purple-500/30';
-            activeBorderClass = 'border-2 border-purple-500 shadow-xl shadow-purple-950/50 bg-slate-950/90 ring-1 ring-purple-500/30';
+            activeBorderClass = 'border-2 border-purple-500 shadow-lg shadow-purple-950/40 bg-slate-950/60 ring-1 ring-purple-500/30';
         }
 
         const borderClass = isActive
             ? activeBorderClass
-            : 'border border-slate-700/70 hover:border-slate-500/80 bg-slate-900/80 hover:bg-slate-800/90 shadow-md';
+            : 'border border-slate-700/50 hover:border-slate-500/70 bg-slate-950/40 hover:bg-slate-900/60 shadow-sm';
 
         const animClass = animate ? 'animate-pill-bounce' : '';
         const animDelay = animate ? `style="animation-delay: ${(pillIndex * 0.05).toFixed(2)}s;"` : '';
@@ -3806,8 +3806,8 @@ function renderRadialSceneriesExtension(ap, animate = false) {
 
     // 2. Default MSFS Base Airport (Clean, no "built-in", no filename sub-box, Sky color liseret)
     const defaultBorderClass = isDefaultActive
-        ? 'border-2 border-sky-500 shadow-xl shadow-sky-950/50 bg-slate-950/90 ring-1 ring-sky-500/30'
-        : 'border border-slate-700/70 hover:border-slate-500/80 bg-slate-900/80 hover:bg-slate-800/90 shadow-md';
+        ? 'border-2 border-sky-500 shadow-lg shadow-sky-950/40 bg-slate-950/60 ring-1 ring-sky-500/30'
+        : 'border border-slate-700/50 hover:border-slate-500/70 bg-slate-950/40 hover:bg-slate-900/60 shadow-sm';
 
     const defaultAnimClass = animate ? 'animate-pill-bounce' : '';
     const defaultAnimDelay = animate ? `style="animation-delay: ${(pillIndex * 0.05).toFixed(2)}s;"` : '';
@@ -3846,7 +3846,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
     if (fixSources.length > 0) {
         html += `
             <div class="flex items-center gap-2 pt-1 px-1">
-                <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300">${t('drawer.fixes_overlays', 'Available Fixes & Overlays')}</span>
+                <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">${t('drawer.fixes_overlays', 'Available Fixes & Overlays')}</span>
             </div>
         `;
 
@@ -3855,8 +3855,8 @@ function renderRadialSceneriesExtension(ap, animate = false) {
             const isActive = !src.is_disabled;
             const pkgPath = (src.folder_name || '').replace(/'/g, "\\'");
             const fixBorderClass = isActive
-                ? 'border-2 border-emerald-500 shadow-xl shadow-emerald-950/50 bg-slate-950/90 ring-1 ring-emerald-500/30'
-                : 'border border-slate-700/70 hover:border-slate-500/80 bg-slate-900/80 hover:bg-slate-800/90 shadow-md';
+                ? 'border-2 border-emerald-500 shadow-lg shadow-emerald-950/40 bg-slate-950/60 ring-1 ring-emerald-500/30'
+                : 'border border-slate-700/50 hover:border-slate-500/70 bg-slate-950/40 hover:bg-slate-900/60 shadow-sm';
 
             const fixAnimClass = animate ? 'animate-pill-bounce' : '';
             const fixAnimDelay = animate ? `style="animation-delay: ${(pillIndex * 0.05).toFixed(2)}s;"` : '';
@@ -3907,13 +3907,13 @@ function renderRadialSceneriesExtension(ap, animate = false) {
 
     html += `
         <div class="flex items-center gap-2 pt-1 px-1">
-            <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300">${t('drawer.freeware_addons', 'Available Freeware Addons')}</span>
+            <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">${t('drawer.freeware_addons', 'Available Freeware Addons')}</span>
         </div>
         <div onclick="event.stopPropagation(); window.open('${fsToSearchUrl}', '_blank');"
              onmousedown="event.stopPropagation();"
              onpointerdown="event.stopPropagation();"
              ${freewareAnimDelay}
-             class="${freewareAnimClass} py-2 px-3 rounded-xl border border-slate-700/70 hover:border-cyan-400/80 bg-slate-900/80 hover:bg-slate-800/90 shadow-md backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1 w-full">
+             class="${freewareAnimClass} py-2 px-3 rounded-xl border border-slate-700/50 hover:border-cyan-400/80 bg-slate-950/40 hover:bg-slate-900/60 shadow-sm backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1 w-full">
             
             <!-- Row 1: Flightsim.to Icon + Title + FREEWARE Badge + FREE Pill + External Link Icon -->
             <div class="flex items-center justify-between gap-2">
@@ -4024,7 +4024,7 @@ function renderRadialAddonDownloads(ap, stores, animate = false, basePillIndex =
 
     let html = `
         <div class="flex items-center gap-2 pt-1 px-1">
-            <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300">${t('drawer.payware_addons', 'Available Payware Addons')}</span>
+            <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">${t('drawer.payware_addons', 'Available Payware Addons')}</span>
         </div>
     `;
 
@@ -4042,8 +4042,8 @@ function renderRadialAddonDownloads(ap, stores, animate = false, basePillIndex =
             : '<span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 shrink-0 uppercase">STORE</span>';
 
         const borderClass = isDev
-            ? 'border border-slate-700/70 hover:border-amber-400/80 bg-slate-900/80 hover:bg-slate-800/90 shadow-md'
-            : 'border border-slate-700/70 hover:border-purple-500/80 bg-slate-900/80 hover:bg-slate-800/90 shadow-md';
+            ? 'border border-slate-700/50 hover:border-amber-400/80 bg-slate-950/40 hover:bg-slate-900/60 shadow-sm'
+            : 'border border-slate-700/50 hover:border-purple-500/80 bg-slate-950/40 hover:bg-slate-900/60 shadow-sm';
 
         const safeUrl = (st.url || '').replace(/'/g, "\\'");
 
