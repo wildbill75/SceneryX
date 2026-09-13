@@ -3891,7 +3891,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
                  ${animDelay}
                  class="${animClass} py-2 px-3 rounded-xl ${borderClass} backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1 w-full">
                 
-                <!-- Row 1: Switch toggle + Title with Native Mouseover Folder Tooltip + Category Badge + Folder Button -->
+                <!-- Row 1: Switch toggle + Title + Category Badge -->
                 <div class="flex items-center justify-between gap-2">
                     <div class="flex items-center gap-2 min-w-0 flex-1">
                         <!-- Preflightly-style Switch Toggle -->
@@ -3908,18 +3908,19 @@ function renderRadialSceneriesExtension(ap, animate = false) {
 
                         <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded ${badgeBg} shrink-0 uppercase leading-tight">${pType}</span>
                     </div>
-
-                    <button onclick="event.stopPropagation(); openSpecificPackageFolderByIndex('${ap.icao}', ${idx})"
-                            title="${t('drawer.open_folder', 'Open Folder')}"
-                            class="w-5.5 h-5.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-amber-400 flex items-center justify-center text-[11px] transition-colors border border-slate-700/50 shrink-0 shadow-sm">
-                        <i class="fa-solid fa-folder-open"></i>
-                    </button>
                 </div>
 
-                <!-- Row 2: MSFS Version, Location & Size -->
+                <!-- Row 2: MSFS Version, Location, Size/Streamed & Folder Button -->
                 <div class="flex items-center justify-between text-[10px] font-mono text-slate-400 pl-[44px] leading-tight">
-                    <span class="truncate">${src.source_folder}</span>
-                    <span class="shrink-0 text-slate-300 font-semibold ml-2">${src.size_str || ''}</span>
+                    <span class="truncate pr-2">${src.source_folder}</span>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <span class="text-slate-300 font-semibold">${src.size_str || ''}</span>
+                        <button onclick="event.stopPropagation(); openSpecificPackageFolderByIndex('${ap.icao}', ${idx})"
+                                title="${t('drawer.open_folder', 'Open Folder')}"
+                                class="w-5 h-5 rounded-md bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-amber-400 flex items-center justify-center text-[10px] transition-colors border border-slate-700/50 shadow-sm">
+                            <i class="fa-solid fa-folder-open"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
         `;
@@ -3943,7 +3944,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
              ${defaultAnimDelay}
              class="${defaultAnimClass} py-2 px-3 rounded-xl ${defaultBorderClass} backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1 w-full">
             
-            <!-- Row 1: Switch toggle + Airport Name + DEFAULT Badge (Justified Right) -->
+            <!-- Row 1: Switch toggle + Airport Name + DEFAULT Badge -->
             <div class="flex items-center justify-between gap-2">
                 <div class="flex items-center gap-2 min-w-0 flex-1">
                     <!-- Preflightly-style Switch Toggle -->
@@ -3959,9 +3960,6 @@ function renderRadialSceneriesExtension(ap, animate = false) {
 
                     <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-blue-600 text-white shrink-0 uppercase leading-tight">DEFAULT</span>
                 </div>
-
-                <!-- Invisible spacer matching folder button width for perfect vertical alignment of tags -->
-                <div class="w-5.5 shrink-0"></div>
             </div>
 
             <!-- Row 2: Clean Base Scenery Description without 'built-in' -->
@@ -3998,6 +3996,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
                      ${fixAnimDelay}
                      class="${fixAnimClass} py-2 px-3 rounded-xl ${fixBorderClass} backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1 w-full">
                     
+                    <!-- Row 1: Switch toggle + Package Name + FIX Badge -->
                     <div class="flex items-center justify-between gap-2">
                         <div class="flex items-center gap-2 min-w-0 flex-1">
                             <div class="relative inline-flex items-center shrink-0">
@@ -4012,16 +4011,19 @@ function renderRadialSceneriesExtension(ap, animate = false) {
 
                             <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-600 text-white shrink-0 uppercase leading-tight">FIX</span>
                         </div>
-                        <button onclick="event.stopPropagation(); openSpecificPackageFolderByIndex('${ap.icao}', ${idx})"
-                                title="${t('drawer.open_folder', 'Open Folder')}"
-                                class="w-5.5 h-5.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-amber-400 flex items-center justify-center text-[11px] transition-colors border border-slate-700/50 shrink-0 shadow-sm">
-                            <i class="fa-solid fa-folder-open"></i>
-                        </button>
                     </div>
 
+                    <!-- Row 2: Source Folder, Size & Folder Button -->
                     <div class="flex items-center justify-between text-[10px] font-mono text-slate-400 pl-[44px] leading-tight">
-                        <span class="truncate">${src.source_folder}</span>
-                        <span class="shrink-0 text-slate-300 font-semibold ml-2">${src.size_str || ''}</span>
+                        <span class="truncate pr-2">${src.source_folder}</span>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <span class="text-slate-300 font-semibold">${src.size_str || ''}</span>
+                            <button onclick="event.stopPropagation(); openSpecificPackageFolderByIndex('${ap.icao}', ${idx})"
+                                    title="${t('drawer.open_folder', 'Open Folder')}"
+                                    class="w-5 h-5 rounded-md bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-amber-400 flex items-center justify-center text-[10px] transition-colors border border-slate-700/50 shadow-sm">
+                                <i class="fa-solid fa-folder-open"></i>
+                            </button>
+                        </div>
                     </div>
                 </div>
             `;
@@ -4044,29 +4046,17 @@ function renderRadialSceneriesExtension(ap, animate = false) {
              ${freewareAnimDelay}
              class="${freewareAnimClass} py-2 px-3 rounded-xl border border-slate-700/50 hover:border-cyan-400/80 bg-slate-950/40 hover:bg-slate-900/60 shadow-sm backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1 w-full">
             
-            <!-- Row 1: Title + FREEWARE Badge + External Link Icon -->
+            <!-- Row 1: Title + FREEWARE Badge -->
             <div class="flex items-center justify-between gap-2">
-                <div class="flex items-center gap-2 min-w-0 flex-1">
-                    <div class="min-w-0 flex-1" title="Flightsim.to">
-                        <span class="text-xs font-bold text-white truncate block group-hover:text-cyan-300 transition-colors">Flightsim.to</span>
-                    </div>
-                    <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-cyan-600 text-white shrink-0 uppercase leading-tight">FREEWARE</span>
+                <div class="min-w-0 flex-1" title="Flightsim.to">
+                    <span class="text-xs font-bold text-white truncate block group-hover:text-cyan-300 transition-colors">Flightsim.to</span>
                 </div>
-
-                <div class="flex items-center gap-1.5 shrink-0">
-                    <div class="w-5.5 h-5.5 rounded-lg bg-slate-800/80 group-hover:bg-cyan-600 text-slate-400 group-hover:text-white flex items-center justify-center text-[10px] transition-colors border border-slate-700/50 shrink-0 shadow-sm">
-                        <i class="fa-solid fa-arrow-up-right-from-square"></i>
-                    </div>
-                </div>
+                <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-cyan-600 text-white shrink-0 uppercase leading-tight">FREEWARE</span>
             </div>
 
-            <!-- Row 2: Description + Available Status -->
-            <div class="flex items-center justify-between text-[10px] font-mono text-slate-400 leading-tight">
-                <span class="truncate pr-2">Community freeware sceneries</span>
-                <div class="flex items-center gap-1 shrink-0 text-cyan-400 font-semibold text-[10px]">
-                    <span>Available</span>
-                    <i class="fa-solid fa-circle-check text-[11px]"></i>
-                </div>
+            <!-- Row 2: Description -->
+            <div class="text-[10px] font-mono text-slate-400 leading-tight">
+                <span class="truncate block">Community freeware sceneries</span>
             </div>
         </div>
     `;
@@ -4194,34 +4184,25 @@ function renderRadialAddonDownloads(ap, stores, animate = false, basePillIndex =
                  ${animDelay}
                  class="${animClass} py-2 px-3 rounded-xl ${borderClass} backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1 w-full">
                 
-                <!-- Row 1: Store Name + Store/Dev Badge + Price & Link Button -->
+                <!-- Row 1: Store Name + Store/Dev Badge + Price -->
                 <div class="flex items-center justify-between gap-2">
-                    <div class="flex items-center gap-2 min-w-0 flex-1">
-                        <div class="min-w-0 flex-1" title="${st.name}">
-                            <span class="text-xs font-bold text-white truncate block group-hover:text-cyan-300 transition-colors">${st.name}</span>
-                        </div>
-                        ${badgeHtml}
+                    <div class="min-w-0 flex-1" title="${st.name}">
+                        <span class="text-xs font-bold text-white truncate block group-hover:text-cyan-300 transition-colors">${st.name}</span>
                     </div>
 
                     <div class="flex items-center gap-1.5 shrink-0">
+                        ${badgeHtml}
                         ${st.formattedPrice ? `
                             <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-600 text-white shrink-0 leading-tight shadow-sm">
                                 ${st.formattedPrice}
                             </span>
                         ` : ''}
-                        <div class="w-5.5 h-5.5 rounded-lg bg-slate-800/80 group-hover:bg-purple-600 text-slate-400 group-hover:text-white flex items-center justify-center text-[10px] transition-colors border border-slate-700/50 shrink-0 shadow-sm">
-                            <i class="fa-solid fa-arrow-up-right-from-square"></i>
-                        </div>
                     </div>
                 </div>
 
-                <!-- Row 2: Store Description + Available Status -->
-                <div class="flex items-center justify-between text-[10px] font-mono text-slate-400 leading-tight">
-                    <span class="truncate pr-2">${storeDesc}</span>
-                    <div class="flex items-center gap-1 shrink-0 text-emerald-400 font-semibold text-[10px]">
-                        <span>Available</span>
-                        <i class="fa-solid fa-circle-check text-[11px]"></i>
-                    </div>
+                <!-- Row 2: Store Description -->
+                <div class="text-[10px] font-mono text-slate-400 leading-tight">
+                    <span class="truncate block">${storeDesc}</span>
                 </div>
             </div>
         `;
