@@ -3906,7 +3906,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
                             <span class="text-xs font-bold text-white truncate block hover:text-cyan-300 transition-colors cursor-help" title="${safePkgName}">${titleLabel}</span>
                         </div>
 
-                        <span class="text-[9px] font-mono px-1.5 py-0.5 rounded ${badgeBg} shrink-0 uppercase">${pType}</span>
+                        <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded ${badgeBg} shrink-0 uppercase leading-tight">${pType}</span>
                     </div>
 
                     <button onclick="event.stopPropagation(); openSpecificPackageFolderByIndex('${ap.icao}', ${idx})"
@@ -3943,7 +3943,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
              ${defaultAnimDelay}
              class="${defaultAnimClass} py-2 px-3 rounded-xl ${defaultBorderClass} backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1 w-full">
             
-            <!-- Row 1: Switch toggle + Airport Name + DEFAULT Badge -->
+            <!-- Row 1: Switch toggle + Airport Name + DEFAULT Badge (Justified Right) -->
             <div class="flex items-center justify-between gap-2">
                 <div class="flex items-center gap-2 min-w-0 flex-1">
                     <!-- Preflightly-style Switch Toggle -->
@@ -3953,9 +3953,15 @@ function renderRadialSceneriesExtension(ap, animate = false) {
                         </div>
                     </div>
 
-                    <span class="text-xs font-bold text-white truncate min-w-0" title="${defaultAirportName}">${defaultAirportName}</span>
-                    <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-600 text-white shrink-0 uppercase">DEFAULT</span>
+                    <div class="min-w-0 flex-1" title="${defaultAirportName}">
+                        <span class="text-xs font-bold text-white truncate block hover:text-cyan-300 transition-colors cursor-help" title="${defaultAirportName}">${defaultAirportName}</span>
+                    </div>
+
+                    <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-blue-600 text-white shrink-0 uppercase leading-tight">DEFAULT</span>
                 </div>
+
+                <!-- Invisible spacer matching folder button width for perfect vertical alignment of tags -->
+                <div class="w-5.5 shrink-0"></div>
             </div>
 
             <!-- Row 2: Clean Base Scenery Description without 'built-in' -->
@@ -4004,7 +4010,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
                                 <span class="text-xs font-bold text-white truncate block hover:text-emerald-300 transition-colors cursor-help" title="${pkgPath}">${src.folder_name}</span>
                             </div>
 
-                            <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-600 text-white shrink-0 uppercase">FIX</span>
+                            <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-600 text-white shrink-0 uppercase leading-tight">FIX</span>
                         </div>
                         <button onclick="event.stopPropagation(); openSpecificPackageFolderByIndex('${ap.icao}', ${idx})"
                                 title="${t('drawer.open_folder', 'Open Folder')}"
@@ -4038,19 +4044,16 @@ function renderRadialSceneriesExtension(ap, animate = false) {
              ${freewareAnimDelay}
              class="${freewareAnimClass} py-2 px-3 rounded-xl border border-slate-700/50 hover:border-cyan-400/80 bg-slate-950/40 hover:bg-slate-900/60 shadow-sm backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1 w-full">
             
-            <!-- Row 1: Title + FREEWARE Badge + FREE Pill + External Link Icon -->
+            <!-- Row 1: Title + FREEWARE Badge + External Link Icon -->
             <div class="flex items-center justify-between gap-2">
                 <div class="flex items-center gap-2 min-w-0 flex-1">
                     <div class="min-w-0 flex-1" title="Flightsim.to">
                         <span class="text-xs font-bold text-white truncate block group-hover:text-cyan-300 transition-colors">Flightsim.to</span>
                     </div>
-                    <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-cyan-600 text-white shrink-0 uppercase">FREEWARE</span>
+                    <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-cyan-600 text-white shrink-0 uppercase leading-tight">FREEWARE</span>
                 </div>
 
                 <div class="flex items-center gap-1.5 shrink-0">
-                    <span class="px-2 py-0.5 rounded-md text-[11px] font-mono font-bold bg-cyan-600 text-white shadow-sm">
-                        FREE
-                    </span>
                     <div class="w-5.5 h-5.5 rounded-lg bg-slate-800/80 group-hover:bg-cyan-600 text-slate-400 group-hover:text-white flex items-center justify-center text-[10px] transition-colors border border-slate-700/50 shrink-0 shadow-sm">
                         <i class="fa-solid fa-arrow-up-right-from-square"></i>
                     </div>
@@ -4059,7 +4062,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
 
             <!-- Row 2: Description + Available Status -->
             <div class="flex items-center justify-between text-[10px] font-mono text-slate-400 leading-tight">
-                <span class="truncate pr-2">Community freeware sceneries on Flightsim.to</span>
+                <span class="truncate pr-2">Community freeware sceneries</span>
                 <div class="flex items-center gap-1 shrink-0 text-cyan-400 font-semibold text-[10px]">
                     <span>Available</span>
                     <i class="fa-solid fa-circle-check text-[11px]"></i>
@@ -4149,6 +4152,24 @@ function renderRadialAddonDownloads(ap, stores, animate = false, basePillIndex =
     `;
 
     let pillIdx = basePillIndex;
+    const shortDescMap = {
+        'simMarket': 'Flight simulation marketplace',
+        'Orbx Direct': 'Official MSFS scenery store',
+        'Flightsim.to Store': 'Official payware marketplace',
+        'iniBuilds Store': 'Premier sceneries & addons',
+        'Aerosoft Shop': 'Official European sim store',
+        'Contrail Web Shop': 'Partner sceneries & addons',
+        'France VFR': 'Official sceneries & airports',
+        'Flightbeam Studios': 'Official store & sceneries',
+        'FlyTampa': 'Official creator website',
+        'FSDreamTeam': 'Official studio & GSX creator',
+        'Jetstream Designs': 'Official creator showcase',
+        'NZA Simulations': 'Official Australasia store',
+        'Pyreegue Dev Co.': 'Official studio via Contrail',
+        'Drzewiecki Design': 'Official airports catalog',
+        'LatinVFR': 'Official developer store'
+    };
+
     positiveStores.forEach(st => {
         const isDev = st.type === 'dev';
         const animClass = animate ? 'animate-pill-bounce' : '';
@@ -4156,14 +4177,15 @@ function renderRadialAddonDownloads(ap, stores, animate = false, basePillIndex =
         pillIdx++;
 
         const badgeHtml = isDev
-            ? '<span class="text-[9px] font-mono font-black px-1.5 py-0.5 rounded bg-amber-500 text-slate-950 shrink-0 uppercase">DEV</span>'
-            : '<span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-purple-600 text-white shrink-0 uppercase">STORE</span>';
+            ? '<span class="text-[10px] font-mono font-black px-2 py-0.5 rounded bg-amber-500 text-slate-950 shrink-0 uppercase leading-tight">DEV</span>'
+            : '<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-purple-600 text-white shrink-0 uppercase leading-tight">STORE</span>';
 
         const borderClass = isDev
             ? 'border border-slate-700/50 hover:border-amber-400/80 bg-slate-950/40 hover:bg-slate-900/60 shadow-sm'
             : 'border border-slate-700/50 hover:border-purple-500/80 bg-slate-950/40 hover:bg-slate-900/60 shadow-sm';
 
         const safeUrl = (st.url || '').replace(/'/g, "\\'");
+        const storeDesc = shortDescMap[st.name] || st.desc || '';
 
         html += `
             <div onclick="event.stopPropagation(); window.open('${safeUrl}', '_blank');"
@@ -4183,7 +4205,7 @@ function renderRadialAddonDownloads(ap, stores, animate = false, basePillIndex =
 
                     <div class="flex items-center gap-1.5 shrink-0">
                         ${st.formattedPrice ? `
-                            <span class="px-2 py-0.5 rounded-md text-[11px] font-mono font-bold bg-emerald-600 text-white shadow-sm">
+                            <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-600 text-white shrink-0 leading-tight shadow-sm">
                                 ${st.formattedPrice}
                             </span>
                         ` : ''}
@@ -4195,7 +4217,7 @@ function renderRadialAddonDownloads(ap, stores, animate = false, basePillIndex =
 
                 <!-- Row 2: Store Description + Available Status -->
                 <div class="flex items-center justify-between text-[10px] font-mono text-slate-400 leading-tight">
-                    <span class="truncate pr-2">${st.desc || ''}</span>
+                    <span class="truncate pr-2">${storeDesc}</span>
                     <div class="flex items-center gap-1 shrink-0 text-emerald-400 font-semibold text-[10px]">
                         <span>Available</span>
                         <i class="fa-solid fa-circle-check text-[11px]"></i>
@@ -10153,12 +10175,12 @@ function openPaywareStoresModal(icao, airportName) {
             console.error("Error checking stores:", err);
             // Fallback default list
             renderPaywareStoresList([
-                { name: 'simMarket', desc: 'Global flight simulation store & marketplace', url: `https://secure.simmarket.com/advanced_search_result.php?keywords=${cleanIcao}`, found: true },
-                { name: 'Orbx Direct', desc: 'OrbxDirect official MSFS scenery catalog', url: `https://orbxdirect.com/msfs?search=${cleanIcao}`, found: true },
-                { name: 'Flightsim.to Store', desc: 'Official payware marketplace on Flightsim.to', url: `https://flightsim.to/store/search?q=${cleanIcao}`, found: false },
-                { name: 'iniBuilds Store', desc: 'iniBuilds premier sceneries & partner developer store', url: `https://inibuilds.com/search?q=${cleanIcao}`, found: false },
-                { name: 'Aerosoft Shop', desc: 'Aerosoft official European flight simulation store', url: `https://www.aerosoft.com/en/search?search=${cleanIcao}`, found: false },
-                { name: 'Contrail Web Shop', desc: 'Flightbeam, Jo Erlend, Pyreegue & partner addons', url: `https://contrail.shop/search?q=${cleanIcao}`, found: false }
+                { name: 'simMarket', desc: 'Flight simulation marketplace', url: `https://secure.simmarket.com/advanced_search_result.php?keywords=${cleanIcao}`, found: true },
+                { name: 'Orbx Direct', desc: 'Official MSFS scenery store', url: `https://orbxdirect.com/msfs?search=${cleanIcao}`, found: true },
+                { name: 'Flightsim.to Store', desc: 'Official payware marketplace', url: `https://flightsim.to/store/search?q=${cleanIcao}`, found: false },
+                { name: 'iniBuilds Store', desc: 'Premier sceneries & addons', url: `https://inibuilds.com/search?q=${cleanIcao}`, found: false },
+                { name: 'Aerosoft Shop', desc: 'Official European sim store', url: `https://www.aerosoft.com/en/search?search=${cleanIcao}`, found: false },
+                { name: 'Contrail Web Shop', desc: 'Partner sceneries & addons', url: `https://contrail.shop/search?q=${cleanIcao}`, found: false }
             ], cleanIcao);
         });
     }

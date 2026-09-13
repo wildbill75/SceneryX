@@ -2481,21 +2481,21 @@ class Api:
             return False, fallback_u, None, ""
 
         stores_def = [
-            ("France VFR", check_francevfr, "France VFR official scenery boutique & regional airports", "dev"),
-            ("Flightbeam Studios", check_flightbeam, "Flightbeam official store & next-gen sceneries", "dev"),
-            ("FlyTampa", lambda c: (c in DEV_CATALOGS['FlyTampa'], DEV_CATALOGS['FlyTampa'].get(c, "https://www.flytampa.org/"), 21.99, "USD"), "FlyTampa official creator website & airports", "dev"),
-            ("FSDreamTeam", lambda c: (c in DEV_CATALOGS['FSDreamTeam'], DEV_CATALOGS['FSDreamTeam'].get(c, "https://www.fsdreamteam.com/products_msfs.html"), 19.99, "USD"), "FSDreamTeam official studio & GSX creator", "dev"),
-            ("Jetstream Designs", lambda c: (c in DEV_CATALOGS['Jetstream Designs'], DEV_CATALOGS['Jetstream Designs'].get(c, "https://www.jetstream-designs.com/"), None, ""), "Jetstream Designs official creator showcase", "dev"),
-            ("NZA Simulations", lambda c: (c in DEV_CATALOGS['NZA Simulations'], DEV_CATALOGS['NZA Simulations'].get(c, "https://nzasimulations.com/"), 24.99, "AUD"), "NZA Simulations official Australasia scenery store", "dev"),
-            ("Pyreegue Dev Co.", check_pyreegue, "Pyreegue Dev Co. official studio (via Contrail)", "dev"),
-            ("Drzewiecki Design", lambda c: (c in DEV_CATALOGS['Drzewiecki Design'], DEV_CATALOGS['Drzewiecki Design'].get(c, "https://drzewiecki-design.net/products.htm"), 21.00, "EUR"), "Drzewiecki Design official airports catalog", "dev"),
-            ("LatinVFR", check_latinvfr, "LatinVFR official developer store & airports", "dev"),
-            ("simMarket", check_sm, "Global flight simulation store & vendor marketplace", "market"),
-            ("Orbx Direct", check_orbx, "OrbxDirect official MSFS scenery catalog", "market"),
-            ("Flightsim.to Store", check_fsto, "Official payware marketplace on Flightsim.to", "market"),
-            ("iniBuilds Store", check_ini, "iniBuilds premier sceneries & partner developer store", "market"),
-            ("Aerosoft Shop", check_aero, "Aerosoft official European flight simulation store", "market"),
-            ("Contrail Web Shop", check_contrail, "Flightbeam, Jo Erlend, Pyreegue & partner addons", "market")
+            ("France VFR", check_francevfr, "Official sceneries & airports", "dev"),
+            ("Flightbeam Studios", check_flightbeam, "Official store & sceneries", "dev"),
+            ("FlyTampa", lambda c: (c in DEV_CATALOGS['FlyTampa'], DEV_CATALOGS['FlyTampa'].get(c, "https://www.flytampa.org/"), 21.99, "USD"), "Official creator website", "dev"),
+            ("FSDreamTeam", lambda c: (c in DEV_CATALOGS['FSDreamTeam'], DEV_CATALOGS['FSDreamTeam'].get(c, "https://www.fsdreamteam.com/products_msfs.html"), 19.99, "USD"), "Official studio & GSX creator", "dev"),
+            ("Jetstream Designs", lambda c: (c in DEV_CATALOGS['Jetstream Designs'], DEV_CATALOGS['Jetstream Designs'].get(c, "https://www.jetstream-designs.com/"), None, ""), "Official creator showcase", "dev"),
+            ("NZA Simulations", lambda c: (c in DEV_CATALOGS['NZA Simulations'], DEV_CATALOGS['NZA Simulations'].get(c, "https://nzasimulations.com/"), 24.99, "AUD"), "Official Australasia store", "dev"),
+            ("Pyreegue Dev Co.", check_pyreegue, "Official studio via Contrail", "dev"),
+            ("Drzewiecki Design", lambda c: (c in DEV_CATALOGS['Drzewiecki Design'], DEV_CATALOGS['Drzewiecki Design'].get(c, "https://drzewiecki-design.net/products.htm"), 21.00, "EUR"), "Official airports catalog", "dev"),
+            ("LatinVFR", check_latinvfr, "Official developer store", "dev"),
+            ("simMarket", check_sm, "Flight simulation marketplace", "market"),
+            ("Orbx Direct", check_orbx, "Official MSFS scenery store", "market"),
+            ("Flightsim.to Store", check_fsto, "Official payware marketplace", "market"),
+            ("iniBuilds Store", check_ini, "Premier sceneries & addons", "market"),
+            ("Aerosoft Shop", check_aero, "Official European sim store", "market"),
+            ("Contrail Web Shop", check_contrail, "Partner sceneries & addons", "market")
         ]
 
         results = []
