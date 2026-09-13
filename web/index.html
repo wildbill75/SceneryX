@@ -44,10 +44,11 @@
             border: 1px solid rgba(51, 65, 85, 0.5);
         }
         .glass-modal {
-            background: rgba(15, 23, 42, 0.95);
-            backdrop-filter: blur(24px);
-            -webkit-backdrop-filter: blur(24px);
-            border: 1px solid rgba(51, 65, 85, 0.7);
+            background: rgba(15, 23, 42, 0.55) !important;
+            backdrop-filter: blur(20px) !important;
+            -webkit-backdrop-filter: blur(20px) !important;
+            border: 1.75px solid rgba(148, 163, 184, 0.40) !important;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.85), 0 0 24px rgba(15, 23, 42, 0.5) !important;
         }
         /* Custom scrollbars */
         ::-webkit-scrollbar {
@@ -387,11 +388,81 @@
         #radial-sceneries-extension,
         #radial-airlines-modal,
         #radial-details-modal,
-        #flight-planning-banner {
+        #flight-planning-banner,
+        #bottom-map-toolbar,
+        #filter-radial-backdrop,
+        #filter-radial-center-hub,
+        .filter-radial-pill {
             background: rgba(15, 23, 42, 0.38);
             backdrop-filter: blur(18px);
             -webkit-backdrop-filter: blur(18px);
             border: 1.75px solid rgba(148, 163, 184, 0.40);
+        }
+
+        #filter-radial-backdrop {
+            background: rgba(15, 23, 42, 0.18) !important;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8) !important;
+        }
+
+        #bottom-map-toolbar {
+            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.8) !important;
+        }
+
+        /* Radial Filter Center Hub Hover & Drag */
+        #filter-radial-center-hub {
+            transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: grab;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6);
+        }
+        #filter-radial-center-hub:hover {
+            background: rgba(255, 255, 255, 0.50) !important;
+            border-color: rgba(255, 255, 255, 0.90) !important;
+            border-width: 2.5px !important;
+            filter: drop-shadow(0 0 16px rgba(255, 255, 255, 0.50)) !important;
+        }
+        #filter-radial-center-hub:hover span,
+        #filter-radial-center-hub:hover i {
+            color: #ffffff !important;
+            text-shadow: 0 0 10px rgba(0, 0, 0, 0.9) !important;
+        }
+        #filter-radial-center-hub:active {
+            filter: brightness(1.35);
+        }
+        #filter-radial-center-hub.cursor-grabbing,
+        #filter-radial-backdrop.cursor-grabbing {
+            cursor: grabbing !important;
+        }
+
+        /* Radial Filter Pills Hover & Active */
+        .filter-radial-pill {
+            transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6);
+        }
+        .filter-radial-pill:hover {
+            background: rgba(255, 255, 255, 0.50) !important;
+            border-color: rgba(255, 255, 255, 0.90) !important;
+            border-width: 2.5px !important;
+            filter: drop-shadow(0 0 16px rgba(255, 255, 255, 0.50)) !important;
+        }
+        .filter-radial-pill:hover span,
+        .filter-radial-pill:hover i {
+            color: #ffffff !important;
+            text-shadow: 0 0 10px rgba(0, 0, 0, 0.9);
+        }
+        .filter-radial-pill:active {
+            filter: brightness(1.35);
+        }
+        .filter-radial-pill.is-active {
+            background: rgba(6, 182, 212, 0.45) !important;
+            border: 2px solid rgba(103, 232, 249, 0.95) !important;
+            box-shadow: 0 0 16px rgba(6, 182, 212, 0.6) !important;
+            color: #ffffff !important;
+        }
+        .filter-radial-pill.is-active:hover {
+            background: rgba(255, 255, 255, 0.50) !important;
+            border-color: rgba(255, 255, 255, 0.90) !important;
+            border-width: 2.5px !important;
+            filter: drop-shadow(0 0 16px rgba(255, 255, 255, 0.50)) !important;
         }
 
         /* Country Hover & Click Deactivation when Zoomed In */
@@ -510,48 +581,48 @@
             <div id="map" class="w-full h-full z-10 bg-slate-950"></div>
 
             <!-- BOTTOM CENTERED MAP TOOLBAR -->
-            <div id="bottom-map-toolbar" class="absolute bottom-6 left-1/2 -translate-x-1/2 z-[400] flex items-center gap-2.5 bg-slate-950/85 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-slate-700/60 shadow-2xl shadow-black/70 select-none">
+            <div id="bottom-map-toolbar" class="absolute bottom-6 left-1/2 -translate-x-1/2 z-[400] flex items-center gap-2.5 px-3.5 py-2 rounded-2xl select-none">
                 <!-- SEARCH BAR -->
                 <div class="relative flex items-center w-64 md:w-80">
                     <i class="fa-solid fa-magnifying-glass absolute left-3.5 text-slate-400 text-xs pointer-events-none"></i>
                     <input type="text" id="search-input" onkeydown="handleSearchKeyDown(event)" oninput="debouncedFilterAirports()" 
                            data-i18n-placeholder="footer.search_placeholder"
                            placeholder="Search ICAO, Airport, Country..." 
-                           class="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl pl-9 pr-8 py-2 text-xs text-slate-100 placeholder-slate-400 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 font-medium transition-all shadow-inner">
+                           class="w-full bg-slate-900/50 hover:bg-slate-900/70 border border-slate-700/60 focus:border-cyan-400 rounded-xl pl-9 pr-8 py-2 text-xs text-slate-100 placeholder-slate-400 focus:outline-none font-medium transition-all shadow-inner">
                     <button id="clear-search" onclick="clearSearch()" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs p-1 cursor-pointer">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
                 </div>
 
                 <!-- SEPARATOR -->
-                <div class="w-px h-6 bg-slate-800 shrink-0"></div>
+                <div class="w-px h-6 bg-slate-700/50 shrink-0"></div>
 
                 <!-- EXPORT BUTTON -->
-                <button onclick="openExportModal()" data-i18n-title="footer.export_button" title="Export Scenery Collection (CSV / JSON)" class="h-9 px-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-800 hover:border-slate-700 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 group">
+                <button onclick="openExportModal()" data-i18n-title="footer.export_button" title="Export Scenery Collection (CSV / JSON)" class="h-9 px-3.5 rounded-xl bg-slate-900/50 hover:bg-slate-800/70 text-slate-200 hover:text-white border border-slate-700/60 hover:border-slate-400/80 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 group">
                     <i class="fa-solid fa-arrow-up-from-bracket text-slate-400 group-hover:text-white text-xs transition-colors"></i>
                     <span data-i18n="footer.export_button">Export</span>
                 </button>
 
                 <!-- RESCAN BUTTON -->
-                <button onclick="rescanMSFS()" data-i18n-title="footer.rescan_button" title="Rescan MSFS Packages" class="h-9 px-3.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 shadow-lg shadow-cyan-600/20">
+                <button onclick="rescanMSFS()" data-i18n-title="footer.rescan_button" title="Rescan MSFS Packages" class="h-9 px-3.5 rounded-xl bg-cyan-600/85 hover:bg-cyan-500 text-white text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 shadow-lg shadow-cyan-600/20 border border-cyan-400/50 hover:border-cyan-300">
                     <i id="rescan-icon" class="fa-solid fa-arrows-rotate text-white text-xs"></i>
                     <span data-i18n="footer.rescan_button">Rescan</span>
                 </button>
 
                 <!-- SETTINGS GEAR BUTTON -->
-                <button onclick="openSettingsModal()" data-i18n-title="footer.settings_tooltip" title="Settings & Scenery Paths" class="w-9 h-9 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 hover:border-slate-700 flex items-center justify-center transition-all shrink-0 cursor-pointer active:scale-95 group">
+                <button onclick="openSettingsModal()" data-i18n-title="footer.settings_tooltip" title="Settings & Scenery Paths" class="w-9 h-9 rounded-xl bg-slate-900/50 hover:bg-slate-800/70 text-slate-300 hover:text-white border border-slate-700/60 hover:border-slate-400/80 flex items-center justify-center transition-all shrink-0 cursor-pointer active:scale-95 group">
                     <i class="fa-solid fa-gear text-slate-400 group-hover:text-white text-sm transition-transform duration-300 group-hover:rotate-45"></i>
                 </button>
             </div>
 
-            <!-- FILTER RADIAL MENU (RIGHT-CLICK CONTEXTUAL FLOATING MENU) -->
+            <!-- FILTER RADIAL MENU (RIGHT-CLICK CONTEXTUAL FLOATING MENU - DRAGGABLE) -->
             <div id="filter-radial-menu" class="hidden fixed z-[1500] select-none pointer-events-none transform -translate-x-1/2 -translate-y-1/2 transition-opacity duration-200" style="transform-origin: center center;">
                 <div class="relative w-[520px] h-[520px] flex items-center justify-center pointer-events-none">
-                    <!-- FROSTED BLURRED CIRCULAR BACKDROP DISC -->
-                    <div id="filter-radial-backdrop" class="absolute w-[500px] h-[500px] rounded-full bg-slate-950/80 backdrop-blur-xl border border-slate-700/50 shadow-2xl shadow-black/80 pointer-events-none"></div>
+                    <!-- FROSTED BLURRED CIRCULAR BACKDROP DISC (DRAGGABLE) -->
+                    <div id="filter-radial-backdrop" class="absolute w-[500px] h-[500px] rounded-full pointer-events-auto cursor-grab" title="Drag wheel or click outside to dismiss"></div>
 
-                    <!-- CENTRAL HUB -->
-                    <div id="filter-radial-center-hub" onclick="handleFilterRadialCenterClick()" class="absolute z-30 w-32 h-32 rounded-full bg-gradient-to-b from-slate-800 to-slate-900 border-2 border-cyan-500/50 hover:border-cyan-400 shadow-xl flex flex-col items-center justify-center cursor-pointer pointer-events-auto transition-all active:scale-95 group text-center p-2">
+                    <!-- CENTRAL HUB (DRAGGABLE & CLICKABLE) -->
+                    <div id="filter-radial-center-hub" class="absolute z-30 w-32 h-32 rounded-full flex flex-col items-center justify-center pointer-events-auto active:scale-95 group text-center p-2 cursor-grab select-none" title="Drag to move or click to navigate">
                         <!-- Content rendered dynamically: Level 1 vs Level 2 -->
                     </div>
 
@@ -1263,7 +1334,7 @@
     <div id="settings-modal" onclick="if(event.target === this) closeSettingsModal()" class="hidden fixed inset-0 z-[2000] items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 sm:p-6 transition-all duration-200">
         <div class="glass-modal w-full max-w-2xl max-h-[88vh] flex flex-col rounded-3xl shadow-2xl border border-slate-800 bg-slate-900/95 overflow-hidden">
             <!-- Pinned Header -->
-            <div class="flex items-center justify-between border-b border-slate-800/80 px-6 py-4 shrink-0 bg-slate-900/90">
+            <div class="flex items-center justify-between border-b border-slate-700/40 px-6 py-4 shrink-0 bg-slate-950/30">
                 <div>
                     <span class="text-[10px] font-mono text-cyan-400/90 uppercase font-bold tracking-wider block mb-1">SceneryX System</span>
                     <div class="flex items-center gap-2.5">

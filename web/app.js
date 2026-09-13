@@ -873,6 +873,7 @@ function initMap() {
     if (filterRadialMenuEl) {
         L.DomEvent.disableClickPropagation(filterRadialMenuEl);
         L.DomEvent.disableScrollPropagation(filterRadialMenuEl);
+        initDraggableFilterRadial();
     }
     const radialExtEl = document.getElementById('radial-sceneries-extension');
     if (radialExtEl) {
@@ -10371,6 +10372,90 @@ const FILTER_RADIAL_CATEGORIES = [
     }
 ];
 
+let isFilterRadialDragging = false;
+let filterRadialDragStart = { x: 0, y: 0 };
+let filterRadialMenuInitialPos = { x: 0, y: 0 };
+let filterRadialHasMoved = false;
+
+function initDraggableFilterRadial() {
+    const menuEl = document.getElementById('filter-radial-menu');
+    const hubEl = document.getElementById('filter-radial-center-hub');
+    const backdropEl = document.getElementById('filter-radial-backdrop');
+    if (!menuEl || !hubEl || hubEl._dragInitialized) return;
+
+    hubEl._dragInitialized = true;
+
+    function handleDragStart(e, isHub) {
+        if (e.button !== 0) return; // Only primary left click
+        e.preventDefault();
+        e.stopPropagation();
+
+        isFilterRadialDragging = true;
+        filterRadialHasMoved = false;
+        filterRadialDragStart = { x: e.clientX, y: e.clientY };
+
+        filterRadialMenuInitialPos = {
+            x: parseFloat(menuEl.style.left) || (window.innerWidth / 2),
+            y: parseFloat(menuEl.style.top) || (window.innerHeight / 2)
+        };
+
+        hubEl.classList.add('cursor-grabbing');
+        hubEl.classList.remove('cursor-grab');
+        if (backdropEl) {
+            backdropEl.classList.add('cursor-grabbing');
+            backdropEl.classList.remove('cursor-grab');
+        }
+
+        const onMouseMove = (moveEvent) => {
+            if (!isFilterRadialDragging) return;
+            moveEvent.preventDefault();
+            moveEvent.stopPropagation();
+
+            const dx = moveEvent.clientX - filterRadialDragStart.x;
+            const dy = moveEvent.clientY - filterRadialDragStart.y;
+
+            if (Math.hypot(dx, dy) > 4) {
+                filterRadialHasMoved = true;
+            }
+
+            const menuRadius = 260;
+            const margin = 10;
+            const newX = Math.max(menuRadius + margin, Math.min(window.innerWidth - menuRadius - margin, filterRadialMenuInitialPos.x + dx));
+            const newY = Math.max(menuRadius + margin, Math.min(window.innerHeight - menuRadius - margin, filterRadialMenuInitialPos.y + dy));
+
+            menuEl.style.left = `${newX}px`;
+            menuEl.style.top = `${newY}px`;
+        };
+
+        const onMouseUp = (upEvent) => {
+            if (!isFilterRadialDragging) return;
+            isFilterRadialDragging = false;
+
+            hubEl.classList.remove('cursor-grabbing');
+            hubEl.classList.add('cursor-grab');
+            if (backdropEl) {
+                backdropEl.classList.remove('cursor-grabbing');
+                backdropEl.classList.add('cursor-grab');
+            }
+
+            window.removeEventListener('mousemove', onMouseMove, true);
+            window.removeEventListener('mouseup', onMouseUp, true);
+
+            if (!filterRadialHasMoved && isHub) {
+                handleFilterRadialCenterClick();
+            }
+        };
+
+        window.addEventListener('mousemove', onMouseMove, true);
+        window.addEventListener('mouseup', onMouseUp, true);
+    }
+
+    hubEl.addEventListener('mousedown', (e) => handleDragStart(e, true));
+    if (backdropEl) {
+        backdropEl.addEventListener('mousedown', (e) => handleDragStart(e, false));
+    }
+}
+
 function openFilterRadialMenu(clientX, clientY) {
     if (typeof closeAirportRadialMenu === 'function') {
         closeAirportRadialMenu();
@@ -10378,6 +10463,8 @@ function openFilterRadialMenu(clientX, clientY) {
 
     const menuEl = document.getElementById('filter-radial-menu');
     if (!menuEl) return;
+
+    initDraggableFilterRadial();
 
     // Viewport edge clamping
     const menuSize = 520;
@@ -10441,7 +10528,7 @@ function renderFilterRadialLevel1() {
             <i class="fa-solid fa-sliders text-cyan-400 text-sm mb-1"></i>
             <span class="text-[9px] font-black tracking-widest text-slate-400 uppercase leading-tight">MAP VIEW</span>
             <span class="text-xs font-black font-mono text-cyan-400 leading-tight">FILTERED BY</span>
-            <span class="text-[10px] font-mono text-slate-300 mt-1 bg-slate-900/90 px-2 py-0.5 rounded-full border border-slate-700/50">${count} AP</span>
+            <span class="text-[10px] font-mono text-slate-300 mt-1 bg-slate-900/60 px-2 py-0.5 rounded-full border border-slate-700/40">${count} AP</span>
         </div>
     `;
 
@@ -10460,14 +10547,14 @@ function renderFilterRadialLevel1() {
 
         html += `
             <button onclick="renderFilterRadialLevel2('${cat.key}')" 
-                    class="absolute pointer-events-auto cursor-pointer transition-all duration-150 active:scale-95 group flex items-center gap-2 px-3 py-2 rounded-2xl bg-slate-900/95 hover:bg-slate-800 border border-slate-700/80 hover:border-cyan-500/60 shadow-xl shadow-black/70"
+                    class="filter-radial-pill absolute pointer-events-auto cursor-pointer transition-all duration-150 active:scale-95 group flex items-center gap-2 px-3.5 py-2 rounded-2xl"
                     style="left: ${x}px; top: ${y}px; transform: translate(-50%, -50%);">
-                <div class="w-7 h-7 rounded-xl bg-slate-800 flex items-center justify-center ${cat.color} group-hover:text-white transition-colors shrink-0">
+                <div class="w-7 h-7 rounded-xl bg-slate-800/60 flex items-center justify-center ${cat.color} group-hover:text-white transition-colors shrink-0">
                     <i class="${cat.icon} text-xs"></i>
                 </div>
                 <div class="flex flex-col text-left">
                     <span class="text-[10px] font-black tracking-wider uppercase text-slate-200 group-hover:text-white leading-tight">${cat.label}</span>
-                    <span class="text-[9px] font-mono text-slate-400 group-hover:text-cyan-300 font-semibold truncate max-w-[105px] leading-tight">${summary}</span>
+                    <span class="text-[9px] font-mono text-slate-300 group-hover:text-white font-semibold truncate max-w-[105px] leading-tight">${summary}</span>
                 </div>
             </button>
         `;
@@ -10502,58 +10589,58 @@ function renderFilterRadialLevel2(categoryKey) {
 
     if (categoryKey === 'pricing') {
         items = [
-            { id: 'all', label: 'All Models', icon: 'fa-solid fa-layer-group', isActive: selectedPricing.size === ALL_PRICING_LIST.length, activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
-            { id: 'Payware', label: 'Payware', icon: 'fa-solid fa-star text-purple-400', isActive: selectedPricing.has('Payware'), activeStyle: 'bg-purple-600 border-purple-400 text-white' },
-            { id: 'Freeware / Flightsim.to', label: 'Freeware', icon: 'fa-solid fa-star text-cyan-400', isActive: selectedPricing.has('Freeware / Flightsim.to'), activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
-            { id: 'Asobo', label: 'Asobo', icon: 'fa-solid fa-star text-amber-400', isActive: selectedPricing.has('Asobo'), activeStyle: 'bg-amber-500 border-amber-300 text-slate-950 font-black' },
-            { id: 'Default', label: 'Default MSFS', icon: 'fa-solid fa-circle text-blue-400', isActive: selectedPricing.has('Default'), activeStyle: 'bg-blue-600 border-blue-400 text-white' }
+            { id: 'all', label: 'All Models', icon: 'fa-solid fa-layer-group', isActive: selectedPricing.size === ALL_PRICING_LIST.length },
+            { id: 'Payware', label: 'Payware', icon: 'fa-solid fa-star text-purple-400', isActive: selectedPricing.has('Payware') },
+            { id: 'Freeware / Flightsim.to', label: 'Freeware', icon: 'fa-solid fa-star text-cyan-400', isActive: selectedPricing.has('Freeware / Flightsim.to') },
+            { id: 'Asobo', label: 'Asobo', icon: 'fa-solid fa-star text-amber-400', isActive: selectedPricing.has('Asobo') },
+            { id: 'Default', label: 'Default MSFS', icon: 'fa-solid fa-circle text-blue-400', isActive: selectedPricing.has('Default') }
         ];
     } else if (categoryKey === 'source') {
         items = [
-            { id: 'all', label: 'All Sources', icon: 'fa-solid fa-layer-group', isActive: selectedSources.size === ALL_SOURCES_LIST.length, activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
-            { id: 'Community', label: 'Community', icon: 'fa-solid fa-folder-open text-cyan-400', isActive: selectedSources.has('Community'), activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
-            { id: 'Marketplace', label: 'Marketplace', icon: 'fa-solid fa-store text-sky-400', isActive: selectedSources.has('Marketplace'), activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
-            { id: 'Official', label: 'Official', icon: 'fa-solid fa-shield text-amber-400', isActive: selectedSources.has('Official'), activeStyle: 'bg-cyan-600 border-cyan-400 text-white' }
+            { id: 'all', label: 'All Sources', icon: 'fa-solid fa-layer-group', isActive: selectedSources.size === ALL_SOURCES_LIST.length },
+            { id: 'Community', label: 'Community', icon: 'fa-solid fa-folder-open text-cyan-400', isActive: selectedSources.has('Community') },
+            { id: 'Marketplace', label: 'Marketplace', icon: 'fa-solid fa-store text-sky-400', isActive: selectedSources.has('Marketplace') },
+            { id: 'Official', label: 'Official', icon: 'fa-solid fa-shield text-amber-400', isActive: selectedSources.has('Official') }
         ];
     } else if (categoryKey === 'region') {
         radius = 185;
         items = [
-            { id: 'all', label: 'All Regions', icon: 'fa-solid fa-globe', isActive: !selectedRegion, activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
-            { id: 'weurope', label: 'W. Europe', icon: null, isActive: selectedRegion === 'weurope', activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
-            { id: 'eeurope', label: 'E. Europe', icon: null, isActive: selectedRegion === 'eeurope', activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
-            { id: 'namerica', label: 'N. America', icon: null, isActive: selectedRegion === 'namerica', activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
-            { id: 'camerica_caribbean', label: 'C. America', icon: null, isActive: selectedRegion === 'camerica_caribbean', activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
-            { id: 'samerica', label: 'S. America', icon: null, isActive: selectedRegion === 'samerica', activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
-            { id: 'asia', label: 'Asia', icon: null, isActive: selectedRegion === 'asia', activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
-            { id: 'middleeast', label: 'Middle East', icon: null, isActive: selectedRegion === 'middleeast', activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
-            { id: 'nafrica', label: 'N. Africa', icon: null, isActive: selectedRegion === 'nafrica', activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
-            { id: 'ssafrica', label: 'SS. Africa', icon: null, isActive: selectedRegion === 'ssafrica', activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
-            { id: 'oceania', label: 'Oceania', icon: null, isActive: selectedRegion === 'oceania', activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
-            { id: 'pacific', label: 'Pacific', icon: null, isActive: selectedRegion === 'pacific', activeStyle: 'bg-cyan-600 border-cyan-400 text-white' }
+            { id: 'all', label: 'All Regions', icon: 'fa-solid fa-globe', isActive: !selectedRegion },
+            { id: 'weurope', label: 'W. Europe', icon: null, isActive: selectedRegion === 'weurope' },
+            { id: 'eeurope', label: 'E. Europe', icon: null, isActive: selectedRegion === 'eeurope' },
+            { id: 'namerica', label: 'N. America', icon: null, isActive: selectedRegion === 'namerica' },
+            { id: 'camerica_caribbean', label: 'C. America', icon: null, isActive: selectedRegion === 'camerica_caribbean' },
+            { id: 'samerica', label: 'S. America', icon: null, isActive: selectedRegion === 'samerica' },
+            { id: 'asia', label: 'Asia', icon: null, isActive: selectedRegion === 'asia' },
+            { id: 'middleeast', label: 'Middle East', icon: null, isActive: selectedRegion === 'middleeast' },
+            { id: 'nafrica', label: 'N. Africa', icon: null, isActive: selectedRegion === 'nafrica' },
+            { id: 'ssafrica', label: 'SS. Africa', icon: null, isActive: selectedRegion === 'ssafrica' },
+            { id: 'oceania', label: 'Oceania', icon: null, isActive: selectedRegion === 'oceania' },
+            { id: 'pacific', label: 'Pacific', icon: null, isActive: selectedRegion === 'pacific' }
         ];
     } else if (categoryKey === 'type') {
         items = [
-            { id: 'all', label: 'All Types', icon: 'fa-solid fa-layer-group', isActive: selectedTypes.size === ALL_TYPES_LIST.length, activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
-            { id: 'International', label: 'International', icon: 'fa-solid fa-plane-departure text-cyan-400', isActive: selectedTypes.has('International'), activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
-            { id: 'Regional', label: 'Regional', icon: 'fa-solid fa-plane text-sky-400', isActive: selectedTypes.has('Regional'), activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
-            { id: 'General Aviation', label: 'General Av.', icon: 'fa-solid fa-paper-plane text-emerald-400', isActive: selectedTypes.has('General Aviation'), activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
-            { id: 'Heli / Water', label: 'Heli / Water', icon: 'fa-solid fa-helicopter text-amber-400', isActive: selectedTypes.has('Heli / Water'), activeStyle: 'bg-cyan-600 border-cyan-400 text-white' }
+            { id: 'all', label: 'All Types', icon: 'fa-solid fa-layer-group', isActive: selectedTypes.size === ALL_TYPES_LIST.length },
+            { id: 'International', label: 'International', icon: 'fa-solid fa-plane-departure text-cyan-400', isActive: selectedTypes.has('International') },
+            { id: 'Regional', label: 'Regional', icon: 'fa-solid fa-plane text-sky-400', isActive: selectedTypes.has('Regional') },
+            { id: 'General Aviation', label: 'General Av.', icon: 'fa-solid fa-paper-plane text-emerald-400', isActive: selectedTypes.has('General Aviation') },
+            { id: 'Heli / Water', label: 'Heli / Water', icon: 'fa-solid fa-helicopter text-amber-400', isActive: selectedTypes.has('Heli / Water') }
         ];
     } else if (categoryKey === 'gsx') {
         items = [
-            { id: 'all', label: 'All Profiles', icon: 'fa-solid fa-layer-group', isActive: selectedGsxFilter === 'all', activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
-            { id: 'with', label: 'With GSX', icon: 'fa-solid fa-check text-emerald-400', isActive: selectedGsxFilter === 'with', activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
-            { id: 'none', label: 'No Profile', icon: 'fa-solid fa-ban text-slate-400', isActive: selectedGsxFilter === 'none', activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
-            { id: 'audit', label: 'Audit Hub', icon: 'fa-solid fa-clipboard-check text-amber-400', isActive: false, activeStyle: 'bg-amber-600 border-amber-400 text-white' }
+            { id: 'all', label: 'All Profiles', icon: 'fa-solid fa-layer-group', isActive: selectedGsxFilter === 'all' },
+            { id: 'with', label: 'With GSX', icon: 'fa-solid fa-check text-emerald-400', isActive: selectedGsxFilter === 'with' },
+            { id: 'none', label: 'No Profile', icon: 'fa-solid fa-ban text-slate-400', isActive: selectedGsxFilter === 'none' },
+            { id: 'audit', label: 'Audit Hub', icon: 'fa-solid fa-clipboard-check text-amber-400', isActive: false }
         ];
     } else if (categoryKey === 'rating') {
         items = [
-            { id: '0', label: 'All (0.0★)', icon: 'fa-regular fa-star text-slate-400', isActive: !selectedMinRating || selectedMinRating === 0, activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
-            { id: '3.0', label: '3.0★ & Up', icon: 'fa-solid fa-star text-amber-400', isActive: selectedMinRating === 3.0, activeStyle: 'bg-amber-500 border-amber-300 text-slate-950 font-black' },
-            { id: '3.5', label: '3.5★ & Up', icon: 'fa-solid fa-star text-amber-400', isActive: selectedMinRating === 3.5, activeStyle: 'bg-amber-500 border-amber-300 text-slate-950 font-black' },
-            { id: '4.0', label: '4.0★ & Up', icon: 'fa-solid fa-star text-amber-400', isActive: selectedMinRating === 4.0, activeStyle: 'bg-amber-500 border-amber-300 text-slate-950 font-black' },
-            { id: '4.5', label: '4.5★ & Up', icon: 'fa-solid fa-star text-amber-400', isActive: selectedMinRating === 4.5, activeStyle: 'bg-amber-500 border-amber-300 text-slate-950 font-black' },
-            { id: '5.0', label: '5.0★ Only', icon: 'fa-solid fa-star text-amber-400', isActive: selectedMinRating === 5.0, activeStyle: 'bg-amber-500 border-amber-300 text-slate-950 font-black' }
+            { id: '0', label: 'All (0.0★)', icon: 'fa-regular fa-star text-slate-400', isActive: !selectedMinRating || selectedMinRating === 0 },
+            { id: '3.0', label: '3.0★ & Up', icon: 'fa-solid fa-star text-amber-400', isActive: selectedMinRating === 3.0 },
+            { id: '3.5', label: '3.5★ & Up', icon: 'fa-solid fa-star text-amber-400', isActive: selectedMinRating === 3.5 },
+            { id: '4.0', label: '4.0★ & Up', icon: 'fa-solid fa-star text-amber-400', isActive: selectedMinRating === 4.0 },
+            { id: '4.5', label: '4.5★ & Up', icon: 'fa-solid fa-star text-amber-400', isActive: selectedMinRating === 4.5 },
+            { id: '5.0', label: '5.0★ Only', icon: 'fa-solid fa-star text-amber-400', isActive: selectedMinRating === 5.0 }
         ];
     }
 
@@ -10566,13 +10653,11 @@ function renderFilterRadialLevel2(categoryKey) {
         const x = Math.round(cx + radius * Math.cos(rad));
         const y = Math.round(cy + radius * Math.sin(rad));
 
-        const baseStyle = item.isActive 
-            ? (item.activeStyle || 'bg-cyan-600 border-cyan-400 text-white')
-            : 'bg-slate-900/95 text-slate-300 hover:text-white border-slate-700/80 hover:border-slate-500';
+        const baseClass = item.isActive ? 'is-active' : '';
 
         html += `
             <button onclick="handleFilterRadialSubItemClick('${categoryKey}', '${escapeJsStr(item.id)}')"
-                    class="absolute pointer-events-auto cursor-pointer transition-all duration-150 active:scale-95 flex items-center gap-1.5 px-3 py-1.5 rounded-2xl border shadow-xl shadow-black/70 whitespace-nowrap text-xs font-bold ${baseStyle}"
+                    class="filter-radial-pill ${baseClass} absolute pointer-events-auto cursor-pointer transition-all duration-150 active:scale-95 flex items-center gap-1.5 px-3 py-1.5 rounded-2xl whitespace-nowrap text-xs font-bold text-slate-200 group"
                     style="left: ${x}px; top: ${y}px; transform: translate(-50%, -50%);">
                 ${item.icon ? `<i class="${item.icon} text-[10px]"></i>` : ''}
                 <span>${escapeHtml(item.label)}</span>
