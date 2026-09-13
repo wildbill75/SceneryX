@@ -885,11 +885,13 @@ def evaluate_gsx_studio_match(pf, ap):
     pkg_name = ap.get('package_name') or ''
     pricing_type = ap.get('pricing_type') or ''
     installed_pkgs = [s.get('folder_name', '') for s in ap.get('all_sources', [])]
+    is_asobo = bool(ap.get('is_asobo_official') or pricing_type == 'Asobo')
+    asobo_desc = f"Microsoft / Asobo ({ap.get('world_update_name')})" if ap.get('world_update_name') else "Microsoft / Asobo (Handcrafted)"
 
     # Check Default MSFS base airport indicator
     is_default_target = target_pkg and any(k in target_pkg.lower() for k in ['fs-base-genericairports', 'fs-base', 'asobo-airport', 'microsoft-airport', 'generic'])
     if is_default_target:
-        if pricing_type != 'Default' and not ap.get('is_asobo_official'):
+        if pricing_type != 'Default' and not is_asobo:
             active_desc = vendor if (vendor and vendor != 'Unknown') else pkg_name
             return ('MISMATCH_DEFAULT', f'Profile designed for Default MSFS, but active scenery is {active_desc}.')
         return ('MATCHED', 'Profile designed for Default MSFS airport.')
@@ -925,6 +927,16 @@ def evaluate_gsx_studio_match(pf, ap):
         studio_display = vendor if vendor and vendor != 'Unknown' else STUDIO_DISPLAY_NAMES.get(prof_studio, prof_studio.title())
         return ('MATCHED', f'Profile perfectly aligned with active scenery ({studio_display}).')
 
+    # 1b. Gaya / Asobo partner relationship for Asobo official handcrafted sceneries
+    if is_asobo:
+        fn_lower = (filename or '').lower()
+        scen_lower = (scenario or '').lower()
+        # Gaya Simulations is Microsoft's primary contractor for World Updates (Cork EICK, Innsbruck LOWI, Nuremberg EDDN, etc.)
+        if prof_studio == 'gaya':
+            return ('MATCHED', f'Profile aligned with Asobo handcrafted scenery by Gaya Simulations ({asobo_desc}).')
+        if any(k in fn_lower or k in scen_lower for k in ['asobo', 'microsoft', 'worldupdate', 'world-update', 'world_update', 'wu1', 'wu2', 'wu3', 'wu4', 'wu5', 'wu6', 'wu7', 'wu8', 'wu9']):
+            return ('MATCHED', f'Profile aligned with active scenery ({asobo_desc}).')
+
     # 2. If normalized vendor appears in target_pkg, filename, scenario or afcad
     if norm_vendor and len(norm_vendor) >= 3:
         if (norm_vendor in norm_target or 
@@ -936,16 +948,20 @@ def evaluate_gsx_studio_match(pf, ap):
     # 3. If studio in profile is explicitly known AND active scenery has a different known studio or is default
     if prof_studio:
         prof_display = STUDIO_DISPLAY_NAMES.get(prof_studio, target_pkg or prof_studio.title())
-        if pricing_type == 'Default' or ap.get('is_asobo_official'):
+        if pricing_type == 'Default' and not is_asobo:
             return ('MISMATCH_STUDIO', f'Profile designed for "{prof_display}", but active scenery is "Microsoft Flight Simulator (Default)".')
+        elif is_asobo:
+            return ('MISMATCH_STUDIO', f'Profile designed for "{prof_display}", but active scenery is "{asobo_desc}".')
         elif act_studio and prof_studio != act_studio:
             active_desc = vendor if (vendor and vendor != 'Unknown') else pkg_name
             return ('MISMATCH_STUDIO', f'Profile designed for "{prof_display}", but active scenery is "{active_desc}".')
 
     # 4. If target_pkg is given, check for mismatch
     if target_pkg:
-        if pricing_type == 'Default' or ap.get('is_asobo_official'):
+        if pricing_type == 'Default' and not is_asobo:
             return ('MISMATCH_STUDIO', f'Profile designed for "{target_pkg}", but active scenery is "Microsoft Flight Simulator (Default)".')
+        elif is_asobo:
+            return ('MISMATCH_STUDIO', f'Profile designed for "{target_pkg}", but active scenery is "{asobo_desc}".')
         target_detected = detect_studio_from_text(target_pkg)
         if target_detected and act_studio and target_detected != act_studio:
             active_desc = vendor if (vendor and vendor != 'Unknown') else pkg_name
@@ -960,8 +976,12 @@ def evaluate_gsx_studio_match(pf, ap):
     if scenario:
         scen_studio = detect_studio_from_text(scenario)
         if scen_studio:
-            if pricing_type == 'Default' or ap.get('is_asobo_official'):
+            if pricing_type == 'Default' and not is_asobo:
                 return ('MISMATCH_STUDIO', f'Profile mentions "{scenario}", but active scenery is "Microsoft Flight Simulator (Default)".')
+            elif is_asobo:
+                if scen_studio == 'gaya':
+                    return ('MATCHED', f'Profile aligned with Asobo handcrafted scenery by Gaya Simulations ({asobo_desc}).')
+                return ('MISMATCH_STUDIO', f'Profile mentions "{scenario}", but active scenery is "{asobo_desc}".')
             elif act_studio and scen_studio != act_studio:
                 return ('MISMATCH_STUDIO', f'Profile mentions "{scenario}", but active scenery is "{vendor}".')
 
