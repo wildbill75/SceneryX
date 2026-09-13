@@ -132,6 +132,7 @@ let pendingScanIsStartup = false;
 const ALL_PRICING_LIST = ['Payware', 'Freeware / Flightsim.to', 'Asobo', 'Default'];
 const ALL_SOURCES_LIST = ['Community', 'Marketplace', 'Official'];
 const ALL_TYPES_LIST = ['International', 'Regional', 'General Aviation', 'Heli / Water'];
+const DEFAULT_COUNTRY_TYPES = ['International', 'Regional'];
 
 const DEFAULT_STARTUP_PRICING = ['Payware', 'Freeware / Flightsim.to', 'Asobo'];
 let selectedPricing = new Set(DEFAULT_STARTUP_PRICING);
@@ -1792,10 +1793,10 @@ function toggleCountrySelection(iso, countryName, layer, forceSelect = false) {
         };
     }
 
-    // In Country Mode, display ALL airports by default (all pricing types including Default MSFS, all sources, all types)
+    // In Country Mode, display all pricing & sources by default, but exclude GA and Heli/Water to prevent map clutter
     selectedPricing = new Set(ALL_PRICING_LIST);
     selectedSources = new Set(ALL_SOURCES_LIST);
-    selectedTypes = new Set(ALL_TYPES_LIST);
+    selectedTypes = new Set(DEFAULT_COUNTRY_TYPES);
     selectedMinRating = 0;
     selectedGsxFilter = 'all';
     const searchInp = document.getElementById('search-input');
