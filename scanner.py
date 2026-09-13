@@ -717,6 +717,193 @@ def scan_gsx_profiles(gsx_dir):
         pass
     return gsx_map
 
+def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
+    if not gsx_dir:
+        gsx_dir = get_default_gsx_path()
+    if not gsx_dir or not os.path.exists(gsx_dir):
+        return {'summary': {'total_files': 0, 'total_icaos': 0, 'matched': 0, 'duplicate': 0, 'mismatch': 0, 'orphan': 0, 'invalid': 0}, 'by_icao': {}, 'non_icao_files': []}
+
+    installed_map = {}
+    if installed_airports is not None:
+        if isinstance(installed_airports, dict):
+            installed_map = installed_airports
+        elif isinstance(installed_airports, list):
+            installed_map = {ap['icao']: ap for ap in installed_airports if isinstance(ap, dict) and 'icao' in ap}
+    elif os.path.exists(OUTPUT_JSON_PATH):
+        try:
+            with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
+                installed_list = json.load(f)
+                installed_map = {ap['icao']: ap for ap in installed_list if isinstance(ap, dict) and 'icao' in ap}
+        except Exception:
+            pass
+
+    try:
+        all_dir_files = os.listdir(gsx_dir)
+    except Exception:
+        all_dir_files = []
+
+    active_ini_files = [f for f in all_dir_files if f.endswith('.ini') and f.lower() != 'configuration.ini']
+    disabled_ini_files = [f for f in all_dir_files if f.endswith('.ini.disabled')]
+
+    by_icao = {}
+    non_icao_files = []
+
+    for f in active_ini_files:
+        m = re.match(r'^([a-zA-Z]{4})', f)
+        if not m:
+            non_icao_files.append(f)
+            continue
+        icao = m.group(1).upper()
+        by_icao.setdefault(icao, []).append({'filename': f, 'is_disabled': False})
+
+    for f in disabled_ini_files:
+        m = re.match(r'^([a-zA-Z]{4})', f)
+        if m:
+            icao = m.group(1).upper()
+            by_icao.setdefault(icao, []).append({'filename': f, 'is_disabled': True})
+
+    results = {}
+    summary = {
+        'total_files': len(active_ini_files),
+        'total_icaos': len(by_icao),
+        'matched': 0,
+        'duplicate': 0,
+        'mismatch': 0,
+        'orphan': 0,
+        'invalid': len(non_icao_files)
+    }
+
+    for icao, file_entries in by_icao.items():
+        ap = installed_map.get(icao)
+        parsed_files = []
+        active_entries = [e for e in file_entries if not e['is_disabled']]
+
+        for entry in file_entries:
+            f = entry['filename']
+            fp = os.path.join(gsx_dir, f)
+            afcad = None
+            scenario = None
+            creator = None
+            gates_count = 0
+            target_pkg = None
+
+            try:
+                with open(fp, 'r', encoding='utf-8', errors='ignore') as file_h:
+                    content = file_h.read()
+                afcad_m = re.search(r'afcad_path\s*=\s*(.+)', content)
+                if afcad_m:
+                    afcad = afcad_m.group(1).strip()
+                scenario_m = re.search(r'scenario\s*=\s*(.+)', content)
+                if scenario_m:
+                    scenario = scenario_m.group(1).strip()
+                creator_m = re.search(r'creator\s*=\s*(.+)', content)
+                if creator_m:
+                    creator = creator_m.group(1).strip()
+                gates_count = len(re.findall(r'\[(?:gate|rwy|parking)\s+[^\]]+\]', content, re.IGNORECASE))
+            except Exception:
+                pass
+
+            if afcad:
+                parts = afcad.replace('/', '\\').split('\\')
+                for i, p in enumerate(parts):
+                    p_l = p.lower()
+                    if p_l in ('community', 'official', 'streamedpackages'):
+                        if i + 1 < len(parts):
+                            next_p = parts[i + 1]
+                            if next_p.lower() in ('onestore', 'steam') and i + 2 < len(parts):
+                                target_pkg = parts[i + 2]
+                            else:
+                                target_pkg = next_p
+                            break
+
+            parsed_files.append({
+                'filename': f,
+                'path': fp,
+                'is_disabled': entry['is_disabled'],
+                'afcad_path': afcad,
+                'target_pkg': target_pkg,
+                'scenario': scenario,
+                'creator': creator,
+                'gates_count': gates_count
+            })
+
+        # Diagnosis logic
+        if not ap:
+            status = 'ORPHAN'
+            reason = 'Aéroport non installé dans votre bibliothèque MSFS.'
+            summary['orphan'] += 1
+        elif len(active_entries) > 1:
+            status = 'DUPLICATE'
+            active_names = [e['filename'] for e in active_entries]
+            reason = f'{len(active_entries)} profils en conflit trouvés pour cet aéroport ({", ".join(active_names)}).'
+            summary['duplicate'] += 1
+        elif len(active_entries) == 0 and len(file_entries) > 0:
+            status = 'DISABLED'
+            reason = 'Profil(s) GSX actuellement désactivé(s).'
+        else:
+            pf = next((p for p in parsed_files if not p['is_disabled']), parsed_files[0])
+            target_pkg = pf['target_pkg']
+            scenario = pf['scenario']
+            installed_pkgs = [s.get('folder_name', '') for s in ap.get('all_sources', [])]
+            pkg_name = ap.get('package_name', '')
+            vendor = ap.get('vendor', '')
+            pricing_type = ap.get('pricing_type', '')
+
+            # Check Default MSFS base conflict
+            if target_pkg and ('fs-base-genericairports' in target_pkg.lower() or 'fs-base' in target_pkg.lower()):
+                if pricing_type != 'Default':
+                    status = 'MISMATCH_DEFAULT'
+                    active_desc = vendor if (vendor and vendor != 'Unknown') else pkg_name
+                    reason = f'Profil conçu pour la scène par défaut MSFS, mais vous avez une scène installée ({active_desc}).'
+                    summary['mismatch'] += 1
+                else:
+                    status = 'MATCHED'
+                    reason = 'Profil conçu pour l\'aéroport par défaut MSFS.'
+                    summary['matched'] += 1
+            elif target_pkg:
+                matched = any(target_pkg.lower() in p.lower() or p.lower() in target_pkg.lower() for p in installed_pkgs)
+                if matched or (vendor and vendor.lower() in target_pkg.lower()):
+                    status = 'MATCHED'
+                    reason = f'Profil parfaitement aligné avec la scène ({target_pkg}).'
+                    summary['matched'] += 1
+                else:
+                    status = 'MISMATCH_STUDIO'
+                    active_desc = vendor if (vendor and vendor != 'Unknown') else pkg_name
+                    reason = f'Profil conçu pour "{target_pkg}", mais votre scène installée est "{active_desc}".'
+                    summary['mismatch'] += 1
+            elif scenario and vendor and vendor != 'Unknown' and vendor.lower() not in scenario.lower():
+                # Scenario explicitly names a different studio
+                status = 'MISMATCH_STUDIO'
+                reason = f'Profil mentionne "{scenario}", mais votre scène installée est "{vendor}".'
+                summary['mismatch'] += 1
+            else:
+                status = 'MATCHED'
+                reason = 'Profil GSX actif.'
+                summary['matched'] += 1
+
+        results[icao] = {
+            'icao': icao,
+            'status': status,
+            'reason': reason,
+            'files': parsed_files
+        }
+
+    audit_payload = {
+        'summary': summary,
+        'by_icao': results,
+        'non_icao_files': non_icao_files
+    }
+
+    # Save cache file
+    try:
+        audit_cache_file = os.path.join(BASE_DIR, 'gsx_audit.json')
+        with open(audit_cache_file, 'w', encoding='utf-8') as f:
+            json.dump(audit_payload, f, indent=2)
+    except Exception:
+        pass
+
+    return audit_payload
+
 def get_settings():
     if os.path.exists(SETTINGS_JSON_PATH):
         try:

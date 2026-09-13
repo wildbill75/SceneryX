@@ -956,8 +956,13 @@
                         
                         <!-- PILL 3: GSX PROFILE & DROP ZONE -->
                         <div class="p-2.5 rounded-2xl bg-slate-950/40 border border-slate-700/50 space-y-1.5">
-                            <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] block" data-i18n="drawer.gsx_profile">GSX Profile</span>
-                            <div id="radial-gsx-container">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] block" data-i18n="drawer.gsx_profile">GSX Profile</span>
+                                <span id="radial-gsx-status-badge" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight text-slate-500 bg-slate-900 border border-slate-800">
+                                    NONE
+                                </span>
+                            </div>
+                            <div id="radial-gsx-container" class="space-y-1.5">
                                 <!-- Populated dynamically -->
                             </div>
                         </div>
@@ -1682,6 +1687,25 @@
                 <p id="rescan-detail-text" class="text-[11px] text-slate-500 font-mono truncate">Scanning packages...</p>
             </div>
 
+            <!-- PHASE GSX: SCANNING GSX PROFILES -->
+            <div id="rescan-phase-gsx" class="hidden space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <span class="text-[10px] font-mono text-cyan-400/90 uppercase font-bold tracking-wider block mb-1">SceneryX System</span>
+                        <h3 class="text-sm font-bold text-white tracking-wide">Scanning GSX Profiles</h3>
+                        <p id="rescan-gsx-status-sub" class="text-xs text-slate-400 mt-0.5">Auditing Virtuali GSX profiles...</p>
+                    </div>
+                    <span id="rescan-gsx-percent-text" class="text-xs font-mono font-bold text-cyan-400">0%</span>
+                </div>
+
+                <!-- Progress Bar -->
+                <div class="w-full bg-slate-900 rounded-full h-2.5 overflow-hidden border border-slate-800">
+                    <div id="rescan-gsx-progress-bar" class="bg-cyan-500 h-full rounded-full transition-all duration-200" style="width: 0%;"></div>
+                </div>
+
+                <p id="rescan-gsx-detail-text" class="text-[11px] text-slate-500 font-mono truncate">Checking profile matches and conflicts...</p>
+            </div>
+
             <!-- PHASE 2: SCAN RESULT -->
             <div id="rescan-phase-result" class="hidden space-y-4">
                 <div>
@@ -1753,8 +1777,8 @@
 
             <!-- Modal Footer Action Buttons -->
             <div class="flex items-center justify-between pt-2 border-t border-slate-800/80">
-                <button data-i18n="conflict.btn_later" onclick="closeConflictModal()" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition-colors cursor-pointer border-0">
-                    Resolve Later
+                <button id="conflict-modal-next-gsx-btn" onclick="proceedFromConflictToGsxScan()" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-mono font-bold transition-colors cursor-pointer border border-slate-700/60">
+                    Next (Scan GSX) →
                 </button>
                 <button id="conflict-modal-submit-btn" onclick="applyConflictSelection()" class="px-6 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-md shadow-cyan-600/25 transition-all cursor-pointer border-0 active:scale-98">
                     <span data-i18n="conflict.btn_apply">Apply Choice</span>

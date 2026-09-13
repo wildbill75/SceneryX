@@ -27,6 +27,7 @@ let activeDrawerMode = 'MAP'; // 'MAP', 'COUNTRY', 'AIRPORT'
 let userRatingsMap = {};
 let currentSettings = { auto_scan_on_startup: true, scan_paths: [], camera_airport_zoom: 6.0, camera_pan_duration: 0.8 };
 let lastFocusedIcao = null;
+window.gsxAuditData = null;
 
 // Performance Caches & Indexing Engine
 const airportMarkerCache = new Map();
@@ -2158,16 +2159,24 @@ function closeConflictModal() {
     const modal = document.getElementById('conflict-resolution-modal');
     if (modal) modal.classList.add('hidden');
 
-    // If there were pending scan results deferred because of conflicts,
-    // display them now if all conflicts are resolved
-    const remainingConflicts = allAirportsData.filter(a => a.has_conflict);
-    if (remainingConflicts.length === 0 && pendingScanDelta && pendingScanDelta.total_changes > 0) {
-        const deltaToDisplay = pendingScanDelta;
-        const isStartup = pendingScanIsStartup;
-        pendingScanDelta = null;
-        pendingScanIsStartup = false;
-        displayScanResults(deltaToDisplay, isStartup);
+    if (pendingScanIsStartup) {
+        startGsxScanPhase(true);
+    } else {
+        const remainingConflicts = allAirportsData.filter(a => a.has_conflict);
+        if (remainingConflicts.length === 0 && pendingScanDelta && pendingScanDelta.total_changes > 0) {
+            const deltaToDisplay = pendingScanDelta;
+            const isStartup = pendingScanIsStartup;
+            pendingScanDelta = null;
+            pendingScanIsStartup = false;
+            displayScanResults(deltaToDisplay, isStartup);
+        }
     }
+}
+
+async function proceedFromConflictToGsxScan() {
+    const modal = document.getElementById('conflict-resolution-modal');
+    if (modal) modal.classList.add('hidden');
+    await startGsxScanPhase(pendingScanIsStartup);
 }
 
 function navigateConflictStep(direction) {
@@ -2354,8 +2363,8 @@ async function applyConflictSelection() {
                     }
                     renderConflictModalStep(currentConflictIndex);
                 } else {
-                    closeConflictModal();
                     showToast(t('conflict.all_resolved', '✓ All scenery conflicts resolved!'), 'success');
+                    await proceedFromConflictToGsxScan();
                 }
             } else {
                 showToast(`Error: ${res.message || 'Failed to apply scenery choice'}`, 'error');
@@ -4748,27 +4757,185 @@ async function renderRadialRunways(ap) {
 
 function renderRadialGsx(ap) {
     const container = document.getElementById('radial-gsx-container');
+    const badgeEl = document.getElementById('radial-gsx-status-badge');
     if (!container || !ap) return;
 
-    if (ap.has_gsx_profile) {
-        const safeGsxPath = encodeURIComponent(ap.gsx_profile_path || '');
+    const audit = (window.gsxAuditData && window.gsxAuditData.by_icao) ? window.gsxAuditData.by_icao[ap.icao] : null;
+
+    let status = 'NONE';
+    let reason = '';
+    let files = [];
+
+    if (audit) {
+        status = audit.status || 'NONE';
+        reason = audit.reason || '';
+        files = audit.files || [];
+    } else if (ap.has_gsx_profile) {
+        status = 'MATCHED';
+        files = [{
+            filename: ap.gsx_profile_filename || `${ap.icao}.ini`,
+            path: ap.gsx_profile_path || '',
+            is_disabled: false
+        }];
+    }
+
+    // Diagnostic badge styling (Flat colors, uniform typography, no icons)
+    let statusLabel = 'NONE';
+    let statusBadgeClass = 'text-slate-500 bg-slate-900 border border-slate-800';
+
+    if (status === 'MATCHED') {
+        statusLabel = 'MATCH';
+        statusBadgeClass = 'text-emerald-400 bg-emerald-950 border border-emerald-800';
+    } else if (status === 'DUPLICATE') {
+        statusLabel = 'DUPLICATE';
+        statusBadgeClass = 'text-amber-400 bg-amber-950 border border-amber-800';
+    } else if (status === 'MISMATCH_DEFAULT') {
+        statusLabel = 'MISMATCH DEFAULT';
+        statusBadgeClass = 'text-rose-400 bg-rose-950 border border-rose-800';
+    } else if (status === 'MISMATCH_STUDIO') {
+        statusLabel = 'MISMATCH STUDIO';
+        statusBadgeClass = 'text-rose-400 bg-rose-950 border border-rose-800';
+    } else if (status === 'DISABLED') {
+        statusLabel = 'DISABLED';
+        statusBadgeClass = 'text-slate-400 bg-slate-900 border border-slate-700';
+    }
+
+    if (badgeEl) {
+        badgeEl.innerText = statusLabel;
+        badgeEl.className = `text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight ${statusBadgeClass}`;
+    }
+
+    const dropZoneHtml = `
+        <div id="radial-gsx-drop-zone"
+             ondragover="handleRadialGsxDragOver(event)"
+             ondragleave="handleRadialGsxDragLeave(event)"
+             ondrop="handleRadialGsxDrop(event)"
+             onclick="triggerRadialInstallGsxProfile()"
+             class="p-2 rounded-xl bg-slate-950/40 border-2 border-dashed border-slate-800 hover:border-cyan-500/60 flex flex-col items-center justify-center gap-0.5 text-center transition-all cursor-pointer">
+            <span class="text-xs font-bold text-slate-300 uppercase tracking-wide">Drop .zip or .ini here to install</span>
+            <span class="text-[10px] text-slate-500 uppercase font-mono">or click to browse file</span>
+        </div>
+    `;
+
+    if (status === 'MATCHED') {
+        const activeFile = files.find(f => !f.is_disabled) || files[0] || {};
+        const safeGsxPath = encodeURIComponent(activeFile.path || ap.gsx_profile_path || '');
+        let metaParts = [];
+        if (activeFile.gates_count) metaParts.push(`${activeFile.gates_count} gates`);
+        if (activeFile.creator) metaParts.push(activeFile.creator);
+        if (activeFile.scenario) metaParts.push(activeFile.scenario);
+        if (metaParts.length === 0 && ap.vendor && ap.vendor !== 'Unknown') metaParts.push(ap.vendor);
+        const metaText = metaParts.join(' • ');
+
         container.innerHTML = `
             <div class="space-y-1.5">
-                <div onclick="openGsxProfileInExplorer(decodeURIComponent('${safeGsxPath}'))"
-                     class="p-2 rounded-xl bg-slate-900/60 hover:bg-slate-800/80 border border-slate-800 hover:border-slate-700 cursor-pointer flex items-center justify-between gap-2 text-xs font-mono font-bold text-slate-200 hover:text-cyan-300 transition-all shadow-sm"
-                     title="Click to reveal GSX INI file in Explorer">
-                    <span class="truncate">${ap.gsx_profile_filename}</span>
-                    <span class="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 hover:text-white px-2 py-0.5 rounded bg-slate-800 border border-slate-700/60 shrink-0">Reveal</span>
+                <div class="p-2 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-between gap-2">
+                    <div class="min-w-0 flex-1">
+                        <div class="text-xs font-mono font-bold text-white truncate">${activeFile.filename || ap.gsx_profile_filename}</div>
+                        ${metaText ? `<div class="text-[10px] font-mono text-slate-400 truncate mt-0.5">${metaText}</div>` : ''}
+                    </div>
+                    <button onclick="revealGsxFile('${safeGsxPath}')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[10px] font-mono font-bold border border-slate-700/60 cursor-pointer shrink-0">
+                        Reveal
+                    </button>
                 </div>
-                <div id="radial-gsx-drop-zone"
-                     ondragover="handleRadialGsxDragOver(event)"
-                     ondragleave="handleRadialGsxDragLeave(event)"
-                     ondrop="handleRadialGsxDrop(event)"
-                     onclick="triggerRadialInstallGsxProfile()"
-                     class="p-2 rounded-xl bg-slate-950/40 border-2 border-dashed border-slate-800 hover:border-cyan-500/60 flex flex-col items-center justify-center gap-0.5 text-center transition-all cursor-pointer">
-                    <span class="text-xs font-bold text-slate-300 uppercase tracking-wide">Drop .zip or .ini here to replace</span>
-                    <span class="text-[10px] text-slate-500 uppercase font-mono">or click to browse file</span>
+                ${dropZoneHtml}
+            </div>
+        `;
+    } else if (status === 'DUPLICATE') {
+        const activeEntries = files.filter(f => !f.is_disabled);
+        container.innerHTML = `
+            <div class="space-y-1.5">
+                <div class="p-2 rounded-xl bg-amber-950/40 border border-amber-900/60 text-[11px] font-mono text-amber-200 leading-tight">
+                    ${activeEntries.length} active profiles found. Choose which profile to keep:
                 </div>
+                <div class="space-y-1 max-h-36 overflow-y-auto custom-scrollbar pr-0.5">
+                    ${files.map(f => {
+                        const isActive = !f.is_disabled;
+                        const safePath = encodeURIComponent(f.path || '');
+                        let metaParts = [];
+                        if (f.gates_count) metaParts.push(`${f.gates_count} gates`);
+                        if (f.creator) metaParts.push(f.creator);
+                        if (f.scenario) metaParts.push(f.scenario);
+                        if (f.target_pkg) metaParts.push(f.target_pkg);
+                        const fMeta = metaParts.join(' • ');
+
+                        return `
+                            <div class="p-2 rounded-xl ${isActive ? 'bg-slate-900/90 border border-cyan-700/80' : 'bg-slate-950/60 border border-slate-800 opacity-65'} flex items-center justify-between gap-2">
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex items-center gap-2">
+                                        <span class="text-xs font-mono font-bold ${isActive ? 'text-white' : 'text-slate-400'} truncate">${f.filename}</span>
+                                        <span class="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded ${isActive ? 'bg-cyan-950 text-cyan-400 border border-cyan-800' : 'bg-slate-800 text-slate-400 border border-slate-700'}">
+                                            ${isActive ? 'ACTIVE' : 'DISABLED'}
+                                        </span>
+                                    </div>
+                                    ${fMeta ? `<div class="text-[10px] font-mono text-slate-400 truncate mt-0.5">${fMeta}</div>` : ''}
+                                </div>
+                                <div class="flex items-center gap-1.5 shrink-0">
+                                    ${!isActive ? `
+                                        <button onclick="activateGsxDuplicate('${ap.icao}', '${f.filename}')" class="px-2 py-0.5 rounded bg-cyan-700 hover:bg-cyan-600 text-white text-[10px] font-mono font-bold border-0 cursor-pointer">
+                                            Activate
+                                        </button>
+                                    ` : ''}
+                                    <button onclick="revealGsxFile('${safePath}')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[10px] font-mono font-bold border border-slate-700/60 cursor-pointer">
+                                        Reveal
+                                    </button>
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+                ${dropZoneHtml}
+            </div>
+        `;
+    } else if (status === 'MISMATCH_DEFAULT' || status === 'MISMATCH_STUDIO') {
+        const activeFile = files.find(f => !f.is_disabled) || files[0];
+        const safePath = encodeURIComponent(activeFile ? activeFile.path : '');
+        const targetVendor = (ap.vendor && ap.vendor !== 'Unknown') ? ap.vendor : ap.package_name;
+        container.innerHTML = `
+            <div class="space-y-1.5">
+                <div class="p-2 rounded-xl bg-rose-950/40 border border-rose-900/60 text-[11px] font-mono text-rose-200 leading-tight">
+                    ${reason}
+                </div>
+                ${activeFile ? `
+                    <div class="p-2 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-between gap-2">
+                        <div class="min-w-0 flex-1">
+                            <div class="text-xs font-mono font-bold text-white truncate">${activeFile.filename}</div>
+                            ${activeFile.scenario ? `<div class="text-[10px] font-mono text-slate-400 truncate mt-0.5">${activeFile.scenario}</div>` : ''}
+                        </div>
+                        <button onclick="revealGsxFile('${safePath}')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[10px] font-mono font-bold border border-slate-700/60 cursor-pointer shrink-0">
+                            Reveal
+                        </button>
+                    </div>
+                ` : ''}
+                <button onclick="triggerGsxStudioSearch('${ap.icao}', '${targetVendor || ''}')" class="w-full py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 hover:text-white text-xs font-mono font-bold transition-colors border border-slate-700/60 text-center cursor-pointer">
+                    Search profile for ${targetVendor || ap.icao} on Flightsim.to
+                </button>
+                ${dropZoneHtml}
+            </div>
+        `;
+    } else if (status === 'DISABLED') {
+        container.innerHTML = `
+            <div class="space-y-1.5">
+                <div class="p-2 rounded-xl bg-slate-900/60 border border-slate-800 text-[11px] font-mono text-slate-400 leading-tight">
+                    Profile currently disabled (.disabled).
+                </div>
+                ${files.map(f => {
+                    const safePath = encodeURIComponent(f.path || '');
+                    return `
+                        <div class="p-2 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center justify-between gap-2">
+                            <span class="text-xs font-mono text-slate-300 truncate">${f.filename}</span>
+                            <div class="flex items-center gap-1.5 shrink-0">
+                                <button onclick="enableGsxProfile('${ap.icao}', '${f.filename}')" class="px-2 py-0.5 rounded bg-cyan-700 hover:bg-cyan-600 text-white text-[10px] font-mono font-bold border-0 cursor-pointer">
+                                    Enable
+                                </button>
+                                <button onclick="revealGsxFile('${safePath}')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[10px] font-mono font-bold border border-slate-700/60 cursor-pointer">
+                                    Reveal
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+                ${dropZoneHtml}
             </div>
         `;
     } else {
@@ -4776,23 +4943,65 @@ function renderRadialGsx(ap) {
             <div class="space-y-1.5">
                 <div class="p-2 rounded-xl bg-slate-900/40 border border-slate-800/80 flex items-center justify-between text-xs font-mono text-slate-400">
                     <span>No GSX profile installed</span>
-                    <span class="text-[10px] font-mono font-bold text-slate-500 uppercase px-1.5 py-0.5 rounded bg-slate-800/60 border border-slate-700/40">None</span>
+                    <button onclick="triggerRadialSearchGsxProfile()" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-cyan-400 hover:text-white text-[10px] font-mono font-bold border border-slate-700/60 cursor-pointer">
+                        Search Flightsim.to
+                    </button>
                 </div>
-                <button onclick="triggerRadialSearchGsxProfile()"
-                        class="w-full p-2 rounded-xl bg-slate-900/80 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-cyan-400 hover:text-white text-xs font-mono font-bold uppercase tracking-wider transition-colors flex items-center justify-center cursor-pointer shadow-sm">
-                    Search on Flightsim.to
-                </button>
-                <div id="radial-gsx-drop-zone"
-                     ondragover="handleRadialGsxDragOver(event)"
-                     ondragleave="handleRadialGsxDragLeave(event)"
-                     ondrop="handleRadialGsxDrop(event)"
-                     onclick="triggerRadialInstallGsxProfile()"
-                     class="p-2 rounded-xl bg-slate-950/40 border-2 border-dashed border-slate-800 hover:border-cyan-500/60 flex flex-col items-center justify-center gap-0.5 text-center transition-all cursor-pointer">
-                    <span class="text-xs font-bold text-slate-300 uppercase tracking-wide">Drop .zip or .ini here</span>
-                    <span class="text-[10px] text-slate-500 uppercase font-mono">or click to browse file</span>
-                </div>
+                ${dropZoneHtml}
             </div>
         `;
+    }
+}
+
+function revealGsxFile(safePath) {
+    const p = decodeURIComponent(safePath || '');
+    if (p && window.pywebview && window.pywebview.api && window.pywebview.api.open_file_in_explorer) {
+        window.pywebview.api.open_file_in_explorer(p);
+    }
+}
+
+async function activateGsxDuplicate(icao, activeFilename) {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.resolve_gsx_duplicate) return;
+    try {
+        const resStr = await window.pywebview.api.resolve_gsx_duplicate(icao, activeFilename);
+        const res = typeof resStr === 'string' ? JSON.parse(resStr) : resStr;
+        if (res && res.status === 'ok') {
+            window.gsxAuditData = res.data;
+            const currentAp = getAirportByIcao(icao);
+            if (currentAp) {
+                renderRadialAirportDetails(currentAp);
+            }
+            showToast(`✓ Active GSX profile set to ${activeFilename}`, 'success');
+        }
+    } catch (e) {
+        console.error("Error activating GSX duplicate:", e);
+    }
+}
+
+async function enableGsxProfile(icao, filename) {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.enable_gsx_profile) return;
+    try {
+        const resStr = await window.pywebview.api.enable_gsx_profile(icao, filename);
+        const res = typeof resStr === 'string' ? JSON.parse(resStr) : resStr;
+        if (res && res.status === 'ok') {
+            window.gsxAuditData = res.data;
+            const currentAp = getAirportByIcao(icao);
+            if (currentAp) {
+                renderRadialAirportDetails(currentAp);
+            }
+            showToast(`✓ GSX profile enabled: ${filename}`, 'success');
+        }
+    } catch (e) {
+        console.error("Error enabling GSX profile:", e);
+    }
+}
+
+function triggerGsxStudioSearch(icao, vendor) {
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.search_gsx_profile) {
+        window.pywebview.api.search_gsx_profile(icao, '', vendor || '');
+    } else {
+        const q = encodeURIComponent(`GSX ${icao} ${vendor || ''}`.trim());
+        window.open(`https://flightsim.to/search?q=${q}`, '_blank');
     }
 }
 
@@ -8479,27 +8688,94 @@ function setButtonActive(btn, active) {
 }
 
 async function checkStartupChanges() {
-    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.get_startup_delta) return;
+    if (!window.pywebview || !window.pywebview.api) return;
     try {
-        const resStr = await window.pywebview.api.get_startup_delta();
-        if (!resStr) return;
-        const delta = JSON.parse(resStr);
+        let delta = null;
+        if (window.pywebview.api.get_startup_delta) {
+            const resStr = await window.pywebview.api.get_startup_delta();
+            if (resStr) {
+                try {
+                    delta = JSON.parse(resStr);
+                } catch (e) {}
+            }
+        }
         console.log("Startup delta check:", delta);
+
+        pendingScanDelta = delta;
+        pendingScanIsStartup = true;
 
         // PRIORITY 1: Check if any scenery conflicts exist!
         const conflictAirports = allAirportsData.filter(a => a.has_conflict);
         if (conflictAirports.length > 0) {
-            pendingScanDelta = delta;
-            pendingScanIsStartup = true;
             openConflictModal(0);
             return;
         }
 
-        if (delta && delta.total_changes > 0) {
-            displayScanResults(delta, true);
-        }
+        // If no scenery conflicts, proceed directly to GSX scan!
+        await startGsxScanPhase(true);
     } catch (e) {
         console.warn("Could not check startup delta:", e);
+    }
+}
+
+async function startGsxScanPhase(isStartup = false) {
+    const modal = document.getElementById('rescan-modal');
+    const phaseScanning = document.getElementById('rescan-phase-scanning');
+    const phaseGsx = document.getElementById('rescan-phase-gsx');
+    const phaseResult = document.getElementById('rescan-phase-result');
+    const bar = document.getElementById('rescan-gsx-progress-bar');
+    const pct = document.getElementById('rescan-gsx-percent-text');
+    const detail = document.getElementById('rescan-gsx-detail-text');
+
+    if (modal && phaseGsx) {
+        if (phaseScanning) phaseScanning.classList.add('hidden');
+        if (phaseResult) phaseResult.classList.add('hidden');
+        phaseGsx.classList.remove('hidden');
+        if (bar) bar.style.width = '20%';
+        if (pct) pct.innerText = '20%';
+        if (detail) detail.innerText = 'Auditing %APPDATA%\\Virtuali\\GSX\\MSFS profiles...';
+        modal.classList.remove('hidden');
+    }
+
+    try {
+        if (bar) bar.style.width = '55%';
+        if (pct) pct.innerText = '55%';
+
+        let auditData = null;
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.scan_gsx_audit) {
+            const raw = await window.pywebview.api.scan_gsx_audit();
+            const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            if (parsed && parsed.status === 'ok') {
+                auditData = parsed.data;
+            }
+        }
+
+        window.gsxAuditData = auditData;
+
+        if (bar) bar.style.width = '100%';
+        if (pct) pct.innerText = '100%';
+        if (detail && auditData && auditData.summary) {
+            const s = auditData.summary;
+            detail.innerText = `Audit complete: ${s.total_files} profiles (${s.matched} matched, ${s.duplicate} duplicates, ${s.mismatch} mismatches).`;
+        } else {
+            if (detail) detail.innerText = 'GSX profiles audit complete.';
+        }
+
+        // Brief smooth display of the completed GSX scan
+        await new Promise(r => setTimeout(r, 650));
+
+        if (pendingScanDelta && (pendingScanDelta.total_changes || 0) > 0) {
+            const d = pendingScanDelta;
+            const startup = pendingScanIsStartup;
+            pendingScanDelta = null;
+            pendingScanIsStartup = false;
+            displayScanResults(d, startup);
+        } else {
+            closeRescanModal();
+        }
+    } catch (err) {
+        console.error("GSX scan phase error:", err);
+        closeRescanModal();
     }
 }
 
@@ -8789,8 +9065,18 @@ async function rescanMSFS() {
         // Brief pause at 100% before displaying result
         await new Promise(r => setTimeout(r, 350));
 
-        // Display delta scan results
-        displayScanResults(delta, false);
+        // Check conflicts or proceed to GSX phase
+        const conflictAirports = allAirportsData.filter(a => a.has_conflict);
+        if (conflictAirports.length > 0) {
+            pendingScanDelta = delta;
+            pendingScanIsStartup = false;
+            closeRescanModal();
+            openConflictModal(0);
+        } else {
+            pendingScanDelta = delta;
+            pendingScanIsStartup = false;
+            await startGsxScanPhase(false);
+        }
 
     } catch (err) {
         console.error("Rescan error:", err);
@@ -9025,8 +9311,25 @@ async function executeGsxInstallation({ filePath = '', base64Data = '', filename
                 });
                 updateStats(allAirportsData);
                 filterAirports();
+
+                if (window.pywebview.api.scan_gsx_audit) {
+                    try {
+                        const auditRes = await window.pywebview.api.scan_gsx_audit();
+                        const parsedAudit = typeof auditRes === 'string' ? JSON.parse(auditRes) : auditRes;
+                        if (parsedAudit && parsedAudit.status === 'ok') {
+                            window.gsxAuditData = parsedAudit.data;
+                        }
+                    } catch (err) {}
+                }
+
                 const updatedAp = getAirportByIcao(selectedAirport.icao);
-                if (updatedAp) showAirportDetails(updatedAp);
+                if (updatedAp) {
+                    showAirportDetails(updatedAp);
+                    if (currentRadialAirport && currentRadialAirport.icao === updatedAp.icao) {
+                        currentRadialAirport = updatedAp;
+                        renderRadialAirportDetails(currentRadialAirport);
+                    }
+                }
                 showCustomModal({
                     title: t('modal.gsx_installed', 'GSX Profile Installed'),
                     message: `${t('modal.gsx_installed_msg', 'GSX profile(s) successfully extracted and installed:')}\n\n• ${res.installed_files.join('\n• ')}`,

@@ -5,7 +5,7 @@ import re
 import urllib.request
 import webbrowser
 import webview
-from scanner import run_scan, get_settings, save_settings, load_ratings, save_rating, save_custom_price, save_custom_category, load_custom_prices, get_estimated_price, get_default_gsx_path, load_airport_database, SPECIAL_BUNDLE_MAP, OUTPUT_JSON_PATH, compute_scan_delta, build_library_snapshot, SNAPSHOT_JSON_PATH, get_resource_file_path
+from scanner import run_scan, get_settings, save_settings, load_ratings, save_rating, save_custom_price, save_custom_category, load_custom_prices, get_estimated_price, get_default_gsx_path, load_airport_database, SPECIAL_BUNDLE_MAP, OUTPUT_JSON_PATH, compute_scan_delta, build_library_snapshot, SNAPSHOT_JSON_PATH, get_resource_file_path, audit_all_gsx_profiles
 
 AIRPORTS_DB_CACHE = None
 
@@ -1916,10 +1916,84 @@ class Api:
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
 
-    def search_gsx_profile(self, icao, name=""):
+    def scan_gsx_audit(self):
+        try:
+            settings = get_settings()
+            gsx_dir = settings.get("gsx_profile_path", get_default_gsx_path())
+            audit_data = audit_all_gsx_profiles(gsx_dir=gsx_dir)
+            return json.dumps({"status": "ok", "data": audit_data}, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
+    def resolve_gsx_duplicate(self, icao, active_filename, disable_filename=None):
+        try:
+            settings = get_settings()
+            gsx_dir = settings.get("gsx_profile_path", get_default_gsx_path())
+            if not gsx_dir or not os.path.exists(gsx_dir):
+                return json.dumps({"status": "error", "message": "GSX directory not found."})
+
+            target_icao = (icao or '').upper()
+
+            # If active_filename currently ends in .disabled, enable it
+            active_path = os.path.join(gsx_dir, active_filename)
+            if active_filename.endswith('.disabled'):
+                new_active_name = active_filename[:-9]
+                new_active_path = os.path.join(gsx_dir, new_active_name)
+                if os.path.exists(active_path):
+                    os.rename(active_path, new_active_path)
+                active_filename = new_active_name
+
+            # If disable_filename specified, disable that specific one
+            if disable_filename:
+                dis_path = os.path.join(gsx_dir, disable_filename)
+                if os.path.exists(dis_path) and not disable_filename.endswith('.disabled'):
+                    os.rename(dis_path, dis_path + '.disabled')
+            else:
+                # Disable all other active .ini profiles for this ICAO
+                for f in os.listdir(gsx_dir):
+                    if f.upper().startswith(target_icao) and f.endswith('.ini') and f != active_filename and f.lower() != 'configuration.ini':
+                        fp = os.path.join(gsx_dir, f)
+                        os.rename(fp, fp + '.disabled')
+
+            audit_data = audit_all_gsx_profiles(gsx_dir=gsx_dir)
+            return json.dumps({"status": "ok", "data": audit_data}, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
+    def enable_gsx_profile(self, icao, filename):
+        try:
+            settings = get_settings()
+            gsx_dir = settings.get("gsx_profile_path", get_default_gsx_path())
+            if not gsx_dir or not os.path.exists(gsx_dir):
+                return json.dumps({"status": "error", "message": "GSX directory not found."})
+
+            target_icao = (icao or '').upper()
+            # Disable any other active .ini profile for this ICAO first
+            for f in os.listdir(gsx_dir):
+                if f.upper().startswith(target_icao) and f.endswith('.ini') and f.lower() != 'configuration.ini':
+                    fp = os.path.join(gsx_dir, f)
+                    os.rename(fp, fp + '.disabled')
+
+            # Now enable target file
+            old_fp = os.path.join(gsx_dir, filename)
+            if filename.endswith('.disabled'):
+                new_name = filename[:-9]
+                new_fp = os.path.join(gsx_dir, new_name)
+                if os.path.exists(old_fp):
+                    os.rename(old_fp, new_fp)
+
+            audit_data = audit_all_gsx_profiles(gsx_dir=gsx_dir)
+            return json.dumps({"status": "ok", "data": audit_data}, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
+    def search_gsx_profile(self, icao, name="", extra_terms=""):
         import webbrowser
         import urllib.parse
-        query = f"GSX {icao}".strip()
+        parts = ["GSX", icao]
+        if extra_terms and extra_terms.lower() not in ['unknown', 'default', 'asobo']:
+            parts.append(extra_terms)
+        query = " ".join(parts).strip()
         url = f"https://flightsim.to/search?q={urllib.parse.quote(query)}"
         webbrowser.open(url)
         return json.dumps({"status": "ok", "url": url})
