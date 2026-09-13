@@ -139,6 +139,7 @@ let selectedSources = new Set(ALL_SOURCES_LIST);
 let selectedTypes = new Set(ALL_TYPES_LIST);
 let selectedMinRating = 0; // 0 = All ratings
 let selectedGsxFilter = 'all'; // 'all', 'with', 'none'
+let preCountryModeFilters = null;
 let selectedAirline = null;
 let selectedAirlines = new Set();
 let activeRouteOrigin = null;
@@ -1778,6 +1779,33 @@ function toggleCountrySelection(iso, countryName, layer, forceSelect = false) {
             return;
         }
     }
+
+    // Capture pre-country-mode filter state before entering Country Mode
+    if (!preCountryModeFilters) {
+        preCountryModeFilters = {
+            pricing: new Set(selectedPricing),
+            sources: new Set(selectedSources),
+            types: new Set(selectedTypes),
+            minRating: selectedMinRating,
+            gsxFilter: selectedGsxFilter,
+            search: document.getElementById('search-input') ? document.getElementById('search-input').value : ''
+        };
+    }
+
+    // In Country Mode, display ALL airports by default (all pricing types including Default MSFS, all sources, all types)
+    selectedPricing = new Set(ALL_PRICING_LIST);
+    selectedSources = new Set(ALL_SOURCES_LIST);
+    selectedTypes = new Set(ALL_TYPES_LIST);
+    selectedMinRating = 0;
+    selectedGsxFilter = 'all';
+    const searchInp = document.getElementById('search-input');
+    if (searchInp) {
+        searchInp.value = '';
+        const clearBtn = document.getElementById('clear-search');
+        if (clearBtn) clearBtn.classList.add('hidden');
+    }
+    updateFilterUI();
+    renderFilterStarWidget(0);
 
     selectedCountryCode = isoUpper;
     selectedCountryName = countryName || isoUpper;
@@ -7455,12 +7483,14 @@ function exitFlightPlanningMode(forceRestore = false) {
     closePlanningBannerClean();
 }
 
-// Global keyboard listener to exit Flight Planning Mode on Escape
+// Global keyboard listener to exit Flight Planning Mode or Country Mode on Escape
 window.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' || e.key === 'Esc') {
         closeAirportRadialMenu();
         if (isFlightPlanningMode) {
             exitFlightPlanningMode();
+        } else if (selectedCountryCode) {
+            exitCountryMode(false);
         }
     }
 });
@@ -8254,6 +8284,22 @@ function showAirportDetails(ap, calledFromCountryMode = false) {
 
     // Only clear country context if navigating to an airport in a DIFFERENT country and not in country mode
     if (!isFromCurrentCountry && !calledFromCountryMode && selectedCountryCode) {
+        if (preCountryModeFilters) {
+            selectedPricing = new Set(preCountryModeFilters.pricing);
+            selectedSources = new Set(preCountryModeFilters.sources);
+            selectedTypes = new Set(preCountryModeFilters.types);
+            selectedMinRating = preCountryModeFilters.minRating;
+            selectedGsxFilter = preCountryModeFilters.gsxFilter;
+            const searchInp = document.getElementById('search-input');
+            if (searchInp) {
+                searchInp.value = preCountryModeFilters.search || '';
+                const clearBtn = document.getElementById('clear-search');
+                if (clearBtn) clearBtn.classList.toggle('hidden', searchInp.value.length === 0);
+            }
+            updateFilterUI();
+            renderFilterStarWidget(selectedMinRating);
+            preCountryModeFilters = null;
+        }
         selectedCountryCode = null;
         selectedCountryName = '';
         expandedCountryIcao = null;
@@ -9132,6 +9178,24 @@ async function toggleFixPatchPackage(path, icao) {
 
 function exitCountryMode(flyCamera = false) {
     try {
+        // Restore pre-country-mode filter state if available
+        if (preCountryModeFilters) {
+            selectedPricing = new Set(preCountryModeFilters.pricing);
+            selectedSources = new Set(preCountryModeFilters.sources);
+            selectedTypes = new Set(preCountryModeFilters.types);
+            selectedMinRating = preCountryModeFilters.minRating;
+            selectedGsxFilter = preCountryModeFilters.gsxFilter;
+            const searchInp = document.getElementById('search-input');
+            if (searchInp) {
+                searchInp.value = preCountryModeFilters.search || '';
+                const clearBtn = document.getElementById('clear-search');
+                if (clearBtn) clearBtn.classList.toggle('hidden', searchInp.value.length === 0);
+            }
+            updateFilterUI();
+            renderFilterStarWidget(selectedMinRating);
+            preCountryModeFilters = null;
+        }
+
         activeDrawerMode = 'MAP';
         selectedCountryCode = null;
         selectedCountryName = '';
@@ -9765,7 +9829,9 @@ function filterAirports() {
         // Selected Country Overlay Filter
         if (selectedCountryCode) {
             const apIso = ((ap.country || ap.iso_country || '').toString()).toUpperCase().trim();
-            if (apIso !== selectedCountryCode) {
+            const rawCountry = (ap.country || '').toString().toLowerCase().trim();
+            const resolvedIso = COUNTRY_NAME_TO_ISO[rawCountry] || apIso;
+            if (apIso !== selectedCountryCode && resolvedIso !== selectedCountryCode) {
                 return false;
             }
         } else {
