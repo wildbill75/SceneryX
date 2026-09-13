@@ -2725,28 +2725,63 @@ function renderGsxAuditModal() {
         }
 
         if (entry.status === 'DUPLICATE') {
-            html += `<div class="space-y-1.5 pt-1">`;
+            html += `<div class="space-y-2 pt-1">`;
             files.forEach(f => {
                 const isActive = !f.is_disabled;
-                const meta = [
-                    f.creator ? `By ${f.creator}` : (f.target_pkg || f.scenario || 'GSX Profile'),
-                    f.gates_count ? `${f.gates_count} gates` : null
-                ].filter(Boolean).join(' • ');
+                const isRecommended = !!f.is_recommended;
+                const vdgsType = f.vdgs_type;
+
+                let vdgsBadge = '';
+                let vdgsNote = '';
+                if (vdgsType === 'Aerosoft VDGS') {
+                    vdgsBadge = `<span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded leading-tight bg-sky-950 text-sky-400 border border-sky-800 shrink-0">Aerosoft VDGS</span>`;
+                    vdgsNote = `<span class="text-sky-400 font-mono text-[10px] block mt-0.5">Use if airport has native Aerosoft VDGS docking enabled</span>`;
+                } else if (vdgsType === 'GSX SafeDock') {
+                    vdgsBadge = `<span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded leading-tight bg-indigo-950 text-indigo-300 border border-indigo-800 shrink-0">GSX SafeDock</span>`;
+                    vdgsNote = `<span class="text-indigo-300 font-mono text-[10px] block mt-0.5">Uses GSX native SafeDock guidance system</span>`;
+                }
+
+                let recBadge = '';
+                let recNote = '';
+                if (isRecommended) {
+                    recBadge = `<span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded leading-tight bg-emerald-950 text-emerald-400 border border-emerald-800 shrink-0">RECOMMENDED</span>`;
+                    if (f.recommend_reason) {
+                        recNote = `<span class="text-emerald-400 font-mono text-[10px] font-bold block mt-0.5">${escapeHtml(f.recommend_reason)}</span>`;
+                    }
+                }
+
+                let metaParts = [
+                    f.creator ? `By ${f.creator}` : (f.target_pkg || f.scenario || null),
+                    f.gates_count ? `${f.gates_count} gates` : null,
+                    f.mtime ? `Updated ${f.mtime}` : null,
+                    f.version ? `v${f.version}` : null,
+                    f.is_2024 ? 'MSFS 2024' : null
+                ].filter(Boolean);
+
+                let meta = metaParts.join(' • ');
 
                 html += `
-                    <div class="flex items-center justify-between p-2 rounded-xl bg-slate-950/70 border border-slate-800/80 gap-2">
+                    <div class="flex items-center justify-between p-2.5 rounded-xl ${isRecommended ? 'bg-emerald-950/20 border border-emerald-800/60' : 'bg-slate-950/70 border border-slate-800/80'} gap-2">
                         <div class="min-w-0 flex-1">
-                            <div class="text-xs font-mono font-bold text-slate-200 truncate">${escapeHtml(f.filename)}</div>
-                            <div class="text-[11px] font-mono text-slate-400 truncate">${escapeHtml(meta)}</div>
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                <span class="text-xs font-mono font-bold text-slate-200 truncate">${escapeHtml(f.filename)}</span>
+                                ${recBadge}
+                                ${vdgsBadge}
+                                ${isActive ? `<span class="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded leading-tight bg-slate-900 text-slate-400 border border-slate-700">ACTIVE</span>` : `<span class="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded leading-tight bg-slate-950 text-slate-600 border border-slate-900">DISABLED</span>`}
+                            </div>
+                            <div class="text-[11px] font-mono text-slate-400 truncate mt-0.5">${escapeHtml(meta)}</div>
+                            ${recNote}
+                            ${vdgsNote}
                         </div>
                         <div class="flex items-center gap-1.5 shrink-0">
+                            <button onclick="activateGsxDuplicateFromModal('${icao}', '${escapeJsStr(f.filename)}')"
+                                    class="text-[10px] font-mono font-bold px-2.5 py-1 rounded-xl leading-tight ${isRecommended ? 'bg-emerald-700 hover:bg-emerald-600 text-white shadow-sm' : 'bg-cyan-900 hover:bg-cyan-800 text-cyan-200 border border-cyan-700'} cursor-pointer transition-colors"
+                                    title="Keep this profile and disable conflicting duplicates">
+                                Keep this
+                            </button>
                             ${isActive ? `
-                                <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-emerald-950 text-emerald-400 border border-emerald-800">ACTIVE</span>
-                                <button onclick="disableGsxProfileFromModal('${icao}', '${escapeJsStr(f.filename)}')" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-slate-800 hover:bg-rose-950 text-slate-300 hover:text-rose-400 border border-slate-700 cursor-pointer transition-colors" title="Disable this profile">Disable</button>
-                            ` : `
-                                <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-slate-900 text-slate-500 border border-slate-800">DISABLED</span>
-                                <button onclick="activateGsxDuplicateFromModal('${icao}', '${escapeJsStr(f.filename)}')" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-cyan-900 hover:bg-cyan-800 text-cyan-200 border border-cyan-700 cursor-pointer transition-colors" title="Activate this profile and disable conflicting duplicates">Keep this</button>
-                            `}
+                                <button onclick="disableGsxProfileFromModal('${icao}', '${escapeJsStr(f.filename)}')" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 border border-slate-700 cursor-pointer transition-colors" title="Disable this profile">Disable</button>
+                            ` : ''}
                             <button onclick="revealGsxFileInExplorer('${escapeJsStr(f.path || f.filename)}')" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 cursor-pointer transition-colors" title="Reveal in Windows Explorer">Reveal</button>
                         </div>
                     </div>

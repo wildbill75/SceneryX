@@ -749,7 +749,7 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
     non_icao_files = []
 
     for f in active_ini_files:
-        m = re.match(r'^([a-zA-Z]{4})', f)
+        m = re.match(r'^([a-zA-Z]{4})(?:[_\-.\s0-9]|$)', f)
         if not m:
             non_icao_files.append(f)
             continue
@@ -757,7 +757,7 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
         by_icao.setdefault(icao, []).append({'filename': f, 'is_disabled': False})
 
     for f in disabled_ini_files:
-        m = re.match(r'^([a-zA-Z]{4})', f)
+        m = re.match(r'^([a-zA-Z]{4})(?:[_\-.\s0-9]|$)', f)
         if m:
             icao = m.group(1).upper()
             by_icao.setdefault(icao, []).append({'filename': f, 'is_disabled': True})
@@ -773,6 +773,8 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
         'invalid': len(non_icao_files)
     }
 
+    import datetime
+
     for icao, file_entries in by_icao.items():
         ap = installed_map.get(icao)
         parsed_files = []
@@ -786,6 +788,15 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
             creator = None
             gates_count = 0
             target_pkg = None
+            mtime_str = None
+            mtime_ts = 0
+            ver_str = None
+
+            try:
+                mtime_ts = os.path.getmtime(fp)
+                mtime_str = datetime.datetime.fromtimestamp(mtime_ts).strftime('%Y-%m-%d')
+            except Exception:
+                pass
 
             try:
                 with open(fp, 'r', encoding='utf-8', errors='ignore') as file_h:
@@ -800,6 +811,9 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
                 if creator_m:
                     creator = creator_m.group(1).strip()
                 gates_count = len(re.findall(r'\[(?:gate|rwy|parking)\s+[^\]]+\]', content, re.IGNORECASE))
+                v_m = re.search(r'version\s*=\s*["\']?([^"\'\r\n]+)["\']?', content)
+                if v_m:
+                    ver_str = v_m.group(1).strip()
             except Exception:
                 pass
 
@@ -816,6 +830,16 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
                                 target_pkg = next_p
                             break
 
+            f_lower = f.lower()
+            is_2024 = '2024' in f_lower or bool(re.search(r'msfs2024only\s*=\s*1', content if 'content' in locals() else ''))
+            is_2020 = '2020' in f_lower
+
+            vdgs_type = None
+            if 'asvdgs' in f_lower or 'asxvdgs' in f_lower:
+                vdgs_type = 'Aerosoft VDGS'
+            elif 'gsxvdgs' in f_lower or ('gsx.ini' in f_lower and any('asvdgs' in other['filename'].lower() or 'asxvdgs' in other['filename'].lower() for other in file_entries)):
+                vdgs_type = 'GSX SafeDock'
+
             parsed_files.append({
                 'filename': f,
                 'path': fp,
@@ -824,22 +848,75 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
                 'target_pkg': target_pkg,
                 'scenario': scenario,
                 'creator': creator,
-                'gates_count': gates_count
+                'gates_count': gates_count,
+                'mtime': mtime_str,
+                'mtime_ts': mtime_ts,
+                'version': ver_str,
+                'is_2024': is_2024,
+                'is_2020': is_2020,
+                'vdgs_type': vdgs_type,
+                'is_recommended': False,
+                'recommend_reason': None
             })
 
         # Diagnosis logic
         if not ap:
             status = 'ORPHAN'
-            reason = 'Aéroport non installé dans votre bibliothèque MSFS.'
+            reason = 'Airport not found in your MSFS library.'
             summary['orphan'] += 1
         elif len(active_entries) > 1:
             status = 'DUPLICATE'
             active_names = [e['filename'] for e in active_entries]
-            reason = f'{len(active_entries)} profils en conflit trouvés pour cet aéroport ({", ".join(active_names)}).'
+            reason = f'{len(active_entries)} conflicting active profiles found for this airport ({", ".join(active_names)}).'
             summary['duplicate'] += 1
+
+            # Smart duplicate recommendation analysis
+            installed_pkgs = [s.get('folder_name', '').lower() for s in ap.get('all_sources', [])]
+            vendor = (ap.get('vendor') or '').lower()
+            pkg_name = (ap.get('package_name') or '').lower()
+
+            for pf in parsed_files:
+                score = 0
+                reasons = []
+                t_pkg = (pf.get('target_pkg') or '').lower()
+                c_creator = (pf.get('creator') or '').lower()
+                c_scenario = (pf.get('scenario') or '').lower()
+
+                # Studio / package match
+                if t_pkg and any(t_pkg in p or p in t_pkg for p in installed_pkgs):
+                    score += 100
+                    reasons.append(f"Studio match ({pf.get('target_pkg')})")
+                elif vendor and vendor != 'unknown' and (vendor in t_pkg or vendor in c_creator or vendor in c_scenario):
+                    score += 100
+                    reasons.append(f"Studio match ({ap.get('vendor')})")
+                elif c_creator and any(c_creator in p for p in installed_pkgs):
+                    score += 80
+                    reasons.append(f"Creator matches scenery ({pf.get('creator')})")
+
+                # MSFS 2024 match
+                if pf.get('is_2024'):
+                    score += 50
+                    reasons.append("MSFS 2024 edition")
+                elif pf.get('is_2020') and any(other.get('is_2024') for other in parsed_files):
+                    score -= 50
+
+                # Recency
+                ts = pf.get('mtime_ts') or 0
+                score += int(ts / (86400 * 30))
+
+                # Gates
+                score += (pf.get('gates_count') or 0)
+
+                pf['score'] = score
+                pf['score_reasons'] = reasons
+
+            sorted_cand = sorted(parsed_files, key=lambda x: x.get('score', 0), reverse=True)
+            if len(sorted_cand) >= 2 and (sorted_cand[0]['score'] - sorted_cand[1]['score'] >= 10):
+                sorted_cand[0]['is_recommended'] = True
+                sorted_cand[0]['recommend_reason'] = ", ".join(sorted_cand[0]['score_reasons']) if sorted_cand[0]['score_reasons'] else "Newer build with more gates"
         elif len(active_entries) == 0 and len(file_entries) > 0:
             status = 'DISABLED'
-            reason = 'Profil(s) GSX actuellement désactivé(s).'
+            reason = 'GSX profile(s) currently disabled.'
         else:
             pf = next((p for p in parsed_files if not p['is_disabled']), parsed_files[0])
             target_pkg = pf['target_pkg']
@@ -854,31 +931,31 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
                 if pricing_type != 'Default':
                     status = 'MISMATCH_DEFAULT'
                     active_desc = vendor if (vendor and vendor != 'Unknown') else pkg_name
-                    reason = f'Profil conçu pour la scène par défaut MSFS, mais vous avez une scène installée ({active_desc}).'
+                    reason = f'Profile designed for Default MSFS, but active scenery is {active_desc}.'
                     summary['mismatch'] += 1
                 else:
                     status = 'MATCHED'
-                    reason = 'Profil conçu pour l\'aéroport par défaut MSFS.'
+                    reason = 'Profile designed for Default MSFS airport.'
                     summary['matched'] += 1
             elif target_pkg:
                 matched = any(target_pkg.lower() in p.lower() or p.lower() in target_pkg.lower() for p in installed_pkgs)
                 if matched or (vendor and vendor.lower() in target_pkg.lower()):
                     status = 'MATCHED'
-                    reason = f'Profil parfaitement aligné avec la scène ({target_pkg}).'
+                    reason = f'Profile perfectly aligned with active scenery ({target_pkg}).'
                     summary['matched'] += 1
                 else:
                     status = 'MISMATCH_STUDIO'
                     active_desc = vendor if (vendor and vendor != 'Unknown') else pkg_name
-                    reason = f'Profil conçu pour "{target_pkg}", mais votre scène installée est "{active_desc}".'
+                    reason = f'Profile designed for "{target_pkg}", but active scenery is "{active_desc}".'
                     summary['mismatch'] += 1
             elif scenario and vendor and vendor != 'Unknown' and vendor.lower() not in scenario.lower():
                 # Scenario explicitly names a different studio
                 status = 'MISMATCH_STUDIO'
-                reason = f'Profil mentionne "{scenario}", mais votre scène installée est "{vendor}".'
+                reason = f'Profile mentions "{scenario}", but active scenery is "{vendor}".'
                 summary['mismatch'] += 1
             else:
                 status = 'MATCHED'
-                reason = 'Profil GSX actif.'
+                reason = 'Active GSX profile.'
                 summary['matched'] += 1
 
         results[icao] = {
