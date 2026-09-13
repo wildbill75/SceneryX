@@ -10514,7 +10514,6 @@ function renderFilterRadialLevel1() {
     const count = currentlyFilteredAirports ? currentlyFilteredAirports.length : (allAirportsData ? allAirportsData.length : 0);
     hubEl.innerHTML = `
         <div class="flex flex-col items-center justify-center pointer-events-none select-none">
-            <i class="fa-solid fa-sliders text-cyan-400 text-sm mb-1"></i>
             <span class="text-[9px] font-black tracking-widest text-slate-400 uppercase leading-tight">MAP VIEW</span>
             <span class="text-xs font-black font-mono text-cyan-400 leading-tight">FILTERED BY</span>
             <span class="text-[10px] font-mono text-slate-300 mt-1 bg-slate-900/60 px-2 py-0.5 rounded-full border border-slate-700/40">${count} AP</span>
@@ -10536,15 +10535,10 @@ function renderFilterRadialLevel1() {
 
         html += `
             <button onclick="renderFilterRadialLevel2('${cat.key}')" 
-                    class="filter-radial-pill absolute pointer-events-auto cursor-pointer transition-all duration-150 active:scale-95 group flex items-center gap-2 px-3.5 py-2 rounded-2xl"
-                    style="left: ${x}px; top: ${y}px; transform: translate(-50%, -50%);">
-                <div class="w-7 h-7 rounded-xl bg-slate-800/60 flex items-center justify-center ${cat.color} group-hover:text-white transition-colors shrink-0">
-                    <i class="${cat.icon} text-xs"></i>
-                </div>
-                <div class="flex flex-col text-left">
-                    <span class="text-[10px] font-black tracking-wider uppercase text-slate-200 group-hover:text-white leading-tight">${cat.label}</span>
-                    <span class="text-[9px] font-mono text-slate-300 group-hover:text-white font-semibold truncate max-w-[105px] leading-tight">${summary}</span>
-                </div>
+                    class="filter-radial-pill absolute pointer-events-auto cursor-pointer transition-all duration-150 active:scale-95 group flex flex-col items-center justify-center px-4 py-2 rounded-2xl text-center"
+                    style="left: ${x}px; top: ${y}px; transform: translate(-50%, -50%); min-width: 115px;">
+                <span class="text-[10px] font-black tracking-wider uppercase text-slate-200 group-hover:text-white leading-tight">${cat.label}</span>
+                <span class="text-[9px] font-mono text-slate-300 group-hover:text-white font-semibold truncate max-w-[125px] leading-tight mt-0.5">${summary}</span>
             </button>
         `;
     });
@@ -10565,7 +10559,6 @@ function renderFilterRadialLevel2(categoryKey) {
 
     hubEl.innerHTML = `
         <div class="flex flex-col items-center justify-center text-cyan-400 group-hover:text-white transition-colors pointer-events-none select-none">
-            <i class="fa-solid fa-arrow-left text-sm mb-1 transition-transform group-hover:-translate-x-1"></i>
             <span class="text-xs font-black tracking-widest uppercase leading-tight">BACK</span>
             <span class="text-[9px] font-mono text-slate-400 mt-0.5 truncate max-w-[110px] leading-tight">${catLabel}</span>
         </div>
@@ -10578,58 +10571,58 @@ function renderFilterRadialLevel2(categoryKey) {
 
     if (categoryKey === 'pricing') {
         items = [
-            { id: 'all', label: 'All Models', icon: 'fa-solid fa-layer-group', isActive: selectedPricing.size === ALL_PRICING_LIST.length },
-            { id: 'Payware', label: 'Payware', icon: 'fa-solid fa-star text-purple-400', isActive: selectedPricing.has('Payware') },
-            { id: 'Freeware / Flightsim.to', label: 'Freeware', icon: 'fa-solid fa-star text-cyan-400', isActive: selectedPricing.has('Freeware / Flightsim.to') },
-            { id: 'Asobo', label: 'Asobo', icon: 'fa-solid fa-star text-amber-400', isActive: selectedPricing.has('Asobo') },
-            { id: 'Default', label: 'Default MSFS', icon: 'fa-solid fa-circle text-blue-400', isActive: selectedPricing.has('Default') }
+            { id: 'all', label: 'All Models', isActive: selectedPricing.size === ALL_PRICING_LIST.length },
+            { id: 'Payware', label: 'Payware', isActive: selectedPricing.has('Payware') },
+            { id: 'Freeware / Flightsim.to', label: 'Freeware', isActive: selectedPricing.has('Freeware / Flightsim.to') },
+            { id: 'Asobo', label: 'Asobo', isActive: selectedPricing.has('Asobo') },
+            { id: 'Default', label: 'Default MSFS', isActive: selectedPricing.has('Default') }
         ];
     } else if (categoryKey === 'source') {
         items = [
-            { id: 'all', label: 'All Sources', icon: 'fa-solid fa-layer-group', isActive: selectedSources.size === ALL_SOURCES_LIST.length },
-            { id: 'Community', label: 'Community', icon: 'fa-solid fa-folder-open text-cyan-400', isActive: selectedSources.has('Community') },
-            { id: 'Marketplace', label: 'Marketplace', icon: 'fa-solid fa-store text-sky-400', isActive: selectedSources.has('Marketplace') },
-            { id: 'Official', label: 'Official', icon: 'fa-solid fa-shield text-amber-400', isActive: selectedSources.has('Official') }
+            { id: 'all', label: 'All Sources', isActive: selectedSources.size === ALL_SOURCES_LIST.length },
+            { id: 'Community', label: 'Community', isActive: selectedSources.has('Community') },
+            { id: 'Marketplace', label: 'Marketplace', isActive: selectedSources.has('Marketplace') },
+            { id: 'Official', label: 'Official', isActive: selectedSources.has('Official') }
         ];
     } else if (categoryKey === 'region') {
         radius = 185;
         items = [
-            { id: 'all', label: 'All Regions', icon: 'fa-solid fa-globe', isActive: !selectedRegion },
-            { id: 'weurope', label: 'W. Europe', icon: null, isActive: selectedRegion === 'weurope' },
-            { id: 'eeurope', label: 'E. Europe', icon: null, isActive: selectedRegion === 'eeurope' },
-            { id: 'namerica', label: 'N. America', icon: null, isActive: selectedRegion === 'namerica' },
-            { id: 'camerica_caribbean', label: 'C. America', icon: null, isActive: selectedRegion === 'camerica_caribbean' },
-            { id: 'samerica', label: 'S. America', icon: null, isActive: selectedRegion === 'samerica' },
-            { id: 'asia', label: 'Asia', icon: null, isActive: selectedRegion === 'asia' },
-            { id: 'middleeast', label: 'Middle East', icon: null, isActive: selectedRegion === 'middleeast' },
-            { id: 'nafrica', label: 'N. Africa', icon: null, isActive: selectedRegion === 'nafrica' },
-            { id: 'ssafrica', label: 'SS. Africa', icon: null, isActive: selectedRegion === 'ssafrica' },
-            { id: 'oceania', label: 'Oceania', icon: null, isActive: selectedRegion === 'oceania' },
-            { id: 'pacific', label: 'Pacific', icon: null, isActive: selectedRegion === 'pacific' }
+            { id: 'all', label: 'All Regions', isActive: !selectedRegion },
+            { id: 'weurope', label: 'W. Europe', isActive: selectedRegion === 'weurope' },
+            { id: 'eeurope', label: 'E. Europe', isActive: selectedRegion === 'eeurope' },
+            { id: 'namerica', label: 'N. America', isActive: selectedRegion === 'namerica' },
+            { id: 'camerica_caribbean', label: 'C. America', isActive: selectedRegion === 'camerica_caribbean' },
+            { id: 'samerica', label: 'S. America', isActive: selectedRegion === 'samerica' },
+            { id: 'asia', label: 'Asia', isActive: selectedRegion === 'asia' },
+            { id: 'middleeast', label: 'Middle East', isActive: selectedRegion === 'middleeast' },
+            { id: 'nafrica', label: 'N. Africa', isActive: selectedRegion === 'nafrica' },
+            { id: 'ssafrica', label: 'SS. Africa', isActive: selectedRegion === 'ssafrica' },
+            { id: 'oceania', label: 'Oceania', isActive: selectedRegion === 'oceania' },
+            { id: 'pacific', label: 'Pacific', isActive: selectedRegion === 'pacific' }
         ];
     } else if (categoryKey === 'type') {
         items = [
-            { id: 'all', label: 'All Types', icon: 'fa-solid fa-layer-group', isActive: selectedTypes.size === ALL_TYPES_LIST.length },
-            { id: 'International', label: 'International', icon: 'fa-solid fa-plane-departure text-cyan-400', isActive: selectedTypes.has('International') },
-            { id: 'Regional', label: 'Regional', icon: 'fa-solid fa-plane text-sky-400', isActive: selectedTypes.has('Regional') },
-            { id: 'General Aviation', label: 'General Av.', icon: 'fa-solid fa-paper-plane text-emerald-400', isActive: selectedTypes.has('General Aviation') },
-            { id: 'Heli / Water', label: 'Heli / Water', icon: 'fa-solid fa-helicopter text-amber-400', isActive: selectedTypes.has('Heli / Water') }
+            { id: 'all', label: 'All Types', isActive: selectedTypes.size === ALL_TYPES_LIST.length },
+            { id: 'International', label: 'International', isActive: selectedTypes.has('International') },
+            { id: 'Regional', label: 'Regional', isActive: selectedTypes.has('Regional') },
+            { id: 'General Aviation', label: 'General Av.', isActive: selectedTypes.has('General Aviation') },
+            { id: 'Heli / Water', label: 'Heli / Water', isActive: selectedTypes.has('Heli / Water') }
         ];
     } else if (categoryKey === 'gsx') {
         items = [
-            { id: 'all', label: 'All Profiles', icon: 'fa-solid fa-layer-group', isActive: selectedGsxFilter === 'all' },
-            { id: 'with', label: 'With GSX', icon: 'fa-solid fa-check text-emerald-400', isActive: selectedGsxFilter === 'with' },
-            { id: 'none', label: 'No Profile', icon: 'fa-solid fa-ban text-slate-400', isActive: selectedGsxFilter === 'none' },
-            { id: 'audit', label: 'Audit Hub', icon: 'fa-solid fa-clipboard-check text-amber-400', isActive: false }
+            { id: 'all', label: 'All Profiles', isActive: selectedGsxFilter === 'all' },
+            { id: 'with', label: 'With GSX', isActive: selectedGsxFilter === 'with' },
+            { id: 'none', label: 'No Profile', isActive: selectedGsxFilter === 'none' },
+            { id: 'audit', label: 'Audit Hub', isActive: false }
         ];
     } else if (categoryKey === 'rating') {
         items = [
-            { id: '0', label: 'All (0.0★)', icon: 'fa-regular fa-star text-slate-400', isActive: !selectedMinRating || selectedMinRating === 0 },
-            { id: '3.0', label: '3.0★ & Up', icon: 'fa-solid fa-star text-amber-400', isActive: selectedMinRating === 3.0 },
-            { id: '3.5', label: '3.5★ & Up', icon: 'fa-solid fa-star text-amber-400', isActive: selectedMinRating === 3.5 },
-            { id: '4.0', label: '4.0★ & Up', icon: 'fa-solid fa-star text-amber-400', isActive: selectedMinRating === 4.0 },
-            { id: '4.5', label: '4.5★ & Up', icon: 'fa-solid fa-star text-amber-400', isActive: selectedMinRating === 4.5 },
-            { id: '5.0', label: '5.0★ Only', icon: 'fa-solid fa-star text-amber-400', isActive: selectedMinRating === 5.0 }
+            { id: '0', label: 'All (0.0★)', isActive: !selectedMinRating || selectedMinRating === 0 },
+            { id: '3.0', label: '3.0★ & Up', isActive: selectedMinRating === 3.0 },
+            { id: '3.5', label: '3.5★ & Up', isActive: selectedMinRating === 3.5 },
+            { id: '4.0', label: '4.0★ & Up', isActive: selectedMinRating === 4.0 },
+            { id: '4.5', label: '4.5★ & Up', isActive: selectedMinRating === 4.5 },
+            { id: '5.0', label: '5.0★ Only', isActive: selectedMinRating === 5.0 }
         ];
     }
 
@@ -10646,11 +10639,9 @@ function renderFilterRadialLevel2(categoryKey) {
 
         html += `
             <button onclick="handleFilterRadialSubItemClick('${categoryKey}', '${escapeJsStr(item.id)}')"
-                    class="filter-radial-pill ${baseClass} absolute pointer-events-auto cursor-pointer transition-all duration-150 active:scale-95 flex items-center gap-1.5 px-3 py-1.5 rounded-2xl whitespace-nowrap text-xs font-bold text-slate-200 group"
+                    class="filter-radial-pill ${baseClass} absolute pointer-events-auto cursor-pointer transition-all duration-150 active:scale-95 flex items-center justify-center px-3.5 py-1.5 rounded-2xl whitespace-nowrap text-xs font-bold text-slate-200 group text-center"
                     style="left: ${x}px; top: ${y}px; transform: translate(-50%, -50%);">
-                ${item.icon ? `<i class="${item.icon} text-[10px]"></i>` : ''}
                 <span>${escapeHtml(item.label)}</span>
-                ${item.isActive && item.id !== 'all' && item.id !== '0' ? '<i class="fa-solid fa-check text-[9px] ml-0.5 opacity-90"></i>' : ''}
             </button>
         `;
     });
