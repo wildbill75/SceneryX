@@ -3865,14 +3865,14 @@ function renderRadialSceneriesExtension(ap, animate = false) {
         const titleLabel = isAsoboPkg ? updateLabel : (src.vendor && src.vendor !== 'Unknown' ? src.vendor : src.folder_name);
         const safePkgName = (src.folder_name || '').replace(/'/g, "\\'");
 
-        let badgeBg = 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30';
+        let badgeBg = 'bg-cyan-600 text-white font-bold';
         let activeBorderClass = 'border-2 border-cyan-500 shadow-lg shadow-cyan-950/40 bg-slate-950/60 ring-1 ring-cyan-500/30';
 
         if (isAsoboPkg) {
-            badgeBg = 'bg-amber-500/20 text-amber-300 border border-amber-500/30';
+            badgeBg = 'bg-amber-500 text-slate-950 font-black';
             activeBorderClass = 'border-2 border-amber-500 shadow-lg shadow-amber-950/40 bg-slate-950/60 ring-1 ring-amber-500/30';
         } else if (pType === 'Payware') {
-            badgeBg = 'bg-purple-500/20 text-purple-300 border border-purple-500/30';
+            badgeBg = 'bg-purple-600 text-white font-bold';
             activeBorderClass = 'border-2 border-purple-500 shadow-lg shadow-purple-950/40 bg-slate-950/60 ring-1 ring-purple-500/30';
         }
 
@@ -3906,7 +3906,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
                             <span class="text-xs font-bold text-white truncate block hover:text-cyan-300 transition-colors cursor-help" title="${safePkgName}">${titleLabel}</span>
                         </div>
 
-                        <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded ${badgeBg} shrink-0 uppercase">${pType}</span>
+                        <span class="text-[9px] font-mono px-1.5 py-0.5 rounded ${badgeBg} shrink-0 uppercase">${pType}</span>
                     </div>
 
                     <button onclick="event.stopPropagation(); openSpecificPackageFolderByIndex('${ap.icao}', ${idx})"
@@ -3934,6 +3934,8 @@ function renderRadialSceneriesExtension(ap, animate = false) {
     const defaultAnimDelay = animate ? `style="animation-delay: ${(pillIndex * 0.05).toFixed(2)}s;"` : '';
     pillIndex++;
 
+    const defaultAirportName = getCleanAirportName(ap.name, ap.city) || ap.name || ap.icao;
+
     html += `
         <div onclick="event.stopPropagation(); activateRadialDefaultScenery(event, '${ap.icao}')"
              onmousedown="event.stopPropagation();"
@@ -3941,7 +3943,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
              ${defaultAnimDelay}
              class="${defaultAnimClass} py-2 px-3 rounded-xl ${defaultBorderClass} backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1 w-full">
             
-            <!-- Row 1: Switch toggle + Title + Badge -->
+            <!-- Row 1: Switch toggle + Airport Name + DEFAULT Badge -->
             <div class="flex items-center justify-between gap-2">
                 <div class="flex items-center gap-2 min-w-0 flex-1">
                     <!-- Preflightly-style Switch Toggle -->
@@ -3951,8 +3953,8 @@ function renderRadialSceneriesExtension(ap, animate = false) {
                         </div>
                     </div>
 
-                    <span class="text-xs font-bold text-white truncate min-w-0">Default</span>
-                    <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30 shrink-0 uppercase">DEFAULT</span>
+                    <span class="text-xs font-bold text-white truncate min-w-0" title="${defaultAirportName}">${defaultAirportName}</span>
+                    <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-600 text-white shrink-0 uppercase">DEFAULT</span>
                 </div>
             </div>
 
@@ -4002,7 +4004,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
                                 <span class="text-xs font-bold text-white truncate block hover:text-emerald-300 transition-colors cursor-help" title="${pkgPath}">${src.folder_name}</span>
                             </div>
 
-                            <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0 uppercase">FIX</span>
+                            <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-emerald-600 text-white shrink-0 uppercase">FIX</span>
                         </div>
                         <button onclick="event.stopPropagation(); openSpecificPackageFolderByIndex('${ap.icao}', ${idx})"
                                 title="${t('drawer.open_folder', 'Open Folder')}"
@@ -4036,16 +4038,13 @@ function renderRadialSceneriesExtension(ap, animate = false) {
              ${freewareAnimDelay}
              class="${freewareAnimClass} py-2 px-3 rounded-xl border border-slate-700/50 hover:border-cyan-400/80 bg-slate-950/40 hover:bg-slate-900/60 shadow-sm backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1 w-full">
             
-            <!-- Row 1: Flightsim.to Icon + Title + FREEWARE Badge + FREE Pill + External Link Icon -->
+            <!-- Row 1: Title + FREEWARE Badge + FREE Pill + External Link Icon -->
             <div class="flex items-center justify-between gap-2">
                 <div class="flex items-center gap-2 min-w-0 flex-1">
-                    <div class="w-5.5 h-5.5 rounded-lg bg-cyan-500 text-slate-950 flex items-center justify-center shrink-0 shadow-sm">
-                        <i class="fa-solid fa-cloud-arrow-down text-xs"></i>
-                    </div>
                     <div class="min-w-0 flex-1" title="Flightsim.to">
                         <span class="text-xs font-bold text-white truncate block group-hover:text-cyan-300 transition-colors">Flightsim.to</span>
                     </div>
-                    <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 shrink-0 uppercase">FREEWARE</span>
+                    <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-cyan-600 text-white shrink-0 uppercase">FREEWARE</span>
                 </div>
 
                 <div class="flex items-center gap-1.5 shrink-0">
@@ -4059,7 +4058,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
             </div>
 
             <!-- Row 2: Description + Available Status -->
-            <div class="flex items-center justify-between text-[10px] font-mono text-slate-400 pl-[30px] leading-tight">
+            <div class="flex items-center justify-between text-[10px] font-mono text-slate-400 leading-tight">
                 <span class="truncate pr-2">Community freeware sceneries on Flightsim.to</span>
                 <div class="flex items-center gap-1 shrink-0 text-cyan-400 font-semibold text-[10px]">
                     <span>Available</span>
@@ -4156,11 +4155,9 @@ function renderRadialAddonDownloads(ap, stores, animate = false, basePillIndex =
         const animDelay = animate ? `style="animation-delay: ${(pillIdx * 0.05).toFixed(2)}s;"` : '';
         pillIdx++;
 
-        const iconBoxClass = isDev ? 'bg-amber-500 text-slate-950' : 'bg-purple-600 text-white';
-        const iconClass = isDev ? 'fa-solid fa-crown text-xs' : 'fa-solid fa-cart-shopping text-[11px]';
         const badgeHtml = isDev
-            ? '<span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0 uppercase">DEV</span>'
-            : '<span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 shrink-0 uppercase">STORE</span>';
+            ? '<span class="text-[9px] font-mono font-black px-1.5 py-0.5 rounded bg-amber-500 text-slate-950 shrink-0 uppercase">DEV</span>'
+            : '<span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-purple-600 text-white shrink-0 uppercase">STORE</span>';
 
         const borderClass = isDev
             ? 'border border-slate-700/50 hover:border-amber-400/80 bg-slate-950/40 hover:bg-slate-900/60 shadow-sm'
@@ -4175,12 +4172,9 @@ function renderRadialAddonDownloads(ap, stores, animate = false, basePillIndex =
                  ${animDelay}
                  class="${animClass} py-2 px-3 rounded-xl ${borderClass} backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1 w-full">
                 
-                <!-- Row 1: Store Icon + Store Name + Store/Dev Badge + Price & Link Button -->
+                <!-- Row 1: Store Name + Store/Dev Badge + Price & Link Button -->
                 <div class="flex items-center justify-between gap-2">
                     <div class="flex items-center gap-2 min-w-0 flex-1">
-                        <div class="w-5.5 h-5.5 rounded-lg ${iconBoxClass} flex items-center justify-center shrink-0 shadow-sm">
-                            <i class="${iconClass}"></i>
-                        </div>
                         <div class="min-w-0 flex-1" title="${st.name}">
                             <span class="text-xs font-bold text-white truncate block group-hover:text-cyan-300 transition-colors">${st.name}</span>
                         </div>
@@ -4200,7 +4194,7 @@ function renderRadialAddonDownloads(ap, stores, animate = false, basePillIndex =
                 </div>
 
                 <!-- Row 2: Store Description + Available Status -->
-                <div class="flex items-center justify-between text-[10px] font-mono text-slate-400 pl-[30px] leading-tight">
+                <div class="flex items-center justify-between text-[10px] font-mono text-slate-400 leading-tight">
                     <span class="truncate pr-2">${st.desc || ''}</span>
                     <div class="flex items-center gap-1 shrink-0 text-emerald-400 font-semibold text-[10px]">
                         <span>Available</span>
