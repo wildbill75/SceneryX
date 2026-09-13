@@ -2689,12 +2689,7 @@ function openMapFromGsxAudit() {
 
     gsxAuditFloatingMode = true;
 
-    // 1. Collapse left filter sidebar to maximize map viewport and free up left space
-    if (!isSidebarCollapsed && typeof toggleSidebarCollapse === 'function') {
-        toggleSidebarCollapse();
-    }
-    const expandBtn = document.getElementById('btn-expand-sidebar');
-    if (expandBtn) expandBtn.classList.add('hidden');
+    // 1. Position the GSX audit window docked on the LEFT (Below top header)
 
     // 2. Position the GSX audit window docked on the LEFT (Below top header)
     modal.classList.remove('hidden');
@@ -2767,13 +2762,7 @@ function closeGsxAuditModal() {
         openMapBtn.className = 'px-6 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-md shadow-cyan-600/25 transition-all cursor-pointer border-0 active:scale-98';
     }
 
-    // Restore the sidebar if it was open before GSX audit opened
-    if (!sidebarWasCollapsedBeforeGsx && isSidebarCollapsed && typeof toggleSidebarCollapse === 'function') {
-        toggleSidebarCollapse();
-    } else if (isSidebarCollapsed) {
-        const expandBtn = document.getElementById('btn-expand-sidebar');
-        if (expandBtn) expandBtn.classList.remove('hidden');
-    }
+
 
     gsxAuditFloatingMode = false;
     isGsxAuditOpen = false;
