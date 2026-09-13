@@ -2534,7 +2534,7 @@ async function openGsxAuditModal(filter = 'ALL') {
     if (!modal) return;
 
     // Reset container to standard modal mode
-    modal.classList.remove('pointer-events-none', 'bg-transparent', 'items-start', 'justify-start', 'pt-[76px]', 'pl-4', 'pb-4');
+    modal.classList.remove('pointer-events-none', 'bg-transparent', 'items-start', 'justify-start', 'pt-[126px]', 'pt-[76px]', 'pl-4', 'pb-4');
     modal.classList.add('bg-slate-950/80', 'backdrop-blur-md', 'items-center', 'justify-center');
 
     const modalBox = modal.querySelector('.glass-modal');
@@ -2549,6 +2549,7 @@ async function openGsxAuditModal(filter = 'ALL') {
 
     const openMapBtn = document.getElementById('btn-gsx-open-map') || modal.querySelector('button[onclick*="openMapFromGsxAudit"]');
     if (openMapBtn) {
+        openMapBtn.classList.remove('hidden');
         openMapBtn.innerHTML = 'Open Map';
         openMapBtn.className = 'px-6 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-md shadow-cyan-600/25 transition-all cursor-pointer border-0 active:scale-98';
     }
@@ -2624,10 +2625,10 @@ function openMapFromGsxAudit() {
     const expandBtn = document.getElementById('btn-expand-sidebar');
     if (expandBtn) expandBtn.classList.add('hidden');
 
-    // 2. Position the GSX audit window docked on the LEFT (Screen 3)
+    // 2. Position the GSX audit window docked on the LEFT (Below top header)
     modal.classList.remove('hidden');
     modal.classList.remove('bg-slate-950/80', 'backdrop-blur-md', 'items-center', 'justify-center');
-    modal.classList.add('pointer-events-none', 'bg-transparent', 'items-start', 'justify-start', 'pt-[76px]', 'pl-4', 'pb-4');
+    modal.classList.add('pointer-events-none', 'bg-transparent', 'items-start', 'justify-start', 'pt-[126px]', 'pl-4', 'pb-4');
 
     const modalBox = modal.querySelector('.glass-modal');
     if (modalBox) {
@@ -2635,16 +2636,15 @@ function openMapFromGsxAudit() {
         modalBox.style.transform = 'none';
         modalBox.style.width = '540px';
         modalBox.style.maxWidth = '560px';
-        modalBox.style.height = 'calc(100vh - 92px)';
-        modalBox.style.maxHeight = 'calc(100vh - 92px)';
+        modalBox.style.height = 'calc(100vh - 142px)';
+        modalBox.style.maxHeight = 'calc(100vh - 142px)';
         gsxAuditModalOffset = { x: 0, y: 0 };
     }
 
-    // Update Open Map button text to reflect active map state
+    // Hide Open Map button when map mode is active (no useless green Map Active button)
     const openMapBtn = document.getElementById('btn-gsx-open-map') || modal.querySelector('button[onclick*="openMapFromGsxAudit"]');
     if (openMapBtn) {
-        openMapBtn.innerHTML = '<i class="fa-solid fa-map-location-dot mr-1.5"></i> Map Active';
-        openMapBtn.className = 'px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/25 transition-all cursor-pointer border-0 active:scale-98 flex items-center gap-1';
+        openMapBtn.classList.add('hidden');
     }
 
     // 3. Reactivate direct pan links in the audit list cards
@@ -2668,7 +2668,7 @@ function closeGsxAuditModal() {
     const modal = document.getElementById('gsx-audit-modal');
     if (modal) {
         modal.classList.add('hidden');
-        modal.classList.remove('pointer-events-none', 'bg-transparent', 'items-start', 'justify-start', 'pt-[76px]', 'pl-4', 'pb-4');
+        modal.classList.remove('pointer-events-none', 'bg-transparent', 'items-start', 'justify-start', 'pt-[126px]', 'pt-[76px]', 'pl-4', 'pb-4');
         modal.classList.add('bg-slate-950/80', 'backdrop-blur-md', 'items-center', 'justify-center');
     }
 
@@ -2680,6 +2680,13 @@ function closeGsxAuditModal() {
         modalBox.style.height = '';
         modalBox.style.maxHeight = '';
         gsxAuditModalOffset = { x: 0, y: 0 };
+    }
+
+    const openMapBtn = document.getElementById('btn-gsx-open-map') || (modal ? modal.querySelector('button[onclick*="openMapFromGsxAudit"]') : null);
+    if (openMapBtn) {
+        openMapBtn.classList.remove('hidden');
+        openMapBtn.innerHTML = 'Open Map';
+        openMapBtn.className = 'px-6 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-md shadow-cyan-600/25 transition-all cursor-pointer border-0 active:scale-98';
     }
 
     // Restore the sidebar if it was open before GSX audit opened
