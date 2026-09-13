@@ -6269,9 +6269,14 @@ function renderRadialGsx(ap) {
                         <div class="text-xs font-mono font-bold text-white truncate">${activeFile.filename || ap.gsx_profile_filename}</div>
                         ${metaText ? `<div class="text-[10px] font-mono text-slate-400 truncate mt-0.5">${metaText}</div>` : ''}
                     </div>
-                    <button onclick="revealGsxFile('${safeGsxPath}')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[10px] font-mono font-bold border border-slate-700/60 cursor-pointer shrink-0">
-                        Reveal
-                    </button>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <button onclick="revealGsxFile('${safeGsxPath}')" title="Reveal in Windows Explorer" class="w-7 h-7 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs border border-slate-700/60 cursor-pointer shrink-0 transition-colors flex items-center justify-center">
+                            <i class="fa-solid fa-folder-open text-xs"></i>
+                        </button>
+                        <button onclick="openGsxAuditFromDetails()" title="Open GSX Profiles Audit list on map" class="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-cyan-950 text-slate-300 hover:text-cyan-300 border border-slate-700/60 hover:border-cyan-700 text-[10px] font-mono font-bold cursor-pointer shrink-0 transition-colors">
+                            VIEW LIST
+                        </button>
+                    </div>
                 </div>
                 ${dropZoneHtml}
             </div>
@@ -6280,8 +6285,11 @@ function renderRadialGsx(ap) {
         const activeEntries = files.filter(f => !f.is_disabled);
         container.innerHTML = `
             <div class="space-y-1.5">
-                <div class="p-2 rounded-xl bg-amber-950/40 border border-amber-900/60 text-[11px] font-mono text-amber-200 leading-tight">
-                    ${activeEntries.length} active profiles found. Choose which profile to keep:
+                <div class="p-2 rounded-xl bg-amber-950/40 border border-amber-900/60 text-[11px] font-mono text-amber-200 leading-tight flex items-center justify-between gap-2">
+                    <span>${activeEntries.length} active profiles found:</span>
+                    <button onclick="openGsxAuditFromDetails('DUPLICATE')" title="Open GSX Profiles Audit list on map" class="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-cyan-950 text-slate-300 hover:text-cyan-300 border border-slate-700/60 hover:border-cyan-700 text-[9px] font-mono font-bold cursor-pointer shrink-0 transition-colors">
+                        VIEW LIST
+                    </button>
                 </div>
                 <div class="space-y-1 max-h-36 overflow-y-auto custom-scrollbar pr-0.5">
                     ${files.map(f => {
@@ -6311,8 +6319,8 @@ function renderRadialGsx(ap) {
                                             Activate
                                         </button>
                                     ` : ''}
-                                    <button onclick="revealGsxFile('${safePath}')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[10px] font-mono font-bold border border-slate-700/60 cursor-pointer">
-                                        Reveal
+                                    <button onclick="revealGsxFile('${safePath}')" title="Reveal in Windows Explorer" class="w-6 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs border border-slate-700/60 cursor-pointer flex items-center justify-center">
+                                        <i class="fa-solid fa-folder-open text-[10px]"></i>
                                     </button>
                                 </div>
                             </div>
@@ -6337,9 +6345,14 @@ function renderRadialGsx(ap) {
                             <div class="text-xs font-mono font-bold text-white truncate">${activeFile.filename}</div>
                             ${activeFile.scenario ? `<div class="text-[10px] font-mono text-slate-400 truncate mt-0.5">${activeFile.scenario}</div>` : ''}
                         </div>
-                        <button onclick="revealGsxFile('${safePath}')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[10px] font-mono font-bold border border-slate-700/60 cursor-pointer shrink-0">
-                            Reveal
-                        </button>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <button onclick="revealGsxFile('${safePath}')" title="Reveal in Windows Explorer" class="w-7 h-7 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs border border-slate-700/60 cursor-pointer shrink-0 transition-colors flex items-center justify-center">
+                                <i class="fa-solid fa-folder-open text-xs"></i>
+                            </button>
+                            <button onclick="openGsxAuditFromDetails('MISMATCH')" title="Open GSX Profiles Audit list on map" class="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-cyan-950 text-slate-300 hover:text-cyan-300 border border-slate-700/60 hover:border-cyan-700 text-[10px] font-mono font-bold cursor-pointer shrink-0 transition-colors">
+                                VIEW LIST
+                            </button>
+                        </div>
                     </div>
                 ` : ''}
                 <button onclick="triggerGsxStudioSearch('${ap.icao}')" class="w-full py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 hover:text-white text-xs font-mono font-bold transition-colors border border-slate-700/60 text-center cursor-pointer">
@@ -6351,8 +6364,11 @@ function renderRadialGsx(ap) {
     } else if (status === 'DISABLED') {
         container.innerHTML = `
             <div class="space-y-1.5">
-                <div class="p-2 rounded-xl bg-slate-900/60 border border-slate-800 text-[11px] font-mono text-slate-400 leading-tight">
-                    Profile currently disabled (.disabled).
+                <div class="p-2 rounded-xl bg-slate-900/60 border border-slate-800 text-[11px] font-mono text-slate-400 leading-tight flex items-center justify-between gap-2">
+                    <span>Profile currently disabled (.disabled).</span>
+                    <button onclick="openGsxAuditFromDetails('DISABLED')" title="Open GSX Profiles Audit list on map" class="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-cyan-950 text-slate-300 hover:text-cyan-300 border border-slate-700/60 hover:border-cyan-700 text-[9px] font-mono font-bold cursor-pointer shrink-0 transition-colors">
+                        VIEW LIST
+                    </button>
                 </div>
                 ${files.map(f => {
                     const safePath = encodeURIComponent(f.path || '');
@@ -6363,8 +6379,8 @@ function renderRadialGsx(ap) {
                                 <button onclick="enableGsxProfile('${ap.icao}', '${f.filename}')" class="px-2 py-0.5 rounded bg-cyan-700 hover:bg-cyan-600 text-white text-[10px] font-mono font-bold border-0 cursor-pointer">
                                     Enable
                                 </button>
-                                <button onclick="revealGsxFile('${safePath}')" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[10px] font-mono font-bold border border-slate-700/60 cursor-pointer">
-                                    Reveal
+                                <button onclick="revealGsxFile('${safePath}')" title="Reveal in Windows Explorer" class="w-6 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs border border-slate-700/60 cursor-pointer flex items-center justify-center">
+                                    <i class="fa-solid fa-folder-open text-[10px]"></i>
                                 </button>
                             </div>
                         </div>
@@ -6376,11 +6392,16 @@ function renderRadialGsx(ap) {
     } else {
         container.innerHTML = `
             <div class="space-y-1.5">
-                <div class="p-2 rounded-xl bg-slate-900/40 border border-slate-800/80 flex items-center justify-between text-xs font-mono text-slate-400">
+                <div class="p-2 rounded-xl bg-slate-900/40 border border-slate-800/80 flex items-center justify-between text-xs font-mono text-slate-400 gap-2">
                     <span>No GSX profile installed</span>
-                    <button onclick="triggerRadialSearchGsxProfile()" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-cyan-400 hover:text-white text-[10px] font-mono font-bold border border-slate-700/60 cursor-pointer">
-                        Search Flightsim.to
-                    </button>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <button onclick="triggerRadialSearchGsxProfile()" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-cyan-400 hover:text-white text-[10px] font-mono font-bold border border-slate-700/60 cursor-pointer">
+                            Search Flightsim.to
+                        </button>
+                        <button onclick="openGsxAuditFromDetails('NO_PROFILE')" title="Open GSX Profiles Audit list on map" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-cyan-950 text-slate-300 hover:text-cyan-300 border border-slate-700/60 hover:border-cyan-700 text-[10px] font-mono font-bold cursor-pointer shrink-0 transition-colors">
+                            VIEW LIST
+                        </button>
+                    </div>
                 </div>
                 ${dropZoneHtml}
             </div>
@@ -6390,10 +6411,26 @@ function renderRadialGsx(ap) {
 
 function revealGsxFile(safePath) {
     const p = decodeURIComponent(safePath || '');
-    if (p && window.pywebview && window.pywebview.api && window.pywebview.api.open_file_in_explorer) {
-        window.pywebview.api.open_file_in_explorer(p);
+    if (window.pywebview && window.pywebview.api) {
+        if (window.pywebview.api.reveal_file_in_explorer) {
+            window.pywebview.api.reveal_file_in_explorer(p);
+        } else if (window.pywebview.api.open_file_in_explorer) {
+            window.pywebview.api.open_file_in_explorer(p);
+        }
     }
 }
+
+async function openGsxAuditFromDetails(filter = 'ALL') {
+    if (typeof closeRadialDetailsModal === 'function') {
+        closeRadialDetailsModal();
+    }
+    if (typeof closeAirportRadialMenu === 'function') {
+        closeAirportRadialMenu();
+    }
+    await openGsxAuditModal(filter);
+    openMapFromGsxAudit();
+}
+window.openGsxAuditFromDetails = openGsxAuditFromDetails;
 
 async function activateGsxDuplicate(icao, activeFilename) {
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.resolve_gsx_duplicate) return;

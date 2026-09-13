@@ -2148,6 +2148,9 @@ class Api:
             return json.dumps({"status": "error", "message": str(e)})
         return json.dumps({"status": "error", "message": "File not found"})
 
+    def open_file_in_explorer(self, file_path):
+        return self.reveal_file_in_explorer(file_path)
+
     def check_update(self, icao, name, vendor, version, pricing_type=""):
         import webbrowser
         import urllib.parse
