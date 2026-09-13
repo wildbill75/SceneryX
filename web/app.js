@@ -4291,6 +4291,9 @@ function renderAirportsOnMap(airports) {
 
             // Left-Click event: Alt+Click for Flight Planning, or focus in Country Mode, or open/toggle Radial Menu
             marker.on('click', function (e) {
+                if (typeof closeFilterRadialMenu === 'function') {
+                    closeFilterRadialMenu();
+                }
                 if (e.originalEvent) {
                     L.DomEvent.stopPropagation(e.originalEvent);
                 }
@@ -4312,6 +4315,9 @@ function renderAirportsOnMap(airports) {
 
             // Right-Click event: opens the sleek circular Radial Menu directly
             marker.on('contextmenu', function (e) {
+                if (typeof closeFilterRadialMenu === 'function') {
+                    closeFilterRadialMenu();
+                }
                 if (e.originalEvent) {
                     e.originalEvent.preventDefault();
                     e.originalEvent.stopPropagation();
@@ -4704,6 +4710,9 @@ function prefetchRadialStores(ap) {
 }
 
 function openAirportRadialMenu(ap, marker, e) {
+    if (typeof closeFilterRadialMenu === 'function') {
+        closeFilterRadialMenu();
+    }
     if (!ap) return;
     const latestAp = (allAirportsData && allAirportsData.find(a => a.icao === ap.icao)) || ap;
     currentRadialAirport = latestAp;
@@ -8063,6 +8072,9 @@ function centerMapOnAirport(ap, forcedZoom = null) {
 }
 
 function focusAirportWithAnimation(ap) {
+    if (typeof closeFilterRadialMenu === 'function') {
+        closeFilterRadialMenu();
+    }
     if (!ap) return;
     lastFocusedIcao = ap.icao;
 
@@ -10350,7 +10362,6 @@ let filterRadialHasMoved = false;
 function initDraggableFilterRadial() {
     const menuEl = document.getElementById('filter-radial-menu');
     const hubEl = document.getElementById('filter-radial-center-hub');
-    const backdropEl = document.getElementById('filter-radial-backdrop');
     if (!menuEl || !hubEl || hubEl._dragInitialized) return;
 
     hubEl._dragInitialized = true;
@@ -10371,10 +10382,6 @@ function initDraggableFilterRadial() {
 
         hubEl.classList.add('cursor-grabbing');
         hubEl.classList.remove('cursor-grab');
-        if (backdropEl) {
-            backdropEl.classList.add('cursor-grabbing');
-            backdropEl.classList.remove('cursor-grab');
-        }
 
         const onMouseMove = (moveEvent) => {
             if (!isFilterRadialDragging) return;
@@ -10403,10 +10410,6 @@ function initDraggableFilterRadial() {
 
             hubEl.classList.remove('cursor-grabbing');
             hubEl.classList.add('cursor-grab');
-            if (backdropEl) {
-                backdropEl.classList.remove('cursor-grabbing');
-                backdropEl.classList.add('cursor-grab');
-            }
 
             window.removeEventListener('mousemove', onMouseMove, true);
             window.removeEventListener('mouseup', onMouseUp, true);
@@ -10421,9 +10424,6 @@ function initDraggableFilterRadial() {
     }
 
     hubEl.addEventListener('mousedown', (e) => handleDragStart(e, true));
-    if (backdropEl) {
-        backdropEl.addEventListener('mousedown', (e) => handleDragStart(e, false));
-    }
 }
 
 function openFilterRadialMenu(clientX, clientY) {
@@ -10453,6 +10453,11 @@ function openFilterRadialMenu(clientX, clientY) {
     }
 
     renderFilterRadialWheel();
+
+    // Trigger snappy bounce animation identical to addon radial menu
+    menuEl.classList.remove('animate-filter-radial-open');
+    void menuEl.offsetWidth; // Force reflow
+    menuEl.classList.add('animate-filter-radial-open');
 }
 
 function toggleFilterRadialMenuAtCenter() {
@@ -10467,6 +10472,7 @@ function closeFilterRadialMenu() {
     const menuEl = document.getElementById('filter-radial-menu');
     if (menuEl) {
         menuEl.classList.add('hidden');
+        menuEl.classList.remove('animate-filter-radial-open');
     }
     isFilterRadialOpen = false;
 }
