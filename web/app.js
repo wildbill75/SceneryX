@@ -2508,10 +2508,14 @@ window.refreshGsxAuditQuietly = refreshGsxAuditQuietly;
 
 let gsxAuditFloatingMode = false;
 let sidebarWasCollapsedBeforeGsx = false;
+let isGsxAuditOpen = false;
+window.isGsxAuditOpen = false;
 
 async function openGsxAuditModal(filter = 'ALL') {
     sidebarWasCollapsedBeforeGsx = (typeof isSidebarCollapsed !== 'undefined' ? isSidebarCollapsed : (window.isSidebarCollapsed || false));
     gsxAuditFloatingMode = false;
+    isGsxAuditOpen = true;
+    window.isGsxAuditOpen = true;
 
     if (!window.gsxAuditData && window.pywebview && window.pywebview.api && window.pywebview.api.scan_gsx_audit) {
         try {
@@ -2557,6 +2561,11 @@ async function openGsxAuditModal(filter = 'ALL') {
     initDraggableGsxAuditModal();
     setGsxAuditFilter(currentGsxAuditFilter);
     modal.classList.remove('hidden');
+
+    // Force map to display GSX audited airports (including default MSFS airports like EPWA)
+    if (typeof filterAirports === 'function') {
+        filterAirports();
+    }
 }
 
 function panCameraToGsxAirport(icao) {
@@ -2606,8 +2615,13 @@ function panCameraToGsxAirport(icao) {
     }
 
     // Pan and center camera smoothly on airport using user-defined settings (zoom & duration)
+    // Guarantee minimum zoom of 7.5 so Leaflet cluster unbundles and individual marker is visible
+    const zoomToUse = Math.max(
+        (currentSettings && currentSettings.camera_airport_zoom !== undefined) ? parseFloat(currentSettings.camera_airport_zoom) : 6.0,
+        7.5
+    );
     if (typeof centerMapOnAirport === 'function') {
-        centerMapOnAirport(ap);
+        centerMapOnAirport(ap, zoomToUse);
     }
 }
 window.panCameraToGsxAirport = panCameraToGsxAirport;
@@ -2649,6 +2663,13 @@ function openMapFromGsxAudit() {
 
     // 3. Reactivate direct pan links in the audit list cards
     renderGsxAuditModal();
+
+    // Ensure GSX audit state is active and forced markers are rendered
+    isGsxAuditOpen = true;
+    window.isGsxAuditOpen = true;
+    if (typeof filterAirports === 'function') {
+        filterAirports();
+    }
 
     // 4. Refresh and invalidate map size so the map renders fully and immediately under the floating window
     if (window.map) {
@@ -2698,6 +2719,13 @@ function closeGsxAuditModal() {
     }
 
     gsxAuditFloatingMode = false;
+    isGsxAuditOpen = false;
+    window.isGsxAuditOpen = false;
+
+    // Restore map markers to strictly match user's active filters (hides temporary default markers)
+    if (typeof filterAirports === 'function') {
+        filterAirports();
+    }
 
     if (pendingScanDelta && (pendingScanDelta.total_changes || 0) > 0) {
         const d = pendingScanDelta;
@@ -9381,6 +9409,19 @@ function filterAirports() {
     }
     const selectedAirlinesArr = selectedAirlines.size > 0 ? Array.from(selectedAirlines) : null;
 
+    // Pre-calculate GSX Audit forced visible ICAOs if GSX audit is currently active
+    const gsxAuditForcedIcaos = new Set();
+    if (isGsxAuditOpen && window.gsxAuditData) {
+        if (window.gsxAuditData.by_icao) {
+            Object.keys(window.gsxAuditData.by_icao).forEach(k => gsxAuditForcedIcaos.add(k));
+        }
+        if (Array.isArray(window.gsxAuditData.missing_profiles)) {
+            window.gsxAuditData.missing_profiles.forEach(m => {
+                if (m && m.icao) gsxAuditForcedIcaos.add(m.icao);
+            });
+        }
+    }
+
     currentlyFilteredAirports = allAirportsData.filter(ap => {
         // High Priority: Origin Airport & Direct Airline Route Destinations (Bypasses global filters)
         if (activeRouteDestIcaos) {
@@ -9423,6 +9464,12 @@ function filterAirports() {
             }
         } else if (isFlightPlanningMode && flightPlanningDeparture && ap.icao === flightPlanningDeparture.icao) {
             // While setting up flight plan (departure selected, waiting for arrival), keep departure airport visible
+            return true;
+        }
+
+        // GSX Audit Temporary Marker Override:
+        // Force display of airports present in GSX Audit (e.g. default airports with GSX issues like EPWA)
+        if (isGsxAuditOpen && gsxAuditForcedIcaos.has(ap.icao)) {
             return true;
         }
 
@@ -9571,6 +9618,35 @@ function filterAirports() {
         if (!currentlyFilteredAirports.some(a => a.icao === flightPlanningDeparture.icao)) {
             currentlyFilteredAirports.unshift(flightPlanningDeparture);
         }
+    }
+
+    // GSX Audit Temporary Display Guarantee:
+    // If an audited airport (e.g. orphan or not yet in allAirportsData) is missing, inject it so its marker is rendered
+    if (isGsxAuditOpen && window.gsxAuditData && window.gsxAuditData.by_icao) {
+        Object.entries(window.gsxAuditData.by_icao).forEach(([icao, entry]) => {
+            if (!currentlyFilteredAirports.some(a => a.icao === icao)) {
+                let ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao(icao) : null;
+                if (!ap && entry.lat !== undefined && entry.lon !== undefined && entry.lat !== null && entry.lon !== null) {
+                    ap = {
+                        icao: icao,
+                        ident: icao,
+                        name: entry.name || icao,
+                        city: entry.city || '',
+                        country: entry.country || '',
+                        lat: entry.lat,
+                        lon: entry.lon,
+                        type: 'large_airport',
+                        english_type: 'International',
+                        vendor: 'Microsoft Flight Simulator (Default)',
+                        pricing_type: 'Default',
+                        is_default: true
+                    };
+                }
+                if (ap && ap.lat !== undefined && ap.lon !== undefined) {
+                    currentlyFilteredAirports.push(ap);
+                }
+            }
+        });
     }
 
     renderAirportsOnMap(currentlyFilteredAirports);
