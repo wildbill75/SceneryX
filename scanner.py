@@ -965,10 +965,40 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
             'files': parsed_files
         }
 
+    # Detect installed airports without any active GSX profile
+    installed_missing = []
+    for icao, ap in installed_map.items():
+        has_active = icao in by_icao and any(not f['is_disabled'] for f in by_icao[icao])
+        if not has_active:
+            pt = ap.get('pricing_type', '')
+            is_payware = bool(ap.get('is_payware') or pt == 'Payware')
+            is_asobo = bool(ap.get('is_asobo_official') or pt == 'Asobo' or (ap.get('vendor') == 'Microsoft / Asobo'))
+            is_freeware = bool((pt == 'Freeware' or pt == 'Freeware / Flightsim.to' or ap.get('is_freeware')) and not is_asobo and not is_payware)
+
+            if is_payware or is_freeware or is_asobo:
+                installed_missing.append({
+                    'icao': icao,
+                    'name': ap.get('name', icao),
+                    'city': ap.get('city', ''),
+                    'country': ap.get('country', ''),
+                    'vendor': ap.get('vendor', ''),
+                    'pricing_type': 'Payware' if is_payware else ('Asobo' if is_asobo else 'Freeware'),
+                    'is_payware': is_payware,
+                    'is_asobo': is_asobo,
+                    'is_freeware': is_freeware
+                })
+
+    missing_rank = {'Payware': 1, 'Freeware': 2, 'Asobo': 3}
+    installed_missing.sort(key=lambda x: (missing_rank.get(x['pricing_type'], 9), x['icao']))
+
+    summary['missing_addons'] = len([m for m in installed_missing if not m['is_asobo']])
+    summary['missing_asobo'] = len([m for m in installed_missing if m['is_asobo']])
+
     audit_payload = {
         'summary': summary,
         'by_icao': results,
-        'non_icao_files': non_icao_files
+        'non_icao_files': non_icao_files,
+        'missing_profiles': installed_missing
     }
 
     # Save cache file

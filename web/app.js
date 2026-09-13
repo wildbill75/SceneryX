@@ -2444,9 +2444,23 @@ function escapeJsStr(str) {
 
 let currentGsxAuditFilter = 'ALL';
 let currentGsxAuditSearch = '';
+let gsxIncludeAsobo = false;
 let isGsxAuditModalDragging = false;
 let gsxAuditDragStart = { x: 0, y: 0 };
 let gsxAuditModalOffset = { x: 0, y: 0 };
+
+function toggleGsxIncludeAsobo(event) {
+    gsxIncludeAsobo = !!(event && event.target && event.target.checked);
+    const audit = window.gsxAuditData;
+    const s = audit && audit.summary ? audit.summary : {};
+    const cNoProf = document.getElementById('gsx-count-noprofile');
+    if (cNoProf) {
+        const missingAddons = s.missing_addons || 0;
+        const missingAsobo = s.missing_asobo || 0;
+        cNoProf.innerText = missingAddons + (gsxIncludeAsobo ? missingAsobo : 0);
+    }
+    renderGsxAuditModal();
+}
 
 function updateGsxSidebarBadge() {
     const badge = document.getElementById('sidebar-gsx-issues-badge');
@@ -2513,7 +2527,8 @@ function setGsxAuditFilter(filter) {
         { id: 'gsx-filter-btn-all', key: 'ALL' },
         { id: 'gsx-filter-btn-duplicate', key: 'DUPLICATE' },
         { id: 'gsx-filter-btn-mismatch', key: 'MISMATCH' },
-        { id: 'gsx-filter-btn-orphan', key: 'ORPHAN' }
+        { id: 'gsx-filter-btn-orphan', key: 'ORPHAN' },
+        { id: 'gsx-filter-btn-noprofile', key: 'NO_PROFILE' }
     ];
 
     buttons.forEach(b => {
@@ -2590,6 +2605,9 @@ function renderGsxAuditModal() {
     const duplicateCount = s.duplicate || 0;
     const mismatchCount = s.mismatch || 0;
     const orphanCount = s.orphan || 0;
+    const missingAddons = s.missing_addons || 0;
+    const missingAsobo = s.missing_asobo || 0;
+    const missingVisible = missingAddons + (gsxIncludeAsobo ? missingAsobo : 0);
     const totalIssues = duplicateCount + mismatchCount + orphanCount;
 
     const totalBadge = document.getElementById('gsx-audit-total-badge');
@@ -2610,15 +2628,98 @@ function renderGsxAuditModal() {
     if (cMis) cMis.innerText = mismatchCount;
     const cOrp = document.getElementById('gsx-count-orphan');
     if (cOrp) cOrp.innerText = orphanCount;
+    const cNoProf = document.getElementById('gsx-count-noprofile');
+    if (cNoProf) cNoProf.innerText = missingVisible;
+    const cAsobo = document.getElementById('gsx-count-asobo');
+    if (cAsobo) cAsobo.innerText = missingAsobo;
 
     const footerSummary = document.getElementById('gsx-audit-footer-summary');
     if (footerSummary) {
         footerSummary.innerText = totalIssues > 0
-            ? `${totalIssues} issue${totalIssues !== 1 ? 's' : ''} detected (${duplicateCount} duplicate${duplicateCount !== 1 ? 's' : ''}, ${mismatchCount} mismatch${mismatchCount !== 1 ? 'es' : ''}, ${orphanCount} orphan${orphanCount !== 1 ? 's' : ''}).`
-            : `All GSX profiles aligned with your library. 0 issues remaining.`;
+            ? `${totalIssues} issue${totalIssues !== 1 ? 's' : ''} detected (${duplicateCount} duplicate${duplicateCount !== 1 ? 's' : ''}, ${mismatchCount} mismatch${mismatchCount !== 1 ? 'es' : ''}, ${orphanCount} orphan${orphanCount !== 1 ? 's' : ''}) • ${missingAddons} custom addon${missingAddons !== 1 ? 's' : ''} missing GSX profile.`
+            : `All active profiles aligned. ${missingAddons} custom addon${missingAddons !== 1 ? 's' : ''} missing GSX profile.`;
     }
 
     updateGsxSidebarBadge();
+
+    const query = (currentGsxAuditSearch || '').toLowerCase();
+
+    // SPECIAL HANDLING: NO_PROFILE TAB
+    if (currentGsxAuditFilter === 'NO_PROFILE') {
+        let missingList = audit.missing_profiles || [];
+        if (!gsxIncludeAsobo) {
+            missingList = missingList.filter(m => !m.is_asobo);
+        }
+
+        if (query) {
+            missingList = missingList.filter(m =>
+                (m.icao || '').toLowerCase().includes(query) ||
+                (m.name || '').toLowerCase().includes(query) ||
+                (m.city || '').toLowerCase().includes(query) ||
+                (m.vendor || '').toLowerCase().includes(query)
+            );
+        }
+
+        if (missingList.length === 0) {
+            container.innerHTML = `
+                <div class="py-12 px-6 text-center space-y-2">
+                    <span class="text-[11px] font-mono font-bold px-3 py-1 rounded-xl bg-emerald-950 text-emerald-400 border border-emerald-800 inline-block">
+                        ALL ADDONS HAVE GSX PROFILES
+                    </span>
+                    <p class="text-xs font-mono text-slate-400">All scanned custom airport sceneries currently have an active GSX profile.</p>
+                </div>
+            `;
+            return;
+        }
+
+        let html = '';
+        missingList.forEach(item => {
+            const icao = item.icao || '';
+            const location = [item.city, item.country].filter(Boolean).join(', ');
+            let pricingBadge = '';
+            if (item.pricing_type === 'Payware') {
+                pricingBadge = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-purple-950 text-purple-400 border border-purple-800">PAYWARE</span>`;
+            } else if (item.pricing_type === 'Asobo') {
+                pricingBadge = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-amber-950 text-amber-400 border border-amber-800">ASOBO</span>`;
+            } else {
+                pricingBadge = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-cyan-950 text-cyan-400 border border-cyan-800">FREEWARE</span>`;
+            }
+
+            html += `
+                <div class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800/90 shadow-sm space-y-2">
+                    <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-mono font-bold text-cyan-400">${escapeHtml(icao)}</span>
+                                <span class="text-xs font-bold text-white truncate">${escapeHtml(item.name || icao)}</span>
+                            </div>
+                            <div class="text-[11px] font-mono text-slate-400 truncate">${escapeHtml(location)}</div>
+                        </div>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            ${pricingBadge}
+                            <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-slate-900 text-slate-400 border border-slate-700">NO PROFILE</span>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-800/60">
+                        <div class="text-[11px] font-mono text-slate-400 truncate">
+                            ${escapeHtml(item.vendor ? `Studio: ${item.vendor}` : 'Custom MSFS Scenery')}
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <button onclick="searchGsxProfileFromModal('${icao}')" class="text-[10px] font-mono font-bold px-3 py-1 rounded-xl leading-tight bg-cyan-950 hover:bg-cyan-900 text-cyan-300 hover:text-cyan-200 border border-cyan-800 cursor-pointer transition-colors" title="Search matching GSX profile on Flightsim.to">
+                                Search GSX on Flightsim.to
+                            </button>
+                            <button onclick="installGsxProfileFromModal('${icao}')" class="text-[10px] font-mono font-bold px-3 py-1 rounded-xl leading-tight bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 cursor-pointer transition-colors" title="Install downloaded GSX profile (.zip, .ini)">
+                                Install Profile
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        container.innerHTML = html;
+        return;
+    }
 
     let entries = Object.values(audit.by_icao);
 
@@ -2632,7 +2733,6 @@ function renderGsxAuditModal() {
         entries = entries.filter(e => e.status === 'DUPLICATE' || (e.status || '').startsWith('MISMATCH') || e.status === 'ORPHAN');
     }
 
-    const query = (currentGsxAuditSearch || '').toLowerCase();
     if (query) {
         entries = entries.filter(e => {
             const icaoMatch = (e.icao || '').toLowerCase().includes(query);
@@ -2923,14 +3023,46 @@ function searchGsxProfileFromModal(icao) {
     }
 }
 
+async function installGsxProfileFromModal(icao) {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.install_gsx_profile) return;
+    try {
+        const raw = await window.pywebview.api.install_gsx_profile(icao);
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (parsed && parsed.status === 'ok') {
+            if (parsed.airports && Array.isArray(parsed.airports)) {
+                allAirportsData = parsed.airports;
+            }
+            if (window.pywebview.api.scan_gsx_audit) {
+                const auditRaw = await window.pywebview.api.scan_gsx_audit();
+                const auditParsed = typeof auditRaw === 'string' ? JSON.parse(auditRaw) : auditRaw;
+                if (auditParsed && auditParsed.status === 'ok') {
+                    window.gsxAuditData = auditParsed.data;
+                }
+            }
+            if (typeof showToast === 'function') {
+                showToast(`GSX profile installed for ${icao}`, 'success');
+            }
+            renderGsxAuditModal();
+        } else if (parsed && parsed.status === 'error') {
+            if (typeof showToast === 'function') {
+                showToast(parsed.message || 'Failed to install GSX profile', 'error');
+            }
+        }
+    } catch (e) {
+        console.error("Error installing GSX profile from modal:", e);
+    }
+}
+
 window.openGsxAuditModal = openGsxAuditModal;
 window.closeGsxAuditModal = closeGsxAuditModal;
 window.setGsxAuditFilter = setGsxAuditFilter;
 window.handleGsxAuditSearch = handleGsxAuditSearch;
+window.toggleGsxIncludeAsobo = toggleGsxIncludeAsobo;
 window.activateGsxDuplicateFromModal = activateGsxDuplicateFromModal;
 window.disableGsxProfileFromModal = disableGsxProfileFromModal;
 window.revealGsxFileInExplorer = revealGsxFileInExplorer;
 window.searchGsxProfileFromModal = searchGsxProfileFromModal;
+window.installGsxProfileFromModal = installGsxProfileFromModal;
 
 function getActiveSource(ap) {
     if (!ap || !ap.all_sources) return null;
