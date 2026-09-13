@@ -2506,7 +2506,13 @@ async function refreshGsxAuditQuietly() {
 }
 window.refreshGsxAuditQuietly = refreshGsxAuditQuietly;
 
+let gsxAuditFloatingMode = false;
+let sidebarWasCollapsedBeforeGsx = false;
+
 async function openGsxAuditModal(filter = 'ALL') {
+    sidebarWasCollapsedBeforeGsx = (typeof isSidebarCollapsed !== 'undefined' ? isSidebarCollapsed : (window.isSidebarCollapsed || false));
+    gsxAuditFloatingMode = false;
+
     if (!window.gsxAuditData && window.pywebview && window.pywebview.api && window.pywebview.api.scan_gsx_audit) {
         try {
             const raw = await window.pywebview.api.scan_gsx_audit();
@@ -2527,24 +2533,36 @@ async function openGsxAuditModal(filter = 'ALL') {
     const modal = document.getElementById('gsx-audit-modal');
     if (!modal) return;
 
+    // Reset container to standard modal mode
+    modal.classList.remove('pointer-events-none', 'bg-transparent', 'items-start', 'justify-start', 'pt-[76px]', 'pl-4', 'pb-4');
+    modal.classList.add('bg-slate-950/80', 'backdrop-blur-md', 'items-center', 'justify-center');
+
     const modalBox = modal.querySelector('.glass-modal');
     if (modalBox) {
         modalBox.style.transform = 'none';
+        modalBox.style.width = '';
+        modalBox.style.maxWidth = '';
+        modalBox.style.height = '';
+        modalBox.style.maxHeight = '';
         gsxAuditModalOffset = { x: 0, y: 0 };
+    }
+
+    const openMapBtn = document.getElementById('btn-gsx-open-map') || modal.querySelector('button[onclick*="openMapFromGsxAudit"]');
+    if (openMapBtn) {
+        openMapBtn.innerHTML = 'Open Map';
+        openMapBtn.className = 'px-6 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-md shadow-cyan-600/25 transition-all cursor-pointer border-0 active:scale-98';
     }
 
     initDraggableGsxAuditModal();
     setGsxAuditFilter(currentGsxAuditFilter);
     modal.classList.remove('hidden');
-    if (gsxAuditFloatingMode) {
-        modal.classList.remove('bg-slate-950/80', 'backdrop-blur-md');
-        modal.classList.add('pointer-events-none', 'bg-transparent');
-    }
 }
 
-let gsxAuditFloatingMode = false;
-
 function panCameraToGsxAirport(icao) {
+    if (!gsxAuditFloatingMode) {
+        // Direct pan is inhibited until user clicks "Open Map"
+        return;
+    }
     if (!icao) return;
     let ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao(icao) : null;
 
@@ -2586,12 +2604,6 @@ function panCameraToGsxAirport(icao) {
         return;
     }
 
-    // If modal is in full-screen modal mode (backdrop blur), transition smoothly to floating map mode
-    const modal = document.getElementById('gsx-audit-modal');
-    if (modal && !modal.classList.contains('pointer-events-none')) {
-        openMapFromGsxAudit();
-    }
-
     // Pan and center camera smoothly on airport using user-defined settings (zoom & duration)
     if (typeof centerMapOnAirport === 'function') {
         centerMapOnAirport(ap);
@@ -2605,22 +2617,44 @@ function openMapFromGsxAudit() {
 
     gsxAuditFloatingMode = true;
 
-    // DO NOT CLOSE THE WINDOW: Keep it visible and floating over the map
+    // 1. Collapse left filter sidebar to maximize map viewport and free up left space
+    if (!isSidebarCollapsed && typeof toggleSidebarCollapse === 'function') {
+        toggleSidebarCollapse();
+    }
+    const expandBtn = document.getElementById('btn-expand-sidebar');
+    if (expandBtn) expandBtn.classList.add('hidden');
+
+    // 2. Position the GSX audit window docked on the LEFT (Screen 3)
     modal.classList.remove('hidden');
-    modal.classList.remove('bg-slate-950/80', 'backdrop-blur-md');
-    modal.classList.add('pointer-events-none', 'bg-transparent');
+    modal.classList.remove('bg-slate-950/80', 'backdrop-blur-md', 'items-center', 'justify-center');
+    modal.classList.add('pointer-events-none', 'bg-transparent', 'items-start', 'justify-start', 'pt-[76px]', 'pl-4', 'pb-4');
 
     const modalBox = modal.querySelector('.glass-modal');
     if (modalBox) {
-        modalBox.classList.add('pointer-events-auto');
-        modalBox.classList.add('shadow-2xl');
+        modalBox.classList.add('pointer-events-auto', 'shadow-2xl');
+        modalBox.style.transform = 'none';
+        modalBox.style.width = '540px';
+        modalBox.style.maxWidth = '560px';
+        modalBox.style.height = 'calc(100vh - 92px)';
+        modalBox.style.maxHeight = 'calc(100vh - 92px)';
+        gsxAuditModalOffset = { x: 0, y: 0 };
     }
 
-    // Refresh and invalidate map size so the map renders fully and immediately under the floating window
+    // Update Open Map button text to reflect active map state
+    const openMapBtn = document.getElementById('btn-gsx-open-map') || modal.querySelector('button[onclick*="openMapFromGsxAudit"]');
+    if (openMapBtn) {
+        openMapBtn.innerHTML = '<i class="fa-solid fa-map-location-dot mr-1.5"></i> Map Active';
+        openMapBtn.className = 'px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md shadow-emerald-600/25 transition-all cursor-pointer border-0 active:scale-98 flex items-center gap-1';
+    }
+
+    // 3. Reactivate direct pan links in the audit list cards
+    renderGsxAuditModal();
+
+    // 4. Refresh and invalidate map size so the map renders fully and immediately under the floating window
     if (window.map) {
         setTimeout(() => {
             window.map.invalidateSize();
-        }, 50);
+        }, 80);
     }
 
     // Clear any pending startup delta modal so the map is fully interactive without obstructions
@@ -2634,10 +2668,29 @@ function closeGsxAuditModal() {
     const modal = document.getElementById('gsx-audit-modal');
     if (modal) {
         modal.classList.add('hidden');
-        gsxAuditFloatingMode = false;
-        modal.classList.remove('pointer-events-none', 'bg-transparent');
-        modal.classList.add('bg-slate-950/80', 'backdrop-blur-md');
+        modal.classList.remove('pointer-events-none', 'bg-transparent', 'items-start', 'justify-start', 'pt-[76px]', 'pl-4', 'pb-4');
+        modal.classList.add('bg-slate-950/80', 'backdrop-blur-md', 'items-center', 'justify-center');
     }
+
+    const modalBox = modal ? modal.querySelector('.glass-modal') : null;
+    if (modalBox) {
+        modalBox.style.transform = 'none';
+        modalBox.style.width = '';
+        modalBox.style.maxWidth = '';
+        modalBox.style.height = '';
+        modalBox.style.maxHeight = '';
+        gsxAuditModalOffset = { x: 0, y: 0 };
+    }
+
+    // Restore the sidebar if it was open before GSX audit opened
+    if (!sidebarWasCollapsedBeforeGsx && isSidebarCollapsed && typeof toggleSidebarCollapse === 'function') {
+        toggleSidebarCollapse();
+    } else if (isSidebarCollapsed) {
+        const expandBtn = document.getElementById('btn-expand-sidebar');
+        if (expandBtn) expandBtn.classList.remove('hidden');
+    }
+
+    gsxAuditFloatingMode = false;
 
     if (pendingScanDelta && (pendingScanDelta.total_changes || 0) > 0) {
         const d = pendingScanDelta;
@@ -2812,17 +2865,26 @@ function renderGsxAuditModal() {
                 pricingBadge = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-cyan-950 text-cyan-400 border border-cyan-800">FREEWARE</span>`;
             }
 
+            const canPan = !!gsxAuditFloatingMode;
+            const clickAttr = canPan ? `onclick="panCameraToGsxAirport('${icao}')"` : '';
+            const cursorClass = canPan ? 'cursor-pointer group/hdr hover:opacity-90' : 'cursor-default';
+            const titleAttr = canPan ? 'Click to view and center camera on airport' : '';
+            const underlineClass = canPan ? 'group-hover/hdr:underline' : '';
+            const hoverTextClass = canPan ? 'group-hover/hdr:text-cyan-300' : '';
+            const iconHtml = canPan ? `
+                <svg class="w-3 h-3 text-cyan-400 opacity-0 group-hover/hdr:opacity-100 transition-opacity shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="3" stroke-width="2"/>
+                    <circle cx="12" cy="12" r="8" stroke-width="2" stroke-dasharray="2 2"/>
+                </svg>` : '';
+
             html += `
                 <div id="gsx-card-${icao}" class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800/90 shadow-sm space-y-2 transition-all duration-500">
                     <div class="flex items-start justify-between gap-3">
-                        <div onclick="panCameraToGsxAirport('${icao}')" class="min-w-0 flex-1 cursor-pointer group/hdr hover:opacity-90 transition-all select-none" title="Click to view and center camera on airport">
+                        <div ${clickAttr} class="min-w-0 flex-1 ${cursorClass} transition-all select-none" title="${titleAttr}">
                             <div class="flex items-center gap-2">
-                                <span class="text-xs font-mono font-bold text-cyan-400 group-hover/hdr:underline">${escapeHtml(icao)}</span>
-                                <span class="text-xs font-bold text-white truncate group-hover/hdr:text-cyan-300 transition-colors">${escapeHtml(item.name || icao)}</span>
-                                <svg class="w-3 h-3 text-cyan-400 opacity-0 group-hover/hdr:opacity-100 transition-opacity shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <circle cx="12" cy="12" r="3" stroke-width="2"/>
-                                    <circle cx="12" cy="12" r="8" stroke-width="2" stroke-dasharray="2 2"/>
-                                </svg>
+                                <span class="text-xs font-mono font-bold text-cyan-400 ${underlineClass}">${escapeHtml(icao)}</span>
+                                <span class="text-xs font-bold text-white truncate ${hoverTextClass} transition-colors">${escapeHtml(item.name || icao)}</span>
+                                ${iconHtml}
                             </div>
                             <div class="text-[11px] font-mono text-slate-400 truncate">${escapeHtml(location)}</div>
                         </div>
@@ -2946,18 +3008,27 @@ function renderGsxAuditModal() {
             badgeHtml = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-slate-800 text-slate-300 border border-slate-700">${escapeHtml(entry.status)}</span>`;
         }
 
+        const canPan = !!gsxAuditFloatingMode;
+        const clickAttr = canPan ? `onclick="panCameraToGsxAirport('${icao}')"` : '';
+        const cursorClass = canPan ? 'cursor-pointer group/hdr hover:opacity-90' : 'cursor-default';
+        const titleAttr = canPan ? 'Click to view and center camera on airport' : '';
+        const underlineClass = canPan ? 'group-hover/hdr:underline' : '';
+        const hoverTextClass = canPan ? 'group-hover/hdr:text-cyan-300' : '';
+        const iconHtml = canPan ? `
+            <svg class="w-3 h-3 text-cyan-400 opacity-0 group-hover/hdr:opacity-100 transition-opacity shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="3" stroke-width="2"/>
+                <circle cx="12" cy="12" r="8" stroke-width="2" stroke-dasharray="2 2"/>
+            </svg>` : '';
+
         html += `<div id="gsx-card-${icao}" class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800/90 shadow-sm space-y-2 transition-all duration-500">`;
 
         html += `
             <div class="flex items-start justify-between gap-3">
-                <div onclick="panCameraToGsxAirport('${icao}')" class="min-w-0 flex-1 cursor-pointer group/hdr hover:opacity-90 transition-all select-none" title="Click to view and center camera on airport">
+                <div ${clickAttr} class="min-w-0 flex-1 ${cursorClass} transition-all select-none" title="${titleAttr}">
                     <div class="flex items-center gap-2">
-                        <span class="text-xs font-mono font-bold text-cyan-400 group-hover/hdr:underline">${escapeHtml(icao)}</span>
-                        <span class="text-xs font-bold text-white truncate group-hover/hdr:text-cyan-300 transition-colors">${escapeHtml(apName)}</span>
-                        <svg class="w-3 h-3 text-cyan-400 opacity-0 group-hover/hdr:opacity-100 transition-opacity shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <circle cx="12" cy="12" r="3" stroke-width="2"/>
-                            <circle cx="12" cy="12" r="8" stroke-width="2" stroke-dasharray="2 2"/>
-                        </svg>
+                        <span class="text-xs font-mono font-bold text-cyan-400 ${underlineClass}">${escapeHtml(icao)}</span>
+                        <span class="text-xs font-bold text-white truncate ${hoverTextClass} transition-colors">${escapeHtml(apName)}</span>
+                        ${iconHtml}
                     </div>
                     <div class="text-[11px] font-mono text-slate-400 truncate">${escapeHtml(location)}</div>
                 </div>
@@ -7626,6 +7697,7 @@ function focusAirportWithAnimation(ap) {
 }
 
 let isSidebarCollapsed = false;
+window.isSidebarCollapsed = false;
 
 function toggleSidebarCollapse() {
     const sb = document.getElementById('sidebar-panel');
@@ -7634,6 +7706,7 @@ function toggleSidebarCollapse() {
     if (!sb) return;
 
     isSidebarCollapsed = !isSidebarCollapsed;
+    window.isSidebarCollapsed = isSidebarCollapsed;
 
     if (isSidebarCollapsed) {
         const w = sb.offsetWidth || 360;
