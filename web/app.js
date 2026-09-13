@@ -10289,6 +10289,8 @@ function setButtonActive(btn, active) {
 let isFilterRadialOpen = false;
 let filterRadialActiveCategory = 'pricing'; // 'pricing', 'source', 'region', 'type', 'gsx', 'rating'
 let filterRadialLastAnimatedCategory = null;
+let filterRadialHoverTimer = null;
+let filterRadialTier2Hovered = false;
 
 const FILTER_RADIAL_CATEGORIES = [
     {
@@ -10449,6 +10451,11 @@ function openFilterRadialMenu(clientX, clientY) {
     menuEl.classList.remove('hidden');
 
     isFilterRadialOpen = true;
+    if (filterRadialHoverTimer) {
+        clearTimeout(filterRadialHoverTimer);
+        filterRadialHoverTimer = null;
+    }
+    filterRadialTier2Hovered = false;
     if (!filterRadialActiveCategory) {
         filterRadialActiveCategory = 'pricing';
     }
@@ -10476,6 +10483,11 @@ function closeFilterRadialMenu() {
         menuEl.classList.add('hidden');
         menuEl.classList.remove('animate-filter-radial-open');
     }
+    if (filterRadialHoverTimer) {
+        clearTimeout(filterRadialHoverTimer);
+        filterRadialHoverTimer = null;
+    }
+    filterRadialTier2Hovered = false;
     isFilterRadialOpen = false;
     filterRadialLastAnimatedCategory = null;
 }
@@ -10603,10 +10615,10 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
 
     const cx = 280;
     const cy = 280;
-    const r1_in = 68;
-    const r1_out = 160;
-    const r2_in = 170;
-    const r2_out = 266;
+    const r1_in = 72;
+    const r1_out = 152;
+    const r2_in = 172;
+    const r2_out = 268;
 
     // --- TIER 1: INNER ANNULAR RING (6 MAIN CATEGORIES) ---
     let innerSvgHtml = '';
@@ -10614,7 +10626,7 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
         const startAngle = -120 + (idx * 60);
         const endAngle = startAngle + 60;
         const midAngle = (startAngle + endAngle) / 2;
-        const pathD = getAnnularSectorPath(cx, cy, r1_in, r1_out, startAngle, endAngle, 2.0);
+        const pathD = getAnnularSectorPath(cx, cy, r1_in, r1_out, startAngle, endAngle, 3.5);
 
         const midR = (r1_in + r1_out) / 2;
         const rad = (midAngle - 90) * Math.PI / 180;
@@ -10628,6 +10640,7 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
             <g class="radial-filter-sector ${isCatActive ? 'is-category-active' : ''} pointer-events-auto cursor-pointer group"
                onclick="handleFilterRadialCategoryClick('${cat.key}')"
                onmouseenter="handleFilterRadialCategoryHover('${cat.key}')"
+               onmouseleave="handleFilterRadialCategoryMouseLeave()"
                role="button" aria-label="${escapeHtml(cat.label)}">
                 <path class="radial-filter-sector-path" d="${pathD}" />
                 <foreignObject x="${(tx - 55).toFixed(1)}" y="${(ty - 24).toFixed(1)}" width="110" height="48" class="pointer-events-none">
@@ -10689,6 +10702,8 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
             outerSvgHtml += `
                 <g class="radial-filter-sector radial-filter-tier2-sector ${animClass} ${specificClass} ${isActive ? 'is-item-active' : ''} pointer-events-auto cursor-pointer group"
                    ${delayStyle}
+                   onmouseenter="handleFilterRadialTier2MouseEnter()"
+                   onmouseleave="handleFilterRadialTier2MouseLeave()"
                    onclick="handleFilterRadialSubItemClick('${filterRadialActiveCategory}', '${escapeJsStr(item.id)}')"
                    role="button" aria-label="${escapeHtml(item.label)}">
                     <path class="radial-filter-sector-path" d="${pathD}" />
@@ -10705,7 +10720,24 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
     svgEl.innerHTML = innerSvgHtml + outerSvgHtml;
 }
 
+function handleFilterRadialTier2MouseEnter() {
+    filterRadialTier2Hovered = true;
+    if (filterRadialHoverTimer) {
+        clearTimeout(filterRadialHoverTimer);
+        filterRadialHoverTimer = null;
+    }
+}
+
+function handleFilterRadialTier2MouseLeave() {
+    filterRadialTier2Hovered = false;
+}
+
 function handleFilterRadialCategoryClick(categoryKey) {
+    if (filterRadialHoverTimer) {
+        clearTimeout(filterRadialHoverTimer);
+        filterRadialHoverTimer = null;
+    }
+    filterRadialTier2Hovered = false;
     if (filterRadialActiveCategory !== categoryKey) {
         filterRadialActiveCategory = categoryKey;
         renderFilterRadialWheel(true);
@@ -10713,9 +10745,34 @@ function handleFilterRadialCategoryClick(categoryKey) {
 }
 
 function handleFilterRadialCategoryHover(categoryKey) {
-    if (filterRadialActiveCategory !== categoryKey) {
-        filterRadialActiveCategory = categoryKey;
-        renderFilterRadialWheel(true);
+    if (filterRadialTier2Hovered) return;
+    if (filterRadialActiveCategory === categoryKey) {
+        if (filterRadialHoverTimer) {
+            clearTimeout(filterRadialHoverTimer);
+            filterRadialHoverTimer = null;
+        }
+        return;
+    }
+
+    if (filterRadialHoverTimer) {
+        clearTimeout(filterRadialHoverTimer);
+        filterRadialHoverTimer = null;
+    }
+
+    // Dwell delay: prevents switching category when cursor simply brushes across an option
+    filterRadialHoverTimer = setTimeout(() => {
+        filterRadialHoverTimer = null;
+        if (!filterRadialTier2Hovered && filterRadialActiveCategory !== categoryKey) {
+            filterRadialActiveCategory = categoryKey;
+            renderFilterRadialWheel(true);
+        }
+    }, 130);
+}
+
+function handleFilterRadialCategoryMouseLeave() {
+    if (filterRadialHoverTimer) {
+        clearTimeout(filterRadialHoverTimer);
+        filterRadialHoverTimer = null;
     }
 }
 
