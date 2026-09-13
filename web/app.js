@@ -1329,8 +1329,6 @@ function openCountryDrawer(iso, countryName) {
     }
 
     setDrawerSlidePosition('COUNTRY');
-    const drawer = document.getElementById('detail-drawer');
-    if (drawer) drawer.classList.remove('translate-x-full');
 }
 
 const COUNTRY_CATEGORY_CONFIG = {
@@ -2426,6 +2424,479 @@ function updateInvestmentBanner() {
     }
 }
 
+// -----------------------------------------------------------------------------
+// GSX PROFILES AUDIT & RESOLUTION MODAL (CENTRALIZED ONE-SCREEN MANAGEMENT)
+// -----------------------------------------------------------------------------
+function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+}
+
+function escapeJsStr(str) {
+    if (!str) return '';
+    return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+let currentGsxAuditFilter = 'ALL';
+let currentGsxAuditSearch = '';
+let isGsxAuditModalDragging = false;
+let gsxAuditDragStart = { x: 0, y: 0 };
+let gsxAuditModalOffset = { x: 0, y: 0 };
+
+function updateGsxSidebarBadge() {
+    const badge = document.getElementById('sidebar-gsx-issues-badge');
+    if (!badge) return;
+    const audit = window.gsxAuditData;
+    const s = audit && audit.summary ? audit.summary : null;
+    const totalIssues = s ? ((s.duplicate || 0) + (s.mismatch || 0) + (s.orphan || 0)) : 0;
+    if (totalIssues > 0) {
+        badge.innerText = `${totalIssues} issue${totalIssues > 1 ? 's' : ''}`;
+        badge.classList.remove('hidden');
+    } else {
+        badge.classList.add('hidden');
+    }
+}
+
+async function openGsxAuditModal(filter = 'ALL') {
+    if (!window.gsxAuditData && window.pywebview && window.pywebview.api && window.pywebview.api.scan_gsx_audit) {
+        try {
+            const raw = await window.pywebview.api.scan_gsx_audit();
+            const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            if (parsed && parsed.status === 'ok') {
+                window.gsxAuditData = parsed.data;
+            }
+        } catch (e) {
+            console.error("Failed to fetch GSX audit:", e);
+        }
+    }
+
+    currentGsxAuditFilter = filter || 'ALL';
+    currentGsxAuditSearch = '';
+    const searchInp = document.getElementById('gsx-audit-search-input');
+    if (searchInp) searchInp.value = '';
+
+    const modal = document.getElementById('gsx-audit-modal');
+    if (!modal) return;
+
+    const modalBox = modal.querySelector('.glass-modal');
+    if (modalBox) {
+        modalBox.style.transform = 'none';
+        gsxAuditModalOffset = { x: 0, y: 0 };
+    }
+
+    initDraggableGsxAuditModal();
+    setGsxAuditFilter(currentGsxAuditFilter);
+    modal.classList.remove('hidden');
+}
+
+function closeGsxAuditModal() {
+    const modal = document.getElementById('gsx-audit-modal');
+    if (modal) modal.classList.add('hidden');
+
+    if (pendingScanDelta && (pendingScanDelta.total_changes || 0) > 0) {
+        const d = pendingScanDelta;
+        const startup = pendingScanIsStartup;
+        pendingScanDelta = null;
+        pendingScanIsStartup = false;
+        displayScanResults(d, startup);
+    }
+}
+
+function setGsxAuditFilter(filter) {
+    currentGsxAuditFilter = filter || 'ALL';
+    const buttons = [
+        { id: 'gsx-filter-btn-all', key: 'ALL' },
+        { id: 'gsx-filter-btn-duplicate', key: 'DUPLICATE' },
+        { id: 'gsx-filter-btn-mismatch', key: 'MISMATCH' },
+        { id: 'gsx-filter-btn-orphan', key: 'ORPHAN' }
+    ];
+
+    buttons.forEach(b => {
+        const el = document.getElementById(b.id);
+        if (!el) return;
+        if (b.key === currentGsxAuditFilter) {
+            el.className = 'px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold leading-tight bg-cyan-700 text-white border-0 cursor-pointer transition-colors';
+        } else {
+            el.className = 'px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold leading-tight bg-slate-800 text-slate-300 hover:text-white border border-slate-700 cursor-pointer transition-colors';
+        }
+    });
+
+    renderGsxAuditModal();
+}
+
+function handleGsxAuditSearch(event) {
+    currentGsxAuditSearch = (event && event.target ? event.target.value : '').trim().toLowerCase();
+    renderGsxAuditModal();
+}
+
+function initDraggableGsxAuditModal() {
+    const header = document.getElementById('gsx-audit-modal-header');
+    const modalBox = document.querySelector('#gsx-audit-modal .glass-modal');
+    if (!header || !modalBox || header._dragInit) return;
+    header._dragInit = true;
+
+    header.addEventListener('mousedown', (e) => {
+        if (e.target.closest('button') || e.target.closest('input')) return;
+        e.preventDefault();
+        e.stopPropagation();
+
+        isGsxAuditModalDragging = true;
+        gsxAuditDragStart = { x: e.clientX, y: e.clientY };
+
+        const onMouseMove = (moveEvent) => {
+            if (!isGsxAuditModalDragging) return;
+            moveEvent.preventDefault();
+            moveEvent.stopPropagation();
+
+            const dx = moveEvent.clientX - gsxAuditDragStart.x;
+            const dy = moveEvent.clientY - gsxAuditDragStart.y;
+            gsxAuditDragStart = { x: moveEvent.clientX, y: moveEvent.clientY };
+
+            gsxAuditModalOffset.x += dx;
+            gsxAuditModalOffset.y += dy;
+
+            modalBox.style.transform = `translate(${gsxAuditModalOffset.x}px, ${gsxAuditModalOffset.y}px)`;
+        };
+
+        const onMouseUp = () => {
+            if (isGsxAuditModalDragging) {
+                isGsxAuditModalDragging = false;
+                window.removeEventListener('mousemove', onMouseMove, true);
+                window.removeEventListener('mouseup', onMouseUp, true);
+            }
+        };
+
+        window.addEventListener('mousemove', onMouseMove, true);
+        window.addEventListener('mouseup', onMouseUp, true);
+    });
+}
+
+function renderGsxAuditModal() {
+    const audit = window.gsxAuditData;
+    const container = document.getElementById('gsx-audit-list-container');
+    if (!container) return;
+
+    if (!audit || !audit.by_icao) {
+        container.innerHTML = `<div class="p-8 text-center text-xs font-mono text-slate-500">No GSX audit data loaded.</div>`;
+        return;
+    }
+
+    const s = audit.summary || {};
+    const duplicateCount = s.duplicate || 0;
+    const mismatchCount = s.mismatch || 0;
+    const orphanCount = s.orphan || 0;
+    const totalIssues = duplicateCount + mismatchCount + orphanCount;
+
+    const totalBadge = document.getElementById('gsx-audit-total-badge');
+    if (totalBadge) {
+        totalBadge.innerText = `${totalIssues} Issue${totalIssues !== 1 ? 's' : ''}`;
+        if (totalIssues > 0) {
+            totalBadge.className = 'text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-amber-950 text-amber-400 border border-amber-800';
+        } else {
+            totalBadge.className = 'text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-emerald-950 text-emerald-400 border border-emerald-800';
+        }
+    }
+
+    const cAll = document.getElementById('gsx-count-all');
+    if (cAll) cAll.innerText = totalIssues;
+    const cDup = document.getElementById('gsx-count-duplicate');
+    if (cDup) cDup.innerText = duplicateCount;
+    const cMis = document.getElementById('gsx-count-mismatch');
+    if (cMis) cMis.innerText = mismatchCount;
+    const cOrp = document.getElementById('gsx-count-orphan');
+    if (cOrp) cOrp.innerText = orphanCount;
+
+    const footerSummary = document.getElementById('gsx-audit-footer-summary');
+    if (footerSummary) {
+        footerSummary.innerText = totalIssues > 0
+            ? `${totalIssues} issue${totalIssues !== 1 ? 's' : ''} detected (${duplicateCount} duplicate${duplicateCount !== 1 ? 's' : ''}, ${mismatchCount} mismatch${mismatchCount !== 1 ? 'es' : ''}, ${orphanCount} orphan${orphanCount !== 1 ? 's' : ''}).`
+            : `All GSX profiles aligned with your library. 0 issues remaining.`;
+    }
+
+    updateGsxSidebarBadge();
+
+    let entries = Object.values(audit.by_icao);
+
+    if (currentGsxAuditFilter === 'DUPLICATE') {
+        entries = entries.filter(e => e.status === 'DUPLICATE');
+    } else if (currentGsxAuditFilter === 'MISMATCH') {
+        entries = entries.filter(e => (e.status || '').startsWith('MISMATCH'));
+    } else if (currentGsxAuditFilter === 'ORPHAN') {
+        entries = entries.filter(e => e.status === 'ORPHAN');
+    } else {
+        entries = entries.filter(e => e.status === 'DUPLICATE' || (e.status || '').startsWith('MISMATCH') || e.status === 'ORPHAN');
+    }
+
+    const query = (currentGsxAuditSearch || '').toLowerCase();
+    if (query) {
+        entries = entries.filter(e => {
+            const icaoMatch = (e.icao || '').toLowerCase().includes(query);
+            const ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao(e.icao) : null;
+            const nameMatch = ap && ap.name && ap.name.toLowerCase().includes(query);
+            const cityMatch = ap && ap.city && ap.city.toLowerCase().includes(query);
+            const vendorMatch = ap && ap.vendor && ap.vendor.toLowerCase().includes(query);
+            const fileMatch = (e.files || []).some(f => 
+                (f.filename || '').toLowerCase().includes(query) ||
+                (f.creator || '').toLowerCase().includes(query) ||
+                (f.target_pkg || '').toLowerCase().includes(query) ||
+                (f.scenario || '').toLowerCase().includes(query)
+            );
+            return icaoMatch || nameMatch || cityMatch || vendorMatch || fileMatch;
+        });
+    }
+
+    const orderMap = { 'DUPLICATE': 1, 'MISMATCH_DEFAULT': 2, 'MISMATCH_STUDIO': 2, 'ORPHAN': 3 };
+    entries.sort((a, b) => {
+        const rankA = orderMap[a.status] || 99;
+        const rankB = orderMap[b.status] || 99;
+        if (rankA !== rankB) return rankA - rankB;
+        return (a.icao || '').localeCompare(b.icao || '');
+    });
+
+    if (entries.length === 0) {
+        if (totalIssues === 0) {
+            container.innerHTML = `
+                <div class="py-12 px-6 text-center space-y-2">
+                    <span class="text-[11px] font-mono font-bold px-3 py-1 rounded-xl bg-emerald-950 text-emerald-400 border border-emerald-800 inline-block">
+                        PROFILES IN PERFECT SYNC
+                    </span>
+                    <p class="text-xs font-mono text-slate-400">Zero conflicts or mismatches detected among your GSX profiles.</p>
+                </div>
+            `;
+        } else {
+            container.innerHTML = `
+                <div class="py-12 px-6 text-center space-y-2">
+                    <span class="text-[11px] font-mono font-bold px-3 py-1 rounded-xl bg-slate-800 text-slate-400 border border-slate-700 inline-block">
+                        NO RESULTS MATCHING FILTER
+                    </span>
+                    <p class="text-xs font-mono text-slate-400">Try selecting another filter tab or clearing your search term.</p>
+                </div>
+            `;
+        }
+        return;
+    }
+
+    let html = '';
+    entries.forEach(entry => {
+        const icao = entry.icao || '';
+        const ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao(icao) : null;
+        const apName = ap ? (ap.name || icao) : icao;
+        const location = ap ? [ap.city, ap.country].filter(Boolean).join(', ') : 'Not Installed';
+        const files = entry.files || [];
+
+        let badgeHtml = '';
+        if (entry.status === 'DUPLICATE') {
+            badgeHtml = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-amber-950 text-amber-400 border border-amber-800">DUPLICATE</span>`;
+        } else if (entry.status === 'MISMATCH_DEFAULT') {
+            badgeHtml = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-rose-950 text-rose-400 border border-rose-800">MISMATCH DEFAULT</span>`;
+        } else if (entry.status === 'MISMATCH_STUDIO') {
+            badgeHtml = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-rose-950 text-rose-400 border border-rose-800">MISMATCH STUDIO</span>`;
+        } else if (entry.status === 'ORPHAN') {
+            badgeHtml = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-slate-900 text-slate-400 border border-slate-700">ORPHAN</span>`;
+        } else {
+            badgeHtml = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-slate-800 text-slate-300 border border-slate-700">${escapeHtml(entry.status)}</span>`;
+        }
+
+        html += `<div class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800/90 shadow-sm space-y-2">`;
+
+        html += `
+            <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0 flex-1">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-mono font-bold text-cyan-400">${escapeHtml(icao)}</span>
+                        <span class="text-xs font-bold text-white truncate">${escapeHtml(apName)}</span>
+                    </div>
+                    <div class="text-[11px] font-mono text-slate-400 truncate">${escapeHtml(location)}</div>
+                </div>
+                <div class="shrink-0">
+                    ${badgeHtml}
+                </div>
+            </div>
+        `;
+
+        if (entry.reason) {
+            const reasonClass = entry.status.startsWith('MISMATCH') ? 'text-rose-300/90' : 'text-slate-400';
+            html += `<p class="text-xs font-mono ${reasonClass} leading-relaxed">${escapeHtml(entry.reason)}</p>`;
+        }
+
+        if (entry.status === 'DUPLICATE') {
+            html += `<div class="space-y-1.5 pt-1">`;
+            files.forEach(f => {
+                const isActive = !f.is_disabled;
+                const meta = [
+                    f.creator ? `By ${f.creator}` : (f.target_pkg || f.scenario || 'GSX Profile'),
+                    f.gates_count ? `${f.gates_count} gates` : null
+                ].filter(Boolean).join(' • ');
+
+                html += `
+                    <div class="flex items-center justify-between p-2 rounded-xl bg-slate-950/70 border border-slate-800/80 gap-2">
+                        <div class="min-w-0 flex-1">
+                            <div class="text-xs font-mono font-bold text-slate-200 truncate">${escapeHtml(f.filename)}</div>
+                            <div class="text-[11px] font-mono text-slate-400 truncate">${escapeHtml(meta)}</div>
+                        </div>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            ${isActive ? `
+                                <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-emerald-950 text-emerald-400 border border-emerald-800">ACTIVE</span>
+                                <button onclick="disableGsxProfileFromModal('${icao}', '${escapeJsStr(f.filename)}')" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-slate-800 hover:bg-rose-950 text-slate-300 hover:text-rose-400 border border-slate-700 cursor-pointer transition-colors" title="Disable this profile">Disable</button>
+                            ` : `
+                                <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-slate-900 text-slate-500 border border-slate-800">DISABLED</span>
+                                <button onclick="activateGsxDuplicateFromModal('${icao}', '${escapeJsStr(f.filename)}')" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-cyan-900 hover:bg-cyan-800 text-cyan-200 border border-cyan-700 cursor-pointer transition-colors" title="Activate this profile and disable conflicting duplicates">Keep this</button>
+                            `}
+                            <button onclick="revealGsxFileInExplorer('${escapeJsStr(f.path || f.filename)}')" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 cursor-pointer transition-colors" title="Reveal in Windows Explorer">Reveal</button>
+                        </div>
+                    </div>
+                `;
+            });
+            html += `</div>`;
+        } else if (entry.status.startsWith('MISMATCH')) {
+            const activeFile = files.find(f => !f.is_disabled) || files[0];
+            const activeMeta = activeFile ? [
+                activeFile.creator ? `By ${activeFile.creator}` : (activeFile.target_pkg || activeFile.scenario || 'GSX Profile'),
+                activeFile.gates_count ? `${activeFile.gates_count} gates` : null
+            ].filter(Boolean).join(' • ') : '';
+
+            html += `<div class="space-y-2 pt-1">`;
+            if (activeFile) {
+                html += `
+                    <div class="flex items-center justify-between p-2 rounded-xl bg-slate-950/70 border border-slate-800/80 gap-2">
+                        <div class="min-w-0 flex-1">
+                            <div class="text-xs font-mono font-bold text-slate-200 truncate">${escapeHtml(activeFile.filename)}</div>
+                            <div class="text-[11px] font-mono text-slate-400 truncate">${escapeHtml(activeMeta)}</div>
+                        </div>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <button onclick="revealGsxFileInExplorer('${escapeJsStr(activeFile.path || activeFile.filename)}')" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 cursor-pointer transition-colors" title="Reveal in Windows Explorer">Reveal</button>
+                        </div>
+                    </div>
+                `;
+            }
+            html += `
+                <div class="flex items-center justify-end gap-2">
+                    <button onclick="searchGsxProfileFromModal('${icao}')" class="text-[10px] font-mono font-bold px-3 py-1 rounded-xl leading-tight bg-cyan-950 hover:bg-cyan-900 text-cyan-300 hover:text-cyan-200 border border-cyan-800 cursor-pointer transition-colors" title="Search matching GSX profile on Flightsim.to">
+                        Search GSX on Flightsim.to
+                    </button>
+                    ${activeFile && !activeFile.is_disabled ? `
+                        <button onclick="disableGsxProfileFromModal('${icao}', '${escapeJsStr(activeFile.filename)}')" class="text-[10px] font-mono font-bold px-3 py-1 rounded-xl leading-tight bg-slate-800 hover:bg-rose-950 text-slate-300 hover:text-rose-400 border border-slate-700 cursor-pointer transition-colors" title="Disable mismatched profile">
+                            Disable Profile
+                        </button>
+                    ` : ''}
+                </div>
+            `;
+            html += `</div>`;
+        } else if (entry.status === 'ORPHAN') {
+            html += `<div class="space-y-1.5 pt-1">`;
+            files.forEach(f => {
+                html += `
+                    <div class="flex items-center justify-between p-2 rounded-xl bg-slate-950/70 border border-slate-800/80 gap-2">
+                        <div class="min-w-0 flex-1">
+                            <div class="text-xs font-mono font-bold text-slate-200 truncate">${escapeHtml(f.filename)}</div>
+                            <div class="text-[11px] font-mono text-slate-400 truncate">${escapeHtml(f.creator ? `By ${f.creator}` : 'Orphan GSX file')}</div>
+                        </div>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            ${!f.is_disabled ? `
+                                <button onclick="disableGsxProfileFromModal('${icao}', '${escapeJsStr(f.filename)}')" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-slate-800 hover:bg-rose-950 text-slate-300 hover:text-rose-400 border border-slate-700 cursor-pointer transition-colors" title="Disable orphan profile">Disable</button>
+                            ` : `
+                                <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-slate-900 text-slate-500 border border-slate-800">DISABLED</span>
+                            `}
+                            <button onclick="revealGsxFileInExplorer('${escapeJsStr(f.path || f.filename)}')" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 cursor-pointer transition-colors" title="Reveal in Windows Explorer">Reveal</button>
+                        </div>
+                    </div>
+                `;
+            });
+            html += `</div>`;
+        }
+
+        html += `</div>`;
+    });
+
+    container.innerHTML = html;
+}
+
+async function activateGsxDuplicateFromModal(icao, filename) {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.resolve_gsx_duplicate) return;
+    try {
+        const raw = await window.pywebview.api.resolve_gsx_duplicate(icao, filename);
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (parsed && parsed.status === 'ok') {
+            window.gsxAuditData = parsed.data;
+            const ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao(icao) : null;
+            if (ap) {
+                ap.gsx_ini_file = filename.replace(/\.disabled$/, '');
+                ap.has_gsx_profile = true;
+                if (typeof currentRadialAirport !== 'undefined' && currentRadialAirport && currentRadialAirport.icao === icao) {
+                    currentRadialAirport.gsx_ini_file = ap.gsx_ini_file;
+                    currentRadialAirport.has_gsx_profile = true;
+                    if (typeof renderRadialAirportDetails === 'function') {
+                        renderRadialAirportDetails(currentRadialAirport);
+                    }
+                }
+            }
+            renderGsxAuditModal();
+        }
+    } catch (e) {
+        console.error("Error activating GSX duplicate profile:", e);
+    }
+}
+
+async function disableGsxProfileFromModal(icao, filename) {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.disable_gsx_profile) return;
+    try {
+        const raw = await window.pywebview.api.disable_gsx_profile(icao, filename);
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (parsed && parsed.status === 'ok') {
+            window.gsxAuditData = parsed.data;
+            const ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao(icao) : null;
+            if (ap) {
+                const auditEntry = window.gsxAuditData && window.gsxAuditData.by_icao ? window.gsxAuditData.by_icao[icao] : null;
+                const activeRemaining = auditEntry && auditEntry.files ? auditEntry.files.find(f => !f.is_disabled) : null;
+                ap.gsx_ini_file = activeRemaining ? activeRemaining.filename : null;
+                ap.has_gsx_profile = !!activeRemaining;
+                if (typeof currentRadialAirport !== 'undefined' && currentRadialAirport && currentRadialAirport.icao === icao) {
+                    currentRadialAirport.gsx_ini_file = ap.gsx_ini_file;
+                    currentRadialAirport.has_gsx_profile = ap.has_gsx_profile;
+                    if (typeof renderRadialAirportDetails === 'function') {
+                        renderRadialAirportDetails(currentRadialAirport);
+                    }
+                }
+            }
+            renderGsxAuditModal();
+        }
+    } catch (e) {
+        console.error("Error disabling GSX profile:", e);
+    }
+}
+
+async function revealGsxFileInExplorer(filePath) {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.reveal_file_in_explorer) return;
+    try {
+        await window.pywebview.api.reveal_file_in_explorer(filePath);
+    } catch (e) {
+        console.error("Error revealing GSX file:", e);
+    }
+}
+
+function searchGsxProfileFromModal(icao) {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.search_gsx_profile) return;
+    try {
+        window.pywebview.api.search_gsx_profile(icao);
+    } catch (e) {
+        console.error("Error searching GSX profile:", e);
+    }
+}
+
+window.openGsxAuditModal = openGsxAuditModal;
+window.closeGsxAuditModal = closeGsxAuditModal;
+window.setGsxAuditFilter = setGsxAuditFilter;
+window.handleGsxAuditSearch = handleGsxAuditSearch;
+window.activateGsxDuplicateFromModal = activateGsxDuplicateFromModal;
+window.disableGsxProfileFromModal = disableGsxProfileFromModal;
+window.revealGsxFileInExplorer = revealGsxFileInExplorer;
+window.searchGsxProfileFromModal = searchGsxProfileFromModal;
+
 function getActiveSource(ap) {
     if (!ap || !ap.all_sources) return null;
     return ap.all_sources.find(s => !s.is_disabled && !isFixOrOverlay(s) && !(s.is_default || (s.folder_name && s.folder_name.startsWith('msfs-default-')))) || null;
@@ -2496,6 +2967,7 @@ function updateStats(airports) {
 
     updateInvestmentBanner();
     updateConflictNavigator();
+    updateGsxSidebarBadge();
 }
 
 let currentFlightMode = { active: false, icaos: [] };
@@ -6815,10 +7287,7 @@ function showAirportDetails(ap, calledFromCountryMode = false) {
         if (sbHandle) sbHandle.classList.remove('hidden');
     }
 
-    // Slide Drawer Track to Airport Pane and Open Drawer
-    setDrawerSlidePosition('AIRPORT');
-    const drawer = document.getElementById('detail-drawer');
-    if (drawer) drawer.classList.remove('translate-x-full');
+    // Right drawer permanently deactivated in favor of radial menu and details modal
 
     const iataVal = (ap.iata && ap.iata.trim() && ap.iata.trim() !== '—' && ap.iata.trim() !== '-') ? ap.iata.trim() : '';
     const codesStr = iataVal ? `${ap.icao}/${iataVal}` : ap.icao;
@@ -7352,8 +7821,6 @@ function showAirportDetails(ap, calledFromCountryMode = false) {
 
     html += `</div>`;
     sourcesContainer.innerHTML = html;
-
-    document.getElementById('detail-drawer').classList.remove('translate-x-full');
 }
 
 async function triggerCheckSceneryUpdate() {
@@ -8754,12 +9221,14 @@ async function startGsxScanPhase(isStartup = false) {
         }
 
         window.gsxAuditData = auditData;
+        const s = auditData && auditData.summary ? auditData.summary : null;
+        const totalIssues = s ? ((s.duplicate || 0) + (s.mismatch || 0) + (s.orphan || 0)) : 0;
+        updateGsxSidebarBadge();
 
         if (bar) bar.style.width = '100%';
         if (pct) pct.innerText = '100%';
-        if (detail && auditData && auditData.summary) {
-            const s = auditData.summary;
-            detail.innerText = `Audit complete: ${s.total_files} profiles (${s.matched} matched, ${s.duplicate} duplicates, ${s.mismatch} mismatches).`;
+        if (detail && s) {
+            detail.innerText = `Audit complete: ${s.total_files} profiles (${s.matched} matched, ${s.duplicate} duplicates, ${s.mismatch} mismatches, ${s.orphan} orphans).`;
         } else {
             if (detail) detail.innerText = 'GSX profiles audit complete.';
         }
@@ -8767,7 +9236,10 @@ async function startGsxScanPhase(isStartup = false) {
         // Brief smooth display of the completed GSX scan
         await new Promise(r => setTimeout(r, 650));
 
-        if (pendingScanDelta && (pendingScanDelta.total_changes || 0) > 0) {
+        if (totalIssues > 0) {
+            closeRescanModal();
+            openGsxAuditModal('ALL');
+        } else if (pendingScanDelta && (pendingScanDelta.total_changes || 0) > 0) {
             const d = pendingScanDelta;
             const startup = pendingScanIsStartup;
             pendingScanDelta = null;
@@ -9330,7 +9802,6 @@ async function executeGsxInstallation({ filePath = '', base64Data = '', filename
 
                 const updatedAp = getAirportByIcao(selectedAirport.icao);
                 if (updatedAp) {
-                    showAirportDetails(updatedAp);
                     if (currentRadialAirport && currentRadialAirport.icao === updatedAp.icao) {
                         currentRadialAirport = updatedAp;
                         renderRadialAirportDetails(currentRadialAirport);

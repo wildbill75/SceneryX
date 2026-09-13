@@ -681,6 +681,10 @@
                                 No Profile
                             </button>
                         </div>
+                        <button id="btn-open-gsx-audit" onclick="openGsxAuditModal()" class="w-full mt-2 py-1.5 px-2.5 rounded-xl text-xs font-mono font-bold bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 flex items-center justify-between cursor-pointer transition-colors" title="Open GSX Profiles Audit Hub">
+                            <span>Audit GSX Profiles</span>
+                            <span id="sidebar-gsx-issues-badge" class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded leading-tight bg-amber-950 text-amber-400 border border-amber-800 hidden">0 issues</span>
+                        </button>
                     </div>
                 </div>
 
@@ -1112,8 +1116,8 @@
                 </div>
             </div>
 
-            <!-- RIGHT DETAIL DRAWER OVERLAY -->
-            <aside id="detail-drawer" style="width: 460px;" class="absolute right-0 top-0 bottom-0 min-w-[360px] max-w-[850px] glass-panel z-[1001] transform translate-x-full transition-transform duration-300 ease-in-out border-l border-slate-800/80 flex flex-col pointer-events-auto overflow-hidden">
+            <!-- RIGHT DETAIL DRAWER OVERLAY (PERMANENTLY DEACTIVATED) -->
+            <aside id="detail-drawer" style="display: none !important;" class="hidden pointer-events-none">
                 <!-- RESIZE HANDLE (LEFT EDGE) -->
                 <div id="drawer-resize-handle" class="absolute top-0 left-0 w-2 h-full cursor-col-resize hover:bg-cyan-500/30 transition-colors z-50 flex items-center justify-center group" title="Click and drag to resize panel">
                     <div class="w-0.5 h-8 bg-slate-700 group-hover:bg-cyan-400 rounded-full transition-colors"></div>
@@ -1782,6 +1786,67 @@
                 </button>
                 <button id="conflict-modal-submit-btn" onclick="applyConflictSelection()" class="px-6 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-md shadow-cyan-600/25 transition-all cursor-pointer border-0 active:scale-98">
                     <span data-i18n="conflict.btn_apply">Apply Choice</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- GSX PROFILES AUDIT & CONFLICT RESOLUTION MODAL (CENTRALIZED ONE-SCREEN RESOLUTION) -->
+    <div id="gsx-audit-modal" class="hidden fixed inset-0 z-[2060] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 transition-all duration-300">
+        <div class="glass-modal w-full max-w-2xl rounded-3xl p-6 shadow-2xl border border-slate-800 bg-slate-900/95 flex flex-col max-h-[88vh]">
+            <!-- Header (Draggable) -->
+            <div id="gsx-audit-modal-header" class="flex items-center justify-between border-b border-slate-800/80 pb-3.5 shrink-0 cursor-grab active:cursor-grabbing">
+                <div>
+                    <span class="text-[10px] font-mono text-cyan-400/90 uppercase font-bold tracking-wider block mb-1">SceneryX System</span>
+                    <h2 class="text-base font-bold text-white leading-tight flex items-center gap-2">
+                        <span>GSX Profiles Audit</span>
+                        <span id="gsx-audit-total-badge" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-amber-950 text-amber-400 border border-amber-800">
+                            0 Issues
+                        </span>
+                    </h2>
+                </div>
+                <button onclick="closeGsxAuditModal()" title="Close" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition-all cursor-pointer border-0">
+                    ✕
+                </button>
+            </div>
+
+            <!-- Filters & Search Toolbar -->
+            <div class="pt-3 pb-2 space-y-2.5 shrink-0">
+                <!-- Filter Pills (Flat colors, uniform sizing) -->
+                <div class="flex flex-wrap items-center gap-1.5">
+                    <button id="gsx-filter-btn-all" onclick="setGsxAuditFilter('ALL')" class="px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold leading-tight bg-cyan-700 text-white border-0 cursor-pointer transition-colors">
+                        ALL (<span id="gsx-count-all">0</span>)
+                    </button>
+                    <button id="gsx-filter-btn-duplicate" onclick="setGsxAuditFilter('DUPLICATE')" class="px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold leading-tight bg-slate-800 text-slate-300 hover:text-white border border-slate-700 cursor-pointer transition-colors">
+                        DUPLICATES (<span id="gsx-count-duplicate">0</span>)
+                    </button>
+                    <button id="gsx-filter-btn-mismatch" onclick="setGsxAuditFilter('MISMATCH')" class="px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold leading-tight bg-slate-800 text-slate-300 hover:text-white border border-slate-700 cursor-pointer transition-colors">
+                        MISMATCHES (<span id="gsx-count-mismatch">0</span>)
+                    </button>
+                    <button id="gsx-filter-btn-orphan" onclick="setGsxAuditFilter('ORPHAN')" class="px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold leading-tight bg-slate-800 text-slate-300 hover:text-white border border-slate-700 cursor-pointer transition-colors">
+                        ORPHANS (<span id="gsx-count-orphan">0</span>)
+                    </button>
+                </div>
+
+                <!-- Quick Search Input -->
+                <div class="relative">
+                    <input type="text" id="gsx-audit-search-input" oninput="handleGsxAuditSearch(event)" placeholder="Filter by ICAO, airport name, or studio..."
+                           class="w-full bg-slate-950/90 border border-slate-800 rounded-xl px-3 py-1.5 text-xs font-mono font-bold text-white placeholder:text-slate-500 focus:outline-none focus:border-slate-600">
+                </div>
+            </div>
+
+            <!-- Scrollable List Container -->
+            <div id="gsx-audit-list-container" class="flex-1 overflow-y-auto custom-scrollbar space-y-2.5 pr-1 min-h-[220px]">
+                <!-- Populated dynamically -->
+            </div>
+
+            <!-- Footer -->
+            <div class="flex items-center justify-between pt-3 mt-2 border-t border-slate-800/80 shrink-0">
+                <span id="gsx-audit-footer-summary" class="text-xs font-mono text-slate-400">
+                    Resolving issues updates your GSX profiles safely.
+                </span>
+                <button onclick="closeGsxAuditModal()" class="px-6 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-md shadow-cyan-600/25 transition-all cursor-pointer border-0 active:scale-98">
+                    Done / Open Map →
                 </button>
             </div>
         </div>

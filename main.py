@@ -1987,6 +1987,22 @@ class Api:
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
 
+    def disable_gsx_profile(self, icao, filename):
+        try:
+            settings = get_settings()
+            gsx_dir = settings.get("gsx_profile_path", get_default_gsx_path())
+            if not gsx_dir or not os.path.exists(gsx_dir):
+                return json.dumps({"status": "error", "message": "GSX directory not found."})
+
+            fp = os.path.join(gsx_dir, filename)
+            if os.path.exists(fp) and not filename.endswith('.disabled'):
+                os.rename(fp, fp + '.disabled')
+
+            audit_data = audit_all_gsx_profiles(gsx_dir=gsx_dir)
+            return json.dumps({"status": "ok", "data": audit_data}, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
     def search_gsx_profile(self, icao, name="", extra_terms=""):
         import webbrowser
         import urllib.parse
@@ -1994,6 +2010,25 @@ class Api:
         url = f"https://flightsim.to/miscellaneous/gsx-pro?q={urllib.parse.quote(target_icao)}"
         webbrowser.open(url)
         return json.dumps({"status": "ok", "url": url})
+
+    def reveal_file_in_explorer(self, file_path):
+        import subprocess
+        try:
+            settings = get_settings()
+            gsx_dir = settings.get("gsx_profile_path", get_default_gsx_path())
+            full_path = file_path or ''
+            if not os.path.isabs(full_path) and gsx_dir:
+                full_path = os.path.join(gsx_dir, file_path)
+            
+            if os.path.exists(full_path):
+                subprocess.Popen(f'explorer /select,"{os.path.normpath(full_path)}"')
+                return json.dumps({"status": "ok"})
+            elif gsx_dir and os.path.exists(gsx_dir):
+                subprocess.Popen(f'explorer "{os.path.normpath(gsx_dir)}"')
+                return json.dumps({"status": "ok"})
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+        return json.dumps({"status": "error", "message": "File not found"})
 
     def check_update(self, icao, name, vendor, version, pricing_type=""):
         import webbrowser
