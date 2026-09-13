@@ -769,6 +769,204 @@ def scan_gsx_profiles(gsx_dir):
         pass
     return gsx_map
 
+KNOWN_STUDIO_ALIASES = {
+    'francevfr': ['francevfr', 'fvfr', 'france vfr'],
+    'fsdreamteam': ['fsdreamteam', 'fsdt', 'virtuali'],
+    'latinvfr': ['latinvfr', 'lvfr', 'latin vfr'],
+    'flytampa': ['flytampa', 'fly tampa'],
+    'mkstudios': ['mkstudios', 'mk studios', 'mk-studios', 'mk'],
+    'drzewiecki': ['drzewiecki', 'drzewiecki design', 'dd'],
+    'pyreegue': ['pyreegue', 'pyreegue dev co', 'pyreegue dev co.'],
+    'flightbeam': ['flightbeam', 'flightbeam studios'],
+    'nza': ['nza', 'nza simulations', 'nzasimulations'],
+    'justsim': ['justsim', 'just sim'],
+    'digitaldesign': ['digitaldesign', 'digital design'],
+    'simwings': ['simwings', 'sim-wings', 'sim wings', 'aerosoft'],
+    'uk2000': ['uk2000', 'uk2000 scenery', 'uk2000scenery'],
+    'redwing': ['redwing', 'redwings', 'redwing simulations'],
+    'amsim': ['amsim', 'am sim'],
+    'bmworld': ['bmworld', 'bm world'],
+    'fly2high': ['fly2high', 'fly 2 high'],
+    'scenerytr': ['scenerytr', 'scenerytr design', 'scenery tr'],
+    'gaya': ['gaya', 'gaya simulations', 'gaya-simulations'],
+    'pilotplus': ['pilotplus', 'pilot plus'],
+    'verticalsim': ['verticalsim', 'vertical sim'],
+    'tailstrike': ['tailstrike', 'tailstrike designs'],
+    'orbx': ['orbx', 'orbxdirect'],
+    'inibuilds': ['inibuilds', 'iniscene', 'ini scene'],
+    'aerosoft': ['aerosoft'],
+    'fsx3d': ['fsx3d', 'fsx 3d'],
+    'lisium': ['lisium'],
+    'deimos': ['deimos', 'deimos inc'],
+    'lhsimulations': ['lhsimulations', 'lh simulations', 'lhsim'],
+    'macco': ['macco', 'macco simulations'],
+    'jopp': ['jopp'],
+    'lazerbeam': ['lazerbeam'],
+    'slhsimdesigns': ['slhsimdesigns', 'slh'],
+    'atelic': ['atelic'],
+}
+
+STUDIO_DISPLAY_NAMES = {
+    'francevfr': 'France VFR',
+    'fsdreamteam': 'FSDreamTeam',
+    'latinvfr': 'LatinVFR',
+    'flytampa': 'FlyTampa',
+    'mkstudios': 'MK-Studios',
+    'drzewiecki': 'Drzewiecki Design',
+    'pyreegue': 'Pyreegue Dev Co.',
+    'flightbeam': 'Flightbeam Studios',
+    'nza': 'NZA Simulations',
+    'justsim': 'JustSim',
+    'digitaldesign': 'Digital Design',
+    'simwings': 'Sim-Wings',
+    'uk2000': 'UK2000 Scenery',
+    'redwing': 'Redwing Simulations',
+    'amsim': 'AMSim',
+    'bmworld': 'BMWorld',
+    'fly2high': 'Fly2High',
+    'scenerytr': 'SceneryTR Design',
+    'gaya': 'Gaya Simulations',
+    'pilotplus': 'Pilot Plus',
+    'verticalsim': 'Verticalsim',
+    'tailstrike': 'Tailstrike Designs',
+    'orbx': 'Orbx',
+    'inibuilds': 'iniBuilds',
+    'aerosoft': 'Aerosoft',
+    'fsx3d': 'FSX3D',
+    'lisium': 'Lisium',
+    'deimos': 'DeimoS Inc',
+    'lhsimulations': 'LHSimulations',
+    'macco': 'Macco Simulations',
+    'jopp': 'JOPP',
+    'lazerbeam': 'Lazerbeam',
+    'slhsimdesigns': 'SLH Sim Designs',
+    'atelic': 'Atelic',
+}
+
+def normalize_studio_name(name):
+    if not name:
+        return ''
+    cleaned = re.sub(r'[^a-z0-9]', '', name.lower())
+    for suffix in ['simulations', 'simulation', 'studios', 'studio', 'designs', 'design', 'scenery', 'sceneries', 'airports', 'airport', 'team', 'devco', 'dev']:
+        if cleaned.endswith(suffix) and len(cleaned) > len(suffix) + 2:
+            cleaned = cleaned[:-len(suffix)]
+            break
+    if cleaned.endswith('s') and len(cleaned) > 4:
+        cleaned = cleaned[:-1]
+    return cleaned
+
+def detect_studio_from_text(text):
+    if not text:
+        return None
+    cleaned = re.sub(r'[^a-z0-9]', '', text.lower())
+    t_lower = text.lower()
+    for studio_key, aliases in KNOWN_STUDIO_ALIASES.items():
+        for alias in aliases:
+            clean_alias = re.sub(r'[^a-z0-9]', '', alias)
+            if len(clean_alias) >= 3 and (clean_alias in cleaned or alias in t_lower):
+                return studio_key
+    return None
+
+def evaluate_gsx_studio_match(pf, ap):
+    """
+    Evaluates whether an active GSX profile matches the active installed scenery for an airport.
+    Returns: (status, reason)
+    status is one of: 'MATCHED', 'MISMATCH_STUDIO', 'MISMATCH_DEFAULT', 'ORPHAN'
+    """
+    if not ap:
+        return ('ORPHAN', 'Airport not found in your MSFS library.')
+
+    target_pkg = pf.get('target_pkg') or ''
+    scenario = pf.get('scenario') or ''
+    filename = pf.get('filename') or ''
+    afcad = pf.get('afcad_path') or ''
+
+    vendor = ap.get('vendor') or ''
+    pkg_name = ap.get('package_name') or ''
+    pricing_type = ap.get('pricing_type') or ''
+    installed_pkgs = [s.get('folder_name', '') for s in ap.get('all_sources', [])]
+
+    # Check Default MSFS base airport indicator
+    is_default_target = target_pkg and any(k in target_pkg.lower() for k in ['fs-base-genericairports', 'fs-base', 'asobo-airport', 'microsoft-airport', 'generic'])
+    if is_default_target:
+        if pricing_type != 'Default' and not ap.get('is_asobo_official'):
+            active_desc = vendor if (vendor and vendor != 'Unknown') else pkg_name
+            return ('MISMATCH_DEFAULT', f'Profile designed for Default MSFS, but active scenery is {active_desc}.')
+        return ('MATCHED', 'Profile designed for Default MSFS airport.')
+
+    # Direct folder/package match in installed packages
+    if target_pkg:
+        clean_target = re.sub(r'[^a-z0-9]', '', target_pkg.lower())
+        for p in installed_pkgs:
+            clean_p = re.sub(r'[^a-z0-9]', '', p.lower())
+            if clean_target in clean_p or clean_p in clean_target:
+                return ('MATCHED', f'Profile perfectly aligned with active scenery ({target_pkg}).')
+
+    # Studio identification
+    prof_studio = (
+        detect_studio_from_text(target_pkg) or
+        detect_studio_from_text(filename) or
+        detect_studio_from_text(scenario) or
+        detect_studio_from_text(afcad)
+    )
+
+    act_studio = (
+        detect_studio_from_text(vendor) or
+        detect_studio_from_text(pkg_name) or
+        next((detect_studio_from_text(p) for p in installed_pkgs if detect_studio_from_text(p)), None)
+    )
+
+    norm_vendor = normalize_studio_name(vendor)
+    norm_target = normalize_studio_name(target_pkg)
+    norm_fn = normalize_studio_name(filename)
+
+    # 1. If detected studio keys match exactly
+    if prof_studio and act_studio and prof_studio == act_studio:
+        studio_display = vendor if vendor and vendor != 'Unknown' else STUDIO_DISPLAY_NAMES.get(prof_studio, prof_studio.title())
+        return ('MATCHED', f'Profile perfectly aligned with active scenery ({studio_display}).')
+
+    # 2. If normalized vendor appears in target_pkg, filename, scenario or afcad
+    if norm_vendor and len(norm_vendor) >= 3:
+        if (norm_vendor in norm_target or 
+            norm_vendor in norm_fn or 
+            (scenario and norm_vendor in normalize_studio_name(scenario)) or
+            (afcad and norm_vendor in normalize_studio_name(afcad))):
+            return ('MATCHED', f'Profile perfectly aligned with active scenery ({vendor}).')
+
+    # 3. If studio in profile is explicitly known AND active scenery has a different known studio or is default
+    if prof_studio:
+        prof_display = STUDIO_DISPLAY_NAMES.get(prof_studio, target_pkg or prof_studio.title())
+        if pricing_type == 'Default' or ap.get('is_asobo_official'):
+            return ('MISMATCH_STUDIO', f'Profile designed for "{prof_display}", but active scenery is "Microsoft Flight Simulator (Default)".')
+        elif act_studio and prof_studio != act_studio:
+            active_desc = vendor if (vendor and vendor != 'Unknown') else pkg_name
+            return ('MISMATCH_STUDIO', f'Profile designed for "{prof_display}", but active scenery is "{active_desc}".')
+
+    # 4. If target_pkg is given, check for mismatch
+    if target_pkg:
+        if pricing_type == 'Default' or ap.get('is_asobo_official'):
+            return ('MISMATCH_STUDIO', f'Profile designed for "{target_pkg}", but active scenery is "Microsoft Flight Simulator (Default)".')
+        target_detected = detect_studio_from_text(target_pkg)
+        if target_detected and act_studio and target_detected != act_studio:
+            active_desc = vendor if (vendor and vendor != 'Unknown') else pkg_name
+            prof_disp = STUDIO_DISPLAY_NAMES.get(target_detected, target_pkg)
+            return ('MISMATCH_STUDIO', f'Profile designed for "{prof_disp}", but active scenery is "{active_desc}".')
+        elif target_detected and not act_studio:
+            active_desc = vendor if (vendor and vendor != 'Unknown') else pkg_name
+            prof_disp = STUDIO_DISPLAY_NAMES.get(target_detected, target_pkg)
+            return ('MISMATCH_STUDIO', f'Profile designed for "{prof_disp}", but active scenery is "{active_desc}".')
+
+    # 5. Scenario check: ONLY a mismatch if scenario names a KNOWN OTHER STUDIO that contradicts active scenery
+    if scenario:
+        scen_studio = detect_studio_from_text(scenario)
+        if scen_studio:
+            if pricing_type == 'Default' or ap.get('is_asobo_official'):
+                return ('MISMATCH_STUDIO', f'Profile mentions "{scenario}", but active scenery is "Microsoft Flight Simulator (Default)".')
+            elif act_studio and scen_studio != act_studio:
+                return ('MISMATCH_STUDIO', f'Profile mentions "{scenario}", but active scenery is "{vendor}".')
+
+    return ('MATCHED', 'Active GSX profile.')
+
 def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
     if not gsx_dir:
         gsx_dir = get_default_gsx_path()
@@ -989,44 +1187,13 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
             reason = 'GSX profile(s) currently disabled.'
         else:
             pf = next((p for p in parsed_files if not p['is_disabled']), parsed_files[0])
-            target_pkg = pf['target_pkg']
-            scenario = pf['scenario']
-            installed_pkgs = [s.get('folder_name', '') for s in ap.get('all_sources', [])]
-            pkg_name = ap.get('package_name', '')
-            vendor = ap.get('vendor', '')
-            pricing_type = ap.get('pricing_type', '')
-
-            # Check Default MSFS base conflict
-            if target_pkg and ('fs-base-genericairports' in target_pkg.lower() or 'fs-base' in target_pkg.lower()):
-                if pricing_type != 'Default':
-                    status = 'MISMATCH_DEFAULT'
-                    active_desc = vendor if (vendor and vendor != 'Unknown') else pkg_name
-                    reason = f'Profile designed for Default MSFS, but active scenery is {active_desc}.'
-                    summary['mismatch'] += 1
-                else:
-                    status = 'MATCHED'
-                    reason = 'Profile designed for Default MSFS airport.'
-                    summary['matched'] += 1
-            elif target_pkg:
-                matched = any(target_pkg.lower() in p.lower() or p.lower() in target_pkg.lower() for p in installed_pkgs)
-                if matched or (vendor and vendor.lower() in target_pkg.lower()):
-                    status = 'MATCHED'
-                    reason = f'Profile perfectly aligned with active scenery ({target_pkg}).'
-                    summary['matched'] += 1
-                else:
-                    status = 'MISMATCH_STUDIO'
-                    active_desc = vendor if (vendor and vendor != 'Unknown') else pkg_name
-                    reason = f'Profile designed for "{target_pkg}", but active scenery is "{active_desc}".'
-                    summary['mismatch'] += 1
-            elif scenario and vendor and vendor != 'Unknown' and vendor.lower() not in scenario.lower():
-                # Scenario explicitly names a different studio
-                status = 'MISMATCH_STUDIO'
-                reason = f'Profile mentions "{scenario}", but active scenery is "{vendor}".'
-                summary['mismatch'] += 1
-            else:
-                status = 'MATCHED'
-                reason = 'Active GSX profile.'
+            status, reason = evaluate_gsx_studio_match(pf, ap)
+            if status == 'MATCHED':
                 summary['matched'] += 1
+            elif status in ('MISMATCH_STUDIO', 'MISMATCH_DEFAULT'):
+                summary['mismatch'] += 1
+            elif status == 'ORPHAN':
+                summary['orphan'] += 1
 
         db_ap = airports_db.get(icao, {}) if airports_db else {}
         results[icao] = {
@@ -1226,27 +1393,7 @@ def audit_single_airport_gsx(icao, gsx_dir=None, ap=None, airports_db=None):
     else:
         active_f = active_entries[0]
         active_pf = next((pf for pf in parsed_files if pf['filename'] == active_f['filename']), None)
-        target_pkg = active_pf.get('target_pkg') if active_pf else None
-        scenario = active_pf.get('scenario') if active_pf else None
-        vendor = ap.get('vendor') or ''
-        pkg_name = ap.get('package_name') or ''
-        pricing = ap.get('pricing_type') or ''
-
-        installed_pkgs = [s.get('folder_name', '').lower() for s in ap.get('all_sources', [])]
-
-        if target_pkg and any(k in target_pkg.lower() for k in ['generic', 'default', 'asobo-airport', 'microsoft-airport', 'fs-base']) and pricing == 'Payware':
-            status = 'MISMATCH_DEFAULT'
-            reason = f'Profile designed for default MSFS, but active scenery is payware ({vendor or pkg_name}).'
-        elif target_pkg and not any(target_pkg.lower() in p or p in target_pkg.lower() for p in installed_pkgs):
-            status = 'MISMATCH_STUDIO'
-            active_desc = vendor if (vendor and vendor != 'Unknown') else pkg_name
-            reason = f'Profile designed for "{target_pkg}", but active scenery is "{active_desc}".'
-        elif scenario and vendor and vendor != 'Unknown' and vendor.lower() not in scenario.lower():
-            status = 'MISMATCH_STUDIO'
-            reason = f'Profile mentions "{scenario}", but active scenery is "{vendor}".'
-        else:
-            status = 'MATCHED'
-            reason = 'Active GSX profile.'
+        status, reason = evaluate_gsx_studio_match(active_pf, ap)
 
     return {
         'status': status,
