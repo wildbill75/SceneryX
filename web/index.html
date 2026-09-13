@@ -534,7 +534,7 @@
             stroke-width: 2.25px !important;
             filter: drop-shadow(0 0 14px rgba(56, 189, 248, 0.50)) !important;
         }
-        /* Active Sub-item in Tier 2 (Glowing Cyan Frosted Glass) */
+        /* Active Sub-item in Tier 2 (Default Glowing Cyan Frosted Glass) */
         .radial-filter-sector.is-item-active .radial-filter-sector-path {
             fill: rgba(6, 182, 212, 0.35) !important;
             stroke: rgba(56, 189, 248, 0.95) !important;
@@ -550,6 +550,67 @@
             stroke: rgba(255, 255, 255, 0.90) !important;
             stroke-width: 2.5px !important;
             filter: drop-shadow(0 0 16px rgba(255, 255, 255, 0.50)) !important;
+        }
+
+        /* "All..." Sub-items across all radial menus: Darker uniform background */
+        .radial-filter-sector.radial-sector-all .radial-filter-sector-path {
+            fill: rgba(14, 18, 28, 0.92) !important;
+            stroke: rgba(100, 116, 139, 0.35) !important;
+        }
+        .radial-filter-sector.radial-sector-all.is-item-active .radial-filter-sector-path {
+            fill: rgba(20, 28, 44, 0.96) !important;
+            stroke: rgba(148, 163, 184, 0.85) !important;
+            stroke-width: 2.25px !important;
+            filter: drop-shadow(0 0 12px rgba(148, 163, 184, 0.35)) !important;
+        }
+
+        /* Pricing Category Sectors: Matched to Map Marker Colors (Keeping Opacity & Frosted Glass Blur) */
+        /* Payware (Neon Purple) */
+        .radial-filter-sector.radial-sector-payware .radial-filter-sector-path {
+            fill: rgba(147, 51, 234, 0.22) !important;
+            stroke: rgba(168, 85, 247, 0.45) !important;
+        }
+        .radial-filter-sector.radial-sector-payware.is-item-active .radial-filter-sector-path {
+            fill: rgba(147, 51, 234, 0.38) !important;
+            stroke: rgba(192, 132, 252, 0.95) !important;
+            stroke-width: 2.25px !important;
+            filter: drop-shadow(0 0 14px rgba(168, 85, 247, 0.55)) !important;
+        }
+
+        /* Freeware (Neon Cyan) */
+        .radial-filter-sector.radial-sector-freeware .radial-filter-sector-path {
+            fill: rgba(6, 182, 212, 0.22) !important;
+            stroke: rgba(6, 182, 212, 0.45) !important;
+        }
+        .radial-filter-sector.radial-sector-freeware.is-item-active .radial-filter-sector-path {
+            fill: rgba(6, 182, 212, 0.35) !important;
+            stroke: rgba(56, 189, 248, 0.95) !important;
+            stroke-width: 2.25px !important;
+            filter: drop-shadow(0 0 14px rgba(6, 182, 212, 0.55)) !important;
+        }
+
+        /* Asobo Handcrafted (Amber / Gold) */
+        .radial-filter-sector.radial-sector-asobo .radial-filter-sector-path {
+            fill: rgba(245, 158, 11, 0.22) !important;
+            stroke: rgba(245, 158, 11, 0.45) !important;
+        }
+        .radial-filter-sector.radial-sector-asobo.is-item-active .radial-filter-sector-path {
+            fill: rgba(245, 158, 11, 0.38) !important;
+            stroke: rgba(251, 191, 36, 0.95) !important;
+            stroke-width: 2.25px !important;
+            filter: drop-shadow(0 0 14px rgba(245, 158, 11, 0.55)) !important;
+        }
+
+        /* Default MSFS (Soft Royal Blue) */
+        .radial-filter-sector.radial-sector-default .radial-filter-sector-path {
+            fill: rgba(37, 99, 235, 0.22) !important;
+            stroke: rgba(59, 130, 246, 0.45) !important;
+        }
+        .radial-filter-sector.radial-sector-default.is-item-active .radial-filter-sector-path {
+            fill: rgba(37, 99, 235, 0.38) !important;
+            stroke: rgba(96, 165, 250, 0.95) !important;
+            stroke-width: 2.25px !important;
+            filter: drop-shadow(0 0 14px rgba(37, 99, 235, 0.55)) !important;
         }
 
         /* Country Hover & Click Deactivation when Zoomed In */

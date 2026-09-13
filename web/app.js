@@ -10675,15 +10675,26 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
             const isActive = !!item.isActive;
             const delayStyle = shouldAnimateOuter ? `style="animation-delay: ${(idx * step).toFixed(3)}s;"` : '';
 
+            const isAll = (item.id === 'all' || item.id === '0' || (item.label && item.label.toLowerCase().startsWith('all')));
+            let specificClass = '';
+            if (isAll) {
+                specificClass = 'radial-sector-all';
+            } else if (filterRadialActiveCategory === 'pricing') {
+                if (item.id === 'Payware') specificClass = 'radial-sector-payware';
+                else if (item.id === 'Freeware / Flightsim.to' || item.id === 'Freeware') specificClass = 'radial-sector-freeware';
+                else if (item.id === 'Asobo') specificClass = 'radial-sector-asobo';
+                else if (item.id === 'Default') specificClass = 'radial-sector-default';
+            }
+
             outerSvgHtml += `
-                <g class="radial-filter-sector radial-filter-tier2-sector ${animClass} ${isActive ? 'is-item-active' : ''} pointer-events-auto cursor-pointer group"
+                <g class="radial-filter-sector radial-filter-tier2-sector ${animClass} ${specificClass} ${isActive ? 'is-item-active' : ''} pointer-events-auto cursor-pointer group"
                    ${delayStyle}
                    onclick="handleFilterRadialSubItemClick('${filterRadialActiveCategory}', '${escapeJsStr(item.id)}')"
                    role="button" aria-label="${escapeHtml(item.label)}">
                     <path class="radial-filter-sector-path" d="${pathD}" />
                     <foreignObject x="${(tx - 52).toFixed(1)}" y="${(ty - 22).toFixed(1)}" width="104" height="44" class="pointer-events-none">
                         <div class="w-full h-full flex items-center justify-center text-center px-1">
-                            <span class="text-[11px] font-bold tracking-tight uppercase leading-snug ${isActive ? 'text-white font-extrabold' : 'text-slate-200 group-hover:text-white'}">${escapeHtml(item.label)}</span>
+                            <span class="text-[11px] font-bold tracking-tight uppercase leading-snug ${isActive ? 'text-white font-extrabold' : (isAll ? 'text-slate-300 group-hover:text-white' : 'text-slate-200 group-hover:text-white')}">${escapeHtml(item.label)}</span>
                         </div>
                     </foreignObject>
                 </g>
