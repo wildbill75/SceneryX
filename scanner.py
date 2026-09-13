@@ -686,28 +686,80 @@ def get_default_gsx_path():
             return gsx_p
     return r"C:\Users\%USERNAME%\AppData\Roaming\Virtuali\GSX\MSFS"
 
+def extract_icao_from_gsx_filename(filename, valid_icaos=None, file_path=None):
+    if not filename:
+        return None
+    clean_f = filename.lower()
+    if clean_f.endswith('.disabled'):
+        clean_f = clean_f[:-9]
+    if not clean_f.endswith('.ini') and not clean_f.endswith('.py'):
+        return None
+    name_no_ext = os.path.splitext(clean_f)[0]
+
+    # Exclude non-airport system ini files
+    if name_no_ext in ['configuration', 'flywithlua', 'fwl_prefs', 'saveinitialassignments', 'user']:
+        return None
+
+    # Priority 1: Exact 4-letter ICAO prefix (e.g. EGLL.ini, LFPG-addon.ini, KJFK_gsx.ini)
+    m = re.match(r'^([a-zA-Z]{4})(?:[_\-.\s0-9]|$)', clean_f)
+    if m:
+        candidate = m.group(1).upper()
+        if valid_icaos is None or candidate in valid_icaos:
+            return candidate
+
+    # Priority 2: Look for valid 4-letter ICAO token anywhere in the filename
+    # e.g. ScotFlight_EGPE_GSX_Profile_v1.0.ini -> 'EGPE', GSX-eghi-inibuilds.ini -> 'EGHI'
+    tokens = re.split(r'[-_.\s]+', clean_f)
+    ignore_tokens = {
+        'gsx', 'msfs', 'pro', 'vfr', 'pack', 'free', 'base', 'user', 'data',
+        'mesh', 'true', 'full', 'lite', 'afcad', 'safe', 'vdgs', 'dock',
+        'scot', 'flight', 'scenery', 'profile', 'addon', 'prep', 'test',
+        'ini', 'disabled'
+    }
+    for t in tokens:
+        if len(t) == 4 and t.isalpha() and t not in ignore_tokens:
+            cand = t.upper()
+            if valid_icaos is None or cand in valid_icaos:
+                return cand
+
+    # Priority 3: Inspect file content if path available
+    if file_path and os.path.exists(file_path):
+        try:
+            with open(file_path, 'r', encoding='utf-8', errors='ignore') as fh:
+                content = fh.read(4096)
+                afcad_m = re.search(r'afcad_path\s*=\s*(.+)', content)
+                if afcad_m:
+                    afcad_line = afcad_m.group(1).lower()
+                    for t in re.split(r'[/\\_\-.\s]+', afcad_line):
+                        if len(t) == 4 and t.isalpha() and t not in ignore_tokens:
+                            cand = t.upper()
+                            if valid_icaos is None or cand in valid_icaos:
+                                return cand
+        except Exception:
+            pass
+
+    return None
+
 def scan_gsx_profiles(gsx_dir):
     if not gsx_dir or not os.path.exists(gsx_dir):
         return {}
     
     gsx_map = {}
+    valid_db = None
+    try:
+        db_res = load_airport_database()
+        if isinstance(db_res, tuple) and len(db_res) > 0 and isinstance(db_res[0], dict):
+            valid_db = db_res[0]
+        elif isinstance(db_res, dict):
+            valid_db = db_res
+    except Exception:
+        pass
+
     try:
         ini_files = [f for f in os.listdir(gsx_dir) if f.endswith('.ini') and f.lower() != 'configuration.ini']
         for f in ini_files:
             fp = os.path.join(gsx_dir, f)
-            match = re.match(r'^([a-zA-Z]{4})', f)
-            icao = match.group(1).upper() if match else None
-            
-            if not icao:
-                try:
-                    with open(fp, 'r', encoding='utf-8', errors='ignore') as file:
-                        content = file.read()
-                        ic_m = re.search(r'\b([A-Z]{4})\b', content)
-                        if ic_m:
-                            icao = ic_m.group(1).upper()
-                except Exception:
-                    pass
-            
+            icao = extract_icao_from_gsx_filename(f, valid_icaos=valid_db, file_path=fp)
             if icao:
                 gsx_map[icao] = {
                     'filename': f,
@@ -755,27 +807,24 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
     except Exception:
         pass
 
+    all_valid_icaos = set(airports_db.keys()) if airports_db else set()
+    all_valid_icaos.update(installed_map.keys())
+
     by_icao = {}
     non_icao_files = []
 
     for f in active_ini_files:
-        m = re.match(r'^([a-zA-Z]{4})(?:[_\-.\s0-9]|$)', f)
-        if not m:
-            non_icao_files.append(f)
-            continue
-        icao = m.group(1).upper()
-        if airports_db and icao not in airports_db and icao not in installed_map:
+        fp = os.path.join(gsx_dir, f)
+        icao = extract_icao_from_gsx_filename(f, valid_icaos=all_valid_icaos, file_path=fp)
+        if not icao:
             non_icao_files.append(f)
             continue
         by_icao.setdefault(icao, []).append({'filename': f, 'is_disabled': False})
 
     for f in disabled_ini_files:
-        m = re.match(r'^([a-zA-Z]{4})(?:[_\-.\s0-9]|$)', f)
-        if m:
-            icao = m.group(1).upper()
-            if airports_db and icao not in airports_db and icao not in installed_map:
-                non_icao_files.append(f)
-                continue
+        fp = os.path.join(gsx_dir, f)
+        icao = extract_icao_from_gsx_filename(f, valid_icaos=all_valid_icaos, file_path=fp)
+        if icao:
             by_icao.setdefault(icao, []).append({'filename': f, 'is_disabled': True})
         else:
             non_icao_files.append(f)
@@ -1039,6 +1088,171 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
         pass
 
     return audit_payload
+
+def audit_single_airport_gsx(icao, gsx_dir=None, ap=None, airports_db=None):
+    if not icao:
+        return {'status': 'NONE', 'files': [], 'reason': 'No ICAO provided.'}
+    target_icao = icao.upper().strip()
+    if not gsx_dir:
+        gsx_dir = get_default_gsx_path()
+    if not gsx_dir or not os.path.exists(gsx_dir):
+        return {'status': 'NONE', 'files': [], 'reason': 'GSX directory not found.'}
+
+    if ap is None and os.path.exists(OUTPUT_JSON_PATH):
+        try:
+            with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
+                installed_list = json.load(f)
+                for item in installed_list:
+                    if item.get('icao') == target_icao:
+                        ap = item
+                        break
+        except Exception:
+            pass
+
+    try:
+        all_files = os.listdir(gsx_dir)
+    except Exception:
+        all_files = []
+
+    matching_files = []
+    for f in all_files:
+        if not f.endswith('.ini') and not f.endswith('.ini.disabled'):
+            continue
+        fp = os.path.join(gsx_dir, f)
+        f_icao = extract_icao_from_gsx_filename(f, valid_icaos={target_icao}, file_path=fp)
+        if f_icao == target_icao:
+            matching_files.append({
+                'filename': f,
+                'path': fp,
+                'is_disabled': f.endswith('.disabled')
+            })
+
+    if not matching_files:
+        return {'status': 'NONE', 'files': [], 'reason': 'No GSX profile installed.'}
+
+    import datetime
+    parsed_files = []
+    active_entries = [e for e in matching_files if not e['is_disabled']]
+
+    for entry in matching_files:
+        f = entry['filename']
+        fp = entry['path']
+        afcad = None
+        scenario = None
+        creator = None
+        gates_count = 0
+        target_pkg = None
+        mtime_str = None
+        mtime_ts = 0
+        ver_str = None
+
+        try:
+            mtime_ts = os.path.getmtime(fp)
+            mtime_str = datetime.datetime.fromtimestamp(mtime_ts).strftime('%Y-%m-%d')
+        except Exception:
+            pass
+
+        try:
+            with open(fp, 'r', encoding='utf-8', errors='ignore') as file_h:
+                content = file_h.read()
+            afcad_m = re.search(r'afcad_path\s*=\s*(.+)', content)
+            if afcad_m:
+                afcad = afcad_m.group(1).strip()
+            scenario_m = re.search(r'scenario\s*=\s*(.+)', content)
+            if scenario_m:
+                scenario = scenario_m.group(1).strip()
+            creator_m = re.search(r'creator\s*=\s*(.+)', content)
+            if creator_m:
+                creator = creator_m.group(1).strip()
+            gates_count = len(re.findall(r'\[(?:gate|rwy|parking)\s+[^\]]+\]', content, re.IGNORECASE))
+            v_m = re.search(r'version\s*=\s*["\']?([^"\'\r\n]+)["\']?', content)
+            if v_m:
+                ver_str = v_m.group(1).strip()
+        except Exception:
+            pass
+
+        if afcad:
+            parts = afcad.replace('/', '\\').split('\\')
+            for i, p in enumerate(parts):
+                p_l = p.lower()
+                if p_l in ('community', 'official', 'streamedpackages'):
+                    if i + 1 < len(parts):
+                        next_p = parts[i + 1]
+                        if next_p.lower() in ('onestore', 'steam') and i + 2 < len(parts):
+                            target_pkg = parts[i + 2]
+                        else:
+                            target_pkg = next_p
+                        break
+
+        f_lower = f.lower()
+        is_2024 = '2024' in f_lower or bool(re.search(r'msfs2024only\s*=\s*1', content if 'content' in locals() else ''))
+        is_2020 = '2020' in f_lower
+
+        vdgs_type = None
+        if 'asvdgs' in f_lower or 'asxvdgs' in f_lower:
+            vdgs_type = 'Aerosoft VDGS'
+        elif 'gsxvdgs' in f_lower or ('gsx.ini' in f_lower and any('asvdgs' in other['filename'].lower() or 'asxvdgs' in other['filename'].lower() for other in matching_files)):
+            vdgs_type = 'GSX SafeDock'
+
+        parsed_files.append({
+            'filename': f,
+            'path': fp,
+            'is_disabled': entry['is_disabled'],
+            'afcad_path': afcad,
+            'target_pkg': target_pkg,
+            'scenario': scenario,
+            'creator': creator,
+            'gates_count': gates_count,
+            'mtime': mtime_str,
+            'mtime_ts': mtime_ts,
+            'version': ver_str,
+            'is_2024': is_2024,
+            'is_2020': is_2020,
+            'vdgs_type': vdgs_type,
+            'is_recommended': False,
+            'recommend_reason': None
+        })
+
+    if len(active_entries) == 0:
+        status = 'DISABLED'
+        reason = 'GSX profile(s) currently disabled.'
+    elif not ap:
+        status = 'ORPHAN'
+        reason = 'Airport not found in your MSFS library.'
+    elif len(active_entries) > 1:
+        status = 'DUPLICATE'
+        active_names = [e['filename'] for e in active_entries]
+        reason = f'{len(active_entries)} conflicting active profiles found for this airport ({", ".join(active_names)}).'
+    else:
+        active_f = active_entries[0]
+        active_pf = next((pf for pf in parsed_files if pf['filename'] == active_f['filename']), None)
+        target_pkg = active_pf.get('target_pkg') if active_pf else None
+        scenario = active_pf.get('scenario') if active_pf else None
+        vendor = ap.get('vendor') or ''
+        pkg_name = ap.get('package_name') or ''
+        pricing = ap.get('pricing_type') or ''
+
+        installed_pkgs = [s.get('folder_name', '').lower() for s in ap.get('all_sources', [])]
+
+        if target_pkg and any(k in target_pkg.lower() for k in ['generic', 'default', 'asobo-airport', 'microsoft-airport', 'fs-base']) and pricing == 'Payware':
+            status = 'MISMATCH_DEFAULT'
+            reason = f'Profile designed for default MSFS, but active scenery is payware ({vendor or pkg_name}).'
+        elif target_pkg and not any(target_pkg.lower() in p or p in target_pkg.lower() for p in installed_pkgs):
+            status = 'MISMATCH_STUDIO'
+            active_desc = vendor if (vendor and vendor != 'Unknown') else pkg_name
+            reason = f'Profile designed for "{target_pkg}", but active scenery is "{active_desc}".'
+        elif scenario and vendor and vendor != 'Unknown' and vendor.lower() not in scenario.lower():
+            status = 'MISMATCH_STUDIO'
+            reason = f'Profile mentions "{scenario}", but active scenery is "{vendor}".'
+        else:
+            status = 'MATCHED'
+            reason = 'Active GSX profile.'
+
+    return {
+        'status': status,
+        'reason': reason,
+        'files': parsed_files
+    }
 
 def get_settings():
     if os.path.exists(SETTINGS_JSON_PATH):
@@ -1542,6 +1756,7 @@ def run_scan():
                     "lat": found_ap.get('lat', 0.0),
                     "lon": found_ap.get('lon', 0.0),
                     "elevation": found_ap.get('elevation', 0),
+                    "elevation_ft": found_ap.get('elevation', 0),
                     "type": raw_type,
                     "english_type": english_type,
                     "iata": found_ap.get('iata', ''),
@@ -1669,6 +1884,7 @@ def run_scan():
                     "lon": float(ap_info.get('longitude_deg', 0.0)),
                     "type": ap_info.get('type', 'airport'),
                     "english_type": english_type,
+                    "elevation": int(float(ap_info.get('elevation_ft', 0))) if ap_info.get('elevation_ft') else None,
                     "elevation_ft": int(float(ap_info.get('elevation_ft', 0))) if ap_info.get('elevation_ft') else None,
                     "has_custom_scenery": True,
                     "package_name": f"fs24-asobo-airport-{h_icao.lower()}",

@@ -4299,6 +4299,7 @@ function openAirportRadialMenu(ap, marker, e) {
 
     // Prefetch store downloads in background so they are ready instantly if Sceneries is clicked
     prefetchRadialStores(ap);
+    refreshAirportGsxStatus(ap.icao);
 
     const radialEl = document.getElementById('airport-radial-menu');
     if (!radialEl) return;
@@ -5610,27 +5611,29 @@ function initDraggableDetailsModal() {
 
 function formatAirportCategoryDisplay(ap) {
     if (!ap) return 'REGIONAL';
-    const raw = (ap.category || ap.type || ap.airport_type || '').toLowerCase().trim();
+    const raw = (ap.category || ap.english_type || ap.type || ap.airport_type || '').toLowerCase().trim();
     if (raw === 'large_airport' || raw === 'international' || raw === 'large') {
         return 'INTERNATIONAL';
     }
-    if (raw === 'medium_airport' || raw === 'national' || raw === 'medium') {
-        return 'NATIONAL';
-    }
-    if (raw === 'small_airport' || raw === 'regional' || raw === 'small') {
+    if (raw === 'medium_airport' || raw === 'regional' || raw === 'national' || raw === 'medium') {
         return 'REGIONAL';
     }
-    if (raw === 'heliport') {
+    if (raw === 'small_airport' || raw === 'general aviation' || raw === 'general_aviation' || raw === 'small') {
+        return 'GENERAL AVIATION';
+    }
+    if (raw === 'heliport' || raw.includes('heli')) {
         return 'HELIPORT';
     }
-    if (raw === 'seaplane_base') {
+    if (raw === 'seaplane_base' || raw.includes('water') || raw.includes('seaplane')) {
         return 'SEAPLANE BASE';
     }
     if (raw === 'closed') {
         return 'CLOSED';
     }
     if (raw) {
-        return raw.replace(/_/g, ' ').toUpperCase();
+        const up = raw.replace(/_/g, ' ').toUpperCase();
+        if (up === 'NATIONAL') return 'REGIONAL';
+        return up;
     }
     return 'REGIONAL';
 }
@@ -5638,6 +5641,11 @@ function formatAirportCategoryDisplay(ap) {
 function renderRadialAirportDetails(ap) {
     if (!ap) return;
     initDraggableDetailsModal();
+
+    // Trigger seamless background GSX status check
+    if (typeof refreshAirportGsxStatus === 'function') {
+        refreshAirportGsxStatus(ap.icao);
+    }
 
     // PILL 1: AIRPORT INFO
     const latEl = document.getElementById('radial-detail-lat');
@@ -5647,7 +5655,10 @@ function renderRadialAirportDetails(ap) {
     if (latEl) latEl.innerText = parseFloat(ap.lat || 0).toFixed(4);
     if (lonEl) lonEl.innerText = parseFloat(ap.lon || 0).toFixed(4);
     if (catEl) catEl.innerText = formatAirportCategoryDisplay(ap);
-    if (elevEl) elevEl.innerText = (ap.elevation_ft !== undefined && ap.elevation_ft !== null) ? `${ap.elevation_ft.toLocaleString()} ft` : '0 ft';
+    const elevVal = (ap.elevation !== undefined && ap.elevation !== null)
+        ? ap.elevation
+        : ((ap.elevation_ft !== undefined && ap.elevation_ft !== null) ? ap.elevation_ft : 0);
+    if (elevEl) elevEl.innerText = `${Math.round(elevVal).toLocaleString()} ft`;
 
     // PILL 2: RUNWAYS
     renderRadialRunways(ap);
@@ -5741,6 +5752,76 @@ async function renderRadialRunways(ap) {
         listEl.innerHTML = `<span class="text-xs font-mono text-slate-500 italic py-2 block text-center">No runway data available for this airport.</span>`;
     }
 }
+
+async function refreshAirportGsxStatus(icao, callback) {
+    if (!icao || !window.pywebview || !window.pywebview.api || !window.pywebview.api.check_airport_gsx_status) {
+        if (typeof callback === 'function') callback(null);
+        return;
+    }
+    try {
+        const raw = await window.pywebview.api.check_airport_gsx_status(icao);
+        const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (res && res.status === 'ok') {
+            const auditEntry = res.audit;
+            if (!window.gsxAuditData) {
+                window.gsxAuditData = { summary: {}, by_icao: {}, missing_profiles: [] };
+            }
+            if (!window.gsxAuditData.by_icao) {
+                window.gsxAuditData.by_icao = {};
+            }
+
+            window.gsxAuditData.by_icao[icao] = auditEntry;
+
+            // If matched, remove from missing_profiles if present
+            if (auditEntry.status === 'MATCHED' && Array.isArray(window.gsxAuditData.missing_profiles)) {
+                window.gsxAuditData.missing_profiles = window.gsxAuditData.missing_profiles.filter(m => m.icao !== icao);
+            }
+
+            const ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao(icao) : null;
+            if (ap) {
+                ap.has_gsx_profile = res.has_gsx_profile;
+                const activeFile = (auditEntry.files || []).find(f => !f.is_disabled);
+                if (activeFile) {
+                    ap.gsx_profile_filename = activeFile.filename;
+                    ap.gsx_ini_file = activeFile.filename;
+                    ap.gsx_profile_path = activeFile.path || '';
+                } else if (!res.has_gsx_profile) {
+                    ap.has_gsx_profile = false;
+                    delete ap.gsx_profile_filename;
+                    delete ap.gsx_ini_file;
+                    delete ap.gsx_profile_path;
+                }
+            }
+
+            if (currentRadialAirport && currentRadialAirport.icao === icao) {
+                currentRadialAirport.has_gsx_profile = res.has_gsx_profile;
+                const activeFile = (auditEntry.files || []).find(f => !f.is_disabled);
+                if (activeFile) {
+                    currentRadialAirport.gsx_profile_filename = activeFile.filename;
+                    currentRadialAirport.gsx_ini_file = activeFile.filename;
+                    currentRadialAirport.gsx_profile_path = activeFile.path || '';
+                } else if (!res.has_gsx_profile) {
+                    currentRadialAirport.has_gsx_profile = false;
+                    delete currentRadialAirport.gsx_profile_filename;
+                    delete currentRadialAirport.gsx_ini_file;
+                    delete currentRadialAirport.gsx_profile_path;
+                }
+                const modal = document.getElementById('radial-details-modal');
+                if (modal && !modal.classList.contains('hidden')) {
+                    renderRadialGsx(currentRadialAirport);
+                }
+            }
+
+            updateGsxHeaderAndTabBadges();
+
+            if (typeof callback === 'function') callback(res);
+        }
+    } catch (err) {
+        console.warn("Error refreshing airport GSX status:", err);
+        if (typeof callback === 'function') callback(null);
+    }
+}
+window.refreshAirportGsxStatus = refreshAirportGsxStatus;
 
 function renderRadialGsx(ap) {
     const container = document.getElementById('radial-gsx-container');

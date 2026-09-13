@@ -5,7 +5,7 @@ import re
 import urllib.request
 import webbrowser
 import webview
-from scanner import run_scan, get_settings, save_settings, load_ratings, save_rating, save_custom_price, save_custom_category, load_custom_prices, get_estimated_price, get_default_gsx_path, load_airport_database, SPECIAL_BUNDLE_MAP, OUTPUT_JSON_PATH, compute_scan_delta, build_library_snapshot, SNAPSHOT_JSON_PATH, get_resource_file_path, audit_all_gsx_profiles
+from scanner import run_scan, get_settings, save_settings, load_ratings, save_rating, save_custom_price, save_custom_category, load_custom_prices, get_estimated_price, get_default_gsx_path, load_airport_database, SPECIAL_BUNDLE_MAP, OUTPUT_JSON_PATH, compute_scan_delta, build_library_snapshot, SNAPSHOT_JSON_PATH, get_resource_file_path, audit_all_gsx_profiles, audit_single_airport_gsx
 
 AIRPORTS_DB_CACHE = None
 
@@ -1931,6 +1931,58 @@ class Api:
                 "status": "ok",
                 "installed_files": installed_files,
                 "airports": airports
+            }, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
+    def check_airport_gsx_status(self, icao):
+        try:
+            target_icao = (icao or '').upper().strip()
+            if not target_icao:
+                return json.dumps({"status": "error", "message": "No ICAO provided"})
+            settings = get_settings()
+            gsx_dir = settings.get("gsx_profile_path", get_default_gsx_path())
+            audit = audit_single_airport_gsx(target_icao, gsx_dir=gsx_dir)
+            has_profile = (audit.get('status') == 'MATCHED') or bool([f for f in audit.get('files', []) if not f.get('is_disabled')])
+            active_file = next((f for f in audit.get('files', []) if not f.get('is_disabled')), None)
+            filename = active_file['filename'] if active_file else None
+
+            # Sync into installed_airports.json if changed
+            changed = False
+            if os.path.exists(OUTPUT_JSON_PATH):
+                try:
+                    with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
+                        airports = json.load(f)
+                    for ap in airports:
+                        if ap.get('icao') == target_icao:
+                            old_has = bool(ap.get('has_gsx_profile'))
+                            old_file = ap.get('gsx_profile_filename')
+                            if old_has != has_profile or old_file != filename:
+                                ap['has_gsx_profile'] = has_profile
+                                if filename:
+                                    ap['gsx_profile_filename'] = filename
+                                    ap['gsx_ini_file'] = filename
+                                    ap['gsx_profile_path'] = active_file.get('path', '')
+                                else:
+                                    ap['has_gsx_profile'] = False
+                                    ap.pop('gsx_profile_filename', None)
+                                    ap.pop('gsx_ini_file', None)
+                                    ap.pop('gsx_profile_path', None)
+                                changed = True
+                            break
+                    if changed:
+                        tmp_p = OUTPUT_JSON_PATH + '.tmp'
+                        with open(tmp_p, 'w', encoding='utf-8') as f:
+                            json.dump(airports, f, ensure_ascii=False)
+                        os.replace(tmp_p, OUTPUT_JSON_PATH)
+                except Exception as e:
+                    print("Error syncing airport GSX status into JSON:", e)
+
+            return json.dumps({
+                "status": "ok",
+                "icao": target_icao,
+                "has_gsx_profile": has_profile,
+                "audit": audit
             }, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
