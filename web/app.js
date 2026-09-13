@@ -4907,8 +4907,8 @@ function renderRadialGsx(ap) {
                         </button>
                     </div>
                 ` : ''}
-                <button onclick="triggerGsxStudioSearch('${ap.icao}', '${targetVendor || ''}')" class="w-full py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 hover:text-white text-xs font-mono font-bold transition-colors border border-slate-700/60 text-center cursor-pointer">
-                    Search profile for ${targetVendor || ap.icao} on Flightsim.to
+                <button onclick="triggerGsxStudioSearch('${ap.icao}')" class="w-full py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 hover:text-white text-xs font-mono font-bold transition-colors border border-slate-700/60 text-center cursor-pointer">
+                    Search GSX Profile for ${ap.icao} on Flightsim.to
                 </button>
                 ${dropZoneHtml}
             </div>
@@ -4996,12 +4996,12 @@ async function enableGsxProfile(icao, filename) {
     }
 }
 
-function triggerGsxStudioSearch(icao, vendor) {
+function triggerGsxStudioSearch(icao) {
+    const cleanIcao = (icao || '').toUpperCase().trim();
     if (window.pywebview && window.pywebview.api && window.pywebview.api.search_gsx_profile) {
-        window.pywebview.api.search_gsx_profile(icao, '', vendor || '');
+        window.pywebview.api.search_gsx_profile(cleanIcao);
     } else {
-        const q = encodeURIComponent(`GSX ${icao} ${vendor || ''}`.trim());
-        window.open(`https://flightsim.to/search?q=${q}`, '_blank');
+        window.open(`https://flightsim.to/miscellaneous/gsx-pro?q=${encodeURIComponent(cleanIcao)}`, '_blank');
     }
 }
 
@@ -5077,9 +5077,12 @@ async function triggerRadialInstallGsxProfile() {
 
 async function triggerRadialSearchGsxProfile() {
     if (!currentRadialAirport) return;
+    const cleanIcao = (currentRadialAirport.icao || '').toUpperCase().trim();
     try {
         if (window.pywebview && window.pywebview.api && window.pywebview.api.search_gsx_profile) {
-            await window.pywebview.api.search_gsx_profile(currentRadialAirport.icao, currentRadialAirport.name || '');
+            await window.pywebview.api.search_gsx_profile(cleanIcao);
+        } else {
+            window.open(`https://flightsim.to/miscellaneous/gsx-pro?q=${encodeURIComponent(cleanIcao)}`, '_blank');
         }
     } catch (e) {
         console.error("Failed to search GSX profile:", e);
@@ -9220,9 +9223,12 @@ function openPackageFolder() {
 
 async function triggerSearchGsxProfile() {
     if (!selectedAirport) return;
+    const cleanIcao = (selectedAirport.icao || '').toUpperCase().trim();
     try {
-        if (window.pywebview) {
-            await window.pywebview.api.search_gsx_profile(selectedAirport.icao, selectedAirport.name || '');
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.search_gsx_profile) {
+            await window.pywebview.api.search_gsx_profile(cleanIcao);
+        } else {
+            window.open(`https://flightsim.to/miscellaneous/gsx-pro?q=${encodeURIComponent(cleanIcao)}`, '_blank');
         }
     } catch (e) {
         console.error("Search GSX profile error:", e);

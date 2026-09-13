@@ -1990,11 +1990,8 @@ class Api:
     def search_gsx_profile(self, icao, name="", extra_terms=""):
         import webbrowser
         import urllib.parse
-        parts = ["GSX", icao]
-        if extra_terms and extra_terms.lower() not in ['unknown', 'default', 'asobo']:
-            parts.append(extra_terms)
-        query = " ".join(parts).strip()
-        url = f"https://flightsim.to/search?q={urllib.parse.quote(query)}"
+        target_icao = (icao or '').upper().strip()
+        url = f"https://flightsim.to/miscellaneous/gsx-pro?q={urllib.parse.quote(target_icao)}"
         webbrowser.open(url)
         return json.dumps({"status": "ok", "url": url})
 
