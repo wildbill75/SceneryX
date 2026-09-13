@@ -2476,6 +2476,26 @@ function updateGsxSidebarBadge() {
     }
 }
 
+async function refreshGsxAuditQuietly() {
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.scan_gsx_audit) {
+        try {
+            const raw = await window.pywebview.api.scan_gsx_audit();
+            const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            if (parsed && parsed.status === 'ok' && parsed.data) {
+                window.gsxAuditData = parsed.data;
+                const modal = document.getElementById('gsx-audit-modal');
+                if (modal && !modal.classList.contains('hidden')) {
+                    renderGsxAuditModal();
+                }
+                updateGsxHeaderAndTabBadges();
+            }
+        } catch (e) {
+            console.error("Failed to quietly refresh GSX audit:", e);
+        }
+    }
+}
+window.refreshGsxAuditQuietly = refreshGsxAuditQuietly;
+
 async function openGsxAuditModal(filter = 'ALL') {
     if (!window.gsxAuditData && window.pywebview && window.pywebview.api && window.pywebview.api.scan_gsx_audit) {
         try {
@@ -3353,6 +3373,8 @@ window.installGsxProfileFromModal = installGsxProfileFromModal;
 window.handleGsxAuditDragOver = handleGsxAuditDragOver;
 window.handleGsxAuditDragLeave = handleGsxAuditDragLeave;
 window.handleGsxAuditDrop = handleGsxAuditDrop;
+window.stageRadialSceneryVariant = stageRadialSceneryVariant;
+window.applyRadialScenerySelection = applyRadialScenerySelection;
 window.executeGsxInstallationForIcao = executeGsxInstallationForIcao;
 
 window.addEventListener('dragover', function(e) { e.preventDefault(); }, false);
@@ -4206,8 +4228,10 @@ function prefetchRadialStores(ap) {
 
 function openAirportRadialMenu(ap, marker, e) {
     if (!ap) return;
-    currentRadialAirport = ap;
+    const latestAp = (allAirportsData && allAirportsData.find(a => a.icao === ap.icao)) || ap;
+    currentRadialAirport = latestAp;
     currentRadialMarker = marker || null;
+    stagedRadialScenerySelection = null;
     currentRadialOpenZoom = (map && typeof map.getZoom === 'function') ? map.getZoom() : 8;
 
     // Prefetch store downloads in background so they are ready instantly if Sceneries is clicked
@@ -4783,9 +4807,19 @@ function renderRadialSceneriesExtension(ap, animate = false) {
     const baseSources = nonDefaultSources.filter(s => !isFixOrOverlay(s));
     const fixSources = nonDefaultSources.filter(s => isFixOrOverlay(s));
 
-    // Strict Mutual Exclusion: Default is active ONLY IF NO custom base package is active
-    const hasActiveCustomBase = baseSources.some(s => !s.is_disabled);
-    const isDefaultActive = !hasActiveCustomBase;
+    // Determine current active scenery package on disk
+    const activeSrc = getActiveSource(ap);
+    const activePkgName = activeSrc ? activeSrc.folder_name : 'DEFAULT';
+
+    // Staged selection for this specific airport
+    const stagedPkg = (stagedRadialScenerySelection && stagedRadialScenerySelection.icao === ap.icao)
+        ? stagedRadialScenerySelection.target
+        : activePkgName;
+
+    // Check if there is an unapplied change
+    const isSameAsActive = (stagedPkg === 'DEFAULT' && activePkgName === 'DEFAULT') ||
+        (stagedPkg !== 'DEFAULT' && activePkgName !== 'DEFAULT' && isMatchingScenerySource({ folder_name: activePkgName }, stagedPkg));
+    const hasPendingChange = !isSameAsActive;
 
     let html = '';
     let pillIndex = 0;
@@ -4800,7 +4834,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
     // 1. Installed Base Scenery Addons
     baseSources.forEach(src => {
         const idx = sources.indexOf(src);
-        const isActive = !src.is_disabled;
+        const isSelected = (stagedPkg !== 'DEFAULT') && (stagedPkg === src.folder_name || isMatchingScenerySource(src, stagedPkg));
         const isAsoboPkg = (src.is_asobo_official || src.vendor === 'Microsoft / Asobo' || (src.folder_name && (src.folder_name.toLowerCase().includes('asobo-airport-') || src.folder_name.toLowerCase().includes('microsoft-airport-'))));
         const pType = src.pricing_type || (src.is_payware ? 'Payware' : (isAsoboPkg ? 'Asobo' : 'Freeware'));
         const updateLabel = src.world_update_name || ap.world_update_name || "Asobo World Update";
@@ -4818,7 +4852,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
             activeBorderClass = 'border-2 border-purple-500 shadow-lg shadow-purple-950/40 bg-slate-950/60 ring-1 ring-purple-500/30';
         }
 
-        const borderClass = isActive
+        const borderClass = isSelected
             ? activeBorderClass
             : 'border border-slate-700/50 hover:border-slate-500/70 bg-slate-950/40 hover:bg-slate-900/60 shadow-sm';
 
@@ -4827,7 +4861,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
         pillIndex++;
 
         html += `
-            <div onclick="event.stopPropagation(); activateRadialSceneryVariant(event, '${ap.icao}', '${safePkgName}')"
+            <div onclick="event.stopPropagation(); stageRadialSceneryVariant(event, '${ap.icao}', '${safePkgName}')"
                  onmousedown="event.stopPropagation();"
                  onpointerdown="event.stopPropagation();"
                  ${animDelay}
@@ -4838,8 +4872,8 @@ function renderRadialSceneriesExtension(ap, animate = false) {
                     <div class="flex items-center gap-2 min-w-0 flex-1">
                         <!-- Preflightly-style Switch Toggle -->
                         <div class="relative inline-flex items-center shrink-0">
-                            <div class="w-9 h-4.5 rounded-full transition-colors duration-200 ease-in-out p-0.5 ${isActive ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-slate-700/80'}">
-                                <div class="w-3.5 h-3.5 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out ${isActive ? 'translate-x-4.5' : 'translate-x-0'}"></div>
+                            <div class="w-9 h-4.5 rounded-full transition-colors duration-200 ease-in-out p-0.5 ${isSelected ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-slate-700/80'}">
+                                <div class="w-3.5 h-3.5 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out ${isSelected ? 'translate-x-4.5' : 'translate-x-0'}"></div>
                             </div>
                         </div>
 
@@ -4869,7 +4903,8 @@ function renderRadialSceneriesExtension(ap, animate = false) {
     });
 
     // 2. Default MSFS Base Airport (Clean, no "built-in", no filename sub-box, Sky color liseret)
-    const defaultBorderClass = isDefaultActive
+    const isDefaultSelected = (stagedPkg === 'DEFAULT');
+    const defaultBorderClass = isDefaultSelected
         ? 'border-2 border-sky-500 shadow-lg shadow-sky-950/40 bg-slate-950/60 ring-1 ring-sky-500/30'
         : 'border border-slate-700/50 hover:border-slate-500/70 bg-slate-950/40 hover:bg-slate-900/60 shadow-sm';
 
@@ -4880,7 +4915,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
     const defaultAirportName = getCleanAirportName(ap.name, ap.city) || ap.name || ap.icao;
 
     html += `
-        <div onclick="event.stopPropagation(); activateRadialDefaultScenery(event, '${ap.icao}')"
+        <div onclick="event.stopPropagation(); stageRadialSceneryVariant(event, '${ap.icao}', 'DEFAULT')"
              onmousedown="event.stopPropagation();"
              onpointerdown="event.stopPropagation();"
              ${defaultAnimDelay}
@@ -4891,8 +4926,8 @@ function renderRadialSceneriesExtension(ap, animate = false) {
                 <div class="flex items-center gap-2 min-w-0 flex-1">
                     <!-- Preflightly-style Switch Toggle -->
                     <div class="relative inline-flex items-center shrink-0">
-                        <div class="w-9 h-4.5 rounded-full transition-colors duration-200 ease-in-out p-0.5 ${isDefaultActive ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-slate-700/80'}">
-                            <div class="w-3.5 h-3.5 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out ${isDefaultActive ? 'translate-x-4.5' : 'translate-x-0'}"></div>
+                        <div class="w-9 h-4.5 rounded-full transition-colors duration-200 ease-in-out p-0.5 ${isDefaultSelected ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-slate-700/80'}">
+                            <div class="w-3.5 h-3.5 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out ${isDefaultSelected ? 'translate-x-4.5' : 'translate-x-0'}"></div>
                         </div>
                     </div>
 
@@ -5005,6 +5040,20 @@ function renderRadialSceneriesExtension(ap, animate = false) {
 
     // 5. Available Payware Addons Container
     html += `<div id="radial-addon-downloads-container" class="flex flex-col gap-1.5"></div>`;
+
+    // 6. Apply Button (in bottom right, under the last available payware pill)
+    html += `
+        <div id="radial-scenery-apply-container" class="flex items-center justify-end pt-3 pb-1 shrink-0">
+            <button id="radial-scenery-apply-btn"
+                    onclick="event.stopPropagation(); applyRadialScenerySelection(event, '${ap.icao}')"
+                    onmousedown="event.stopPropagation();"
+                    onpointerdown="event.stopPropagation();"
+                    ${hasPendingChange ? '' : 'disabled'}
+                    class="px-5 py-2 rounded-xl text-xs font-mono font-bold transition-all ${hasPendingChange ? 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-md shadow-cyan-600/30 cursor-pointer border-0 active:scale-95' : 'bg-slate-800/80 text-slate-500 cursor-not-allowed opacity-50 border border-slate-700/40 pointer-events-none'}">
+                Apply
+            </button>
+        </div>
+    `;
 
     extEl.innerHTML = html;
 
@@ -5229,50 +5278,47 @@ function isMatchingScenerySource(s, folderName) {
     return false;
 }
 
-async function activateRadialSceneryVariant(e, icao, folderName) {
-    if (e && e.stopPropagation) {
-        e.stopPropagation();
-    } else if (typeof e === 'string') {
-        folderName = icao;
-        icao = e;
-    }
+let stagedRadialScenerySelection = null;
+
+function stageRadialSceneryVariant(e, icao, folderName) {
+    if (e && e.stopPropagation) e.stopPropagation();
     if (window.event) window.event.cancelBubble = true;
 
-    if (!window.pywebview || isToggleInProgress || !icao || !folderName) return;
+    if (!currentRadialAirport || currentRadialAirport.icao !== icao) return;
 
-    // Never block activation if airport is in Default mode
-    const isAlreadyActive = currentRadialAirport 
-        && currentRadialAirport.pricing_type !== 'Default' 
-        && currentRadialAirport.package_name !== 'Default MSFS Base Airport'
-        && isMatchingScenerySource({ folder_name: currentRadialAirport.package_name }, folderName)
-        && !currentRadialAirport.is_disabled;
-    if (isAlreadyActive) {
-        return;
+    const activeSrc = getActiveSource(currentRadialAirport);
+    const activePkgName = activeSrc ? activeSrc.folder_name : 'DEFAULT';
+
+    const isSame = (folderName === 'DEFAULT' && activePkgName === 'DEFAULT') ||
+        (folderName !== 'DEFAULT' && activePkgName !== 'DEFAULT' && isMatchingScenerySource({ folder_name: activePkgName }, folderName));
+
+    if (isSame) {
+        stagedRadialScenerySelection = null;
+    } else {
+        stagedRadialScenerySelection = { icao: icao, target: folderName };
     }
 
-    // 1. Immediate OPTIMISTIC UI update (0ms perceived latency!)
-    if (currentRadialAirport && currentRadialAirport.icao === icao) {
-        if (currentRadialAirport.all_sources) {
-            currentRadialAirport.all_sources.forEach(s => {
-                if (!isFixOrOverlay(s)) {
-                    s.is_disabled = !isMatchingScenerySource(s, folderName);
-                }
-            });
-        }
-        const targetSrc = currentRadialAirport.all_sources ? currentRadialAirport.all_sources.find(s => isMatchingScenerySource(s, folderName)) : null;
-        const isAsobo = targetSrc && (targetSrc.is_asobo_official || targetSrc.vendor === 'Microsoft / Asobo' || (targetSrc.folder_name && (targetSrc.folder_name.toLowerCase().includes('asobo-') || targetSrc.folder_name.toLowerCase().includes('microsoft-'))));
-        currentRadialAirport.pricing_type = targetSrc ? (targetSrc.pricing_type || (targetSrc.is_payware ? 'Payware' : (isAsobo ? 'Asobo' : 'Freeware'))) : (isAsobo ? 'Asobo' : 'Freeware');
-        currentRadialAirport.is_asobo_official = !!isAsobo;
-        currentRadialAirport.is_payware = !!(targetSrc && targetSrc.is_payware);
-        currentRadialAirport.package_name = targetSrc ? targetSrc.folder_name : folderName;
-        currentRadialAirport.is_disabled = false;
-        renderRadialSceneriesExtension(currentRadialAirport, false);
-        updateRadialCoreBadge(currentRadialAirport);
+    renderRadialSceneriesExtension(currentRadialAirport, false);
+}
+
+async function applyRadialScenerySelection(e, icao) {
+    if (e && e.stopPropagation) e.stopPropagation();
+    if (window.event) window.event.cancelBubble = true;
+
+    if (!stagedRadialScenerySelection || stagedRadialScenerySelection.icao !== icao) return;
+    const targetPkg = stagedRadialScenerySelection.target;
+    if (!targetPkg) return;
+
+    const btn = document.getElementById('radial-scenery-apply-btn');
+    if (btn) {
+        btn.disabled = true;
+        btn.className = 'px-5 py-2 rounded-xl text-xs font-mono font-bold transition-all bg-slate-800/80 text-slate-500 cursor-not-allowed opacity-50 border border-slate-700/40 pointer-events-none';
+        btn.innerText = 'Applying...';
     }
 
     isToggleInProgress = true;
     try {
-        const resStr = await window.pywebview.api.select_scenery_option(icao, folderName);
+        const resStr = await window.pywebview.api.select_scenery_option(icao, targetPkg);
         const res = JSON.parse(resStr);
         if (res.status === 'ok') {
             const updatedAp = res.updated_airport || (res.airports ? res.airports.find(a => a.icao === icao) : null);
@@ -5287,97 +5333,42 @@ async function activateRadialSceneryVariant(e, icao, folderName) {
                 if (selectedAirport && selectedAirport.icao === icao) {
                     selectedAirport = updatedAp;
                 }
-                renderRadialSceneriesExtension(updatedAp, false);
-                updateRadialCoreBadge(updatedAp);
                 updateSingleAirportMarker(updatedAp);
-
-                const detailDrawer = document.getElementById('detail-drawer');
-                if (detailDrawer && !detailDrawer.classList.contains('translate-x-full')) {
-                    renderUnifiedScenerySelector(updatedAp);
-                }
-            } else if (res.airports) {
-                allAirportsData = res.airports;
+                updateRadialCoreBadge(updatedAp);
             }
+            stagedRadialScenerySelection = null;
+            renderRadialSceneriesExtension(currentRadialAirport, false);
             setTimeout(() => updateStats(allAirportsData), 0);
-            showToast(`✓ ${folderName} Activated`, 'success');
+
+            // Re-sync GSX audit quietly so any open GSX audit window updates instantly!
+            await refreshGsxAuditQuietly();
+
+            const displayName = (targetPkg === 'DEFAULT') ? 'Default MSFS' : targetPkg;
+            showToast(`✓ Scenery Applied: ${displayName}`, 'success');
+        } else {
+            showToast(`Error: ${res.message || 'Failed to apply scenery'}`, 'error');
+            if (btn) {
+                btn.disabled = false;
+                btn.className = 'px-5 py-2 rounded-xl text-xs font-mono font-bold transition-all bg-cyan-600 hover:bg-cyan-500 text-white shadow-md shadow-cyan-600/30 cursor-pointer border-0 active:scale-95';
+                btn.innerText = 'Apply';
+            }
         }
-    } catch (e) {
-        console.error("Failed to activate radial scenery variant:", e);
+    } catch (err) {
+        console.error("Error applying scenery selection:", err);
+        showToast('Error applying scenery', 'error');
     } finally {
         isToggleInProgress = false;
     }
 }
 
+async function activateRadialSceneryVariant(e, icao, folderName) {
+    stageRadialSceneryVariant(e, icao, folderName);
+    await applyRadialScenerySelection(e, icao);
+}
+
 async function activateRadialDefaultScenery(e, icao) {
-    if (e && e.stopPropagation) {
-        e.stopPropagation();
-    } else if (typeof e === 'string') {
-        icao = e;
-    }
-    if (window.event) window.event.cancelBubble = true;
-
-    if (!window.pywebview || isToggleInProgress || !icao) return;
-    const isAlreadyDefault = currentRadialAirport 
-        && (currentRadialAirport.pricing_type === 'Default' || currentRadialAirport.package_name === 'Default MSFS Base Airport')
-        && (!currentRadialAirport.all_sources || currentRadialAirport.all_sources.filter(s => !isFixOrOverlay(s)).every(s => s.is_disabled));
-    if (isAlreadyDefault) {
-        return;
-    }
-
-    // 1. Immediate OPTIMISTIC UI update (0ms perceived latency!)
-    if (currentRadialAirport && currentRadialAirport.icao === icao) {
-        if (currentRadialAirport.all_sources) {
-            currentRadialAirport.all_sources.forEach(s => {
-                if (!isFixOrOverlay(s)) {
-                    s.is_disabled = true;
-                }
-            });
-        }
-        currentRadialAirport.pricing_type = 'Default';
-        currentRadialAirport.package_name = 'Default MSFS Base Airport';
-        currentRadialAirport.is_asobo_official = false;
-        currentRadialAirport.is_payware = false;
-        currentRadialAirport.is_disabled = false;
-        renderRadialSceneriesExtension(currentRadialAirport, false);
-        updateRadialCoreBadge(currentRadialAirport);
-    }
-
-    isToggleInProgress = true;
-    try {
-        const resStr = await window.pywebview.api.select_scenery_option(icao, 'DEFAULT');
-        const res = JSON.parse(resStr);
-        if (res.status === 'ok') {
-            const updatedAp = res.updated_airport || (res.airports ? res.airports.find(a => a.icao === icao) : null);
-            if (updatedAp) {
-                if (userRatingsMap[updatedAp.icao] !== undefined) {
-                    updatedAp.rating = userRatingsMap[updatedAp.icao];
-                }
-                const idx = allAirportsData.findIndex(a => a.icao === updatedAp.icao);
-                if (idx !== -1) allAirportsData[idx] = updatedAp;
-
-                currentRadialAirport = updatedAp;
-                if (selectedAirport && selectedAirport.icao === icao) {
-                    selectedAirport = updatedAp;
-                }
-                renderRadialSceneriesExtension(updatedAp, false);
-                updateRadialCoreBadge(updatedAp);
-                updateSingleAirportMarker(updatedAp);
-
-                const detailDrawer = document.getElementById('detail-drawer');
-                if (detailDrawer && !detailDrawer.classList.contains('translate-x-full')) {
-                    renderUnifiedScenerySelector(updatedAp);
-                }
-            } else if (res.airports) {
-                allAirportsData = res.airports;
-            }
-            setTimeout(() => updateStats(allAirportsData), 0);
-            showToast(`✓ Reverted to Default MSFS Base Airport`, 'info');
-        }
-    } catch (e) {
-        console.error("Failed to activate default scenery:", e);
-    } finally {
-        isToggleInProgress = false;
-    }
+    stageRadialSceneryVariant(e, icao, 'DEFAULT');
+    await applyRadialScenerySelection(e, icao);
 }
 
 async function activateRadialFixPackage(e, path, icao) {

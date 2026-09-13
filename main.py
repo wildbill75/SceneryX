@@ -242,6 +242,13 @@ def set_package_state_for_icao(p_path, target_icao, should_enable):
         # Fast path for standard single-airport packages: instant folder rename
         if should_enable:
             enable_physical_package(target_dir)
+            # Ensure any internal .bgl.disabled are restored to active .bgl
+            if os.path.exists(clean_p):
+                for root, dirs, files in os.walk(clean_p):
+                    for f in files:
+                        if f.lower().endswith('.bgl.disabled'):
+                            old_bgl = os.path.join(root, f)
+                            safe_rename_path(old_bgl, old_bgl[:-9])
         else:
             disable_physical_package(target_dir)
         return
@@ -285,6 +292,12 @@ def set_package_state_for_icao(p_path, target_icao, should_enable):
     else:
         if should_enable:
             enable_physical_package(target_dir)
+            if os.path.exists(clean_p):
+                for root, dirs, files in os.walk(clean_p):
+                    for f in files:
+                        if f.lower().endswith('.bgl.disabled'):
+                            old_bgl = os.path.join(root, f)
+                            safe_rename_path(old_bgl, old_bgl[:-9])
         else:
             disable_physical_package(target_dir)
 
@@ -464,6 +477,12 @@ def fast_update_airport_cache(icao_target, target_pkg_name=None, toggle_all=Fals
                     s['is_disabled'] = False
                     if clean_p:
                         s['package_path'] = clean_p
+                        if os.path.exists(clean_p):
+                            for root, dirs, files in os.walk(clean_p):
+                                for f in files:
+                                    if f.lower().endswith('.bgl.disabled'):
+                                        old_b = os.path.join(root, f)
+                                        safe_rename_path(old_b, old_b[:-9])
                 else:
                     s['is_disabled'] = True
                     if dis_p and os.path.exists(dis_p):
