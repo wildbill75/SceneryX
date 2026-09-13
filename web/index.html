@@ -1793,7 +1793,7 @@
 
     <!-- GSX PROFILES AUDIT & CONFLICT RESOLUTION MODAL (CENTRALIZED ONE-SCREEN RESOLUTION) -->
     <div id="gsx-audit-modal" class="hidden fixed inset-0 z-[2060] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 transition-all duration-300">
-        <div class="glass-modal w-full max-w-2xl rounded-3xl p-6 shadow-2xl border border-slate-800 bg-slate-900/95 flex flex-col max-h-[88vh]">
+        <div class="glass-modal pointer-events-auto w-full max-w-2xl rounded-3xl p-6 shadow-2xl border border-slate-800 bg-slate-900/95 flex flex-col max-h-[88vh]">
             <!-- Header (Draggable) -->
             <div id="gsx-audit-modal-header" class="flex items-center justify-between border-b border-slate-800/80 pb-3.5 shrink-0 cursor-grab active:cursor-grabbing">
                 <div>
@@ -1831,9 +1831,11 @@
                             NO PROFILE (<span id="gsx-count-noprofile">0</span>)
                         </button>
                     </div>
-                    <label class="flex items-center gap-1.5 text-[10px] font-mono font-bold text-slate-400 hover:text-slate-200 cursor-pointer select-none">
-                        <input type="checkbox" id="gsx-include-asobo-toggle" onchange="toggleGsxIncludeAsobo(event)" class="rounded border-slate-700 bg-slate-950 text-cyan-500 focus:ring-0">
-                        <span>Include Asobo (<span id="gsx-count-asobo">0</span>)</span>
+
+                    <!-- Toggle Asobo for No Profile -->
+                    <label id="gsx-asobo-toggle-wrapper" class="hidden items-center gap-1.5 text-[10px] font-mono text-slate-400 hover:text-slate-200 cursor-pointer select-none">
+                        <input type="checkbox" id="gsx-include-asobo-checkbox" onchange="toggleGsxIncludeAsobo(event)" class="rounded bg-slate-950 border-slate-700 text-cyan-600 focus:ring-0 cursor-pointer">
+                        <span>Include Asobo (<span id="gsx-count-asobo-missing">0</span>)</span>
                     </label>
                 </div>
 
@@ -1854,8 +1856,8 @@
                 <span id="gsx-audit-footer-summary" class="text-xs font-mono text-slate-400">
                     Resolving issues updates your GSX profiles safely.
                 </span>
-                <button onclick="closeGsxAuditModal()" class="px-6 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-md shadow-cyan-600/25 transition-all cursor-pointer border-0 active:scale-98">
-                    Done / Open Map →
+                <button onclick="openMapFromGsxAudit()" class="px-6 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-md shadow-cyan-600/25 transition-all cursor-pointer border-0 active:scale-98">
+                    Open Map
                 </button>
             </div>
         </div>

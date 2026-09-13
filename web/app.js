@@ -2506,11 +2506,53 @@ async function openGsxAuditModal(filter = 'ALL') {
     initDraggableGsxAuditModal();
     setGsxAuditFilter(currentGsxAuditFilter);
     modal.classList.remove('hidden');
+    if (gsxAuditFloatingMode) {
+        modal.classList.remove('bg-slate-950/80', 'backdrop-blur-md');
+        modal.classList.add('pointer-events-none', 'bg-transparent');
+    }
+}
+
+let gsxAuditFloatingMode = false;
+
+function openMapFromGsxAudit() {
+    const modal = document.getElementById('gsx-audit-modal');
+    if (!modal) return;
+
+    gsxAuditFloatingMode = true;
+
+    // DO NOT CLOSE THE WINDOW: Keep it visible and floating over the map
+    modal.classList.remove('hidden');
+    modal.classList.remove('bg-slate-950/80', 'backdrop-blur-md');
+    modal.classList.add('pointer-events-none', 'bg-transparent');
+
+    const modalBox = modal.querySelector('.glass-modal');
+    if (modalBox) {
+        modalBox.classList.add('pointer-events-auto');
+        modalBox.classList.add('shadow-2xl');
+    }
+
+    // Refresh and invalidate map size so the map renders fully and immediately under the floating window
+    if (window.map) {
+        setTimeout(() => {
+            window.map.invalidateSize();
+        }, 50);
+    }
+
+    // Clear any pending startup delta modal so the map is fully interactive without obstructions
+    if (pendingScanDelta && (pendingScanDelta.total_changes || 0) > 0) {
+        pendingScanDelta = null;
+        pendingScanIsStartup = false;
+    }
 }
 
 function closeGsxAuditModal() {
     const modal = document.getElementById('gsx-audit-modal');
-    if (modal) modal.classList.add('hidden');
+    if (modal) {
+        modal.classList.add('hidden');
+        gsxAuditFloatingMode = false;
+        modal.classList.remove('pointer-events-none', 'bg-transparent');
+        modal.classList.add('bg-slate-950/80', 'backdrop-blur-md');
+    }
 
     if (pendingScanDelta && (pendingScanDelta.total_changes || 0) > 0) {
         const d = pendingScanDelta;
@@ -3299,6 +3341,7 @@ async function handleGsxAuditDrop(e, icao) {
 
 window.openGsxAuditModal = openGsxAuditModal;
 window.closeGsxAuditModal = closeGsxAuditModal;
+window.openMapFromGsxAudit = openMapFromGsxAudit;
 window.setGsxAuditFilter = setGsxAuditFilter;
 window.handleGsxAuditSearch = handleGsxAuditSearch;
 window.toggleGsxIncludeAsobo = toggleGsxIncludeAsobo;
