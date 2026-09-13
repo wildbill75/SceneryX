@@ -10288,6 +10288,7 @@ function setButtonActive(btn, active) {
 
 let isFilterRadialOpen = false;
 let filterRadialActiveCategory = 'pricing'; // 'pricing', 'source', 'region', 'type', 'gsx', 'rating'
+let filterRadialLastAnimatedCategory = null;
 
 const FILTER_RADIAL_CATEGORIES = [
     {
@@ -10452,7 +10453,8 @@ function openFilterRadialMenu(clientX, clientY) {
         filterRadialActiveCategory = 'pricing';
     }
 
-    renderFilterRadialWheel();
+    filterRadialLastAnimatedCategory = null; // Force cascade animation on open
+    renderFilterRadialWheel(true);
 
     // Trigger snappy bounce animation identical to addon radial menu
     menuEl.classList.remove('animate-filter-radial-open');
@@ -10475,6 +10477,7 @@ function closeFilterRadialMenu() {
         menuEl.classList.remove('animate-filter-radial-open');
     }
     isFilterRadialOpen = false;
+    filterRadialLastAnimatedCategory = null;
 }
 
 function handleFilterRadialCenterClick() {
@@ -10577,7 +10580,7 @@ function getFilterRadialCategoryItems(categoryKey) {
 /**
  * Renders concentric annular wheel matching Screen 1 (No icons, high readability)
  */
-function renderFilterRadialWheel() {
+function renderFilterRadialWheel(forceAnimateOuter = false) {
     const hubEl = document.getElementById('filter-radial-center-hub');
     const svgEl = document.getElementById('filter-radial-svg');
     if (!hubEl || !svgEl) return;
@@ -10585,6 +10588,9 @@ function renderFilterRadialWheel() {
     if (!filterRadialActiveCategory) {
         filterRadialActiveCategory = 'pricing';
     }
+
+    const shouldAnimateOuter = forceAnimateOuter || (filterRadialActiveCategory !== filterRadialLastAnimatedCategory);
+    filterRadialLastAnimatedCategory = filterRadialActiveCategory;
 
     const count = currentlyFilteredAirports ? currentlyFilteredAirports.length : (allAirportsData ? allAirportsData.length : 0);
     hubEl.innerHTML = `
@@ -10652,6 +10658,9 @@ function renderFilterRadialWheel() {
             startAngle = catMidAngle - (totalSpan / 2);
         }
 
+        const animClass = shouldAnimateOuter ? 'animate-sector-bounce' : '';
+        const step = itemCount > 8 ? 0.022 : 0.035;
+
         items.forEach((item, idx) => {
             const aStart = startAngle + (idx * itemSpan);
             const aEnd = aStart + itemSpan;
@@ -10664,9 +10673,11 @@ function renderFilterRadialWheel() {
             const ty = cy + midR2 * Math.sin(rad);
 
             const isActive = !!item.isActive;
+            const delayStyle = shouldAnimateOuter ? `style="animation-delay: ${(idx * step).toFixed(3)}s;"` : '';
 
             outerSvgHtml += `
-                <g class="radial-filter-sector ${isActive ? 'is-item-active' : ''} pointer-events-auto cursor-pointer group"
+                <g class="radial-filter-sector radial-filter-tier2-sector ${animClass} ${isActive ? 'is-item-active' : ''} pointer-events-auto cursor-pointer group"
+                   ${delayStyle}
                    onclick="handleFilterRadialSubItemClick('${filterRadialActiveCategory}', '${escapeJsStr(item.id)}')"
                    role="button" aria-label="${escapeHtml(item.label)}">
                     <path class="radial-filter-sector-path" d="${pathD}" />
@@ -10686,14 +10697,14 @@ function renderFilterRadialWheel() {
 function handleFilterRadialCategoryClick(categoryKey) {
     if (filterRadialActiveCategory !== categoryKey) {
         filterRadialActiveCategory = categoryKey;
-        renderFilterRadialWheel();
+        renderFilterRadialWheel(true);
     }
 }
 
 function handleFilterRadialCategoryHover(categoryKey) {
     if (filterRadialActiveCategory !== categoryKey) {
         filterRadialActiveCategory = categoryKey;
-        renderFilterRadialWheel();
+        renderFilterRadialWheel(true);
     }
 }
 
@@ -10729,13 +10740,13 @@ function handleFilterRadialSubItemClick(categoryKey, itemId) {
     }
 
     if (isFilterRadialOpen) {
-        renderFilterRadialWheel();
+        renderFilterRadialWheel(false);
     }
 }
 
 function updateFilterRadialUI() {
     if (!isFilterRadialOpen) return;
-    renderFilterRadialWheel();
+    renderFilterRadialWheel(false);
 }
 
 async function checkStartupChanges() {
