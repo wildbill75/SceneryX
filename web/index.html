@@ -391,8 +391,7 @@
         #flight-planning-banner,
         #bottom-map-toolbar,
         #filter-radial-backdrop,
-        #filter-radial-center-hub,
-        .filter-radial-pill {
+        #filter-radial-center-hub {
             background: rgba(15, 23, 42, 0.38);
             backdrop-filter: blur(18px);
             -webkit-backdrop-filter: blur(18px);
@@ -400,7 +399,7 @@
         }
 
         #filter-radial-backdrop {
-            background: rgba(15, 23, 42, 0.18) !important;
+            background: rgba(15, 23, 42, 0.20) !important;
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8) !important;
         }
 
@@ -410,18 +409,19 @@
 
         /* Radial Filter Center Hub Hover & Drag */
         #filter-radial-center-hub {
+            background: rgba(15, 23, 42, 0.85) !important;
+            border: 2px solid rgba(148, 163, 184, 0.50) !important;
             transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
             cursor: grab;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7);
         }
         #filter-radial-center-hub:hover {
-            background: rgba(255, 255, 255, 0.50) !important;
+            background: rgba(255, 255, 255, 0.45) !important;
             border-color: rgba(255, 255, 255, 0.90) !important;
             border-width: 2.5px !important;
             filter: drop-shadow(0 0 16px rgba(255, 255, 255, 0.50)) !important;
         }
-        #filter-radial-center-hub:hover span,
-        #filter-radial-center-hub:hover i {
+        #filter-radial-center-hub:hover span {
             color: #ffffff !important;
             text-shadow: 0 0 10px rgba(0, 0, 0, 0.9) !important;
         }
@@ -433,35 +433,53 @@
             cursor: grabbing !important;
         }
 
-        /* Radial Filter Pills Hover & Active */
-        .filter-radial-pill {
-            transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.6);
+        /* Radial Filter Concentric Annular Sectors (SVG) */
+        .radial-filter-sector {
+            transform-box: view-box;
+            transform-origin: 280px 280px;
         }
-        .filter-radial-pill:hover {
-            background: rgba(255, 255, 255, 0.50) !important;
-            border-color: rgba(255, 255, 255, 0.90) !important;
-            border-width: 2.5px !important;
+        .radial-filter-sector-path {
+            fill: rgba(15, 23, 42, 0.50);
+            stroke: rgba(148, 163, 184, 0.45);
+            stroke-width: 1.75px;
+            transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+        }
+        .radial-filter-sector:hover .radial-filter-sector-path {
+            fill: rgba(255, 255, 255, 0.45) !important;
+            stroke: rgba(255, 255, 255, 0.90) !important;
+            stroke-width: 2.5px !important;
             filter: drop-shadow(0 0 16px rgba(255, 255, 255, 0.50)) !important;
         }
-        .filter-radial-pill:hover span,
-        .filter-radial-pill:hover i {
+        .radial-filter-sector:hover span {
             color: #ffffff !important;
             text-shadow: 0 0 10px rgba(0, 0, 0, 0.9);
         }
-        .filter-radial-pill:active {
+        .radial-filter-sector:active .radial-filter-sector-path {
             filter: brightness(1.35);
         }
-        .filter-radial-pill.is-active {
-            background: rgba(6, 182, 212, 0.45) !important;
-            border: 2px solid rgba(103, 232, 249, 0.95) !important;
-            box-shadow: 0 0 16px rgba(6, 182, 212, 0.6) !important;
-            color: #ffffff !important;
+        /* Active Category in Tier 1 */
+        .radial-filter-sector.is-category-active .radial-filter-sector-path {
+            fill: rgba(15, 23, 42, 0.75) !important;
+            stroke: rgba(56, 189, 248, 0.95) !important;
+            stroke-width: 2.25px !important;
+            filter: drop-shadow(0 0 14px rgba(56, 189, 248, 0.50)) !important;
         }
-        .filter-radial-pill.is-active:hover {
-            background: rgba(255, 255, 255, 0.50) !important;
-            border-color: rgba(255, 255, 255, 0.90) !important;
-            border-width: 2.5px !important;
+        /* Active Sub-item in Tier 2 */
+        .radial-filter-sector.is-item-active .radial-filter-sector-path {
+            fill: rgba(6, 182, 212, 0.45) !important;
+            stroke: rgba(103, 232, 249, 0.95) !important;
+            stroke-width: 2.25px !important;
+            filter: drop-shadow(0 0 14px rgba(6, 182, 212, 0.60)) !important;
+        }
+        .radial-filter-sector.is-item-active span {
+            color: #ffffff !important;
+            text-shadow: 0 0 10px rgba(0, 0, 0, 0.9);
+        }
+        .radial-filter-sector.is-item-active:hover .radial-filter-sector-path {
+            fill: rgba(255, 255, 255, 0.50) !important;
+            stroke: rgba(255, 255, 255, 0.90) !important;
+            stroke-width: 2.5px !important;
             filter: drop-shadow(0 0 16px rgba(255, 255, 255, 0.50)) !important;
         }
 
@@ -615,20 +633,18 @@
                 </button>
             </div>
 
-            <!-- FILTER RADIAL MENU (RIGHT-CLICK CONTEXTUAL FLOATING MENU - DRAGGABLE) -->
+            <!-- FILTER RADIAL MENU (RIGHT-CLICK CONTEXTUAL FLOATING CONCENTRIC ANNULAR WHEEL - DRAGGABLE) -->
             <div id="filter-radial-menu" class="hidden fixed z-[1500] select-none pointer-events-none transform -translate-x-1/2 -translate-y-1/2 transition-opacity duration-200" style="transform-origin: center center;">
-                <div class="relative w-[520px] h-[520px] flex items-center justify-center pointer-events-none">
-                    <!-- FROSTED BLURRED CIRCULAR BACKDROP DISC (DRAGGABLE - 350px diameter passing through center of pills) -->
-                    <div id="filter-radial-backdrop" class="absolute w-[350px] h-[350px] rounded-full pointer-events-auto cursor-grab" title="Drag wheel or click outside to dismiss"></div>
+                <div class="relative w-[560px] h-[560px] flex items-center justify-center pointer-events-none">
+                    <!-- FROSTED BLURRED CIRCULAR BACKDROP DISC (DRAGGABLE) -->
+                    <div id="filter-radial-backdrop" class="absolute w-[550px] h-[550px] rounded-full backdrop-blur-xl border border-slate-700/30 shadow-2xl pointer-events-auto cursor-grab" style="background: rgba(15, 23, 42, 0.20);" title="Drag wheel or click outside to dismiss"></div>
 
-                    <!-- CENTRAL HUB (DRAGGABLE & CLICKABLE - ENLARGED 150px) -->
-                    <div id="filter-radial-center-hub" class="absolute z-30 w-[150px] h-[150px] rounded-full flex flex-col items-center justify-center pointer-events-auto active:scale-95 group text-center p-2 cursor-grab select-none" title="Drag to move or click to navigate">
-                        <!-- Content rendered dynamically: Level 1 vs Level 2 -->
-                    </div>
+                    <!-- SVG Ring with Concentric Annular Sectors (Tier 1 Categories + Tier 2 Sub-items) -->
+                    <svg id="filter-radial-svg" class="absolute inset-0 w-full h-full filter drop-shadow-2xl overflow-visible pointer-events-none" viewBox="0 0 560 560" style="transform-origin: 280px 280px;"></svg>
 
-                    <!-- RADIAL ITEMS CONTAINER (LEVEL 1 / LEVEL 2 PILLS) -->
-                    <div id="filter-radial-items-container" class="absolute inset-0 pointer-events-none">
-                        <!-- Populated dynamically -->
+                    <!-- CENTRAL HUB (DRAGGABLE & CLICKABLE TO CLOSE) -->
+                    <div id="filter-radial-center-hub" class="absolute z-30 w-[130px] h-[130px] rounded-full flex flex-col items-center justify-center pointer-events-auto active:scale-95 group text-center p-2 cursor-grab select-none shadow-2xl" title="Drag to move or click to close">
+                        <!-- Rendered dynamically -->
                     </div>
                 </div>
             </div>

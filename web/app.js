@@ -10275,16 +10275,12 @@ function setButtonActive(btn, active) {
 /* ================= CONTEXTUAL FLOATING RADIAL FILTER MENU ================= */
 
 let isFilterRadialOpen = false;
-let filterRadialCurrentLevel = 1; // 1 = Main categories, 2 = Sub-category
-let filterRadialActiveCategory = null; // 'pricing', 'source', 'region', 'type', 'gsx', 'rating'
+let filterRadialActiveCategory = 'pricing'; // 'pricing', 'source', 'region', 'type', 'gsx', 'rating'
 
 const FILTER_RADIAL_CATEGORIES = [
     {
         key: 'pricing',
         label: 'PRICING MODEL',
-        icon: 'fa-solid fa-tag',
-        color: 'text-purple-400',
-        activeColor: 'border-purple-500/60 bg-purple-950/40 text-purple-200',
         getSummary: () => {
             if (selectedPricing.size === ALL_PRICING_LIST.length) return 'All Models';
             return `${selectedPricing.size} Active`;
@@ -10293,9 +10289,6 @@ const FILTER_RADIAL_CATEGORIES = [
     {
         key: 'source',
         label: 'SCENERY SOURCE',
-        icon: 'fa-solid fa-cubes',
-        color: 'text-cyan-400',
-        activeColor: 'border-cyan-500/60 bg-cyan-950/40 text-cyan-200',
         getSummary: () => {
             if (selectedSources.size === ALL_SOURCES_LIST.length) return 'All Sources';
             return `${selectedSources.size} Active`;
@@ -10303,10 +10296,7 @@ const FILTER_RADIAL_CATEGORIES = [
     },
     {
         key: 'region',
-        label: 'GEOGRAPHIC REGION',
-        icon: 'fa-solid fa-globe',
-        color: 'text-emerald-400',
-        activeColor: 'border-emerald-500/60 bg-emerald-950/40 text-emerald-200',
+        label: 'REGION',
         getSummary: () => {
             if (!selectedRegion) return 'Global (All)';
             const names = {
@@ -10328,9 +10318,6 @@ const FILTER_RADIAL_CATEGORIES = [
     {
         key: 'type',
         label: 'AIRPORT TYPE',
-        icon: 'fa-solid fa-plane-departure',
-        color: 'text-sky-400',
-        activeColor: 'border-sky-500/60 bg-sky-950/40 text-sky-200',
         getSummary: () => {
             if (selectedTypes.size === ALL_TYPES_LIST.length) return 'All Types';
             return `${selectedTypes.size} Active`;
@@ -10339,9 +10326,6 @@ const FILTER_RADIAL_CATEGORIES = [
     {
         key: 'gsx',
         label: 'GSX PROFILE',
-        icon: 'fa-solid fa-dolly',
-        color: 'text-amber-400',
-        activeColor: 'border-amber-500/60 bg-amber-950/40 text-amber-200',
         getSummary: () => {
             if (selectedGsxFilter === 'all') return 'All Profiles';
             if (selectedGsxFilter === 'with') return 'With GSX Only';
@@ -10350,10 +10334,7 @@ const FILTER_RADIAL_CATEGORIES = [
     },
     {
         key: 'rating',
-        label: 'USER RATING',
-        icon: 'fa-solid fa-star',
-        color: 'text-amber-400',
-        activeColor: 'border-amber-500/60 bg-amber-950/40 text-amber-200',
+        label: 'MIN RATING',
         getSummary: () => {
             if (!selectedMinRating || selectedMinRating === 0) return 'All Ratings (0★)';
             return `${selectedMinRating}★ Minimum`;
@@ -10407,7 +10388,7 @@ function initDraggableFilterRadial() {
                 filterRadialHasMoved = true;
             }
 
-            const menuRadius = 260;
+            const menuRadius = 280;
             const margin = 10;
             const newX = Math.max(menuRadius + margin, Math.min(window.innerWidth - menuRadius - margin, filterRadialMenuInitialPos.x + dx));
             const newY = Math.max(menuRadius + margin, Math.min(window.innerHeight - menuRadius - margin, filterRadialMenuInitialPos.y + dy));
@@ -10456,7 +10437,7 @@ function openFilterRadialMenu(clientX, clientY) {
     initDraggableFilterRadial();
 
     // Viewport edge clamping
-    const menuSize = 520;
+    const menuSize = 560;
     const half = menuSize / 2;
     const margin = 15;
     const posX = Math.max(half + margin, Math.min(window.innerWidth - half - margin, clientX));
@@ -10467,10 +10448,11 @@ function openFilterRadialMenu(clientX, clientY) {
     menuEl.classList.remove('hidden');
 
     isFilterRadialOpen = true;
-    filterRadialCurrentLevel = 1;
-    filterRadialActiveCategory = null;
+    if (!filterRadialActiveCategory) {
+        filterRadialActiveCategory = 'pricing';
+    }
 
-    renderFilterRadialLevel1();
+    renderFilterRadialWheel();
 }
 
 function toggleFilterRadialMenuAtCenter() {
@@ -10487,90 +10469,49 @@ function closeFilterRadialMenu() {
         menuEl.classList.add('hidden');
     }
     isFilterRadialOpen = false;
-    filterRadialCurrentLevel = 1;
-    filterRadialActiveCategory = null;
 }
 
 function handleFilterRadialCenterClick() {
-    if (filterRadialCurrentLevel === 2) {
-        // Return to Level 1
-        filterRadialCurrentLevel = 1;
-        filterRadialActiveCategory = null;
-        renderFilterRadialLevel1();
-    } else {
-        // Close menu
-        closeFilterRadialMenu();
-    }
+    closeFilterRadialMenu();
 }
 
-function renderFilterRadialLevel1() {
-    const hubEl = document.getElementById('filter-radial-center-hub');
-    const container = document.getElementById('filter-radial-items-container');
-    if (!hubEl || !container) return;
+/**
+ * Computes SVG path for an annular sector (pie slice with inner and outer radius)
+ */
+function getAnnularSectorPath(cx, cy, rIn, rOut, startAngleDeg, endAngleDeg, gapDeg = 2.0) {
+    const halfGap = gapDeg / 2;
+    const actualStart = startAngleDeg + halfGap;
+    const actualEnd = endAngleDeg - halfGap;
 
-    filterRadialCurrentLevel = 1;
-    filterRadialActiveCategory = null;
+    // Convert degrees to radians (0 deg = 12 o'clock / top)
+    const a1 = (actualStart - 90) * Math.PI / 180;
+    const a2 = (actualEnd - 90) * Math.PI / 180;
 
-    const count = currentlyFilteredAirports ? currentlyFilteredAirports.length : (allAirportsData ? allAirportsData.length : 0);
-    hubEl.innerHTML = `
-        <div class="flex flex-col items-center justify-center pointer-events-none select-none">
-            <span class="text-[10px] font-black tracking-widest text-slate-400 uppercase leading-tight">MAP VIEW</span>
-            <span class="text-sm font-black font-mono text-cyan-400 leading-tight my-0.5">FILTERED BY</span>
-            <span class="text-xs font-mono text-slate-300 mt-1.5 bg-slate-900/70 px-3 py-0.5 rounded-full border border-slate-700/50 shadow-inner">${count} AP</span>
-        </div>
-    `;
+    const x1 = cx + rOut * Math.cos(a1);
+    const y1 = cy + rOut * Math.sin(a1);
+    const x2 = cx + rOut * Math.cos(a2);
+    const y2 = cy + rOut * Math.sin(a2);
+    const x3 = cx + rIn * Math.cos(a2);
+    const y3 = cy + rIn * Math.sin(a2);
+    const x4 = cx + rIn * Math.cos(a1);
+    const y4 = cy + rIn * Math.sin(a1);
 
-    const cx = 260;
-    const cy = 260;
-    const radius = 175;
-    const total = FILTER_RADIAL_CATEGORIES.length;
-    let html = '';
+    const angleDiff = actualEnd - actualStart;
+    const largeArc = angleDiff > 180 ? 1 : 0;
 
-    FILTER_RADIAL_CATEGORIES.forEach((cat, idx) => {
-        const angle = -90 + (idx * 360 / total);
-        const rad = angle * Math.PI / 180;
-        const x = Math.round(cx + radius * Math.cos(rad));
-        const y = Math.round(cy + radius * Math.sin(rad));
-        const summary = cat.getSummary();
-
-        html += `
-            <button onclick="renderFilterRadialLevel2('${cat.key}')" 
-                    class="filter-radial-pill absolute pointer-events-auto cursor-pointer transition-all duration-150 active:scale-95 group flex flex-col items-center justify-center px-4 py-2 rounded-2xl text-center"
-                    style="left: ${x}px; top: ${y}px; transform: translate(-50%, -50%); min-width: 115px;">
-                <span class="text-[10px] font-black tracking-wider uppercase text-slate-200 group-hover:text-white leading-tight">${cat.label}</span>
-                <span class="text-[9px] font-mono text-slate-300 group-hover:text-white font-semibold truncate max-w-[125px] leading-tight mt-0.5">${summary}</span>
-            </button>
-        `;
-    });
-
-    container.innerHTML = html;
+    return `M ${x1.toFixed(2)} ${y1.toFixed(2)} ` +
+           `A ${rOut} ${rOut} 0 ${largeArc} 1 ${x2.toFixed(2)} ${y2.toFixed(2)} ` +
+           `L ${x3.toFixed(2)} ${y3.toFixed(2)} ` +
+           `A ${rIn} ${rIn} 0 ${largeArc} 0 ${x4.toFixed(2)} ${y4.toFixed(2)} ` +
+           `Z`;
 }
 
-function renderFilterRadialLevel2(categoryKey) {
-    const hubEl = document.getElementById('filter-radial-center-hub');
-    const container = document.getElementById('filter-radial-items-container');
-    if (!hubEl || !container) return;
-
-    filterRadialCurrentLevel = 2;
-    filterRadialActiveCategory = categoryKey;
-
-    const catObj = FILTER_RADIAL_CATEGORIES.find(c => c.key === categoryKey);
-    const catLabel = catObj ? catObj.label : 'CATEGORY';
-
-    hubEl.innerHTML = `
-        <div class="flex flex-col items-center justify-center text-cyan-400 group-hover:text-white transition-colors pointer-events-none select-none">
-            <span class="text-sm font-black tracking-widest uppercase leading-tight">BACK</span>
-            <span class="text-[10px] font-mono text-slate-400 mt-1 truncate max-w-[120px] leading-tight">${catLabel}</span>
-        </div>
-    `;
-
-    const cx = 260;
-    const cy = 260;
-    let items = [];
-    let radius = 175;
-
+/**
+ * Returns the sub-items for a given category key
+ */
+function getFilterRadialCategoryItems(categoryKey) {
     if (categoryKey === 'pricing') {
-        items = [
+        return [
             { id: 'all', label: 'All Models', isActive: selectedPricing.size === ALL_PRICING_LIST.length },
             { id: 'Payware', label: 'Payware', isActive: selectedPricing.has('Payware') },
             { id: 'Freeware / Flightsim.to', label: 'Freeware', isActive: selectedPricing.has('Freeware / Flightsim.to') },
@@ -10578,14 +10519,14 @@ function renderFilterRadialLevel2(categoryKey) {
             { id: 'Default', label: 'Default MSFS', isActive: selectedPricing.has('Default') }
         ];
     } else if (categoryKey === 'source') {
-        items = [
+        return [
             { id: 'all', label: 'All Sources', isActive: selectedSources.size === ALL_SOURCES_LIST.length },
             { id: 'Community', label: 'Community', isActive: selectedSources.has('Community') },
             { id: 'Marketplace', label: 'Marketplace', isActive: selectedSources.has('Marketplace') },
             { id: 'Official', label: 'Official', isActive: selectedSources.has('Official') }
         ];
     } else if (categoryKey === 'region') {
-        items = [
+        return [
             { id: 'all', label: 'All Regions', isActive: !selectedRegion },
             { id: 'weurope', label: 'W. Europe', isActive: selectedRegion === 'weurope' },
             { id: 'eeurope', label: 'E. Europe', isActive: selectedRegion === 'eeurope' },
@@ -10600,7 +10541,7 @@ function renderFilterRadialLevel2(categoryKey) {
             { id: 'pacific', label: 'Pacific', isActive: selectedRegion === 'pacific' }
         ];
     } else if (categoryKey === 'type') {
-        items = [
+        return [
             { id: 'all', label: 'All Types', isActive: selectedTypes.size === ALL_TYPES_LIST.length },
             { id: 'International', label: 'International', isActive: selectedTypes.has('International') },
             { id: 'Regional', label: 'Regional', isActive: selectedTypes.has('Regional') },
@@ -10608,15 +10549,15 @@ function renderFilterRadialLevel2(categoryKey) {
             { id: 'Heli / Water', label: 'Heli / Water', isActive: selectedTypes.has('Heli / Water') }
         ];
     } else if (categoryKey === 'gsx') {
-        items = [
+        return [
             { id: 'all', label: 'All Profiles', isActive: selectedGsxFilter === 'all' },
             { id: 'with', label: 'With GSX', isActive: selectedGsxFilter === 'with' },
             { id: 'none', label: 'No Profile', isActive: selectedGsxFilter === 'none' },
             { id: 'audit', label: 'Audit Hub', isActive: false }
         ];
     } else if (categoryKey === 'rating') {
-        items = [
-            { id: '0', label: 'All (0.0★)', isActive: !selectedMinRating || selectedMinRating === 0 },
+        return [
+            { id: '0', label: 'All Ratings', isActive: !selectedMinRating || selectedMinRating === 0 },
             { id: '3.0', label: '3.0★ & Up', isActive: selectedMinRating === 3.0 },
             { id: '3.5', label: '3.5★ & Up', isActive: selectedMinRating === 3.5 },
             { id: '4.0', label: '4.0★ & Up', isActive: selectedMinRating === 4.0 },
@@ -10624,28 +10565,130 @@ function renderFilterRadialLevel2(categoryKey) {
             { id: '5.0', label: '5.0★ Only', isActive: selectedMinRating === 5.0 }
         ];
     }
+    return [];
+}
 
-    const total = items.length;
-    let html = '';
+/**
+ * Renders concentric annular wheel matching Screen 1 (No icons, high readability)
+ */
+function renderFilterRadialWheel() {
+    const hubEl = document.getElementById('filter-radial-center-hub');
+    const svgEl = document.getElementById('filter-radial-svg');
+    if (!hubEl || !svgEl) return;
 
-    items.forEach((item, idx) => {
-        const angle = -90 + (idx * 360 / total);
-        const rad = angle * Math.PI / 180;
-        const x = Math.round(cx + radius * Math.cos(rad));
-        const y = Math.round(cy + radius * Math.sin(rad));
+    if (!filterRadialActiveCategory) {
+        filterRadialActiveCategory = 'pricing';
+    }
 
-        const baseClass = item.isActive ? 'is-active' : '';
+    const count = currentlyFilteredAirports ? currentlyFilteredAirports.length : (allAirportsData ? allAirportsData.length : 0);
+    hubEl.innerHTML = `
+        <div class="flex flex-col items-center justify-center pointer-events-none select-none">
+            <span class="text-[10px] font-black tracking-widest text-slate-400 uppercase leading-tight">MAP VIEW</span>
+            <span class="text-xs font-black font-mono text-cyan-400 leading-tight my-0.5">FILTERED BY</span>
+            <span class="text-[11px] font-mono font-bold text-slate-200 mt-1 bg-slate-900/80 px-2.5 py-0.5 rounded-full border border-slate-700/60 shadow-inner">${count} AP</span>
+        </div>
+    `;
 
-        html += `
-            <button onclick="handleFilterRadialSubItemClick('${categoryKey}', '${escapeJsStr(item.id)}')"
-                    class="filter-radial-pill ${baseClass} absolute pointer-events-auto cursor-pointer transition-all duration-150 active:scale-95 flex items-center justify-center px-3.5 py-1.5 rounded-2xl whitespace-nowrap text-xs font-bold text-slate-200 group text-center"
-                    style="left: ${x}px; top: ${y}px; transform: translate(-50%, -50%);">
-                <span>${escapeHtml(item.label)}</span>
-            </button>
+    const cx = 280;
+    const cy = 280;
+    const r1_in = 68;
+    const r1_out = 160;
+    const r2_in = 170;
+    const r2_out = 266;
+
+    // --- TIER 1: INNER ANNULAR RING (6 MAIN CATEGORIES) ---
+    let innerSvgHtml = '';
+    FILTER_RADIAL_CATEGORIES.forEach((cat, idx) => {
+        const startAngle = -120 + (idx * 60);
+        const endAngle = startAngle + 60;
+        const midAngle = (startAngle + endAngle) / 2;
+        const pathD = getAnnularSectorPath(cx, cy, r1_in, r1_out, startAngle, endAngle, 2.0);
+
+        const midR = (r1_in + r1_out) / 2;
+        const rad = (midAngle - 90) * Math.PI / 180;
+        const tx = cx + midR * Math.cos(rad);
+        const ty = cy + midR * Math.sin(rad);
+
+        const isCatActive = (cat.key === filterRadialActiveCategory);
+        const summary = cat.getSummary();
+
+        innerSvgHtml += `
+            <g class="radial-filter-sector ${isCatActive ? 'is-category-active' : ''} pointer-events-auto cursor-pointer group"
+               onclick="handleFilterRadialCategoryClick('${cat.key}')"
+               onmouseenter="handleFilterRadialCategoryHover('${cat.key}')"
+               role="button" aria-label="${escapeHtml(cat.label)}">
+                <path class="radial-filter-sector-path" d="${pathD}" />
+                <foreignObject x="${(tx - 55).toFixed(1)}" y="${(ty - 24).toFixed(1)}" width="110" height="48" class="pointer-events-none">
+                    <div class="w-full h-full flex flex-col items-center justify-center text-center leading-tight">
+                        <span class="text-[10px] font-black tracking-wider uppercase ${isCatActive ? 'text-cyan-400 font-extrabold' : 'text-slate-200 group-hover:text-white'}">${escapeHtml(cat.label)}</span>
+                        <span class="text-[9px] font-mono font-medium ${isCatActive ? 'text-cyan-300' : 'text-slate-400 group-hover:text-slate-200'} truncate max-w-[100px] mt-0.5">${escapeHtml(summary)}</span>
+                    </div>
+                </foreignObject>
+            </g>
         `;
     });
 
-    container.innerHTML = html;
+    // --- TIER 2: OUTER ANNULAR ARC (SUB-FILTER ITEMS OF ACTIVE CATEGORY) ---
+    let outerSvgHtml = '';
+    const items = getFilterRadialCategoryItems(filterRadialActiveCategory);
+    if (items && items.length > 0) {
+        const catIdx = FILTER_RADIAL_CATEGORIES.findIndex(c => c.key === filterRadialActiveCategory);
+        const catMidAngle = -90 + (catIdx * 60);
+
+        const itemCount = items.length;
+        let itemSpan = 360 / itemCount;
+        let startAngle = -120;
+
+        if (itemCount < 10) {
+            // Fan out symmetrically centered on the active category (Screen 1 style)
+            itemSpan = itemCount <= 4 ? 42 : (itemCount === 5 ? 38 : 34);
+            const totalSpan = itemCount * itemSpan;
+            startAngle = catMidAngle - (totalSpan / 2);
+        }
+
+        items.forEach((item, idx) => {
+            const aStart = startAngle + (idx * itemSpan);
+            const aEnd = aStart + itemSpan;
+            const midAngle = (aStart + aEnd) / 2;
+            const pathD = getAnnularSectorPath(cx, cy, r2_in, r2_out, aStart, aEnd, 2.0);
+
+            const midR2 = (r2_in + r2_out) / 2;
+            const rad = (midAngle - 90) * Math.PI / 180;
+            const tx = cx + midR2 * Math.cos(rad);
+            const ty = cy + midR2 * Math.sin(rad);
+
+            const isActive = !!item.isActive;
+
+            outerSvgHtml += `
+                <g class="radial-filter-sector ${isActive ? 'is-item-active' : ''} pointer-events-auto cursor-pointer group"
+                   onclick="handleFilterRadialSubItemClick('${filterRadialActiveCategory}', '${escapeJsStr(item.id)}')"
+                   role="button" aria-label="${escapeHtml(item.label)}">
+                    <path class="radial-filter-sector-path" d="${pathD}" />
+                    <foreignObject x="${(tx - 52).toFixed(1)}" y="${(ty - 22).toFixed(1)}" width="104" height="44" class="pointer-events-none">
+                        <div class="w-full h-full flex items-center justify-center text-center px-1">
+                            <span class="text-[11px] font-bold tracking-tight uppercase leading-snug ${isActive ? 'text-white font-extrabold' : 'text-slate-200 group-hover:text-white'}">${escapeHtml(item.label)}</span>
+                        </div>
+                    </foreignObject>
+                </g>
+            `;
+        });
+    }
+
+    svgEl.innerHTML = innerSvgHtml + outerSvgHtml;
+}
+
+function handleFilterRadialCategoryClick(categoryKey) {
+    if (filterRadialActiveCategory !== categoryKey) {
+        filterRadialActiveCategory = categoryKey;
+        renderFilterRadialWheel();
+    }
+}
+
+function handleFilterRadialCategoryHover(categoryKey) {
+    if (filterRadialActiveCategory !== categoryKey) {
+        filterRadialActiveCategory = categoryKey;
+        renderFilterRadialWheel();
+    }
 }
 
 function handleFilterRadialSubItemClick(categoryKey, itemId) {
@@ -10679,18 +10722,14 @@ function handleFilterRadialSubItemClick(categoryKey, itemId) {
         }
     }
 
-    if (isFilterRadialOpen && filterRadialCurrentLevel === 2) {
-        renderFilterRadialLevel2(categoryKey);
+    if (isFilterRadialOpen) {
+        renderFilterRadialWheel();
     }
 }
 
 function updateFilterRadialUI() {
     if (!isFilterRadialOpen) return;
-    if (filterRadialCurrentLevel === 1) {
-        renderFilterRadialLevel1();
-    } else if (filterRadialCurrentLevel === 2 && filterRadialActiveCategory) {
-        renderFilterRadialLevel2(filterRadialActiveCategory);
-    }
+    renderFilterRadialWheel();
 }
 
 async function checkStartupChanges() {
