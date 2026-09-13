@@ -1452,8 +1452,6 @@ function renderCountryAirportCard(ap) {
 
     let accordionHtml = '';
     const sources = ap.all_sources || [];
-    const fsToSearchUrl = `https://flightsim.to/search?q=${encodeURIComponent(ap.icao)}&cat=airports,scenery&exclude_cat=static-aircraft,gsx-pro&sim=msfs2020,msfs2024`;
-
     let rowsHtml = '';
     if (sources.length > 0) {
         rowsHtml = sources.map(s => {
@@ -1467,7 +1465,7 @@ function renderCountryAirportCard(ap) {
             else pBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-cyan-600 text-white">FREEWARE</span>`;
 
             return `
-                <div onclick="event.stopPropagation(); ${sPt === 'Payware' ? `openPaywareStoresModal('${ap.icao}', '${(ap.name || '').replace(/'/g, "\\'")}')` : `window.open('${fsToSearchUrl}', '_blank')`}"
+                <div onclick="event.stopPropagation(); ${sPt === 'Payware' ? `openPaywareStoresModal('${ap.icao}', '${(ap.name || '').replace(/'/g, "\\'")}')` : `openFreewareScenerySearch('${ap.icao}')`}"
                      class="flex items-center justify-between p-2 rounded-lg bg-slate-900/70 hover:bg-slate-800/80 border border-slate-800/80 cursor-pointer transition-all group">
                     <div class="flex items-center gap-2 min-w-0 flex-1">
                         <span class="text-xs font-mono font-black text-cyan-300 shrink-0">${ap.icao}</span>
@@ -1482,7 +1480,7 @@ function renderCountryAirportCard(ap) {
         }).join('');
     } else {
         rowsHtml = `
-            <div onclick="event.stopPropagation(); window.open('${fsToSearchUrl}', '_blank')"
+            <div onclick="event.stopPropagation(); openFreewareScenerySearch('${ap.icao}')"
                  class="flex items-center justify-between p-2 rounded-lg bg-slate-900/70 hover:bg-slate-800/80 border border-slate-800/80 cursor-pointer transition-all group">
                 <div class="flex items-center gap-2 min-w-0 flex-1">
                     <span class="text-xs font-mono font-black text-cyan-300 shrink-0">${ap.icao}</span>
@@ -1497,7 +1495,7 @@ function renderCountryAirportCard(ap) {
     }
 
     const freewareSearchRow = `
-        <div onclick="event.stopPropagation(); window.open('${fsToSearchUrl}', '_blank')"
+        <div onclick="event.stopPropagation(); openFreewareScenerySearch('${ap.icao}')"
              class="flex items-center justify-between p-2 rounded-lg bg-slate-900/40 hover:bg-slate-800/60 border border-slate-800/50 cursor-pointer transition-all group opacity-85 hover:opacity-100">
             <div class="flex items-center gap-2 min-w-0 flex-1">
                 <span class="text-xs font-mono font-black text-slate-400 shrink-0">${ap.icao}</span>
@@ -2077,18 +2075,30 @@ function disagreeAndExitApp() {
     }
 }
 
-async function openSupportLink() {
-    const targetUrl = "https://www.flightsim.to/profile/wildbill75";
+function openExternalUrl(url) {
+    if (!url) return;
     try {
         if (window.pywebview && window.pywebview.api && window.pywebview.api.open_external_url) {
-            await window.pywebview.api.open_external_url(targetUrl);
+            window.pywebview.api.open_external_url(url);
         } else {
-            window.open(targetUrl, '_blank');
+            window.open(url, '_blank');
         }
     } catch (e) {
-        console.error("Failed to open support URL:", e);
-        window.open(targetUrl, '_blank');
+        console.error("Failed to open external URL:", e);
+        window.open(url, '_blank');
     }
+}
+window.openExternalUrl = openExternalUrl;
+
+function openFreewareScenerySearch(icao) {
+    const cleanIcao = encodeURIComponent((icao || '').toUpperCase().trim());
+    const url = `https://flightsim.to/search?q=${cleanIcao}&cat=airports%2Cscenery&exclude_cat=static-aircraft%2Cgsx-pro&sim=msfs2020%2Cmsfs2024`;
+    openExternalUrl(url);
+}
+window.openFreewareScenerySearch = openFreewareScenerySearch;
+
+async function openSupportLink() {
+    openExternalUrl("https://www.flightsim.to/profile/wildbill75");
 }
 
 function formatCurrency(amountEur) {
@@ -4836,7 +4846,7 @@ function triggerRadialScenerySelector() {
 
     if (!extEl.classList.contains('hidden')) {
         // Toggle OFF with smooth exit animation
-        const pills = extEl.querySelectorAll('[onclick*="activateRadial"], [onclick*="window.open"]');
+        const pills = extEl.querySelectorAll('[onclick*="activateRadial"], [onclick*="window.open"], [onclick*="openFreewareScenerySearch"], [onclick*="openExternalUrl"]');
         pills.forEach(p => {
             p.classList.remove('animate-pill-bounce');
             p.classList.add('animate-pill-exit');
@@ -5072,7 +5082,6 @@ function renderRadialSceneriesExtension(ap, animate = false) {
     }
 
     // 4. Available Freeware Addons (Flightsim.to)
-    const fsToSearchUrl = `https://flightsim.to/search?q=${encodeURIComponent(ap.icao)}&cat=airports,scenery&exclude_cat=static-aircraft,gsx-pro&sim=msfs2020,msfs2024`;
     const freewareAnimClass = animate ? 'animate-pill-bounce' : '';
     const freewareAnimDelay = animate ? `style="animation-delay: ${(pillIndex * 0.05).toFixed(2)}s;"` : '';
     pillIndex++;
@@ -5081,7 +5090,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
         <div class="flex items-center gap-2 pt-1 px-1">
             <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">${t('drawer.freeware_addons', 'Available Freeware Addons')}</span>
         </div>
-        <div onclick="event.stopPropagation(); window.open('${fsToSearchUrl}', '_blank');"
+        <div onclick="event.stopPropagation(); openFreewareScenerySearch('${ap.icao}');"
              onmousedown="event.stopPropagation();"
              onpointerdown="event.stopPropagation();"
              ${freewareAnimDelay}
@@ -5233,7 +5242,7 @@ function renderRadialAddonDownloads(ap, stores, animate = false, basePillIndex =
         const storeDesc = shortDescMap[st.name] || st.desc || '';
 
         html += `
-            <div onclick="event.stopPropagation(); window.open('${safeUrl}', '_blank');"
+            <div onclick="event.stopPropagation(); openExternalUrl('${safeUrl}');"
                  onmousedown="event.stopPropagation();"
                  onpointerdown="event.stopPropagation();"
                  ${animDelay}
@@ -11609,7 +11618,7 @@ function renderPaywareStoresList(stores, cleanIcao) {
             const borderClass = isDev ? `border-amber-500/40 hover:border-amber-400 bg-slate-900/95` : `border-slate-800 hover:border-purple-500/50 bg-slate-900/90 hover:bg-slate-800`;
 
             return `
-                <button onclick="window.open('${st.url}', '_blank');"
+                <button onclick="openExternalUrl('${st.url}');"
                         class="w-full p-3.5 rounded-2xl ${borderClass} border text-slate-200 hover:text-white text-xs flex items-center justify-between transition-colors group cursor-pointer shadow-sm">
                     <div class="flex items-center gap-3 text-left min-w-0">
                         <div class="w-8 h-8 rounded-xl ${iconBoxClass} flex items-center justify-center text-xs shrink-0 transition-colors border-0">
