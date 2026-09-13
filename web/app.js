@@ -2743,6 +2743,7 @@ function setGsxAuditFilter(filter) {
         { id: 'gsx-filter-btn-duplicate', key: 'DUPLICATE' },
         { id: 'gsx-filter-btn-mismatch', key: 'MISMATCH' },
         { id: 'gsx-filter-btn-orphan', key: 'ORPHAN' },
+        { id: 'gsx-filter-btn-disabled', key: 'DISABLED' },
         { id: 'gsx-filter-btn-noprofile', key: 'NO_PROFILE' }
     ];
 
@@ -2758,11 +2759,13 @@ function setGsxAuditFilter(filter) {
 
     renderGsxAuditModal();
 }
+window.setGsxAuditFilter = setGsxAuditFilter;
 
 function handleGsxAuditSearch(event) {
     currentGsxAuditSearch = (event && event.target ? event.target.value : '').trim().toLowerCase();
     renderGsxAuditModal();
 }
+window.handleGsxAuditSearch = handleGsxAuditSearch;
 
 function initDraggableGsxAuditModal() {
     const header = document.getElementById('gsx-audit-modal-header');
@@ -2843,6 +2846,8 @@ function renderGsxAuditModal() {
     if (cMis) cMis.innerText = mismatchCount;
     const cOrp = document.getElementById('gsx-count-orphan');
     if (cOrp) cOrp.innerText = orphanCount;
+    const cDis = document.getElementById('gsx-count-disabled');
+    if (cDis) cDis.innerText = s.disabled || 0;
     const cNoProf = document.getElementById('gsx-count-noprofile');
     if (cNoProf) cNoProf.innerText = missingVisible;
     const cAsobo = document.getElementById('gsx-count-asobo');
@@ -2958,6 +2963,127 @@ function renderGsxAuditModal() {
                 </div>
             `;
         });
+        container.innerHTML = html;
+        return;
+    }
+
+    // SPECIAL HANDLING: DISABLED TAB
+    if (currentGsxAuditFilter === 'DISABLED') {
+        let disabledList = audit.disabled_profiles || [];
+
+        if (query) {
+            disabledList = disabledList.filter(item =>
+                (item.icao || '').toLowerCase().includes(query) ||
+                (item.name || '').toLowerCase().includes(query) ||
+                (item.filename || '').toLowerCase().includes(query) ||
+                (item.city || '').toLowerCase().includes(query)
+            );
+        }
+
+        if (disabledList.length === 0) {
+            if ((audit.disabled_profiles || []).length === 0) {
+                container.innerHTML = `
+                    <div class="py-12 px-6 text-center space-y-2">
+                        <span class="text-[11px] font-mono font-bold px-3 py-1 rounded-xl bg-slate-800 text-slate-400 border border-slate-700 inline-block">
+                            NO DISABLED PROFILES
+                        </span>
+                        <p class="text-xs font-mono text-slate-400">You don't have any disabled GSX profiles in your directory.</p>
+                    </div>
+                `;
+            } else {
+                container.innerHTML = `
+                    <div class="py-12 px-6 text-center space-y-2">
+                        <span class="text-[11px] font-mono font-bold px-3 py-1 rounded-xl bg-slate-800 text-slate-400 border border-slate-700 inline-block">
+                            NO RESULTS MATCHING FILTER
+                        </span>
+                        <p class="text-xs font-mono text-slate-400">Try clearing your search term.</p>
+                    </div>
+                `;
+            }
+            return;
+        }
+
+        const totalDisabled = (audit.disabled_profiles || []).length;
+        let html = `
+            <div class="flex items-center justify-between pb-1.5 px-1 border-b border-slate-800/60">
+                <span class="text-[11px] font-mono text-slate-400">
+                    ${disabledList.length} disabled profile${disabledList.length > 1 ? 's' : ''}${query ? ` (filtered from ${totalDisabled})` : ''}
+                </span>
+                <button onclick="confirmDeleteAllDisabledProfiles()"
+                        class="text-[10px] font-mono font-bold px-2.5 py-1 rounded-xl bg-rose-950/80 hover:bg-rose-900 text-rose-300 hover:text-white border border-rose-800/80 cursor-pointer transition-all flex items-center gap-1.5 active:scale-98 shadow-sm shadow-rose-950/40"
+                        title="Permanently delete all disabled profiles from hard disk">
+                    <svg class="w-3 h-3 text-rose-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    <span>Delete All Disabled (${totalDisabled})</span>
+                </button>
+            </div>
+            <div class="space-y-2 pt-1.5">
+        `;
+
+        disabledList.forEach(item => {
+            const icao = item.icao || '';
+            const location = [item.city, item.country].filter(Boolean).join(', ');
+            const canPan = !!gsxAuditFloatingMode;
+            const clickAttr = canPan ? `onclick="panCameraToGsxAirport('${icao}')"` : '';
+            const cursorClass = canPan ? 'cursor-pointer group/hdr hover:opacity-90' : 'cursor-default';
+            const titleAttr = canPan ? 'Click to view and center camera on airport' : '';
+            const underlineClass = canPan ? 'group-hover/hdr:underline' : '';
+            const hoverTextClass = canPan ? 'group-hover/hdr:text-cyan-300' : '';
+            const iconHtml = canPan ? `
+                <svg class="w-3 h-3 text-cyan-400 opacity-0 group-hover/hdr:opacity-100 transition-opacity shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="3" stroke-width="2"/>
+                    <circle cx="12" cy="12" r="8" stroke-width="2" stroke-dasharray="2 2"/>
+                </svg>` : '';
+
+            const safeId = 'gsx-dis-' + String(item.filename).replace(/[^a-zA-Z0-9_-]/g, '_');
+
+            html += `
+                <div id="${safeId}" class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800/90 shadow-sm space-y-2 transition-all duration-300">
+                    <div class="flex items-start justify-between gap-3">
+                        <div ${clickAttr} class="min-w-0 flex-1 ${cursorClass} transition-all select-none" title="${titleAttr}">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-mono font-bold text-cyan-400 ${underlineClass}">${escapeHtml(icao || '----')}</span>
+                                <span class="text-xs font-bold text-white truncate ${hoverTextClass} transition-colors">${escapeHtml(item.name || icao || item.filename)}</span>
+                                ${iconHtml}
+                            </div>
+                            ${location ? `<div class="text-[11px] font-mono text-slate-400 truncate">${escapeHtml(location)}</div>` : ''}
+                        </div>
+                        <div class="shrink-0">
+                            <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-slate-900 text-slate-400 border border-slate-700">DISABLED</span>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-800/60 flex-wrap sm:flex-nowrap">
+                        <div class="min-w-0 flex-1">
+                            <div class="text-xs font-mono font-bold text-slate-300 truncate" title="${escapeHtml(item.filename)}">
+                                ${escapeHtml(item.filename)}
+                            </div>
+                            ${item.mtime ? `<div class="text-[10px] font-mono text-slate-500">Updated ${escapeHtml(item.mtime)}</div>` : ''}
+                        </div>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <button onclick="enableGsxProfileFromAudit('${icao}', '${escapeJsStr(item.filename)}')"
+                                    class="text-[10px] font-mono font-bold px-3 py-1.5 rounded-xl bg-cyan-900 hover:bg-cyan-800 text-cyan-200 border border-cyan-700 cursor-pointer transition-colors shadow-sm"
+                                    title="Re-enable this profile">
+                                Enable
+                            </button>
+                            <button onclick="confirmDeleteGsxProfile('${icao}', '${escapeJsStr(item.filename)}')"
+                                    class="text-[10px] font-mono font-bold px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 border border-slate-700 hover:border-rose-800 cursor-pointer transition-colors"
+                                    title="Permanently delete from disk">
+                                Delete
+                            </button>
+                            <button onclick="revealGsxFileInExplorer('${escapeJsStr(item.path || item.filename)}')"
+                                    class="text-[10px] font-mono font-bold px-2 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 cursor-pointer transition-colors"
+                                    title="Reveal in Windows Explorer">
+                                Reveal
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+
+        html += `</div>`;
         container.innerHTML = html;
         return;
     }
@@ -3270,6 +3396,8 @@ function updateGsxHeaderAndTabBadges() {
     if (cMis) cMis.innerText = mismatchCount;
     const cOrp = document.getElementById('gsx-count-orphan');
     if (cOrp) cOrp.innerText = orphanCount;
+    const cDis = document.getElementById('gsx-count-disabled');
+    if (cDis) cDis.innerText = s.disabled || 0;
     const cNoProf = document.getElementById('gsx-count-noprofile');
     if (cNoProf) cNoProf.innerText = missingVisible;
     const cAsobo = document.getElementById('gsx-count-asobo');
@@ -3394,6 +3522,130 @@ async function disableGsxProfileFromModal(icao, filename) {
         console.error("Error disabling GSX profile:", e);
     }
 }
+
+async function enableGsxProfileFromAudit(icao, filename) {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.enable_gsx_profile) return;
+    try {
+        const raw = await window.pywebview.api.enable_gsx_profile(icao, filename);
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (parsed && parsed.status === 'ok') {
+            window.gsxAuditData = parsed.data;
+            const ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao(icao) : null;
+            if (ap) {
+                ap.gsx_ini_file = filename.replace(/\.disabled$/, '');
+                ap.has_gsx_profile = true;
+                if (typeof currentRadialAirport !== 'undefined' && currentRadialAirport && currentRadialAirport.icao === icao) {
+                    currentRadialAirport.gsx_ini_file = ap.gsx_ini_file;
+                    currentRadialAirport.has_gsx_profile = true;
+                    if (typeof renderRadialAirportDetails === 'function') {
+                        renderRadialAirportDetails(currentRadialAirport);
+                    }
+                }
+                updateStats(allAirportsData);
+                filterAirports();
+            }
+            if (typeof showToast === 'function') {
+                showToast(`✓ Profile enabled: ${filename.replace(/\.disabled$/, '')}`, 'success');
+            }
+            renderGsxAuditModal();
+            updateGsxHeaderAndTabBadges();
+        } else {
+            if (typeof showToast === 'function') {
+                showToast((parsed && parsed.message) || 'Error enabling GSX profile', 'error');
+            }
+        }
+    } catch (e) {
+        console.error("Error enabling GSX profile from audit:", e);
+    }
+}
+window.enableGsxProfileFromAudit = enableGsxProfileFromAudit;
+
+function confirmDeleteGsxProfile(icao, filename) {
+    showCustomModal({
+        title: 'Delete GSX Profile',
+        message: `Do you really want to delete "${filename}" from your hard disk?`,
+        type: 'error',
+        confirmText: 'Delete',
+        cancelText: 'Cancel',
+        showCancel: true,
+        onConfirm: async () => {
+            if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.delete_gsx_profile) return;
+            try {
+                const raw = await window.pywebview.api.delete_gsx_profile(icao, filename);
+                const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                if (parsed && parsed.status === 'ok') {
+                    window.gsxAuditData = parsed.data;
+                    const ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao(icao) : null;
+                    if (ap) {
+                        const auditEntry = window.gsxAuditData && window.gsxAuditData.by_icao ? window.gsxAuditData.by_icao[icao] : null;
+                        const activeRemaining = auditEntry && auditEntry.files ? auditEntry.files.find(f => !f.is_disabled) : null;
+                        ap.gsx_ini_file = activeRemaining ? activeRemaining.filename : null;
+                        ap.has_gsx_profile = !!activeRemaining;
+                        if (typeof currentRadialAirport !== 'undefined' && currentRadialAirport && currentRadialAirport.icao === icao) {
+                            currentRadialAirport.gsx_ini_file = ap.gsx_ini_file;
+                            currentRadialAirport.has_gsx_profile = ap.has_gsx_profile;
+                            if (typeof renderRadialAirportDetails === 'function') {
+                                renderRadialAirportDetails(currentRadialAirport);
+                            }
+                        }
+                        updateStats(allAirportsData);
+                        filterAirports();
+                    }
+                    if (typeof showToast === 'function') {
+                        showToast(`✓ File deleted: ${filename}`, 'info');
+                    }
+                    renderGsxAuditModal();
+                    updateGsxHeaderAndTabBadges();
+                } else {
+                    if (typeof showToast === 'function') {
+                        showToast((parsed && parsed.message) || 'Error deleting GSX profile', 'error');
+                    }
+                }
+            } catch (e) {
+                console.error("Error deleting GSX profile:", e);
+            }
+        }
+    });
+}
+window.confirmDeleteGsxProfile = confirmDeleteGsxProfile;
+
+function confirmDeleteAllDisabledProfiles() {
+    const disabledCount = (window.gsxAuditData && window.gsxAuditData.disabled_profiles)
+        ? window.gsxAuditData.disabled_profiles.length
+        : 0;
+    if (disabledCount === 0) return;
+
+    showCustomModal({
+        title: 'Delete All Disabled Profiles',
+        message: `Do you really want to permanently delete all ${disabledCount} disabled GSX profile${disabledCount > 1 ? 's' : ''} from your hard disk?\n\nThis action cannot be undone.`,
+        type: 'error',
+        confirmText: `Delete All (${disabledCount})`,
+        cancelText: 'Cancel',
+        showCancel: true,
+        onConfirm: async () => {
+            if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.delete_all_disabled_gsx_profiles) return;
+            try {
+                const raw = await window.pywebview.api.delete_all_disabled_gsx_profiles();
+                const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                if (parsed && parsed.status === 'ok') {
+                    window.gsxAuditData = parsed.data;
+                    if (typeof showToast === 'function') {
+                        showToast(`✓ Deleted ${parsed.deleted_count !== undefined ? parsed.deleted_count : disabledCount} disabled GSX profile(s)`, 'info');
+                    }
+                    renderGsxAuditModal();
+                    updateGsxHeaderAndTabBadges();
+                } else {
+                    if (typeof showToast === 'function') {
+                        showToast((parsed && parsed.message) || 'Error deleting disabled GSX profiles', 'error');
+                    }
+                }
+            } catch (e) {
+                console.error("Error deleting all disabled GSX profiles:", e);
+            }
+        }
+    });
+}
+window.confirmDeleteAllDisabledProfiles = confirmDeleteAllDisabledProfiles;
 
 async function revealGsxFileInExplorer(filePath) {
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.reveal_file_in_explorer) return;
@@ -11049,6 +11301,13 @@ function showCustomModal(titleOrObj, messageStr, typeStr = 'info') {
         if (confirmBtn) {
             confirmBtn.innerText = confirmText;
             confirmBtn.classList.remove('hidden');
+            if (typeof titleOrObj === 'object' && titleOrObj && titleOrObj.confirmClass) {
+                confirmBtn.className = titleOrObj.confirmClass;
+            } else if (type === 'error') {
+                confirmBtn.className = "px-6 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition-colors border-0 cursor-pointer shadow-md shadow-rose-950/40";
+            } else {
+                confirmBtn.className = "px-6 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition-colors border-0 cursor-pointer";
+            }
         }
         if (cancelBtn) {
             cancelBtn.innerText = cancelText;

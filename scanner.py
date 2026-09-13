@@ -1013,7 +1013,7 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
         all_dir_files = []
 
     active_ini_files = [f for f in all_dir_files if f.endswith('.ini') and f.lower() != 'configuration.ini']
-    disabled_ini_files = [f for f in all_dir_files if f.endswith('.ini.disabled')]
+    disabled_ini_files = [f for f in all_dir_files if f.lower().endswith('.disabled') and not f.lower().startswith('configuration')]
 
     airports_db = {}
     try:
@@ -1055,6 +1055,7 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
         'duplicate': 0,
         'mismatch': 0,
         'orphan': 0,
+        'disabled': len(disabled_ini_files),
         'invalid': len(non_icao_files)
     }
 
@@ -1259,11 +1260,46 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
     summary['missing_addons'] = len([m for m in installed_missing if not m['is_asobo']])
     summary['missing_asobo'] = len([m for m in installed_missing if m['is_asobo']])
 
+    disabled_profiles = []
+    for f in disabled_ini_files:
+        fp = os.path.join(gsx_dir, f)
+        icao = extract_icao_from_gsx_filename(f, valid_icaos=all_valid_icaos, file_path=fp) or ''
+        ap = installed_map.get(icao)
+        db_ap = airports_db.get(icao, {}) if airports_db else {}
+        ap_name = ap.get('name') if ap else db_ap.get('name', icao)
+        city = ap.get('city') if ap else db_ap.get('city', '')
+        country = ap.get('country') if ap else db_ap.get('country', '')
+        lat = ap.get('lat') if ap else db_ap.get('lat')
+        lon = ap.get('lon') if ap else db_ap.get('lon')
+
+        mtime_str = None
+        try:
+            mtime_ts = os.path.getmtime(fp)
+            mtime_str = datetime.datetime.fromtimestamp(mtime_ts).strftime('%Y-%m-%d')
+        except Exception:
+            pass
+
+        disabled_profiles.append({
+            'filename': f,
+            'path': fp,
+            'icao': icao,
+            'name': ap_name or icao,
+            'city': city,
+            'country': country,
+            'lat': lat,
+            'lon': lon,
+            'mtime': mtime_str
+        })
+
+    disabled_profiles.sort(key=lambda x: (x['icao'] or 'ZZZZ', x['filename']))
+    summary['disabled'] = len(disabled_profiles)
+
     audit_payload = {
         'summary': summary,
         'by_icao': results,
         'non_icao_files': non_icao_files,
-        'missing_profiles': installed_missing
+        'missing_profiles': installed_missing,
+        'disabled_profiles': disabled_profiles
     }
 
     # Save cache file

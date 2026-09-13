@@ -5,7 +5,7 @@ import re
 import urllib.request
 import webbrowser
 import webview
-from scanner import run_scan, get_settings, save_settings, load_ratings, save_rating, save_custom_price, save_custom_category, load_custom_prices, get_estimated_price, get_default_gsx_path, load_airport_database, SPECIAL_BUNDLE_MAP, OUTPUT_JSON_PATH, compute_scan_delta, build_library_snapshot, SNAPSHOT_JSON_PATH, get_resource_file_path, audit_all_gsx_profiles, audit_single_airport_gsx
+from scanner import run_scan, get_settings, save_settings, load_ratings, save_rating, save_custom_price, save_custom_category, load_custom_prices, get_estimated_price, get_default_gsx_path, load_airport_database, SPECIAL_BUNDLE_MAP, OUTPUT_JSON_PATH, compute_scan_delta, build_library_snapshot, SNAPSHOT_JSON_PATH, get_resource_file_path, audit_all_gsx_profiles, audit_single_airport_gsx, extract_icao_from_gsx_filename
 
 AIRPORTS_DB_CACHE = None
 
@@ -2038,11 +2038,14 @@ class Api:
             if not gsx_dir or not os.path.exists(gsx_dir):
                 return json.dumps({"status": "error", "message": "GSX directory not found."})
 
-            target_icao = (icao or '').upper()
+            target_icao = (icao or '').upper().strip()
             # Disable any other active .ini profile for this ICAO first
             for f in os.listdir(gsx_dir):
-                if f.upper().startswith(target_icao) and f.endswith('.ini') and f.lower() != 'configuration.ini':
-                    fp = os.path.join(gsx_dir, f)
+                if f.lower() == 'configuration.ini' or not f.endswith('.ini'):
+                    continue
+                fp = os.path.join(gsx_dir, f)
+                f_icao = extract_icao_from_gsx_filename(f, valid_icaos={target_icao} if target_icao else None, file_path=fp)
+                if (target_icao and f.upper().startswith(target_icao)) or (target_icao and f_icao == target_icao):
                     os.rename(fp, fp + '.disabled')
 
             # Now enable target file
@@ -2071,6 +2074,50 @@ class Api:
 
             audit_data = audit_all_gsx_profiles(gsx_dir=gsx_dir)
             return json.dumps({"status": "ok", "data": audit_data}, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
+    def delete_gsx_profile(self, icao, filename):
+        try:
+            settings = get_settings()
+            gsx_dir = settings.get("gsx_profile_path", get_default_gsx_path())
+            if not gsx_dir or not os.path.exists(gsx_dir):
+                return json.dumps({"status": "error", "message": "GSX directory not found."})
+
+            if not filename or '..' in filename or '/' in filename or '\\' in filename:
+                return json.dumps({"status": "error", "message": "Invalid filename."})
+
+            fp = os.path.join(gsx_dir, filename)
+            if os.path.exists(fp) and os.path.isfile(fp):
+                os.remove(fp)
+            else:
+                return json.dumps({"status": "error", "message": f"File '{filename}' not found."})
+
+            audit_data = audit_all_gsx_profiles(gsx_dir=gsx_dir)
+            return json.dumps({"status": "ok", "data": audit_data}, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
+    def delete_all_disabled_gsx_profiles(self):
+        try:
+            settings = get_settings()
+            gsx_dir = settings.get("gsx_profile_path", get_default_gsx_path())
+            if not gsx_dir or not os.path.exists(gsx_dir):
+                return json.dumps({"status": "error", "message": "GSX directory not found."})
+
+            deleted_count = 0
+            for f in os.listdir(gsx_dir):
+                if f.lower().endswith('.disabled'):
+                    fp = os.path.join(gsx_dir, f)
+                    try:
+                        if os.path.isfile(fp):
+                            os.remove(fp)
+                            deleted_count += 1
+                    except Exception as e:
+                        print(f"Error removing {fp}: {e}")
+
+            audit_data = audit_all_gsx_profiles(gsx_dir=gsx_dir)
+            return json.dumps({"status": "ok", "deleted_count": deleted_count, "data": audit_data}, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
 
