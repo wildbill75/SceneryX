@@ -2534,6 +2534,61 @@ async function openGsxAuditModal(filter = 'ALL') {
 
 let gsxAuditFloatingMode = false;
 
+function panCameraToGsxAirport(icao) {
+    if (!icao) return;
+    let ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao(icao) : null;
+
+    // Fallback if not found in active installed airports (e.g. orphan profile or not yet in allAirportsData)
+    if (!ap || ap.lat === undefined || ap.lon === undefined) {
+        if (window.gsxAuditData) {
+            if (window.gsxAuditData.by_icao && window.gsxAuditData.by_icao[icao]) {
+                const entry = window.gsxAuditData.by_icao[icao];
+                if (entry.lat !== undefined && entry.lon !== undefined && entry.lat !== null && entry.lon !== null) {
+                    ap = {
+                        icao: icao,
+                        name: entry.name || icao,
+                        city: entry.city || '',
+                        country: entry.country || '',
+                        lat: entry.lat,
+                        lon: entry.lon
+                    };
+                }
+            } else if (Array.isArray(window.gsxAuditData.missing_profiles)) {
+                const missing = window.gsxAuditData.missing_profiles.find(m => m.icao === icao);
+                if (missing && missing.lat !== undefined && missing.lon !== undefined) {
+                    ap = {
+                        icao: icao,
+                        name: missing.name || icao,
+                        city: missing.city || '',
+                        country: missing.country || '',
+                        lat: missing.lat,
+                        lon: missing.lon
+                    };
+                }
+            }
+        }
+    }
+
+    if (!ap || ap.lat === undefined || ap.lon === undefined) {
+        if (typeof showToast === 'function') {
+            showToast(`Airport ${icao} coordinates not available on map`, 'info');
+        }
+        return;
+    }
+
+    // If modal is in full-screen modal mode (backdrop blur), transition smoothly to floating map mode
+    const modal = document.getElementById('gsx-audit-modal');
+    if (modal && !modal.classList.contains('pointer-events-none')) {
+        openMapFromGsxAudit();
+    }
+
+    // Pan and center camera smoothly on airport using user-defined settings (zoom & duration)
+    if (typeof centerMapOnAirport === 'function') {
+        centerMapOnAirport(ap);
+    }
+}
+window.panCameraToGsxAirport = panCameraToGsxAirport;
+
 function openMapFromGsxAudit() {
     const modal = document.getElementById('gsx-audit-modal');
     if (!modal) return;
@@ -2750,10 +2805,14 @@ function renderGsxAuditModal() {
             html += `
                 <div id="gsx-card-${icao}" class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800/90 shadow-sm space-y-2 transition-all duration-500">
                     <div class="flex items-start justify-between gap-3">
-                        <div class="min-w-0 flex-1">
+                        <div onclick="panCameraToGsxAirport('${icao}')" class="min-w-0 flex-1 cursor-pointer group/hdr hover:opacity-90 transition-all select-none" title="Click to view and center camera on airport">
                             <div class="flex items-center gap-2">
-                                <span class="text-xs font-mono font-bold text-cyan-400">${escapeHtml(icao)}</span>
-                                <span class="text-xs font-bold text-white truncate">${escapeHtml(item.name || icao)}</span>
+                                <span class="text-xs font-mono font-bold text-cyan-400 group-hover/hdr:underline">${escapeHtml(icao)}</span>
+                                <span class="text-xs font-bold text-white truncate group-hover/hdr:text-cyan-300 transition-colors">${escapeHtml(item.name || icao)}</span>
+                                <svg class="w-3 h-3 text-cyan-400 opacity-0 group-hover/hdr:opacity-100 transition-opacity shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <circle cx="12" cy="12" r="3" stroke-width="2"/>
+                                    <circle cx="12" cy="12" r="8" stroke-width="2" stroke-dasharray="2 2"/>
+                                </svg>
                             </div>
                             <div class="text-[11px] font-mono text-slate-400 truncate">${escapeHtml(location)}</div>
                         </div>
@@ -2881,10 +2940,14 @@ function renderGsxAuditModal() {
 
         html += `
             <div class="flex items-start justify-between gap-3">
-                <div class="min-w-0 flex-1">
+                <div onclick="panCameraToGsxAirport('${icao}')" class="min-w-0 flex-1 cursor-pointer group/hdr hover:opacity-90 transition-all select-none" title="Click to view and center camera on airport">
                     <div class="flex items-center gap-2">
-                        <span class="text-xs font-mono font-bold text-cyan-400">${escapeHtml(icao)}</span>
-                        <span class="text-xs font-bold text-white truncate">${escapeHtml(apName)}</span>
+                        <span class="text-xs font-mono font-bold text-cyan-400 group-hover/hdr:underline">${escapeHtml(icao)}</span>
+                        <span class="text-xs font-bold text-white truncate group-hover/hdr:text-cyan-300 transition-colors">${escapeHtml(apName)}</span>
+                        <svg class="w-3 h-3 text-cyan-400 opacity-0 group-hover/hdr:opacity-100 transition-opacity shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="3" stroke-width="2"/>
+                            <circle cx="12" cy="12" r="8" stroke-width="2" stroke-dasharray="2 2"/>
+                        </svg>
                     </div>
                     <div class="text-[11px] font-mono text-slate-400 truncate">${escapeHtml(location)}</div>
                 </div>

@@ -979,8 +979,14 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
                 reason = 'Active GSX profile.'
                 summary['matched'] += 1
 
+        db_ap = airports_db.get(icao, {}) if airports_db else {}
         results[icao] = {
             'icao': icao,
+            'name': ap.get('name') if ap else db_ap.get('name', icao),
+            'city': ap.get('city') if ap else db_ap.get('city', ''),
+            'country': ap.get('country') if ap else db_ap.get('country', ''),
+            'lat': ap.get('lat') if ap else db_ap.get('lat'),
+            'lon': ap.get('lon') if ap else db_ap.get('lon'),
             'status': status,
             'reason': reason,
             'files': parsed_files
@@ -1002,6 +1008,8 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
                     'name': ap.get('name', icao),
                     'city': ap.get('city', ''),
                     'country': ap.get('country', ''),
+                    'lat': ap.get('lat'),
+                    'lon': ap.get('lon'),
                     'vendor': ap.get('vendor', ''),
                     'pricing_type': 'Payware' if is_payware else ('Asobo' if is_asobo else 'Freeware'),
                     'is_payware': is_payware,
