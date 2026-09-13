@@ -2686,7 +2686,7 @@ function renderGsxAuditModal() {
             }
 
             html += `
-                <div class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800/90 shadow-sm space-y-2">
+                <div id="gsx-card-${icao}" class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800/90 shadow-sm space-y-2 transition-all duration-500">
                     <div class="flex items-start justify-between gap-3">
                         <div class="min-w-0 flex-1">
                             <div class="flex items-center gap-2">
@@ -2701,30 +2701,31 @@ function renderGsxAuditModal() {
                         </div>
                     </div>
 
-                    <div class="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-800/60">
-                        <div class="text-[11px] font-mono text-slate-400 truncate">
+                    <div class="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-800/60 flex-wrap sm:flex-nowrap">
+                        <div class="text-[11px] font-mono text-slate-400 truncate min-w-0 flex-1">
                             ${escapeHtml(item.vendor ? `Studio: ${item.vendor}` : 'Custom MSFS Scenery')}
                         </div>
                         <div class="flex items-center gap-2 shrink-0">
-                            <button onclick="searchGsxProfileFromModal('${icao}')" class="text-[10px] font-mono font-bold px-3 py-1 rounded-xl leading-tight bg-cyan-950 hover:bg-cyan-900 text-cyan-300 hover:text-cyan-200 border border-cyan-800 cursor-pointer transition-colors" title="Search matching GSX profile on Flightsim.to">
+                            <!-- Drop pill to the left of Search -->
+                            <div id="gsx-dropzone-${icao}"
+                                 ondragover="handleGsxAuditDragOver(event, '${icao}')"
+                                 ondragleave="handleGsxAuditDragLeave(event, '${icao}')"
+                                 ondrop="handleGsxAuditDrop(event, '${icao}')"
+                                 onclick="installGsxProfileFromModal('${icao}')"
+                                 class="px-2.5 py-1.5 rounded-xl bg-slate-950/80 border border-dashed border-slate-700 hover:border-cyan-400 hover:bg-cyan-950/30 flex flex-col items-center justify-center text-center cursor-pointer transition-all group shrink-0"
+                                 title="Drop .ini or archive (.zip) here, or click to browse">
+                                <span class="text-[9px] font-mono font-bold text-slate-300 group-hover:text-cyan-300 transition-colors pointer-events-none leading-none">
+                                    DROP .INI / .ZIP
+                                </span>
+                                <span class="text-[8px] font-mono text-slate-500 group-hover:text-slate-400 transition-colors pointer-events-none leading-tight mt-0.5">
+                                    or browse
+                                </span>
+                            </div>
+
+                            <button onclick="searchGsxProfileFromModal('${icao}')" class="text-[10px] font-mono font-bold px-3 py-2 rounded-xl leading-tight bg-cyan-950 hover:bg-cyan-900 text-cyan-300 hover:text-cyan-200 border border-cyan-800 cursor-pointer transition-colors shrink-0" title="Search matching GSX profile on Flightsim.to">
                                 Search GSX on Flightsim.to
                             </button>
                         </div>
-                    </div>
-
-                    <div id="gsx-dropzone-${icao}"
-                         ondragover="handleGsxAuditDragOver(event, '${icao}')"
-                         ondragleave="handleGsxAuditDragLeave(event, '${icao}')"
-                         ondrop="handleGsxAuditDrop(event, '${icao}')"
-                         onclick="installGsxProfileFromModal('${icao}')"
-                         class="py-1 px-3 rounded-xl bg-slate-950/60 border border-dashed border-slate-800 hover:border-cyan-500/60 flex items-center justify-between gap-2 transition-all cursor-pointer group"
-                         title="Drop .zip or .ini to install, or click to browse">
-                        <span class="text-[10px] font-mono font-bold text-slate-400 group-hover:text-cyan-300 transition-colors pointer-events-none truncate">
-                            DROP GSX .INI / .ZIP TO INSTALL
-                        </span>
-                        <span class="text-[9px] font-mono text-slate-500 group-hover:text-slate-300 transition-colors pointer-events-none shrink-0">
-                            or click to browse
-                        </span>
                     </div>
                 </div>
             `;
@@ -2814,7 +2815,7 @@ function renderGsxAuditModal() {
             badgeHtml = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-slate-800 text-slate-300 border border-slate-700">${escapeHtml(entry.status)}</span>`;
         }
 
-        html += `<div class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800/90 shadow-sm space-y-2">`;
+        html += `<div id="gsx-card-${icao}" class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800/90 shadow-sm space-y-2 transition-all duration-500">`;
 
         html += `
             <div class="flex items-start justify-between gap-3">
@@ -2901,19 +2902,22 @@ function renderGsxAuditModal() {
             });
             html += `</div>`;
             html += `
-                <div id="gsx-dropzone-${icao}"
-                     ondragover="handleGsxAuditDragOver(event, '${icao}')"
-                     ondragleave="handleGsxAuditDragLeave(event, '${icao}')"
-                     ondrop="handleGsxAuditDrop(event, '${icao}')"
-                     onclick="installGsxProfileFromModal('${icao}')"
-                     class="py-1 px-3 rounded-xl bg-slate-950/60 border border-dashed border-slate-800 hover:border-cyan-500/60 flex items-center justify-between gap-2 transition-all cursor-pointer group"
-                     title="Drop new profile .zip or .ini to install, or click to browse">
-                    <span class="text-[10px] font-mono font-bold text-slate-400 group-hover:text-cyan-300 transition-colors pointer-events-none truncate">
-                        DROP NEW GSX .INI / .ZIP TO INSTALL
-                    </span>
-                    <span class="text-[9px] font-mono text-slate-500 group-hover:text-slate-300 transition-colors pointer-events-none shrink-0">
-                        or click to browse
-                    </span>
+                <div class="flex items-center justify-end gap-2 pt-1 border-t border-slate-800/60">
+                    <span class="text-[10px] font-mono text-slate-500">Or install new profile:</span>
+                    <div id="gsx-dropzone-${icao}"
+                         ondragover="handleGsxAuditDragOver(event, '${icao}')"
+                         ondragleave="handleGsxAuditDragLeave(event, '${icao}')"
+                         ondrop="handleGsxAuditDrop(event, '${icao}')"
+                         onclick="installGsxProfileFromModal('${icao}')"
+                         class="px-2.5 py-1.5 rounded-xl bg-slate-950/80 border border-dashed border-slate-700 hover:border-cyan-400 hover:bg-cyan-950/30 flex flex-col items-center justify-center text-center cursor-pointer transition-all group shrink-0"
+                         title="Drop new profile .ini or archive (.zip) here, or click to browse">
+                        <span class="text-[9px] font-mono font-bold text-slate-300 group-hover:text-cyan-300 transition-colors pointer-events-none leading-none">
+                            DROP .INI / .ZIP
+                        </span>
+                        <span class="text-[8px] font-mono text-slate-500 group-hover:text-slate-400 transition-colors pointer-events-none leading-tight mt-0.5">
+                            or browse
+                        </span>
+                    </div>
                 </div>
             `;
         } else if (entry.status.startsWith('MISMATCH')) {
@@ -2938,29 +2942,31 @@ function renderGsxAuditModal() {
                 `;
             }
             html += `
-                <div class="flex items-center justify-end gap-2">
-                    <button onclick="searchGsxProfileFromModal('${icao}')" class="text-[10px] font-mono font-bold px-3 py-1 rounded-xl leading-tight bg-cyan-950 hover:bg-cyan-900 text-cyan-300 hover:text-cyan-200 border border-cyan-800 cursor-pointer transition-colors" title="Search matching GSX profile on Flightsim.to">
+                <div class="flex items-center justify-end gap-2 pt-1 border-t border-slate-800/60 flex-wrap sm:flex-nowrap">
+                    <!-- Drop pill to the left of Search -->
+                    <div id="gsx-dropzone-${icao}"
+                         ondragover="handleGsxAuditDragOver(event, '${icao}')"
+                         ondragleave="handleGsxAuditDragLeave(event, '${icao}')"
+                         ondrop="handleGsxAuditDrop(event, '${icao}')"
+                         onclick="installGsxProfileFromModal('${icao}')"
+                         class="px-2.5 py-1.5 rounded-xl bg-slate-950/80 border border-dashed border-slate-700 hover:border-cyan-400 hover:bg-cyan-950/30 flex flex-col items-center justify-center text-center cursor-pointer transition-all group shrink-0"
+                         title="Drop replacement .ini or archive (.zip) here, or click to browse">
+                        <span class="text-[9px] font-mono font-bold text-slate-300 group-hover:text-cyan-300 transition-colors pointer-events-none leading-none">
+                            DROP .INI / .ZIP
+                        </span>
+                        <span class="text-[8px] font-mono text-slate-500 group-hover:text-slate-400 transition-colors pointer-events-none leading-tight mt-0.5">
+                            or browse
+                        </span>
+                    </div>
+
+                    <button onclick="searchGsxProfileFromModal('${icao}')" class="text-[10px] font-mono font-bold px-3 py-2 rounded-xl leading-tight bg-cyan-950 hover:bg-cyan-900 text-cyan-300 hover:text-cyan-200 border border-cyan-800 cursor-pointer transition-colors shrink-0" title="Search matching GSX profile on Flightsim.to">
                         Search GSX on Flightsim.to
                     </button>
                     ${activeFile && !activeFile.is_disabled ? `
-                        <button onclick="disableGsxProfileFromModal('${icao}', '${escapeJsStr(activeFile.filename)}')" class="text-[10px] font-mono font-bold px-3 py-1 rounded-xl leading-tight bg-slate-800 hover:bg-rose-950 text-slate-300 hover:text-rose-400 border border-slate-700 cursor-pointer transition-colors" title="Disable mismatched profile">
+                        <button onclick="disableGsxProfileFromModal('${icao}', '${escapeJsStr(activeFile.filename)}')" class="text-[10px] font-mono font-bold px-3 py-2 rounded-xl leading-tight bg-slate-800 hover:bg-rose-950 text-slate-300 hover:text-rose-400 border border-slate-700 cursor-pointer transition-colors shrink-0" title="Disable mismatched profile">
                             Disable Profile
                         </button>
                     ` : ''}
-                </div>
-                <div id="gsx-dropzone-${icao}"
-                     ondragover="handleGsxAuditDragOver(event, '${icao}')"
-                     ondragleave="handleGsxAuditDragLeave(event, '${icao}')"
-                     ondrop="handleGsxAuditDrop(event, '${icao}')"
-                     onclick="installGsxProfileFromModal('${icao}')"
-                     class="py-1 px-3 rounded-xl bg-slate-950/60 border border-dashed border-slate-800 hover:border-cyan-500/60 flex items-center justify-between gap-2 transition-all cursor-pointer group"
-                     title="Drop replacement .zip or .ini, or click to browse">
-                    <span class="text-[10px] font-mono font-bold text-slate-400 group-hover:text-cyan-300 transition-colors pointer-events-none truncate">
-                        DROP REPLACEMENT GSX .INI / .ZIP
-                    </span>
-                    <span class="text-[9px] font-mono text-slate-500 group-hover:text-slate-300 transition-colors pointer-events-none shrink-0">
-                        or click to browse
-                    </span>
                 </div>
             `;
             html += `</div>`;
@@ -2993,6 +2999,97 @@ function renderGsxAuditModal() {
     container.innerHTML = html;
 }
 
+function updateGsxHeaderAndTabBadges() {
+    const audit = window.gsxAuditData;
+    if (!audit || !audit.summary) return;
+    const s = audit.summary;
+    const duplicateCount = s.duplicate || 0;
+    const mismatchCount = s.mismatch || 0;
+    const orphanCount = s.orphan || 0;
+    const missingAddons = s.missing_addons || 0;
+    const missingAsobo = s.missing_asobo || 0;
+    const missingVisible = missingAddons + (gsxIncludeAsobo ? missingAsobo : 0);
+    const totalIssues = duplicateCount + mismatchCount + orphanCount;
+
+    const totalBadge = document.getElementById('gsx-audit-total-badge');
+    if (totalBadge) {
+        totalBadge.innerText = `${totalIssues} Issue${totalIssues !== 1 ? 's' : ''}`;
+        if (totalIssues > 0) {
+            totalBadge.className = 'text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-amber-950 text-amber-400 border border-amber-800';
+        } else {
+            totalBadge.className = 'text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-emerald-950 text-emerald-400 border border-emerald-800';
+        }
+    }
+
+    const cAll = document.getElementById('gsx-count-all');
+    if (cAll) cAll.innerText = totalIssues;
+    const cDup = document.getElementById('gsx-count-duplicate');
+    if (cDup) cDup.innerText = duplicateCount;
+    const cMis = document.getElementById('gsx-count-mismatch');
+    if (cMis) cMis.innerText = mismatchCount;
+    const cOrp = document.getElementById('gsx-count-orphan');
+    if (cOrp) cOrp.innerText = orphanCount;
+    const cNoProf = document.getElementById('gsx-count-noprofile');
+    if (cNoProf) cNoProf.innerText = missingVisible;
+    const cAsobo = document.getElementById('gsx-count-asobo');
+    if (cAsobo) cAsobo.innerText = missingAsobo;
+
+    const footerSummary = document.getElementById('gsx-audit-footer-summary');
+    if (footerSummary) {
+        footerSummary.innerText = totalIssues > 0
+            ? `${totalIssues} issue${totalIssues !== 1 ? 's' : ''} detected (${duplicateCount} duplicate${duplicateCount !== 1 ? 's' : ''}, ${mismatchCount} mismatch${mismatchCount !== 1 ? 'es' : ''}, ${orphanCount} orphan${orphanCount !== 1 ? 's' : ''}) • ${missingAddons} custom addon${missingAddons !== 1 ? 's' : ''} missing GSX profile.`
+            : `All active profiles aligned. ${missingAddons} custom addon${missingAddons !== 1 ? 's' : ''} missing GSX profile.`;
+    }
+
+    updateGsxSidebarBadge();
+}
+
+function markGsxCardResolved(icao, successMsg = '✓ GSX Profile Active & Synced') {
+    updateGsxHeaderAndTabBadges();
+    const card = document.getElementById(`gsx-card-${icao}`);
+    if (!card) {
+        renderGsxAuditModal();
+        return;
+    }
+
+    // 1. Pass card visually to GREEN
+    card.classList.remove('bg-slate-900', 'border-slate-800/90');
+    card.classList.add('bg-emerald-950/40', 'border-emerald-500/80', 'ring-1', 'ring-emerald-500/50');
+
+    const topRow = card.children[0];
+    if (topRow) {
+        const badgeCol = topRow.querySelector('.shrink-0');
+        if (badgeCol) {
+            badgeCol.innerHTML = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-emerald-950 text-emerald-400 border border-emerald-800">RESOLVED / OK</span>`;
+        }
+    }
+
+    const actionRow = card.querySelector('.border-t');
+    if (actionRow) {
+        actionRow.className = 'pt-2 border-t border-emerald-800/60';
+        actionRow.innerHTML = `
+            <div class="w-full py-1.5 px-3 rounded-xl bg-emerald-950/70 border border-emerald-800/80 text-emerald-300 text-[11px] font-mono font-bold flex items-center justify-between">
+                <span>${escapeHtml(successMsg)}</span>
+                <span class="text-[10px] font-mono text-emerald-500">OK</span>
+            </div>
+        `;
+    }
+
+    // 2. Smooth fade out and removal after ~1.1s
+    setTimeout(() => {
+        card.style.transition = 'all 0.35s ease-out';
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(-8px) scale(0.98)';
+        setTimeout(() => {
+            card.remove();
+            const container = document.getElementById('gsx-audit-list-container');
+            if (container && container.children.length === 0) {
+                renderGsxAuditModal();
+            }
+        }, 360);
+    }, 1100);
+}
+
 async function activateGsxDuplicateFromModal(icao, filename) {
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.resolve_gsx_duplicate) return;
     try {
@@ -3011,8 +3108,13 @@ async function activateGsxDuplicateFromModal(icao, filename) {
                         renderRadialAirportDetails(currentRadialAirport);
                     }
                 }
+                updateStats(allAirportsData);
+                filterAirports();
             }
-            renderGsxAuditModal();
+            if (typeof showToast === 'function') {
+                showToast(`✓ Duplicate resolved for ${icao}: kept ${filename}`, 'success');
+            }
+            markGsxCardResolved(icao, `✓ Kept ${filename} - Duplicates Disabled`);
         }
     } catch (e) {
         console.error("Error activating GSX duplicate profile:", e);
@@ -3039,8 +3141,13 @@ async function disableGsxProfileFromModal(icao, filename) {
                         renderRadialAirportDetails(currentRadialAirport);
                     }
                 }
+                updateStats(allAirportsData);
+                filterAirports();
             }
-            renderGsxAuditModal();
+            if (typeof showToast === 'function') {
+                showToast(`✓ Profile disabled for ${icao}`, 'info');
+            }
+            markGsxCardResolved(icao, '✓ Profile Disabled - Issue Cleared');
         }
     } catch (e) {
         console.error("Error disabling GSX profile:", e);
@@ -3079,6 +3186,27 @@ async function executeGsxInstallationForIcao(icao, { filePath = '', base64Data =
             if (parsed.airports && Array.isArray(parsed.airports)) {
                 allAirportsData = parsed.airports;
             }
+            const ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao(icao) : null;
+            if (ap) {
+                ap.has_gsx_profile = true;
+                if (parsed.installed_files && parsed.installed_files.length > 0) {
+                    ap.gsx_ini_file = parsed.installed_files[0];
+                    ap.gsx_profile_filename = parsed.installed_files[0];
+                }
+            }
+            updateStats(allAirportsData);
+            filterAirports();
+
+            if (typeof currentRadialAirport !== 'undefined' && currentRadialAirport && currentRadialAirport.icao === icao) {
+                const updatedAp = getAirportByIcao(icao);
+                if (updatedAp) {
+                    currentRadialAirport = updatedAp;
+                    if (typeof renderRadialAirportDetails === 'function') {
+                        renderRadialAirportDetails(currentRadialAirport);
+                    }
+                }
+            }
+
             if (window.pywebview.api.scan_gsx_audit) {
                 const auditRaw = await window.pywebview.api.scan_gsx_audit();
                 const auditParsed = typeof auditRaw === 'string' ? JSON.parse(auditRaw) : auditRaw;
@@ -3086,12 +3214,14 @@ async function executeGsxInstallationForIcao(icao, { filePath = '', base64Data =
                     window.gsxAuditData = auditParsed.data;
                 }
             }
+
             const fileCount = (parsed.installed_files || []).length;
             const fileMsg = fileCount > 0 ? `: ${parsed.installed_files.join(', ')}` : '';
             if (typeof showToast === 'function') {
                 showToast(`✓ GSX profile installed for ${icao}${fileMsg}`, 'success');
             }
-            renderGsxAuditModal();
+
+            markGsxCardResolved(icao, `✓ GSX Profile Installed & Matched${fileMsg}`);
         } else if (parsed && parsed.status === 'error') {
             if (typeof showToast === 'function') {
                 showToast(parsed.message || 'Failed to install GSX profile', 'error');

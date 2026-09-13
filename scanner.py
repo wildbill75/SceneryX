@@ -745,6 +745,16 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
     active_ini_files = [f for f in all_dir_files if f.endswith('.ini') and f.lower() != 'configuration.ini']
     disabled_ini_files = [f for f in all_dir_files if f.endswith('.ini.disabled')]
 
+    airports_db = {}
+    try:
+        db_res = load_airport_database()
+        if isinstance(db_res, tuple) and len(db_res) > 0 and isinstance(db_res[0], dict):
+            airports_db = db_res[0]
+        elif isinstance(db_res, dict):
+            airports_db = db_res
+    except Exception:
+        pass
+
     by_icao = {}
     non_icao_files = []
 
@@ -754,13 +764,21 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
             non_icao_files.append(f)
             continue
         icao = m.group(1).upper()
+        if airports_db and icao not in airports_db and icao not in installed_map:
+            non_icao_files.append(f)
+            continue
         by_icao.setdefault(icao, []).append({'filename': f, 'is_disabled': False})
 
     for f in disabled_ini_files:
         m = re.match(r'^([a-zA-Z]{4})(?:[_\-.\s0-9]|$)', f)
         if m:
             icao = m.group(1).upper()
+            if airports_db and icao not in airports_db and icao not in installed_map:
+                non_icao_files.append(f)
+                continue
             by_icao.setdefault(icao, []).append({'filename': f, 'is_disabled': True})
+        else:
+            non_icao_files.append(f)
 
     results = {}
     summary = {
@@ -860,7 +878,10 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
             })
 
         # Diagnosis logic
-        if not ap:
+        if len(active_entries) == 0:
+            status = 'DISABLED'
+            reason = 'GSX profile(s) currently disabled.'
+        elif not ap:
             status = 'ORPHAN'
             reason = 'Airport not found in your MSFS library.'
             summary['orphan'] += 1
