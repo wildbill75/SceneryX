@@ -2709,10 +2709,22 @@ function renderGsxAuditModal() {
                             <button onclick="searchGsxProfileFromModal('${icao}')" class="text-[10px] font-mono font-bold px-3 py-1 rounded-xl leading-tight bg-cyan-950 hover:bg-cyan-900 text-cyan-300 hover:text-cyan-200 border border-cyan-800 cursor-pointer transition-colors" title="Search matching GSX profile on Flightsim.to">
                                 Search GSX on Flightsim.to
                             </button>
-                            <button onclick="installGsxProfileFromModal('${icao}')" class="text-[10px] font-mono font-bold px-3 py-1 rounded-xl leading-tight bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 cursor-pointer transition-colors" title="Install downloaded GSX profile (.zip, .ini)">
-                                Install Profile
-                            </button>
                         </div>
+                    </div>
+
+                    <div id="gsx-dropzone-${icao}"
+                         ondragover="handleGsxAuditDragOver(event, '${icao}')"
+                         ondragleave="handleGsxAuditDragLeave(event, '${icao}')"
+                         ondrop="handleGsxAuditDrop(event, '${icao}')"
+                         onclick="installGsxProfileFromModal('${icao}')"
+                         class="py-1 px-3 rounded-xl bg-slate-950/60 border border-dashed border-slate-800 hover:border-cyan-500/60 flex items-center justify-between gap-2 transition-all cursor-pointer group"
+                         title="Drop .zip or .ini to install, or click to browse">
+                        <span class="text-[10px] font-mono font-bold text-slate-400 group-hover:text-cyan-300 transition-colors pointer-events-none truncate">
+                            DROP GSX .INI / .ZIP TO INSTALL
+                        </span>
+                        <span class="text-[9px] font-mono text-slate-500 group-hover:text-slate-300 transition-colors pointer-events-none shrink-0">
+                            or click to browse
+                        </span>
                     </div>
                 </div>
             `;
@@ -2888,6 +2900,22 @@ function renderGsxAuditModal() {
                 `;
             });
             html += `</div>`;
+            html += `
+                <div id="gsx-dropzone-${icao}"
+                     ondragover="handleGsxAuditDragOver(event, '${icao}')"
+                     ondragleave="handleGsxAuditDragLeave(event, '${icao}')"
+                     ondrop="handleGsxAuditDrop(event, '${icao}')"
+                     onclick="installGsxProfileFromModal('${icao}')"
+                     class="py-1 px-3 rounded-xl bg-slate-950/60 border border-dashed border-slate-800 hover:border-cyan-500/60 flex items-center justify-between gap-2 transition-all cursor-pointer group"
+                     title="Drop new profile .zip or .ini to install, or click to browse">
+                    <span class="text-[10px] font-mono font-bold text-slate-400 group-hover:text-cyan-300 transition-colors pointer-events-none truncate">
+                        DROP NEW GSX .INI / .ZIP TO INSTALL
+                    </span>
+                    <span class="text-[9px] font-mono text-slate-500 group-hover:text-slate-300 transition-colors pointer-events-none shrink-0">
+                        or click to browse
+                    </span>
+                </div>
+            `;
         } else if (entry.status.startsWith('MISMATCH')) {
             const activeFile = files.find(f => !f.is_disabled) || files[0];
             const activeMeta = activeFile ? [
@@ -2919,6 +2947,20 @@ function renderGsxAuditModal() {
                             Disable Profile
                         </button>
                     ` : ''}
+                </div>
+                <div id="gsx-dropzone-${icao}"
+                     ondragover="handleGsxAuditDragOver(event, '${icao}')"
+                     ondragleave="handleGsxAuditDragLeave(event, '${icao}')"
+                     ondrop="handleGsxAuditDrop(event, '${icao}')"
+                     onclick="installGsxProfileFromModal('${icao}')"
+                     class="py-1 px-3 rounded-xl bg-slate-950/60 border border-dashed border-slate-800 hover:border-cyan-500/60 flex items-center justify-between gap-2 transition-all cursor-pointer group"
+                     title="Drop replacement .zip or .ini, or click to browse">
+                    <span class="text-[10px] font-mono font-bold text-slate-400 group-hover:text-cyan-300 transition-colors pointer-events-none truncate">
+                        DROP REPLACEMENT GSX .INI / .ZIP
+                    </span>
+                    <span class="text-[9px] font-mono text-slate-500 group-hover:text-slate-300 transition-colors pointer-events-none shrink-0">
+                        or click to browse
+                    </span>
                 </div>
             `;
             html += `</div>`;
@@ -3023,10 +3065,15 @@ function searchGsxProfileFromModal(icao) {
     }
 }
 
-async function installGsxProfileFromModal(icao) {
+async function executeGsxInstallationForIcao(icao, { filePath = '', base64Data = '', filename = '' } = {}) {
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.install_gsx_profile) return;
     try {
-        const raw = await window.pywebview.api.install_gsx_profile(icao);
+        const raw = await window.pywebview.api.install_gsx_profile(
+            icao || '',
+            filePath || '',
+            base64Data || '',
+            filename || ''
+        );
         const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
         if (parsed && parsed.status === 'ok') {
             if (parsed.airports && Array.isArray(parsed.airports)) {
@@ -3039,8 +3086,10 @@ async function installGsxProfileFromModal(icao) {
                     window.gsxAuditData = auditParsed.data;
                 }
             }
+            const fileCount = (parsed.installed_files || []).length;
+            const fileMsg = fileCount > 0 ? `: ${parsed.installed_files.join(', ')}` : '';
             if (typeof showToast === 'function') {
-                showToast(`GSX profile installed for ${icao}`, 'success');
+                showToast(`✓ GSX profile installed for ${icao}${fileMsg}`, 'success');
             }
             renderGsxAuditModal();
         } else if (parsed && parsed.status === 'error') {
@@ -3049,7 +3098,72 @@ async function installGsxProfileFromModal(icao) {
             }
         }
     } catch (e) {
-        console.error("Error installing GSX profile from modal:", e);
+        console.error("Error installing GSX profile for icao:", e);
+        if (typeof showToast === 'function') {
+            showToast(`Installation error: ${e.message || String(e)}`, 'error');
+        }
+    }
+}
+
+async function installGsxProfileFromModal(icao) {
+    await executeGsxInstallationForIcao(icao, { filePath: '' });
+}
+
+function handleGsxAuditDragOver(e, icao) {
+    e.preventDefault();
+    e.stopPropagation();
+    const zone = document.getElementById(`gsx-dropzone-${icao}`);
+    if (zone) {
+        zone.classList.add('border-cyan-400', 'bg-cyan-950/40');
+        zone.classList.remove('border-slate-800', 'bg-slate-950/60');
+    }
+}
+
+function handleGsxAuditDragLeave(e, icao) {
+    e.preventDefault();
+    e.stopPropagation();
+    const zone = document.getElementById(`gsx-dropzone-${icao}`);
+    if (zone) {
+        zone.classList.remove('border-cyan-400', 'bg-cyan-950/40');
+        zone.classList.add('border-slate-800', 'bg-slate-950/60');
+    }
+}
+
+async function handleGsxAuditDrop(e, icao) {
+    e.preventDefault();
+    e.stopPropagation();
+    const zone = document.getElementById(`gsx-dropzone-${icao}`);
+    if (zone) {
+        zone.classList.remove('border-cyan-400', 'bg-cyan-950/40');
+        zone.classList.add('border-slate-800', 'bg-slate-950/60');
+    }
+
+    if (!e.dataTransfer || !e.dataTransfer.files || e.dataTransfer.files.length === 0) return;
+    const file = e.dataTransfer.files[0];
+    const ext = (file.name || '').split('.').pop().toLowerCase();
+    const validExts = ['ini', 'py', 'zip', 'rar', '7z', 'tar', 'gz'];
+    if (!validExts.includes(ext)) {
+        if (typeof showToast === 'function') {
+            showToast('Please drop a GSX profile (.ini) or archive (.zip, .rar)', 'warning');
+        }
+        return;
+    }
+
+    const path = file.path || '';
+    if (path) {
+        await executeGsxInstallationForIcao(icao, { filePath: path });
+    } else {
+        const reader = new FileReader();
+        reader.onload = async function(event) {
+            const base64Data = event.target.result;
+            await executeGsxInstallationForIcao(icao, { base64Data: base64Data, filename: file.name });
+        };
+        reader.onerror = function() {
+            if (typeof showToast === 'function') {
+                showToast('Unable to read dropped file', 'error');
+            }
+        };
+        reader.readAsDataURL(file);
     }
 }
 
@@ -3063,6 +3177,13 @@ window.disableGsxProfileFromModal = disableGsxProfileFromModal;
 window.revealGsxFileInExplorer = revealGsxFileInExplorer;
 window.searchGsxProfileFromModal = searchGsxProfileFromModal;
 window.installGsxProfileFromModal = installGsxProfileFromModal;
+window.handleGsxAuditDragOver = handleGsxAuditDragOver;
+window.handleGsxAuditDragLeave = handleGsxAuditDragLeave;
+window.handleGsxAuditDrop = handleGsxAuditDrop;
+window.executeGsxInstallationForIcao = executeGsxInstallationForIcao;
+
+window.addEventListener('dragover', function(e) { e.preventDefault(); }, false);
+window.addEventListener('drop', function(e) { e.preventDefault(); }, false);
 
 function getActiveSource(ap) {
     if (!ap || !ap.all_sources) return null;
