@@ -837,6 +837,9 @@ function initMap() {
     // Single click on neutral map area: closes radial menu & drawer WITHOUT changing camera (ignored on drag/pan)
     map.on('click', () => {
         if (isMapDragging) return;
+        if (isFilterRadialOpen) {
+            closeFilterRadialMenu();
+        }
         if (isAirlinesModalOpen() || isDetailsModalOpen()) {
             // In airlines or details mode: map clicks MUST NOT dismiss or exit. Only close button does.
             return;
@@ -851,11 +854,25 @@ function initMap() {
         }
     });
 
+    // Right-Click event on map: opens the floating Contextual Filter Radial Menu
+    map.on('contextmenu', (e) => {
+        if (e.originalEvent) {
+            e.originalEvent.preventDefault();
+            e.originalEvent.stopPropagation();
+        }
+        openFilterRadialMenu(e.originalEvent.clientX, e.originalEvent.clientY);
+    });
+
     // Prevent clicks inside radial menu and sceneries extension from bubbling to Leaflet map
     const radialMenuEl = document.getElementById('airport-radial-menu');
     if (radialMenuEl) {
         L.DomEvent.disableClickPropagation(radialMenuEl);
         L.DomEvent.disableScrollPropagation(radialMenuEl);
+    }
+    const filterRadialMenuEl = document.getElementById('filter-radial-menu');
+    if (filterRadialMenuEl) {
+        L.DomEvent.disableClickPropagation(filterRadialMenuEl);
+        L.DomEvent.disableScrollPropagation(filterRadialMenuEl);
     }
     const radialExtEl = document.getElementById('radial-sceneries-extension');
     if (radialExtEl) {
@@ -1061,8 +1078,18 @@ async function loadCountryOverlays() {
                             toggleCountrySelection(iso, cName, layer);
                         }, 220);
                     },
+                    contextmenu: (e) => {
+                        if (e.originalEvent) {
+                            e.originalEvent.preventDefault();
+                            e.originalEvent.stopPropagation();
+                        }
+                        openFilterRadialMenu(e.originalEvent.clientX, e.originalEvent.clientY);
+                    },
                     dblclick: (e) => {
                         L.DomEvent.stopPropagation(e);
+                        if (isFilterRadialOpen) {
+                            closeFilterRadialMenu();
+                        }
                         if (isAirlinesModalOpen() || isDetailsModalOpen()) {
                             // In airlines or details mode: clicking on map/country MUST NOT exit mode. Only close button does.
                             return;
@@ -7488,6 +7515,10 @@ function exitFlightPlanningMode(forceRestore = false) {
 window.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' || e.key === 'Esc') {
         closeAirportRadialMenu();
+        if (isFilterRadialOpen) {
+            closeFilterRadialMenu();
+            return;
+        }
         if (isFlightPlanningMode) {
             exitFlightPlanningMode();
         } else if (selectedCountryCode) {
@@ -8051,36 +8082,11 @@ function focusAirportWithAnimation(ap) {
     }
 }
 
-let isSidebarCollapsed = false;
-window.isSidebarCollapsed = false;
+let isSidebarCollapsed = true;
+window.isSidebarCollapsed = true;
 
 function toggleSidebarCollapse() {
-    const sb = document.getElementById('sidebar-panel');
-    const sbHandle = document.getElementById('sidebar-resize-handle');
-    const expandBtn = document.getElementById('btn-expand-sidebar');
-    if (!sb) return;
-
-    isSidebarCollapsed = !isSidebarCollapsed;
-    window.isSidebarCollapsed = isSidebarCollapsed;
-
-    if (isSidebarCollapsed) {
-        const w = sb.offsetWidth || 360;
-        sb.style.marginLeft = `-${w}px`;
-        sb.classList.add('opacity-0', 'pointer-events-none');
-        if (sbHandle) sbHandle.classList.add('hidden');
-        if (expandBtn) expandBtn.classList.remove('hidden');
-    } else {
-        sb.style.marginLeft = '0px';
-        sb.classList.remove('opacity-0', 'pointer-events-none');
-        if (sbHandle) sbHandle.classList.remove('hidden');
-        if (expandBtn) expandBtn.classList.add('hidden');
-    }
-
-    setTimeout(() => {
-        if (map && map.invalidateSize) {
-            map.invalidateSize();
-        }
-    }, 320);
+    toggleFilterRadialMenuAtCenter();
 }
 
 function renderUnifiedScenerySelector(ap) {
@@ -10245,6 +10251,8 @@ function updateFilterUI() {
             airlinePill.classList.remove('flex');
         }
     }
+
+    updateFilterRadialUI();
 }
 
 function toggleGsxFilter(val) {
@@ -10271,6 +10279,353 @@ function setButtonActive(btn, active) {
         btn.className = "py-2 px-3 rounded-xl text-xs font-bold bg-cyan-600 text-white transition-colors text-center flex items-center justify-center gap-1.5";
     } else {
         btn.className = "py-2 px-3 rounded-xl text-xs font-medium bg-slate-800 text-slate-400 hover:text-white transition-colors text-center flex items-center justify-center gap-1.5";
+    }
+}
+
+/* ================= CONTEXTUAL FLOATING RADIAL FILTER MENU ================= */
+
+let isFilterRadialOpen = false;
+let filterRadialCurrentLevel = 1; // 1 = Main categories, 2 = Sub-category
+let filterRadialActiveCategory = null; // 'pricing', 'source', 'region', 'type', 'gsx', 'rating'
+
+const FILTER_RADIAL_CATEGORIES = [
+    {
+        key: 'pricing',
+        label: 'PRICING MODEL',
+        icon: 'fa-solid fa-tag',
+        color: 'text-purple-400',
+        activeColor: 'border-purple-500/60 bg-purple-950/40 text-purple-200',
+        getSummary: () => {
+            if (selectedPricing.size === ALL_PRICING_LIST.length) return 'All Models';
+            return `${selectedPricing.size} Active`;
+        }
+    },
+    {
+        key: 'source',
+        label: 'SCENERY SOURCE',
+        icon: 'fa-solid fa-cubes',
+        color: 'text-cyan-400',
+        activeColor: 'border-cyan-500/60 bg-cyan-950/40 text-cyan-200',
+        getSummary: () => {
+            if (selectedSources.size === ALL_SOURCES_LIST.length) return 'All Sources';
+            return `${selectedSources.size} Active`;
+        }
+    },
+    {
+        key: 'region',
+        label: 'GEOGRAPHIC REGION',
+        icon: 'fa-solid fa-globe',
+        color: 'text-emerald-400',
+        activeColor: 'border-emerald-500/60 bg-emerald-950/40 text-emerald-200',
+        getSummary: () => {
+            if (!selectedRegion) return 'Global (All)';
+            const names = {
+                'weurope': 'Western Europe',
+                'eeurope': 'Eastern Europe',
+                'namerica': 'North America',
+                'camerica_caribbean': 'C. America',
+                'samerica': 'South America',
+                'asia': 'Asia',
+                'middleeast': 'Middle East',
+                'nafrica': 'North Africa',
+                'ssafrica': 'Sub-Saharan Africa',
+                'oceania': 'Oceania',
+                'pacific': 'Pacific Ocean'
+            };
+            return names[selectedRegion] || selectedRegion;
+        }
+    },
+    {
+        key: 'type',
+        label: 'AIRPORT TYPE',
+        icon: 'fa-solid fa-plane-departure',
+        color: 'text-sky-400',
+        activeColor: 'border-sky-500/60 bg-sky-950/40 text-sky-200',
+        getSummary: () => {
+            if (selectedTypes.size === ALL_TYPES_LIST.length) return 'All Types';
+            return `${selectedTypes.size} Active`;
+        }
+    },
+    {
+        key: 'gsx',
+        label: 'GSX PROFILE',
+        icon: 'fa-solid fa-dolly',
+        color: 'text-amber-400',
+        activeColor: 'border-amber-500/60 bg-amber-950/40 text-amber-200',
+        getSummary: () => {
+            if (selectedGsxFilter === 'all') return 'All Profiles';
+            if (selectedGsxFilter === 'with') return 'With GSX Only';
+            return 'No GSX Profile';
+        }
+    },
+    {
+        key: 'rating',
+        label: 'USER RATING',
+        icon: 'fa-solid fa-star',
+        color: 'text-amber-400',
+        activeColor: 'border-amber-500/60 bg-amber-950/40 text-amber-200',
+        getSummary: () => {
+            if (!selectedMinRating || selectedMinRating === 0) return 'All Ratings (0★)';
+            return `${selectedMinRating}★ Minimum`;
+        }
+    }
+];
+
+function openFilterRadialMenu(clientX, clientY) {
+    if (typeof closeAirportRadialMenu === 'function') {
+        closeAirportRadialMenu();
+    }
+
+    const menuEl = document.getElementById('filter-radial-menu');
+    if (!menuEl) return;
+
+    // Viewport edge clamping
+    const menuSize = 520;
+    const half = menuSize / 2;
+    const margin = 15;
+    const posX = Math.max(half + margin, Math.min(window.innerWidth - half - margin, clientX));
+    const posY = Math.max(half + margin, Math.min(window.innerHeight - half - margin, clientY));
+
+    menuEl.style.left = `${posX}px`;
+    menuEl.style.top = `${posY}px`;
+    menuEl.classList.remove('hidden');
+
+    isFilterRadialOpen = true;
+    filterRadialCurrentLevel = 1;
+    filterRadialActiveCategory = null;
+
+    renderFilterRadialLevel1();
+}
+
+function toggleFilterRadialMenuAtCenter() {
+    if (isFilterRadialOpen) {
+        closeFilterRadialMenu();
+    } else {
+        openFilterRadialMenu(window.innerWidth / 2, (window.innerHeight / 2) - 20);
+    }
+}
+
+function closeFilterRadialMenu() {
+    const menuEl = document.getElementById('filter-radial-menu');
+    if (menuEl) {
+        menuEl.classList.add('hidden');
+    }
+    isFilterRadialOpen = false;
+    filterRadialCurrentLevel = 1;
+    filterRadialActiveCategory = null;
+}
+
+function handleFilterRadialCenterClick() {
+    if (filterRadialCurrentLevel === 2) {
+        // Return to Level 1
+        filterRadialCurrentLevel = 1;
+        filterRadialActiveCategory = null;
+        renderFilterRadialLevel1();
+    } else {
+        // Close menu
+        closeFilterRadialMenu();
+    }
+}
+
+function renderFilterRadialLevel1() {
+    const hubEl = document.getElementById('filter-radial-center-hub');
+    const container = document.getElementById('filter-radial-items-container');
+    if (!hubEl || !container) return;
+
+    filterRadialCurrentLevel = 1;
+    filterRadialActiveCategory = null;
+
+    const count = currentlyFilteredAirports ? currentlyFilteredAirports.length : (allAirportsData ? allAirportsData.length : 0);
+    hubEl.innerHTML = `
+        <div class="flex flex-col items-center justify-center pointer-events-none select-none">
+            <i class="fa-solid fa-sliders text-cyan-400 text-sm mb-1"></i>
+            <span class="text-[9px] font-black tracking-widest text-slate-400 uppercase leading-tight">MAP VIEW</span>
+            <span class="text-xs font-black font-mono text-cyan-400 leading-tight">FILTERED BY</span>
+            <span class="text-[10px] font-mono text-slate-300 mt-1 bg-slate-900/90 px-2 py-0.5 rounded-full border border-slate-700/50">${count} AP</span>
+        </div>
+    `;
+
+    const cx = 260;
+    const cy = 260;
+    const radius = 175;
+    const total = FILTER_RADIAL_CATEGORIES.length;
+    let html = '';
+
+    FILTER_RADIAL_CATEGORIES.forEach((cat, idx) => {
+        const angle = -90 + (idx * 360 / total);
+        const rad = angle * Math.PI / 180;
+        const x = Math.round(cx + radius * Math.cos(rad));
+        const y = Math.round(cy + radius * Math.sin(rad));
+        const summary = cat.getSummary();
+
+        html += `
+            <button onclick="renderFilterRadialLevel2('${cat.key}')" 
+                    class="absolute pointer-events-auto cursor-pointer transition-all duration-150 active:scale-95 group flex items-center gap-2 px-3 py-2 rounded-2xl bg-slate-900/95 hover:bg-slate-800 border border-slate-700/80 hover:border-cyan-500/60 shadow-xl shadow-black/70"
+                    style="left: ${x}px; top: ${y}px; transform: translate(-50%, -50%);">
+                <div class="w-7 h-7 rounded-xl bg-slate-800 flex items-center justify-center ${cat.color} group-hover:text-white transition-colors shrink-0">
+                    <i class="${cat.icon} text-xs"></i>
+                </div>
+                <div class="flex flex-col text-left">
+                    <span class="text-[10px] font-black tracking-wider uppercase text-slate-200 group-hover:text-white leading-tight">${cat.label}</span>
+                    <span class="text-[9px] font-mono text-slate-400 group-hover:text-cyan-300 font-semibold truncate max-w-[105px] leading-tight">${summary}</span>
+                </div>
+            </button>
+        `;
+    });
+
+    container.innerHTML = html;
+}
+
+function renderFilterRadialLevel2(categoryKey) {
+    const hubEl = document.getElementById('filter-radial-center-hub');
+    const container = document.getElementById('filter-radial-items-container');
+    if (!hubEl || !container) return;
+
+    filterRadialCurrentLevel = 2;
+    filterRadialActiveCategory = categoryKey;
+
+    const catObj = FILTER_RADIAL_CATEGORIES.find(c => c.key === categoryKey);
+    const catLabel = catObj ? catObj.label : 'CATEGORY';
+
+    hubEl.innerHTML = `
+        <div class="flex flex-col items-center justify-center text-cyan-400 group-hover:text-white transition-colors pointer-events-none select-none">
+            <i class="fa-solid fa-arrow-left text-sm mb-1 transition-transform group-hover:-translate-x-1"></i>
+            <span class="text-xs font-black tracking-widest uppercase leading-tight">BACK</span>
+            <span class="text-[9px] font-mono text-slate-400 mt-0.5 truncate max-w-[110px] leading-tight">${catLabel}</span>
+        </div>
+    `;
+
+    const cx = 260;
+    const cy = 260;
+    let items = [];
+    let radius = 175;
+
+    if (categoryKey === 'pricing') {
+        items = [
+            { id: 'all', label: 'All Models', icon: 'fa-solid fa-layer-group', isActive: selectedPricing.size === ALL_PRICING_LIST.length, activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
+            { id: 'Payware', label: 'Payware', icon: 'fa-solid fa-star text-purple-400', isActive: selectedPricing.has('Payware'), activeStyle: 'bg-purple-600 border-purple-400 text-white' },
+            { id: 'Freeware / Flightsim.to', label: 'Freeware', icon: 'fa-solid fa-star text-cyan-400', isActive: selectedPricing.has('Freeware / Flightsim.to'), activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
+            { id: 'Asobo', label: 'Asobo', icon: 'fa-solid fa-star text-amber-400', isActive: selectedPricing.has('Asobo'), activeStyle: 'bg-amber-500 border-amber-300 text-slate-950 font-black' },
+            { id: 'Default', label: 'Default MSFS', icon: 'fa-solid fa-circle text-blue-400', isActive: selectedPricing.has('Default'), activeStyle: 'bg-blue-600 border-blue-400 text-white' }
+        ];
+    } else if (categoryKey === 'source') {
+        items = [
+            { id: 'all', label: 'All Sources', icon: 'fa-solid fa-layer-group', isActive: selectedSources.size === ALL_SOURCES_LIST.length, activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
+            { id: 'Community', label: 'Community', icon: 'fa-solid fa-folder-open text-cyan-400', isActive: selectedSources.has('Community'), activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
+            { id: 'Marketplace', label: 'Marketplace', icon: 'fa-solid fa-store text-sky-400', isActive: selectedSources.has('Marketplace'), activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
+            { id: 'Official', label: 'Official', icon: 'fa-solid fa-shield text-amber-400', isActive: selectedSources.has('Official'), activeStyle: 'bg-cyan-600 border-cyan-400 text-white' }
+        ];
+    } else if (categoryKey === 'region') {
+        radius = 185;
+        items = [
+            { id: 'all', label: 'All Regions', icon: 'fa-solid fa-globe', isActive: !selectedRegion, activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
+            { id: 'weurope', label: 'W. Europe', icon: null, isActive: selectedRegion === 'weurope', activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
+            { id: 'eeurope', label: 'E. Europe', icon: null, isActive: selectedRegion === 'eeurope', activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
+            { id: 'namerica', label: 'N. America', icon: null, isActive: selectedRegion === 'namerica', activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
+            { id: 'camerica_caribbean', label: 'C. America', icon: null, isActive: selectedRegion === 'camerica_caribbean', activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
+            { id: 'samerica', label: 'S. America', icon: null, isActive: selectedRegion === 'samerica', activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
+            { id: 'asia', label: 'Asia', icon: null, isActive: selectedRegion === 'asia', activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
+            { id: 'middleeast', label: 'Middle East', icon: null, isActive: selectedRegion === 'middleeast', activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
+            { id: 'nafrica', label: 'N. Africa', icon: null, isActive: selectedRegion === 'nafrica', activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
+            { id: 'ssafrica', label: 'SS. Africa', icon: null, isActive: selectedRegion === 'ssafrica', activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
+            { id: 'oceania', label: 'Oceania', icon: null, isActive: selectedRegion === 'oceania', activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
+            { id: 'pacific', label: 'Pacific', icon: null, isActive: selectedRegion === 'pacific', activeStyle: 'bg-cyan-600 border-cyan-400 text-white' }
+        ];
+    } else if (categoryKey === 'type') {
+        items = [
+            { id: 'all', label: 'All Types', icon: 'fa-solid fa-layer-group', isActive: selectedTypes.size === ALL_TYPES_LIST.length, activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
+            { id: 'International', label: 'International', icon: 'fa-solid fa-plane-departure text-cyan-400', isActive: selectedTypes.has('International'), activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
+            { id: 'Regional', label: 'Regional', icon: 'fa-solid fa-plane text-sky-400', isActive: selectedTypes.has('Regional'), activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
+            { id: 'General Aviation', label: 'General Av.', icon: 'fa-solid fa-paper-plane text-emerald-400', isActive: selectedTypes.has('General Aviation'), activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
+            { id: 'Heli / Water', label: 'Heli / Water', icon: 'fa-solid fa-helicopter text-amber-400', isActive: selectedTypes.has('Heli / Water'), activeStyle: 'bg-cyan-600 border-cyan-400 text-white' }
+        ];
+    } else if (categoryKey === 'gsx') {
+        items = [
+            { id: 'all', label: 'All Profiles', icon: 'fa-solid fa-layer-group', isActive: selectedGsxFilter === 'all', activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
+            { id: 'with', label: 'With GSX', icon: 'fa-solid fa-check text-emerald-400', isActive: selectedGsxFilter === 'with', activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
+            { id: 'none', label: 'No Profile', icon: 'fa-solid fa-ban text-slate-400', isActive: selectedGsxFilter === 'none', activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
+            { id: 'audit', label: 'Audit Hub', icon: 'fa-solid fa-clipboard-check text-amber-400', isActive: false, activeStyle: 'bg-amber-600 border-amber-400 text-white' }
+        ];
+    } else if (categoryKey === 'rating') {
+        items = [
+            { id: '0', label: 'All (0.0★)', icon: 'fa-regular fa-star text-slate-400', isActive: !selectedMinRating || selectedMinRating === 0, activeStyle: 'bg-cyan-600 border-cyan-400 text-white' },
+            { id: '3.0', label: '3.0★ & Up', icon: 'fa-solid fa-star text-amber-400', isActive: selectedMinRating === 3.0, activeStyle: 'bg-amber-500 border-amber-300 text-slate-950 font-black' },
+            { id: '3.5', label: '3.5★ & Up', icon: 'fa-solid fa-star text-amber-400', isActive: selectedMinRating === 3.5, activeStyle: 'bg-amber-500 border-amber-300 text-slate-950 font-black' },
+            { id: '4.0', label: '4.0★ & Up', icon: 'fa-solid fa-star text-amber-400', isActive: selectedMinRating === 4.0, activeStyle: 'bg-amber-500 border-amber-300 text-slate-950 font-black' },
+            { id: '4.5', label: '4.5★ & Up', icon: 'fa-solid fa-star text-amber-400', isActive: selectedMinRating === 4.5, activeStyle: 'bg-amber-500 border-amber-300 text-slate-950 font-black' },
+            { id: '5.0', label: '5.0★ Only', icon: 'fa-solid fa-star text-amber-400', isActive: selectedMinRating === 5.0, activeStyle: 'bg-amber-500 border-amber-300 text-slate-950 font-black' }
+        ];
+    }
+
+    const total = items.length;
+    let html = '';
+
+    items.forEach((item, idx) => {
+        const angle = -90 + (idx * 360 / total);
+        const rad = angle * Math.PI / 180;
+        const x = Math.round(cx + radius * Math.cos(rad));
+        const y = Math.round(cy + radius * Math.sin(rad));
+
+        const baseStyle = item.isActive 
+            ? (item.activeStyle || 'bg-cyan-600 border-cyan-400 text-white')
+            : 'bg-slate-900/95 text-slate-300 hover:text-white border-slate-700/80 hover:border-slate-500';
+
+        html += `
+            <button onclick="handleFilterRadialSubItemClick('${categoryKey}', '${escapeJsStr(item.id)}')"
+                    class="absolute pointer-events-auto cursor-pointer transition-all duration-150 active:scale-95 flex items-center gap-1.5 px-3 py-1.5 rounded-2xl border shadow-xl shadow-black/70 whitespace-nowrap text-xs font-bold ${baseStyle}"
+                    style="left: ${x}px; top: ${y}px; transform: translate(-50%, -50%);">
+                ${item.icon ? `<i class="${item.icon} text-[10px]"></i>` : ''}
+                <span>${escapeHtml(item.label)}</span>
+                ${item.isActive && item.id !== 'all' && item.id !== '0' ? '<i class="fa-solid fa-check text-[9px] ml-0.5 opacity-90"></i>' : ''}
+            </button>
+        `;
+    });
+
+    container.innerHTML = html;
+}
+
+function handleFilterRadialSubItemClick(categoryKey, itemId) {
+    if (categoryKey === 'pricing') {
+        togglePricingFilter(itemId);
+    } else if (categoryKey === 'source') {
+        toggleSourceFilter(itemId);
+    } else if (categoryKey === 'region') {
+        toggleRegionFilter(itemId);
+    } else if (categoryKey === 'type') {
+        toggleTypeFilter(itemId);
+    } else if (categoryKey === 'gsx') {
+        if (itemId === 'audit') {
+            closeFilterRadialMenu();
+            if (typeof openGsxAuditModal === 'function') openGsxAuditModal();
+            return;
+        }
+        toggleGsxFilter(itemId);
+    } else if (categoryKey === 'rating') {
+        const val = parseFloat(itemId);
+        if (val === 0 || isNaN(val)) {
+            resetMinRatingFilter();
+        } else {
+            if (selectedMinRating === val) {
+                selectedMinRating = 0;
+            } else {
+                selectedMinRating = val;
+            }
+            renderFilterStarWidget(selectedMinRating);
+            filterAirports();
+        }
+    }
+
+    if (isFilterRadialOpen && filterRadialCurrentLevel === 2) {
+        renderFilterRadialLevel2(categoryKey);
+    }
+}
+
+function updateFilterRadialUI() {
+    if (!isFilterRadialOpen) return;
+    if (filterRadialCurrentLevel === 1) {
+        renderFilterRadialLevel1();
+    } else if (filterRadialCurrentLevel === 2 && filterRadialActiveCategory) {
+        renderFilterRadialLevel2(filterRadialActiveCategory);
     }
 }
 

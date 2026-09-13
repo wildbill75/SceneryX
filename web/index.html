@@ -505,287 +505,62 @@
     <!-- MAIN CONTENT VIEWPORT -->
     <div class="relative flex-1 flex overflow-hidden">
 
-        <!-- LEFT SIDEBAR FILTERS -->
-        <aside id="sidebar-panel" style="width: 360px;" class="min-w-[320px] max-w-[600px] glass-panel z-20 flex flex-col shrink-0 border-r border-slate-800/80 transition-all duration-300 ease-in-out">
+        <!-- LEAFLET MAP CONTAINER -->
+        <main class="flex-1 relative">
+            <div id="map" class="w-full h-full z-10 bg-slate-950"></div>
 
-            <!-- SIDEBAR HEADER (COLLAPSIBLE TOGGLE) -->
-            <div class="px-4 py-2.5 flex items-center justify-between border-b border-slate-800/80 shrink-0 bg-slate-950/40">
-                <div class="flex items-center gap-2">
-                    <i class="fa-solid fa-sliders text-cyan-400 text-xs"></i>
-                    <span data-i18n="filter.sidebar_title" class="text-xs font-bold uppercase tracking-wider text-slate-300">Filters</span>
-                </div>
-                <button id="btn-collapse-sidebar" onclick="toggleSidebarCollapse()" data-i18n-title="filter.collapse_tooltip" title="Collapse filter panel (Full Map)" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-xs transition-colors cursor-pointer border-0">
-                    <i class="fa-solid fa-chevron-left"></i>
-                </button>
-            </div>
-
-            <div class="p-4 space-y-6 overflow-y-auto flex-1">
-
-                <!-- PRICING FILTER -->
-                <div>
-                    <button type="button" onclick="toggleLeftFilterAccordion('pricing_model')" class="w-full flex items-center justify-between mb-2.5 text-left group cursor-pointer border-0 bg-transparent p-0 select-none">
-                        <span data-i18n="filter.pricing_model" data-i18n-title="filter.pricing_tooltip" title="Filter sceneries by pricing model: Payware, Freeware, Asobo handcrafted, or Default MSFS." class="text-[11px] font-bold text-slate-400 group-hover:text-slate-200 uppercase tracking-wider transition-colors cursor-pointer">Pricing Model</span>
-                        <i id="left-accordion-icon-pricing_model" class="fa-solid fa-chevron-down text-slate-500 group-hover:text-slate-300 text-xs transition-transform duration-200"></i>
-                    </button>
-                    <div id="left-accordion-content-pricing_model">
-                        <div class="grid grid-cols-2 gap-2">
-                            <button id="filter-price-all" onclick="togglePricingFilter('all')" data-i18n="filter.price_all" data-i18n-title="filter.price_all_tooltip" title="Show all sceneries across all pricing categories" class="col-span-2 py-2 px-3 rounded-xl text-xs font-bold bg-cyan-600 text-white transition-colors text-center flex items-center justify-center gap-1.5 border-0 cursor-pointer">
-                                All Models
-                            </button>
-                            <button id="filter-price-payware" onclick="togglePricingFilter('Payware')" data-i18n-title="filter.price_payware_tooltip" title="Show only third-party commercial payware sceneries" class="py-2 px-3 rounded-xl text-xs font-bold bg-cyan-600 text-white transition-colors text-center flex items-center justify-center gap-1.5 border-0 cursor-pointer">
-                                <i class="fa-solid fa-star text-[10px] text-purple-400"></i> <span data-i18n="filter.price_payware">Payware</span>
-                            </button>
-                            <button id="filter-price-freeware" onclick="togglePricingFilter('Freeware / Flightsim.to')" data-i18n-title="filter.price_freeware_tooltip" title="Show community freeware sceneries (Flightsim.to, etc.)" class="py-2 px-3 rounded-xl text-xs font-bold bg-cyan-600 text-white transition-colors text-center flex items-center justify-center gap-1.5 border-0 cursor-pointer">
-                                <i class="fa-solid fa-star text-[10px] text-cyan-400"></i> <span data-i18n="filter.price_freeware">Freeware</span>
-                            </button>
-                            <button id="filter-price-asobo" onclick="togglePricingFilter('Asobo')" data-i18n-title="filter.price_asobo_tooltip" title="Show official handcrafted sceneries bundled by Microsoft & Asobo" class="py-2 px-3 rounded-xl text-xs font-bold bg-cyan-600 text-white transition-colors text-center flex items-center justify-center gap-1.5 border-0 cursor-pointer">
-                                <i class="fa-solid fa-star text-[10px] text-amber-400"></i> <span data-i18n="filter.price_asobo">Asobo</span>
-                            </button>
-                            <button id="filter-price-default" onclick="togglePricingFilter('Default')" data-i18n-title="filter.price_default_tooltip" title="Show standard procedural default MSFS base airports" class="py-2 px-3 rounded-xl text-xs font-bold bg-cyan-600 text-white transition-colors text-center flex items-center justify-center gap-1.5 border-0 cursor-pointer">
-                                <i class="fa-solid fa-circle text-[10px] text-blue-400"></i> <span data-i18n="filter.price_default">Default MSFS</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- PACKAGE SOURCE FILTER -->
-                <div>
-                    <button type="button" onclick="toggleLeftFilterAccordion('scenery_source')" class="w-full flex items-center justify-between mb-2.5 text-left group cursor-pointer border-0 bg-transparent p-0 select-none">
-                        <span data-i18n="filter.scenery_source" data-i18n-title="filter.source_tooltip" title="Filter sceneries by package origin: Community folders, Marketplace, or Official content." class="text-[11px] font-bold text-slate-400 group-hover:text-slate-200 uppercase tracking-wider transition-colors cursor-pointer">Scenery Source</span>
-                        <i id="left-accordion-icon-scenery_source" class="fa-solid fa-chevron-down text-slate-500 group-hover:text-slate-300 text-xs transition-transform duration-200"></i>
-                    </button>
-                    <div id="left-accordion-content-scenery_source">
-                        <div class="grid grid-cols-2 gap-2">
-                            <button id="filter-src-all" onclick="toggleSourceFilter('all')" 
-                                    data-i18n="filter.src_all"
-                                    data-i18n-title="filter.src_all_tooltip"
-                                    class="py-2 px-3 rounded-xl text-xs font-bold bg-cyan-600 text-white transition-colors text-center flex items-center justify-center border-0 cursor-pointer whitespace-nowrap"
-                                    title="Show all sceneries across all sources (Community, Marketplace, and Official)">
-                                All Sources
-                            </button>
-                            <button id="filter-src-Community" onclick="toggleSourceFilter('Community')" 
-                                    data-i18n="filter.src_community"
-                                    data-i18n-title="filter.src_community_tooltip"
-                                    class="py-2 px-3 rounded-xl text-xs font-bold bg-cyan-600 text-white transition-colors text-center flex items-center justify-center border-0 cursor-pointer whitespace-nowrap"
-                                    title="Third-party sceneries and addons installed in Community folders or custom directories (+ Add Path, Addon Linker)">
-                                Community
-                            </button>
-                            <button id="filter-src-Marketplace" onclick="toggleSourceFilter('Marketplace')" 
-                                    data-i18n="filter.src_marketplace"
-                                    data-i18n-title="filter.src_marketplace_tooltip"
-                                    class="py-2 px-3 rounded-xl text-xs font-bold bg-cyan-600 text-white transition-colors text-center flex items-center justify-center border-0 cursor-pointer whitespace-nowrap"
-                                    title="Third-party sceneries purchased directly from Microsoft's in-game Marketplace (iniBuilds, Aerosoft, France VFR...)">
-                                Marketplace
-                            </button>
-                            <button id="filter-src-Official" onclick="toggleSourceFilter('Official')" 
-                                    data-i18n="filter.src_official"
-                                    data-i18n-title="filter.src_official_tooltip"
-                                    class="py-2 px-3 rounded-xl text-xs font-bold bg-cyan-600 text-white transition-colors text-center flex items-center justify-center border-0 cursor-pointer whitespace-nowrap"
-                                    title="Official Microsoft & Asobo handcrafted content (World Updates, City Updates, Deluxe editions)">
-                                Official
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- GEOGRAPHIC REGION FILTER -->
-                <div>
-                    <button type="button" onclick="toggleLeftFilterAccordion('geographic_region')" class="w-full flex items-center justify-between mb-2.5 text-left group cursor-pointer border-0 bg-transparent p-0 select-none">
-                        <span data-i18n="filter.geographic_region" data-i18n-title="filter.region_tooltip" title="Filter airports by continental zone and focus the camera on that region." class="text-[11px] font-bold text-slate-400 group-hover:text-slate-200 uppercase tracking-wider transition-colors cursor-pointer">Geographic Region</span>
-                        <i id="left-accordion-icon-geographic_region" class="fa-solid fa-chevron-down text-slate-500 group-hover:text-slate-300 text-xs transition-transform duration-200"></i>
-                    </button>
-                    <div id="left-accordion-content-geographic_region">
-                        <div class="grid grid-cols-2 gap-1.5" id="region-pills-container">
-                            <button id="filter-region-all" onclick="toggleRegionFilter('all')" data-i18n="filter.region_all" data-i18n-title="filter.region_all_tooltip" title="Show airports across all world regions" class="col-span-2 py-1.5 px-2 rounded-xl text-[11px] font-bold bg-cyan-600 text-white transition-colors text-center flex items-center justify-center border-0 cursor-pointer">
-                                All Regions
-                            </button>
-                            <button id="filter-region-weurope" onclick="toggleRegionFilter('weurope')" data-i18n="filter.region_weurope" data-i18n-title="filter.region_weurope_tooltip" title="Western Europe (France, UK, Germany, Spain, Italy...)" class="py-1.5 px-2 rounded-xl text-[11px] font-medium bg-slate-800 text-slate-400 hover:text-white transition-colors text-center flex items-center justify-center cursor-pointer border-0">
-                                Western Europe
-                            </button>
-                            <button id="filter-region-eeurope" onclick="toggleRegionFilter('eeurope')" data-i18n="filter.region_eeurope" data-i18n-title="filter.region_eeurope_tooltip" title="Eastern Europe (Poland, Greece, Turkey, Romania...)" class="py-1.5 px-2 rounded-xl text-[11px] font-medium bg-slate-800 text-slate-400 hover:text-white transition-colors text-center flex items-center justify-center cursor-pointer border-0">
-                                Eastern Europe
-                            </button>
-                            <button id="filter-region-namerica" onclick="toggleRegionFilter('namerica')" data-i18n="filter.region_namerica" data-i18n-title="filter.region_namerica_tooltip" title="North America (United States, Canada, Greenland)" class="py-1.5 px-2 rounded-xl text-[11px] font-medium bg-slate-800 text-slate-400 hover:text-white transition-colors text-center flex items-center justify-center cursor-pointer border-0">
-                                North America
-                            </button>
-                            <button id="filter-region-camerica_caribbean" onclick="toggleRegionFilter('camerica_caribbean')" data-i18n="filter.region_camerica" data-i18n-title="filter.region_camerica_tooltip" title="Central America & Caribbean (Mexico, Panama, Bahamas...)" class="py-1.5 px-2 rounded-xl text-[11px] font-medium bg-slate-800 text-slate-400 hover:text-white transition-colors text-center flex items-center justify-center cursor-pointer border-0">
-                                Central America & Caribbean
-                            </button>
-                            <button id="filter-region-samerica" onclick="toggleRegionFilter('samerica')" data-i18n="filter.region_samerica" data-i18n-title="filter.region_samerica_tooltip" title="South America (Brazil, Argentina, Colombia, Chile...)" class="py-1.5 px-2 rounded-xl text-[11px] font-medium bg-slate-800 text-slate-400 hover:text-white transition-colors text-center flex items-center justify-center cursor-pointer border-0">
-                                South America
-                            </button>
-                            <button id="filter-region-asia" onclick="toggleRegionFilter('asia')" data-i18n="filter.region_asia" data-i18n-title="filter.region_asia_tooltip" title="Asia (Japan, China, India, Thailand, Indonesia...)" class="py-1.5 px-2 rounded-xl text-[11px] font-medium bg-slate-800 text-slate-400 hover:text-white transition-colors text-center flex items-center justify-center cursor-pointer border-0">
-                                Asia
-                            </button>
-                            <button id="filter-region-middleeast" onclick="toggleRegionFilter('middleeast')" data-i18n="filter.region_middleeast" data-i18n-title="filter.region_middleeast_tooltip" title="Middle East (UAE, Saudi Arabia, Qatar, Israel...)" class="py-1.5 px-2 rounded-xl text-[11px] font-medium bg-slate-800 text-slate-400 hover:text-white transition-colors text-center flex items-center justify-center cursor-pointer border-0">
-                                Middle East
-                            </button>
-                            <button id="filter-region-nafrica" onclick="toggleRegionFilter('nafrica')" data-i18n="filter.region_nafrica" data-i18n-title="filter.region_nafrica_tooltip" title="North Africa (Egypt, Morocco, Algeria, Tunisia...)" class="py-1.5 px-2 rounded-xl text-[11px] font-medium bg-slate-800 text-slate-400 hover:text-white transition-colors text-center flex items-center justify-center cursor-pointer border-0">
-                                North Africa
-                            </button>
-                            <button id="filter-region-ssafrica" onclick="toggleRegionFilter('ssafrica')" data-i18n="filter.region_ssafrica" data-i18n-title="filter.region_ssafrica_tooltip" title="Sub-Saharan Africa (South Africa, Kenya, Nigeria...)" class="py-1.5 px-2 rounded-xl text-[11px] font-medium bg-slate-800 text-slate-400 hover:text-white transition-colors text-center flex items-center justify-center cursor-pointer border-0">
-                                Sub-Saharan Africa
-                            </button>
-                            <button id="filter-region-oceania" onclick="toggleRegionFilter('oceania')" data-i18n="filter.region_oceania" data-i18n-title="filter.region_oceania_tooltip" title="Oceania (Australia, New Zealand, Papua New Guinea)" class="py-1.5 px-2 rounded-xl text-[11px] font-medium bg-slate-800 text-slate-400 hover:text-white transition-colors text-center flex items-center justify-center cursor-pointer border-0">
-                                Oceania
-                            </button>
-                            <button id="filter-region-pacific" onclick="toggleRegionFilter('pacific')" data-i18n="filter.region_pacific" data-i18n-title="filter.region_pacific_tooltip" title="Pacific Ocean islands & territories" class="col-span-2 py-1.5 px-2 rounded-xl text-[11px] font-medium bg-slate-800 text-slate-400 hover:text-white transition-colors text-center flex items-center justify-center cursor-pointer border-0">
-                                Pacific Ocean
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- AIRPORT TYPE FILTER -->
-                <div>
-                    <button type="button" onclick="toggleLeftFilterAccordion('airport_type')" class="w-full flex items-center justify-between mb-2.5 text-left group cursor-pointer border-0 bg-transparent p-0 select-none">
-                        <span data-i18n="filter.airport_type" data-i18n-title="filter.type_tooltip" title="Filter airports by classification: International, Regional, General Aviation, or Heli/Water." class="text-[11px] font-bold text-slate-400 group-hover:text-slate-200 uppercase tracking-wider transition-colors cursor-pointer">Airport Type</span>
-                        <i id="left-accordion-icon-airport_type" class="fa-solid fa-chevron-down text-slate-500 group-hover:text-slate-300 text-xs transition-transform duration-200"></i>
-                    </button>
-                    <div id="left-accordion-content-airport_type">
-                        <div class="grid grid-cols-2 gap-2">
-                            <button id="filter-type-all" onclick="toggleTypeFilter('all')" data-i18n="filter.type_all" data-i18n-title="filter.type_all_tooltip" title="Show all airport types" class="py-2 px-3 rounded-xl text-xs font-bold bg-cyan-600 text-white transition-colors text-center flex items-center justify-center gap-1.5 border-0 cursor-pointer">
-                                All Types
-                            </button>
-                            <button id="filter-type-International" onclick="toggleTypeFilter('International')" data-i18n-title="filter.type_international_tooltip" title="Major international hubs with commercial airline service" class="py-2 px-3 rounded-xl text-xs font-bold bg-cyan-600 text-white transition-colors text-center flex items-center justify-center gap-1.5 border-0 cursor-pointer">
-                                <span data-i18n="filter.type_international">International</span>
-                            </button>
-                            <button id="filter-type-Regional" onclick="toggleTypeFilter('Regional')" data-i18n-title="filter.type_regional_tooltip" title="Regional airports serving domestic or local commercial routes" class="py-2 px-3 rounded-xl text-xs font-bold bg-cyan-600 text-white transition-colors text-center flex items-center justify-center gap-1.5 border-0 cursor-pointer">
-                                <span data-i18n="filter.type_regional">Regional</span>
-                            </button>
-                            <button id="filter-type-General-Aviation" onclick="toggleTypeFilter('General Aviation')" data-i18n-title="filter.type_ga_tooltip" title="General aviation airfields for private, club, and sport flying" class="py-2 px-3 rounded-xl text-xs font-bold bg-cyan-600 text-white transition-colors text-center flex items-center justify-center gap-1.5 border-0 cursor-pointer">
-                                <span data-i18n="filter.type_ga">General Aviation</span>
-                            </button>
-                            <button id="filter-type-Heli---Water" onclick="toggleTypeFilter('Heli / Water')" data-i18n-title="filter.type_heli_water_tooltip" title="Heliports, helipads, and seaplane water runways" class="py-2 px-3 rounded-xl text-xs font-bold bg-cyan-600 text-white transition-colors text-center flex items-center justify-center gap-1.5 border-0 cursor-pointer">
-                                <span data-i18n="filter.type_heli_water">Heli / Water</span>
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- GSX PROFILE FILTER -->
-                <div>
-                    <button type="button" onclick="toggleLeftFilterAccordion('gsx_profile')" class="w-full flex items-center justify-between mb-2.5 text-left group cursor-pointer border-0 bg-transparent p-0 select-none">
-                        <span data-i18n="filter.gsx_profile" data-i18n-title="filter.gsx_tooltip" title="Filter airports according to whether a custom GSX Pro ground handling profile (.ini) is installed." class="text-[11px] font-bold text-slate-400 group-hover:text-slate-200 uppercase tracking-wider transition-colors cursor-pointer">GSX Profile</span>
-                        <i id="left-accordion-icon-gsx_profile" class="fa-solid fa-chevron-down text-slate-500 group-hover:text-slate-300 text-xs transition-transform duration-200"></i>
-                    </button>
-                    <div id="left-accordion-content-gsx_profile">
-                        <div class="grid grid-cols-3 gap-2">
-                            <button id="filter-gsx-all" onclick="toggleGsxFilter('all')" data-i18n="filter.gsx_all" data-i18n-title="filter.gsx_all_tooltip" title="Show all airports with or without GSX profiles" class="py-2 px-2 rounded-xl text-xs font-bold bg-cyan-600 text-white transition-colors text-center flex items-center justify-center gap-1 border-0 cursor-pointer">
-                                All
-                            </button>
-                            <button id="filter-gsx-with" onclick="toggleGsxFilter('with')" data-i18n="filter.gsx_with" data-i18n-title="filter.gsx_with_tooltip" title="Show only airports with an active GSX profile installed" class="py-2 px-2 rounded-xl text-xs font-medium bg-slate-800 text-slate-400 hover:text-white transition-colors text-center flex items-center justify-center gap-1 border-0 cursor-pointer">
-                                With
-                            </button>
-                            <button id="filter-gsx-none" onclick="toggleGsxFilter('none')" data-i18n="filter.gsx_none" data-i18n-title="filter.gsx_none_tooltip" title="Show only airports without a GSX profile" class="py-2 px-2 rounded-xl text-xs font-medium bg-slate-800 text-slate-400 hover:text-white transition-colors text-center flex items-center justify-center gap-1 border-0 cursor-pointer">
-                                No Profile
-                            </button>
-                        </div>
-                        <button id="btn-open-gsx-audit" onclick="openGsxAuditModal()" class="w-full mt-2 py-1.5 px-2.5 rounded-xl text-xs font-mono font-bold bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 flex items-center justify-between cursor-pointer transition-colors" title="Open GSX Profiles Audit Hub">
-                            <span>Audit GSX Profiles</span>
-                            <span id="sidebar-gsx-issues-badge" class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded leading-tight bg-amber-950 text-amber-400 border border-amber-800 hidden">0 issues</span>
-                        </button>
-                    </div>
-                </div>
-
-                <!-- MINIMUM USER RATING STAR FILTER -->
-                <div>
-                    <div class="flex items-center justify-between mb-2">
-                        <label data-i18n="filter.user_rating" data-i18n-title="filter.rating_tooltip" title="Filter airports by your personal star rating to quickly highlight your favorite sceneries." class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block cursor-help">Minimum User Rating</label>
-                        <span id="filter-rating-display" class="text-xs font-mono font-bold text-cyan-400">All (0.0★)</span>
-                    </div>
-
-                    <div class="p-3 rounded-xl bg-slate-900/90 border border-slate-800 flex items-center justify-between" data-i18n-title="filter.rating_widget_tooltip" title="Click a star to set the minimum rating threshold (e.g. 4 stars to see 4★ and 5★ airports).">
-                        <div id="filter-star-widget" class="flex items-center gap-1.5" onmouseleave="resetFilterStarHover()">
-                            <!-- Rendered dynamically by app.js -->
-                        </div>
-                        <button data-i18n="filter.rating_reset" data-i18n-title="filter.rating_reset_tooltip" onclick="resetMinRatingFilter()" title="Reset Rating Filter to 0.0★" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-[10px] font-bold transition-colors cursor-pointer border-0">
-                            Reset
-                        </button>
-                    </div>
-                </div>
-
-                <!-- SIMBRIEF FLIGHT OPTIMIZER FILTER (SIDEBAR) -->
-                <div class="border-t border-slate-800/80 pt-4 hidden">
-                    <div class="flex items-center justify-between mb-2.5">
-                        <label class="text-[11px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                            <i class="fa-solid fa-plane-flight text-amber-400"></i>
-                            <span data-i18n="simbrief.title">SimBrief Flight Mode</span>
-                        </label>
-                        <span id="sb-status-badge" data-i18n="simbrief.status_inactive" class="text-[9px] font-bold font-mono px-2 py-0.5 rounded-full bg-slate-900 text-slate-400 border border-slate-800">INACTIVE</span>
-                    </div>
-                    
-                    <div class="space-y-2.5">
-                        <div class="grid grid-cols-2 gap-2">
-                            <div>
-                                <span data-i18n="simbrief.username_label" class="text-[10px] text-slate-400 font-semibold block mb-1">SimBrief Username</span>
-                                <input type="text" id="sb-username-input" onkeydown="if(event.key==='Enter') autoSyncSimBrief('username')" onblur="autoSyncSimBrief('username')" placeholder="Username" class="w-full bg-slate-900/90 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500 font-mono transition-all">
-                            </div>
-                            <div>
-                                <span data-i18n="simbrief.pilot_id_label" class="text-[10px] text-slate-400 font-semibold block mb-1">Pilot ID</span>
-                                <input type="text" id="sb-userid-input" onkeydown="if(event.key==='Enter') autoSyncSimBrief('userid')" onblur="autoSyncSimBrief('userid')" placeholder="Pilot ID" class="w-full bg-slate-900/90 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-amber-500 font-mono transition-all">
-                            </div>
-                        </div>
-
-                        <button id="sb-import-btn" onclick="triggerSimBriefImport()" class="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 text-amber-300 font-extrabold text-xs transition-all flex items-center justify-center gap-2 shadow-sm shadow-amber-500/10 active:scale-98">
-                            <i id="sb-import-icon" class="fa-solid fa-cloud-arrow-down text-amber-400"></i>
-                            <span data-i18n="simbrief.import_btn">Import Active SimBrief OFP</span>
-                        </button>
-
-                        <div id="sb-route-info" class="hidden text-[11px] font-mono text-center p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 font-semibold space-y-0.5">
-                            <div id="sb-route-text"></div>
-                            <div id="sb-disabled-text" class="text-[10px] text-slate-400 font-normal"></div>
-                        </div>
-                    </div>
-                </div>
-
-            </div>
-
-            <!-- BOTTOM FIXED ACTION & SEARCH PANEL (LEFT SIDEBAR FOOTER) -->
-            <div class="px-4 py-4 border-t border-slate-800/80 bg-slate-950/70 flex flex-col gap-3">
+            <!-- BOTTOM CENTERED MAP TOOLBAR -->
+            <div id="bottom-map-toolbar" class="absolute bottom-6 left-1/2 -translate-x-1/2 z-[400] flex items-center gap-2.5 bg-slate-950/85 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-slate-700/60 shadow-2xl shadow-black/70 select-none">
                 <!-- SEARCH BAR -->
-                <div class="relative flex items-center">
+                <div class="relative flex items-center w-64 md:w-80">
                     <i class="fa-solid fa-magnifying-glass absolute left-3.5 text-slate-400 text-xs pointer-events-none"></i>
                     <input type="text" id="search-input" onkeydown="handleSearchKeyDown(event)" oninput="debouncedFilterAirports()" 
                            data-i18n-placeholder="footer.search_placeholder"
                            placeholder="Search ICAO, Airport, Country..." 
-                           class="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl pl-9 pr-8 py-2.5 text-xs text-slate-100 placeholder-slate-400 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 font-medium transition-all shadow-inner">
-                    <button id="clear-search" onclick="clearSearch()" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs p-1">
+                           class="w-full bg-slate-900/90 border border-slate-700/80 rounded-xl pl-9 pr-8 py-2 text-xs text-slate-100 placeholder-slate-400 focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/30 font-medium transition-all shadow-inner">
+                    <button id="clear-search" onclick="clearSearch()" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs p-1 cursor-pointer">
                         <i class="fa-solid fa-xmark"></i>
                     </button>
                 </div>
 
-                <!-- ACTION BUTTONS ROW: EXPORT, RESCAN, SETTINGS -->
-                <div class="flex items-center gap-2.5 w-full">
-                    <!-- EXPORT BUTTON -->
-                    <button onclick="openExportModal()" data-i18n-title="footer.export_button" title="Export Scenery Collection (CSV / JSON)" class="flex-1 h-10 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-bold transition-colors flex items-center justify-center gap-2 cursor-pointer border-0 active:scale-98 group">
-                        <i class="fa-solid fa-arrow-up-from-bracket text-slate-400 group-hover:text-white text-xs transition-colors"></i>
-                        <span data-i18n="footer.export_button">Export</span>
-                    </button>
+                <!-- SEPARATOR -->
+                <div class="w-px h-6 bg-slate-800 shrink-0"></div>
 
-                    <!-- RESCAN BUTTON -->
-                    <button onclick="rescanMSFS()" data-i18n-title="footer.rescan_button" title="Rescan MSFS Packages" class="flex-1 h-10 px-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold transition-colors flex items-center justify-center gap-2 cursor-pointer border-0 active:scale-98">
-                        <i id="rescan-icon" class="fa-solid fa-arrows-rotate text-white text-xs"></i>
-                        <span data-i18n="footer.rescan_button">Rescan</span>
-                    </button>
+                <!-- EXPORT BUTTON -->
+                <button onclick="openExportModal()" data-i18n-title="footer.export_button" title="Export Scenery Collection (CSV / JSON)" class="h-9 px-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-800 hover:border-slate-700 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 group">
+                    <i class="fa-solid fa-arrow-up-from-bracket text-slate-400 group-hover:text-white text-xs transition-colors"></i>
+                    <span data-i18n="footer.export_button">Export</span>
+                </button>
 
-                    <!-- SETTINGS GEAR BUTTON -->
-                    <button onclick="openSettingsModal()" data-i18n-title="footer.settings_tooltip" title="Settings & Scenery Paths" class="w-10 h-10 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition-colors shrink-0 cursor-pointer border-0 active:scale-98 group">
-                        <i class="fa-solid fa-gear text-slate-400 group-hover:text-white text-sm transition-transform duration-300 group-hover:rotate-45"></i>
-                    </button>
+                <!-- RESCAN BUTTON -->
+                <button onclick="rescanMSFS()" data-i18n-title="footer.rescan_button" title="Rescan MSFS Packages" class="h-9 px-3.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 shadow-lg shadow-cyan-600/20">
+                    <i id="rescan-icon" class="fa-solid fa-arrows-rotate text-white text-xs"></i>
+                    <span data-i18n="footer.rescan_button">Rescan</span>
+                </button>
+
+                <!-- SETTINGS GEAR BUTTON -->
+                <button onclick="openSettingsModal()" data-i18n-title="footer.settings_tooltip" title="Settings & Scenery Paths" class="w-9 h-9 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 hover:border-slate-700 flex items-center justify-center transition-all shrink-0 cursor-pointer active:scale-95 group">
+                    <i class="fa-solid fa-gear text-slate-400 group-hover:text-white text-sm transition-transform duration-300 group-hover:rotate-45"></i>
+                </button>
+            </div>
+
+            <!-- FILTER RADIAL MENU (RIGHT-CLICK CONTEXTUAL FLOATING MENU) -->
+            <div id="filter-radial-menu" class="hidden fixed z-[1500] select-none pointer-events-none transform -translate-x-1/2 -translate-y-1/2 transition-opacity duration-200" style="transform-origin: center center;">
+                <div class="relative w-[520px] h-[520px] flex items-center justify-center pointer-events-none">
+                    <!-- FROSTED BLURRED CIRCULAR BACKDROP DISC -->
+                    <div id="filter-radial-backdrop" class="absolute w-[500px] h-[500px] rounded-full bg-slate-950/80 backdrop-blur-xl border border-slate-700/50 shadow-2xl shadow-black/80 pointer-events-none"></div>
+
+                    <!-- CENTRAL HUB -->
+                    <div id="filter-radial-center-hub" onclick="handleFilterRadialCenterClick()" class="absolute z-30 w-32 h-32 rounded-full bg-gradient-to-b from-slate-800 to-slate-900 border-2 border-cyan-500/50 hover:border-cyan-400 shadow-xl flex flex-col items-center justify-center cursor-pointer pointer-events-auto transition-all active:scale-95 group text-center p-2">
+                        <!-- Content rendered dynamically: Level 1 vs Level 2 -->
+                    </div>
+
+                    <!-- RADIAL ITEMS CONTAINER (LEVEL 1 / LEVEL 2 PILLS) -->
+                    <div id="filter-radial-items-container" class="absolute inset-0 pointer-events-none">
+                        <!-- Populated dynamically -->
+                    </div>
                 </div>
             </div>
-        </aside>
-
-        <!-- LEFT SIDEBAR RESIZE SPLITTER HANDLE (GLISSIÈRE LATÉRALE) -->
-        <div id="sidebar-resize-handle" class="w-2 hover:bg-cyan-500/30 cursor-col-resize z-20 transition-colors shrink-0 select-none relative group flex items-center justify-center" title="Click and drag to resize sidebar">
-            <div class="absolute inset-y-0 -left-1.5 -right-1.5 cursor-col-resize"></div>
-            <div class="w-0.5 h-8 bg-slate-700 group-hover:bg-cyan-400 rounded-full transition-colors pointer-events-none"></div>
-        </div>
-
-        <!-- LEAFLET MAP CONTAINER -->
-        <main class="flex-1 relative">
-            <div id="map" class="w-full h-full z-10 bg-slate-950"></div>
 
             <!-- AIRPORT RADIAL MENU (STRICTLY CIRCULAR 4-QUADRANT WHEEL - 2X SCALE & TRANSLUCENT) -->
             <div id="airport-radial-menu" class="hidden absolute z-[1500] select-none pointer-events-none transform -translate-x-1/2 -translate-y-1/2" style="transform-origin: center center;">
