@@ -10514,9 +10514,9 @@ function renderFilterRadialLevel1() {
     const count = currentlyFilteredAirports ? currentlyFilteredAirports.length : (allAirportsData ? allAirportsData.length : 0);
     hubEl.innerHTML = `
         <div class="flex flex-col items-center justify-center pointer-events-none select-none">
-            <span class="text-[9px] font-black tracking-widest text-slate-400 uppercase leading-tight">MAP VIEW</span>
-            <span class="text-xs font-black font-mono text-cyan-400 leading-tight">FILTERED BY</span>
-            <span class="text-[10px] font-mono text-slate-300 mt-1 bg-slate-900/60 px-2 py-0.5 rounded-full border border-slate-700/40">${count} AP</span>
+            <span class="text-[10px] font-black tracking-widest text-slate-400 uppercase leading-tight">MAP VIEW</span>
+            <span class="text-sm font-black font-mono text-cyan-400 leading-tight my-0.5">FILTERED BY</span>
+            <span class="text-xs font-mono text-slate-300 mt-1.5 bg-slate-900/70 px-3 py-0.5 rounded-full border border-slate-700/50 shadow-inner">${count} AP</span>
         </div>
     `;
 
@@ -10559,8 +10559,8 @@ function renderFilterRadialLevel2(categoryKey) {
 
     hubEl.innerHTML = `
         <div class="flex flex-col items-center justify-center text-cyan-400 group-hover:text-white transition-colors pointer-events-none select-none">
-            <span class="text-xs font-black tracking-widest uppercase leading-tight">BACK</span>
-            <span class="text-[9px] font-mono text-slate-400 mt-0.5 truncate max-w-[110px] leading-tight">${catLabel}</span>
+            <span class="text-sm font-black tracking-widest uppercase leading-tight">BACK</span>
+            <span class="text-[10px] font-mono text-slate-400 mt-1 truncate max-w-[120px] leading-tight">${catLabel}</span>
         </div>
     `;
 
@@ -10585,7 +10585,6 @@ function renderFilterRadialLevel2(categoryKey) {
             { id: 'Official', label: 'Official', isActive: selectedSources.has('Official') }
         ];
     } else if (categoryKey === 'region') {
-        radius = 185;
         items = [
             { id: 'all', label: 'All Regions', isActive: !selectedRegion },
             { id: 'weurope', label: 'W. Europe', isActive: selectedRegion === 'weurope' },

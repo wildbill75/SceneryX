@@ -618,11 +618,11 @@
             <!-- FILTER RADIAL MENU (RIGHT-CLICK CONTEXTUAL FLOATING MENU - DRAGGABLE) -->
             <div id="filter-radial-menu" class="hidden fixed z-[1500] select-none pointer-events-none transform -translate-x-1/2 -translate-y-1/2 transition-opacity duration-200" style="transform-origin: center center;">
                 <div class="relative w-[520px] h-[520px] flex items-center justify-center pointer-events-none">
-                    <!-- FROSTED BLURRED CIRCULAR BACKDROP DISC (DRAGGABLE) -->
-                    <div id="filter-radial-backdrop" class="absolute w-[500px] h-[500px] rounded-full pointer-events-auto cursor-grab" title="Drag wheel or click outside to dismiss"></div>
+                    <!-- FROSTED BLURRED CIRCULAR BACKDROP DISC (DRAGGABLE - 350px diameter passing through center of pills) -->
+                    <div id="filter-radial-backdrop" class="absolute w-[350px] h-[350px] rounded-full pointer-events-auto cursor-grab" title="Drag wheel or click outside to dismiss"></div>
 
-                    <!-- CENTRAL HUB (DRAGGABLE & CLICKABLE) -->
-                    <div id="filter-radial-center-hub" class="absolute z-30 w-32 h-32 rounded-full flex flex-col items-center justify-center pointer-events-auto active:scale-95 group text-center p-2 cursor-grab select-none" title="Drag to move or click to navigate">
+                    <!-- CENTRAL HUB (DRAGGABLE & CLICKABLE - ENLARGED 150px) -->
+                    <div id="filter-radial-center-hub" class="absolute z-30 w-[150px] h-[150px] rounded-full flex flex-col items-center justify-center pointer-events-auto active:scale-95 group text-center p-2 cursor-grab select-none" title="Drag to move or click to navigate">
                         <!-- Content rendered dynamically: Level 1 vs Level 2 -->
                     </div>
 
