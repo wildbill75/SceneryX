@@ -1883,77 +1883,50 @@
             <div class="flex items-center justify-between border-b border-slate-800/80 pb-3.5">
                 <div>
                     <span class="text-[10px] font-mono text-cyan-400/90 uppercase font-bold tracking-wider block mb-1">SceneryX System</span>
-                    <div class="flex items-center gap-2.5">
-                        <div class="w-7 h-7 rounded-lg bg-cyan-600 text-white flex items-center justify-center font-bold text-xs">
-                            <i class="fa-solid fa-file-export"></i>
-                        </div>
-                        <h2 data-i18n="export.title" class="text-base font-bold text-white">Export Scenery Collection</h2>
-                    </div>
+                    <h2 data-i18n="export.title" class="text-lg font-bold text-white">Export Scenery Collection</h2>
                 </div>
                 <button onclick="closeExportModal()" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-xs transition-all">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
 
-            <!-- Scope Selection with Tooltips -->
+            <!-- Scope Selection -->
             <div class="space-y-2">
                 <label data-i18n="export.scope" class="text-xs font-bold text-slate-400 uppercase tracking-wider block">Export Scope</label>
                 <div class="grid grid-cols-2 gap-2 text-xs">
                     <label title="Export your entire scenery collection (Payware, Freeware & Asobo)." 
-                           class="p-3 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center gap-2 cursor-pointer hover:border-cyan-500/50 transition-all group relative">
+                           class="p-3 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center gap-2.5 cursor-pointer hover:border-cyan-500/50 transition-all group">
                         <input type="radio" name="export-scope" value="all" checked class="accent-cyan-500">
                         <span data-i18n="export.all" class="font-bold text-slate-200 group-hover:text-cyan-300">All Sceneries</span>
-                        <i class="fa-solid fa-circle-info text-[10px] text-slate-500 group-hover:text-cyan-400 ml-auto"></i>
                     </label>
 
                     <label title="Export only the sceneries currently visible on the map based on active filters (e.g. Payware only, GSX profile, etc.)." 
-                           class="p-3 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center gap-2 cursor-pointer hover:border-cyan-500/50 transition-all group relative">
+                           class="p-3 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center gap-2.5 cursor-pointer hover:border-cyan-500/50 transition-all group">
                         <input type="radio" name="export-scope" value="filtered" class="accent-cyan-500">
                         <span data-i18n="export.filtered" class="font-bold text-slate-200 group-hover:text-cyan-300">Filtered List</span>
-                        <i class="fa-solid fa-circle-info text-[10px] text-slate-500 group-hover:text-cyan-400 ml-auto"></i>
                     </label>
                 </div>
             </div>
 
             <!-- Scope Description Explainer Box -->
-            <div id="export-scope-desc" class="p-3 rounded-xl bg-slate-950/40 border border-slate-800/60 text-[11px] text-slate-400 space-y-1">
-                <div class="flex items-center gap-1.5 font-bold text-cyan-400">
-                    <i class="fa-solid fa-circle-info text-xs"></i>
-                    <span data-i18n="export.scope_details">Scope Details</span>
-                </div>
-                <p id="export-scope-text" data-i18n="export.scope_all_desc">Exports your entire scenery collection (physical sceneries & streamed Marketplace).</p>
+            <div id="export-scope-desc" class="p-3.5 rounded-xl bg-slate-950/50 border border-slate-800/80">
+                <p id="export-scope-text" data-i18n="export.scope_all_desc" class="text-sm font-medium text-slate-300 leading-relaxed">Exports your entire scenery collection (physical sceneries & streamed Marketplace).</p>
             </div>
 
-            <!-- Export Actions with Tooltips -->
+            <!-- Export Actions -->
             <div class="space-y-2.5 pt-1">
                 <button onclick="triggerExportCollection('csv')" 
                         title="Generates a CSV / Excel spreadsheet compatible with Volanta, Elevatex, and Google Sheets."
-                        class="w-full p-3.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/50 text-slate-100 font-bold text-xs flex items-center justify-between transition-all group shadow-sm">
-                    <div class="flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center text-sm font-bold">
-                            <i class="fa-solid fa-file-csv"></i>
-                        </div>
-                        <div class="text-left">
-                            <div data-i18n="export.csv_title" class="text-slate-200 group-hover:text-cyan-300 transition-colors">Export CSV Spreadsheet</div>
-                            <div data-i18n="export.csv_subtitle" class="text-[10px] text-slate-400 font-normal">Excel, Volanta & Elevatex compatible</div>
-                        </div>
-                    </div>
-                    <i class="fa-solid fa-arrow-down-to-line text-slate-400 group-hover:text-white transition-colors"></i>
+                        class="w-full p-3.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/50 transition-all group shadow-sm text-left">
+                    <div data-i18n="export.csv_title" class="text-sm font-bold text-slate-200 group-hover:text-cyan-300 transition-colors">Export CSV Spreadsheet</div>
+                    <div data-i18n="export.csv_subtitle" class="text-xs text-slate-400 font-normal mt-0.5">Excel, Volanta & Elevatex compatible</div>
                 </button>
 
                 <button onclick="triggerExportCollection('json')" 
                         title="Saves a complete raw JSON metadata backup for re-importing or custom automation."
-                        class="w-full p-3.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/50 text-slate-100 font-bold text-xs flex items-center justify-between transition-all group shadow-sm">
-                    <div class="flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-lg bg-purple-600 text-white flex items-center justify-center text-sm font-bold">
-                            <i class="fa-solid fa-code"></i>
-                        </div>
-                        <div class="text-left">
-                            <div data-i18n="export.json_title" class="text-slate-200 group-hover:text-cyan-300 transition-colors">Export JSON Backup</div>
-                            <div data-i18n="export.json_subtitle" class="text-[10px] text-slate-400 font-normal">Structured backup for flight sim apps</div>
-                        </div>
-                    </div>
-                    <i class="fa-solid fa-arrow-down-to-line text-slate-400 group-hover:text-white transition-colors"></i>
+                        class="w-full p-3.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 hover:border-cyan-500/50 transition-all group shadow-sm text-left">
+                    <div data-i18n="export.json_title" class="text-sm font-bold text-slate-200 group-hover:text-cyan-300 transition-colors">Export JSON Backup</div>
+                    <div data-i18n="export.json_subtitle" class="text-xs text-slate-400 font-normal mt-0.5">Structured backup for flight sim apps</div>
                 </button>
             </div>
         </div>
