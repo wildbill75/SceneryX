@@ -1064,9 +1064,8 @@ async function loadCountryOverlays() {
                             }
                             return;
                         }
-                        // Neutral area rule: If the detail drawer is currently open or another country is selected, clicking closes it without moving camera
-                        if (activeDrawerMode !== 'MAP' || (selectedCountryCode && selectedCountryCode !== iso)) {
-                            closeDrawerWithoutCameraChange();
+                        if (isFilterRadialOpen) {
+                            closeFilterRadialMenu();
                             return;
                         }
                         // If drawer is closed, debounce single click to allow double click detection
