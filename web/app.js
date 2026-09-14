@@ -1837,6 +1837,7 @@ function toggleCountrySelection(iso, countryName, layer, forceSelect = false) {
 
     selectedCountryCode = isoUpper;
     selectedCountryName = countryName || isoUpper;
+    updateMapZoomTier();
     resetConflictingFiltersForCountrySelection();
 
     // Ensure right drawer is closed (Country Mode is map-only filter now)
@@ -3973,6 +3974,19 @@ function updateMapZoomTier() {
     const z = map.getZoom();
     const mapEl = document.getElementById('map');
     if (!mapEl) return;
+
+    const isCountryMode = Boolean(selectedCountryCode);
+    if (isCountryMode) {
+        mapEl.setAttribute('data-country-mode', 'true');
+        let cZoom = 'none';
+        if (z >= 6) cZoom = 'detail';
+        else if (z >= 3) cZoom = 'wide';
+        else cZoom = 'none';
+        mapEl.setAttribute('data-country-zoom', cZoom);
+    } else {
+        mapEl.removeAttribute('data-country-mode');
+        mapEl.removeAttribute('data-country-zoom');
+    }
 
     let tier = 0;
     if (z >= 11) tier = 8;
@@ -8328,6 +8342,7 @@ function showAirportDetails(ap, calledFromCountryMode = false) {
         selectedCountryCode = null;
         selectedCountryName = '';
         expandedCountryIcao = null;
+        updateMapZoomTier();
         if (typeof selectedCountryPolygonLayer !== 'undefined' && selectedCountryPolygonLayer && map) {
             try { map.removeLayer(selectedCountryPolygonLayer); } catch(err) {}
             selectedCountryPolygonLayer = null;
@@ -9225,6 +9240,7 @@ function exitCountryMode(flyCamera = false) {
         selectedCountryCode = null;
         selectedCountryName = '';
         expandedCountryIcao = null;
+        updateMapZoomTier();
         selectedAirport = null;
         flightCorridorArrivalAirport = null;
 

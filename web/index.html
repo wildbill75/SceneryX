@@ -147,6 +147,30 @@
         .airport-map-label.label-force-visible {
             display: inline-flex !important;
         }
+
+        /* ================= COUNTRY MODE PROGRESSIVE DISCLOSURE ================= */
+        /* En Mode Pays uniquement: Affichage des tags à un niveau de zoom plus large
+           (Zoom >= 3 pour International / Regional / General Aviation, Zoom >= 6 pour Heliports / Seaplanes). */
+        #map[data-country-mode="true"][data-country-zoom="none"] .airport-map-label:not(.label-force-visible) {
+            display: none !important;
+        }
+
+        #map[data-country-mode="true"][data-country-zoom="wide"] .airport-label-tier-1,
+        #map[data-country-mode="true"][data-country-zoom="wide"] .airport-label-tier-2,
+        #map[data-country-mode="true"][data-country-zoom="wide"] .airport-label-tier-3,
+        #map[data-country-mode="true"][data-country-zoom="wide"] .airport-label-tier-5,
+        #map[data-country-mode="true"][data-country-zoom="wide"] .airport-label-tier-6,
+        #map[data-country-mode="true"][data-country-zoom="wide"] .airport-label-tier-7,
+        #map[data-country-mode="true"][data-country-zoom="detail"] .airport-label-tier-1,
+        #map[data-country-mode="true"][data-country-zoom="detail"] .airport-label-tier-2,
+        #map[data-country-mode="true"][data-country-zoom="detail"] .airport-label-tier-3,
+        #map[data-country-mode="true"][data-country-zoom="detail"] .airport-label-tier-4,
+        #map[data-country-mode="true"][data-country-zoom="detail"] .airport-label-tier-5,
+        #map[data-country-mode="true"][data-country-zoom="detail"] .airport-label-tier-6,
+        #map[data-country-mode="true"][data-country-zoom="detail"] .airport-label-tier-7,
+        #map[data-country-mode="true"][data-country-zoom="detail"] .airport-label-tier-8 {
+            display: inline-flex !important;
+        }
         /* Leaflet Dark Popup Customization */
         .leaflet-popup-content-wrapper {
             background: rgba(15, 23, 42, 0.95) !important;
