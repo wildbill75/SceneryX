@@ -10658,6 +10658,60 @@ function formatFilterRadialLabel(label) {
 }
 
 /**
+ * Computes proportional blue gradient colors for Tier 2 radial sectors
+ * from dark navy blue (ALL items, e.g. rgb(15, 23, 42)) to light sky blue (last item, e.g. rgb(14, 165, 233))
+ * Number of steps is strictly determined by totalCount.
+ */
+function getFilterRadialSectorGradientColor(index, totalCount, isActive = false) {
+    if (totalCount <= 1) {
+        return {
+            fill: isActive ? 'rgba(18, 30, 52, 0.95)' : 'rgba(15, 23, 42, 0.88)',
+            stroke: isActive ? 'rgba(56, 189, 248, 0.95)' : 'rgba(100, 116, 139, 0.35)',
+            strokeWidth: isActive ? '2.5px' : '1.5px',
+            filter: isActive ? 'drop-shadow(0 0 14px rgba(56, 189, 248, 0.60))' : 'drop-shadow(0 2px 6px rgba(0, 0, 0, 0.35))'
+        };
+    }
+
+    const t = Math.max(0, Math.min(1, index / (totalCount - 1)));
+
+    // Start color (t=0): Dark navy blue of "ALL" items (rgb(15, 23, 42))
+    // End color (t=1): Luminous light sky blue (rgb(14, 165, 233))
+    const rStart = 15, gStart = 23, bStart = 42;
+    const rEnd = 14, gEnd = 165, bEnd = 233;
+
+    let r = Math.round(rStart + t * (rEnd - rStart));
+    let g = Math.round(gStart + t * (gEnd - gStart));
+    let b = Math.round(bStart + t * (bEnd - bStart));
+
+    let alpha = 0.88;
+    if (isActive) {
+        // Boost vibrancy for active items while adhering strictly to the gradient step hue
+        r = Math.min(255, Math.round(r * 1.10 + 6));
+        g = Math.min(255, Math.round(g * 1.10 + 8));
+        b = Math.min(255, Math.round(b * 1.08 + 12));
+        alpha = 0.95;
+    }
+
+    const fill = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+
+    let stroke, strokeWidth, filter;
+    if (isActive) {
+        stroke = 'rgba(56, 189, 248, 0.95)';
+        strokeWidth = '2.5px';
+        filter = 'drop-shadow(0 0 14px rgba(56, 189, 248, 0.60))';
+    } else {
+        const sr = Math.round(100 + t * (56 - 100));
+        const sg = Math.round(116 + t * (189 - 116));
+        const sb = Math.round(139 + t * (248 - 139));
+        stroke = `rgba(${sr}, ${sg}, ${sb}, 0.35)`;
+        strokeWidth = '1.5px';
+        filter = 'drop-shadow(0 2px 6px rgba(0, 0, 0, 0.35))';
+    }
+
+    return { fill, stroke, strokeWidth, filter };
+}
+
+/**
  * Renders concentric annular wheel matching Screen 1 (No icons, high readability)
  */
 function renderFilterRadialWheel(forceAnimateOuter = false) {
@@ -10760,13 +10814,18 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
 
             const isAll = (item.id === 'all' || item.id === '0' || (item.label && item.label.toLowerCase().startsWith('all')));
             let specificClass = '';
-            if (isAll) {
-                specificClass = 'radial-sector-all';
-            } else if (filterRadialActiveCategory === 'pricing') {
-                if (item.id === 'Payware') specificClass = 'radial-sector-payware';
+            let inlinePathStyle = '';
+
+            if (filterRadialActiveCategory === 'pricing') {
+                if (isAll) specificClass = 'radial-sector-all';
+                else if (item.id === 'Payware') specificClass = 'radial-sector-payware';
                 else if (item.id === 'Freeware / Flightsim.to' || item.id === 'Freeware') specificClass = 'radial-sector-freeware';
                 else if (item.id === 'Asobo') specificClass = 'radial-sector-asobo';
                 else if (item.id === 'Default') specificClass = 'radial-sector-default';
+            } else {
+                // Proportional Blue Gradient from dark navy blue (ALL) to light sky blue
+                const grad = getFilterRadialSectorGradientColor(idx, itemCount, isActive);
+                inlinePathStyle = `style="fill: ${grad.fill}; stroke: ${grad.stroke}; stroke-width: ${grad.strokeWidth}; ${grad.filter ? `filter: ${grad.filter};` : ''}"`;
             }
 
             const formattedItemLabel = formatFilterRadialLabel(item.label);
@@ -10778,10 +10837,10 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
                    onmouseleave="handleFilterRadialTier2MouseLeave()"
                    onclick="handleFilterRadialSubItemClick('${filterRadialActiveCategory}', '${escapeJsStr(item.id)}')"
                    role="button" aria-label="${escapeHtml(item.label)}">
-                    <path class="radial-filter-sector-path" d="${pathD}" />
+                    <path class="radial-filter-sector-path" ${inlinePathStyle} d="${pathD}" />
                     <foreignObject x="${(tx - 56).toFixed(1)}" y="${(ty - 18).toFixed(1)}" width="112" height="36" class="pointer-events-none">
                         <div class="w-full h-full flex items-center justify-center text-center px-1">
-                            <span class="text-[10px] font-bold tracking-tight uppercase leading-tight whitespace-nowrap ${isActive ? 'text-white font-extrabold' : (isAll ? 'text-slate-300 group-hover:text-white' : 'text-slate-200 group-hover:text-white')}">${formattedItemLabel}</span>
+                            <span class="text-[10px] font-bold tracking-tight uppercase leading-tight whitespace-nowrap ${isActive ? 'text-white font-extrabold' : 'text-slate-200 group-hover:text-white'}">${formattedItemLabel}</span>
                         </div>
                     </foreignObject>
                 </g>
