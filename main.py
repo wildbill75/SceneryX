@@ -2353,14 +2353,15 @@ class Api:
             'trial', 'free trial', 'emergencydispatcher', 'donation', 'linienstern',
             'skyelite', 'landmark', 'landmarks', 'city pack', 'city scenery', 'bridges',
             'photogrammetry', 'satellite', 'aerial', 'poi', 'points of interest',
-            'profile', 'profiles', 'approach plate', 'charts', 'guide', 'manual'
+            'profile', 'profiles', 'approach plate', 'charts', 'guide', 'manual',
+            'tree', 'trees', 'vegetation', 'foliage', 'forest'
         ]
 
         clean_words = []
         if name_clean:
             for w in re.split(r'[\s\-,/]+', name_clean):
                 w_clean = re.sub(r'[^a-zA-Z]', '', w).strip()
-                if len(w_clean) >= 4 and w_clean.lower() not in ['airport', 'international', 'regional', 'national', 'field', 'paris', 'london', 'berlin']:
+                if len(w_clean) >= 4 and w_clean.lower() not in ['airport', 'international', 'regional', 'national', 'field', 'paris', 'london', 'berlin', 'town', 'city', 'east', 'west', 'north', 'south']:
                     clean_words.append(w_clean.lower())
 
         def check_sm(code):
@@ -2473,15 +2474,19 @@ class Api:
                 t_low = title.lower()
                 l_low = link.lower()
                 code_low = code.lower()
-                if any(b in t_low for b in BLACKLIST_KEYWORDS):
+                # 1. Blacklist check
+                if any(b in t_low for b in BLACKLIST_KEYWORDS) or any(b in l_low for b in BLACKLIST_KEYWORDS):
+                    continue
+                # 2. Simulator check (exclude X-Plane, P3D, FSX if not MSFS)
+                if any(old in t_low or old in l_low for old in ['p3d', 'prepar3d', 'fsx', 'fs9', 'xp11', 'xp12', 'xp ', 'x-plane', 'xplane']) and 'msfs' not in t_low and 'msfs' not in l_low:
                     continue
                     
                 matched = False
-                if re.search(r'\b' + re.escape(code_low) + r'\b', t_low) or (code_low in l_low):
+                if re.search(r'\b' + re.escape(code_low) + r'\b', t_low) or re.search(r'(^|[/\-_])' + re.escape(code_low) + r'([/\-_]|$)', l_low):
                     matched = True
-                else:
+                elif clean_words:
                     for cw in clean_words:
-                        if cw in t_low or cw in l_low:
+                        if re.search(r'\b' + re.escape(cw) + r'\b', t_low) or re.search(r'(^|[/\-_])' + re.escape(cw) + r'([/\-_]|$)', l_low):
                             matched = True
                             break
 
