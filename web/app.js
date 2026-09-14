@@ -5423,7 +5423,7 @@ function renderAirlineDestAccordionContent(destIcao) {
                          class="py-2 px-3.5 rounded-xl border border-slate-700/60 hover:border-purple-500 bg-slate-950/60 hover:bg-slate-900 transition-all cursor-pointer group flex items-center justify-between gap-2.5">
                         <div class="min-w-0 flex-1">
                             <span class="text-sm font-bold text-white group-hover:text-purple-300 transition-colors truncate block">${st.name}</span>
-                            ${devSubtitle ? `<span class="text-xs font-mono text-slate-400 truncate block mt-0.5"><span class="text-slate-500">by </span><span class="text-cyan-300 font-medium">${devSubtitle}</span></span>` : ''}
+                            ${devSubtitle ? `<span class="text-xs font-mono text-slate-400 truncate block mt-0.5"><span class="text-slate-500 text-[10px]">by </span><span class="text-cyan-300 font-bold tracking-wide">${devSubtitle}</span></span>` : ''}
                         </div>
                         <div class="flex items-center gap-2 shrink-0">
                             ${badgeHtml}
@@ -6106,9 +6106,9 @@ function renderRadialAddonDownloads(ap, stores, animate = false, basePillIndex =
 
                 ${devSubtitle ? `
                     <!-- Row 2: Developer / Studio -->
-                    <div class="text-[10px] font-mono leading-tight truncate flex items-center gap-1.5 text-slate-400">
-                        <span class="text-slate-500">by</span>
-                        <span class="text-cyan-300 font-medium truncate">${devSubtitle}</span>
+                    <div class="text-[11px] font-mono leading-snug truncate flex items-center gap-1.5 text-slate-400">
+                        <span class="text-slate-500 text-[10px]">by</span>
+                        <span class="text-cyan-300 font-bold truncate tracking-wide">${devSubtitle}</span>
                     </div>
                 ` : ''}
             </div>
@@ -13298,7 +13298,7 @@ function renderPaywareStoresList(stores, cleanIcao) {
                                 <span class="font-bold">${st.name}</span>
                                 ${badgeHtml}
                             </div>
-                            ${devSubtitle ? `<div class="text-[11px] font-mono text-slate-400 leading-relaxed mt-0.5 truncate"><span class="text-slate-500">by </span><span class="text-cyan-300 font-medium">${devSubtitle}</span></div>` : ''}
+                            ${devSubtitle ? `<div class="text-xs font-mono text-slate-400 leading-relaxed mt-0.5 truncate"><span class="text-slate-500 text-[10px]">by </span><span class="text-cyan-300 font-bold tracking-wide">${devSubtitle}</span></div>` : ''}
                         </div>
                     </div>
                     <div class="flex items-center gap-3 shrink-0 ml-2">

@@ -2461,14 +2461,94 @@ class Api:
                     return True, prod_url, price_val, curr, dev_name
             return False, u, None, "", ""
 
+        def get_fsto_prices():
+            if not hasattr(self, '_fsto_prices_cache'):
+                self._fsto_prices_cache = {}
+            if self._fsto_prices_cache:
+                return self._fsto_prices_cache
+            try:
+                p_req = urllib.request.Request('https://flightsim.to/backend/store/prices', headers={'User-Agent': 'Mozilla/5.0', 'Referer': 'https://flightsim.to/store/'})
+                with urllib.request.urlopen(p_req, timeout=4) as p_resp:
+                    self._fsto_prices_cache = json.loads(p_resp.read().decode('utf-8'))
+            except Exception:
+                pass
+            return self._fsto_prices_cache
+
         def check_fsto(code):
-            u = f"https://flightsim.to/store/search?q={code}"
-            h = fetch_html(u)
-            if not h or "no products found" in h.lower() or "0 results" in h.lower():
-                return False, u, None, "", ""
-            stripped = h.replace(f'value="{code}"', '').replace(f"value='{code}'", '')
-            pat = re.compile(r'(\b' + re.escape(code) + r'\b)', re.IGNORECASE)
-            return bool(pat.search(stripped)), u, None, "", ""
+            default_u = f"https://flightsim.to/store/search?q={code}"
+            code_low = code.lower()
+
+            candidates = []
+            queries = [code]
+            if len(clean_words) == 1:
+                queries.append(clean_words[0])
+            elif len(clean_words) >= 2:
+                queries.append(" ".join(clean_words[:2]))
+
+            for q in queries:
+                u = f"https://flightsim.to/backend/store/search?query={urllib.parse.quote(q)}"
+                try:
+                    req = urllib.request.Request(u, headers={'User-Agent': 'Mozilla/5.0', 'Referer': 'https://flightsim.to/store/'})
+                    with urllib.request.urlopen(req, timeout=4) as resp:
+                        d = json.loads(resp.read().decode('utf-8'))
+                        for it in d.get('data', []):
+                            if it.get('id') not in [c.get('id') for c in candidates]:
+                                candidates.append(it)
+                except Exception:
+                    pass
+
+            if not candidates:
+                return False, default_u, None, "", ""
+
+            prices = get_fsto_prices()
+
+            for it in candidates:
+                title = it.get('title', '')
+                t_low = title.lower()
+                slug = it.get('slug', '')
+                cat = it.get('category', '')
+
+                # Exclude blacklisted items or non-airports
+                if any(b in t_low for b in BLACKLIST_KEYWORDS) or any(b in slug for b in BLACKLIST_KEYWORDS):
+                    continue
+                if cat and cat not in ['Airports', 'Scenery', 'Scenery Enhancements']:
+                    continue
+
+                matched = False
+                if re.search(r'\b' + re.escape(code_low) + r'\b', t_low) or re.search(r'(^|-)' + re.escape(code_low) + r'(-|$)', slug):
+                    matched = True
+                elif len(clean_words) == 1:
+                    cw = clean_words[0]
+                    if re.search(r'\b' + re.escape(cw) + r'\b', t_low) or re.search(r'(^|-)' + re.escape(cw) + r'(-|$)', slug):
+                        matched = True
+                elif len(clean_words) >= 2:
+                    if all(re.search(r'\b' + re.escape(cw) + r'\b', t_low) or re.search(r'(^|-)' + re.escape(cw) + r'(-|$)', slug) for cw in clean_words[:2]):
+                        matched = True
+
+                if not matched:
+                    continue
+
+                price_val, curr = None, ""
+                p_info = prices.get(slug, {})
+                if p_info:
+                    raw_us = p_info.get('US', '')
+                    raw_fr = p_info.get('FR', '')
+                    if raw_us:
+                        m_num = re.search(r'(\d+[\.,]\d{2})', raw_us)
+                        if m_num:
+                            price_val = float(m_num.group(1).replace(',', '.'))
+                            curr = "USD"
+                    elif raw_fr:
+                        m_num = re.search(r'(\d+[\.,]\d{2})', raw_fr)
+                        if m_num:
+                            price_val = float(m_num.group(1).replace(',', '.'))
+                            curr = "EUR"
+
+                author = it.get('author', {}).get('name', '').strip()
+                link = it.get('link') or f"https://flightsim.to/store/product/{slug}"
+                return True, link, price_val, curr, author
+
+            return False, default_u, None, "", ""
 
         def check_aero(code):
             default_url = f"https://www.aerosoft.com/en/search?sSearch={code}"
