@@ -10806,6 +10806,10 @@ const FILTER_RADIAL_CATEGORIES = [
         getSummary: () => {
             if (!selectedMinRating || selectedMinRating === 0) return 'All Ratings (0★)';
             return `${selectedMinRating}★ Minimum`;
+        },
+        getHtmlSummary: () => {
+            if (!selectedMinRating || selectedMinRating === 0) return 'All Ratings <span class="text-amber-400 font-sans">(0★)</span>';
+            return `${selectedMinRating}<span class="text-amber-400 font-sans">★</span> Minimum`;
         }
     }
 ];
@@ -11040,13 +11044,27 @@ function getFilterRadialCategoryItems(categoryKey) {
             { id: 'audit', label: 'Audit Hub', isActive: false }
         ];
     } else if (categoryKey === 'rating') {
+        const createStarHtml = (ratingVal) => {
+            const full = Math.floor(ratingVal);
+            const hasHalf = (ratingVal % 1 !== 0);
+            let s = '<span class="inline-flex items-center text-amber-400 mr-1.5 gap-[1px] pointer-events-none">';
+            for (let i = 0; i < full; i++) {
+                s += '<i class="fa-solid fa-star text-[9px]"></i>';
+            }
+            if (hasHalf) {
+                s += '<i class="fa-solid fa-star-half-stroke text-[9px]"></i>';
+            }
+            s += '</span>';
+            return s;
+        };
+
         return [
-            { id: '0', label: 'All Ratings', isActive: !selectedMinRating || selectedMinRating === 0 },
-            { id: '3.0', label: '3.0★ & Up', isActive: selectedMinRating === 3.0 },
-            { id: '3.5', label: '3.5★ & Up', isActive: selectedMinRating === 3.5 },
-            { id: '4.0', label: '4.0★ & Up', isActive: selectedMinRating === 4.0 },
-            { id: '4.5', label: '4.5★ & Up', isActive: selectedMinRating === 4.5 },
-            { id: '5.0', label: '5.0★ Only', isActive: selectedMinRating === 5.0 }
+            { id: '0', label: 'All Ratings', htmlLabel: '<span>ALL RATINGS</span>', isActive: !selectedMinRating || selectedMinRating === 0 },
+            { id: '3.0', label: '3.0★ & Up', htmlLabel: `${createStarHtml(3.0)}<span>& UP</span>`, isActive: selectedMinRating === 3.0 },
+            { id: '3.5', label: '3.5★ & Up', htmlLabel: `${createStarHtml(3.5)}<span>& UP</span>`, isActive: selectedMinRating === 3.5 },
+            { id: '4.0', label: '4.0★ & Up', htmlLabel: `${createStarHtml(4.0)}<span>& UP</span>`, isActive: selectedMinRating === 4.0 },
+            { id: '4.5', label: '4.5★ & Up', htmlLabel: `${createStarHtml(4.5)}<span>& UP</span>`, isActive: selectedMinRating === 4.5 },
+            { id: '5.0', label: '5.0★ Only', htmlLabel: `${createStarHtml(5.0)}<span>ONLY</span>`, isActive: selectedMinRating === 5.0 }
         ];
     }
     return [];
@@ -11155,6 +11173,7 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
 
         const isCatActive = (cat.key === filterRadialActiveCategory);
         const summary = cat.getSummary();
+        const summaryHtml = cat.getHtmlSummary ? cat.getHtmlSummary() : escapeHtml(summary);
         const formattedCatLabel = formatFilterRadialLabel(cat.label);
 
         innerSvgHtml += `
@@ -11167,7 +11186,7 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
                 <foreignObject x="${(tx - 58).toFixed(1)}" y="${(ty - 23).toFixed(1)}" width="116" height="46" class="pointer-events-none">
                     <div class="w-full h-full flex flex-col items-center justify-center text-center leading-none px-1">
                         <span class="text-[10px] font-black tracking-wider uppercase leading-tight whitespace-nowrap ${isCatActive ? 'text-white font-extrabold' : 'text-slate-200 group-hover:text-white'}">${formattedCatLabel}</span>
-                        <span class="text-[10px] font-mono font-bold ${isCatActive ? 'text-white' : 'text-sky-400'} truncate max-w-[108px] mt-1">${escapeHtml(summary)}</span>
+                        <span class="text-[10px] font-mono font-bold ${isCatActive ? 'text-white' : 'text-sky-400'} truncate max-w-[108px] mt-1">${summaryHtml}</span>
                     </div>
                 </foreignObject>
             </g>
@@ -11225,7 +11244,7 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
                 inlinePathStyle = `style="fill: ${grad.fill}; stroke: ${grad.stroke}; stroke-width: ${grad.strokeWidth}; ${grad.filter ? `filter: ${grad.filter};` : ''}"`;
             }
 
-            const formattedItemLabel = formatFilterRadialLabel(item.label);
+            const formattedItemLabel = item.htmlLabel || formatFilterRadialLabel(item.label);
 
             outerSvgHtml += `
                 <g class="radial-filter-sector radial-filter-tier2-sector ${animClass} ${specificClass} ${isActive ? 'is-item-active' : ''} pointer-events-auto cursor-pointer group"
@@ -11237,7 +11256,7 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
                     <path class="radial-filter-sector-path" ${inlinePathStyle} d="${pathD}" />
                     <foreignObject x="${(tx - 56).toFixed(1)}" y="${(ty - 18).toFixed(1)}" width="112" height="36" class="pointer-events-none">
                         <div class="w-full h-full flex items-center justify-center text-center px-1">
-                            <span class="text-[10px] font-bold tracking-tight uppercase leading-tight whitespace-nowrap ${isActive ? 'text-white font-extrabold' : 'text-slate-200 group-hover:text-white'}">${formattedItemLabel}</span>
+                            <span class="text-[10px] font-bold tracking-tight uppercase leading-tight whitespace-nowrap inline-flex items-center justify-center ${isActive ? 'text-white font-extrabold' : 'text-slate-200 group-hover:text-white'}">${formattedItemLabel}</span>
                         </div>
                     </foreignObject>
                 </g>
