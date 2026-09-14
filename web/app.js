@@ -11826,7 +11826,7 @@ function displayScanResults(delta, isStartup = false) {
                                 </div>
                             </div>
                         </div>
-                        <div class="shrink-0">
+                        <div class="flex items-center gap-2 shrink-0">
                             ${statusBadge}
                         </div>
                     </div>
@@ -11850,16 +11850,16 @@ function displayScanResults(delta, isStartup = false) {
                                 ${item.icao}
                             </span>
                             <div class="min-w-0 flex-1">
-                                <div class="flex items-center gap-2">
-                                    <span class="text-sm font-bold text-white truncate">${displayName}</span>
-                                    <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 shrink-0">GSX Profile</span>
+                                <div class="text-sm font-bold text-white truncate">
+                                    ${displayName}
                                 </div>
                                 <div class="text-xs font-mono text-slate-400 truncate mt-0.5">
                                     ${iniName}
                                 </div>
                             </div>
                         </div>
-                        <div class="shrink-0">
+                        <div class="flex items-center gap-2 shrink-0">
+                            <span class="text-xs font-bold px-3 py-1 rounded-full bg-purple-900 text-purple-200 border border-purple-700">GSX Profile</span>
                             ${statusBadge}
                         </div>
                     </div>
@@ -11873,7 +11873,7 @@ function displayScanResults(delta, isStartup = false) {
                         <div class="text-xs font-bold uppercase tracking-wider text-slate-300">
                             <span>${t('rescan.section_sceneries', 'Scenery Packages')}</span>
                         </div>
-                        <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700/60">${totalSceneries}</span>
+                        <span class="text-xs font-mono font-bold text-slate-400">${totalSceneries}</span>
                     </div>
                     <div class="space-y-2 mb-4">
                         ${addedSceneries.map(item => renderSceneryCard(item, true)).join('')}
@@ -11889,7 +11889,7 @@ function displayScanResults(delta, isStartup = false) {
                         <div class="text-xs font-bold uppercase tracking-wider text-purple-300">
                             <span>${t('rescan.section_gsx', 'GSX Profiles')}</span>
                         </div>
-                        <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-purple-600 text-white border-0">${totalGsx}</span>
+                        <span class="text-xs font-mono font-bold text-slate-400">${totalGsx}</span>
                     </div>
                     <div class="space-y-2">
                         ${addedGsx.map(item => renderGsxCard(item, true)).join('')}
