@@ -5343,15 +5343,6 @@ function renderAirlineDestAccordionContent(destIcao) {
 
     let html = `
         <div class="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-700/60 space-y-2.5 mt-2.5" onclick="event.stopPropagation();">
-            ${isDestOwned ? `
-                <div class="flex items-center justify-between p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-800/60 text-emerald-300 text-xs font-mono">
-                    <span class="flex items-center gap-2 font-bold">
-                        <span class="px-2.5 py-0.5 rounded-lg bg-emerald-600 text-white text-[10px] uppercase font-black border-0">OWNED</span>
-                        <span class="text-white">${escapeHtml(destAp.vendor || destAp.creator || destAp.package_name || 'Scenery Addon')}</span>
-                    </span>
-                    <span class="text-[11px] text-emerald-400 font-medium">Installed in your simulator</span>
-                </div>
-            ` : ''}
             <!-- 1. Available Freeware Addons -->
             <div class="flex items-center gap-2 px-0.5">
                 <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300">${t('drawer.freeware_addons', 'Available Freeware Addons')}</span>
