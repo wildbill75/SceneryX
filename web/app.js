@@ -161,7 +161,7 @@ const COUNTRY_NAME_TO_ISO = {
     'denmark': 'DK', 'djibouti': 'DJ', 'dominica': 'DM', 'dominican republic': 'DO',
     'ecuador': 'EC', 'egypt': 'EG', 'el salvador': 'SV', 'equatorial guinea': 'GQ', 'eritrea': 'ER',
     'estonia': 'EE', 'eswatini': 'SZ', 'ethiopia': 'ET',
-    'faroe islands': 'FO', 'faroe': 'FO', 'iles feroe': 'FO', 'îles féroé': 'FO', 'faroer': 'FO', 'islas feroe': 'FO', 'fiji': 'FJ', 'finland': 'FI', 'france': 'FR', 'french guiana': 'GF', 'french polynesia': 'PF',
+    'faroe islands': 'FO', 'faroe': 'FO', 'iles feroe': 'FO', 'îles féroé': 'FO', 'faroer': 'FO', 'islas feroe': 'FO', 'fiji': 'FJ', 'finland': 'FI', 'france': 'FR', 'french guiana': 'GF', 'french polynesia': 'PF', 'tahiti': 'PF', 'polynesie': 'PF', 'polynésie': 'PF', 'polynesie francaise': 'PF', 'polynésie française': 'PF',
     'gabon': 'GA', 'gambia': 'GM', 'georgia': 'GE', 'germany': 'DE', 'ghana': 'GH',
     'greece': 'GR', 'greenland': 'GL', 'grenada': 'GD', 'guatemala': 'GT', 'guinea': 'GN',
     'guinea-bissau': 'GW', 'guyana': 'GY',
@@ -281,6 +281,13 @@ function getCountryFlagEmoji(iso) {
     if (!iso || iso.length !== 2) return '🌐';
     const codePoints = iso.toUpperCase().split('').map(char => 127397 + char.charCodeAt(0));
     return String.fromCodePoint(...codePoints);
+}
+
+function buildAirportSearchKey(ap) {
+    if (!ap) return '';
+    const raw = `${ap.icao || ''} ${ap.iata || ''} ${ap.name || ''} ${ap.city || ''} ${ap.country || ''} ${ap.iso_country || ''} ${ap.package_name || ''} ${ap.vendor || ''}`.toLowerCase();
+    const normalized = raw.normalize ? raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : raw;
+    return raw + ' ' + normalized;
 }
 
 let selectedCountryPricingFilters = new Set(['PAYWARE', 'FREEWARE', 'ASOBO', 'DEFAULT']);
@@ -2045,7 +2052,7 @@ async function loadAirportsData() {
             } else {
                 ap.rating = ap.rating || 0;
             }
-            ap._searchKey = `${ap.icao} ${ap.name} ${ap.city || ''} ${ap.package_name || ''} ${ap.vendor || ''}`.toLowerCase();
+            ap._searchKey = buildAirportSearchKey(ap);
         });
 
         // GSX Audit Scan directly during the splash screen!
@@ -2419,7 +2426,7 @@ async function applyConflictSelection() {
                     if (userRatingsMap[updatedAp.icao] !== undefined) {
                         updatedAp.rating = userRatingsMap[updatedAp.icao];
                     }
-                    updatedAp._searchKey = `${updatedAp.icao} ${updatedAp.name} ${updatedAp.city || ''} ${updatedAp.package_name || ''} ${updatedAp.vendor || ''}`.toLowerCase();
+                    updatedAp._searchKey = buildAirportSearchKey(updatedAp);
                     const idx = allAirportsData.findIndex(a => a.icao === updatedAp.icao);
                     if (idx !== -1) allAirportsData[idx] = updatedAp;
                 } else if (res.airports) {
@@ -9401,7 +9408,7 @@ async function toggleUserCategoryOverride(newCategory) {
                     if (userRatingsMap[ap.icao] !== undefined) {
                         ap.rating = userRatingsMap[ap.icao];
                     }
-                    ap._searchKey = `${ap.icao} ${ap.name} ${ap.city || ''} ${ap.package_name || ''} ${ap.vendor || ''}`.toLowerCase();
+                    ap._searchKey = buildAirportSearchKey(ap);
                 });
                 updateStats(allAirportsData);
                 filterAirports();
@@ -10242,8 +10249,9 @@ function filterAirports() {
         if (activeRouteDestIcaos) {
             if (ap.icao === activeRouteOrigin.icao || activeRouteDestIcaos.has(ap.icao)) {
                 if (search && search.length > 0) {
-                    const searchStr = `${ap.icao} ${ap.name || ''} ${ap.city || ''} ${ap.country || ''}`.toLowerCase();
-                    if (!searchStr.includes(search)) return false;
+                    const searchStr = buildAirportSearchKey(ap);
+                    const normalizedSearch = search.normalize ? search.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : search;
+                    if (!searchStr.includes(search) && !searchStr.includes(normalizedSearch)) return false;
                 }
                 return true;
             }
@@ -10390,9 +10398,10 @@ function filterAirports() {
                 if (apIso !== searchIso) return false;
             } else {
                 if (!ap._searchKey) {
-                    ap._searchKey = `${ap.icao} ${ap.name} ${ap.city || ''} ${ap.country || ''} ${ap.iso_country || ''} ${ap.package_name || ''} ${ap.vendor || ''}`.toLowerCase();
+                    ap._searchKey = buildAirportSearchKey(ap);
                 }
-                if (!ap._searchKey.includes(search)) return false;
+                const normalizedSearch = search.normalize ? search.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : search;
+                if (!ap._searchKey.includes(search) && !ap._searchKey.includes(normalizedSearch)) return false;
             }
         }
 
@@ -11737,7 +11746,7 @@ async function rescanMSFS() {
             } else {
                 ap.rating = ap.rating || 0;
             }
-            ap._searchKey = `${ap.icao} ${ap.name} ${ap.city || ''} ${ap.package_name || ''} ${ap.vendor || ''}`.toLowerCase();
+            ap._searchKey = buildAirportSearchKey(ap);
         });
 
         updateStats(allAirportsData);
@@ -11845,7 +11854,7 @@ async function runInitialFirstLaunchScan() {
             } else {
                 ap.rating = ap.rating || 0;
             }
-            ap._searchKey = `${ap.icao} ${ap.name} ${ap.city || ''} ${ap.package_name || ''} ${ap.vendor || ''}`.toLowerCase();
+            ap._searchKey = buildAirportSearchKey(ap);
         });
 
         updateStats(allAirportsData);
