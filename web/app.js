@@ -5351,9 +5351,6 @@ function renderAirlineDestAccordionContent(destIcao) {
                     <span class="text-sm font-bold text-white group-hover:text-cyan-300 transition-colors">Flightsim.to</span>
                     <span class="text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg bg-cyan-600 text-white uppercase leading-tight border-0">FREEWARE</span>
                 </div>
-                <div class="text-xs font-mono text-slate-400">
-                    <span>Community freeware sceneries</span>
-                </div>
             </div>
 
             <!-- 2. Available Payware Addons -->
@@ -5400,34 +5397,33 @@ function renderAirlineDestAccordionContent(destIcao) {
                 return 0;
             });
 
-            const shortDescMap = {
-                'simMarket': 'Flight simulation marketplace',
-                'Orbx Direct': 'Official MSFS scenery store',
-                'Flightsim.to Store': 'Official payware marketplace',
-                'iniBuilds Store': 'Premier sceneries & addons',
-                'Aerosoft Shop': 'Official European sim store',
-                'Contrail Web Shop': 'Partner sceneries & addons',
-                'France VFR': 'Official sceneries & airports',
-                'Flightbeam Studios': 'Official store & sceneries',
-                'FlyTampa': 'Official creator website',
-                'FSDreamTeam': 'Official studio & GSX creator'
-            };
-
             html += `<div class="space-y-1.5">`;
             positiveStores.forEach(st => {
                 const isDev = st.type === 'dev';
                 const safeUrl = (st.url || '').replace(/'/g, "\\'");
-                const desc = shortDescMap[st.name] || st.desc || '';
                 const badgeHtml = isDev
                     ? '<span class="text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg bg-amber-500 text-slate-950 uppercase border-0">DEV</span>'
                     : '<span class="text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg bg-purple-600 text-white uppercase border-0">STORE</span>';
+
+                let devSubtitle = '';
+                if (st.developer && typeof st.developer === 'string') {
+                    const devClean = st.developer.trim();
+                    const devLower = devClean.toLowerCase();
+                    const nameLower = (st.name || '').toLowerCase();
+                    const isRedundant = nameLower.includes(devLower) || devLower.includes(nameLower) ||
+                                        (nameLower.includes('inibuilds') && (devLower === 'inibuilds' || devLower === 'iniscene')) ||
+                                        (nameLower.includes('aerosoft') && devLower === 'aerosoft');
+                    if (!isRedundant && devClean.length > 0) {
+                        devSubtitle = devClean;
+                    }
+                }
 
                 html += `
                     <div onclick="event.stopPropagation(); openExternalUrl('${safeUrl}');"
                          class="py-2 px-3.5 rounded-xl border border-slate-700/60 hover:border-purple-500 bg-slate-950/60 hover:bg-slate-900 transition-all cursor-pointer group flex items-center justify-between gap-2.5">
                         <div class="min-w-0 flex-1">
                             <span class="text-sm font-bold text-white group-hover:text-purple-300 transition-colors truncate block">${st.name}</span>
-                            ${desc ? `<span class="text-xs font-mono text-slate-400 truncate block mt-0.5">${desc}</span>` : ''}
+                            ${devSubtitle ? `<span class="text-xs font-mono text-slate-400 truncate block mt-0.5"><span class="text-slate-500">by </span><span class="text-cyan-300 font-medium">${devSubtitle}</span></span>` : ''}
                         </div>
                         <div class="flex items-center gap-2 shrink-0">
                             ${badgeHtml}
@@ -5954,11 +5950,6 @@ function renderRadialSceneriesExtension(ap, animate = false) {
                 </div>
                 <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-cyan-600 text-white shrink-0 uppercase leading-tight">FREEWARE</span>
             </div>
-
-            <!-- Row 2: Description -->
-            <div class="text-[10px] font-mono text-slate-400 leading-tight">
-                <span class="truncate block">Community freeware sceneries</span>
-            </div>
         </div>
     `;
 
@@ -6057,23 +6048,6 @@ function renderRadialAddonDownloads(ap, stores, animate = false, basePillIndex =
     `;
 
     let pillIdx = basePillIndex;
-    const shortDescMap = {
-        'simMarket': 'Flight simulation marketplace',
-        'Orbx Direct': 'Official MSFS scenery store',
-        'Flightsim.to Store': 'Official payware marketplace',
-        'iniBuilds Store': 'Premier sceneries & addons',
-        'Aerosoft Shop': 'Official European sim store',
-        'Contrail Web Shop': 'Partner sceneries & addons',
-        'France VFR': 'Official sceneries & airports',
-        'Flightbeam Studios': 'Official store & sceneries',
-        'FlyTampa': 'Official creator website',
-        'FSDreamTeam': 'Official studio & GSX creator',
-        'Jetstream Designs': 'Official creator showcase',
-        'NZA Simulations': 'Official Australasia store',
-        'Pyreegue Dev Co.': 'Official studio via Contrail',
-        'Drzewiecki Design': 'Official airports catalog',
-        'LatinVFR': 'Official developer store'
-    };
 
     positiveStores.forEach(st => {
         const isDev = st.type === 'dev';
@@ -6090,7 +6064,22 @@ function renderRadialAddonDownloads(ap, stores, animate = false, basePillIndex =
             : 'border border-slate-700/50 hover:border-purple-500/80 bg-slate-950/40 hover:bg-slate-900/60 shadow-sm';
 
         const safeUrl = (st.url || '').replace(/'/g, "\\'");
-        const storeDesc = shortDescMap[st.name] || st.desc || '';
+
+        // Determine developer / studio subtitle
+        let devSubtitle = '';
+        if (st.developer && typeof st.developer === 'string') {
+            const devClean = st.developer.trim();
+            const devLower = devClean.toLowerCase();
+            const nameLower = (st.name || '').toLowerCase();
+
+            const isRedundant = nameLower.includes(devLower) || devLower.includes(nameLower) ||
+                                (nameLower.includes('inibuilds') && (devLower === 'inibuilds' || devLower === 'iniscene')) ||
+                                (nameLower.includes('aerosoft') && devLower === 'aerosoft');
+
+            if (!isRedundant && devClean.length > 0) {
+                devSubtitle = devClean;
+            }
+        }
 
         html += `
             <div onclick="event.stopPropagation(); openExternalUrl('${safeUrl}');"
@@ -6115,10 +6104,13 @@ function renderRadialAddonDownloads(ap, stores, animate = false, basePillIndex =
                     </div>
                 </div>
 
-                <!-- Row 2: Store Description -->
-                <div class="text-[10px] font-mono text-slate-400 leading-tight">
-                    <span class="truncate block">${storeDesc}</span>
-                </div>
+                ${devSubtitle ? `
+                    <!-- Row 2: Developer / Studio -->
+                    <div class="text-[10px] font-mono leading-tight truncate flex items-center gap-1.5 text-slate-400">
+                        <span class="text-slate-500">by</span>
+                        <span class="text-cyan-300 font-medium truncate">${devSubtitle}</span>
+                    </div>
+                ` : ''}
             </div>
         `;
     });
@@ -13281,6 +13273,19 @@ function renderPaywareStoresList(stores, cleanIcao) {
             const iconClass = isDev ? `fa-solid fa-crown` : `fa-solid fa-arrow-up-right-from-square`;
             const borderClass = isDev ? `border-amber-500/40 hover:border-amber-400 bg-slate-900/95` : `border-slate-800 hover:border-purple-500/50 bg-slate-900/90 hover:bg-slate-800`;
 
+            let devSubtitle = '';
+            if (st.developer && typeof st.developer === 'string') {
+                const devClean = st.developer.trim();
+                const devLower = devClean.toLowerCase();
+                const nameLower = (st.name || '').toLowerCase();
+                const isRedundant = nameLower.includes(devLower) || devLower.includes(nameLower) ||
+                                    (nameLower.includes('inibuilds') && (devLower === 'inibuilds' || devLower === 'iniscene')) ||
+                                    (nameLower.includes('aerosoft') && devLower === 'aerosoft');
+                if (!isRedundant && devClean.length > 0) {
+                    devSubtitle = devClean;
+                }
+            }
+
             return `
                 <button onclick="openExternalUrl('${st.url}');"
                         class="w-full p-3.5 rounded-2xl ${borderClass} border text-slate-200 hover:text-white text-xs flex items-center justify-between transition-colors group cursor-pointer shadow-sm">
@@ -13293,7 +13298,7 @@ function renderPaywareStoresList(stores, cleanIcao) {
                                 <span class="font-bold">${st.name}</span>
                                 ${badgeHtml}
                             </div>
-                            <div class="text-[11px] text-slate-400 font-normal leading-relaxed mt-0.5 line-clamp-2">${st.desc}</div>
+                            ${devSubtitle ? `<div class="text-[11px] font-mono text-slate-400 leading-relaxed mt-0.5 truncate"><span class="text-slate-500">by </span><span class="text-cyan-300 font-medium">${devSubtitle}</span></div>` : ''}
                         </div>
                     </div>
                     <div class="flex items-center gap-3 shrink-0 ml-2">
