@@ -10658,17 +10658,26 @@ function formatFilterRadialLabel(label) {
 }
 
 /**
- * Computes proportional blue gradient colors for Tier 2 radial sectors
- * from dark navy blue (ALL items, e.g. rgb(15, 23, 42)) to light sky blue (last item, e.g. rgb(14, 165, 233))
- * Number of steps is strictly determined by totalCount.
+ * Computes colors for Tier 2 radial sectors:
+ * - When INACTIVE (OFF / éteint): Identical dark gray as the inner wheel sectors.
+ * - When ACTIVE (ON / allumé): Proportional blue gradient from dark navy blue (ALL items) to light sky blue (last item).
  */
 function getFilterRadialSectorGradientColor(index, totalCount, isActive = false) {
+    if (!isActive) {
+        return {
+            fill: 'rgba(38, 46, 60, 0.82)',
+            stroke: 'rgba(148, 163, 184, 0.40)',
+            strokeWidth: '1.75px',
+            filter: 'drop-shadow(0 4px 12px rgba(0, 0, 0, 0.60))'
+        };
+    }
+
     if (totalCount <= 1) {
         return {
-            fill: isActive ? 'rgba(18, 30, 52, 0.95)' : 'rgba(15, 23, 42, 0.88)',
-            stroke: isActive ? 'rgba(56, 189, 248, 0.95)' : 'rgba(100, 116, 139, 0.35)',
-            strokeWidth: isActive ? '2.5px' : '1.5px',
-            filter: isActive ? 'drop-shadow(0 0 14px rgba(56, 189, 248, 0.60))' : 'drop-shadow(0 2px 6px rgba(0, 0, 0, 0.35))'
+            fill: 'rgba(18, 30, 52, 0.95)',
+            stroke: 'rgba(56, 189, 248, 0.95)',
+            strokeWidth: '2.5px',
+            filter: 'drop-shadow(0 0 14px rgba(56, 189, 248, 0.60))'
         };
     }
 
@@ -10683,30 +10692,15 @@ function getFilterRadialSectorGradientColor(index, totalCount, isActive = false)
     let g = Math.round(gStart + t * (gEnd - gStart));
     let b = Math.round(bStart + t * (bEnd - bStart));
 
-    let alpha = 0.88;
-    if (isActive) {
-        // Boost vibrancy for active items while adhering strictly to the gradient step hue
-        r = Math.min(255, Math.round(r * 1.10 + 6));
-        g = Math.min(255, Math.round(g * 1.10 + 8));
-        b = Math.min(255, Math.round(b * 1.08 + 12));
-        alpha = 0.95;
-    }
+    // Boost vibrancy for active illuminated items
+    r = Math.min(255, Math.round(r * 1.10 + 6));
+    g = Math.min(255, Math.round(g * 1.10 + 8));
+    b = Math.min(255, Math.round(b * 1.08 + 12));
 
-    const fill = `rgba(${r}, ${g}, ${b}, ${alpha})`;
-
-    let stroke, strokeWidth, filter;
-    if (isActive) {
-        stroke = 'rgba(56, 189, 248, 0.95)';
-        strokeWidth = '2.5px';
-        filter = 'drop-shadow(0 0 14px rgba(56, 189, 248, 0.60))';
-    } else {
-        const sr = Math.round(100 + t * (56 - 100));
-        const sg = Math.round(116 + t * (189 - 116));
-        const sb = Math.round(139 + t * (248 - 139));
-        stroke = `rgba(${sr}, ${sg}, ${sb}, 0.35)`;
-        strokeWidth = '1.5px';
-        filter = 'drop-shadow(0 2px 6px rgba(0, 0, 0, 0.35))';
-    }
+    const fill = `rgba(${r}, ${g}, ${b}, 0.95)`;
+    const stroke = 'rgba(56, 189, 248, 0.95)';
+    const strokeWidth = '2.5px';
+    const filter = 'drop-shadow(0 0 14px rgba(56, 189, 248, 0.60))';
 
     return { fill, stroke, strokeWidth, filter };
 }
