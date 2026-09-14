@@ -2048,6 +2048,23 @@ async function loadAirportsData() {
             ap._searchKey = `${ap.icao} ${ap.name} ${ap.city || ''} ${ap.package_name || ''} ${ap.vendor || ''}`.toLowerCase();
         });
 
+        // GSX Audit Scan directly during the splash screen!
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.scan_gsx_audit) {
+            updateSplashProgress(75, "Auditing GSX Profiles...", "Virtuali GSX Profiles");
+            try {
+                const raw = await window.pywebview.api.scan_gsx_audit();
+                const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                if (parsed && parsed.status === 'ok') {
+                    window.gsxAuditData = parsed.data;
+                }
+            } catch (ge) {
+                console.warn("GSX startup audit error:", ge);
+            }
+            updateGsxSidebarBadge();
+        }
+
+        updateSplashProgress(92, "Rendering map & preparing interface...", "Ready");
+
         rebuildAirportsByIcaoIndex();
 
         updateStats(allAirportsData);
@@ -10590,6 +10607,26 @@ function getFilterRadialCategoryItems(categoryKey) {
 }
 
 /**
+ * Formats radial labels across 2 lines when appropriate to avoid border overflow
+ */
+function formatFilterRadialLabel(label) {
+    if (!label) return '';
+    const trimmed = label.trim();
+    if (trimmed.includes(' / ')) {
+        const parts = trimmed.split(' / ');
+        return `${escapeHtml(parts[0])} /<br>${escapeHtml(parts[1])}`;
+    }
+    const words = trimmed.split(/\s+/);
+    if (words.length === 2) {
+        return `${escapeHtml(words[0])}<br>${escapeHtml(words[1])}`;
+    }
+    if (words.length === 3 && (words[1] === '&' || words[1] === 'and')) {
+        return `${escapeHtml(words[0])}<br>${escapeHtml(words[1])} ${escapeHtml(words[2])}`;
+    }
+    return escapeHtml(trimmed);
+}
+
+/**
  * Renders concentric annular wheel matching Screen 1 (No icons, high readability)
  */
 function renderFilterRadialWheel(forceAnimateOuter = false) {
@@ -10615,8 +10652,8 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
 
     const cx = 280;
     const cy = 280;
-    const r1_in = 72;
-    const r1_out = 152;
+    const r1_in = 70;
+    const r1_out = 154;
     const r2_in = 172;
     const r2_out = 268;
 
@@ -10626,7 +10663,7 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
         const startAngle = -120 + (idx * 60);
         const endAngle = startAngle + 60;
         const midAngle = (startAngle + endAngle) / 2;
-        const pathD = getAnnularSectorPath(cx, cy, r1_in, r1_out, startAngle, endAngle, 3.5);
+        const pathD = getAnnularSectorPath(cx, cy, r1_in, r1_out, startAngle, endAngle, 2.75);
 
         const midR = (r1_in + r1_out) / 2;
         const rad = (midAngle - 90) * Math.PI / 180;
@@ -10635,6 +10672,7 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
 
         const isCatActive = (cat.key === filterRadialActiveCategory);
         const summary = cat.getSummary();
+        const formattedCatLabel = formatFilterRadialLabel(cat.label);
 
         innerSvgHtml += `
             <g class="radial-filter-sector ${isCatActive ? 'is-category-active' : ''} pointer-events-auto cursor-pointer group"
@@ -10643,10 +10681,10 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
                onmouseleave="handleFilterRadialCategoryMouseLeave()"
                role="button" aria-label="${escapeHtml(cat.label)}">
                 <path class="radial-filter-sector-path" d="${pathD}" />
-                <foreignObject x="${(tx - 55).toFixed(1)}" y="${(ty - 24).toFixed(1)}" width="110" height="48" class="pointer-events-none">
-                    <div class="w-full h-full flex flex-col items-center justify-center text-center leading-tight">
-                        <span class="text-[10px] font-black tracking-wider uppercase ${isCatActive ? 'text-cyan-400 font-extrabold' : 'text-slate-200 group-hover:text-white'}">${escapeHtml(cat.label)}</span>
-                        <span class="text-[9px] font-mono font-medium ${isCatActive ? 'text-cyan-300' : 'text-slate-400 group-hover:text-slate-200'} truncate max-w-[100px] mt-0.5">${escapeHtml(summary)}</span>
+                <foreignObject x="${(tx - 55).toFixed(1)}" y="${(ty - 26).toFixed(1)}" width="110" height="52" class="pointer-events-none">
+                    <div class="w-full h-full flex flex-col items-center justify-center text-center leading-none px-1">
+                        <span class="text-[9.5px] font-black tracking-wider uppercase leading-tight ${isCatActive ? 'text-cyan-400 font-extrabold' : 'text-slate-200 group-hover:text-white'}">${formattedCatLabel}</span>
+                        <span class="text-[8.5px] font-mono font-medium ${isCatActive ? 'text-cyan-300' : 'text-slate-400 group-hover:text-slate-200'} truncate max-w-[95px] mt-1">${escapeHtml(summary)}</span>
                     </div>
                 </foreignObject>
             </g>
@@ -10699,6 +10737,8 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
                 else if (item.id === 'Default') specificClass = 'radial-sector-default';
             }
 
+            const formattedItemLabel = formatFilterRadialLabel(item.label);
+
             outerSvgHtml += `
                 <g class="radial-filter-sector radial-filter-tier2-sector ${animClass} ${specificClass} ${isActive ? 'is-item-active' : ''} pointer-events-auto cursor-pointer group"
                    ${delayStyle}
@@ -10707,9 +10747,9 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
                    onclick="handleFilterRadialSubItemClick('${filterRadialActiveCategory}', '${escapeJsStr(item.id)}')"
                    role="button" aria-label="${escapeHtml(item.label)}">
                     <path class="radial-filter-sector-path" d="${pathD}" />
-                    <foreignObject x="${(tx - 52).toFixed(1)}" y="${(ty - 22).toFixed(1)}" width="104" height="44" class="pointer-events-none">
+                    <foreignObject x="${(tx - 52).toFixed(1)}" y="${(ty - 24).toFixed(1)}" width="104" height="48" class="pointer-events-none">
                         <div class="w-full h-full flex items-center justify-center text-center px-1">
-                            <span class="text-[11px] font-bold tracking-tight uppercase leading-snug ${isActive ? 'text-white font-extrabold' : (isAll ? 'text-slate-300 group-hover:text-white' : 'text-slate-200 group-hover:text-white')}">${escapeHtml(item.label)}</span>
+                            <span class="text-[10.5px] font-bold tracking-tight uppercase leading-tight ${isActive ? 'text-white font-extrabold' : (isAll ? 'text-slate-300 group-hover:text-white' : 'text-slate-200 group-hover:text-white')}">${formattedItemLabel}</span>
                         </div>
                     </foreignObject>
                 </g>
@@ -10841,8 +10881,13 @@ async function checkStartupChanges() {
             return;
         }
 
-        // If no scenery conflicts, proceed directly to GSX scan!
-        await startGsxScanPhase(true);
+        // Check if startup delta detected new or modified sceneries (GSX audit already done on splash screen!)
+        if (pendingScanDelta && (pendingScanDelta.total_changes || 0) > 0) {
+            const d = pendingScanDelta;
+            pendingScanDelta = null;
+            pendingScanIsStartup = false;
+            displayScanResults(d, true);
+        }
     } catch (e) {
         console.warn("Could not check startup delta:", e);
     }
