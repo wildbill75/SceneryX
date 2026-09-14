@@ -335,7 +335,9 @@ const LOCALES = {
         "radial.country": "Country",
         "radial.operating_airlines": "Operating Airlines",
         "radial.details_title": "Airport Details",
-        "radial.info_title": "Airport Info"
+        "radial.info_title": "Airport Info",
+        "drawer.freeware_addons": "Available Freeware Addons",
+        "drawer.payware_addons": "Available Payware Addons"
     },
     fr: {
         "country.back_to": "Retour à",
@@ -672,7 +674,9 @@ const LOCALES = {
         "radial.country": "Pays",
         "radial.operating_airlines": "Operating Airlines",
         "radial.details_title": "Détails de l'aéroport",
-        "radial.info_title": "Infos aéroport"
+        "radial.info_title": "Infos aéroport",
+        "drawer.freeware_addons": "Scènes Freeware Disponibles",
+        "drawer.payware_addons": "Scènes Payware Disponibles"
     },
     de: {
         "country.back_to": "Zurück zu",

@@ -4574,23 +4574,35 @@ function updateRadialAirlinesModalPosition(force = false) {
     const point = (typeof map.latLngToContainerPoint === 'function') ? map.latLngToContainerPoint(latLng) : null;
     if (!point) return;
 
-    // Center horizontally on airport, clamped so the wide modal does not overflow map boundaries
     const mapSize = (typeof map.getSize === 'function') ? map.getSize() : null;
     const containerW = mapSize ? mapSize.x : (modal.offsetParent ? modal.offsetParent.offsetWidth : window.innerWidth);
+    const containerH = mapSize ? mapSize.y : (modal.offsetParent ? modal.offsetParent.offsetHeight : window.innerHeight);
     const modalWidth = modal.offsetWidth || 820;
-    const halfWidth = modalWidth / 2;
-    const minLeft = halfWidth + 12;
-    const maxLeft = Math.max(minLeft, containerW - halfWidth - 12);
-    const clampedX = Math.max(minLeft, Math.min(maxLeft, Math.round(point.x)));
-    modal.style.left = `${clampedX}px`;
+    const modalHeight = modal.offsetHeight || 340;
 
     if (!hasUserDraggedAirlinesModal) {
-        // Place strictly UNDER the airport marker & label (with a clean 44px clearance below point.y)
-        const desiredTop = Math.round(point.y) + 44;
+        // Place to the LEFT of the airport marker (Screen 1) with clearance
+        const desiredLeft = Math.round(point.x) - modalWidth - 28;
+        let finalLeft = desiredLeft;
+
+        if (desiredLeft < 16) {
+            // Not enough space on the left: place to the RIGHT of the airport if fits
+            const rightPos = Math.round(point.x) + 36;
+            if (rightPos + modalWidth <= containerW - 16) {
+                finalLeft = rightPos;
+            } else {
+                finalLeft = 16;
+            }
+        }
+
+        modal.style.left = `${finalLeft}px`;
+
+        // Align vertically around airport marker level, clamped within viewport
+        const desiredTop = Math.max(64, Math.min(containerH - modalHeight - 16, Math.round(point.y) - 60));
         modal.style.top = `${desiredTop}px`;
-        modal.style.transform = 'translateX(-50%)';
+        modal.style.transform = 'none';
     } else {
-        modal.style.transform = `translate(calc(-50% + ${airlinesModalUserOffset.x}px), ${airlinesModalUserOffset.y}px)`;
+        modal.style.transform = `translate(${airlinesModalUserOffset.x}px, ${airlinesModalUserOffset.y}px)`;
     }
 }
 
@@ -4659,10 +4671,12 @@ function panMapToAirport(ap, forcedZoom = null) {
 
     let yOffset = 0;
     if (isAirlinesModalOpen()) {
-        // En mode Airlines : positionner l'aéroport dans le quart supérieur de l'écran (~20-22%, min 100px, max 180px)
+        // En mode Airlines : positionner l'aéroport légèrement décalé vers la droite pour faire place à la modale à gauche
+        const mapW = (map && typeof map.getSize === 'function') ? map.getSize().x : window.innerWidth;
         const mapH = (map && typeof map.getSize === 'function') ? map.getSize().y : window.innerHeight;
+        xOffset = -Math.round(Math.min(220, mapW * 0.15));
         const cy = mapH / 2;
-        const desiredApY = Math.max(100, Math.min(180, Math.round(mapH * 0.20)));
+        const desiredApY = Math.round(mapH * 0.45);
         yOffset = Math.round(cy - desiredApY);
     } else if (isDetailsModalOpen()) {
         // En mode Details : positionner l'aéroport dans la partie supérieure (~22%) pour laisser la place à la modale en dessous
@@ -5013,11 +5027,15 @@ function closeRadialAirlinesModal(event) {
     if (modal) {
         modal.classList.add('hidden');
         modal.classList.remove('user-dragged');
-        modal.style.transform = 'translateX(-50%)';
+        modal.style.transform = 'none';
     }
     hasUserDraggedAirlinesModal = false;
     airlinesModalUserOffset = { x: 0, y: 0 };
     isAirlinesModalDragging = false;
+    expandedAirlineDestIcao = null;
+    currentAirlineDestFilter = 'ALL';
+    const destSection = document.getElementById('radial-airlines-destinations-section');
+    if (destSection) destSection.classList.add('hidden');
     if (sectorAirlines) {
         sectorAirlines.classList.remove('active-radial-sector');
     }
@@ -5090,7 +5108,7 @@ function initDraggableAirlinesModal() {
             hasUserDraggedAirlinesModal = true;
 
             modal.classList.add('user-dragged');
-            modal.style.transform = `translate(calc(-50% + ${airlinesModalUserOffset.x}px), ${airlinesModalUserOffset.y}px)`;
+            modal.style.transform = `translate(${airlinesModalUserOffset.x}px, ${airlinesModalUserOffset.y}px)`;
         };
 
         const onMouseUp = (upEvent) => {
@@ -5200,6 +5218,15 @@ function renderRadialOperatingAirlines(ap) {
         }
     }
 
+    if (hasActiveAirline) {
+        listEl.style.maxHeight = '112px';
+        renderAirlineDestinationsList(ap);
+    } else {
+        listEl.style.maxHeight = '188px';
+        const destSection = document.getElementById('radial-airlines-destinations-section');
+        if (destSection) destSection.classList.add('hidden');
+    }
+
     if (airlines.length === 0) {
         listEl.innerHTML = `<div class="col-span-full text-xs text-slate-400 italic py-4 text-center">${t('drawer.no_airlines', 'No scheduled airlines data available for this airport.')}</div>`;
         if (modal && !modal.classList.contains('hidden')) {
@@ -5262,6 +5289,347 @@ function renderRadialOperatingAirlines(ap) {
     }
 }
 
+let currentAirlineDestFilter = 'ALL';
+let expandedAirlineDestIcao = null;
+
+function setAirlineDestFilterCategory(cat) {
+    currentAirlineDestFilter = cat;
+    if (currentRadialAirport) {
+        renderAirlineDestinationsList(currentRadialAirport);
+    }
+}
+window.setAirlineDestFilterCategory = setAirlineDestFilterCategory;
+
+function toggleAirlineDestAccordion(destIcao, event) {
+    if (event) event.stopPropagation();
+    if (expandedAirlineDestIcao === destIcao) {
+        expandedAirlineDestIcao = null;
+    } else {
+        expandedAirlineDestIcao = destIcao;
+        const destAp = getAirportByIcao(destIcao);
+        if (!radialStoreCache[destIcao] && window.pywebview && window.pywebview.api && window.pywebview.api.check_payware_stores) {
+            window.pywebview.api.check_payware_stores(destIcao, (destAp && destAp.name) || '').then(raw => {
+                const stores = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                radialStoreCache[destIcao] = stores;
+                if (expandedAirlineDestIcao === destIcao) {
+                    renderAirlineDestAccordionContent(destIcao);
+                }
+            }).catch(err => {
+                console.error("Error loading stores for destination:", err);
+            });
+        }
+    }
+    if (currentRadialAirport) {
+        renderAirlineDestinationsList(currentRadialAirport);
+    }
+}
+window.toggleAirlineDestAccordion = toggleAirlineDestAccordion;
+
+function centerMapOnDestination(destIcao, event) {
+    if (event) event.stopPropagation();
+    const ap = getAirportByIcao(destIcao) || (window.worldAirportCoords && window.worldAirportCoords[destIcao] ? {
+        icao: destIcao,
+        lat: window.worldAirportCoords[destIcao].lat,
+        lon: window.worldAirportCoords[destIcao].lon,
+        name: window.worldAirportCoords[destIcao].name
+    } : null);
+
+    if (ap && ap.lat && ap.lon && map) {
+        map.flyTo([parseFloat(ap.lat), parseFloat(ap.lon)], Math.max(6, map.getZoom()), {
+            duration: 1.0
+        });
+    }
+}
+window.centerMapOnDestination = centerMapOnDestination;
+
+function renderAirlineDestAccordionContent(destIcao) {
+    const accContainer = document.getElementById(`airline-dest-accordion-${destIcao}`);
+    if (!accContainer) return;
+
+    const destAp = getAirportByIcao(destIcao) || {};
+    const stores = radialStoreCache[destIcao];
+
+    let html = `
+        <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-700/60 space-y-2 mt-2" onclick="event.stopPropagation();">
+            <!-- 1. Available Freeware Addons -->
+            <div class="flex items-center gap-2 px-0.5">
+                <span class="text-[11px] font-mono font-bold uppercase tracking-wider text-slate-300">${t('drawer.freeware_addons', 'Available Freeware Addons')}</span>
+            </div>
+            <div onclick="event.stopPropagation(); openFreewareScenerySearch('${destIcao}');"
+                 class="py-2 px-3 rounded-xl border border-slate-700/60 hover:border-cyan-400 bg-slate-950/60 hover:bg-slate-900 transition-all cursor-pointer group flex flex-col gap-0.5">
+                <div class="flex items-center justify-between gap-2">
+                    <span class="text-xs font-bold text-white group-hover:text-cyan-300 transition-colors">Flightsim.to</span>
+                    <span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-cyan-600 text-white uppercase leading-tight border-0">FREEWARE</span>
+                </div>
+                <div class="text-[10px] font-mono text-slate-400">
+                    <span>Community freeware sceneries</span>
+                </div>
+            </div>
+
+            <!-- 2. Available Payware Addons -->
+            <div class="flex items-center gap-2 px-0.5 pt-1">
+                <span class="text-[11px] font-mono font-bold uppercase tracking-wider text-slate-300">${t('drawer.payware_addons', 'Available Payware Addons')}</span>
+            </div>
+    `;
+
+    if (!stores) {
+        html += `
+            <div class="p-2 rounded-xl bg-slate-950/40 border border-slate-800 text-center text-[10px] font-mono text-slate-400">
+                <i class="fa-solid fa-spinner fa-spin mr-1"></i> Checking store availability...
+            </div>
+        `;
+    } else {
+        const positiveStores = stores.filter(st => st && st.found && st.url);
+        if (positiveStores.length === 0) {
+            html += `
+                <div class="p-2 rounded-xl bg-slate-950/40 border border-slate-800 text-center text-[10px] font-mono text-slate-400">
+                    No commercial store addons listed for ${destIcao}.
+                </div>
+            `;
+        } else {
+            positiveStores.forEach(st => {
+                if (st.price !== null && st.price !== undefined) {
+                    const fromCurr = st.currency || 'USD';
+                    const rateFrom = CURRENCY_RATES[fromCurr] || 1.0;
+                    const priceEur = parseFloat(st.price) / rateFrom;
+                    const rateTo = CURRENCY_RATES[selectedCurrency] || 1.0;
+                    const priceTarget = priceEur * rateTo;
+                    st.convertedPrice = priceTarget;
+                    const sym = CURRENCY_SYMBOLS[selectedCurrency] || '$';
+                    st.formattedPrice = `${sym}${priceTarget.toFixed(2)}`;
+                } else {
+                    st.convertedPrice = null;
+                    st.formattedPrice = null;
+                }
+            });
+
+            positiveStores.sort((a, b) => {
+                const pA = a.convertedPrice !== null ? a.convertedPrice : 999999;
+                const pB = b.convertedPrice !== null ? b.convertedPrice : 999999;
+                if (pA !== pB) return pA - pB;
+                return 0;
+            });
+
+            const shortDescMap = {
+                'simMarket': 'Flight simulation marketplace',
+                'Orbx Direct': 'Official MSFS scenery store',
+                'Flightsim.to Store': 'Official payware marketplace',
+                'iniBuilds Store': 'Premier sceneries & addons',
+                'Aerosoft Shop': 'Official European sim store',
+                'Contrail Web Shop': 'Partner sceneries & addons',
+                'France VFR': 'Official sceneries & airports',
+                'Flightbeam Studios': 'Official store & sceneries',
+                'FlyTampa': 'Official creator website',
+                'FSDreamTeam': 'Official studio & GSX creator'
+            };
+
+            html += `<div class="space-y-1">`;
+            positiveStores.forEach(st => {
+                const isDev = st.type === 'dev';
+                const safeUrl = (st.url || '').replace(/'/g, "\\'");
+                const desc = shortDescMap[st.name] || st.desc || '';
+                const badgeHtml = isDev
+                    ? '<span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-amber-500 text-slate-950 uppercase border-0">DEV</span>'
+                    : '<span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-purple-600 text-white uppercase border-0">STORE</span>';
+
+                html += `
+                    <div onclick="event.stopPropagation(); openExternalUrl('${safeUrl}');"
+                         class="py-1.5 px-3 rounded-xl border border-slate-700/60 hover:border-purple-500 bg-slate-950/60 hover:bg-slate-900 transition-all cursor-pointer group flex items-center justify-between gap-2">
+                        <div class="min-w-0 flex-1">
+                            <span class="text-xs font-bold text-white group-hover:text-purple-300 transition-colors truncate block">${st.name}</span>
+                            ${desc ? `<span class="text-[10px] font-mono text-slate-400 truncate block">${desc}</span>` : ''}
+                        </div>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            ${badgeHtml}
+                            ${st.formattedPrice ? `
+                                <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-600 text-white border-0">
+                                    ${st.formattedPrice}
+                                </span>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+            html += `</div>`;
+        }
+    }
+
+    html += `</div>`;
+    accContainer.innerHTML = html;
+}
+
+function renderAirlineDestinationsList(originAp) {
+    const listEl = document.getElementById('radial-airlines-destinations-list');
+    const destSection = document.getElementById('radial-airlines-destinations-section');
+    if (!listEl || !destSection) return;
+
+    const activeAl = selectedAirline || (selectedAirlines.size > 0 ? Array.from(selectedAirlines)[0] : null);
+    if (!activeAl || !originAp || !originAp.routes || !originAp.routes[activeAl]) {
+        destSection.classList.add('hidden');
+        listEl.innerHTML = '';
+        return;
+    }
+
+    const destIcaos = originAp.routes[activeAl].slice();
+    if (destIcaos.length === 0) {
+        destSection.classList.add('hidden');
+        listEl.innerHTML = '';
+        return;
+    }
+
+    destSection.classList.remove('hidden');
+
+    const destList = destIcaos.map(icao => {
+        let ap = getAirportByIcao(icao);
+        if (!ap && window.worldAirportCoords && window.worldAirportCoords[icao]) {
+            const w = window.worldAirportCoords[icao];
+            ap = {
+                icao: icao,
+                lat: w.lat,
+                lon: w.lon,
+                name: w.name || icao,
+                city: w.city || '',
+                country: w.country || '',
+                is_default: true,
+                pricing_type: 'Default'
+            };
+        } else if (!ap) {
+            ap = {
+                icao: icao,
+                name: icao,
+                is_default: true,
+                pricing_type: 'Default'
+            };
+        }
+        const cat = getAirportCategory(ap);
+        return { icao, airport: ap, category: cat };
+    });
+
+    const totalCount = destList.length;
+    const paywareCount = destList.filter(d => d.category === 'PAYWARE').length;
+    const freewareCount = destList.filter(d => d.category === 'FREEWARE').length;
+    const asoboCount = destList.filter(d => d.category === 'ASOBO').length;
+    const defaultCount = destList.filter(d => d.category === 'DEFAULT').length;
+    const addonCount = paywareCount + freewareCount + asoboCount;
+    const addonPct = totalCount > 0 ? Math.round((addonCount / totalCount) * 100) : 0;
+    const paywarePct = totalCount > 0 ? Math.round((paywareCount / totalCount) * 100) : 0;
+
+    const titleEl = document.getElementById('radial-airline-dest-title');
+    const compBadge = document.getElementById('radial-airline-completion-badge');
+    const paywareBadge = document.getElementById('radial-airline-payware-badge');
+    if (titleEl) titleEl.innerText = `${activeAl} — ${totalCount} DESTINATIONS`;
+    if (compBadge) compBadge.innerText = `${addonPct}% ADDONS (${addonCount}/${totalCount})`;
+    if (paywareBadge) paywareBadge.innerText = `${paywarePct}% PAYWARE`;
+
+    const progPay = document.getElementById('radial-airline-prog-payware');
+    const progFree = document.getElementById('radial-airline-prog-freeware');
+    const progAsobo = document.getElementById('radial-airline-prog-asobo');
+    const progDef = document.getElementById('radial-airline-prog-default');
+    if (progPay) progPay.style.width = `${(paywareCount / totalCount) * 100}%`;
+    if (progFree) progFree.style.width = `${(freewareCount / totalCount) * 100}%`;
+    if (progAsobo) progAsobo.style.width = `${(asoboCount / totalCount) * 100}%`;
+    if (progDef) progDef.style.width = `${(defaultCount / totalCount) * 100}%`;
+
+    const countAllEl = document.getElementById('count-dest-all');
+    const countPayEl = document.getElementById('count-dest-payware');
+    const countFreeEl = document.getElementById('count-dest-freeware');
+    const countAsoboEl = document.getElementById('count-dest-asobo');
+    const countDefEl = document.getElementById('count-dest-default');
+    if (countAllEl) countAllEl.innerText = totalCount;
+    if (countPayEl) countPayEl.innerText = paywareCount;
+    if (countFreeEl) countFreeEl.innerText = freewareCount;
+    if (countAsoboEl) countAsoboEl.innerText = asoboCount;
+    if (countDefEl) countDefEl.innerText = defaultCount;
+
+    const filterBtns = document.querySelectorAll('.airline-dest-filter-btn');
+    filterBtns.forEach(btn => {
+        const isCurrent = btn.id === `airline-dest-filter-${currentAirlineDestFilter}`;
+        btn.className = 'airline-dest-filter-btn px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold border-0 cursor-pointer transition-all ' +
+            (isCurrent
+                ? 'bg-white text-slate-950 shadow-sm'
+                : 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700');
+    });
+
+    let filteredList = destList;
+    if (currentAirlineDestFilter !== 'ALL') {
+        filteredList = destList.filter(d => d.category === currentAirlineDestFilter);
+    }
+
+    const catOrder = { 'PAYWARE': 1, 'FREEWARE': 2, 'ASOBO': 3, 'DEFAULT': 4 };
+    filteredList.sort((a, b) => {
+        const oA = catOrder[a.category] || 5;
+        const oB = catOrder[b.category] || 5;
+        if (oA !== oB) return oA - oB;
+        return a.icao.localeCompare(b.icao);
+    });
+
+    if (filteredList.length === 0) {
+        listEl.innerHTML = `<div class="text-xs text-slate-400 italic py-4 text-center">No destinations match the "${currentAirlineDestFilter}" category.</div>`;
+        return;
+    }
+
+    listEl.innerHTML = filteredList.map(item => {
+        const ap = item.airport;
+        const cat = item.category;
+        const isExpanded = expandedAirlineDestIcao === item.icao;
+
+        let badgeClass = 'bg-slate-700 text-slate-300 border-0';
+        let badgeText = 'DEFAULT';
+        let packageInfo = 'MSFS Generic';
+
+        if (cat === 'PAYWARE') {
+            badgeClass = 'bg-purple-600 text-white border-0';
+            badgeText = 'PAYWARE';
+            packageInfo = ap.vendor || ap.creator || ap.package_name || 'Installed Payware';
+        } else if (cat === 'FREEWARE') {
+            badgeClass = 'bg-cyan-600 text-white border-0';
+            badgeText = 'FREEWARE';
+            packageInfo = ap.vendor || ap.creator || 'Community Addon';
+        } else if (cat === 'ASOBO') {
+            badgeClass = 'bg-amber-500 text-slate-950 border-0';
+            badgeText = 'ASOBO';
+            packageInfo = 'Asobo Handcrafted';
+        }
+
+        const cityCountry = [ap.city, ap.country].filter(Boolean).join(', ');
+
+        return `
+            <div class="rounded-2xl bg-slate-950/40 border border-slate-800/80 p-2 transition-all">
+                <div onclick="toggleAirlineDestAccordion('${item.icao}', event)"
+                     class="flex items-center justify-between gap-2 cursor-pointer group">
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-mono font-bold text-white group-hover:text-cyan-300 transition-colors">${item.icao}</span>
+                            <span class="text-xs font-bold text-slate-200 truncate">${ap.name || item.icao}</span>
+                        </div>
+                        <div class="flex items-center gap-2 mt-0.5 text-[10px] font-mono text-slate-400">
+                            ${cityCountry ? `<span class="truncate">${cityCountry}</span>` : ''}
+                            ${cityCountry && packageInfo ? `<span>•</span>` : ''}
+                            ${packageInfo ? `<span class="text-slate-300 truncate font-sans">${packageInfo}</span>` : ''}
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2 shrink-0">
+                        <span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded leading-tight ${badgeClass}">
+                            ${badgeText}
+                        </span>
+                        <button onclick="centerMapOnDestination('${item.icao}', event)" title="Locate on map" class="w-6 h-6 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-[10px] border border-slate-700/50 transition-colors cursor-pointer">
+                            <i class="fa-solid fa-crosshairs"></i>
+                        </button>
+                        <i class="fa-solid fa-chevron-${isExpanded ? 'up' : 'down'} text-[10px] text-slate-400 group-hover:text-white transition-colors"></i>
+                    </div>
+                </div>
+
+                <div id="airline-dest-accordion-${item.icao}" class="${isExpanded ? '' : 'hidden'}"></div>
+            </div>
+        `;
+    }).join('');
+
+    if (expandedAirlineDestIcao) {
+        renderAirlineDestAccordionContent(expandedAirlineDestIcao);
+    }
+}
+
 function radialFilterByAirline(airlineName, btnEl, event) {
     if (event) event.stopPropagation();
     if (!currentRadialAirport) return;
@@ -5275,29 +5643,32 @@ function radialFilterByAirline(airlineName, btnEl, event) {
     }
 
     if (selectedAirlines.has(airlineName)) {
-        selectedAirlines.delete(airlineName);
-        if (selectedAirlines.size === 0) {
-            activeRouteOrigin = null;
-            selectedAirline = null;
-        } else {
-            selectedAirline = Array.from(selectedAirlines)[selectedAirlines.size - 1];
-        }
+        // Toggle OFF (de-select)
+        selectedAirlines.clear();
+        selectedAirline = null;
+        activeRouteOrigin = null;
+        expandedAirlineDestIcao = null;
+        currentAirlineDestFilter = 'ALL';
     } else {
         const destIcaos = (originAp.routes && originAp.routes[airlineName]) || [];
-        if (destIcaos.length === 0 && selectedAirlines.size === 0) {
+        if (destIcaos.length === 0) {
             showToast(`No scheduled route destinations for ${airlineName} from ${originAp.icao}`, 'info');
             return;
         }
+        // Single selection mode ("déstackage"): one active airline at a time
+        selectedAirlines.clear();
         selectedAirlines.add(airlineName);
         selectedAirline = airlineName;
         activeRouteOrigin = originAp;
+        expandedAirlineDestIcao = null;
+        currentAirlineDestFilter = 'ALL';
     }
 
     // Filter map routes
     filterAirports();
     updateFilterUI();
 
-    // Re-render modal UI (updates card borders/highlights and clear button)
+    // Re-render modal UI (updates card borders/highlights, clear button, and destination list)
     renderRadialOperatingAirlines(originAp);
 
     // Also update drawer if open
@@ -5309,6 +5680,8 @@ function clearRadialAirlineFilter(event) {
     selectedAirlines.clear();
     selectedAirline = null;
     activeRouteOrigin = null;
+    expandedAirlineDestIcao = null;
+    currentAirlineDestFilter = 'ALL';
     if (activeRouteLinesGroup) {
         activeRouteLinesGroup.clearLayers();
     }
