@@ -1890,33 +1890,33 @@
             <!-- Filters & Search Toolbar -->
             <div class="pt-3 pb-2 space-y-2.5 shrink-0">
                 <!-- Filter Pills (Flat colors, uniform sizing) -->
-                <div class="flex flex-wrap items-center justify-between gap-1.5">
-                    <div class="flex flex-wrap items-center gap-1.5">
-                        <button id="gsx-filter-btn-all" onclick="setGsxAuditFilter('ALL')" class="px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold leading-tight bg-slate-800 text-slate-300 hover:text-white border-0 cursor-pointer transition-colors">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button id="gsx-filter-btn-all" onclick="setGsxAuditFilter('ALL')" class="px-3 py-1.5 rounded-xl text-xs font-mono font-bold leading-tight bg-cyan-600 text-white border-0 cursor-pointer transition-colors">
                             ALL (<span id="gsx-count-all">0</span>)
                         </button>
-                        <button id="gsx-filter-btn-active" onclick="setGsxAuditFilter('ACTIVE')" class="px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold leading-tight bg-cyan-600 text-white border-0 cursor-pointer transition-colors">
+                        <button id="gsx-filter-btn-active" onclick="setGsxAuditFilter('ACTIVE')" class="px-3 py-1.5 rounded-xl text-xs font-mono font-bold leading-tight bg-slate-800 text-slate-300 hover:text-white border-0 cursor-pointer transition-colors">
                             ACTIVE (<span id="gsx-count-active">0</span>)
                         </button>
-                        <button id="gsx-filter-btn-duplicate" onclick="setGsxAuditFilter('DUPLICATE')" class="px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold leading-tight bg-slate-800 text-slate-300 hover:text-white border-0 cursor-pointer transition-colors">
+                        <button id="gsx-filter-btn-duplicate" onclick="setGsxAuditFilter('DUPLICATE')" class="px-3 py-1.5 rounded-xl text-xs font-mono font-bold leading-tight bg-slate-800 text-slate-300 hover:text-white border-0 cursor-pointer transition-colors">
                             DUPLICATES (<span id="gsx-count-duplicate">0</span>)
                         </button>
-                        <button id="gsx-filter-btn-mismatch" onclick="setGsxAuditFilter('MISMATCH')" class="px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold leading-tight bg-slate-800 text-slate-300 hover:text-white border-0 cursor-pointer transition-colors">
+                        <button id="gsx-filter-btn-mismatch" onclick="setGsxAuditFilter('MISMATCH')" class="px-3 py-1.5 rounded-xl text-xs font-mono font-bold leading-tight bg-slate-800 text-slate-300 hover:text-white border-0 cursor-pointer transition-colors">
                             MISMATCHES (<span id="gsx-count-mismatch">0</span>)
                         </button>
-                        <button id="gsx-filter-btn-orphan" onclick="setGsxAuditFilter('ORPHAN')" class="px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold leading-tight bg-slate-800 text-slate-300 hover:text-white border-0 cursor-pointer transition-colors">
+                        <button id="gsx-filter-btn-orphan" onclick="setGsxAuditFilter('ORPHAN')" class="px-3 py-1.5 rounded-xl text-xs font-mono font-bold leading-tight bg-slate-800 text-slate-300 hover:text-white border-0 cursor-pointer transition-colors">
                             ORPHANS (<span id="gsx-count-orphan">0</span>)
                         </button>
-                        <button id="gsx-filter-btn-disabled" onclick="setGsxAuditFilter('DISABLED')" class="px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold leading-tight bg-slate-800 text-slate-300 hover:text-white border-0 cursor-pointer transition-colors">
+                        <button id="gsx-filter-btn-disabled" onclick="setGsxAuditFilter('DISABLED')" class="px-3 py-1.5 rounded-xl text-xs font-mono font-bold leading-tight bg-slate-800 text-slate-300 hover:text-white border-0 cursor-pointer transition-colors">
                             DISABLED (<span id="gsx-count-disabled">0</span>)
                         </button>
-                        <button id="gsx-filter-btn-noprofile" onclick="setGsxAuditFilter('NO_PROFILE')" class="px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold leading-tight bg-slate-800 text-slate-300 hover:text-white border-0 cursor-pointer transition-colors">
+                        <button id="gsx-filter-btn-noprofile" onclick="setGsxAuditFilter('NO_PROFILE')" class="px-3 py-1.5 rounded-xl text-xs font-mono font-bold leading-tight bg-slate-800 text-slate-300 hover:text-white border-0 cursor-pointer transition-colors">
                             NO PROFILE (<span id="gsx-count-noprofile">0</span>)
                         </button>
                     </div>
 
                     <!-- Toggle Asobo for No Profile -->
-                    <label id="gsx-asobo-toggle-wrapper" class="hidden items-center gap-1.5 text-[10px] font-mono text-slate-400 hover:text-slate-200 cursor-pointer select-none">
+                    <label id="gsx-asobo-toggle-wrapper" class="hidden items-center gap-1.5 text-xs font-mono text-slate-400 hover:text-slate-200 cursor-pointer select-none">
                         <input type="checkbox" id="gsx-include-asobo-checkbox" onchange="toggleGsxIncludeAsobo(event)" class="rounded bg-slate-950 border-slate-700 text-cyan-600 focus:ring-0 cursor-pointer">
                         <span>Include Asobo (<span id="gsx-count-asobo-missing">0</span>)</span>
                     </label>

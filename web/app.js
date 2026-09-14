@@ -2816,9 +2816,9 @@ function setGsxAuditFilter(filter) {
         const el = document.getElementById(b.id);
         if (!el) return;
         if (b.key === currentGsxAuditFilter) {
-            el.className = 'px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold leading-tight bg-cyan-600 text-white border-0 cursor-pointer transition-colors';
+            el.className = 'px-3 py-1.5 rounded-xl text-xs font-mono font-bold leading-tight bg-cyan-600 text-white border-0 cursor-pointer transition-colors';
         } else {
-            el.className = 'px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold leading-tight bg-slate-800 text-slate-300 hover:text-white border-0 cursor-pointer transition-colors';
+            el.className = 'px-3 py-1.5 rounded-xl text-xs font-mono font-bold leading-tight bg-slate-800 text-slate-300 hover:text-white border-0 cursor-pointer transition-colors';
         }
     });
 
@@ -2894,6 +2894,7 @@ function renderGsxAuditModal() {
     const totalIssues = duplicateCount + mismatchCount + orphanCount;
 
     const totalActiveProfiles = Object.keys(audit.by_icao || {}).filter(k => audit.by_icao[k].status !== 'DISABLED').length;
+    const totalAllCount = totalActiveProfiles + (s.disabled || 0) + missingVisible;
 
     const totalBadge = document.getElementById('gsx-audit-total-badge');
     if (totalBadge) {
@@ -2908,7 +2909,7 @@ function renderGsxAuditModal() {
     }
 
     const cAll = document.getElementById('gsx-count-all');
-    if (cAll) cAll.innerText = totalActiveProfiles;
+    if (cAll) cAll.innerText = totalAllCount;
     const cActive = document.getElementById('gsx-count-active');
     if (cActive) cActive.innerText = s.matched || 0;
     const cDup = document.getElementById('gsx-count-duplicate');
@@ -3162,7 +3163,39 @@ function renderGsxAuditModal() {
 
     let entries = Object.values(audit.by_icao || {}).filter(e => e.status !== 'DISABLED');
 
-    if (currentGsxAuditFilter === 'ACTIVE') {
+    if (currentGsxAuditFilter === 'ALL') {
+        let missingList = audit.missing_profiles || [];
+        if (!gsxIncludeAsobo) {
+            missingList = missingList.filter(m => !m.is_asobo);
+        }
+        const missingEntries = missingList.map(m => ({
+            icao: m.icao,
+            name: m.name,
+            city: m.city,
+            country: m.country,
+            vendor: m.vendor,
+            pricing_type: m.pricing_type,
+            is_asobo: m.is_asobo,
+            status: 'NO_PROFILE',
+            files: []
+        }));
+        entries = entries.concat(missingEntries);
+
+        if ((s.disabled || 0) > 0 && audit.disabled_profiles) {
+            const disabledEntries = audit.disabled_profiles.map(d => ({
+                icao: d.icao,
+                name: d.name,
+                city: d.city,
+                country: d.country,
+                filename: d.filename,
+                path: d.path,
+                mtime: d.mtime,
+                status: 'DISABLED',
+                files: [{ filename: d.filename, path: d.path, mtime: d.mtime, is_disabled: true }]
+            }));
+            entries = entries.concat(disabledEntries);
+        }
+    } else if (currentGsxAuditFilter === 'ACTIVE') {
         entries = entries.filter(e => e.status === 'MATCHED');
     } else if (currentGsxAuditFilter === 'DUPLICATE') {
         entries = entries.filter(e => e.status === 'DUPLICATE');
@@ -3178,7 +3211,7 @@ function renderGsxAuditModal() {
             const ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao(e.icao) : null;
             const nameMatch = (e.name || (ap && ap.name) || '').toLowerCase().includes(query);
             const cityMatch = (e.city || (ap && ap.city) || '').toLowerCase().includes(query);
-            const vendorMatch = ap && ap.vendor && ap.vendor.toLowerCase().includes(query);
+            const vendorMatch = ((ap && ap.vendor) || e.vendor || '').toLowerCase().includes(query);
             const fileMatch = (e.files || []).some(f => 
                 (f.filename || '').toLowerCase().includes(query) ||
                 (f.creator || '').toLowerCase().includes(query) ||
@@ -3189,7 +3222,7 @@ function renderGsxAuditModal() {
         });
     }
 
-    const orderMap = { 'DUPLICATE': 1, 'MISMATCH_DEFAULT': 2, 'MISMATCH_STUDIO': 2, 'ORPHAN': 3, 'MATCHED': 4 };
+    const orderMap = { 'DUPLICATE': 1, 'MISMATCH_DEFAULT': 2, 'MISMATCH_STUDIO': 2, 'ORPHAN': 3, 'MATCHED': 4, 'NO_PROFILE': 5, 'DISABLED': 6 };
     entries.sort((a, b) => {
         const rankA = orderMap[a.status] || 99;
         const rankB = orderMap[b.status] || 99;
@@ -3275,19 +3308,23 @@ function renderGsxAuditModal() {
             badgeHtml = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-slate-800 text-slate-400 border-0">ORPHAN</span>`;
         } else if (entry.status === 'MATCHED') {
             badgeHtml = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-emerald-600 text-white border-0">MATCHED</span>`;
+        } else if (entry.status === 'NO_PROFILE') {
+            badgeHtml = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-slate-800 text-slate-300 border-0">NO PROFILE</span>`;
+        } else if (entry.status === 'DISABLED') {
+            badgeHtml = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-slate-900 text-slate-400 border border-slate-700">DISABLED</span>`;
         } else {
             badgeHtml = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-slate-800 text-slate-300 border-0">${escapeHtml(entry.status)}</span>`;
         }
 
         let pricingBadge = '';
-        if (ap) {
-            if (ap.pricing_type === 'Payware') {
-                pricingBadge = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-purple-600 text-white border-0">PAYWARE</span>`;
-            } else if (ap.pricing_type === 'Asobo' || ap.vendor === 'Microsoft / Asobo') {
-                pricingBadge = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-amber-500 text-slate-950 border-0">ASOBO</span>`;
-            } else if (ap.pricing_type === 'Freeware' || ap.pricing_type === 'Freeware / Flightsim.to') {
-                pricingBadge = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-cyan-600 text-white border-0">FREEWARE</span>`;
-            }
+        const pt = (ap && ap.pricing_type) || entry.pricing_type;
+        const vendor = (ap && ap.vendor) || entry.vendor || '';
+        if (pt === 'Payware') {
+            pricingBadge = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-purple-600 text-white border-0">PAYWARE</span>`;
+        } else if (pt === 'Asobo' || vendor === 'Microsoft / Asobo' || entry.is_asobo) {
+            pricingBadge = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-amber-500 text-slate-950 border-0">ASOBO</span>`;
+        } else if (pt === 'Freeware' || pt === 'Freeware / Flightsim.to' || entry.is_freeware) {
+            pricingBadge = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-cyan-600 text-white border-0">FREEWARE</span>`;
         }
 
         const canPan = !!gsxAuditFloatingMode;
@@ -3549,6 +3586,65 @@ function renderGsxAuditModal() {
                 `;
             });
             html += `</div>`;
+        } else if (entry.status === 'NO_PROFILE') {
+            const vendorName = entry.vendor || (ap ? ap.vendor : '') || '';
+            html += `
+                <div class="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-800 flex-wrap sm:flex-nowrap">
+                    <div class="text-[11px] font-mono text-slate-400 truncate min-w-0 flex-1">
+                        ${escapeHtml(vendorName ? `Studio: ${vendorName}` : 'Custom MSFS Scenery')}
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <div id="gsx-dropzone-${icao}"
+                             ondragover="handleGsxAuditDragOver(event, '${icao}')"
+                             ondragleave="handleGsxAuditDragLeave(event, '${icao}')"
+                             ondrop="handleGsxAuditDrop(event, '${icao}')"
+                             onclick="installGsxProfileFromModal('${icao}')"
+                             class="px-4 py-2 min-w-[130px] h-10 rounded-xl bg-slate-950 border-2 border-dashed border-slate-700 hover:border-cyan-400 hover:bg-slate-900 flex flex-col items-center justify-center text-center cursor-pointer transition-all group shrink-0"
+                             title="Drop .ini or archive (.zip) here, or click to browse">
+                            <span class="text-[10px] font-mono font-bold text-slate-200 group-hover:text-cyan-300 transition-colors pointer-events-none leading-none">
+                                DROP .INI / .ZIP
+                            </span>
+                            <span class="text-[8px] font-mono text-slate-400 group-hover:text-slate-300 transition-colors pointer-events-none leading-tight mt-0.5">
+                                or browse file
+                            </span>
+                        </div>
+
+                        <button onclick="searchGsxProfileFromModal('${icao}')" class="text-[10px] font-mono font-bold px-3.5 py-2.5 h-10 rounded-xl leading-tight bg-cyan-700 hover:bg-cyan-600 text-white border-0 cursor-pointer transition-colors shrink-0 flex items-center justify-center" title="Search on Flightsim.to">
+                            <span>Search on Flightsim.to</span>
+                        </button>
+                    </div>
+                </div>
+            `;
+        } else if (entry.status === 'DISABLED') {
+            const disFile = (files.find(f => f.is_disabled) || files[0] || {});
+            const disFilename = disFile.filename || entry.filename || '';
+            const disPath = disFile.path || entry.path || disFilename;
+            html += `
+                <div class="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-800 flex-wrap sm:flex-nowrap">
+                    <div class="min-w-0 flex-1">
+                        <div class="text-xs font-mono font-bold text-slate-300 truncate" title="${escapeHtml(disFilename)}">
+                            ${escapeHtml(disFilename)}
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <button onclick="enableGsxProfileFromAudit('${icao}', '${escapeJsStr(disFilename)}')"
+                                class="text-[10px] font-mono font-bold px-3 py-1.5 rounded-xl bg-cyan-900 hover:bg-cyan-800 text-cyan-200 border border-cyan-700 cursor-pointer transition-colors shadow-sm"
+                                title="Re-enable this profile">
+                            Enable
+                        </button>
+                        <button onclick="confirmDeleteGsxProfile('${icao}', '${escapeJsStr(disFilename)}')"
+                                class="text-[10px] font-mono font-bold px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-900 text-slate-400 hover:text-white border border-slate-700 hover:border-rose-800 cursor-pointer transition-colors"
+                                title="Permanently delete from disk">
+                            Delete
+                        </button>
+                        <button onclick="revealGsxFileInExplorer('${escapeJsStr(disPath)}')"
+                                class="text-[10px] font-mono font-bold px-2 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 cursor-pointer transition-colors"
+                                title="Reveal in Windows Explorer">
+                            Reveal
+                        </button>
+                    </div>
+                </div>
+            `;
         }
 
         html += `</div>`;
@@ -3582,8 +3678,9 @@ function updateGsxHeaderAndTabBadges() {
     }
 
     const totalActiveProfiles = Object.keys(audit.by_icao || {}).filter(k => audit.by_icao[k].status !== 'DISABLED').length;
+    const totalAllCount = totalActiveProfiles + (s.disabled || 0) + missingVisible;
     const cAll = document.getElementById('gsx-count-all');
-    if (cAll) cAll.innerText = totalActiveProfiles;
+    if (cAll) cAll.innerText = totalAllCount;
     const cActive = document.getElementById('gsx-count-active');
     if (cActive) cActive.innerText = s.matched || 0;
     const cDup = document.getElementById('gsx-count-duplicate');
