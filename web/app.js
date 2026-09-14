@@ -4606,7 +4606,7 @@ function updateRadialDetailsModalPosition(force = false) {
 
     const mapSize = (typeof map.getSize === 'function') ? map.getSize() : null;
     const containerW = mapSize ? mapSize.x : (modal.offsetParent ? modal.offsetParent.offsetWidth : window.innerWidth);
-    const modalWidth = modal.offsetWidth || 840;
+    const modalWidth = modal.offsetWidth || 940;
     const halfWidth = modalWidth / 2;
     const minLeft = halfWidth + 12;
     const maxLeft = Math.max(minLeft, containerW - halfWidth - 12);
@@ -6142,8 +6142,10 @@ function renderRadialAirportDetails(ap) {
     const lonEl = document.getElementById('radial-detail-lon');
     const catEl = document.getElementById('radial-detail-category');
     const elevEl = document.getElementById('radial-detail-elevation');
-    if (latEl) latEl.innerText = parseFloat(ap.lat || 0).toFixed(4);
-    if (lonEl) lonEl.innerText = parseFloat(ap.lon || 0).toFixed(4);
+    const latVal = parseFloat(ap.lat || 0);
+    const lonVal = parseFloat(ap.lon || 0);
+    if (latEl) latEl.innerText = `${Math.abs(latVal).toFixed(4)}° ${latVal >= 0 ? 'N' : 'S'}`;
+    if (lonEl) lonEl.innerText = `${Math.abs(lonVal).toFixed(4)}° ${lonVal >= 0 ? 'E' : 'W'}`;
     if (catEl) catEl.innerText = formatAirportCategoryDisplay(ap);
     const elevVal = (ap.elevation !== undefined && ap.elevation !== null)
         ? ap.elevation
@@ -6165,6 +6167,7 @@ function renderRadialAirportDetails(ap) {
 
 async function renderRadialRunways(ap) {
     const listEl = document.getElementById('radial-runways-list');
+    const titleEl = document.getElementById('radial-runways-title');
     const countEl = document.getElementById('radial-runways-count');
     if (!listEl) return;
 
@@ -6181,8 +6184,11 @@ async function renderRadialRunways(ap) {
         }
     }
 
-    if (countEl) {
-        countEl.innerText = `${(runways || []).length} Runways`;
+    const rwyCount = (runways || []).length;
+    if (titleEl) {
+        titleEl.innerText = `${rwyCount} RUNWAYS`;
+    } else if (countEl) {
+        countEl.innerText = `${rwyCount} Runways`;
     }
 
     if (runways && runways.length > 0) {
@@ -6337,25 +6343,25 @@ function renderRadialGsx(ap) {
         }];
     }
 
-    // Diagnostic badge styling (Flat colors, uniform typography, no icons)
+    // Diagnostic badge styling (Pure solid flat colors, uniform typography, no borders)
     let statusLabel = 'NONE';
-    let statusBadgeClass = 'text-slate-500 bg-slate-900 border border-slate-800';
+    let statusBadgeClass = 'text-slate-300 bg-slate-700 border-0 font-bold';
 
     if (status === 'MATCHED') {
         statusLabel = 'MATCH';
-        statusBadgeClass = 'text-emerald-400 bg-emerald-950 border border-emerald-800';
+        statusBadgeClass = 'text-white bg-emerald-600 border-0 font-bold';
     } else if (status === 'DUPLICATE') {
         statusLabel = 'DUPLICATE';
-        statusBadgeClass = 'text-amber-400 bg-amber-950 border border-amber-800';
+        statusBadgeClass = 'text-slate-950 bg-amber-500 border-0 font-bold';
     } else if (status === 'MISMATCH_DEFAULT') {
         statusLabel = 'MISMATCH DEFAULT';
-        statusBadgeClass = 'text-rose-400 bg-rose-950 border border-rose-800';
+        statusBadgeClass = 'text-white bg-rose-600 border-0 font-bold';
     } else if (status === 'MISMATCH_STUDIO') {
         statusLabel = 'MISMATCH STUDIO';
-        statusBadgeClass = 'text-rose-400 bg-rose-950 border border-rose-800';
+        statusBadgeClass = 'text-white bg-rose-600 border-0 font-bold';
     } else if (status === 'DISABLED') {
         statusLabel = 'DISABLED';
-        statusBadgeClass = 'text-slate-400 bg-slate-900 border border-slate-700';
+        statusBadgeClass = 'text-white bg-slate-600 border-0 font-bold';
     }
 
     if (badgeEl) {
@@ -6430,7 +6436,7 @@ function renderRadialGsx(ap) {
                                 <div class="min-w-0 flex-1">
                                     <div class="flex items-center gap-2">
                                         <span class="text-xs font-mono font-bold ${isActive ? 'text-white' : 'text-slate-400'} truncate">${f.filename}</span>
-                                        <span class="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded ${isActive ? 'bg-cyan-950 text-cyan-400 border border-cyan-800' : 'bg-slate-800 text-slate-400 border border-slate-700'}">
+                                        <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded leading-tight ${isActive ? 'bg-cyan-600 text-white border-0' : 'bg-slate-700 text-slate-300 border-0'}">
                                             ${isActive ? 'ACTIVE' : 'DISABLED'}
                                         </span>
                                     </div>
@@ -8469,8 +8475,12 @@ function showAirportDetails(ap, calledFromCountryMode = false) {
     const cityCountryEl = document.getElementById('drawer-city-country');
     if (cityCountryEl) cityCountryEl.innerText = `${cleanCity || 'Unknown City'}, ${resolvedCountryName}`;
 
-    document.getElementById('drawer-lat').innerText = ap.lat ? ap.lat.toFixed(4) : '0.0000';
-    document.getElementById('drawer-lon').innerText = ap.lon ? ap.lon.toFixed(4) : '0.0000';
+    const dLat = (ap.lat !== undefined && ap.lat !== null) ? parseFloat(ap.lat) : 0;
+    const dLon = (ap.lon !== undefined && ap.lon !== null) ? parseFloat(ap.lon) : 0;
+    const drawerLatEl = document.getElementById('drawer-lat');
+    const drawerLonEl = document.getElementById('drawer-lon');
+    if (drawerLatEl) drawerLatEl.innerText = `${Math.abs(dLat).toFixed(4)}° ${dLat >= 0 ? 'N' : 'S'}`;
+    if (drawerLonEl) drawerLonEl.innerText = `${Math.abs(dLon).toFixed(4)}° ${dLon >= 0 ? 'E' : 'W'}`;
     
     const elevFt = ap.elevation !== undefined ? ap.elevation : 0;
     const elevM = Math.round(elevFt * 0.3048);
