@@ -6662,18 +6662,14 @@ function renderRadialStarRating(rating) {
     }
 
     for (let starIdx = 1; starIdx <= 5; starIdx++) {
-        const starEl = document.createElement('span');
-        starEl.className = 'radial-star-item text-lg cursor-pointer select-none transition-transform hover:scale-110';
+        const starEl = document.createElement('i');
 
         if (rating >= starIdx) {
-            starEl.innerText = '★';
-            starEl.classList.add('text-amber-400');
+            starEl.className = 'fa-solid fa-star radial-star-item full';
         } else if (rating >= starIdx - 0.5) {
-            starEl.innerText = '★';
-            starEl.classList.add('text-amber-300', 'opacity-70');
+            starEl.className = 'fa-solid fa-star-half-stroke radial-star-item full';
         } else {
-            starEl.innerText = '☆';
-            starEl.classList.add('text-slate-600');
+            starEl.className = 'fa-regular fa-star radial-star-item';
         }
 
         starEl.addEventListener('mousemove', (e) => handleRadialStarMouseMove(e, starIdx));
@@ -6703,16 +6699,12 @@ function renderRadialStarRatingPreview(val) {
 
     stars.forEach((starEl, index) => {
         const starIdx = index + 1;
-        starEl.className = 'radial-star-item text-lg cursor-pointer select-none transition-transform hover:scale-110';
         if (val >= starIdx) {
-            starEl.innerText = '★';
-            starEl.classList.add('text-amber-400');
+            starEl.className = 'fa-solid fa-star radial-star-item full';
         } else if (val >= starIdx - 0.5) {
-            starEl.innerText = '★';
-            starEl.classList.add('text-amber-300', 'opacity-70');
+            starEl.className = 'fa-solid fa-star-half-stroke radial-star-item full';
         } else {
-            starEl.innerText = '☆';
-            starEl.classList.add('text-slate-600');
+            starEl.className = 'fa-regular fa-star radial-star-item';
         }
     });
 }

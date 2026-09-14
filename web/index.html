@@ -209,16 +209,22 @@
         }
 
         /* Star Rating Widget Styling */
-        .star-item {
+        .star-item, .radial-star-item {
             cursor: pointer;
             transition: transform 0.15s ease, color 0.15s ease;
-            font-size: 1.1rem;
+            font-size: 1.55rem;
+            width: 1.65rem;
+            height: 1.65rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             color: #475569;
+            transform-origin: center center;
         }
-        .star-item:hover {
-            transform: scale(1.25);
+        .star-item:hover, .radial-star-item:hover {
+            transform: scale(1.2);
         }
-        .star-item.full {
+        .star-item.full, .radial-star-item.full {
             color: #f59e0b;
         }
 
