@@ -1204,7 +1204,7 @@ function openCountryDrawer(iso, countryName) {
                     const bKey = ap.bundle_id || ap.package_name;
                     if (!processedBundles.has(bKey)) {
                         processedBundles.add(bKey);
-                        totalSpentEur += (ap.bundle_total_price || 39.00);
+                        totalSpentEur += (ap.bundle_total_price || 29.90);
                     }
                 } else {
                     totalSpentEur += (ap.price_eur || 0);
@@ -2482,19 +2482,22 @@ function resumeCurrencyCarousel() {}
 function updateInvestmentBanner() {
     let totalSpentEur = 0;
     let paywareCount = 0;
+    let distinctPackageCount = 0;
     const processedBundles = new Set();
 
     allAirportsData.forEach(ap => {
-        const pt = ap.pricing_type || (ap.is_asobo_official ? "Asobo / MS" : "Freeware / Flightsim.to");
-        if (pt === "Payware" || ap.is_payware) {
+        const pt = getAirportPricingType(ap);
+        if (pt === "Payware") {
             paywareCount++;
             if (ap.is_bundle || ap.bundle_id) {
                 const bKey = ap.bundle_id || ap.package_name;
                 if (!processedBundles.has(bKey)) {
                     processedBundles.add(bKey);
-                    totalSpentEur += (ap.bundle_total_price || 39.00);
+                    distinctPackageCount++;
+                    totalSpentEur += (ap.bundle_total_price || 29.90);
                 }
             } else {
+                distinctPackageCount++;
                 totalSpentEur += (ap.price_eur || 0);
             }
         }
@@ -2509,9 +2512,9 @@ function updateInvestmentBanner() {
     }
 
     if (cardEl) {
-        const avgPriceEur = paywareCount > 0 ? (totalSpentEur / paywareCount) : 0;
+        const avgPriceEur = distinctPackageCount > 0 ? (totalSpentEur / distinctPackageCount) : 0;
         const avgFormatted = formatCurrency(avgPriceEur);
-        cardEl.title = `Based on single sceneries & bundle packs (Avg ${avgFormatted}/scenery across ${paywareCount} payware sceneries).`;
+        cardEl.title = `Total basé sur ${distinctPackageCount} packs/scènes payware achetés (${paywareCount} aéroports couverts). Moyenne : ${avgFormatted} / produit.`;
     }
 }
 

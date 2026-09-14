@@ -214,7 +214,8 @@ NON_AIRPORT_KEYWORDS = [
     'generic-airports', 'bushtrip', 'bush-trip', 'bush', 'bushchallenge', 'bush-challenge',
     'flight-tutorials', 'tutorials', 'tutorial', 'shortto', 'shortldg', 'waterldg', 'waterto', 'watertr',
     'downdraft', 'career', 'career-mode', 'flight-lessons', 'lessons', 'examination', 'exam', 'emergency',
-    'asobo-live', 'asobo-nav', 'asobo-generic'
+    'asobo-live', 'asobo-nav', 'asobo-generic', 'instruments', 'instrument', 'avionics', 'workingtitle',
+    'g1000', 'g3000', 'g5000', 'wt21', 'proline'
 ]
 
 ADDON_LIBRARY_KEYWORDS = [
@@ -456,16 +457,19 @@ SPECIAL_BUNDLE_MAP = {
 }
 
 BUNDLE_PACKAGE_PRICES = {
-    'francevfr-airport-pidf-parisvfrairports': {'price': 39.00, 'name': 'France VFR - Paris VFR Airports Pack'},
-    'fs20-francevfr-airport-pidf-parisvfrairports': {'price': 39.00, 'name': 'France VFR - Paris VFR Airports Pack'},
-    'francevfr-800-sevfrairports': {'price': 39.00, 'name': 'France VFR - Sud-Est VFR Airports Pack'},
+    'francevfr-airport-pidf-parisvfrairports': {'price': 29.90, 'name': 'France VFR - Paris VFR Airports Pack'},
+    'fs20-francevfr-airport-pidf-parisvfrairports': {'price': 29.90, 'name': 'France VFR - Paris VFR Airports Pack'},
+    'francevfr-airport-apt1-airportfrance-pack1': {'price': 29.90, 'name': 'France VFR - Airport France Pack 1'},
+    'fs20-francevfr-airport-apt1-airportfrance-pack1': {'price': 29.90, 'name': 'France VFR - Airport France Pack 1'},
+    'francevfr-800-sevfrairports': {'price': 24.90, 'name': 'France VFR - Sud-Est VFR Airports Pack'},
     'francevfr-800-marseille': {'price': 14.99, 'name': 'France VFR - Marseille Airport'},
 }
 
 # Known Real Retail Prices Catalog in EUR (€)
-# Known Real Retail Prices Catalog in EUR (€)
 KNOWN_PAYWARE_PRICES = {
-    # Free official releases from payware vendors (remain in Payware category with 0.00€)
+    # Free official releases from vendors (0.00€)
+    'aerosoft-paderborn': 0.0,
+    'fs20-aerosoft-paderborn': 0.0,
     'inibuilds-airport-at98-wolfsfang': 0.0,
     'inibuilds-airport-kmke-milwaukee': 0.0,
     'at98-wolfsfang': 0.0,
@@ -475,7 +479,6 @@ KNOWN_PAYWARE_PRICES = {
     'wolfsfang': 0.0,
 
     # Specific Package Folder Patterns
-    'francevfr-airport-apt1': 7.47, 'francevfr-airport-pidf': 5.00,
     'scenerytr-airport-ltfm-istanbul': 21.99,
     'slh_sim_designs_soca_fs24': 13.99
 }
@@ -1591,6 +1594,12 @@ def determine_pricing(source_folder, folder_name, vendor, manifest_data, icao=No
         return "Asobo", False
 
     s_lower = source_folder.lower()
+
+    # Known Official Freeware Releases (Paderborn Aerosoft, iniBuilds AT98 & KMKE giveaways)
+    if 'paderborn' in fn_lower:
+        return "Freeware / Flightsim.to", False
+    if icao in ['AT98', 'KMKE'] and ('wolf' in fn_lower or 'at98' in fn_lower or 'milwaukee' in fn_lower or 'kmke' in fn_lower):
+        return "Freeware / Flightsim.to", False
 
     # 3rd-Party Payware Marketplace sceneries (France VFR, Gaya, Deimos, BMW, Orbx, Sim Design Group, etc.)
     if any(p in fn_lower or p in v_lower or p in creator for p in COMMERCIAL_PAYWARE_VENDORS):
