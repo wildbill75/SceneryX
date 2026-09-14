@@ -7,15 +7,24 @@ function isFixOrOverlay(s) {
     if (!s) return false;
     const fn = (s.folder_name || '').toLowerCase();
     if (MAIN_SCENERY_EXCEPTIONS.has(fn)) return false;
+    // Official Microsoft / Asobo handcrafted base sceneries are full base airports, never fixes or overlays
+    if (s.is_asobo_official || s.pricing_type === 'Asobo' || (s.vendor && (s.vendor.toLowerCase().includes('asobo') || s.vendor.toLowerCase().includes('microsoft')))) {
+        return false;
+    }
+    if (fn.startsWith('asobo-airport-') || fn.startsWith('microsoft-airport-') || 
+        fn.startsWith('fs20-asobo-') || fn.startsWith('fs20-microsoft-') || 
+        fn.startsWith('fs24-asobo-') || fn.startsWith('fs24-microsoft-')) {
+        return false;
+    }
     if (s.is_fix_patch || s.is_addon) return true;
     const fixKeywords = [
         'fix', 'patch', 'flatten', 'fixer', 'correction', 'enhancement', 'mod',
         'interior', 'optional', 'overlay', 'mesh', 'aerial', 'ortho', 'vdgs',
-        'lights', 'lighting', 'trees', 'vegetation', 'sound', 'texture', 'extension',
+        'lights', 'lighting', 'trees', 'vegetation', 'texture', 'extension',
         'zparking', 'exclusion', 'jetway', 'marking'
     ];
     return fixKeywords.some(k => {
-        return fn.includes(`-${k}`) || fn.includes(`_${k}`) || fn.includes(`${k}-`) || fn.includes(`${k}_`) || fn.endsWith(k);
+        return fn.includes(`-${k}`) || fn.includes(`_${k}`) || fn.includes(`${k}-`) || fn.includes(`${k}_`);
     });
 }
 let map;
@@ -10603,7 +10612,11 @@ function filterAirports() {
                 if (!selectedAirlinesArr.some(al => airlines.includes(al))) return false;
             }
         } else {
-            // Global Pricing Filter (from left filter panel)
+            // Global Pricing Filter (from radial filter or left filter panel)
+            if (selectedPricing.size === 0) {
+                return false;
+            }
+
             const pt = getAirportPricingType(ap);
             const isPureDefault = !hasCustomAddonSources(ap);
 
@@ -10618,9 +10631,11 @@ function filterAirports() {
                 if (pt === 'Default') {
                     // Airport is currently set to Default MSFS base airport:
                     // Keep visible on map as a Blue Circle unless filtering exclusively for another category
-                    const isSingleSpecificCategory = (selectedPricing.size === 1 && !selectedPricing.has('Default'));
-                    if (isSingleSpecificCategory) {
-                        return false;
+                    if (!selectedPricing.has('Default')) {
+                        const isSingleSpecificCategory = (selectedPricing.size === 1);
+                        if (isSingleSpecificCategory) {
+                            return false;
+                        }
                     }
                 } else {
                     if (!selectedPricing.has(pt)) {

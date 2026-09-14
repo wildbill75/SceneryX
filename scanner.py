@@ -220,7 +220,7 @@ NON_AIRPORT_KEYWORDS = [
 
 ADDON_LIBRARY_KEYWORDS = [
     'models', 'model', 'library', 'libraries', 'interior', 'extension', 'mesh', 'aerial',
-    'ortho', 'vdgs', 'lights', 'trees', 'vegetation', 'sound', 'gsx', 'enhancement', 'optional'
+    'ortho', 'vdgs', 'lights', 'trees', 'vegetation', 'gsx', 'enhancement', 'optional'
 ]
 
 FIX_PATCH_KEYWORDS = [
@@ -230,7 +230,7 @@ FIX_PATCH_KEYWORDS = [
     'stalex', 'stg', 'overlay', 'exclusion', 'excl', 'profile', 'xavios',
     'jetway', 'jetways', 'gate', 'gates', 'frequency', 'frequencies', 'marking', 'markings',
     'interior', 'optional', 'extension', 'mesh', 'aerial', 'ortho', 'lights', 'lighting',
-    'trees', 'vegetation', 'sound', 'sounds', 'texture', 'textures', 'liveries', 'livery',
+    'trees', 'vegetation', 'texture', 'textures', 'liveries', 'livery',
     'static', 'statics', 'cars', 'people'
 ]
 
@@ -1797,8 +1797,15 @@ def run_scan():
         for hint_term in ['custom_airport_patch', 'bespoke_airport_patch', 'community_airport_patch', 'official_airport_patch', 'airport_patch', 'custom_airport', 'bespoke_airport', 'community_airport']:
             clean_hint = clean_hint.replace(hint_term, '')
 
+        is_official_asobo_base = (
+            fn_lower.startswith(('asobo-airport-', 'microsoft-airport-', 'fs20-asobo-', 'fs20-microsoft-', 'fs24-asobo-', 'fs24-microsoft-'))
+            or 'asobo-airport-' in fn_lower
+            or 'microsoft-airport-' in fn_lower
+        )
+
         is_fix_patch = (
-            fn_lower not in MAIN_SCENERY_EXCEPTIONS
+            not is_official_asobo_base
+            and fn_lower not in MAIN_SCENERY_EXCEPTIONS
             and (
                 any(re.search(rf'\b{re.escape(k)}\b', fn_lower) for k in FIX_PATCH_KEYWORDS)
                 or any(fn_lower.endswith(f"_{k}") or fn_lower.endswith(f"-{k}") for k in FIX_PATCH_KEYWORDS)
@@ -1806,7 +1813,7 @@ def run_scan():
                 or any(k in m_title_lower for k in ['fix', 'patch', 'enhancement', 'flatten', 'correction', 'overlay'])
             )
         )
-        is_addon_package = (fn_lower not in MAIN_SCENERY_EXCEPTIONS) and (is_fix_patch or any(k in fn_lower for k in ADDON_LIBRARY_KEYWORDS))
+        is_addon_package = (not is_official_asobo_base and fn_lower not in MAIN_SCENERY_EXCEPTIONS) and (is_fix_patch or any(k in fn_lower for k in ADDON_LIBRARY_KEYWORDS))
 
         if fn_lower in SPECIAL_BUNDLE_MAP:
             bundle_icaos = SPECIAL_BUNDLE_MAP[fn_lower]
@@ -1952,8 +1959,8 @@ def run_scan():
                 "is_payware": is_payware,
                 "is_asobo_official": is_asobo_official,
                 "is_disabled": source_is_disabled,
-                "is_addon": is_addon_package,
-                "is_fix_patch": False if (is_asobo_official or is_payware) else (is_fix_patch or is_addon_package),
+                "is_addon": False if (is_asobo_official or is_official_asobo_base) else is_addon_package,
+                "is_fix_patch": False if (is_asobo_official or is_official_asobo_base or is_payware) else (is_fix_patch or is_addon_package),
                 "version": pkg_version,
                 "size_str": pkg_size_str,
                 "world_update_name": get_world_update_name(icao, folder_name)
