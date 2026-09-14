@@ -1114,7 +1114,7 @@
                     <span class="text-slate-600">•</span>
                     <span id="persistent-flight-count" class="text-slate-300 font-medium">0 sceneries isolated</span>
                 </div>
-                <button onclick="restoreAllFlightSceneriesUI()" class="ml-1 px-3 py-1 rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 text-amber-300 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-sm" title="Restore all sceneries back to normal">
+                <button onclick="restoreAllFlightSceneriesUI()" class="ml-1 px-3 py-1 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 border-0" title="Restore all sceneries back to normal">
                     <i class="fa-solid fa-rotate-left text-amber-400 text-xs"></i>
                     <span data-i18n="flight_mode.btn_restore">Restore Library</span>
                 </button>
@@ -1160,7 +1160,7 @@
                     </div>
 
                     <!-- Optimize Button -->
-                    <button id="fp-btn-optimize" onclick="executeFlightCorridorOptimization()" class="px-3.5 py-1 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs transition-all shadow-md shadow-emerald-500/20 cursor-pointer active:scale-95" data-i18n-title="optimizer.optimize_tooltip" title="Apply optimization: disables non-flight sceneries in MSFS to boost FPS and reduce loading times">
+                    <button id="fp-btn-optimize" onclick="executeFlightCorridorOptimization()" class="px-3.5 py-1 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition-all cursor-pointer active:scale-95 border-0" data-i18n-title="optimizer.optimize_tooltip" title="Apply optimization: disables non-flight sceneries in MSFS to boost FPS and reduce loading times">
                         <span data-i18n="optimizer.optimize">Optimize</span>
                     </button>
 
@@ -1187,7 +1187,7 @@
                     <span id="flight-dest-tag" class="font-mono font-bold text-xs bg-slate-950 px-2.5 py-1 rounded-lg text-cyan-300 border border-cyan-500/30">ARR: ----</span>
                 </div>
                 <div class="flex items-center gap-2">
-                    <button onclick="executeFlightOptimizer()" id="btn-run-flight-opt" class="px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs transition-all shadow-md shadow-emerald-500/20 flex items-center gap-1.5 cursor-pointer">
+                    <button onclick="executeFlightOptimizer()" id="btn-run-flight-opt" class="px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition-all flex items-center gap-1.5 cursor-pointer border-0 active:scale-95">
                         <i class="fa-solid fa-bolt"></i> <span data-i18n="optimizer.disable_rest">Disable Rest (+FPS)</span>
                     </button>
                     <button onclick="executeRestoreAllSceneries()" id="btn-restore-all" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs border border-slate-700 transition-all cursor-pointer flex items-center gap-1">
@@ -1780,7 +1780,7 @@
                     <div>
                         <span class="text-[10px] font-mono text-cyan-400/90 uppercase font-bold tracking-wider block mb-1">SceneryX System</span>
                         <h3 class="text-sm font-bold text-white tracking-wide">Scanning GSX Profiles</h3>
-                        <p id="rescan-gsx-status-sub" class="text-xs text-slate-400 mt-0.5">Auditing Virtuali GSX profiles...</p>
+                        <p id="rescan-gsx-status-sub" class="text-xs text-slate-400 mt-0.5">Scanning GSX profile files in %APPDATA%\Virtuali\GSX\MSFS...</p>
                     </div>
                     <span id="rescan-gsx-percent-text" class="text-xs font-mono font-bold text-cyan-400">0%</span>
                 </div>
@@ -1881,8 +1881,8 @@
                 <div>
                     <span class="text-[10px] font-mono text-cyan-400/90 uppercase font-bold tracking-wider block mb-1">SceneryX System</span>
                     <h2 class="text-base font-bold text-white leading-tight flex items-center gap-2">
-                        <span>GSX Profiles Audit</span>
-                        <span id="gsx-audit-total-badge" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-amber-950 text-amber-400 border border-amber-800">
+                        <span>GSX Profiles Details</span>
+                        <span id="gsx-audit-total-badge" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg leading-tight bg-amber-500/20 text-amber-300 border-0">
                             0 Issues
                         </span>
                     </h2>
@@ -1897,22 +1897,22 @@
                 <!-- Filter Pills (Flat colors, uniform sizing) -->
                 <div class="flex flex-wrap items-center justify-between gap-1.5">
                     <div class="flex flex-wrap items-center gap-1.5">
-                        <button id="gsx-filter-btn-all" onclick="setGsxAuditFilter('ALL')" class="px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold leading-tight bg-cyan-700 text-white border-0 cursor-pointer transition-colors">
+                        <button id="gsx-filter-btn-all" onclick="setGsxAuditFilter('ALL')" class="px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold leading-tight bg-cyan-600 text-white border-0 cursor-pointer transition-colors">
                             ALL (<span id="gsx-count-all">0</span>)
                         </button>
-                        <button id="gsx-filter-btn-duplicate" onclick="setGsxAuditFilter('DUPLICATE')" class="px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold leading-tight bg-slate-800 text-slate-300 hover:text-white border border-slate-700 cursor-pointer transition-colors">
+                        <button id="gsx-filter-btn-duplicate" onclick="setGsxAuditFilter('DUPLICATE')" class="px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold leading-tight bg-slate-800 text-slate-300 hover:text-white border-0 cursor-pointer transition-colors">
                             DUPLICATES (<span id="gsx-count-duplicate">0</span>)
                         </button>
-                        <button id="gsx-filter-btn-mismatch" onclick="setGsxAuditFilter('MISMATCH')" class="px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold leading-tight bg-slate-800 text-slate-300 hover:text-white border border-slate-700 cursor-pointer transition-colors">
+                        <button id="gsx-filter-btn-mismatch" onclick="setGsxAuditFilter('MISMATCH')" class="px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold leading-tight bg-slate-800 text-slate-300 hover:text-white border-0 cursor-pointer transition-colors">
                             MISMATCHES (<span id="gsx-count-mismatch">0</span>)
                         </button>
-                        <button id="gsx-filter-btn-orphan" onclick="setGsxAuditFilter('ORPHAN')" class="px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold leading-tight bg-slate-800 text-slate-300 hover:text-white border border-slate-700 cursor-pointer transition-colors">
+                        <button id="gsx-filter-btn-orphan" onclick="setGsxAuditFilter('ORPHAN')" class="px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold leading-tight bg-slate-800 text-slate-300 hover:text-white border-0 cursor-pointer transition-colors">
                             ORPHANS (<span id="gsx-count-orphan">0</span>)
                         </button>
-                        <button id="gsx-filter-btn-disabled" onclick="setGsxAuditFilter('DISABLED')" class="px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold leading-tight bg-slate-800 text-slate-300 hover:text-white border border-slate-700 cursor-pointer transition-colors">
+                        <button id="gsx-filter-btn-disabled" onclick="setGsxAuditFilter('DISABLED')" class="px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold leading-tight bg-slate-800 text-slate-300 hover:text-white border-0 cursor-pointer transition-colors">
                             DISABLED (<span id="gsx-count-disabled">0</span>)
                         </button>
-                        <button id="gsx-filter-btn-noprofile" onclick="setGsxAuditFilter('NO_PROFILE')" class="px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold leading-tight bg-slate-800 text-slate-300 hover:text-white border border-slate-700 cursor-pointer transition-colors">
+                        <button id="gsx-filter-btn-noprofile" onclick="setGsxAuditFilter('NO_PROFILE')" class="px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold leading-tight bg-slate-800 text-slate-300 hover:text-white border-0 cursor-pointer transition-colors">
                             NO PROFILE (<span id="gsx-count-noprofile">0</span>)
                         </button>
                     </div>
@@ -2113,7 +2113,7 @@
                 <button onclick="closeSimBriefModal()" data-i18n="modal.cancel" class="px-4 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white text-xs font-bold transition-all">
                     Cancel
                 </button>
-                <button id="sb-modal-confirm-btn" onclick="confirmSimBriefOptimization()" class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs transition-all shadow-lg shadow-amber-500/25 flex items-center gap-2 active:scale-95">
+                <button id="sb-modal-confirm-btn" onclick="confirmSimBriefOptimization()" class="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all flex items-center gap-2 active:scale-95 border-0">
                     <i class="fa-solid fa-check"></i>
                     <span data-i18n="simbrief_modal.btn_optimize">OK - Optimize Sceneries</span>
                 </button>
@@ -2143,7 +2143,7 @@
 
             <div class="flex items-center justify-end gap-3 pt-1">
                 <button onclick="disagreeAndExitApp()" data-i18n="disclaimer.disagree" class="px-5 py-2.5 rounded-xl bg-slate-800/90 hover:bg-red-500/20 hover:text-red-300 border border-slate-700/80 text-slate-300 text-xs font-bold transition-all cursor-pointer">Disagree</button>
-                <button onclick="agreeAndContinueApp()" data-i18n="disclaimer.agree" class="px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-xs shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40 hover:scale-[1.02] active:scale-95 transition-all cursor-pointer">
+                <button onclick="agreeAndContinueApp()" data-i18n="disclaimer.agree" class="px-6 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs hover:scale-[1.02] active:scale-95 transition-all cursor-pointer border-0">
                     Agree & Continue
                 </button>
         </div>

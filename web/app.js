@@ -587,7 +587,7 @@ function updateFlightOptimizerUI() {
                 optBtn.className = "px-3.5 py-1.5 rounded-xl bg-emerald-500 text-slate-950 font-black text-xs transition-all shadow-md shadow-emerald-500/30 flex items-center gap-1.5 cursor-pointer ring-2 ring-emerald-400 animate-pulse";
                 optBtn.innerHTML = `<i class="fa-solid fa-check"></i> <span>Flight Active (+FPS)</span>`;
             } else {
-                optBtn.className = "px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black text-xs transition-all shadow-md shadow-emerald-500/20 flex items-center gap-1.5 cursor-pointer";
+                optBtn.className = "px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition-all border-0 shadow-sm flex items-center gap-1.5 cursor-pointer";
                 optBtn.innerHTML = `<i class="fa-solid fa-bolt"></i> <span>Disable Rest (+FPS)</span>`;
             }
         }
@@ -1521,7 +1521,7 @@ function renderCountryAirportCard(ap) {
                 <div class="flex items-center gap-2 min-w-0 flex-1">
                     <span class="text-xs font-mono font-black text-cyan-300 shrink-0">${ap.icao}</span>
                     <span class="text-xs font-bold text-slate-300 group-hover:text-white truncate min-w-0">Microsoft / Asobo (Default)</span>
-                    <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-slate-800 text-slate-400 border border-slate-700">DEFAULT</span>
+                    <span class="px-1.5 py-0.5 rounded-lg text-[9px] font-mono font-bold bg-slate-800 text-slate-300 border-0">DEFAULT</span>
                 </div>
                 <div class="shrink-0 pl-2">
                     <i class="fa-solid fa-circle-check text-emerald-400 text-sm" title="Installed Base Airport"></i>
@@ -1536,7 +1536,7 @@ function renderCountryAirportCard(ap) {
             <div class="flex items-center gap-2 min-w-0 flex-1">
                 <span class="text-xs font-mono font-black text-slate-400 shrink-0">${ap.icao}</span>
                 <span class="text-xs font-semibold text-slate-400 group-hover:text-cyan-300 truncate min-w-0">${t('country.search_freeware', 'Search Freeware on Flightsim.to')}</span>
-                <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">FREEWARE</span>
+                <span class="px-1.5 py-0.5 rounded-lg text-[9px] font-mono font-bold bg-cyan-600 text-white border-0">FREEWARE</span>
             </div>
             <div class="shrink-0 pl-2">
                 <i class="fa-regular fa-circle text-slate-600 text-sm group-hover:text-cyan-400" title="Search Freeware"></i>
@@ -1551,7 +1551,7 @@ function renderCountryAirportCard(ap) {
             <div class="flex items-center gap-2 min-w-0 flex-1">
                 <span class="text-xs font-mono font-black text-slate-400 shrink-0">${ap.icao}</span>
                 <span class="text-xs font-semibold text-slate-400 group-hover:text-purple-300 truncate min-w-0">${t('country.search_payware', 'Search Payware Stores')}</span>
-                <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-purple-500/10 text-purple-400 border border-purple-500/20">PAYWARE</span>
+                <span class="px-1.5 py-0.5 rounded-lg text-[9px] font-mono font-bold bg-purple-600 text-white border-0">PAYWARE</span>
             </div>
             <div class="shrink-0 pl-2">
                 <i class="fa-regular fa-circle text-slate-600 text-sm group-hover:text-purple-400" title="Search Payware Stores"></i>
@@ -2057,7 +2057,7 @@ async function loadAirportsData() {
 
         // GSX Audit Scan directly during the splash screen!
         if (window.pywebview && window.pywebview.api && window.pywebview.api.scan_gsx_audit) {
-            updateSplashProgress(75, "Auditing GSX Profiles...", "Virtuali GSX Profiles");
+            updateSplashProgress(75, "Scanning GSX profile files...", "Virtuali GSX Profiles");
             try {
                 const raw = await window.pywebview.api.scan_gsx_audit();
                 const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
@@ -2905,9 +2905,9 @@ function renderGsxAuditModal() {
     if (totalBadge) {
         totalBadge.innerText = `${totalIssues} Issue${totalIssues !== 1 ? 's' : ''}`;
         if (totalIssues > 0) {
-            totalBadge.className = 'text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-amber-950 text-amber-400 border border-amber-800';
+            totalBadge.className = 'text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg leading-tight bg-amber-500/20 text-amber-300 border-0';
         } else {
-            totalBadge.className = 'text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-emerald-950 text-emerald-400 border border-emerald-800';
+            totalBadge.className = 'text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg leading-tight bg-emerald-500/20 text-emerald-300 border-0';
         }
     }
 
@@ -2956,7 +2956,7 @@ function renderGsxAuditModal() {
         if (missingList.length === 0) {
             container.innerHTML = `
                 <div class="py-12 px-6 text-center space-y-2">
-                    <span class="text-[11px] font-mono font-bold px-3 py-1 rounded-xl bg-emerald-950 text-emerald-400 border border-emerald-800 inline-block">
+                    <span class="text-[11px] font-mono font-bold px-3 py-1 rounded-xl bg-emerald-500/20 text-emerald-300 border-0 inline-block">
                         ALL ADDONS HAVE GSX PROFILES
                     </span>
                     <p class="text-xs font-mono text-slate-400">All scanned custom airport sceneries currently have an active GSX profile.</p>
@@ -2971,11 +2971,11 @@ function renderGsxAuditModal() {
             const location = [item.city, item.country].filter(Boolean).join(', ');
             let pricingBadge = '';
             if (item.pricing_type === 'Payware') {
-                pricingBadge = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-purple-950 text-purple-400 border border-purple-800">PAYWARE</span>`;
+                pricingBadge = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-purple-600 text-white border-0">PAYWARE</span>`;
             } else if (item.pricing_type === 'Asobo') {
-                pricingBadge = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-amber-950 text-amber-400 border border-amber-800">ASOBO</span>`;
+                pricingBadge = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-amber-500 text-slate-950 border-0">ASOBO</span>`;
             } else {
-                pricingBadge = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-cyan-950 text-cyan-400 border border-cyan-800">FREEWARE</span>`;
+                pricingBadge = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-cyan-600 text-white border-0">FREEWARE</span>`;
             }
 
             const canPan = !!gsxAuditFloatingMode;
@@ -3003,7 +3003,7 @@ function renderGsxAuditModal() {
                         </div>
                         <div class="flex items-center gap-1.5 shrink-0">
                             ${pricingBadge}
-                            <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-slate-900 text-slate-400 border border-slate-700">NO PROFILE</span>
+                            <span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-slate-800 text-slate-300 border-0">NO PROFILE</span>
                         </div>
                     </div>
 
@@ -3012,24 +3012,25 @@ function renderGsxAuditModal() {
                             ${escapeHtml(item.vendor ? `Studio: ${item.vendor}` : 'Custom MSFS Scenery')}
                         </div>
                         <div class="flex items-center gap-2 shrink-0">
-                            <!-- Drop pill to the left of Search -->
+                            <!-- Drop zone enlarged for easy dragging -->
                             <div id="gsx-dropzone-${icao}"
                                  ondragover="handleGsxAuditDragOver(event, '${icao}')"
                                  ondragleave="handleGsxAuditDragLeave(event, '${icao}')"
                                  ondrop="handleGsxAuditDrop(event, '${icao}')"
                                  onclick="installGsxProfileFromModal('${icao}')"
-                                 class="px-2.5 py-1.5 rounded-xl bg-slate-950/80 border border-dashed border-slate-700 hover:border-cyan-400 hover:bg-cyan-950/30 flex flex-col items-center justify-center text-center cursor-pointer transition-all group shrink-0"
+                                 class="px-4 py-2 min-w-[130px] h-10 rounded-xl bg-slate-950 border-2 border-dashed border-slate-700 hover:border-cyan-400 hover:bg-cyan-950/30 flex flex-col items-center justify-center text-center cursor-pointer transition-all group shrink-0"
                                  title="Drop .ini or archive (.zip) here, or click to browse">
-                                <span class="text-[9px] font-mono font-bold text-slate-300 group-hover:text-cyan-300 transition-colors pointer-events-none leading-none">
-                                    DROP .INI / .ZIP
+                                <span class="text-[10px] font-mono font-bold text-slate-200 group-hover:text-cyan-300 transition-colors pointer-events-none leading-none flex items-center gap-1.5">
+                                    <i class="fa-solid fa-file-arrow-up text-[11px] text-cyan-400"></i> DROP .INI / .ZIP
                                 </span>
-                                <span class="text-[8px] font-mono text-slate-500 group-hover:text-slate-400 transition-colors pointer-events-none leading-tight mt-0.5">
-                                    or browse
+                                <span class="text-[8px] font-mono text-slate-400 group-hover:text-slate-300 transition-colors pointer-events-none leading-tight mt-0.5">
+                                    or browse file
                                 </span>
                             </div>
 
-                            <button onclick="searchGsxProfileFromModal('${icao}')" class="text-[10px] font-mono font-bold px-3 py-2 rounded-xl leading-tight bg-cyan-950 hover:bg-cyan-900 text-cyan-300 hover:text-cyan-200 border border-cyan-800 cursor-pointer transition-colors shrink-0" title="Search matching GSX profile on Flightsim.to">
-                                Search GSX on Flightsim.to
+                            <button onclick="searchGsxProfileFromModal('${icao}')" class="text-[10px] font-mono font-bold px-3.5 py-2.5 h-10 rounded-xl leading-tight bg-cyan-700 hover:bg-cyan-600 text-white border-0 cursor-pointer transition-colors shrink-0 flex items-center gap-1.5" title="Search matching GSX profile on Flightsim.to">
+                                <i class="fa-solid fa-magnifying-glass text-[10px]"></i>
+                                <span>Search GSX on Flightsim.to</span>
                             </button>
                         </div>
                     </div>
@@ -3202,7 +3203,7 @@ function renderGsxAuditModal() {
         if (totalIssues === 0) {
             container.innerHTML = `
                 <div class="py-12 px-6 text-center space-y-2">
-                    <span class="text-[11px] font-mono font-bold px-3 py-1 rounded-xl bg-emerald-950 text-emerald-400 border border-emerald-800 inline-block">
+                    <span class="text-[11px] font-mono font-bold px-3 py-1 rounded-xl bg-emerald-500/20 text-emerald-300 border-0 inline-block">
                         PROFILES IN PERFECT SYNC
                     </span>
                     <p class="text-xs font-mono text-slate-400">Zero conflicts or mismatches detected among your GSX profiles.</p>
@@ -3211,7 +3212,7 @@ function renderGsxAuditModal() {
         } else {
             container.innerHTML = `
                 <div class="py-12 px-6 text-center space-y-2">
-                    <span class="text-[11px] font-mono font-bold px-3 py-1 rounded-xl bg-slate-800 text-slate-400 border border-slate-700 inline-block">
+                    <span class="text-[11px] font-mono font-bold px-3 py-1 rounded-xl bg-slate-800 text-slate-400 border-0 inline-block">
                         NO RESULTS MATCHING FILTER
                     </span>
                     <p class="text-xs font-mono text-slate-400">Try selecting another filter tab or clearing your search term.</p>
@@ -3231,15 +3232,15 @@ function renderGsxAuditModal() {
 
         let badgeHtml = '';
         if (entry.status === 'DUPLICATE') {
-            badgeHtml = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-amber-950 text-amber-400 border border-amber-800">DUPLICATE</span>`;
+            badgeHtml = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-amber-600 text-white border-0">DUPLICATE</span>`;
         } else if (entry.status === 'MISMATCH_DEFAULT') {
-            badgeHtml = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-rose-950 text-rose-400 border border-rose-800">MISMATCH DEFAULT</span>`;
+            badgeHtml = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-rose-600 text-white border-0">MISMATCH DEFAULT</span>`;
         } else if (entry.status === 'MISMATCH_STUDIO') {
-            badgeHtml = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-rose-950 text-rose-400 border border-rose-800">MISMATCH STUDIO</span>`;
+            badgeHtml = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-rose-600 text-white border-0">MISMATCH STUDIO</span>`;
         } else if (entry.status === 'ORPHAN') {
-            badgeHtml = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-slate-900 text-slate-400 border border-slate-700">ORPHAN</span>`;
+            badgeHtml = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-slate-800 text-slate-400 border-0">ORPHAN</span>`;
         } else {
-            badgeHtml = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-slate-800 text-slate-300 border border-slate-700">${escapeHtml(entry.status)}</span>`;
+            badgeHtml = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-slate-800 text-slate-300 border-0">${escapeHtml(entry.status)}</span>`;
         }
 
         const canPan = !!gsxAuditFloatingMode;
@@ -3287,17 +3288,17 @@ function renderGsxAuditModal() {
                 let vdgsBadge = '';
                 let vdgsNote = '';
                 if (vdgsType === 'Aerosoft VDGS') {
-                    vdgsBadge = `<span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded leading-tight bg-sky-950 text-sky-400 border border-sky-800 shrink-0">Aerosoft VDGS</span>`;
+                    vdgsBadge = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg leading-tight bg-sky-700 text-white border-0 shrink-0">Aerosoft VDGS</span>`;
                     vdgsNote = `<span class="text-sky-400 font-mono text-[10px] block mt-0.5">Use if airport has native Aerosoft VDGS docking enabled</span>`;
                 } else if (vdgsType === 'GSX SafeDock') {
-                    vdgsBadge = `<span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded leading-tight bg-indigo-950 text-indigo-300 border border-indigo-800 shrink-0">GSX SafeDock</span>`;
+                    vdgsBadge = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg leading-tight bg-indigo-600 text-white border-0 shrink-0">GSX SafeDock</span>`;
                     vdgsNote = `<span class="text-indigo-300 font-mono text-[10px] block mt-0.5">Uses GSX native SafeDock guidance system</span>`;
                 }
 
                 let recBadge = '';
                 let recNote = '';
                 if (isRecommended) {
-                    recBadge = `<span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded leading-tight bg-emerald-950 text-emerald-400 border border-emerald-800 shrink-0">RECOMMENDED</span>`;
+                    recBadge = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg leading-tight bg-emerald-600 text-white border-0 shrink-0">RECOMMENDED</span>`;
                     if (f.recommend_reason) {
                         recNote = `<span class="text-emerald-400 font-mono text-[10px] font-bold block mt-0.5">${escapeHtml(f.recommend_reason)}</span>`;
                     }
@@ -3320,7 +3321,7 @@ function renderGsxAuditModal() {
                                 <span class="text-xs font-mono font-bold text-slate-200 truncate">${escapeHtml(f.filename)}</span>
                                 ${recBadge}
                                 ${vdgsBadge}
-                                ${isActive ? `<span class="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded leading-tight bg-slate-900 text-slate-400 border border-slate-700">ACTIVE</span>` : `<span class="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded leading-tight bg-slate-950 text-slate-600 border border-slate-900">DISABLED</span>`}
+                                ${isActive ? `<span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded-lg leading-tight bg-slate-800 text-slate-300 border-0">ACTIVE</span>` : `<span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded-lg leading-tight bg-slate-950 text-slate-600 border-0">DISABLED</span>`}
                             </div>
                             <div class="text-[11px] font-mono text-slate-400 truncate mt-0.5">${escapeHtml(meta)}</div>
                             ${recNote}
@@ -3328,14 +3329,14 @@ function renderGsxAuditModal() {
                         </div>
                         <div class="flex items-center gap-1.5 shrink-0">
                             <button onclick="activateGsxDuplicateFromModal('${icao}', '${escapeJsStr(f.filename)}')"
-                                    class="text-[10px] font-mono font-bold px-2.5 py-1 rounded-xl leading-tight ${isRecommended ? 'bg-emerald-700 hover:bg-emerald-600 text-white shadow-sm' : 'bg-cyan-900 hover:bg-cyan-800 text-cyan-200 border border-cyan-700'} cursor-pointer transition-colors"
+                                    class="text-[10px] font-mono font-bold px-3 py-1.5 rounded-xl leading-tight ${isRecommended ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm' : 'bg-cyan-700 hover:bg-cyan-600 text-white border-0'} cursor-pointer transition-colors"
                                     title="Keep this profile and disable conflicting duplicates">
                                 Keep this
                             </button>
                             ${isActive ? `
-                                <button onclick="disableGsxProfileFromModal('${icao}', '${escapeJsStr(f.filename)}')" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 border border-slate-700 cursor-pointer transition-colors" title="Disable this profile">Disable</button>
+                                <button onclick="disableGsxProfileFromModal('${icao}', '${escapeJsStr(f.filename)}')" class="text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg leading-tight bg-slate-800 hover:bg-rose-600 text-slate-400 hover:text-white border-0 cursor-pointer transition-colors" title="Disable this profile">Disable</button>
                             ` : ''}
-                            <button onclick="revealGsxFileInExplorer('${escapeJsStr(f.path || f.filename)}')" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 cursor-pointer transition-colors" title="Reveal in Windows Explorer">Reveal</button>
+                            <button onclick="revealGsxFileInExplorer('${escapeJsStr(f.path || f.filename)}')" class="text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg leading-tight bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border-0 cursor-pointer transition-colors" title="Reveal in Windows Explorer">Reveal</button>
                         </div>
                     </div>
                 `;
@@ -3349,13 +3350,13 @@ function renderGsxAuditModal() {
                          ondragleave="handleGsxAuditDragLeave(event, '${icao}')"
                          ondrop="handleGsxAuditDrop(event, '${icao}')"
                          onclick="installGsxProfileFromModal('${icao}')"
-                         class="px-2.5 py-1.5 rounded-xl bg-slate-950/80 border border-dashed border-slate-700 hover:border-cyan-400 hover:bg-cyan-950/30 flex flex-col items-center justify-center text-center cursor-pointer transition-all group shrink-0"
+                         class="px-4 py-2 min-w-[130px] h-10 rounded-xl bg-slate-950 border-2 border-dashed border-slate-700 hover:border-cyan-400 hover:bg-cyan-950/30 flex flex-col items-center justify-center text-center cursor-pointer transition-all group shrink-0"
                          title="Drop new profile .ini or archive (.zip) here, or click to browse">
-                        <span class="text-[9px] font-mono font-bold text-slate-300 group-hover:text-cyan-300 transition-colors pointer-events-none leading-none">
-                            DROP .INI / .ZIP
+                        <span class="text-[10px] font-mono font-bold text-slate-200 group-hover:text-cyan-300 transition-colors pointer-events-none leading-none flex items-center gap-1.5">
+                            <i class="fa-solid fa-file-arrow-up text-[11px] text-cyan-400"></i> DROP .INI / .ZIP
                         </span>
-                        <span class="text-[8px] font-mono text-slate-500 group-hover:text-slate-400 transition-colors pointer-events-none leading-tight mt-0.5">
-                            or browse
+                        <span class="text-[8px] font-mono text-slate-400 group-hover:text-slate-300 transition-colors pointer-events-none leading-tight mt-0.5">
+                            or browse file
                         </span>
                     </div>
                 </div>
@@ -3383,27 +3384,28 @@ function renderGsxAuditModal() {
             }
             html += `
                 <div class="flex items-center justify-end gap-2 pt-1 border-t border-slate-800/60 flex-wrap sm:flex-nowrap">
-                    <!-- Drop pill to the left of Search -->
+                    <!-- Drop zone enlarged for easy dragging -->
                     <div id="gsx-dropzone-${icao}"
                          ondragover="handleGsxAuditDragOver(event, '${icao}')"
                          ondragleave="handleGsxAuditDragLeave(event, '${icao}')"
                          ondrop="handleGsxAuditDrop(event, '${icao}')"
                          onclick="installGsxProfileFromModal('${icao}')"
-                         class="px-2.5 py-1.5 rounded-xl bg-slate-950/80 border border-dashed border-slate-700 hover:border-cyan-400 hover:bg-cyan-950/30 flex flex-col items-center justify-center text-center cursor-pointer transition-all group shrink-0"
+                         class="px-4 py-2 min-w-[130px] h-10 rounded-xl bg-slate-950 border-2 border-dashed border-slate-700 hover:border-cyan-400 hover:bg-cyan-950/30 flex flex-col items-center justify-center text-center cursor-pointer transition-all group shrink-0"
                          title="Drop replacement .ini or archive (.zip) here, or click to browse">
-                        <span class="text-[9px] font-mono font-bold text-slate-300 group-hover:text-cyan-300 transition-colors pointer-events-none leading-none">
-                            DROP .INI / .ZIP
+                        <span class="text-[10px] font-mono font-bold text-slate-200 group-hover:text-cyan-300 transition-colors pointer-events-none leading-none flex items-center gap-1.5">
+                            <i class="fa-solid fa-file-arrow-up text-[11px] text-cyan-400"></i> DROP .INI / .ZIP
                         </span>
-                        <span class="text-[8px] font-mono text-slate-500 group-hover:text-slate-400 transition-colors pointer-events-none leading-tight mt-0.5">
-                            or browse
+                        <span class="text-[8px] font-mono text-slate-400 group-hover:text-slate-300 transition-colors pointer-events-none leading-tight mt-0.5">
+                            or browse file
                         </span>
                     </div>
 
-                    <button onclick="searchGsxProfileFromModal('${icao}')" class="text-[10px] font-mono font-bold px-3 py-2 rounded-xl leading-tight bg-cyan-950 hover:bg-cyan-900 text-cyan-300 hover:text-cyan-200 border border-cyan-800 cursor-pointer transition-colors shrink-0" title="Search matching GSX profile on Flightsim.to">
-                        Search GSX on Flightsim.to
+                    <button onclick="searchGsxProfileFromModal('${icao}')" class="text-[10px] font-mono font-bold px-3.5 py-2.5 h-10 rounded-xl leading-tight bg-cyan-700 hover:bg-cyan-600 text-white border-0 cursor-pointer transition-colors shrink-0 flex items-center gap-1.5" title="Search matching GSX profile on Flightsim.to">
+                        <i class="fa-solid fa-magnifying-glass text-[10px]"></i>
+                        <span>Search GSX on Flightsim.to</span>
                     </button>
                     ${activeFile && !activeFile.is_disabled ? `
-                        <button onclick="disableGsxProfileFromModal('${icao}', '${escapeJsStr(activeFile.filename)}')" class="text-[10px] font-mono font-bold px-3 py-2 rounded-xl leading-tight bg-slate-800 hover:bg-rose-950 text-slate-300 hover:text-rose-400 border border-slate-700 cursor-pointer transition-colors shrink-0" title="Disable mismatched profile">
+                        <button onclick="disableGsxProfileFromModal('${icao}', '${escapeJsStr(activeFile.filename)}')" class="text-[10px] font-mono font-bold px-3 py-2.5 h-10 rounded-xl leading-tight bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white border-0 cursor-pointer transition-colors shrink-0" title="Disable mismatched profile">
                             Disable Profile
                         </button>
                     ` : ''}
@@ -6767,7 +6769,7 @@ function renderRadialGsx(ap) {
                         <button onclick="revealGsxFile('${safeGsxPath}')" title="Reveal in Windows Explorer" class="w-7 h-7 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs border border-slate-700/60 cursor-pointer shrink-0 transition-colors flex items-center justify-center">
                             <i class="fa-solid fa-folder-open text-xs"></i>
                         </button>
-                        <button onclick="openGsxAuditFromDetails()" title="Open GSX Profiles Audit list on map" class="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-cyan-950 text-slate-300 hover:text-cyan-300 border border-slate-700/60 hover:border-cyan-700 text-[10px] font-mono font-bold cursor-pointer shrink-0 transition-colors">
+                        <button onclick="openGsxAuditFromDetails()" title="Open GSX Profiles Details on map" class="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-cyan-950 text-slate-300 hover:text-cyan-300 border border-slate-700/60 hover:border-cyan-700 text-[10px] font-mono font-bold cursor-pointer shrink-0 transition-colors">
                             VIEW LIST
                         </button>
                     </div>
@@ -6781,7 +6783,7 @@ function renderRadialGsx(ap) {
             <div class="space-y-1.5">
                 <div class="p-2 rounded-xl bg-amber-950/40 border border-amber-900/60 text-[11px] font-mono text-amber-200 leading-tight flex items-center justify-between gap-2">
                     <span>${activeEntries.length} active profiles found:</span>
-                    <button onclick="openGsxAuditFromDetails('DUPLICATE')" title="Open GSX Profiles Audit list on map" class="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-cyan-950 text-slate-300 hover:text-cyan-300 border border-slate-700/60 hover:border-cyan-700 text-[9px] font-mono font-bold cursor-pointer shrink-0 transition-colors">
+                    <button onclick="openGsxAuditFromDetails('DUPLICATE')" title="Open GSX Profiles Details on map" class="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-cyan-950 text-slate-300 hover:text-cyan-300 border border-slate-700/60 hover:border-cyan-700 text-[9px] font-mono font-bold cursor-pointer shrink-0 transition-colors">
                         VIEW LIST
                     </button>
                 </div>
@@ -6843,7 +6845,7 @@ function renderRadialGsx(ap) {
                             <button onclick="revealGsxFile('${safePath}')" title="Reveal in Windows Explorer" class="w-7 h-7 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs border border-slate-700/60 cursor-pointer shrink-0 transition-colors flex items-center justify-center">
                                 <i class="fa-solid fa-folder-open text-xs"></i>
                             </button>
-                            <button onclick="openGsxAuditFromDetails('MISMATCH')" title="Open GSX Profiles Audit list on map" class="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-cyan-950 text-slate-300 hover:text-cyan-300 border border-slate-700/60 hover:border-cyan-700 text-[10px] font-mono font-bold cursor-pointer shrink-0 transition-colors">
+                            <button onclick="openGsxAuditFromDetails('MISMATCH')" title="Open GSX Profiles Details on map" class="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-cyan-950 text-slate-300 hover:text-cyan-300 border border-slate-700/60 hover:border-cyan-700 text-[10px] font-mono font-bold cursor-pointer shrink-0 transition-colors">
                                 VIEW LIST
                             </button>
                         </div>
@@ -6860,7 +6862,7 @@ function renderRadialGsx(ap) {
             <div class="space-y-1.5">
                 <div class="p-2 rounded-xl bg-slate-900/60 border border-slate-800 text-[11px] font-mono text-slate-400 leading-tight flex items-center justify-between gap-2">
                     <span>Profile currently disabled (.disabled).</span>
-                    <button onclick="openGsxAuditFromDetails('DISABLED')" title="Open GSX Profiles Audit list on map" class="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-cyan-950 text-slate-300 hover:text-cyan-300 border border-slate-700/60 hover:border-cyan-700 text-[9px] font-mono font-bold cursor-pointer shrink-0 transition-colors">
+                    <button onclick="openGsxAuditFromDetails('DISABLED')" title="Open GSX Profiles Details on map" class="px-2 py-0.5 rounded-lg bg-slate-800 hover:bg-cyan-950 text-slate-300 hover:text-cyan-300 border border-slate-700/60 hover:border-cyan-700 text-[9px] font-mono font-bold cursor-pointer shrink-0 transition-colors">
                         VIEW LIST
                     </button>
                 </div>
@@ -6892,7 +6894,7 @@ function renderRadialGsx(ap) {
                         <button onclick="triggerRadialSearchGsxProfile()" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-cyan-400 hover:text-white text-[10px] font-mono font-bold border border-slate-700/60 cursor-pointer">
                             Search Flightsim.to
                         </button>
-                        <button onclick="openGsxAuditFromDetails('NO_PROFILE')" title="Open GSX Profiles Audit list on map" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-cyan-950 text-slate-300 hover:text-cyan-300 border border-slate-700/60 hover:border-cyan-700 text-[10px] font-mono font-bold cursor-pointer shrink-0 transition-colors">
+                        <button onclick="openGsxAuditFromDetails('NO_PROFILE')" title="Open GSX Profiles Details on map" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-cyan-950 text-slate-300 hover:text-cyan-300 border border-slate-700/60 hover:border-cyan-700 text-[10px] font-mono font-bold cursor-pointer shrink-0 transition-colors">
                             VIEW LIST
                         </button>
                     </div>
@@ -11045,7 +11047,7 @@ function getFilterRadialCategoryItems(categoryKey) {
             { id: 'all', label: 'All Profiles', isActive: selectedGsxFilter === 'all' },
             { id: 'with', label: 'With GSX', isActive: selectedGsxFilter === 'with' },
             { id: 'none', label: 'No Profile', isActive: selectedGsxFilter === 'none' },
-            { id: 'audit', label: 'Audit Hub', isActive: false }
+            { id: 'audit', label: 'Profiles Details', isActive: false }
         ];
     } else if (categoryKey === 'rating') {
         const createStarHtml = (ratingVal) => {
@@ -11419,7 +11421,7 @@ async function startGsxScanPhase(isStartup = false) {
         phaseGsx.classList.remove('hidden');
         if (bar) bar.style.width = '20%';
         if (pct) pct.innerText = '20%';
-        if (detail) detail.innerText = 'Auditing %APPDATA%\\Virtuali\\GSX\\MSFS profiles...';
+        if (detail) detail.innerText = 'Scanning GSX profile files in %APPDATA%\\Virtuali\\GSX\\MSFS...';
         modal.classList.remove('hidden');
     }
 
@@ -11444,9 +11446,9 @@ async function startGsxScanPhase(isStartup = false) {
         if (bar) bar.style.width = '100%';
         if (pct) pct.innerText = '100%';
         if (detail && s) {
-            detail.innerText = `Audit complete: ${s.total_files} profiles (${s.matched} matched, ${s.duplicate} duplicates, ${s.mismatch} mismatches, ${s.orphan} orphans).`;
+            detail.innerText = `Scan complete: ${s.total_files} profiles (${s.matched} matched, ${s.duplicate} duplicates, ${s.mismatch} mismatches, ${s.orphan} orphans).`;
         } else {
-            if (detail) detail.innerText = 'GSX profiles audit complete.';
+            if (detail) detail.innerText = 'GSX profiles scan complete.';
         }
 
         // Brief smooth display of the completed GSX scan
@@ -11642,7 +11644,7 @@ function displayScanResults(delta, isStartup = false) {
                         <div class="text-xs font-bold uppercase tracking-wider text-purple-300">
                             <span>${t('rescan.section_gsx', 'GSX Profiles')}</span>
                         </div>
-                        <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-purple-950/60 text-purple-300 border border-purple-800/40">${totalGsx}</span>
+                        <span class="text-xs font-bold px-2.5 py-0.5 rounded-full bg-purple-600 text-white border-0">${totalGsx}</span>
                     </div>
                     <div class="space-y-2">
                         ${addedGsx.map(item => renderGsxCard(item, true)).join('')}
@@ -12850,7 +12852,7 @@ function updateFlightModeBannerUI(flightMode) {
             disabledText.innerText = `${currentFlightMode.disabled_count || 0} sceneries isolated`;
         }
         if (importBtn) {
-            importBtn.className = "w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-red-500/30 via-amber-500/30 to-orange-500/30 hover:from-red-500/40 hover:to-orange-500/40 border border-amber-500/60 text-amber-200 font-extrabold text-xs transition-all flex items-center justify-center gap-2 shadow-md shadow-amber-500/10 active:scale-98 cursor-pointer";
+            importBtn.className = "w-full py-2.5 px-3 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-200 font-extrabold text-xs transition-all flex items-center justify-center gap-2 active:scale-98 cursor-pointer";
             importBtn.onclick = function() { restoreAllFlightSceneriesUI(); };
             importBtn.innerHTML = `<i class="fa-solid fa-power-off text-amber-400"></i> <span>Exit Flight Mode & Restore Sceneries</span>`;
         }
@@ -12861,7 +12863,7 @@ function updateFlightModeBannerUI(flightMode) {
         }
         if (routeInfo) routeInfo.classList.add('hidden');
         if (importBtn) {
-            importBtn.className = "w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500/20 to-orange-500/20 hover:from-amber-500/30 hover:to-orange-500/30 border border-amber-500/40 text-amber-300 font-extrabold text-xs transition-all flex items-center justify-center gap-2 shadow-sm shadow-amber-500/10 active:scale-98 cursor-pointer";
+            importBtn.className = "w-full py-2.5 px-3 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-300 font-extrabold text-xs transition-all flex items-center justify-center gap-2 active:scale-98 cursor-pointer";
             importBtn.onclick = function() { triggerSimBriefImport(); };
             importBtn.innerHTML = `<i id="sb-import-icon" class="fa-solid fa-cloud-arrow-down text-amber-400"></i> <span>Import Active SimBrief OFP</span>`;
         }
