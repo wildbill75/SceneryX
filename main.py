@@ -2505,8 +2505,32 @@ class Api:
 
             prices = get_fsto_prices()
 
+            def find_fsto_price(slug, code_val):
+                if not prices or not slug:
+                    return None
+                if slug in prices:
+                    return prices[slug]
+                slug_tokens = set(re.split(r'[-_\s]+', slug.lower()))
+                for k, v in prices.items():
+                    k_tokens = set(re.split(r'[-_\s]+', k.lower()))
+                    if slug_tokens == k_tokens:
+                        return v
+                code_low_val = code_val.lower()
+                best_match = None
+                best_score = 0
+                for k, v in prices.items():
+                    k_tokens = set(re.split(r'[-_\s]+', k.lower()))
+                    if code_low_val in k_tokens:
+                        overlap = len(slug_tokens & k_tokens)
+                        if overlap > best_score:
+                            best_score = overlap
+                            best_match = v
+                if best_match and best_score >= 3:
+                    return best_match
+                return None
+
             # Prioritize candidates that have an available price in prices map
-            candidates.sort(key=lambda it: 0 if prices.get(it.get('slug')) else 1)
+            candidates.sort(key=lambda it: 0 if find_fsto_price(it.get('slug'), code) else 1)
 
             for it in candidates:
                 title = it.get('title', '')
@@ -2537,7 +2561,7 @@ class Api:
                     continue
 
                 price_val, curr = None, ""
-                p_info = prices.get(slug, {})
+                p_info = find_fsto_price(slug, code)
                 if p_info:
                     raw_us = p_info.get('US', '')
                     raw_fr = p_info.get('FR', '')
