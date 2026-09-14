@@ -1232,11 +1232,11 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
             'files': parsed_files
         }
 
-    # Detect installed airports without any active GSX profile
+    # Detect installed airports without any GSX profile (active or disabled)
     installed_missing = []
     for icao, ap in installed_map.items():
-        has_active = icao in by_icao and any(not f['is_disabled'] for f in by_icao[icao])
-        if not has_active:
+        has_profile = icao in by_icao and len(by_icao[icao]) > 0
+        if not has_profile:
             pt = ap.get('pricing_type', '')
             is_payware = bool(ap.get('is_payware') or pt == 'Payware')
             is_asobo = bool(ap.get('is_asobo_official') or pt == 'Asobo' or (ap.get('vendor') == 'Microsoft / Asobo'))

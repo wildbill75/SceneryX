@@ -2545,14 +2545,7 @@ let gsxAuditModalOffset = { x: 0, y: 0 };
 
 function toggleGsxIncludeAsobo(event) {
     gsxIncludeAsobo = !!(event && event.target && event.target.checked);
-    const audit = window.gsxAuditData;
-    const s = audit && audit.summary ? audit.summary : {};
-    const cNoProf = document.getElementById('gsx-count-noprofile');
-    if (cNoProf) {
-        const missingAddons = s.missing_addons || 0;
-        const missingAsobo = s.missing_asobo || 0;
-        cNoProf.innerText = missingAddons + (gsxIncludeAsobo ? missingAsobo : 0);
-    }
+    updateGsxHeaderAndTabBadges();
     renderGsxAuditModal();
 }
 
@@ -2888,13 +2881,21 @@ function renderGsxAuditModal() {
     const duplicateCount = s.duplicate || 0;
     const mismatchCount = s.mismatch || 0;
     const orphanCount = s.orphan || 0;
-    const missingAddons = s.missing_addons || 0;
-    const missingAsobo = s.missing_asobo || 0;
-    const missingVisible = missingAddons + (gsxIncludeAsobo ? missingAsobo : 0);
+
+    const disabledIcaos = new Set((audit.disabled_profiles || []).map(d => d.icao).filter(Boolean));
+    Object.keys(audit.by_icao || {}).forEach(k => {
+        if (audit.by_icao[k].status === 'DISABLED') disabledIcaos.add(k);
+    });
+
+    const disabledCount = (audit.disabled_profiles || []).length || (s.disabled || 0);
+    const rawMissingList = (audit.missing_profiles || []).filter(m => !disabledIcaos.has(m.icao));
+    const missingAddons = rawMissingList.filter(m => !m.is_asobo).length;
+    const missingAsobo = (audit.missing_profiles || []).filter(m => !disabledIcaos.has(m.icao) && m.is_asobo).length;
+    const missingVisible = rawMissingList.filter(m => gsxIncludeAsobo || !m.is_asobo).length;
     const totalIssues = duplicateCount + mismatchCount + orphanCount;
 
     const totalActiveProfiles = Object.keys(audit.by_icao || {}).filter(k => audit.by_icao[k].status !== 'DISABLED').length;
-    const totalAllCount = totalActiveProfiles + (s.disabled || 0) + missingVisible;
+    const totalAllCount = totalActiveProfiles + disabledCount + missingVisible;
 
     const totalBadge = document.getElementById('gsx-audit-total-badge');
     if (totalBadge) {
@@ -2919,7 +2920,7 @@ function renderGsxAuditModal() {
     const cOrp = document.getElementById('gsx-count-orphan');
     if (cOrp) cOrp.innerText = orphanCount;
     const cDis = document.getElementById('gsx-count-disabled');
-    if (cDis) cDis.innerText = s.disabled || 0;
+    if (cDis) cDis.innerText = disabledCount;
     const cNoProf = document.getElementById('gsx-count-noprofile');
     if (cNoProf) cNoProf.innerText = missingVisible;
     const cAsobo = document.getElementById('gsx-count-asobo');
@@ -2939,7 +2940,7 @@ function renderGsxAuditModal() {
 
     // SPECIAL HANDLING: NO_PROFILE TAB
     if (currentGsxAuditFilter === 'NO_PROFILE') {
-        let missingList = audit.missing_profiles || [];
+        let missingList = (audit.missing_profiles || []).filter(m => !disabledIcaos.has(m.icao));
         if (!gsxIncludeAsobo) {
             missingList = missingList.filter(m => !m.is_asobo);
         }
@@ -3164,7 +3165,7 @@ function renderGsxAuditModal() {
     let entries = Object.values(audit.by_icao || {}).filter(e => e.status !== 'DISABLED');
 
     if (currentGsxAuditFilter === 'ALL') {
-        let missingList = audit.missing_profiles || [];
+        let missingList = (audit.missing_profiles || []).filter(m => !disabledIcaos.has(m.icao));
         if (!gsxIncludeAsobo) {
             missingList = missingList.filter(m => !m.is_asobo);
         }
@@ -3181,7 +3182,7 @@ function renderGsxAuditModal() {
         }));
         entries = entries.concat(missingEntries);
 
-        if ((s.disabled || 0) > 0 && audit.disabled_profiles) {
+        if (disabledCount > 0 && audit.disabled_profiles) {
             const disabledEntries = audit.disabled_profiles.map(d => ({
                 icao: d.icao,
                 name: d.name,
@@ -3660,9 +3661,17 @@ function updateGsxHeaderAndTabBadges() {
     const duplicateCount = s.duplicate || 0;
     const mismatchCount = s.mismatch || 0;
     const orphanCount = s.orphan || 0;
-    const missingAddons = s.missing_addons || 0;
-    const missingAsobo = s.missing_asobo || 0;
-    const missingVisible = missingAddons + (gsxIncludeAsobo ? missingAsobo : 0);
+
+    const disabledIcaos = new Set((audit.disabled_profiles || []).map(d => d.icao).filter(Boolean));
+    Object.keys(audit.by_icao || {}).forEach(k => {
+        if (audit.by_icao[k].status === 'DISABLED') disabledIcaos.add(k);
+    });
+
+    const disabledCount = (audit.disabled_profiles || []).length || (s.disabled || 0);
+    const rawMissingList = (audit.missing_profiles || []).filter(m => !disabledIcaos.has(m.icao));
+    const missingAddons = rawMissingList.filter(m => !m.is_asobo).length;
+    const missingAsobo = (audit.missing_profiles || []).filter(m => !disabledIcaos.has(m.icao) && m.is_asobo).length;
+    const missingVisible = rawMissingList.filter(m => gsxIncludeAsobo || !m.is_asobo).length;
     const totalIssues = duplicateCount + mismatchCount + orphanCount;
 
     const totalBadge = document.getElementById('gsx-audit-total-badge');
@@ -3678,7 +3687,7 @@ function updateGsxHeaderAndTabBadges() {
     }
 
     const totalActiveProfiles = Object.keys(audit.by_icao || {}).filter(k => audit.by_icao[k].status !== 'DISABLED').length;
-    const totalAllCount = totalActiveProfiles + (s.disabled || 0) + missingVisible;
+    const totalAllCount = totalActiveProfiles + disabledCount + missingVisible;
     const cAll = document.getElementById('gsx-count-all');
     if (cAll) cAll.innerText = totalAllCount;
     const cActive = document.getElementById('gsx-count-active');
@@ -3690,7 +3699,7 @@ function updateGsxHeaderAndTabBadges() {
     const cOrp = document.getElementById('gsx-count-orphan');
     if (cOrp) cOrp.innerText = orphanCount;
     const cDis = document.getElementById('gsx-count-disabled');
-    if (cDis) cDis.innerText = s.disabled || 0;
+    if (cDis) cDis.innerText = disabledCount;
     const cNoProf = document.getElementById('gsx-count-noprofile');
     if (cNoProf) cNoProf.innerText = missingVisible;
     const cAsobo = document.getElementById('gsx-count-asobo');
