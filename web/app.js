@@ -10430,7 +10430,7 @@ function initDraggableFilterRadial() {
                 filterRadialHasMoved = true;
             }
 
-            const menuRadius = 280;
+            const menuRadius = 310;
             const margin = 10;
             const newX = Math.max(menuRadius + margin, Math.min(window.innerWidth - menuRadius - margin, filterRadialMenuInitialPos.x + dx));
             const newY = Math.max(menuRadius + margin, Math.min(window.innerHeight - menuRadius - margin, filterRadialMenuInitialPos.y + dy));
@@ -10472,7 +10472,7 @@ function openFilterRadialMenu(clientX, clientY) {
     initDraggableFilterRadial();
 
     // Viewport edge clamping
-    const menuSize = 560;
+    const menuSize = 620;
     const half = menuSize / 2;
     const margin = 15;
     const posX = Math.max(half + margin, Math.min(window.innerWidth - half - margin, clientX));
@@ -10530,26 +10530,36 @@ function handleFilterRadialCenterClick() {
 
 /**
  * Computes SVG path for an annular sector (pie slice with inner and outer radius)
+ * Calculates constant linear gap (gapPx) at both inner and outer edges for perfectly parallel seams
  */
-function getAnnularSectorPath(cx, cy, rIn, rOut, startAngleDeg, endAngleDeg, gapDeg = 2.0) {
-    const halfGap = gapDeg / 2;
-    const actualStart = startAngleDeg + halfGap;
-    const actualEnd = endAngleDeg - halfGap;
+function getAnnularSectorPath(cx, cy, rIn, rOut, startAngleDeg, endAngleDeg, gapPx = 4.0) {
+    const halfGapRadIn = (gapPx / 2) / rIn;
+    const halfGapRadOut = (gapPx / 2) / rOut;
+
+    const halfGapDegIn = halfGapRadIn * 180 / Math.PI;
+    const halfGapDegOut = halfGapRadOut * 180 / Math.PI;
+
+    const startDegIn = startAngleDeg + halfGapDegIn;
+    const endDegIn = endAngleDeg - halfGapDegIn;
+    const startDegOut = startAngleDeg + halfGapDegOut;
+    const endDegOut = endAngleDeg - halfGapDegOut;
 
     // Convert degrees to radians (0 deg = 12 o'clock / top)
-    const a1 = (actualStart - 90) * Math.PI / 180;
-    const a2 = (actualEnd - 90) * Math.PI / 180;
+    const a1 = (startDegOut - 90) * Math.PI / 180;
+    const a2 = (endDegOut - 90) * Math.PI / 180;
+    const a3 = (endDegIn - 90) * Math.PI / 180;
+    const a4 = (startDegIn - 90) * Math.PI / 180;
 
     const x1 = cx + rOut * Math.cos(a1);
     const y1 = cy + rOut * Math.sin(a1);
     const x2 = cx + rOut * Math.cos(a2);
     const y2 = cy + rOut * Math.sin(a2);
-    const x3 = cx + rIn * Math.cos(a2);
-    const y3 = cy + rIn * Math.sin(a2);
-    const x4 = cx + rIn * Math.cos(a1);
-    const y4 = cy + rIn * Math.sin(a1);
+    const x3 = cx + rIn * Math.cos(a3);
+    const y3 = cy + rIn * Math.sin(a3);
+    const x4 = cx + rIn * Math.cos(a4);
+    const y4 = cy + rIn * Math.sin(a4);
 
-    const angleDiff = actualEnd - actualStart;
+    const angleDiff = endAngleDeg - startAngleDeg;
     const largeArc = angleDiff > 180 ? 1 : 0;
 
     return `M ${x1.toFixed(2)} ${y1.toFixed(2)} ` +
@@ -10581,15 +10591,15 @@ function getFilterRadialCategoryItems(categoryKey) {
     } else if (categoryKey === 'region') {
         return [
             { id: 'all', label: 'All Regions', isActive: !selectedRegion },
-            { id: 'weurope', label: 'W. Europe', isActive: selectedRegion === 'weurope' },
-            { id: 'eeurope', label: 'E. Europe', isActive: selectedRegion === 'eeurope' },
-            { id: 'namerica', label: 'N. America', isActive: selectedRegion === 'namerica' },
-            { id: 'camerica_caribbean', label: 'C. America', isActive: selectedRegion === 'camerica_caribbean' },
-            { id: 'samerica', label: 'S. America', isActive: selectedRegion === 'samerica' },
+            { id: 'weurope', label: 'West Europe', isActive: selectedRegion === 'weurope' },
+            { id: 'eeurope', label: 'East Europe', isActive: selectedRegion === 'eeurope' },
+            { id: 'namerica', label: 'North America', isActive: selectedRegion === 'namerica' },
+            { id: 'camerica_caribbean', label: 'Central America', isActive: selectedRegion === 'camerica_caribbean' },
+            { id: 'samerica', label: 'South America', isActive: selectedRegion === 'samerica' },
             { id: 'asia', label: 'Asia', isActive: selectedRegion === 'asia' },
             { id: 'middleeast', label: 'Middle East', isActive: selectedRegion === 'middleeast' },
-            { id: 'nafrica', label: 'N. Africa', isActive: selectedRegion === 'nafrica' },
-            { id: 'ssafrica', label: 'SS. Africa', isActive: selectedRegion === 'ssafrica' },
+            { id: 'nafrica', label: 'North Africa', isActive: selectedRegion === 'nafrica' },
+            { id: 'ssafrica', label: 'Sub-Sahara Africa', isActive: selectedRegion === 'ssafrica' },
             { id: 'oceania', label: 'Oceania', isActive: selectedRegion === 'oceania' },
             { id: 'pacific', label: 'Pacific', isActive: selectedRegion === 'pacific' }
         ];
@@ -10598,7 +10608,7 @@ function getFilterRadialCategoryItems(categoryKey) {
             { id: 'all', label: 'All Types', isActive: selectedTypes.size === ALL_TYPES_LIST.length },
             { id: 'International', label: 'International', isActive: selectedTypes.has('International') },
             { id: 'Regional', label: 'Regional', isActive: selectedTypes.has('Regional') },
-            { id: 'General Aviation', label: 'General Av.', isActive: selectedTypes.has('General Aviation') },
+            { id: 'General Aviation', label: 'General Aviation', isActive: selectedTypes.has('General Aviation') },
             { id: 'Heli / Water', label: 'Heli / Water', isActive: selectedTypes.has('Heli / Water') }
         ];
     } else if (categoryKey === 'gsx') {
@@ -10622,23 +10632,11 @@ function getFilterRadialCategoryItems(categoryKey) {
 }
 
 /**
- * Formats radial labels across 2 lines when appropriate to avoid border overflow
+ * Formats radial labels on a single line
  */
 function formatFilterRadialLabel(label) {
     if (!label) return '';
-    const trimmed = label.trim();
-    if (trimmed.includes(' / ')) {
-        const parts = trimmed.split(' / ');
-        return `${escapeHtml(parts[0])} /<br>${escapeHtml(parts[1])}`;
-    }
-    const words = trimmed.split(/\s+/);
-    if (words.length === 2) {
-        return `${escapeHtml(words[0])}<br>${escapeHtml(words[1])}`;
-    }
-    if (words.length === 3 && (words[1] === '&' || words[1] === 'and')) {
-        return `${escapeHtml(words[0])}<br>${escapeHtml(words[1])} ${escapeHtml(words[2])}`;
-    }
-    return escapeHtml(trimmed);
+    return escapeHtml(label.trim());
 }
 
 /**
@@ -10658,19 +10656,20 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
 
     const count = currentlyFilteredAirports ? currentlyFilteredAirports.length : (allAirportsData ? allAirportsData.length : 0);
     hubEl.innerHTML = `
-        <div class="flex flex-col items-center justify-center pointer-events-none select-none">
-            <span class="text-[10px] font-black tracking-widest text-slate-400 uppercase leading-tight">MAP VIEW</span>
-            <span class="text-xs font-black font-mono text-cyan-400 leading-tight my-0.5">FILTERED BY</span>
-            <span class="text-[11px] font-mono font-bold text-slate-200 mt-1 bg-slate-900/80 px-2.5 py-0.5 rounded-full border border-slate-700/60 shadow-inner">${count} AP</span>
+        <div class="flex flex-col items-center justify-center pointer-events-none select-none text-center">
+            <span class="text-[10px] font-bold tracking-widest text-slate-400 uppercase leading-tight">MAP VIEW</span>
+            <span class="text-[10px] font-bold tracking-widest text-slate-400 uppercase leading-tight mt-0.5">FILTERED BY</span>
+            <span class="text-2xl font-black font-mono text-white leading-none mt-1.5 tracking-tight">${count}</span>
+            <span class="text-[9.5px] font-normal tracking-wider text-slate-400 uppercase leading-tight mt-0.5">AIRPORTS</span>
         </div>
     `;
 
-    const cx = 280;
-    const cy = 280;
-    const r1_in = 70;
-    const r1_out = 154;
-    const r2_in = 172;
-    const r2_out = 268;
+    const cx = 310;
+    const cy = 310;
+    const r1_in = 74;
+    const r1_out = 172;
+    const r2_in = 176;
+    const r2_out = 296;
 
     // --- TIER 1: INNER ANNULAR RING (6 MAIN CATEGORIES) ---
     let innerSvgHtml = '';
@@ -10678,7 +10677,7 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
         const startAngle = -120 + (idx * 60);
         const endAngle = startAngle + 60;
         const midAngle = (startAngle + endAngle) / 2;
-        const pathD = getAnnularSectorPath(cx, cy, r1_in, r1_out, startAngle, endAngle, 2.75);
+        const pathD = getAnnularSectorPath(cx, cy, r1_in, r1_out, startAngle, endAngle, 4.0);
 
         const midR = (r1_in + r1_out) / 2;
         const rad = (midAngle - 90) * Math.PI / 180;
@@ -10696,10 +10695,10 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
                onmouseleave="handleFilterRadialCategoryMouseLeave()"
                role="button" aria-label="${escapeHtml(cat.label)}">
                 <path class="radial-filter-sector-path" d="${pathD}" />
-                <foreignObject x="${(tx - 55).toFixed(1)}" y="${(ty - 26).toFixed(1)}" width="110" height="52" class="pointer-events-none">
+                <foreignObject x="${(tx - 60).toFixed(1)}" y="${(ty - 23).toFixed(1)}" width="120" height="46" class="pointer-events-none">
                     <div class="w-full h-full flex flex-col items-center justify-center text-center leading-none px-1">
-                        <span class="text-[9.5px] font-black tracking-wider uppercase leading-tight ${isCatActive ? 'text-cyan-400 font-extrabold' : 'text-slate-200 group-hover:text-white'}">${formattedCatLabel}</span>
-                        <span class="text-[8.5px] font-mono font-medium ${isCatActive ? 'text-cyan-300' : 'text-slate-400 group-hover:text-slate-200'} truncate max-w-[95px] mt-1">${escapeHtml(summary)}</span>
+                        <span class="text-[10px] font-black tracking-wider uppercase leading-tight whitespace-nowrap ${isCatActive ? 'text-white font-extrabold' : 'text-slate-200 group-hover:text-white'}">${formattedCatLabel}</span>
+                        <span class="text-[10px] font-mono font-bold ${isCatActive ? 'text-white' : 'text-sky-400'} truncate max-w-[110px] mt-1">${escapeHtml(summary)}</span>
                     </div>
                 </foreignObject>
             </g>
@@ -10715,7 +10714,7 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
 
         const itemCount = items.length;
         let itemSpan = 360 / itemCount;
-        let startAngle = -120;
+        let startAngle = -90;
 
         if (itemCount < 10) {
             // Fan out symmetrically centered on the active category (Screen 1 style)
@@ -10731,7 +10730,7 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
             const aStart = startAngle + (idx * itemSpan);
             const aEnd = aStart + itemSpan;
             const midAngle = (aStart + aEnd) / 2;
-            const pathD = getAnnularSectorPath(cx, cy, r2_in, r2_out, aStart, aEnd, 2.0);
+            const pathD = getAnnularSectorPath(cx, cy, r2_in, r2_out, aStart, aEnd, 4.0);
 
             const midR2 = (r2_in + r2_out) / 2;
             const rad = (midAngle - 90) * Math.PI / 180;
@@ -10762,9 +10761,9 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
                    onclick="handleFilterRadialSubItemClick('${filterRadialActiveCategory}', '${escapeJsStr(item.id)}')"
                    role="button" aria-label="${escapeHtml(item.label)}">
                     <path class="radial-filter-sector-path" d="${pathD}" />
-                    <foreignObject x="${(tx - 52).toFixed(1)}" y="${(ty - 24).toFixed(1)}" width="104" height="48" class="pointer-events-none">
+                    <foreignObject x="${(tx - 58).toFixed(1)}" y="${(ty - 18).toFixed(1)}" width="116" height="36" class="pointer-events-none">
                         <div class="w-full h-full flex items-center justify-center text-center px-1">
-                            <span class="text-[10.5px] font-bold tracking-tight uppercase leading-tight ${isActive ? 'text-white font-extrabold' : (isAll ? 'text-slate-300 group-hover:text-white' : 'text-slate-200 group-hover:text-white')}">${formattedItemLabel}</span>
+                            <span class="text-[10px] font-bold tracking-tight uppercase leading-tight whitespace-nowrap ${isActive ? 'text-white font-extrabold' : (isAll ? 'text-slate-300 group-hover:text-white' : 'text-slate-200 group-hover:text-white')}">${formattedItemLabel}</span>
                         </div>
                     </foreignObject>
                 </g>
@@ -10821,7 +10820,7 @@ function handleFilterRadialCategoryHover(categoryKey) {
             filterRadialActiveCategory = categoryKey;
             renderFilterRadialWheel(true);
         }
-    }, 130);
+    }, 180);
 }
 
 function handleFilterRadialCategoryMouseLeave() {

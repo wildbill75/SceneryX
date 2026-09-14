@@ -518,7 +518,7 @@
 
         .radial-filter-tier2-sector {
             transform-box: view-box;
-            transform-origin: 280px 280px;
+            transform-origin: 310px 310px;
         }
 
         .radial-filter-tier2-sector.animate-sector-bounce {
@@ -528,7 +528,7 @@
         /* Radial Filter Sectors (Exact Color Match with Screen 1 .radial-sector-path) */
         .radial-filter-sector {
             transform-box: view-box;
-            transform-origin: 280px 280px;
+            transform-origin: 310px 310px;
         }
         .radial-filter-sector-path {
             fill: rgba(38, 46, 60, 0.82);
@@ -538,25 +538,34 @@
             transition: fill 0.18s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.18s cubic-bezier(0.4, 0, 0.2, 1);
             cursor: pointer;
         }
-        .radial-filter-sector:hover .radial-filter-sector-path {
+        /* Hover: White frosted glass across ALL sectors */
+        .radial-filter-sector:hover .radial-filter-sector-path,
+        .radial-filter-sector.is-category-active:hover .radial-filter-sector-path,
+        .radial-filter-sector.is-item-active:hover .radial-filter-sector-path {
             fill: rgba(255, 255, 255, 0.45) !important;
-            stroke: rgba(255, 255, 255, 0.90) !important;
+            stroke: rgba(255, 255, 255, 0.95) !important;
             stroke-width: 2.5px !important;
             filter: drop-shadow(0 0 16px rgba(255, 255, 255, 0.50)) !important;
         }
-        .radial-filter-sector:hover span {
+        .radial-filter-sector:hover span,
+        .radial-filter-sector.is-category-active:hover span,
+        .radial-filter-sector.is-item-active:hover span {
             color: #ffffff !important;
-            text-shadow: 0 0 10px rgba(0, 0, 0, 0.9);
+            text-shadow: 0 1px 8px rgba(0, 0, 0, 0.95), 0 0 4px rgba(0, 0, 0, 0.8) !important;
         }
         .radial-filter-sector:active .radial-filter-sector-path {
             filter: brightness(1.35);
         }
-        /* Active Category in Tier 1 */
+        /* Active Category in Tier 1: Stays white frosted glass and white border while active (Screen 5 style) */
         .radial-filter-sector.is-category-active .radial-filter-sector-path {
-            fill: rgba(38, 46, 60, 0.92) !important;
-            stroke: rgba(56, 189, 248, 0.95) !important;
-            stroke-width: 2.25px !important;
-            filter: drop-shadow(0 0 14px rgba(56, 189, 248, 0.50)) !important;
+            fill: rgba(255, 255, 255, 0.45) !important;
+            stroke: rgba(255, 255, 255, 0.95) !important;
+            stroke-width: 2.5px !important;
+            filter: drop-shadow(0 0 16px rgba(255, 255, 255, 0.50)) !important;
+        }
+        .radial-filter-sector.is-category-active span {
+            color: #ffffff !important;
+            text-shadow: 0 1px 8px rgba(0, 0, 0, 0.95), 0 0 4px rgba(0, 0, 0, 0.8) !important;
         }
         /* Active Sub-item in Tier 2 (Default Glowing Cyan Frosted Glass) */
         .radial-filter-sector.is-item-active .radial-filter-sector-path {
@@ -567,11 +576,11 @@
         }
         .radial-filter-sector.is-item-active span {
             color: #ffffff !important;
-            text-shadow: 0 0 10px rgba(0, 0, 0, 0.9);
+            text-shadow: 0 1px 8px rgba(0, 0, 0, 0.95), 0 0 4px rgba(0, 0, 0, 0.8);
         }
         .radial-filter-sector.is-item-active:hover .radial-filter-sector-path {
             fill: rgba(255, 255, 255, 0.45) !important;
-            stroke: rgba(255, 255, 255, 0.90) !important;
+            stroke: rgba(255, 255, 255, 0.95) !important;
             stroke-width: 2.5px !important;
             filter: drop-shadow(0 0 16px rgba(255, 255, 255, 0.50)) !important;
         }
@@ -789,15 +798,15 @@
 
             <!-- FILTER RADIAL MENU (RIGHT-CLICK CONTEXTUAL FLOATING CONCENTRIC ANNULAR WHEEL - DRAGGABLE) -->
             <div id="filter-radial-menu" class="hidden fixed z-[1500] select-none pointer-events-none transform -translate-x-1/2 -translate-y-1/2" style="transform-origin: center center;">
-                <div class="relative w-[560px] h-[560px] flex items-center justify-center pointer-events-none">
-                    <!-- INNER RING FROSTED BACKDROP (Covers ONLY Tier 1 inner ring: radius 154px = 308px + padding, heavy blur) -->
-                    <div id="filter-radial-inner-backdrop" class="absolute w-[314px] h-[314px] rounded-full pointer-events-none" style="background: rgba(15, 23, 42, 0.38); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); border: 1.75px solid rgba(148, 163, 184, 0.35);"></div>
+                <div class="relative w-[620px] h-[620px] flex items-center justify-center pointer-events-none">
+                    <!-- INNER RING FROSTED BACKDROP (Covers Tier 1 inner ring: radius 172px = 344px + padding, heavy blur) -->
+                    <div id="filter-radial-inner-backdrop" class="absolute w-[348px] h-[348px] rounded-full pointer-events-none" style="background: rgba(15, 23, 42, 0.38); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); border: 1.75px solid rgba(148, 163, 184, 0.35);"></div>
 
                     <!-- SVG Ring with Concentric Annular Sectors (Tier 1 Categories + Tier 2 Sub-items) -->
-                    <svg id="filter-radial-svg" class="absolute inset-0 w-full h-full filter drop-shadow-2xl overflow-visible pointer-events-none" viewBox="0 0 560 560" style="transform-origin: 280px 280px;"></svg>
+                    <svg id="filter-radial-svg" class="absolute inset-0 w-full h-full filter drop-shadow-2xl overflow-visible pointer-events-none" viewBox="0 0 620 620" style="transform-origin: 310px 310px;"></svg>
 
                     <!-- CENTRAL HUB (DRAGGABLE & CLICKABLE TO CLOSE) -->
-                    <div id="filter-radial-center-hub" class="absolute z-30 w-[130px] h-[130px] rounded-full flex flex-col items-center justify-center pointer-events-auto active:scale-95 group text-center p-2 cursor-grab select-none shadow-2xl" title="Drag to move or click to close">
+                    <div id="filter-radial-center-hub" class="absolute z-30 w-[140px] h-[140px] rounded-full flex flex-col items-center justify-center pointer-events-auto active:scale-95 group text-center p-2 cursor-grab select-none shadow-2xl" title="Drag to move or click to close">
                         <!-- Rendered dynamically -->
                     </div>
                 </div>
