@@ -10532,7 +10532,7 @@ function handleFilterRadialCenterClick() {
  * Computes SVG path for an annular sector (pie slice with inner and outer radius)
  * Calculates constant linear gap (gapPx) at both inner and outer edges for perfectly parallel seams
  */
-function getAnnularSectorPath(cx, cy, rIn, rOut, startAngleDeg, endAngleDeg, gapPx = 4.0) {
+function getAnnularSectorPath(cx, cy, rIn, rOut, startAngleDeg, endAngleDeg, gapPx = 8.0) {
     const halfGapRadIn = (gapPx / 2) / rIn;
     const halfGapRadOut = (gapPx / 2) / rOut;
 
@@ -10666,10 +10666,10 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
 
     const cx = 310;
     const cy = 310;
-    const r1_in = 74;
+    const r1_in = 78;
     const r1_out = 172;
-    const r2_in = 176;
-    const r2_out = 296;
+    const r2_in = 180;
+    const r2_out = 300;
 
     // --- TIER 1: INNER ANNULAR RING (6 MAIN CATEGORIES) ---
     let innerSvgHtml = '';
@@ -10677,7 +10677,7 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
         const startAngle = -120 + (idx * 60);
         const endAngle = startAngle + 60;
         const midAngle = (startAngle + endAngle) / 2;
-        const pathD = getAnnularSectorPath(cx, cy, r1_in, r1_out, startAngle, endAngle, 4.0);
+        const pathD = getAnnularSectorPath(cx, cy, r1_in, r1_out, startAngle, endAngle, 8.0);
 
         const midR = (r1_in + r1_out) / 2;
         const rad = (midAngle - 90) * Math.PI / 180;
@@ -10695,10 +10695,10 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
                onmouseleave="handleFilterRadialCategoryMouseLeave()"
                role="button" aria-label="${escapeHtml(cat.label)}">
                 <path class="radial-filter-sector-path" d="${pathD}" />
-                <foreignObject x="${(tx - 60).toFixed(1)}" y="${(ty - 23).toFixed(1)}" width="120" height="46" class="pointer-events-none">
+                <foreignObject x="${(tx - 58).toFixed(1)}" y="${(ty - 23).toFixed(1)}" width="116" height="46" class="pointer-events-none">
                     <div class="w-full h-full flex flex-col items-center justify-center text-center leading-none px-1">
                         <span class="text-[10px] font-black tracking-wider uppercase leading-tight whitespace-nowrap ${isCatActive ? 'text-white font-extrabold' : 'text-slate-200 group-hover:text-white'}">${formattedCatLabel}</span>
-                        <span class="text-[10px] font-mono font-bold ${isCatActive ? 'text-white' : 'text-sky-400'} truncate max-w-[110px] mt-1">${escapeHtml(summary)}</span>
+                        <span class="text-[10px] font-mono font-bold ${isCatActive ? 'text-white' : 'text-sky-400'} truncate max-w-[108px] mt-1">${escapeHtml(summary)}</span>
                     </div>
                 </foreignObject>
             </g>
@@ -10730,7 +10730,7 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
             const aStart = startAngle + (idx * itemSpan);
             const aEnd = aStart + itemSpan;
             const midAngle = (aStart + aEnd) / 2;
-            const pathD = getAnnularSectorPath(cx, cy, r2_in, r2_out, aStart, aEnd, 4.0);
+            const pathD = getAnnularSectorPath(cx, cy, r2_in, r2_out, aStart, aEnd, 8.0);
 
             const midR2 = (r2_in + r2_out) / 2;
             const rad = (midAngle - 90) * Math.PI / 180;
@@ -10761,7 +10761,7 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
                    onclick="handleFilterRadialSubItemClick('${filterRadialActiveCategory}', '${escapeJsStr(item.id)}')"
                    role="button" aria-label="${escapeHtml(item.label)}">
                     <path class="radial-filter-sector-path" d="${pathD}" />
-                    <foreignObject x="${(tx - 58).toFixed(1)}" y="${(ty - 18).toFixed(1)}" width="116" height="36" class="pointer-events-none">
+                    <foreignObject x="${(tx - 56).toFixed(1)}" y="${(ty - 18).toFixed(1)}" width="112" height="36" class="pointer-events-none">
                         <div class="w-full h-full flex items-center justify-center text-center px-1">
                             <span class="text-[10px] font-bold tracking-tight uppercase leading-tight whitespace-nowrap ${isActive ? 'text-white font-extrabold' : (isAll ? 'text-slate-300 group-hover:text-white' : 'text-slate-200 group-hover:text-white')}">${formattedItemLabel}</span>
                         </div>
