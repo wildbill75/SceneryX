@@ -2804,6 +2804,7 @@ function setGsxAuditFilter(filter) {
     currentGsxAuditFilter = filter || 'ALL';
     const buttons = [
         { id: 'gsx-filter-btn-all', key: 'ALL' },
+        { id: 'gsx-filter-btn-active', key: 'ACTIVE' },
         { id: 'gsx-filter-btn-duplicate', key: 'DUPLICATE' },
         { id: 'gsx-filter-btn-mismatch', key: 'MISMATCH' },
         { id: 'gsx-filter-btn-orphan', key: 'ORPHAN' },
@@ -2908,6 +2909,8 @@ function renderGsxAuditModal() {
 
     const cAll = document.getElementById('gsx-count-all');
     if (cAll) cAll.innerText = totalActiveProfiles;
+    const cActive = document.getElementById('gsx-count-active');
+    if (cActive) cActive.innerText = s.matched || 0;
     const cDup = document.getElementById('gsx-count-duplicate');
     if (cDup) cDup.innerText = duplicateCount;
     const cMis = document.getElementById('gsx-count-mismatch');
@@ -2987,7 +2990,7 @@ function renderGsxAuditModal() {
                 </svg>` : '';
 
             html += `
-                <div id="gsx-card-${icao}" class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800/90 shadow-sm space-y-2 transition-all duration-500">
+                <div id="gsx-card-${icao}" class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2 transition-all duration-500">
                     <div class="flex items-start justify-between gap-3">
                         <div ${clickAttr} class="min-w-0 flex-1 ${cursorClass} transition-all select-none" title="${titleAttr}">
                             <div class="flex items-center gap-2">
@@ -3003,7 +3006,7 @@ function renderGsxAuditModal() {
                         </div>
                     </div>
 
-                    <div class="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-800/60 flex-wrap sm:flex-nowrap">
+                    <div class="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-800 flex-wrap sm:flex-nowrap">
                         <div class="text-[11px] font-mono text-slate-400 truncate min-w-0 flex-1">
                             ${escapeHtml(item.vendor ? `Studio: ${item.vendor}` : 'Custom MSFS Scenery')}
                         </div>
@@ -3014,7 +3017,7 @@ function renderGsxAuditModal() {
                                  ondragleave="handleGsxAuditDragLeave(event, '${icao}')"
                                  ondrop="handleGsxAuditDrop(event, '${icao}')"
                                  onclick="installGsxProfileFromModal('${icao}')"
-                                 class="px-4 py-2 min-w-[130px] h-10 rounded-xl bg-slate-950 border-2 border-dashed border-slate-700 hover:border-cyan-400 hover:bg-cyan-950/30 flex flex-col items-center justify-center text-center cursor-pointer transition-all group shrink-0"
+                                 class="px-4 py-2 min-w-[130px] h-10 rounded-xl bg-slate-950 border-2 border-dashed border-slate-700 hover:border-cyan-400 hover:bg-slate-900 flex flex-col items-center justify-center text-center cursor-pointer transition-all group shrink-0"
                                  title="Drop .ini or archive (.zip) here, or click to browse">
                                 <span class="text-[10px] font-mono font-bold text-slate-200 group-hover:text-cyan-300 transition-colors pointer-events-none leading-none">
                                     DROP .INI / .ZIP
@@ -3074,14 +3077,14 @@ function renderGsxAuditModal() {
 
         const totalDisabled = (audit.disabled_profiles || []).length;
         let html = `
-            <div class="flex items-center justify-between pb-1.5 px-1 border-b border-slate-800/60">
+            <div class="flex items-center justify-between pb-1.5 px-1 border-b border-slate-800">
                 <span class="text-[11px] font-mono text-slate-400">
                     ${disabledList.length} disabled profile${disabledList.length > 1 ? 's' : ''}${query ? ` (filtered from ${totalDisabled})` : ''}
                 </span>
                 <button onclick="confirmDeleteAllDisabledProfiles()"
-                        class="text-[10px] font-mono font-bold px-2.5 py-1 rounded-xl bg-rose-950/80 hover:bg-rose-900 text-rose-300 hover:text-white border border-rose-800/80 cursor-pointer transition-all flex items-center gap-1.5 active:scale-98 shadow-sm shadow-rose-950/40"
+                        class="text-[10px] font-mono font-bold px-2.5 py-1 rounded-xl bg-rose-900 hover:bg-rose-800 text-white cursor-pointer transition-all flex items-center gap-1.5 active:scale-98 border-0"
                         title="Permanently delete all disabled profiles from hard disk">
-                    <svg class="w-3 h-3 text-rose-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg class="w-3 h-3 text-rose-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                     </svg>
                     <span>Delete All Disabled (${totalDisabled})</span>
@@ -3108,7 +3111,7 @@ function renderGsxAuditModal() {
             const safeId = 'gsx-dis-' + String(item.filename).replace(/[^a-zA-Z0-9_-]/g, '_');
 
             html += `
-                <div id="${safeId}" class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800/90 shadow-sm space-y-2 transition-all duration-300">
+                <div id="${safeId}" class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2 transition-all duration-300">
                     <div class="flex items-start justify-between gap-3">
                         <div ${clickAttr} class="min-w-0 flex-1 ${cursorClass} transition-all select-none" title="${titleAttr}">
                             <div class="flex items-center gap-2">
@@ -3123,7 +3126,7 @@ function renderGsxAuditModal() {
                         </div>
                     </div>
 
-                    <div class="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-800/60 flex-wrap sm:flex-nowrap">
+                    <div class="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-800 flex-wrap sm:flex-nowrap">
                         <div class="min-w-0 flex-1">
                             <div class="text-xs font-mono font-bold text-slate-300 truncate" title="${escapeHtml(item.filename)}">
                                 ${escapeHtml(item.filename)}
@@ -3159,7 +3162,9 @@ function renderGsxAuditModal() {
 
     let entries = Object.values(audit.by_icao || {}).filter(e => e.status !== 'DISABLED');
 
-    if (currentGsxAuditFilter === 'DUPLICATE') {
+    if (currentGsxAuditFilter === 'ACTIVE') {
+        entries = entries.filter(e => e.status === 'MATCHED');
+    } else if (currentGsxAuditFilter === 'DUPLICATE') {
         entries = entries.filter(e => e.status === 'DUPLICATE');
     } else if (currentGsxAuditFilter === 'MISMATCH') {
         entries = entries.filter(e => (e.status || '').startsWith('MISMATCH'));
@@ -3200,6 +3205,15 @@ function renderGsxAuditModal() {
                         No results matching filter
                     </div>
                     <p class="text-xs font-mono text-slate-400">Try clearing your search term.</p>
+                </div>
+            `;
+        } else if (currentGsxAuditFilter === 'ACTIVE') {
+            container.innerHTML = `
+                <div class="py-12 px-6 text-center space-y-2">
+                    <div class="text-base sm:text-lg font-bold text-white tracking-wide">
+                        No active profiles
+                    </div>
+                    <p class="text-xs font-mono text-slate-400">No active GSX profiles found in your simulator.</p>
                 </div>
             `;
         } else if (currentGsxAuditFilter === 'DUPLICATE') {
@@ -3288,7 +3302,7 @@ function renderGsxAuditModal() {
                 <circle cx="12" cy="12" r="8" stroke-width="2" stroke-dasharray="2 2"/>
             </svg>` : '';
 
-        html += `<div id="gsx-card-${icao}" class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800/90 shadow-sm space-y-2 transition-all duration-500">`;
+        html += `<div id="gsx-card-${icao}" class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2 transition-all duration-500">`;
 
         html += `
             <div class="flex items-start justify-between gap-3">
@@ -3308,7 +3322,7 @@ function renderGsxAuditModal() {
         `;
 
         if (entry.reason && entry.status !== 'MATCHED') {
-            const reasonClass = entry.status.startsWith('MISMATCH') ? 'text-rose-300/90' : 'text-slate-400';
+            const reasonClass = entry.status.startsWith('MISMATCH') ? 'text-rose-300' : 'text-slate-400';
             html += `<p class="text-xs font-mono ${reasonClass} leading-relaxed">${escapeHtml(entry.reason)}</p>`;
         }
 
@@ -3336,14 +3350,14 @@ function renderGsxAuditModal() {
 
             html += `
                 <div class="space-y-2 pt-1">
-                    <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-950/70 border border-slate-800/80 gap-2">
+                    <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-950 border border-slate-800 gap-2">
                         <div class="min-w-0 flex-1">
                             <div class="flex items-center gap-2 flex-wrap">
                                 <span class="text-xs font-mono font-bold text-slate-200 truncate" title="${escapeHtml(activeFile.filename)}">
                                     ${escapeHtml(activeFile.filename)}
                                 </span>
                                 ${vdgsBadge}
-                                <span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded-lg leading-tight bg-emerald-950 text-emerald-300 border border-emerald-800/60">ACTIVE</span>
+                                <span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded-lg leading-tight bg-emerald-600 text-white border-0">ACTIVE</span>
                             </div>
                             ${metaText ? `<div class="text-[11px] font-mono text-slate-400 truncate mt-0.5">${escapeHtml(metaText)}</div>` : ''}
                         </div>
@@ -3360,14 +3374,14 @@ function renderGsxAuditModal() {
                             </button>
                         </div>
                     </div>
-                    <div class="flex items-center justify-end gap-2 pt-1 border-t border-slate-800/60">
+                    <div class="flex items-center justify-end gap-2 pt-1 border-t border-slate-800">
                         <span class="text-[10px] font-mono text-slate-500">Update profile:</span>
                         <div id="gsx-dropzone-${icao}"
                              ondragover="handleGsxAuditDragOver(event, '${icao}')"
                              ondragleave="handleGsxAuditDragLeave(event, '${icao}')"
                              ondrop="handleGsxAuditDrop(event, '${icao}')"
                              onclick="installGsxProfileFromModal('${icao}')"
-                             class="px-3 py-1.5 h-8 rounded-xl bg-slate-950 border border-dashed border-slate-700 hover:border-cyan-400 hover:bg-cyan-950/30 flex items-center justify-center text-center cursor-pointer transition-all group shrink-0"
+                             class="px-3 py-1.5 h-8 rounded-xl bg-slate-950 border border-dashed border-slate-700 hover:border-cyan-400 hover:bg-slate-900 flex items-center justify-center text-center cursor-pointer transition-all group shrink-0"
                              title="Drop updated .ini or archive (.zip) here, or click to browse">
                             <span class="text-[10px] font-mono font-bold text-slate-300 group-hover:text-cyan-300 transition-colors pointer-events-none leading-none">
                                 DROP .INI / .ZIP
@@ -3418,7 +3432,7 @@ function renderGsxAuditModal() {
                 let meta = metaParts.join(' • ');
 
                 html += `
-                    <div class="flex items-center justify-between p-2.5 rounded-xl ${isRecommended ? 'bg-emerald-950/20 border border-emerald-800/60' : 'bg-slate-950/70 border border-slate-800/80'} gap-2">
+                    <div class="flex items-center justify-between p-2.5 rounded-xl ${isRecommended ? 'bg-emerald-950 border border-emerald-700' : 'bg-slate-950 border border-slate-800'} gap-2">
                         <div class="min-w-0 flex-1">
                             <div class="flex items-center gap-1.5 flex-wrap">
                                 <span class="text-xs font-mono font-bold text-slate-200 truncate">${escapeHtml(f.filename)}</span>
@@ -3446,14 +3460,14 @@ function renderGsxAuditModal() {
             });
             html += `</div>`;
             html += `
-                <div class="flex items-center justify-end gap-2 pt-1 border-t border-slate-800/60">
+                <div class="flex items-center justify-end gap-2 pt-1 border-t border-slate-800">
                     <span class="text-[10px] font-mono text-slate-500">Or install new profile:</span>
                     <div id="gsx-dropzone-${icao}"
                          ondragover="handleGsxAuditDragOver(event, '${icao}')"
                          ondragleave="handleGsxAuditDragLeave(event, '${icao}')"
                          ondrop="handleGsxAuditDrop(event, '${icao}')"
                          onclick="installGsxProfileFromModal('${icao}')"
-                         class="px-4 py-2 min-w-[130px] h-10 rounded-xl bg-slate-950 border-2 border-dashed border-slate-700 hover:border-cyan-400 hover:bg-cyan-950/30 flex flex-col items-center justify-center text-center cursor-pointer transition-all group shrink-0"
+                         class="px-4 py-2 min-w-[130px] h-10 rounded-xl bg-slate-950 border-2 border-dashed border-slate-700 hover:border-cyan-400 hover:bg-slate-900 flex flex-col items-center justify-center text-center cursor-pointer transition-all group shrink-0"
                          title="Drop new profile .ini or archive (.zip) here, or click to browse">
                         <span class="text-[10px] font-mono font-bold text-slate-200 group-hover:text-cyan-300 transition-colors pointer-events-none leading-none">
                             DROP .INI / .ZIP
@@ -3474,7 +3488,7 @@ function renderGsxAuditModal() {
             html += `<div class="space-y-2 pt-1">`;
             if (activeFile) {
                 html += `
-                    <div class="flex items-center justify-between p-2 rounded-xl bg-slate-950/70 border border-slate-800/80 gap-2">
+                    <div class="flex items-center justify-between p-2 rounded-xl bg-slate-950 border border-slate-800 gap-2">
                         <div class="min-w-0 flex-1">
                             <div class="text-xs font-mono font-bold text-slate-200 truncate">${escapeHtml(activeFile.filename)}</div>
                             <div class="text-[11px] font-mono text-slate-400 truncate">${escapeHtml(activeMeta)}</div>
@@ -3486,14 +3500,14 @@ function renderGsxAuditModal() {
                 `;
             }
             html += `
-                <div class="flex items-center justify-end gap-2 pt-1 border-t border-slate-800/60 flex-wrap sm:flex-nowrap">
+                <div class="flex items-center justify-end gap-2 pt-1 border-t border-slate-800 flex-wrap sm:flex-nowrap">
                     <!-- Drop zone enlarged for easy dragging -->
                     <div id="gsx-dropzone-${icao}"
                          ondragover="handleGsxAuditDragOver(event, '${icao}')"
                          ondragleave="handleGsxAuditDragLeave(event, '${icao}')"
                          ondrop="handleGsxAuditDrop(event, '${icao}')"
                          onclick="installGsxProfileFromModal('${icao}')"
-                         class="px-4 py-2 min-w-[130px] h-10 rounded-xl bg-slate-950 border-2 border-dashed border-slate-700 hover:border-cyan-400 hover:bg-cyan-950/30 flex flex-col items-center justify-center text-center cursor-pointer transition-all group shrink-0"
+                         class="px-4 py-2 min-w-[130px] h-10 rounded-xl bg-slate-950 border-2 border-dashed border-slate-700 hover:border-cyan-400 hover:bg-slate-900 flex flex-col items-center justify-center text-center cursor-pointer transition-all group shrink-0"
                          title="Drop replacement .ini or archive (.zip) here, or click to browse">
                         <span class="text-[10px] font-mono font-bold text-slate-200 group-hover:text-cyan-300 transition-colors pointer-events-none leading-none">
                             DROP .INI / .ZIP
@@ -3518,14 +3532,14 @@ function renderGsxAuditModal() {
             html += `<div class="space-y-1.5 pt-1">`;
             files.forEach(f => {
                 html += `
-                    <div class="flex items-center justify-between p-2 rounded-xl bg-slate-950/70 border border-slate-800/80 gap-2">
+                    <div class="flex items-center justify-between p-2 rounded-xl bg-slate-950 border border-slate-800 gap-2">
                         <div class="min-w-0 flex-1">
                             <div class="text-xs font-mono font-bold text-slate-200 truncate">${escapeHtml(f.filename)}</div>
                             <div class="text-[11px] font-mono text-slate-400 truncate">${escapeHtml(f.creator ? `By ${f.creator}` : 'Orphan GSX file')}</div>
                         </div>
                         <div class="flex items-center gap-1.5 shrink-0">
                             ${!f.is_disabled ? `
-                                <button onclick="disableGsxProfileFromModal('${icao}', '${escapeJsStr(f.filename)}')" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-slate-800 hover:bg-rose-950 text-slate-300 hover:text-rose-400 border border-slate-700 cursor-pointer transition-colors" title="Disable orphan profile">Disable</button>
+                                <button onclick="disableGsxProfileFromModal('${icao}', '${escapeJsStr(f.filename)}')" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-slate-800 hover:bg-rose-900 text-slate-300 hover:text-white border border-slate-700 cursor-pointer transition-colors" title="Disable orphan profile">Disable</button>
                             ` : `
                                 <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-slate-900 text-slate-500 border border-slate-800">DISABLED</span>
                             `}
@@ -3570,6 +3584,8 @@ function updateGsxHeaderAndTabBadges() {
     const totalActiveProfiles = Object.keys(audit.by_icao || {}).filter(k => audit.by_icao[k].status !== 'DISABLED').length;
     const cAll = document.getElementById('gsx-count-all');
     if (cAll) cAll.innerText = totalActiveProfiles;
+    const cActive = document.getElementById('gsx-count-active');
+    if (cActive) cActive.innerText = s.matched || 0;
     const cDup = document.getElementById('gsx-count-duplicate');
     if (cDup) cDup.innerText = duplicateCount;
     const cMis = document.getElementById('gsx-count-mismatch');
