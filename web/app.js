@@ -7026,6 +7026,24 @@ function initDraggableFlightPlanningBanner() {
         L.DomEvent.disableScrollPropagation(banner);
     }
 
+    const corridorBtn = document.getElementById('fp-btn-corridor');
+    if (corridorBtn && !corridorBtn._attached) {
+        corridorBtn._attached = true;
+        corridorBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            setFlightCorridorProfile('CORRIDOR');
+        });
+    }
+
+    const directBtn = document.getElementById('fp-btn-direct');
+    if (directBtn && !directBtn._attached) {
+        directBtn._attached = true;
+        directBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            setFlightCorridorProfile('DIRECT');
+        });
+    }
+
     let isDragging = false;
     let startX = 0;
     let startY = 0;
