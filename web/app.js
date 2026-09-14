@@ -2824,9 +2824,9 @@ function setGsxAuditFilter(filter) {
         const el = document.getElementById(b.id);
         if (!el) return;
         if (b.key === currentGsxAuditFilter) {
-            el.className = 'px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold leading-tight bg-cyan-700 text-white border-0 cursor-pointer transition-colors';
+            el.className = 'px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold leading-tight bg-cyan-600 text-white border-0 cursor-pointer transition-colors';
         } else {
-            el.className = 'px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold leading-tight bg-slate-800 text-slate-300 hover:text-white border border-slate-700 cursor-pointer transition-colors';
+            el.className = 'px-2.5 py-1 rounded-xl text-[10px] font-mono font-bold leading-tight bg-slate-800 text-slate-300 hover:text-white border-0 cursor-pointer transition-colors';
         }
     });
 
@@ -2903,11 +2903,13 @@ function renderGsxAuditModal() {
 
     const totalBadge = document.getElementById('gsx-audit-total-badge');
     if (totalBadge) {
-        totalBadge.innerText = `${totalIssues} Issue${totalIssues !== 1 ? 's' : ''}`;
         if (totalIssues > 0) {
-            totalBadge.className = 'text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg leading-tight bg-amber-500/20 text-amber-300 border-0';
+            totalBadge.innerText = `${totalIssues} Issue${totalIssues !== 1 ? 's' : ''}`;
+            totalBadge.className = 'text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-amber-500 text-slate-950 border-0';
+            totalBadge.classList.remove('hidden');
         } else {
-            totalBadge.className = 'text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg leading-tight bg-emerald-500/20 text-emerald-300 border-0';
+            totalBadge.classList.add('hidden');
+            totalBadge.innerText = '';
         }
     }
 
@@ -2928,6 +2930,7 @@ function renderGsxAuditModal() {
 
     const footerSummary = document.getElementById('gsx-audit-footer-summary');
     if (footerSummary) {
+        footerSummary.className = 'text-sm font-bold text-white';
         footerSummary.innerText = totalIssues > 0
             ? `${totalIssues} issue${totalIssues !== 1 ? 's' : ''} detected (${duplicateCount} duplicate${duplicateCount !== 1 ? 's' : ''}, ${mismatchCount} mismatch${mismatchCount !== 1 ? 'es' : ''}, ${orphanCount} orphan${orphanCount !== 1 ? 's' : ''}) • ${missingAddons} custom addon${missingAddons !== 1 ? 's' : ''} missing GSX profile.`
             : `All active profiles aligned. ${missingAddons} custom addon${missingAddons !== 1 ? 's' : ''} missing GSX profile.`;
@@ -2956,9 +2959,9 @@ function renderGsxAuditModal() {
         if (missingList.length === 0) {
             container.innerHTML = `
                 <div class="py-12 px-6 text-center space-y-2">
-                    <span class="text-[11px] font-mono font-bold px-3 py-1 rounded-xl bg-emerald-500/20 text-emerald-300 border-0 inline-block">
-                        ALL ADDONS HAVE GSX PROFILES
-                    </span>
+                    <div class="text-base sm:text-lg font-bold text-white tracking-wide">
+                        All addons have GSX profiles
+                    </div>
                     <p class="text-xs font-mono text-slate-400">All scanned custom airport sceneries currently have an active GSX profile.</p>
                 </div>
             `;
@@ -3020,17 +3023,16 @@ function renderGsxAuditModal() {
                                  onclick="installGsxProfileFromModal('${icao}')"
                                  class="px-4 py-2 min-w-[130px] h-10 rounded-xl bg-slate-950 border-2 border-dashed border-slate-700 hover:border-cyan-400 hover:bg-cyan-950/30 flex flex-col items-center justify-center text-center cursor-pointer transition-all group shrink-0"
                                  title="Drop .ini or archive (.zip) here, or click to browse">
-                                <span class="text-[10px] font-mono font-bold text-slate-200 group-hover:text-cyan-300 transition-colors pointer-events-none leading-none flex items-center gap-1.5">
-                                    <i class="fa-solid fa-file-arrow-up text-[11px] text-cyan-400"></i> DROP .INI / .ZIP
+                                <span class="text-[10px] font-mono font-bold text-slate-200 group-hover:text-cyan-300 transition-colors pointer-events-none leading-none">
+                                    DROP .INI / .ZIP
                                 </span>
                                 <span class="text-[8px] font-mono text-slate-400 group-hover:text-slate-300 transition-colors pointer-events-none leading-tight mt-0.5">
                                     or browse file
                                 </span>
                             </div>
 
-                            <button onclick="searchGsxProfileFromModal('${icao}')" class="text-[10px] font-mono font-bold px-3.5 py-2.5 h-10 rounded-xl leading-tight bg-cyan-700 hover:bg-cyan-600 text-white border-0 cursor-pointer transition-colors shrink-0 flex items-center gap-1.5" title="Search matching GSX profile on Flightsim.to">
-                                <i class="fa-solid fa-magnifying-glass text-[10px]"></i>
-                                <span>Search GSX on Flightsim.to</span>
+                            <button onclick="searchGsxProfileFromModal('${icao}')" class="text-[10px] font-mono font-bold px-3.5 py-2.5 h-10 rounded-xl leading-tight bg-cyan-700 hover:bg-cyan-600 text-white border-0 cursor-pointer transition-colors shrink-0 flex items-center justify-center" title="Search on Flightsim.to">
+                                <span>Search on Flightsim.to</span>
                             </button>
                         </div>
                     </div>
@@ -3203,18 +3205,18 @@ function renderGsxAuditModal() {
         if (totalIssues === 0) {
             container.innerHTML = `
                 <div class="py-12 px-6 text-center space-y-2">
-                    <span class="text-[11px] font-mono font-bold px-3 py-1 rounded-xl bg-emerald-500/20 text-emerald-300 border-0 inline-block">
-                        PROFILES IN PERFECT SYNC
-                    </span>
+                    <div class="text-base sm:text-lg font-bold text-white tracking-wide">
+                        All profiles synchronised
+                    </div>
                     <p class="text-xs font-mono text-slate-400">Zero conflicts or mismatches detected among your GSX profiles.</p>
                 </div>
             `;
         } else {
             container.innerHTML = `
                 <div class="py-12 px-6 text-center space-y-2">
-                    <span class="text-[11px] font-mono font-bold px-3 py-1 rounded-xl bg-slate-800 text-slate-400 border-0 inline-block">
-                        NO RESULTS MATCHING FILTER
-                    </span>
+                    <div class="text-sm font-bold text-slate-300 tracking-wide">
+                        No results matching filter
+                    </div>
                     <p class="text-xs font-mono text-slate-400">Try selecting another filter tab or clearing your search term.</p>
                 </div>
             `;
@@ -3352,8 +3354,8 @@ function renderGsxAuditModal() {
                          onclick="installGsxProfileFromModal('${icao}')"
                          class="px-4 py-2 min-w-[130px] h-10 rounded-xl bg-slate-950 border-2 border-dashed border-slate-700 hover:border-cyan-400 hover:bg-cyan-950/30 flex flex-col items-center justify-center text-center cursor-pointer transition-all group shrink-0"
                          title="Drop new profile .ini or archive (.zip) here, or click to browse">
-                        <span class="text-[10px] font-mono font-bold text-slate-200 group-hover:text-cyan-300 transition-colors pointer-events-none leading-none flex items-center gap-1.5">
-                            <i class="fa-solid fa-file-arrow-up text-[11px] text-cyan-400"></i> DROP .INI / .ZIP
+                        <span class="text-[10px] font-mono font-bold text-slate-200 group-hover:text-cyan-300 transition-colors pointer-events-none leading-none">
+                            DROP .INI / .ZIP
                         </span>
                         <span class="text-[8px] font-mono text-slate-400 group-hover:text-slate-300 transition-colors pointer-events-none leading-tight mt-0.5">
                             or browse file
@@ -3392,17 +3394,16 @@ function renderGsxAuditModal() {
                          onclick="installGsxProfileFromModal('${icao}')"
                          class="px-4 py-2 min-w-[130px] h-10 rounded-xl bg-slate-950 border-2 border-dashed border-slate-700 hover:border-cyan-400 hover:bg-cyan-950/30 flex flex-col items-center justify-center text-center cursor-pointer transition-all group shrink-0"
                          title="Drop replacement .ini or archive (.zip) here, or click to browse">
-                        <span class="text-[10px] font-mono font-bold text-slate-200 group-hover:text-cyan-300 transition-colors pointer-events-none leading-none flex items-center gap-1.5">
-                            <i class="fa-solid fa-file-arrow-up text-[11px] text-cyan-400"></i> DROP .INI / .ZIP
+                        <span class="text-[10px] font-mono font-bold text-slate-200 group-hover:text-cyan-300 transition-colors pointer-events-none leading-none">
+                            DROP .INI / .ZIP
                         </span>
                         <span class="text-[8px] font-mono text-slate-400 group-hover:text-slate-300 transition-colors pointer-events-none leading-tight mt-0.5">
                             or browse file
                         </span>
                     </div>
 
-                    <button onclick="searchGsxProfileFromModal('${icao}')" class="text-[10px] font-mono font-bold px-3.5 py-2.5 h-10 rounded-xl leading-tight bg-cyan-700 hover:bg-cyan-600 text-white border-0 cursor-pointer transition-colors shrink-0 flex items-center gap-1.5" title="Search matching GSX profile on Flightsim.to">
-                        <i class="fa-solid fa-magnifying-glass text-[10px]"></i>
-                        <span>Search GSX on Flightsim.to</span>
+                    <button onclick="searchGsxProfileFromModal('${icao}')" class="text-[10px] font-mono font-bold px-3.5 py-2.5 h-10 rounded-xl leading-tight bg-cyan-700 hover:bg-cyan-600 text-white border-0 cursor-pointer transition-colors shrink-0 flex items-center justify-center" title="Search on Flightsim.to">
+                        <span>Search on Flightsim.to</span>
                     </button>
                     ${activeFile && !activeFile.is_disabled ? `
                         <button onclick="disableGsxProfileFromModal('${icao}', '${escapeJsStr(activeFile.filename)}')" class="text-[10px] font-mono font-bold px-3 py-2.5 h-10 rounded-xl leading-tight bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white border-0 cursor-pointer transition-colors shrink-0" title="Disable mismatched profile">
@@ -3455,11 +3456,13 @@ function updateGsxHeaderAndTabBadges() {
 
     const totalBadge = document.getElementById('gsx-audit-total-badge');
     if (totalBadge) {
-        totalBadge.innerText = `${totalIssues} Issue${totalIssues !== 1 ? 's' : ''}`;
         if (totalIssues > 0) {
-            totalBadge.className = 'text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-amber-950 text-amber-400 border border-amber-800';
+            totalBadge.innerText = `${totalIssues} Issue${totalIssues !== 1 ? 's' : ''}`;
+            totalBadge.className = 'text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-amber-500 text-slate-950 border-0';
+            totalBadge.classList.remove('hidden');
         } else {
-            totalBadge.className = 'text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-emerald-950 text-emerald-400 border border-emerald-800';
+            totalBadge.classList.add('hidden');
+            totalBadge.innerText = '';
         }
     }
 
@@ -3480,6 +3483,7 @@ function updateGsxHeaderAndTabBadges() {
 
     const footerSummary = document.getElementById('gsx-audit-footer-summary');
     if (footerSummary) {
+        footerSummary.className = 'text-sm font-bold text-white';
         footerSummary.innerText = totalIssues > 0
             ? `${totalIssues} issue${totalIssues !== 1 ? 's' : ''} detected (${duplicateCount} duplicate${duplicateCount !== 1 ? 's' : ''}, ${mismatchCount} mismatch${mismatchCount !== 1 ? 'es' : ''}, ${orphanCount} orphan${orphanCount !== 1 ? 's' : ''}) • ${missingAddons} custom addon${missingAddons !== 1 ? 's' : ''} missing GSX profile.`
             : `All active profiles aligned. ${missingAddons} custom addon${missingAddons !== 1 ? 's' : ''} missing GSX profile.`;
@@ -3504,7 +3508,7 @@ function markGsxCardResolved(icao, successMsg = '✓ GSX Profile Active & Synced
     if (topRow) {
         const badgeCol = topRow.querySelector('.shrink-0');
         if (badgeCol) {
-            badgeCol.innerHTML = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-emerald-950 text-emerald-400 border border-emerald-800">RESOLVED / OK</span>`;
+            badgeCol.innerHTML = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-emerald-600 text-white border-0">RESOLVED / OK</span>`;
         }
     }
 

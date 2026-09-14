@@ -1882,9 +1882,7 @@
                     <span class="text-[10px] font-mono text-cyan-400/90 uppercase font-bold tracking-wider block mb-1">SceneryX System</span>
                     <h2 class="text-base font-bold text-white leading-tight flex items-center gap-2">
                         <span>GSX Profiles Details</span>
-                        <span id="gsx-audit-total-badge" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg leading-tight bg-amber-500/20 text-amber-300 border-0">
-                            0 Issues
-                        </span>
+                        <span id="gsx-audit-total-badge" class="hidden text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-amber-500 text-slate-950 border-0"></span>
                     </h2>
                 </div>
                 <button onclick="closeGsxAuditModal()" title="Close" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition-all cursor-pointer border-0">
@@ -1938,7 +1936,7 @@
 
             <!-- Footer -->
             <div class="flex items-center justify-between pt-3 mt-2 border-t border-slate-800/80 shrink-0">
-                <span id="gsx-audit-footer-summary" class="text-xs font-mono text-slate-400">
+                <span id="gsx-audit-footer-summary" class="text-sm font-bold text-white">
                     Resolving issues updates your GSX profiles safely.
                 </span>
                 <button id="btn-gsx-open-map" onclick="openMapFromGsxAudit()" class="px-6 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-md shadow-cyan-600/25 transition-all cursor-pointer border-0 active:scale-98">
