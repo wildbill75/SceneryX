@@ -895,8 +895,8 @@
                  onclick="event.stopPropagation();"
                  onmousedown="event.stopPropagation();"
                  onpointerdown="event.stopPropagation();"
-                 class="hidden absolute flex flex-col rounded-3xl shadow-xl shadow-black/50 p-4 select-none w-[820px] max-w-[96vw] pointer-events-auto z-[1550] transition-opacity duration-200 ease-out"
-                 style="transform: translateX(-50%);">
+                 class="hidden absolute flex flex-col rounded-3xl shadow-xl shadow-black/50 p-4 select-none max-w-[820px] pointer-events-auto z-[1550] transition-opacity duration-200 ease-out"
+                 style="transform: translateX(-50%); width: 820px;">
                 
                 <!-- Drag Handle & Modal Header -->
                 <div id="radial-airlines-modal-header" class="h-9 flex items-center justify-between pb-2 border-b border-slate-700/40 shrink-0 cursor-grab active:cursor-grabbing">
@@ -921,8 +921,8 @@
                     </div>
                 </div>
 
-                <!-- Horizontal Multi-Column Grid (8 columns, 3 rows visible, scrollable) -->
-                <div id="radial-airlines-list" class="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-2 overflow-y-auto custom-scrollbar pr-1 h-[188px] shrink-0 py-1">
+                <!-- Horizontal Multi-Column Grid (Dynamic columns, auto-height up to 188px max) -->
+                <div id="radial-airlines-list" class="grid gap-2 overflow-y-auto custom-scrollbar pr-1 max-h-[188px] h-auto shrink-0 py-1">
                     <!-- Dynamic airline cards rendered here -->
                 </div>
             </div>

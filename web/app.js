@@ -5154,6 +5154,37 @@ function renderRadialOperatingAirlines(ap) {
         return a.localeCompare(b);
     });
 
+    const modal = document.getElementById('radial-airlines-modal');
+    const count = airlines.length;
+    let cols = 8;
+    let targetWidth = 820;
+
+    if (count === 0) {
+        cols = 1;
+        targetWidth = 420;
+    } else if (count === 1) {
+        cols = 2;
+        targetWidth = 420;
+    } else if (count <= 3) {
+        cols = count;
+        targetWidth = 420;
+    } else if (count < 8) {
+        cols = count;
+        targetWidth = Math.round(32 + (count * 91.5) + ((count - 1) * 8));
+    } else {
+        cols = 8;
+        targetWidth = 820;
+    }
+
+    if (modal) {
+        modal.style.width = `${targetWidth}px`;
+        modal.style.maxWidth = 'min(820px, 96vw)';
+    }
+
+    listEl.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
+    listEl.style.maxHeight = '188px';
+    listEl.style.height = 'auto';
+
     if (countEl) {
         countEl.innerText = `${airlines.length} ${t('drawer.airlines_operating_from', 'Airlines operating from')} ${ap.icao}`.toUpperCase();
     }
@@ -5170,7 +5201,10 @@ function renderRadialOperatingAirlines(ap) {
     }
 
     if (airlines.length === 0) {
-        listEl.innerHTML = `<div class="col-span-full text-xs text-slate-400 italic py-8 text-center">${t('drawer.no_airlines', 'No scheduled airlines data available for this airport.')}</div>`;
+        listEl.innerHTML = `<div class="col-span-full text-xs text-slate-400 italic py-4 text-center">${t('drawer.no_airlines', 'No scheduled airlines data available for this airport.')}</div>`;
+        if (modal && !modal.classList.contains('hidden')) {
+            updateRadialAirlinesModalPosition();
+        }
         return;
     }
 
@@ -5222,6 +5256,10 @@ function renderRadialOperatingAirlines(ap) {
             `;
         }
     }).join('');
+
+    if (modal && !modal.classList.contains('hidden')) {
+        updateRadialAirlinesModalPosition();
+    }
 }
 
 function radialFilterByAirline(airlineName, btnEl, event) {
