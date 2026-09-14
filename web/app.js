@@ -2597,7 +2597,7 @@ window.isGsxAuditOpen = false;
 
 async function openGsxAuditModal(filter = 'ALL') {
     sidebarWasCollapsedBeforeGsx = (typeof isSidebarCollapsed !== 'undefined' ? isSidebarCollapsed : (window.isSidebarCollapsed || false));
-    gsxAuditFloatingMode = false;
+    gsxAuditFloatingMode = true;
     isGsxAuditOpen = true;
     window.isGsxAuditOpen = true;
 
@@ -2621,25 +2621,24 @@ async function openGsxAuditModal(filter = 'ALL') {
     const modal = document.getElementById('gsx-audit-modal');
     if (!modal) return;
 
-    // Reset container to standard modal mode
-    modal.classList.remove('pointer-events-none', 'bg-transparent', 'items-start', 'justify-start', 'pt-[126px]', 'pt-[76px]', 'pl-4', 'pb-4');
-    modal.classList.add('bg-slate-950/80', 'backdrop-blur-md', 'items-center', 'justify-center');
+    // Direct floating panel on top of the interactive map (no blur backdrop)
+    modal.classList.remove('hidden', 'bg-slate-950/80', 'backdrop-blur-md', 'items-center', 'justify-center');
+    modal.classList.add('pointer-events-none', 'bg-transparent', 'items-start', 'justify-start', 'pt-[126px]', 'pl-4', 'pb-4');
 
     const modalBox = modal.querySelector('.glass-modal');
     if (modalBox) {
+        modalBox.classList.add('pointer-events-auto', 'shadow-2xl');
         modalBox.style.transform = 'none';
-        modalBox.style.width = '';
-        modalBox.style.maxWidth = '';
-        modalBox.style.height = '';
-        modalBox.style.maxHeight = '';
+        modalBox.style.width = '540px';
+        modalBox.style.maxWidth = '560px';
+        modalBox.style.height = 'calc(100vh - 142px)';
+        modalBox.style.maxHeight = 'calc(100vh - 142px)';
         gsxAuditModalOffset = { x: 0, y: 0 };
     }
 
     const openMapBtn = document.getElementById('btn-gsx-open-map') || modal.querySelector('button[onclick*="openMapFromGsxAudit"]');
     if (openMapBtn) {
-        openMapBtn.classList.remove('hidden');
-        openMapBtn.innerHTML = 'Open Map';
-        openMapBtn.className = 'px-6 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-md shadow-cyan-600/25 transition-all cursor-pointer border-0 active:scale-98';
+        openMapBtn.classList.add('hidden');
     }
 
     initDraggableGsxAuditModal();
@@ -2649,6 +2648,13 @@ async function openGsxAuditModal(filter = 'ALL') {
     // Force map to display GSX audited airports (including default MSFS airports like EPWA)
     if (typeof filterAirports === 'function') {
         filterAirports();
+    }
+
+    // Refresh and invalidate map size so the map renders fully and immediately under the floating window
+    if (window.map) {
+        setTimeout(() => {
+            window.map.invalidateSize();
+        }, 80);
     }
 }
 
@@ -2768,28 +2774,13 @@ function closeGsxAuditModal() {
     const modal = document.getElementById('gsx-audit-modal');
     if (modal) {
         modal.classList.add('hidden');
-        modal.classList.remove('pointer-events-none', 'bg-transparent', 'items-start', 'justify-start', 'pt-[126px]', 'pt-[76px]', 'pl-4', 'pb-4');
-        modal.classList.add('bg-slate-950/80', 'backdrop-blur-md', 'items-center', 'justify-center');
     }
 
     const modalBox = modal ? modal.querySelector('.glass-modal') : null;
     if (modalBox) {
         modalBox.style.transform = 'none';
-        modalBox.style.width = '';
-        modalBox.style.maxWidth = '';
-        modalBox.style.height = '';
-        modalBox.style.maxHeight = '';
         gsxAuditModalOffset = { x: 0, y: 0 };
     }
-
-    const openMapBtn = document.getElementById('btn-gsx-open-map') || (modal ? modal.querySelector('button[onclick*="openMapFromGsxAudit"]') : null);
-    if (openMapBtn) {
-        openMapBtn.classList.remove('hidden');
-        openMapBtn.innerHTML = 'Open Map';
-        openMapBtn.className = 'px-6 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-md shadow-cyan-600/25 transition-all cursor-pointer border-0 active:scale-98';
-    }
-
-
 
     gsxAuditFloatingMode = false;
     isGsxAuditOpen = false;
@@ -6928,7 +6919,6 @@ async function openGsxAuditFromDetails(filter = 'ALL') {
         closeAirportRadialMenu();
     }
     await openGsxAuditModal(filter);
-    openMapFromGsxAudit();
 }
 window.openGsxAuditFromDetails = openGsxAuditFromDetails;
 

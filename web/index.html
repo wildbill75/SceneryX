@@ -1873,9 +1873,9 @@
         </div>
     </div>
 
-    <!-- GSX PROFILES AUDIT & CONFLICT RESOLUTION MODAL (CENTRALIZED ONE-SCREEN RESOLUTION) -->
-    <div id="gsx-audit-modal" class="hidden fixed inset-0 z-[2060] flex items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 transition-all duration-300">
-        <div class="glass-modal pointer-events-auto w-full max-w-2xl rounded-3xl p-6 shadow-2xl border border-slate-800 bg-slate-900/95 flex flex-col max-h-[88vh]">
+    <!-- GSX PROFILES DETAILS & CONFLICT RESOLUTION MODAL (CENTRALIZED DIRECTLY ON MAP) -->
+    <div id="gsx-audit-modal" class="hidden fixed inset-0 z-[2060] pointer-events-none bg-transparent flex items-start justify-start pt-[126px] pl-4 pb-4 transition-all duration-300">
+        <div class="glass-modal pointer-events-auto w-[540px] max-w-[560px] h-[calc(100vh-142px)] max-h-[calc(100vh-142px)] rounded-3xl p-5 shadow-2xl border border-slate-800 bg-slate-900/95 flex flex-col overflow-hidden">
             <!-- Header (Draggable) -->
             <div id="gsx-audit-modal-header" class="flex items-center justify-between border-b border-slate-800/80 pb-3.5 shrink-0 cursor-grab active:cursor-grabbing">
                 <div>
@@ -1939,7 +1939,7 @@
                 <span id="gsx-audit-footer-summary" class="text-sm font-bold text-white">
                     Resolving issues updates your GSX profiles safely.
                 </span>
-                <button id="btn-gsx-open-map" onclick="openMapFromGsxAudit()" class="px-6 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-md shadow-cyan-600/25 transition-all cursor-pointer border-0 active:scale-98">
+                <button id="btn-gsx-open-map" onclick="openMapFromGsxAudit()" class="hidden px-6 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs shadow-md shadow-cyan-600/25 transition-all cursor-pointer border-0 active:scale-98">
                     Open Map
                 </button>
             </div>
