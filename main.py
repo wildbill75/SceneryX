@@ -2396,7 +2396,7 @@ class Api:
                 dev_name = re.sub(r'<[^>]+>', '', dev_m.group(1)).strip() if dev_m else ""
 
                 return True, clean_link, price_val, "EUR", dev_name
-            return ("product-card" in h), u, None, "", ""
+            return False, u, None, "", ""
 
         def check_orbx(code):
             default_u = f"https://orbxdirect.com/?s={code}"
@@ -2443,11 +2443,14 @@ class Api:
                     dev_name = ""
                     idx = h.find(link)
                     if idx != -1:
-                        snippet = h[idx:idx+3500]
-                        m = re.search(r'amount[^\d]*(\d+[\.,]\d{2})[^\w]*currencyCode[^\w]*([A-Z]{3})', snippet)
+                        snippet = h[idx:idx+4500]
+                        m = re.search(r'class=[\'"]?money[\'"]?[^>]*>[^\d]*(\d+[\.,]\d{2})\s*([A-Z]{3})', snippet)
+                        if not m:
+                            m = re.search(r'[£$€]\s*(\d+[\.,]\d{2})\s*([A-Z]{3})?', snippet)
                         if m:
                             price_val = float(m.group(1).replace(',', '.'))
-                            curr = m.group(2)
+                            if len(m.groups()) > 1 and m.group(2):
+                                curr = m.group(2)
                         dev_m = re.search(r'vendorColor[^>]*>([\s\S]*?)</div>', snippet)
                         if dev_m:
                             raw_vendor = re.sub(r'<[^>]+>', '', dev_m.group(1)).strip()
@@ -2480,10 +2483,10 @@ class Api:
 
             candidates = []
             queries = [code]
-            if len(clean_words) == 1:
+            if name_clean and len(name_clean) >= 4:
+                queries.append(name_clean)
+            elif len(clean_words) == 1:
                 queries.append(clean_words[0])
-            elif len(clean_words) >= 2:
-                queries.append(" ".join(clean_words[:2]))
 
             for q in queries:
                 u = f"https://flightsim.to/backend/store/search?query={urllib.parse.quote(q)}"
@@ -2502,6 +2505,9 @@ class Api:
 
             prices = get_fsto_prices()
 
+            # Prioritize candidates that have an available price in prices map
+            candidates.sort(key=lambda it: 0 if prices.get(it.get('slug')) else 1)
+
             for it in candidates:
                 title = it.get('title', '')
                 t_low = title.lower()
@@ -2517,9 +2523,11 @@ class Api:
                 matched = False
                 if re.search(r'\b' + re.escape(code_low) + r'\b', t_low) or re.search(r'(^|-)' + re.escape(code_low) + r'(-|$)', slug):
                     matched = True
+                elif name_clean and len(name_clean) >= 4 and re.search(r'\b' + re.escape(name_clean.lower()) + r'\b', t_low):
+                    matched = True
                 elif len(clean_words) == 1:
                     cw = clean_words[0]
-                    if re.search(r'\b' + re.escape(cw) + r'\b', t_low) or re.search(r'(^|-)' + re.escape(cw) + r'(-|$)', slug):
+                    if len(cw) >= 4 and (re.search(r'\b' + re.escape(cw) + r'\b', t_low) or re.search(r'(^|-)' + re.escape(cw) + r'(-|$)', slug)):
                         matched = True
                 elif len(clean_words) >= 2:
                     if all(re.search(r'\b' + re.escape(cw) + r'\b', t_low) or re.search(r'(^|-)' + re.escape(cw) + r'(-|$)', slug) for cw in clean_words[:2]):
