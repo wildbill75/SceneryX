@@ -4577,7 +4577,7 @@ function updateRadialAirlinesModalPosition(force = false) {
     const mapSize = (typeof map.getSize === 'function') ? map.getSize() : null;
     const containerW = mapSize ? mapSize.x : (modal.offsetParent ? modal.offsetParent.offsetWidth : window.innerWidth);
     const containerH = mapSize ? mapSize.y : (modal.offsetParent ? modal.offsetParent.offsetHeight : window.innerHeight);
-    const modalWidth = modal.offsetWidth || 820;
+    const modalWidth = modal.offsetWidth || 940;
     const modalHeight = modal.offsetHeight || 340;
 
     if (!hasUserDraggedAirlinesModal) {
@@ -5191,12 +5191,12 @@ function renderRadialOperatingAirlines(ap) {
         targetWidth = Math.round(32 + (count * 91.5) + ((count - 1) * 8));
     } else {
         cols = 8;
-        targetWidth = 820;
+        targetWidth = 940;
     }
 
     if (modal) {
         modal.style.width = `${targetWidth}px`;
-        modal.style.maxWidth = 'min(820px, 96vw)';
+        modal.style.maxWidth = 'min(940px, 96vw)';
     }
 
     listEl.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
@@ -5350,39 +5350,39 @@ function renderAirlineDestAccordionContent(destIcao) {
     const stores = radialStoreCache[destIcao];
 
     let html = `
-        <div class="p-2.5 rounded-xl bg-slate-900/90 border border-slate-700/60 space-y-2 mt-2" onclick="event.stopPropagation();">
+        <div class="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-700/60 space-y-2.5 mt-2.5" onclick="event.stopPropagation();">
             <!-- 1. Available Freeware Addons -->
             <div class="flex items-center gap-2 px-0.5">
-                <span class="text-[11px] font-mono font-bold uppercase tracking-wider text-slate-300">${t('drawer.freeware_addons', 'Available Freeware Addons')}</span>
+                <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300">${t('drawer.freeware_addons', 'Available Freeware Addons')}</span>
             </div>
             <div onclick="event.stopPropagation(); openFreewareScenerySearch('${destIcao}');"
-                 class="py-2 px-3 rounded-xl border border-slate-700/60 hover:border-cyan-400 bg-slate-950/60 hover:bg-slate-900 transition-all cursor-pointer group flex flex-col gap-0.5">
+                 class="py-2.5 px-3.5 rounded-xl border border-slate-700/60 hover:border-cyan-400 bg-slate-950/60 hover:bg-slate-900 transition-all cursor-pointer group flex flex-col gap-1">
                 <div class="flex items-center justify-between gap-2">
-                    <span class="text-xs font-bold text-white group-hover:text-cyan-300 transition-colors">Flightsim.to</span>
-                    <span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-cyan-600 text-white uppercase leading-tight border-0">FREEWARE</span>
+                    <span class="text-sm font-bold text-white group-hover:text-cyan-300 transition-colors">Flightsim.to</span>
+                    <span class="text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg bg-cyan-600 text-white uppercase leading-tight border-0">FREEWARE</span>
                 </div>
-                <div class="text-[10px] font-mono text-slate-400">
+                <div class="text-xs font-mono text-slate-400">
                     <span>Community freeware sceneries</span>
                 </div>
             </div>
 
             <!-- 2. Available Payware Addons -->
             <div class="flex items-center gap-2 px-0.5 pt-1">
-                <span class="text-[11px] font-mono font-bold uppercase tracking-wider text-slate-300">${t('drawer.payware_addons', 'Available Payware Addons')}</span>
+                <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300">${t('drawer.payware_addons', 'Available Payware Addons')}</span>
             </div>
     `;
 
     if (!stores) {
         html += `
-            <div class="p-2 rounded-xl bg-slate-950/40 border border-slate-800 text-center text-[10px] font-mono text-slate-400">
-                <i class="fa-solid fa-spinner fa-spin mr-1"></i> Checking store availability...
+            <div class="p-3 rounded-xl bg-slate-950/40 border border-slate-800 text-center text-xs font-mono text-slate-400">
+                <i class="fa-solid fa-spinner fa-spin mr-1.5"></i> Checking store availability...
             </div>
         `;
     } else {
         const positiveStores = stores.filter(st => st && st.found && st.url);
         if (positiveStores.length === 0) {
             html += `
-                <div class="p-2 rounded-xl bg-slate-950/40 border border-slate-800 text-center text-[10px] font-mono text-slate-400">
+                <div class="p-3 rounded-xl bg-slate-950/40 border border-slate-800 text-center text-xs font-mono text-slate-400">
                     No commercial store addons listed for ${destIcao}.
                 </div>
             `;
@@ -5423,26 +5423,26 @@ function renderAirlineDestAccordionContent(destIcao) {
                 'FSDreamTeam': 'Official studio & GSX creator'
             };
 
-            html += `<div class="space-y-1">`;
+            html += `<div class="space-y-1.5">`;
             positiveStores.forEach(st => {
                 const isDev = st.type === 'dev';
                 const safeUrl = (st.url || '').replace(/'/g, "\\'");
                 const desc = shortDescMap[st.name] || st.desc || '';
                 const badgeHtml = isDev
-                    ? '<span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-amber-500 text-slate-950 uppercase border-0">DEV</span>'
-                    : '<span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-purple-600 text-white uppercase border-0">STORE</span>';
+                    ? '<span class="text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg bg-amber-500 text-slate-950 uppercase border-0">DEV</span>'
+                    : '<span class="text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg bg-purple-600 text-white uppercase border-0">STORE</span>';
 
                 html += `
                     <div onclick="event.stopPropagation(); openExternalUrl('${safeUrl}');"
-                         class="py-1.5 px-3 rounded-xl border border-slate-700/60 hover:border-purple-500 bg-slate-950/60 hover:bg-slate-900 transition-all cursor-pointer group flex items-center justify-between gap-2">
+                         class="py-2 px-3.5 rounded-xl border border-slate-700/60 hover:border-purple-500 bg-slate-950/60 hover:bg-slate-900 transition-all cursor-pointer group flex items-center justify-between gap-2.5">
                         <div class="min-w-0 flex-1">
-                            <span class="text-xs font-bold text-white group-hover:text-purple-300 transition-colors truncate block">${st.name}</span>
-                            ${desc ? `<span class="text-[10px] font-mono text-slate-400 truncate block">${desc}</span>` : ''}
+                            <span class="text-sm font-bold text-white group-hover:text-purple-300 transition-colors truncate block">${st.name}</span>
+                            ${desc ? `<span class="text-xs font-mono text-slate-400 truncate block mt-0.5">${desc}</span>` : ''}
                         </div>
-                        <div class="flex items-center gap-1.5 shrink-0">
+                        <div class="flex items-center gap-2 shrink-0">
                             ${badgeHtml}
                             ${st.formattedPrice ? `
-                                <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-600 text-white border-0">
+                                <span class="text-xs font-mono font-bold px-2.5 py-1 rounded-lg bg-emerald-600 text-white border-0">
                                     ${st.formattedPrice}
                                 </span>
                             ` : ''}
@@ -5513,13 +5513,20 @@ function renderAirlineDestinationsList(originAp) {
     const addonCount = paywareCount + freewareCount + asoboCount;
     const addonPct = totalCount > 0 ? Math.round((addonCount / totalCount) * 100) : 0;
     const paywarePct = totalCount > 0 ? Math.round((paywareCount / totalCount) * 100) : 0;
+    const freewarePct = totalCount > 0 ? Math.round((freewareCount / totalCount) * 100) : 0;
+    const asoboPct = totalCount > 0 ? Math.round((asoboCount / totalCount) * 100) : 0;
 
     const titleEl = document.getElementById('radial-airline-dest-title');
     const compBadge = document.getElementById('radial-airline-completion-badge');
     const paywareBadge = document.getElementById('radial-airline-payware-badge');
+    const freewareBadge = document.getElementById('radial-airline-freeware-badge');
+    const asoboBadge = document.getElementById('radial-airline-asobo-badge');
+
     if (titleEl) titleEl.innerText = `${activeAl} — ${totalCount} DESTINATIONS`;
-    if (compBadge) compBadge.innerText = `${addonPct}% ADDONS (${addonCount}/${totalCount})`;
     if (paywareBadge) paywareBadge.innerText = `${paywarePct}% PAYWARE`;
+    if (freewareBadge) freewareBadge.innerText = `${freewarePct}% FREEWARE`;
+    if (asoboBadge) asoboBadge.innerText = `${asoboPct}% ASOBO`;
+    if (compBadge) compBadge.innerText = `${addonPct}% ADDONS (${addonCount}/${totalCount})`;
 
     const progPay = document.getElementById('radial-airline-prog-payware');
     const progFree = document.getElementById('radial-airline-prog-freeware');
@@ -5544,9 +5551,9 @@ function renderAirlineDestinationsList(originAp) {
     const filterBtns = document.querySelectorAll('.airline-dest-filter-btn');
     filterBtns.forEach(btn => {
         const isCurrent = btn.id === `airline-dest-filter-${currentAirlineDestFilter}`;
-        btn.className = 'airline-dest-filter-btn px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold border-0 cursor-pointer transition-all ' +
+        btn.className = 'airline-dest-filter-btn px-3 py-1.5 rounded-xl text-xs font-mono font-bold border-0 cursor-pointer transition-all shadow-sm ' +
             (isCurrent
-                ? 'bg-white text-slate-950 shadow-sm'
+                ? 'bg-white text-slate-950'
                 : 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700');
     });
 
@@ -5594,29 +5601,29 @@ function renderAirlineDestinationsList(originAp) {
         const cityCountry = [ap.city, ap.country].filter(Boolean).join(', ');
 
         return `
-            <div class="rounded-2xl bg-slate-950/40 border border-slate-800/80 p-2 transition-all">
+            <div class="rounded-2xl bg-slate-950/50 border border-slate-800/90 p-3.5 hover:border-slate-700 transition-all shadow-sm">
                 <div onclick="toggleAirlineDestAccordion('${item.icao}', event)"
-                     class="flex items-center justify-between gap-2 cursor-pointer group">
+                     class="flex items-center justify-between gap-3 cursor-pointer group">
                     <div class="min-w-0 flex-1">
-                        <div class="flex items-center gap-2">
-                            <span class="text-xs font-mono font-bold text-white group-hover:text-cyan-300 transition-colors">${item.icao}</span>
-                            <span class="text-xs font-bold text-slate-200 truncate">${ap.name || item.icao}</span>
+                        <div class="flex items-center gap-2.5">
+                            <span class="text-sm font-mono font-black text-white group-hover:text-cyan-300 transition-colors">${item.icao}</span>
+                            <span class="text-sm font-bold text-slate-100 truncate">${ap.name || item.icao}</span>
                         </div>
-                        <div class="flex items-center gap-2 mt-0.5 text-[10px] font-mono text-slate-400">
+                        <div class="flex items-center gap-2 mt-1 text-xs font-mono text-slate-400">
                             ${cityCountry ? `<span class="truncate">${cityCountry}</span>` : ''}
-                            ${cityCountry && packageInfo ? `<span>•</span>` : ''}
-                            ${packageInfo ? `<span class="text-slate-300 truncate font-sans">${packageInfo}</span>` : ''}
+                            ${cityCountry && packageInfo ? `<span class="text-slate-600">•</span>` : ''}
+                            ${packageInfo ? `<span class="text-slate-300 truncate font-sans font-medium">${packageInfo}</span>` : ''}
                         </div>
                     </div>
 
-                    <div class="flex items-center gap-2 shrink-0">
-                        <span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded leading-tight ${badgeClass}">
+                    <div class="flex items-center gap-2.5 shrink-0">
+                        <span class="text-[11px] font-mono font-bold px-2.5 py-1 rounded-lg leading-tight ${badgeClass}">
                             ${badgeText}
                         </span>
-                        <button onclick="centerMapOnDestination('${item.icao}', event)" title="Locate on map" class="w-6 h-6 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-[10px] border border-slate-700/50 transition-colors cursor-pointer">
+                        <button onclick="centerMapOnDestination('${item.icao}', event)" title="Locate on map" class="w-8 h-8 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-xs border border-slate-700/60 transition-colors cursor-pointer">
                             <i class="fa-solid fa-crosshairs"></i>
                         </button>
-                        <i class="fa-solid fa-chevron-${isExpanded ? 'up' : 'down'} text-[10px] text-slate-400 group-hover:text-white transition-colors"></i>
+                        <i class="fa-solid fa-chevron-${isExpanded ? 'up' : 'down'} text-xs text-slate-400 group-hover:text-white transition-colors ml-0.5"></i>
                     </div>
                 </div>
 
