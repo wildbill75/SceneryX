@@ -3051,18 +3051,18 @@ function renderGsxAuditModal() {
             if ((audit.disabled_profiles || []).length === 0) {
                 container.innerHTML = `
                     <div class="py-12 px-6 text-center space-y-2">
-                        <span class="text-[11px] font-mono font-bold px-3 py-1 rounded-xl bg-slate-800 text-slate-400 border border-slate-700 inline-block">
-                            NO DISABLED PROFILES
-                        </span>
+                        <div class="text-base sm:text-lg font-bold text-white tracking-wide">
+                            No disabled profiles
+                        </div>
                         <p class="text-xs font-mono text-slate-400">You don't have any disabled GSX profiles in your directory.</p>
                     </div>
                 `;
             } else {
                 container.innerHTML = `
                     <div class="py-12 px-6 text-center space-y-2">
-                        <span class="text-[11px] font-mono font-bold px-3 py-1 rounded-xl bg-slate-800 text-slate-400 border border-slate-700 inline-block">
-                            NO RESULTS MATCHING FILTER
-                        </span>
+                        <div class="text-base sm:text-lg font-bold text-white tracking-wide">
+                            No results matching filter
+                        </div>
                         <p class="text-xs font-mono text-slate-400">Try clearing your search term.</p>
                     </div>
                 `;
@@ -3205,7 +3205,7 @@ function renderGsxAuditModal() {
         } else {
             container.innerHTML = `
                 <div class="py-12 px-6 text-center space-y-2">
-                    <div class="text-sm font-bold text-slate-300 tracking-wide">
+                    <div class="text-base sm:text-lg font-bold text-white tracking-wide">
                         No results matching filter
                     </div>
                     <p class="text-xs font-mono text-slate-400">Try selecting another filter tab or clearing your search term.</p>
