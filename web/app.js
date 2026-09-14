@@ -5174,25 +5174,8 @@ function renderRadialOperatingAirlines(ap) {
 
     const modal = document.getElementById('radial-airlines-modal');
     const count = airlines.length;
-    let cols = 8;
-    let targetWidth = 820;
-
-    if (count === 0) {
-        cols = 1;
-        targetWidth = 420;
-    } else if (count === 1) {
-        cols = 2;
-        targetWidth = 420;
-    } else if (count <= 3) {
-        cols = count;
-        targetWidth = 420;
-    } else if (count < 8) {
-        cols = count;
-        targetWidth = Math.round(32 + (count * 91.5) + ((count - 1) * 8));
-    } else {
-        cols = 8;
-        targetWidth = 940;
-    }
+    const cols = 8;
+    const targetWidth = 940;
 
     if (modal) {
         modal.style.width = `${targetWidth}px`;
