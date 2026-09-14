@@ -11124,6 +11124,7 @@ function displayScanResults(delta, isStartup = false) {
 
     const modal = document.getElementById('rescan-modal');
     const phaseScanning = document.getElementById('rescan-phase-scanning');
+    const phaseGsx = document.getElementById('rescan-phase-gsx');
     const phaseResult = document.getElementById('rescan-phase-result');
     const titleEl = document.getElementById('rescan-result-title');
     const msgEl = document.getElementById('rescan-result-message');
@@ -11131,13 +11132,14 @@ function displayScanResults(delta, isStartup = false) {
 
     if (modal) {
         if (phaseScanning) phaseScanning.classList.add('hidden');
+        if (phaseGsx) phaseGsx.classList.add('hidden');
         if (phaseResult) phaseResult.classList.remove('hidden');
         modal.classList.remove('hidden');
     }
 
     if (totalChanges > 0) {
         if (titleEl) {
-            titleEl.innerHTML = `<i class="fa-solid fa-layer-group text-cyan-400 text-lg mr-2"></i><span>${t('rescan.changes_detected', 'Library Changes Detected')}</span>`;
+            titleEl.innerHTML = `<span>${t('rescan.changes_detected', 'Library Changes Detected')}</span>`;
         }
 
         if (msgEl) {
@@ -11209,9 +11211,8 @@ function displayScanResults(delta, isStartup = false) {
                                     <span class="text-sm font-bold text-white truncate">${displayName}</span>
                                     <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 shrink-0">GSX Profile</span>
                                 </div>
-                                <div class="text-xs font-mono text-slate-400 truncate mt-0.5 flex items-center gap-1.5">
-                                    <i class="fa-solid fa-square-parking text-purple-400/80 text-[11px]"></i>
-                                    <span>${iniName}</span>
+                                <div class="text-xs font-mono text-slate-400 truncate mt-0.5">
+                                    ${iniName}
                                 </div>
                             </div>
                         </div>
@@ -11226,8 +11227,7 @@ function displayScanResults(delta, isStartup = false) {
             if (totalSceneries > 0) {
                 htmlItems.push(`
                     <div class="flex items-center justify-between pb-1.5 pt-1 border-b border-slate-800/80 mb-2">
-                        <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-300">
-                            <i class="fa-solid fa-layer-group text-sky-400"></i>
+                        <div class="text-xs font-bold uppercase tracking-wider text-slate-300">
                             <span>${t('rescan.section_sceneries', 'Scenery Packages')}</span>
                         </div>
                         <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700/60">${totalSceneries}</span>
@@ -11243,8 +11243,7 @@ function displayScanResults(delta, isStartup = false) {
             if (totalGsx > 0) {
                 htmlItems.push(`
                     <div class="flex items-center justify-between pb-1.5 pt-1 border-b border-slate-800/80 mb-2">
-                        <div class="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-purple-300">
-                            <i class="fa-solid fa-square-parking text-purple-400"></i>
+                        <div class="text-xs font-bold uppercase tracking-wider text-purple-300">
                             <span>${t('rescan.section_gsx', 'GSX Profiles')}</span>
                         </div>
                         <span class="text-xs font-bold px-2 py-0.5 rounded-full bg-purple-950/60 text-purple-300 border border-purple-800/40">${totalGsx}</span>
@@ -11262,7 +11261,7 @@ function displayScanResults(delta, isStartup = false) {
     } else {
         // No changes detected (manual rescan)
         if (titleEl) {
-            titleEl.innerHTML = `<i class="fa-solid fa-circle-check text-cyan-400 text-lg mr-2"></i><span>${t('rescan.completed_title', 'Scan Completed')}</span>`;
+            titleEl.innerHTML = `<span>${t('rescan.completed_title', 'Scan Completed')}</span>`;
         }
         if (msgEl) {
             msgEl.innerText = t('rescan.no_changes', 'No changes detected. Your library is up to date.');
@@ -11499,6 +11498,13 @@ function closeRescanModal() {
     const icon = document.getElementById('rescan-icon');
     if (icon) icon.classList.remove('fa-spin');
 
+    const phaseScanning = document.getElementById('rescan-phase-scanning');
+    const phaseGsx = document.getElementById('rescan-phase-gsx');
+    const phaseResult = document.getElementById('rescan-phase-result');
+    if (phaseScanning) phaseScanning.classList.add('hidden');
+    if (phaseGsx) phaseGsx.classList.add('hidden');
+    if (phaseResult) phaseResult.classList.add('hidden');
+
     const statusSub = document.getElementById('rescan-status-sub');
     const titleEl = document.querySelector('#rescan-phase-scanning h3');
     if (titleEl) titleEl.innerText = t('rescan.title_scanning', 'Scanning Sceneries');
@@ -11627,9 +11633,36 @@ async function executeGsxInstallation({ filePath = '', base64Data = '', filename
                         renderRadialAirportDetails(currentRadialAirport);
                     }
                 }
+                const targetAp = (selectedAirport && selectedAirport.icao) ? selectedAirport : (currentRadialAirport || null);
+                const icao = targetAp ? targetAp.icao.toUpperCase() : 'GSX';
+                const apName = targetAp ? (targetAp.name || targetAp.icao) : 'GSX Profile';
+                const files = (res.installed_files && res.installed_files.length > 0) ? res.installed_files : ['profile.ini'];
+
+                const installedCardsHtml = files.map(fileName => `
+                    <div class="p-3 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between gap-4">
+                        <div class="flex items-center gap-3.5 min-w-0 flex-1">
+                            <span class="font-mono font-black text-lg sm:text-xl tracking-tight shrink-0 text-cyan-400">
+                                ${icao}
+                            </span>
+                            <div class="min-w-0 flex-1 text-left">
+                                <div class="text-sm font-bold text-white truncate">
+                                    ${apName}
+                                </div>
+                                <div class="text-xs font-mono text-slate-400 truncate mt-0.5">
+                                    ${fileName}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="shrink-0">
+                            <span class="text-xs font-bold px-3 py-1 rounded-full bg-emerald-600 text-white">${t('rescan.status_added', 'Added')}</span>
+                        </div>
+                    </div>
+                `).join('');
+
                 showCustomModal({
                     title: t('modal.gsx_installed', 'GSX Profile Installed'),
-                    message: `${t('modal.gsx_installed_msg', 'GSX profile(s) successfully extracted and installed:')}\n\n• ${res.installed_files.join('\n• ')}`,
+                    message: installedCardsHtml,
+                    messageBoxClass: 'max-h-72 overflow-y-auto space-y-2 p-2 rounded-2xl bg-slate-950 border border-slate-800',
                     type: 'success',
                     confirmText: t('modal.continue', 'Continue')
                 });
@@ -12081,8 +12114,6 @@ function showCustomModal(titleOrObj, messageStr, typeStr = 'info') {
     const msgEl = document.getElementById('custom-modal-message');
     const cancelBtn = document.getElementById('custom-modal-cancel-btn');
     const confirmBtn = document.getElementById('custom-modal-confirm-btn');
-    const iconBg = document.getElementById('custom-modal-icon-bg');
-    const iconEl = document.getElementById('custom-modal-icon');
 
     if (titleEl) {
         if (title && title.trim().length > 0) {
@@ -12094,10 +12125,20 @@ function showCustomModal(titleOrObj, messageStr, typeStr = 'info') {
         }
     }
     if (msgEl) {
-        if (typeof message === 'string' && (message.includes('<') || message.includes('\n'))) {
-            msgEl.innerHTML = message.replace(/\n/g, '<br>');
+        if (typeof titleOrObj === 'object' && titleOrObj && titleOrObj.messageBoxClass) {
+            msgEl.className = titleOrObj.messageBoxClass;
         } else {
-            msgEl.innerText = message;
+            msgEl.className = "text-xs font-semibold text-slate-200 leading-relaxed bg-slate-950/70 p-4 rounded-2xl border border-slate-800/70 font-sans break-words max-h-64 overflow-y-auto space-y-1";
+        }
+
+        if (typeof message === 'string') {
+            if (message.includes('<')) {
+                msgEl.innerHTML = message;
+            } else if (message.includes('\n')) {
+                msgEl.innerHTML = message.replace(/\n/g, '<br>');
+            } else {
+                msgEl.innerText = message;
+            }
         }
     }
 
