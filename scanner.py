@@ -1191,42 +1191,23 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
             reason = f'{len(active_entries)} conflicting active profiles found for this airport ({", ".join(active_names)}).'
             summary['duplicate'] += 1
 
-            # Smart duplicate recommendation analysis
-            active_src = next((s for s in ap.get('all_sources', []) if not s.get('is_disabled') and not s.get('is_fix_patch') and not s.get('is_addon')), None) if ap else None
-            active_folder = (active_src.get('folder_name') or '').lower() if active_src else ''
-            active_vendor = (active_src.get('vendor') or (ap.get('vendor') if ap else '') or '').lower()
-            act_studio = (
-                detect_studio_from_text(active_vendor) or
-                detect_studio_from_text(active_folder)
-            )
-
+                        # Smart duplicate recommendation analysis
             for pf in parsed_files:
+                f_status, f_reason = evaluate_gsx_studio_match(pf, ap)
+                pf['match_status'] = f_status
+                pf['match_reason'] = f_reason
+
                 score = 0
                 reasons = []
-                t_pkg = (pf.get('target_pkg') or '').lower()
-                c_creator = (pf.get('creator') or '').lower()
-                c_scenario = (pf.get('scenario') or '').lower()
-                p_studio = (
-                    detect_studio_from_text(t_pkg) or
-                    detect_studio_from_text(pf.get('filename')) or
-                    detect_studio_from_text(c_scenario) or
-                    detect_studio_from_text(c_creator)
-                )
-
-                # 1. Exact active package match (+200)
-                if t_pkg and active_folder and (t_pkg == active_folder or _normalize_pkg(t_pkg) == _normalize_pkg(active_folder)):
+                if f_status == 'MATCHED':
                     score += 200
-                    reasons.append(f"Matches active scenery ({pf.get('target_pkg')})")
-                # 2. Studio match (+120)
-                elif p_studio and act_studio and p_studio == act_studio:
-                    score += 120
-                    reasons.append(f"Studio match ({STUDIO_DISPLAY_NAMES.get(p_studio, p_studio.title())})")
-                elif active_vendor and active_vendor != 'unknown' and (active_vendor in t_pkg or active_vendor in c_creator or active_vendor in c_scenario):
-                    score += 100
-                    reasons.append(f"Studio match ({active_vendor})")
-                elif c_creator and active_folder and (c_creator in active_folder):
-                    score += 80
-                    reasons.append(f"Creator matches scenery ({pf.get('creator')})")
+                    reasons.append("Aligned with active scenery")
+                elif f_status == 'MISMATCH_STUDIO':
+                    score -= 200
+                    reasons.append("Designed for a different scenery add-on")
+                elif f_status == 'MISMATCH_DEFAULT':
+                    score -= 150
+                    reasons.append("Designed for default MSFS")
 
                 # MSFS 2024 match
                 if pf.get('is_2024'):
@@ -1240,18 +1221,28 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
                 score += int(ts / (86400 * 30))
 
                 # Gates
-                score += min(50, (pf.get('gates_count') or 0))
+                gates = pf.get('gates_count') or 0
+                score += min(50, gates)
+                if gates >= 50:
+                    reasons.append(f"{gates} gates configured")
 
                 pf['score'] = score
                 pf['score_reasons'] = reasons
 
-            sorted_cand = sorted(parsed_files, key=lambda x: x.get('score', 0), reverse=True)
-            if len(sorted_cand) >= 2 and (sorted_cand[0]['score'] - sorted_cand[1]['score'] >= 10):
+            active_cands = [p for p in parsed_files if not p['is_disabled']]
+            sorted_cand = sorted(active_cands if active_cands else parsed_files, key=lambda x: x.get('score', 0), reverse=True)
+            if sorted_cand:
                 sorted_cand[0]['is_recommended'] = True
-                sorted_cand[0]['recommend_reason'] = ", ".join(sorted_cand[0]['score_reasons']) if sorted_cand[0]['score_reasons'] else "Best matching profile"
+                top_reasons = [r for r in sorted_cand[0].get('score_reasons', []) if not r.startswith('Designed for')]
+                sorted_cand[0]['recommend_reason'] = ", ".join(top_reasons) if top_reasons else "Best matching profile"
         else:
             pf = next((p for p in parsed_files if not p['is_disabled']), parsed_files[0])
             status, reason = evaluate_gsx_studio_match(pf, ap)
+            for other in parsed_files:
+                if 'match_status' not in other or not other.get('match_status'):
+                    o_status, o_reason = evaluate_gsx_studio_match(other, ap)
+                    other['match_status'] = o_status
+                    other['match_reason'] = o_reason
             if status == 'MATCHED':
                 summary['matched'] += 1
             elif status in ('MISMATCH_STUDIO', 'MISMATCH_DEFAULT'):

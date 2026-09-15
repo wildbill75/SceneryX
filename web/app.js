@@ -3812,11 +3812,12 @@ function renderGsxAuditModal() {
                     </div>
                 </div>
             `;
-        } else if (entry.status === 'DUPLICATE') {
+                } else if (entry.status === 'DUPLICATE') {
             html += `<div class="space-y-2 pt-1">`;
             files.forEach(f => {
                 const isActive = !f.is_disabled;
                 const isRecommended = !!f.is_recommended;
+                const isMismatch = (f.match_status || '').startsWith('MISMATCH');
                 const vdgsType = f.vdgs_type;
 
                 let vdgsBadge = '';
@@ -3829,12 +3830,18 @@ function renderGsxAuditModal() {
                     vdgsNote = `<span class="text-indigo-300 font-mono text-[10px] block mt-0.5">Uses GSX native SafeDock guidance system</span>`;
                 }
 
-                let recBadge = '';
-                let recNote = '';
+                let statusBadge = '';
+                let statusNote = '';
                 if (isRecommended) {
-                    recBadge = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg leading-tight bg-emerald-600 text-white border-0 shrink-0">RECOMMENDED</span>`;
+                    statusBadge = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg leading-tight bg-emerald-600 text-white border-0 shrink-0 flex items-center gap-1 shadow-sm"><i class="fa-solid fa-star text-[8px]"></i> RECOMMENDED</span>`;
                     if (f.recommend_reason) {
-                        recNote = `<span class="text-emerald-400 font-mono text-[10px] font-bold block mt-0.5">${escapeHtml(f.recommend_reason)}</span>`;
+                        statusNote = `<span class="text-emerald-400 font-mono text-[10px] font-bold block mt-0.5">✓ ${escapeHtml(f.recommend_reason)}</span>`;
+                    }
+                } else if (isMismatch) {
+                    const mismatchLabel = f.match_status === 'MISMATCH_DEFAULT' ? 'MISMATCH DEFAULT' : 'MISMATCH STUDIO';
+                    statusBadge = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg leading-tight bg-rose-600 text-white border-0 shrink-0">${mismatchLabel}</span>`;
+                    if (f.match_reason) {
+                        statusNote = `<span class="text-rose-400/90 font-mono text-[10px] block mt-0.5">${escapeHtml(f.match_reason)}</span>`;
                     }
                 }
 
@@ -3849,16 +3856,16 @@ function renderGsxAuditModal() {
                 let meta = metaParts.join(' • ');
 
                 html += `
-                    <div class="flex items-center justify-between p-2.5 rounded-xl ${isRecommended ? 'bg-emerald-950 border border-emerald-700' : 'bg-slate-950 border border-slate-800'} gap-2">
+                    <div class="flex items-center justify-between p-2.5 rounded-xl ${isRecommended ? 'bg-emerald-950/40 border border-emerald-600/80 shadow-sm shadow-emerald-950/40' : (isMismatch ? 'bg-rose-950/20 border border-rose-900/60' : 'bg-slate-950 border border-slate-800')} gap-2">
                         <div class="min-w-0 flex-1">
                             <div class="flex items-center gap-1.5 flex-wrap">
                                 <span class="text-xs font-mono font-bold text-slate-200 truncate">${escapeHtml(f.filename)}</span>
-                                ${recBadge}
+                                ${statusBadge}
                                 ${vdgsBadge}
                                 ${isActive ? `<span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded-lg leading-tight bg-slate-800 text-slate-300 border-0">ACTIVE</span>` : `<span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded-lg leading-tight bg-slate-950 text-slate-600 border-0">DISABLED</span>`}
                             </div>
                             <div class="text-[11px] font-mono text-slate-400 truncate mt-0.5">${escapeHtml(meta)}</div>
-                            ${recNote}
+                            ${statusNote}
                             ${vdgsNote}
                         </div>
                         <div class="flex items-center gap-1.5 shrink-0">
@@ -3870,6 +3877,7 @@ function renderGsxAuditModal() {
                             ${isActive ? `
                                 <button onclick="disableGsxProfileFromModal('${icao}', '${escapeJsStr(f.filename)}')" class="text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg leading-tight bg-slate-800 hover:bg-rose-600 text-slate-400 hover:text-white border-0 cursor-pointer transition-colors" title="Disable this profile">Disable</button>
                             ` : ''}
+                            <button onclick="confirmDeleteGsxProfile('${icao}', '${escapeJsStr(f.filename)}')" class="text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg leading-tight bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 border border-slate-700 hover:border-rose-800 cursor-pointer transition-colors" title="Permanently delete from disk"><i class="fa-solid fa-trash text-[10px]"></i></button>
                             <button onclick="revealGsxFileInExplorer('${escapeJsStr(f.path || f.filename)}')" class="text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg leading-tight bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border-0 cursor-pointer transition-colors" title="Reveal in Windows Explorer">Reveal</button>
                         </div>
                     </div>
@@ -7437,67 +7445,7 @@ function renderRadialGsx(ap) {
     if (status === 'MATCHED') {
         statusLabel = 'MATCH';
         statusBadgeClass = 'text-white bg-emerald-600 border-0 font-bold';
-    } else if (status === 'DUPLICATE') {
-        statusLabel = 'DUPLICATE';
-        statusBadgeClass = 'text-slate-950 bg-amber-500 border-0 font-bold';
-    } else if (status === 'MISMATCH_DEFAULT') {
-        statusLabel = 'MISMATCH DEFAULT';
-        statusBadgeClass = 'text-white bg-rose-600 border-0 font-bold';
-    } else if (status === 'MISMATCH_STUDIO') {
-        statusLabel = 'MISMATCH STUDIO';
-        statusBadgeClass = 'text-white bg-rose-600 border-0 font-bold';
-    } else if (status === 'DISABLED') {
-        statusLabel = 'DISABLED';
-        statusBadgeClass = 'text-white bg-slate-600 border-0 font-bold';
-    }
-
-    if (badgeEl) {
-        badgeEl.innerText = statusLabel;
-        badgeEl.className = `text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight ${statusBadgeClass}`;
-    }
-
-    const dropZoneHtml = `
-        <div id="radial-gsx-drop-zone"
-             ondragover="handleRadialGsxDragOver(event)"
-             ondragleave="handleRadialGsxDragLeave(event)"
-             ondrop="handleRadialGsxDrop(event)"
-             onclick="triggerRadialInstallGsxProfile()"
-             class="p-2 rounded-xl bg-slate-950/40 border-2 border-dashed border-slate-800 hover:border-cyan-500/60 flex flex-col items-center justify-center gap-0.5 text-center transition-all cursor-pointer">
-            <span class="text-xs font-bold text-slate-300 uppercase tracking-wide">Drop .zip or .ini here to install</span>
-            <span class="text-[10px] text-slate-500 uppercase font-mono">or click to browse file</span>
-        </div>
-    `;
-
-    if (status === 'MATCHED') {
-        const activeFile = files.find(f => !f.is_disabled) || files[0] || {};
-        const safeGsxPath = encodeURIComponent(activeFile.path || ap.gsx_profile_path || '');
-        let metaParts = [];
-        if (activeFile.gates_count) metaParts.push(`${activeFile.gates_count} gates`);
-        if (activeFile.creator) metaParts.push(activeFile.creator);
-        if (activeFile.scenario) metaParts.push(activeFile.scenario);
-        if (metaParts.length === 0 && ap.vendor && ap.vendor !== 'Unknown') metaParts.push(ap.vendor);
-        const metaText = metaParts.join(' • ');
-
-        container.innerHTML = `
-            <div class="space-y-1.5">
-                <div class="p-2 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-between gap-2">
-                    <div class="min-w-0 flex-1">
-                        <div class="text-xs font-mono font-bold text-white truncate">${activeFile.filename || ap.gsx_profile_filename}</div>
-                        ${metaText ? `<div class="text-[10px] font-mono text-slate-400 truncate mt-0.5">${metaText}</div>` : ''}
-                    </div>
-                    <div class="flex items-center gap-1.5 shrink-0">
-                        <button onclick="revealGsxFile('${safeGsxPath}')" title="Reveal in Windows Explorer" class="w-7 h-7 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs border border-slate-700/60 cursor-pointer shrink-0 transition-colors flex items-center justify-center">
-                            <i class="fa-solid fa-folder-open text-xs"></i>
-                        </button>
-                        <button onclick="openGsxAuditFromDetails()" title="Open GSX Profiles Details on map" class="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-cyan-950 text-slate-300 hover:text-cyan-300 border border-slate-700/60 hover:border-cyan-700 text-[10px] font-mono font-bold cursor-pointer shrink-0 transition-colors">
-                            VIEW LIST
-                        </button>
-                    </div>
-                </div>
-                ${dropZoneHtml}
-            </div>
-        `;
-    } else if (status === 'DUPLICATE') {
+        } else if (status === 'DUPLICATE') {
         const activeEntries = files.filter(f => !f.is_disabled);
         container.innerHTML = `
             <div class="space-y-1.5">
@@ -7507,10 +7455,11 @@ function renderRadialGsx(ap) {
                         VIEW LIST
                     </button>
                 </div>
-                <div class="space-y-1 max-h-36 overflow-y-auto custom-scrollbar pr-0.5">
+                <div class="space-y-1 max-h-40 overflow-y-auto custom-scrollbar pr-0.5">
                     ${files.map(f => {
                         const isActive = !f.is_disabled;
                         const isRec = !!f.is_recommended;
+                        const isMismatch = (f.match_status || '').startsWith('MISMATCH');
                         const safePath = encodeURIComponent(f.path || '');
                         let metaParts = [];
                         if (f.gates_count) metaParts.push(`${f.gates_count} gates`);
@@ -7520,7 +7469,7 @@ function renderRadialGsx(ap) {
                         const fMeta = metaParts.join(' • ');
 
                         return `
-                            <div class="p-2 rounded-xl ${isActive ? (isRec ? 'bg-emerald-950/30 border border-emerald-700/80 shadow-sm shadow-emerald-950/30' : 'bg-slate-900/90 border border-cyan-700/80') : 'bg-slate-950/60 border border-slate-800 opacity-65'} flex items-center justify-between gap-2">
+                            <div class="p-2 rounded-xl ${isActive ? (isRec ? 'bg-emerald-950/40 border border-emerald-600/80 shadow-sm shadow-emerald-950/40' : (isMismatch ? 'bg-rose-950/20 border border-rose-900/60' : 'bg-slate-900/90 border border-cyan-700/80')) : 'bg-slate-950/60 border border-slate-800 opacity-65'} flex items-center justify-between gap-2">
                                 <div class="min-w-0 flex-1">
                                     <div class="flex items-center gap-2 flex-wrap">
                                         <span class="text-xs font-mono font-bold ${isActive ? 'text-white' : 'text-slate-400'} truncate">${escapeHtml(f.filename)}</span>
@@ -7532,9 +7481,15 @@ function renderRadialGsx(ap) {
                                                 <i class="fa-solid fa-star text-[8px]"></i> RECOMMENDED
                                             </span>
                                         ` : ''}
+                                        ${isMismatch ? `
+                                            <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded leading-tight bg-rose-600 text-white border-0">
+                                                ${f.match_status === 'MISMATCH_DEFAULT' ? 'MISMATCH DEFAULT' : 'MISMATCH STUDIO'}
+                                            </span>
+                                        ` : ''}
                                     </div>
                                     ${fMeta ? `<div class="text-[10px] font-mono text-slate-400 truncate mt-0.5">${escapeHtml(fMeta)}</div>` : ''}
-                                    ${f.recommend_reason ? `<div class="text-[9px] font-mono text-emerald-400/90 truncate">${escapeHtml(f.recommend_reason)}</div>` : ''}
+                                    ${isRec && f.recommend_reason ? `<div class="text-[9px] font-mono text-emerald-400/90 font-bold truncate mt-0.5">✓ ${escapeHtml(f.recommend_reason)}</div>` : ''}
+                                    ${isMismatch && f.match_reason ? `<div class="text-[9px] font-mono text-rose-400/90 truncate mt-0.5">${escapeHtml(f.match_reason)}</div>` : ''}
                                 </div>
                                 <div class="flex items-center gap-1.5 shrink-0">
                                     ${!isActive ? `
@@ -7542,7 +7497,7 @@ function renderRadialGsx(ap) {
                                             Activate
                                         </button>
                                     ` : `
-                                        <button onclick="activateGsxDuplicate('${ap.icao}', '${escapeJsStr(f.filename)}')" class="px-2 py-1 rounded-lg bg-emerald-800/80 hover:bg-emerald-700 text-emerald-200 hover:text-white text-[10px] font-mono font-bold border border-emerald-600/40 cursor-pointer transition-colors shadow-sm" title="Keep only this profile and disable others">
+                                        <button onclick="activateGsxDuplicate('${ap.icao}', '${escapeJsStr(f.filename)}')" class="px-2 py-1 rounded-lg ${isRec ? 'bg-emerald-600 hover:bg-emerald-500 text-white' : 'bg-emerald-800/80 hover:bg-emerald-700 text-emerald-200'} text-[10px] font-mono font-bold border border-emerald-600/40 cursor-pointer transition-colors shadow-sm" title="Keep only this profile and disable others">
                                             Keep this
                                         </button>
                                         <button onclick="disableGsxProfileFromAudit('${ap.icao}', '${escapeJsStr(f.filename)}')" class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-rose-900 text-slate-400 hover:text-white text-[10px] font-mono font-bold border border-slate-700/60 cursor-pointer transition-colors" title="Disable this profile">
