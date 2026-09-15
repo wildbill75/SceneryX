@@ -1,3 +1,20 @@
+function getPricingBadgeLabel(type, isPlural = false) {
+    const tLower = (type || '').toLowerCase();
+    if (tLower.includes('payware')) {
+        return isPlural ? t('pricing.payware_plural', 'Payware') : t('pricing.payware_caps', 'PAYWARE');
+    }
+    if (tLower.includes('freeware')) {
+        return isPlural ? t('pricing.freeware_plural', 'Freeware') : t('pricing.freeware_caps', 'FREEWARE');
+    }
+    if (tLower.includes('asobo')) {
+        return t('pricing.asobo_caps', 'ASOBO');
+    }
+    if (tLower.includes('default')) {
+        return t('pricing.default_caps', 'DEFAULT');
+    }
+    return (type || '').toUpperCase();
+}
+
 
 const MAIN_SCENERY_EXCEPTIONS = new Set([
     'wombiiactual-airport-enbr-fleslandfix'
@@ -1504,10 +1521,10 @@ function renderCountryAirportCard(ap) {
             const devName = s.vendor || (s.is_asobo_official ? 'Microsoft / Asobo' : 'Community');
             const sPt = s.pricing_type || (s.is_payware ? 'Payware' : (s.is_asobo_official ? 'Asobo' : 'Freeware'));
             let pBadge = '';
-            if (sPt === 'Payware') pBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-purple-600 text-white">PAYWARE</span>`;
+            if (sPt === 'Payware') pBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-purple-600 text-white">${t('pricing.payware_caps', 'PAYWARE')}</span>`;
             else if (sPt === 'Asobo') pBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-500 text-slate-950 font-black">ASOBO</span>`;
-            else if (sPt === 'Default' || ap.pricing_type === 'Default') pBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-slate-800 text-slate-300 border border-slate-700">DEFAULT</span>`;
-            else pBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-cyan-600 text-white">FREEWARE</span>`;
+            else if (sPt === 'Default' || ap.pricing_type === 'Default') pBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-slate-800 text-slate-300 border border-slate-700">${t('pricing.default_caps', 'DEFAULT')}</span>`;
+            else pBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold bg-cyan-600 text-white">${t('pricing.freeware_caps', 'FREEWARE')}</span>`;
 
             return `
                 <div onclick="event.stopPropagation(); ${sPt === 'Payware' ? `openPaywareStoresModal('${ap.icao}', '${(ap.name || '').replace(/'/g, "\\'")}')` : `openFreewareScenerySearch('${ap.icao}')`}"
@@ -1530,7 +1547,7 @@ function renderCountryAirportCard(ap) {
                 <div class="flex items-center gap-2 min-w-0 flex-1">
                     <span class="text-xs font-mono font-black text-cyan-300 shrink-0">${ap.icao}</span>
                     <span class="text-xs font-bold text-slate-300 group-hover:text-white truncate min-w-0">Microsoft / Asobo (Default)</span>
-                    <span class="px-1.5 py-0.5 rounded-lg text-[9px] font-mono font-bold bg-slate-800 text-slate-300 border-0">DEFAULT</span>
+                    <span class="px-1.5 py-0.5 rounded-lg text-[9px] font-mono font-bold bg-slate-800 text-slate-300 border-0">${t('pricing.default_caps', 'DEFAULT')}</span>
                 </div>
                 <div class="shrink-0 pl-2">
                     <i class="fa-solid fa-circle-check text-emerald-400 text-sm" title="Installed Base Airport"></i>
@@ -1545,7 +1562,7 @@ function renderCountryAirportCard(ap) {
             <div class="flex items-center gap-2 min-w-0 flex-1">
                 <span class="text-xs font-mono font-black text-slate-400 shrink-0">${ap.icao}</span>
                 <span class="text-xs font-semibold text-slate-400 group-hover:text-cyan-300 truncate min-w-0">${t('country.search_freeware', 'Search Freeware on Flightsim.to')}</span>
-                <span class="px-1.5 py-0.5 rounded-lg text-[9px] font-mono font-bold bg-cyan-600 text-white border-0">FREEWARE</span>
+                <span class="px-1.5 py-0.5 rounded-lg text-[9px] font-mono font-bold bg-cyan-600 text-white border-0">${t('pricing.freeware_caps', 'FREEWARE')}</span>
             </div>
             <div class="shrink-0 pl-2">
                 <i class="fa-regular fa-circle text-slate-600 text-sm group-hover:text-cyan-400" title="Search Freeware"></i>
@@ -1560,7 +1577,7 @@ function renderCountryAirportCard(ap) {
             <div class="flex items-center gap-2 min-w-0 flex-1">
                 <span class="text-xs font-mono font-black text-slate-400 shrink-0">${ap.icao}</span>
                 <span class="text-xs font-semibold text-slate-400 group-hover:text-purple-300 truncate min-w-0">${t('country.search_payware', 'Search Payware Stores')}</span>
-                <span class="px-1.5 py-0.5 rounded-lg text-[9px] font-mono font-bold bg-purple-600 text-white border-0">PAYWARE</span>
+                <span class="px-1.5 py-0.5 rounded-lg text-[9px] font-mono font-bold bg-purple-600 text-white border-0">${t('pricing.payware_caps', 'PAYWARE')}</span>
             </div>
             <div class="shrink-0 pl-2">
                 <i class="fa-regular fa-circle text-slate-600 text-sm group-hover:text-purple-400" title="Search Payware Stores"></i>
@@ -2985,11 +3002,11 @@ function renderGsxAuditModal() {
             const location = [item.city, item.country].filter(Boolean).join(', ');
             let pricingBadge = '';
             if (item.pricing_type === 'Payware') {
-                pricingBadge = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-purple-600 text-white border-0">PAYWARE</span>`;
+                pricingBadge = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-purple-600 text-white border-0">${t('pricing.payware_caps', 'PAYWARE')}</span>`;
             } else if (item.pricing_type === 'Asobo') {
                 pricingBadge = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-amber-500 text-slate-950 border-0">ASOBO</span>`;
             } else {
-                pricingBadge = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-cyan-600 text-white border-0">FREEWARE</span>`;
+                pricingBadge = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-cyan-600 text-white border-0">${t('pricing.freeware_caps', 'FREEWARE')}</span>`;
             }
 
             const canPan = !!gsxAuditFloatingMode;
@@ -3334,11 +3351,11 @@ function renderGsxAuditModal() {
         const pt = (ap && ap.pricing_type) || entry.pricing_type;
         const vendor = (ap && ap.vendor) || entry.vendor || '';
         if (pt === 'Payware') {
-            pricingBadge = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-purple-600 text-white border-0">PAYWARE</span>`;
+            pricingBadge = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-purple-600 text-white border-0">${t('pricing.payware_caps', 'PAYWARE')}</span>`;
         } else if (pt === 'Asobo' || vendor === 'Microsoft / Asobo' || entry.is_asobo) {
             pricingBadge = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-amber-500 text-slate-950 border-0">ASOBO</span>`;
         } else if (pt === 'Freeware' || pt === 'Freeware / Flightsim.to' || entry.is_freeware) {
-            pricingBadge = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-cyan-600 text-white border-0">FREEWARE</span>`;
+            pricingBadge = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-cyan-600 text-white border-0">${t('pricing.freeware_caps', 'FREEWARE')}</span>`;
         }
 
         const canPan = !!gsxAuditFloatingMode;
@@ -5184,15 +5201,15 @@ function openAirportRadialMenu(ap, marker, e) {
         badgeClass = 'bg-amber-500 text-slate-950 font-black';
         icaoColor = 'text-amber-400';
     } else if (cat === 'PAYWARE') {
-        badgeLabel = ap.vendor ? `PAYWARE • ${ap.vendor}` : 'PAYWARE';
+        badgeLabel = ap.vendor ? `${t('pricing.payware_caps', 'PAYWARE')} • ${ap.vendor}` : t('pricing.payware_caps', 'PAYWARE');
         badgeClass = 'bg-purple-600 text-white font-bold';
         icaoColor = 'text-purple-400';
     } else if (cat === 'DEFAULT') {
-        badgeLabel = 'DEFAULT • BASE';
+        badgeLabel = `${t('pricing.default_caps', 'DEFAULT')} • BASE`;
         badgeClass = 'bg-blue-600 text-white font-bold';
         icaoColor = 'text-sky-400';
     } else {
-        badgeLabel = ap.vendor ? `FREEWARE • ${ap.vendor}` : 'FREEWARE';
+        badgeLabel = ap.vendor ? `${t('pricing.freeware_caps', 'FREEWARE')} • ${ap.vendor}` : t('pricing.freeware_caps', 'FREEWARE');
         badgeClass = 'bg-cyan-600 text-white font-bold';
         icaoColor = 'text-cyan-400';
     }
@@ -5599,7 +5616,7 @@ function renderAirlineDestAccordionContent(destIcao) {
                  class="py-2.5 px-3.5 rounded-xl border border-slate-700/60 hover:border-cyan-400 bg-slate-950/60 hover:bg-slate-900 transition-all cursor-pointer group flex flex-col gap-1">
                 <div class="flex items-center justify-between gap-2">
                     <span class="text-sm font-bold text-white group-hover:text-cyan-300 transition-colors">Flightsim.to</span>
-                    <span class="text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg bg-cyan-600 text-white uppercase leading-tight border-0">FREEWARE</span>
+                    <span class="text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg bg-cyan-600 text-white uppercase leading-tight border-0">${t('pricing.freeware_caps', 'FREEWARE')}</span>
                 </div>
             </div>
 
@@ -6067,7 +6084,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
                             <span class="text-xs font-bold text-white truncate block hover:text-cyan-300 transition-colors cursor-help" title="${safePkgName}">${titleLabel}</span>
                         </div>
 
-                        <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded ${badgeBg} shrink-0 uppercase leading-tight">${pType}</span>
+                        <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded ${badgeBg} shrink-0 uppercase leading-tight">${getPricingBadgeLabel(pType)}</span>
                     </div>
                 </div>
 
@@ -6120,13 +6137,13 @@ function renderRadialSceneriesExtension(ap, animate = false) {
                         <span class="text-xs font-bold text-white truncate block hover:text-cyan-300 transition-colors cursor-help" title="${defaultAirportName}">${defaultAirportName}</span>
                     </div>
 
-                    <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-blue-600 text-white shrink-0 uppercase leading-tight">DEFAULT</span>
+                    <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-blue-600 text-white shrink-0 uppercase leading-tight">${t('pricing.default_caps', 'DEFAULT')}</span>
                 </div>
             </div>
 
             <!-- Row 2: Clean Base Scenery Description without 'built-in' -->
             <div class="flex items-center justify-between text-[10px] font-mono text-slate-400 pl-[44px] leading-tight">
-                <span class="truncate">MSFS Base Scenery</span>
+                <span class="truncate">${t('drawer.msfs_base_scenery', 'MSFS Base Scenery')}</span>
             </div>
         </div>
     `;
@@ -6212,7 +6229,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
                 <div class="min-w-0 flex-1" title="Flightsim.to">
                     <span class="text-xs font-bold text-white truncate block group-hover:text-cyan-300 transition-colors">Flightsim.to</span>
                 </div>
-                <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-cyan-600 text-white shrink-0 uppercase leading-tight">FREEWARE</span>
+                <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-cyan-600 text-white shrink-0 uppercase leading-tight">${t('pricing.freeware_caps', 'FREEWARE')}</span>
             </div>
         </div>
     `;
@@ -6229,7 +6246,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
                     onpointerdown="event.stopPropagation();"
                     ${hasPendingChange ? '' : 'disabled'}
                     class="px-5 py-2 rounded-xl text-xs font-mono font-bold transition-all ${hasPendingChange ? 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-md shadow-cyan-600/30 cursor-pointer border-0 active:scale-95' : 'bg-slate-800/80 text-slate-500 cursor-not-allowed opacity-50 border border-slate-700/40 pointer-events-none'}">
-                Apply
+                ${t('common.apply', 'Apply')}
             </button>
         </div>
     `;
@@ -6405,15 +6422,15 @@ function updateRadialCoreBadge(ap) {
         badgeClass = 'bg-amber-500 text-slate-950 font-black';
         icaoColor = 'text-amber-400';
     } else if (cat === 'PAYWARE') {
-        badgeLabel = ap.vendor ? `PAYWARE • ${ap.vendor}` : 'PAYWARE';
+        badgeLabel = ap.vendor ? `${t('pricing.payware_caps', 'PAYWARE')} • ${ap.vendor}` : t('pricing.payware_caps', 'PAYWARE');
         badgeClass = 'bg-purple-600 text-white font-bold';
         icaoColor = 'text-purple-400';
     } else if (cat === 'DEFAULT') {
-        badgeLabel = 'DEFAULT • BASE';
+        badgeLabel = `${t('pricing.default_caps', 'DEFAULT')} • BASE`;
         badgeClass = 'bg-blue-600 text-white font-bold';
         icaoColor = 'text-sky-400';
     } else {
-        badgeLabel = ap.vendor ? `FREEWARE • ${ap.vendor}` : 'FREEWARE';
+        badgeLabel = ap.vendor ? `${t('pricing.freeware_caps', 'FREEWARE')} • ${ap.vendor}` : t('pricing.freeware_caps', 'FREEWARE');
         badgeClass = 'bg-cyan-600 text-white font-bold';
         icaoColor = 'text-cyan-400';
     }
@@ -8913,7 +8930,7 @@ function renderUnifiedScenerySelector(ap) {
                         </div>
                         <span class="text-xs font-black uppercase tracking-wider">${t('drawer.default_airport', 'Default MSFS Base Airport')}</span>
                     </div>
-                    <span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-white text-blue-900 uppercase shrink-0">DEFAULT</span>
+                    <span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded-full bg-white text-blue-900 uppercase shrink-0">${t('pricing.default_caps', 'DEFAULT')}</span>
                 </div>
                 <p class="text-[11px] text-blue-100 pl-[48px]">${t('drawer.default_procedural', 'Built-in Procedural MSFS Base Scenery')}</p>
             </div>
@@ -8930,7 +8947,7 @@ function renderUnifiedScenerySelector(ap) {
                         </div>
                         <span class="text-xs font-bold text-slate-200 group-hover:text-white truncate">${t('drawer.default_airport', 'Default MSFS Base Airport')}</span>
                     </div>
-                    <span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30 shrink-0 uppercase">DEFAULT</span>
+                    <span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30 shrink-0 uppercase">${t('pricing.default_caps', 'DEFAULT')}</span>
                 </div>
                 <p class="text-[11px] text-slate-400 pl-[48px]">${t('drawer.default_procedural', 'Built-in Procedural MSFS Base Scenery')}</p>
             </div>
@@ -11021,7 +11038,7 @@ const FILTER_RADIAL_CATEGORIES = [
         get label() { return t('radial.category_pricing', 'PRICING MODEL'); },
         getSummary: () => {
             if (selectedPricing.size === ALL_PRICING_LIST.length) return t('radial.all_models', 'All Models');
-            return `${selectedPricing.size} ${t('common.active', 'Active')}`;
+            return `${selectedPricing.size} ${t('common.active_plural', 'Active')}`;
         }
     },
     {
@@ -11029,7 +11046,7 @@ const FILTER_RADIAL_CATEGORIES = [
         get label() { return t('radial.category_source', 'SCENERY SOURCE'); },
         getSummary: () => {
             if (selectedSources.size === ALL_SOURCES_LIST.length) return t('radial.all_sources', 'All Sources');
-            return `${selectedSources.size} ${t('common.active', 'Active')}`;
+            return `${selectedSources.size} ${t('common.active_plural', 'Active')}`;
         }
     },
     {
@@ -11058,7 +11075,7 @@ const FILTER_RADIAL_CATEGORIES = [
         get label() { return t('radial.category_type', 'AIRPORT TYPE'); },
         getSummary: () => {
             if (selectedTypes.size === ALL_TYPES_LIST.length) return t('radial.all_types', 'All Types');
-            return `${selectedTypes.size} ${t('common.active', 'Active')}`;
+            return `${selectedTypes.size} ${t('common.active_plural', 'Active')}`;
         }
     },
     {
@@ -11270,41 +11287,41 @@ function getAnnularSectorPath(cx, cy, rIn, rOut, startAngleDeg, endAngleDeg, gap
 function getFilterRadialCategoryItems(categoryKey) {
     if (categoryKey === 'pricing') {
         return [
-            { id: 'all', label: 'All Models', isActive: selectedPricing.size === ALL_PRICING_LIST.length },
-            { id: 'Payware', label: 'Payware', isActive: selectedPricing.has('Payware') },
-            { id: 'Freeware / Flightsim.to', label: 'Freeware', isActive: selectedPricing.has('Freeware / Flightsim.to') },
-            { id: 'Asobo', label: 'Asobo', isActive: selectedPricing.has('Asobo') },
-            { id: 'Default', label: 'Default MSFS', isActive: selectedPricing.has('Default') }
+            { id: 'all', label: t('radial.all_models', 'All Models'), isActive: selectedPricing.size === ALL_PRICING_LIST.length },
+            { id: 'Payware', label: t('pricing.payware_plural', 'Payware'), isActive: selectedPricing.has('Payware') },
+            { id: 'Freeware / Flightsim.to', label: t('pricing.freeware_plural', 'Freeware'), isActive: selectedPricing.has('Freeware / Flightsim.to') },
+            { id: 'Asobo', label: t('pricing.asobo_caps', 'Asobo'), isActive: selectedPricing.has('Asobo') },
+            { id: 'Default', label: t('pricing.default_caps', 'Default MSFS'), isActive: selectedPricing.has('Default') }
         ];
     } else if (categoryKey === 'source') {
         return [
-            { id: 'all', label: 'All Sources', isActive: selectedSources.size === ALL_SOURCES_LIST.length },
-            { id: 'Community', label: 'Community', isActive: selectedSources.has('Community') },
-            { id: 'Marketplace', label: 'Marketplace', isActive: selectedSources.has('Marketplace') },
-            { id: 'Official', label: 'Official', isActive: selectedSources.has('Official') }
+            { id: 'all', label: t('radial.all_sources', 'All Sources'), isActive: selectedSources.size === ALL_SOURCES_LIST.length },
+            { id: 'Community', label: t('filter.source_community', 'Community'), isActive: selectedSources.has('Community') },
+            { id: 'Marketplace', label: t('filter.source_marketplace', 'Marketplace'), isActive: selectedSources.has('Marketplace') },
+            { id: 'Official', label: t('filter.source_official', 'Official'), isActive: selectedSources.has('Official') }
         ];
     } else if (categoryKey === 'region') {
         return [
-            { id: 'all', label: 'All Regions', isActive: !selectedRegion },
-            { id: 'weurope', label: 'West Europe', isActive: selectedRegion === 'weurope' },
-            { id: 'eeurope', label: 'East Europe', isActive: selectedRegion === 'eeurope' },
-            { id: 'namerica', label: 'North America', isActive: selectedRegion === 'namerica' },
-            { id: 'camerica_caribbean', label: 'Central America', isActive: selectedRegion === 'camerica_caribbean' },
-            { id: 'samerica', label: 'South America', isActive: selectedRegion === 'samerica' },
-            { id: 'asia', label: 'Asia', isActive: selectedRegion === 'asia' },
-            { id: 'middleeast', label: 'Middle East', isActive: selectedRegion === 'middleeast' },
-            { id: 'nafrica', label: 'North Africa', isActive: selectedRegion === 'nafrica' },
-            { id: 'ssafrica', label: 'Sub-Sahara Africa', isActive: selectedRegion === 'ssafrica' },
-            { id: 'oceania', label: 'Oceania', isActive: selectedRegion === 'oceania' },
-            { id: 'pacific', label: 'Pacific', isActive: selectedRegion === 'pacific' }
+            { id: 'all', label: t('radial.all_regions', 'All Regions'), isActive: !selectedRegion },
+            { id: 'weurope', label: t('radial.region_weurope', 'West Europe'), isActive: selectedRegion === 'weurope' },
+            { id: 'eeurope', label: t('radial.region_eeurope', 'East Europe'), isActive: selectedRegion === 'eeurope' },
+            { id: 'namerica', label: t('radial.region_namerica', 'North America'), isActive: selectedRegion === 'namerica' },
+            { id: 'camerica_caribbean', label: t('radial.region_camerica', 'Central America'), isActive: selectedRegion === 'camerica_caribbean' },
+            { id: 'samerica', label: t('radial.region_samerica', 'South America'), isActive: selectedRegion === 'samerica' },
+            { id: 'asia', label: t('radial.region_asia', 'Asia'), isActive: selectedRegion === 'asia' },
+            { id: 'middleeast', label: t('radial.region_middleeast', 'Middle East'), isActive: selectedRegion === 'middleeast' },
+            { id: 'nafrica', label: t('radial.region_nafrica', 'North Africa'), isActive: selectedRegion === 'nafrica' },
+            { id: 'ssafrica', label: t('radial.region_ssafrica', 'Sub-Sahara Africa'), isActive: selectedRegion === 'ssafrica' },
+            { id: 'oceania', label: t('radial.region_oceania', 'Oceania'), isActive: selectedRegion === 'oceania' },
+            { id: 'pacific', label: t('radial.region_pacific', 'Pacific'), isActive: selectedRegion === 'pacific' }
         ];
     } else if (categoryKey === 'type') {
         return [
-            { id: 'all', label: 'All Types', isActive: selectedTypes.size === ALL_TYPES_LIST.length },
-            { id: 'International', label: 'International', isActive: selectedTypes.has('International') },
-            { id: 'Regional', label: 'Regional', isActive: selectedTypes.has('Regional') },
-            { id: 'General Aviation', label: 'General Aviation', isActive: selectedTypes.has('General Aviation') },
-            { id: 'Heli / Water', label: 'Heli / Water', isActive: selectedTypes.has('Heli / Water') }
+            { id: 'all', label: t('radial.all_types', 'All Types'), isActive: selectedTypes.size === ALL_TYPES_LIST.length },
+            { id: 'International', label: t('radial.type_intl', 'International'), isActive: selectedTypes.has('International') },
+            { id: 'Regional', label: t('radial.type_regional', 'Regional'), isActive: selectedTypes.has('Regional') },
+            { id: 'General Aviation', label: t('radial.type_ga', 'General Aviation'), isActive: selectedTypes.has('General Aviation') },
+            { id: 'Heli / Water', label: t('radial.type_heli', 'Heli / Water'), isActive: selectedTypes.has('Heli / Water') }
         ];
     } else if (categoryKey === 'gsx') {
         return [
@@ -11329,12 +11346,12 @@ function getFilterRadialCategoryItems(categoryKey) {
         };
 
         return [
-            { id: '0', label: 'All Ratings', htmlLabel: '<span>ALL RATINGS</span>', isActive: !selectedMinRating || selectedMinRating === 0 },
-            { id: '3.0', label: '3.0★ & Up', htmlLabel: `${createStarHtml(3.0)}<span>& UP</span>`, isActive: selectedMinRating === 3.0 },
-            { id: '3.5', label: '3.5★ & Up', htmlLabel: `${createStarHtml(3.5)}<span>& UP</span>`, isActive: selectedMinRating === 3.5 },
-            { id: '4.0', label: '4.0★ & Up', htmlLabel: `${createStarHtml(4.0)}<span>& UP</span>`, isActive: selectedMinRating === 4.0 },
-            { id: '4.5', label: '4.5★ & Up', htmlLabel: `${createStarHtml(4.5)}<span>& UP</span>`, isActive: selectedMinRating === 4.5 },
-            { id: '5.0', label: '5.0★ Only', htmlLabel: `${createStarHtml(5.0)}<span>ONLY</span>`, isActive: selectedMinRating === 5.0 }
+            { id: '0', label: t('radial.all_ratings', 'All Ratings'), htmlLabel: `<span>${t('radial.all_ratings', 'ALL RATINGS')}</span>`, isActive: !selectedMinRating || selectedMinRating === 0 },
+            { id: '3.0', label: `3.0★ ${t('radial.and_up', '& Up')}`, htmlLabel: `${createStarHtml(3.0)}<span>${t('radial.and_up', '& UP')}</span>`, isActive: selectedMinRating === 3.0 },
+            { id: '3.5', label: `3.5★ ${t('radial.and_up', '& Up')}`, htmlLabel: `${createStarHtml(3.5)}<span>${t('radial.and_up', '& UP')}</span>`, isActive: selectedMinRating === 3.5 },
+            { id: '4.0', label: `4.0★ ${t('radial.and_up', '& Up')}`, htmlLabel: `${createStarHtml(4.0)}<span>& UP</span>`, isActive: selectedMinRating === 4.0 },
+            { id: '4.5', label: `4.5★ ${t('radial.and_up', '& Up')}`, htmlLabel: `${createStarHtml(4.5)}<span>${t('radial.and_up', '& UP')}</span>`, isActive: selectedMinRating === 4.5 },
+            { id: '5.0', label: `5.0★ ${t('radial.only', 'Only')}`, htmlLabel: `${createStarHtml(5.0)}<span>${t('radial.only', 'ONLY')}</span>`, isActive: selectedMinRating === 5.0 }
         ];
     }
     return [];
@@ -11345,6 +11362,9 @@ function getFilterRadialCategoryItems(categoryKey) {
  */
 function formatFilterRadialLabel(label) {
     if (!label) return '';
+    if (label.includes('<br>') || label.includes('<span') || label.includes('<b')) {
+        return label;
+    }
     return escapeHtml(label.trim());
 }
 
@@ -11524,9 +11544,9 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
                    onclick="handleFilterRadialSubItemClick('${filterRadialActiveCategory}', '${escapeJsStr(item.id)}')"
                    role="button" aria-label="${escapeHtml(item.label)}">
                     <path class="radial-filter-sector-path" ${inlinePathStyle} d="${pathD}" />
-                    <foreignObject x="${(tx - 56).toFixed(1)}" y="${(ty - 18).toFixed(1)}" width="112" height="36" class="pointer-events-none">
+                    <foreignObject x="${(tx - 56).toFixed(1)}" y="${(ty - 20).toFixed(1)}" width="112" height="40" class="pointer-events-none">
                         <div class="w-full h-full flex items-center justify-center text-center px-1">
-                            <span class="text-[10px] font-bold tracking-tight uppercase leading-tight whitespace-nowrap inline-flex items-center justify-center ${isActive ? 'text-white font-extrabold' : 'text-slate-200 group-hover:text-white'}">${formattedItemLabel}</span>
+                            <span class="text-[9.5px] font-bold tracking-tight uppercase leading-tight inline-flex items-center justify-center text-center ${isActive ? 'text-white font-extrabold' : 'text-slate-200 group-hover:text-white'}">${formattedItemLabel}</span>
                         </div>
                     </foreignObject>
                 </g>
