@@ -65,7 +65,7 @@ function rebuildAirportsByIcaoIndex() {
     for (let i = 0; i < allAirportsData.length; i++) {
         const ap = allAirportsData[i];
         if (ap && ap.icao) {
-            airportsByIcao.set(ap.icao, ap);
+            airportsByIcao.set(String(ap.icao).toUpperCase().trim(), ap);
         }
     }
 }
@@ -75,7 +75,8 @@ function getAirportByIcao(icao) {
     if (airportsByIcao.size !== allAirportsData.length) {
         rebuildAirportsByIcaoIndex();
     }
-    return airportsByIcao.get(icao) || null;
+    const clean = String(icao).toUpperCase().trim();
+    return airportsByIcao.get(clean) || null;
 }
 
 function getCleanCityName(rawCity) {
@@ -3673,7 +3674,7 @@ function renderGsxAuditModal() {
         const icao = entry.icao || '';
         const ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao(icao) : null;
         const apName = ap ? (ap.name || icao) : (entry.name || icao);
-        const location = ap ? [ap.city, ap.country].filter(Boolean).join(', ') : ([entry.city, entry.country].filter(Boolean).join(', ') || 'Not Installed');
+        const location = ap ? [ap.city, ap.country].filter(Boolean).join(', ') : ([entry.city, entry.country].filter(Boolean).join(', ') || '');
         const files = entry.files || [];
 
         let badgeHtml = '';
@@ -7509,6 +7510,7 @@ function renderRadialGsx(ap) {
                 <div class="space-y-1 max-h-36 overflow-y-auto custom-scrollbar pr-0.5">
                     ${files.map(f => {
                         const isActive = !f.is_disabled;
+                        const isRec = !!f.is_recommended;
                         const safePath = encodeURIComponent(f.path || '');
                         let metaParts = [];
                         if (f.gates_count) metaParts.push(`${f.gates_count} gates`);
@@ -7518,22 +7520,38 @@ function renderRadialGsx(ap) {
                         const fMeta = metaParts.join(' • ');
 
                         return `
-                            <div class="p-2 rounded-xl ${isActive ? 'bg-slate-900/90 border border-cyan-700/80' : 'bg-slate-950/60 border border-slate-800 opacity-65'} flex items-center justify-between gap-2">
+                            <div class="p-2 rounded-xl ${isActive ? (isRec ? 'bg-emerald-950/30 border border-emerald-700/80 shadow-sm shadow-emerald-950/30' : 'bg-slate-900/90 border border-cyan-700/80') : 'bg-slate-950/60 border border-slate-800 opacity-65'} flex items-center justify-between gap-2">
                                 <div class="min-w-0 flex-1">
-                                    <div class="flex items-center gap-2">
-                                        <span class="text-xs font-mono font-bold ${isActive ? 'text-white' : 'text-slate-400'} truncate">${f.filename}</span>
+                                    <div class="flex items-center gap-2 flex-wrap">
+                                        <span class="text-xs font-mono font-bold ${isActive ? 'text-white' : 'text-slate-400'} truncate">${escapeHtml(f.filename)}</span>
                                         <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded leading-tight ${isActive ? 'bg-cyan-600 text-white border-0' : 'bg-slate-700 text-slate-300 border-0'}">
                                             ${isActive ? 'ACTIVE' : 'DISABLED'}
                                         </span>
+                                        ${isRec ? `
+                                            <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded leading-tight bg-emerald-600 text-white border-0 flex items-center gap-1 shadow-sm" title="${escapeHtml(f.recommend_reason || 'Best matching profile')}">
+                                                <i class="fa-solid fa-star text-[8px]"></i> RECOMMENDED
+                                            </span>
+                                        ` : ''}
                                     </div>
-                                    ${fMeta ? `<div class="text-[10px] font-mono text-slate-400 truncate mt-0.5">${fMeta}</div>` : ''}
+                                    ${fMeta ? `<div class="text-[10px] font-mono text-slate-400 truncate mt-0.5">${escapeHtml(fMeta)}</div>` : ''}
+                                    ${f.recommend_reason ? `<div class="text-[9px] font-mono text-emerald-400/90 truncate">${escapeHtml(f.recommend_reason)}</div>` : ''}
                                 </div>
                                 <div class="flex items-center gap-1.5 shrink-0">
                                     ${!isActive ? `
-                                        <button onclick="activateGsxDuplicate('${ap.icao}', '${f.filename}')" class="px-2 py-0.5 rounded bg-cyan-700 hover:bg-cyan-600 text-white text-[10px] font-mono font-bold border-0 cursor-pointer">
+                                        <button onclick="activateGsxDuplicate('${ap.icao}', '${escapeJsStr(f.filename)}')" class="px-2 py-1 rounded-lg bg-cyan-700 hover:bg-cyan-600 text-white text-[10px] font-mono font-bold border-0 cursor-pointer transition-colors shadow-sm" title="Activate this profile">
                                             Activate
                                         </button>
-                                    ` : ''}
+                                    ` : `
+                                        <button onclick="activateGsxDuplicate('${ap.icao}', '${escapeJsStr(f.filename)}')" class="px-2 py-1 rounded-lg bg-emerald-800/80 hover:bg-emerald-700 text-emerald-200 hover:text-white text-[10px] font-mono font-bold border border-emerald-600/40 cursor-pointer transition-colors shadow-sm" title="Keep only this profile and disable others">
+                                            Keep this
+                                        </button>
+                                        <button onclick="disableGsxProfileFromAudit('${ap.icao}', '${escapeJsStr(f.filename)}')" class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-rose-900 text-slate-400 hover:text-white text-[10px] font-mono font-bold border border-slate-700/60 cursor-pointer transition-colors" title="Disable this profile">
+                                            Disable
+                                        </button>
+                                    `}
+                                    <button onclick="confirmDeleteGsxProfile('${ap.icao}', '${escapeJsStr(f.filename)}')" title="Delete from disk" class="px-2 py-1 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 text-[10px] font-mono font-bold border border-slate-700/60 cursor-pointer transition-colors">
+                                        <i class="fa-solid fa-trash text-[10px]"></i>
+                                    </button>
                                     <button onclick="revealGsxFile('${safePath}')" title="Reveal in Windows Explorer" class="w-6 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs border border-slate-700/60 cursor-pointer flex items-center justify-center">
                                         <i class="fa-solid fa-folder-open text-[10px]"></i>
                                     </button>

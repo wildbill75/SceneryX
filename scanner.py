@@ -807,6 +807,12 @@ KNOWN_STUDIO_ALIASES = {
     'lazerbeam': ['lazerbeam'],
     'slhsimdesigns': ['slhsimdesigns', 'slh'],
     'atelic': ['atelic'],
+    'justflight': ['justflight', 'just flight', 'jf'],
+    'euroscene': ['euroscene', 'euro scene'],
+    'burningblue': ['burningblue', 'burningbluedesign', 'burning blue'],
+    'feelthere': ['feelthere', 'feel there'],
+    'flightsimdevelopment': ['flightsimdevelopment', 'fsdg'],
+    'samscene': ['samscene', 'samscene3d', 'sam scene'],
 }
 
 STUDIO_DISPLAY_NAMES = {
@@ -844,7 +850,21 @@ STUDIO_DISPLAY_NAMES = {
     'lazerbeam': 'Lazerbeam',
     'slhsimdesigns': 'SLH Sim Designs',
     'atelic': 'Atelic',
+    'justflight': 'Just Flight',
+    'euroscene': 'EuroScene',
+    'burningblue': 'Burning Blue Design',
+    'feelthere': 'FeelThere',
+    'flightsimdevelopment': 'FSDG',
+    'samscene': 'SamScene3D',
 }
+
+def _normalize_pkg(pkg_name):
+    if not pkg_name:
+        return ''
+    cleaned = pkg_name.lower().replace('-', '').replace('_', '').replace(' ', '')
+    cleaned = re.sub(r'^(community|official|streamedpackages|fs20|fs24|msfs2020|msfs2024|msfs)', '', cleaned)
+    cleaned = re.sub(r'(airport|scenery|scene)$', '', cleaned)
+    return cleaned
 
 def normalize_studio_name(name):
     if not name:
@@ -872,31 +892,29 @@ def detect_studio_from_text(text):
 
 def evaluate_gsx_studio_match(pf, ap):
     """
-    Evaluates whether an active GSX profile matches the active installed scenery for an airport.
-    Returns: (status, reason)
+    Evaluates whether a GSX profile matches the installed airport scenery.
+    Returns (status, reason)
     status is one of: 'MATCHED', 'MISMATCH_STUDIO', 'MISMATCH_DEFAULT', 'ORPHAN'
     """
     if not ap:
         return ('ORPHAN', 'Airport not found in your MSFS library.')
 
-    target_pkg = pf.get('target_pkg') or ''
-    scenario = pf.get('scenario') or ''
-    filename = pf.get('filename') or ''
-    afcad = pf.get('afcad_path') or ''
-    creator = pf.get('creator') or ''
+    target_pkg = pf.get('target_pkg')
+    filename = pf.get('filename')
+    scenario = pf.get('scenario')
+    creator = pf.get('creator')
+    afcad = pf.get('afcad_path')
 
-    # Identify ACTIVE primary scenery package
+    pricing_type = ap.get('pricing_type', 'Default')
+    is_asobo = bool(ap.get('is_asobo') or (ap.get('vendor') or '').lower() in ('asobo', 'microsoft / asobo', 'microsoft') or any(s.get('is_asobo_official') for s in ap.get('all_sources', [])))
+    asobo_desc = ap.get('package_name') or 'Asobo Handcrafted Scenery'
+
     active_src = next((s for s in ap.get('all_sources', []) if not s.get('is_disabled') and not s.get('is_fix_patch') and not s.get('is_addon')), None)
-    
-    active_folder = (active_src.get('folder_name') or '') if active_src else ''
-    active_vendor = (active_src.get('vendor') or ap.get('vendor') or '') if active_src else (ap.get('vendor') or '')
-    active_pkg_name = (active_src.get('package_name') or ap.get('package_name') or '') if active_src else (ap.get('package_name') or '')
-    pricing_type = (active_src.get('pricing_type') or ap.get('pricing_type') or 'Default') if active_src else (ap.get('pricing_type') or 'Default')
-    is_asobo = bool(active_src.get('is_asobo_official') or pricing_type == 'Asobo') if active_src else bool(ap.get('is_asobo_official') or pricing_type == 'Asobo')
-    asobo_desc = f"Microsoft / Asobo ({ap.get('world_update_name')})" if ap.get('world_update_name') else "Microsoft / Asobo (Handcrafted)"
+    active_folder = (active_src.get('folder_name') or '').lower() if active_src else ''
+    active_vendor = (active_src.get('vendor') or ap.get('vendor') or '').strip() if active_src else (ap.get('vendor') or '').strip()
+    active_pkg_name = (active_src.get('package_name') or ap.get('package_name') or '').strip() if active_src else (ap.get('package_name') or '').strip()
 
-    # Check Default MSFS base airport indicator
-    is_default_target = target_pkg and any(k in target_pkg.lower() for k in ['fs-base-genericairports', 'fs-base', 'asobo-airport', 'microsoft-airport', 'generic'])
+    is_default_target = (target_pkg and 'default' in target_pkg.lower()) or (filename and ('default' in filename.lower() or 'stock' in filename.lower()))
     if is_default_target:
         if pricing_type != 'Default' and not is_asobo:
             active_desc = active_vendor if (active_vendor and active_vendor != 'Unknown') else (active_pkg_name or active_folder or 'Custom Scenery')
@@ -907,7 +925,7 @@ def evaluate_gsx_studio_match(pf, ap):
     if target_pkg and active_folder:
         clean_target = re.sub(r'[^a-z0-9]', '', target_pkg.lower())
         clean_active = re.sub(r'[^a-z0-9]', '', active_folder.lower())
-        if clean_target == clean_active or clean_target in clean_active or clean_active in clean_target:
+        if clean_target == clean_active or clean_target in clean_active or clean_active in clean_target or _normalize_pkg(target_pkg) == _normalize_pkg(active_folder):
             disp_name = active_vendor if (active_vendor and active_vendor != 'Unknown') else target_pkg
             return ('MATCHED', f'Profile perfectly aligned with active scenery ({disp_name}).')
 
@@ -969,18 +987,13 @@ def evaluate_gsx_studio_match(pf, ap):
 
     # 4. If target_pkg is given, check for mismatch against active scenery
     if target_pkg:
+        prof_disp = STUDIO_DISPLAY_NAMES.get(detect_studio_from_text(target_pkg), target_pkg)
         if pricing_type == 'Default' and not is_asobo:
-            return ('MISMATCH_DEFAULT', f'Profile designed for "{target_pkg}", but active scenery is "Microsoft Flight Simulator (Default)".')
+            return ('MISMATCH_DEFAULT', f'Profile designed for "{prof_disp}", but active scenery is "Microsoft Flight Simulator (Default)".')
         elif is_asobo:
-            return ('MISMATCH_STUDIO', f'Profile designed for "{target_pkg}", but active scenery is "{asobo_desc}".')
-        target_detected = detect_studio_from_text(target_pkg)
-        if target_detected and act_studio and target_detected != act_studio:
+            return ('MISMATCH_STUDIO', f'Profile designed for "{prof_disp}", but active scenery is "{asobo_desc}".')
+        else:
             active_desc = active_vendor if (active_vendor and active_vendor != 'Unknown') else (active_pkg_name or active_folder)
-            prof_disp = STUDIO_DISPLAY_NAMES.get(target_detected, target_pkg)
-            return ('MISMATCH_STUDIO', f'Profile designed for "{prof_disp}", but active scenery is "{active_desc}".')
-        elif target_detected and not act_studio:
-            active_desc = active_vendor if (active_vendor and active_vendor != 'Unknown') else (active_pkg_name or active_folder)
-            prof_disp = STUDIO_DISPLAY_NAMES.get(target_detected, target_pkg)
             return ('MISMATCH_STUDIO', f'Profile designed for "{prof_disp}", but active scenery is "{active_desc}".')
 
     # 5. Scenario check: ONLY a mismatch if scenario names a KNOWN OTHER STUDIO that contradicts active scenery
@@ -1001,6 +1014,7 @@ def evaluate_gsx_studio_match(pf, ap):
         return ('MATCHED', 'Profile aligned with Default MSFS airport.')
 
     return ('MATCHED', 'Active GSX profile.')
+
 
 def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
     if not gsx_dir:
@@ -1248,10 +1262,15 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
         results[icao] = {
             'icao': icao,
             'name': ap.get('name') if (ap and ap.get('name')) else db_ap.get('name', f"{icao} Airport"),
-            'city': ap.get('city') if (ap and ap.get('city')) else db_ap.get('municipality', db_ap.get('city', '')),
-            'country': ap.get('country') if (ap and ap.get('country')) else db_ap.get('iso_country', db_ap.get('country', '')),
-            'lat': ap.get('lat') if ap else float(db_ap.get('latitude_deg', 0.0) or 0.0),
-            'lon': ap.get('lon') if ap else float(db_ap.get('longitude_deg', 0.0) or 0.0),
+            'city': ap.get('city') if (ap and ap.get('city')) else db_ap.get('city', ''),
+            'country': ap.get('country') if (ap and ap.get('country')) else db_ap.get('country', ''),
+            'lat': ap.get('lat') if ap else float(db_ap.get('lat', 0.0) or 0.0),
+            'lon': ap.get('lon') if ap else float(db_ap.get('lon', 0.0) or 0.0),
+            'pricing_type': ap.get('pricing_type') if ap else ('Default' if is_known_world_airport else 'Unknown'),
+            'vendor': ap.get('vendor') if ap else ('Microsoft / Asobo' if is_known_world_airport else ''),
+            'is_asobo': bool(ap.get('is_asobo')) if ap else False,
+            'is_freeware': (ap.get('pricing_type') == 'Freeware / Flightsim.to') if ap else False,
+            'is_payware': (ap.get('pricing_type') == 'Payware') if ap else False,
             'status': status,
             'reason': reason,
             'files': parsed_files
