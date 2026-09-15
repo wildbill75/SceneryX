@@ -2496,23 +2496,61 @@ async function applyConflictSelection() {
     }
 }
 
-// Currency carousel has been abandoned in favor of user-selected currency setting
-let currencyInterval = null;
-function startCurrencyCarousel() {
-    if (currencyInterval) clearInterval(currencyInterval);
-    currencyInterval = null;
-}
-function pauseCurrencyCarousel() {}
-function resumeCurrencyCarousel() {}
+// -----------------------------------------------------------------------------
+// PILOT INSIGHTS & FUN STATS TICKER ENGINE
+// -----------------------------------------------------------------------------
+let currentFunStatsList = [];
+let currentFunStatsIndex = 0;
+let funStatsTimer = null;
+let funStatsIsPaused = false;
 
-function updateInvestmentBanner() {
+function flyToAirport(icao) {
+    if (!icao) return;
+    const ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao(icao) : null;
+    if (!ap || ap.lat === undefined || ap.lon === undefined) return;
+    if (typeof map !== 'undefined' && map) {
+        map.flyTo([ap.lat, ap.lon], 9, {
+            animate: true,
+            duration: 1.2
+        });
+        setTimeout(() => {
+            if (typeof showAirportDetails === 'function') {
+                showAirportDetails(ap);
+            }
+        }, 600);
+    }
+}
+
+function filterByWorldCapitals() {
+    if (!window.WORLD_CAPITALS || !allAirportsData) return;
+    const capitalIcaos = new Set(Object.keys(window.WORLD_CAPITALS));
+    const capitalAirports = allAirportsData.filter(ap => capitalIcaos.has(ap.icao.toUpperCase()));
+    if (capitalAirports.length > 0) {
+        currentlyFilteredAirports = capitalAirports;
+        renderAirportMarkers(capitalAirports);
+        if (typeof showToast === 'function') {
+            showToast(`🏛️ ${capitalAirports.length} world capital airports displayed on map`, 'info');
+        }
+    }
+}
+
+function computeFunStats(airports) {
+    if (!airports || airports.length === 0) return [];
+
+    const stats = [];
+
+    // 1. SPENT PAYWARE
     let totalSpentEur = 0;
     let paywareCount = 0;
     let distinctPackageCount = 0;
     const processedBundles = new Set();
+    const customAirports = [];
 
-    allAirportsData.forEach(ap => {
+    airports.forEach(ap => {
         const pt = getAirportPricingType(ap);
+        const isCustom = (pt !== 'Default');
+        if (isCustom) customAirports.push(ap);
+
         if (pt === "Payware") {
             paywareCount++;
             if (ap.is_bundle || ap.bundle_id) {
@@ -2529,24 +2567,334 @@ function updateInvestmentBanner() {
         }
     });
 
-    const bannerEl = document.getElementById('investment-banner-text');
-    const cardEl = document.getElementById('investment-card');
+    const formattedSpent = formatCurrency(totalSpentEur);
+    const avgPriceEur = distinctPackageCount > 0 ? (totalSpentEur / distinctPackageCount) : 0;
+    const avgFormatted = formatCurrency(avgPriceEur);
 
-    if (bannerEl) {
-        const formatted = formatCurrency(totalSpentEur);
-        bannerEl.innerText = formatted;
-    }
-
-    if (cardEl) {
-        const avgPriceEur = distinctPackageCount > 0 ? (totalSpentEur / distinctPackageCount) : 0;
-        const avgFormatted = formatCurrency(avgPriceEur);
-        cardEl.title = t('header.payware_tooltip', `Total based on {count} purchased payware packages ({airports} airports covered). Average: {avg} / product.`, {
+    stats.push({
+        id: 'spent',
+        html: t('funstats.spent', 'YOU HAVE SPENT <span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{amount}</span> ON PAYWARE SCENERIES SO FAR !', { amount: formattedSpent }),
+        tooltip: t('funstats.spent_tooltip', 'Total based on {count} purchased payware packages ({airports} airports covered). Average: {avg} / product. Click to filter.', {
             count: distinctPackageCount,
             airports: paywareCount,
             avg: avgFormatted
+        }),
+        action: () => {
+            if (typeof filterByPricingPill === 'function') filterByPricingPill('Payware');
+        }
+    });
+
+    // 2. CAPITALS COVERED
+    if (window.WORLD_CAPITALS) {
+        const totalCapitals = window.WORLD_CAPITALS_TOTAL_COUNTRIES || 195;
+        const ownedCapitalsSet = new Set();
+
+        customAirports.forEach(ap => {
+            const capInfo = window.getCapitalInfo(ap.icao);
+            if (capInfo) {
+                ownedCapitalsSet.add(capInfo.country);
+            }
+        });
+
+        const count = ownedCapitalsSet.size;
+        const pct = Math.round((count / totalCapitals) * 100);
+
+        stats.push({
+            id: 'capitals',
+            html: t('funstats.capitals', 'YOU OWN <span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{count} / {total}</span> WORLD CAPITALS ({pct}%)', {
+                count: count,
+                total: totalCapitals,
+                pct: pct
+            }),
+            tooltip: t('funstats.capitals_tooltip', 'Click to view and filter your world capital airports on the map.'),
+            action: () => {
+                filterByWorldCapitals();
+            }
         });
     }
+
+    // 3. TOP COUNTRY
+    const countryCounts = {};
+    customAirports.forEach(ap => {
+        const c = ap.country || ap.iso_country;
+        if (c && c !== 'Unknown') {
+            countryCounts[c] = (countryCounts[c] || 0) + 1;
+        }
+    });
+    let topCountry = null;
+    let topCountryCount = 0;
+    for (const [cName, cCount] of Object.entries(countryCounts)) {
+        if (cCount > topCountryCount) {
+            topCountry = cName;
+            topCountryCount = cCount;
+        }
+    }
+    if (topCountry && topCountryCount >= 2) {
+        const displayName = (typeof getLocalizedCountryName === 'function') ? getLocalizedCountryName(null, topCountry) : topCountry;
+        stats.push({
+            id: 'top_country',
+            html: t('funstats.top_country', 'TOP DESTINATION: <span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{country}</span> ({count} ADDON SCENERIES)', {
+                country: displayName,
+                count: topCountryCount
+            }),
+            tooltip: t('funstats.top_country_tooltip', 'Click to center map on {country} and explore its addons.', { country: displayName }),
+            action: () => {
+                let cCode = null;
+                if (typeof ISO_TO_COUNTRY_NAME !== 'undefined') {
+                    for (const [code, name] of Object.entries(ISO_TO_COUNTRY_NAME)) {
+                        if (name.toLowerCase() === topCountry.toLowerCase()) {
+                            cCode = code;
+                            break;
+                        }
+                    }
+                }
+                if (cCode && typeof openCountryDrawer === 'function') {
+                    openCountryDrawer(cCode, displayName);
+                } else {
+                    const searchInput = document.getElementById('search-input');
+                    if (searchInput) {
+                        searchInput.value = displayName;
+                        handleSearch();
+                    }
+                }
+            }
+        });
+    }
+
+    // 4. TOTAL DISK FOOTPRINT
+    let totalBytes = 0;
+    customAirports.forEach(ap => {
+        (ap.all_sources || []).forEach(src => {
+            if (src.size_bytes && typeof src.size_bytes === 'number') {
+                totalBytes += src.size_bytes;
+            } else if (src.size_str) {
+                const mGb = src.size_str.match(/([\d\.]+)\s*GB/i);
+                const mMb = src.size_str.match(/([\d\.]+)\s*MB/i);
+                if (mGb) totalBytes += parseFloat(mGb[1]) * 1024 * 1024 * 1024;
+                else if (mMb) totalBytes += parseFloat(mMb[1]) * 1024 * 1024;
+            }
+        });
+    });
+    if (totalBytes > 0) {
+        const sizeGb = (totalBytes / (1024 * 1024 * 1024)).toFixed(1);
+        stats.push({
+            id: 'disk_space',
+            html: t('funstats.disk_space', 'YOUR SCENERIES OCCUPY <span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{size}</span> ON YOUR SSD', {
+                size: `${sizeGb} GB`
+            }),
+            tooltip: t('funstats.disk_space_tooltip', 'Cumulative disk footprint across all scanned MSFS airport packages.'),
+            action: () => {
+                showToast(`💾 Total SSD footprint: ${sizeGb} GB across ${customAirports.length} custom addons`, 'info');
+            }
+        });
+    }
+
+    // 5. TOP STUDIO / DEVELOPER
+    const studioCounts = {};
+    customAirports.forEach(ap => {
+        const v = (ap.vendor || '').trim();
+        if (v && v !== 'Unknown' && v !== 'Microsoft / Asobo' && v !== 'Asobo' && v !== 'Community' && v !== 'Default') {
+            studioCounts[v] = (studioCounts[v] || 0) + 1;
+        }
+    });
+    let topStudio = null;
+    let topStudioCount = 0;
+    for (const [sName, sCount] of Object.entries(studioCounts)) {
+        if (sCount > topStudioCount) {
+            topStudio = sName;
+            topStudioCount = sCount;
+        }
+    }
+    if (topStudio && topStudioCount >= 2) {
+        stats.push({
+            id: 'top_studio',
+            html: t('funstats.top_studio', 'TOP STUDIO: <span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{studio}</span> ({count} AIRPORTS)', {
+                studio: topStudio,
+                count: topStudioCount
+            }),
+            tooltip: t('funstats.top_studio_tooltip', 'Click to filter and search sceneries crafted by {studio}.', { studio: topStudio }),
+            action: () => {
+                const searchInput = document.getElementById('search-input');
+                if (searchInput) {
+                    searchInput.value = topStudio;
+                    handleSearch();
+                }
+            }
+        });
+    }
+
+    // 6. GSX EQUIPMENT RATE
+    if (customAirports.length > 0) {
+        const gsxCount = customAirports.filter(ap => ap.has_gsx_profile).length;
+        const gsxPct = Math.round((gsxCount / customAirports.length) * 100);
+        stats.push({
+            id: 'gsx_rate',
+            html: t('funstats.gsx_rate', '<span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{pct}%</span> OF YOUR SCENERIES HAVE AN ACTIVE GSX PROFILE ({active}/{total})', {
+                pct: gsxPct,
+                active: gsxCount,
+                total: customAirports.length
+            }),
+            tooltip: t('funstats.gsx_rate_tooltip', 'Click to open the GSX Profiles Audit and resolve missing or duplicate profiles.'),
+            action: () => {
+                if (typeof openGsxAuditModal === 'function') openGsxAuditModal('ALL');
+            }
+        });
+    }
+
+    // 7. HIGHEST ELEVATION AIRPORT
+    let highestAp = null;
+    let maxElevation = -9999;
+    (customAirports.length > 0 ? customAirports : airports).forEach(ap => {
+        const elev = typeof ap.elevation === 'number' ? ap.elevation : (ap.alt || ap.altitude || -9999);
+        if (elev > maxElevation && elev < 20000) {
+            maxElevation = elev;
+            highestAp = ap;
+        }
+    });
+    if (highestAp && maxElevation > 3000) {
+        const cleanName = getCleanAirportName(highestAp.name, highestAp.city) || highestAp.icao;
+        stats.push({
+            id: 'highest_airport',
+            html: t('funstats.highest_airport', 'HIGHEST ELEVATION: <span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{name} ({icao})</span> AT {elevation} FT !', {
+                name: cleanName,
+                icao: highestAp.icao,
+                elevation: maxElevation.toLocaleString()
+            }),
+            tooltip: t('funstats.highest_airport_tooltip', 'Highest airport in your scenery collection. Click to fly and center camera.'),
+            action: () => {
+                flyToAirport(highestAp.icao);
+            }
+        });
+    }
+
+    // 8. POLAR / NORTHERNMOST AIRPORT
+    let northernAp = null;
+    let maxLat = -90;
+    (customAirports.length > 0 ? customAirports : airports).forEach(ap => {
+        const lat = typeof ap.lat === 'number' ? ap.lat : (typeof ap.latitude === 'number' ? ap.latitude : -90);
+        if (lat > maxLat && lat <= 90) {
+            maxLat = lat;
+            northernAp = ap;
+        }
+    });
+    if (northernAp && maxLat > 60) {
+        const cleanName = getCleanAirportName(northernAp.name, northernAp.city) || northernAp.icao;
+        stats.push({
+            id: 'northern_airport',
+            html: t('funstats.northern_airport', 'POLAR OUTPOST: <span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{name} ({icao})</span> AT {lat}°N', {
+                name: cleanName,
+                icao: northernAp.icao,
+                lat: maxLat.toFixed(1)
+            }),
+            tooltip: t('funstats.northern_airport_tooltip', 'Northernmost custom airport in your collection. Click to fly and center camera.'),
+            action: () => {
+                flyToAirport(northernAp.icao);
+            }
+        });
+    }
+
+    // 9. GLOBAL REACH
+    const distinctCountriesCount = Object.keys(countryCounts).length;
+    if (distinctCountriesCount >= 3) {
+        stats.push({
+            id: 'global_reach',
+            html: t('funstats.global_reach', 'YOUR ADDONS SPAN OVER <span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{count} COUNTRIES</span> WORLDWIDE', {
+                count: distinctCountriesCount
+            }),
+            tooltip: t('funstats.global_reach_tooltip', 'Click to reset filters and view your global world coverage.'),
+            action: () => {
+                if (typeof resetAllFilters === 'function') resetAllFilters();
+                if (typeof showToast === 'function') showToast(`🌍 Showing all airports across ${distinctCountriesCount} countries`, 'info');
+            }
+        });
+    }
+
+    return stats;
 }
+
+function renderFunStatsSlide(index, animate = true) {
+    if (!currentFunStatsList || currentFunStatsList.length === 0) return;
+    currentFunStatsIndex = (index + currentFunStatsList.length) % currentFunStatsList.length;
+    const item = currentFunStatsList[currentFunStatsIndex];
+    const contentEl = document.getElementById('fun-stats-content');
+    const cardEl = document.getElementById('investment-card');
+    const indicatorEl = document.getElementById('fun-stats-indicator');
+
+    if (indicatorEl) {
+        indicatorEl.innerText = `${currentFunStatsIndex + 1}/${currentFunStatsList.length}`;
+    }
+
+    if (cardEl && item) {
+        cardEl.title = item.tooltip || '';
+    }
+
+    if (contentEl && item) {
+        if (animate) {
+            contentEl.style.opacity = '0';
+            contentEl.style.transform = 'translateY(6px)';
+            setTimeout(() => {
+                contentEl.innerHTML = item.html;
+                contentEl.style.opacity = '1';
+                contentEl.style.transform = 'translateY(0)';
+            }, 180);
+        } else {
+            contentEl.innerHTML = item.html;
+            contentEl.style.opacity = '1';
+            contentEl.style.transform = 'translateY(0)';
+        }
+    }
+}
+
+function nextFunStatsSlide() {
+    renderFunStatsSlide(currentFunStatsIndex + 1, true);
+}
+
+function prevFunStatsSlide() {
+    renderFunStatsSlide(currentFunStatsIndex - 1, true);
+}
+
+function handleFunStatsCardClick() {
+    if (!currentFunStatsList || currentFunStatsList.length === 0) return;
+    const item = currentFunStatsList[currentFunStatsIndex];
+    if (item && typeof item.action === 'function') {
+        item.action();
+    }
+}
+
+function startFunStatsCarousel() {
+    if (funStatsTimer) clearInterval(funStatsTimer);
+    funStatsTimer = setInterval(() => {
+        if (!funStatsIsPaused) {
+            nextFunStatsSlide();
+        }
+    }, 8000);
+}
+
+function pauseFunStatsCarousel() {
+    funStatsIsPaused = true;
+}
+
+function resumeFunStatsCarousel() {
+    funStatsIsPaused = false;
+}
+
+function updateInvestmentBanner() {
+    if (!allAirportsData || allAirportsData.length === 0) return;
+    currentFunStatsList = computeFunStats(allAirportsData);
+    renderFunStatsSlide(currentFunStatsIndex, false);
+    if (!funStatsTimer) {
+        startFunStatsCarousel();
+    }
+}
+
+window.nextFunStatsSlide = nextFunStatsSlide;
+window.prevFunStatsSlide = prevFunStatsSlide;
+window.handleFunStatsCardClick = handleFunStatsCardClick;
+window.pauseFunStatsCarousel = pauseFunStatsCarousel;
+window.resumeFunStatsCarousel = resumeFunStatsCarousel;
+window.updateInvestmentBanner = updateInvestmentBanner;
+window.filterByWorldCapitals = filterByWorldCapitals;
+
 
 // -----------------------------------------------------------------------------
 // GSX PROFILES AUDIT & RESOLUTION MODAL (CENTRALIZED ONE-SCREEN MANAGEMENT)

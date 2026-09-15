@@ -736,9 +736,36 @@
                 </div>
             </div>
 
-            <!-- SPENT CAROUSEL SUB-BANNER (AIRY MARGIN TOP) -->
-            <div id="investment-card" class="text-sm lg:text-base font-extrabold text-slate-200 font-mono tracking-wider uppercase flex items-center justify-center gap-1.5 cursor-pointer hover:text-white transition-colors py-0.5" title="Based on catalog market prices & custom entries.">
-                <span><span data-i18n="stat.spent_prefix">YOU HAVE SPENT</span> <span id="investment-banner-text" class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5 ">$0.00</span> <span data-i18n="stat.spent_suffix">ON PAYWARE SCENERIES SO FAR !</span></span>
+            <!-- PILOT INSIGHTS & FUN STATS CAROUSEL BANNER -->
+            <div id="fun-stats-banner" class="relative group/ticker flex items-center justify-center max-w-[840px] mx-auto py-0.5 select-none"
+                 onmouseenter="pauseFunStatsCarousel()"
+                 onmouseleave="resumeFunStatsCarousel()">
+                
+                <!-- Left Nav Arrow (Discrete, appears on hover) -->
+                <button id="fun-stats-prev-btn" onclick="event.stopPropagation(); prevFunStatsSlide()"
+                        class="opacity-0 group-hover/ticker:opacity-80 hover:opacity-100 transition-opacity p-1 text-slate-400 hover:text-cyan-400 cursor-pointer border-0 bg-transparent shrink-0 text-sm active:scale-90"
+                        title="Previous fact">
+                    <i class="fa-solid fa-chevron-left"></i>
+                </button>
+
+                <!-- Center Interactive Fact Card -->
+                <div id="investment-card" onclick="handleFunStatsCardClick()"
+                     class="text-xs sm:text-sm lg:text-base font-extrabold text-slate-200 font-mono tracking-wider uppercase flex items-center justify-center text-center cursor-pointer hover:text-white transition-all px-2.5 py-0.5 min-h-[28px] overflow-hidden"
+                     title="Click to explore on map">
+                    <div id="fun-stats-content" class="transition-all duration-300 transform inline-flex items-center justify-center flex-wrap gap-1.5">
+                        <span><span data-i18n="stat.spent_prefix">YOU HAVE SPENT</span> <span id="investment-banner-text" class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5 ">$0.00</span> <span data-i18n="stat.spent_suffix">ON PAYWARE SCENERIES SO FAR !</span></span>
+                    </div>
+                </div>
+
+                <!-- Right Nav Arrow (Discrete, appears on hover) -->
+                <button id="fun-stats-next-btn" onclick="event.stopPropagation(); nextFunStatsSlide()"
+                        class="opacity-0 group-hover/ticker:opacity-80 hover:opacity-100 transition-opacity p-1 text-slate-400 hover:text-cyan-400 cursor-pointer border-0 bg-transparent shrink-0 text-sm active:scale-90"
+                        title="Next fact">
+                    <i class="fa-solid fa-chevron-right"></i>
+                </button>
+
+                <!-- Indicator Pill (Slide index, e.g. 1/8) -->
+                <span id="fun-stats-indicator" class="opacity-0 group-hover/ticker:opacity-60 transition-opacity text-[10px] font-mono text-slate-400 font-bold ml-1 shrink-0 hidden sm:inline">1/8</span>
             </div>
         </div>
 
@@ -2156,6 +2183,8 @@
 
     <!-- LOCALES DICTIONARY SCRIPT -->
     <script src="locales.js?v=1.0.4"></script>
+    <!-- WORLD CAPITALS DATABASE SCRIPT -->
+    <script src="capitals_data.js?v=1.0.4"></script>
     <!-- MAIN APP JS SCRIPT -->
     <script src="app.js?v=1.0.4"></script>
 </body>
