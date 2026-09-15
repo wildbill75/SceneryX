@@ -7438,14 +7438,82 @@ function renderRadialGsx(ap) {
         }];
     }
 
-    // Diagnostic badge styling (Pure solid flat colors, uniform typography, no borders)
+    // Diagnostic badge styling
     let statusLabel = 'NONE';
     let statusBadgeClass = 'text-slate-300 bg-slate-700 border-0 font-bold';
 
     if (status === 'MATCHED') {
         statusLabel = 'MATCH';
         statusBadgeClass = 'text-white bg-emerald-600 border-0 font-bold';
-        } else if (status === 'DUPLICATE') {
+    } else if (status === 'DUPLICATE') {
+        statusLabel = 'DUPLICATE';
+        statusBadgeClass = 'text-white bg-amber-600 border-0 font-bold';
+    } else if (status === 'MISMATCH_DEFAULT') {
+        statusLabel = 'MISMATCH DEFAULT';
+        statusBadgeClass = 'text-white bg-rose-600 border-0 font-bold';
+    } else if (status === 'MISMATCH_STUDIO') {
+        statusLabel = 'MISMATCH STUDIO';
+        statusBadgeClass = 'text-white bg-rose-600 border-0 font-bold';
+    } else if (status === 'DISABLED') {
+        statusLabel = 'DISABLED';
+        statusBadgeClass = 'text-slate-400 bg-slate-900 border border-slate-700 font-bold';
+    } else if (status === 'ORPHAN') {
+        statusLabel = 'ORPHAN';
+        statusBadgeClass = 'text-slate-400 bg-slate-800 border-0 font-bold';
+    }
+
+    if (badgeEl) {
+        badgeEl.innerText = statusLabel;
+        badgeEl.className = `text-[10px] font-mono px-2 py-0.5 rounded uppercase tracking-wider ${statusBadgeClass}`;
+    }
+
+    const dropZoneHtml = `
+        <div id="radial-gsx-dropzone" 
+             ondragover="handleRadialGsxDragOver(event)" 
+             ondragleave="handleRadialGsxDragLeave(event)" 
+             ondrop="handleRadialGsxDrop(event, '${ap.icao}')"
+             onclick="triggerRadialGsxFileBrowse('${ap.icao}')"
+             class="p-2.5 rounded-xl border border-dashed border-slate-700/80 hover:border-cyan-500 bg-slate-950/40 hover:bg-slate-900/60 transition-all flex flex-col items-center justify-center cursor-pointer group mt-2">
+            <div class="text-[11px] font-mono font-bold text-slate-300 group-hover:text-cyan-300 transition-colors flex items-center gap-1.5">
+                <i class="fa-solid fa-file-arrow-up text-xs text-slate-400 group-hover:text-cyan-400"></i>
+                <span>DROP .ZIP OR .INI HERE TO INSTALL</span>
+            </div>
+            <div class="text-[9px] font-mono text-slate-400 mt-0.5">OR CLICK TO BROWSE FILE</div>
+        </div>
+    `;
+
+    if (status === 'MATCHED') {
+        const activeFile = files.find(f => !f.is_disabled) || files[0] || {};
+        const safePath = encodeURIComponent(activeFile.path || '');
+        let metaParts = [];
+        if (activeFile.gates_count) metaParts.push(`${activeFile.gates_count} gates`);
+        if (activeFile.creator) metaParts.push(activeFile.creator);
+        if (activeFile.scenario) metaParts.push(activeFile.scenario);
+        if (activeFile.target_pkg) metaParts.push(activeFile.target_pkg);
+        const fMeta = metaParts.join(' • ');
+
+        container.innerHTML = `
+            <div class="space-y-1.5">
+                <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between gap-2">
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-mono font-bold text-white truncate">${escapeHtml(activeFile.filename || `${ap.icao}.ini`)}</span>
+                        </div>
+                        ${fMeta ? `<div class="text-[10px] font-mono text-slate-400 truncate mt-0.5">${escapeHtml(fMeta)}</div>` : ''}
+                    </div>
+                    <div class="flex items-center gap-1.5 shrink-0">
+                        <button onclick="revealGsxFile('${safePath}')" title="Reveal in Windows Explorer" class="w-7 h-7 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs border border-slate-700/60 cursor-pointer shrink-0 transition-colors flex items-center justify-center">
+                            <i class="fa-solid fa-folder-open text-xs"></i>
+                        </button>
+                        <button onclick="openGsxAuditFromDetails('MATCHED')" title="Open GSX Profiles Details on map" class="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-cyan-950 text-slate-300 hover:text-cyan-300 border border-slate-700/60 hover:border-cyan-700 text-[10px] font-mono font-bold cursor-pointer shrink-0 transition-colors">
+                            VIEW LIST
+                        </button>
+                    </div>
+                </div>
+                ${dropZoneHtml}
+            </div>
+        `;
+    } else if (status === 'DUPLICATE') {
         const activeEntries = files.filter(f => !f.is_disabled);
         container.innerHTML = `
             <div class="space-y-1.5">
@@ -7521,17 +7589,16 @@ function renderRadialGsx(ap) {
     } else if (status === 'MISMATCH_DEFAULT' || status === 'MISMATCH_STUDIO') {
         const activeFile = files.find(f => !f.is_disabled) || files[0];
         const safePath = encodeURIComponent(activeFile ? activeFile.path : '');
-        const targetVendor = (ap.vendor && ap.vendor !== 'Unknown') ? ap.vendor : ap.package_name;
         container.innerHTML = `
             <div class="space-y-1.5">
                 <div class="p-2 rounded-xl bg-rose-950/40 border border-rose-900/60 text-[11px] font-mono text-rose-200 leading-tight">
-                    ${reason}
+                    ${escapeHtml(reason)}
                 </div>
                 ${activeFile ? `
                     <div class="p-2 rounded-xl bg-slate-900/60 border border-slate-800 flex items-center justify-between gap-2">
                         <div class="min-w-0 flex-1">
-                            <div class="text-xs font-mono font-bold text-white truncate">${activeFile.filename}</div>
-                            ${activeFile.scenario ? `<div class="text-[10px] font-mono text-slate-400 truncate mt-0.5">${activeFile.scenario}</div>` : ''}
+                            <div class="text-xs font-mono font-bold text-white truncate">${escapeHtml(activeFile.filename)}</div>
+                            ${activeFile.scenario ? `<div class="text-[10px] font-mono text-slate-400 truncate mt-0.5">${escapeHtml(activeFile.scenario)}</div>` : ''}
                         </div>
                         <div class="flex items-center gap-1.5 shrink-0">
                             <button onclick="revealGsxFile('${safePath}')" title="Reveal in Windows Explorer" class="w-7 h-7 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs border border-slate-700/60 cursor-pointer shrink-0 transition-colors flex items-center justify-center">
@@ -7562,9 +7629,9 @@ function renderRadialGsx(ap) {
                     const safePath = encodeURIComponent(f.path || '');
                     return `
                         <div class="p-2 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center justify-between gap-2">
-                            <span class="text-xs font-mono text-slate-300 truncate">${f.filename}</span>
+                            <span class="text-xs font-mono text-slate-300 truncate">${escapeHtml(f.filename)}</span>
                             <div class="flex items-center gap-1.5 shrink-0">
-                                <button onclick="enableGsxProfile('${ap.icao}', '${f.filename}')" class="px-2 py-0.5 rounded bg-cyan-700 hover:bg-cyan-600 text-white text-[10px] font-mono font-bold border-0 cursor-pointer">
+                                <button onclick="enableGsxProfile('${ap.icao}', '${escapeJsStr(f.filename)}')" class="px-2 py-0.5 rounded bg-cyan-700 hover:bg-cyan-600 text-white text-[10px] font-mono font-bold border-0 cursor-pointer">
                                     Enable
                                 </button>
                                 <button onclick="revealGsxFile('${safePath}')" title="Reveal in Windows Explorer" class="w-6 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs border border-slate-700/60 cursor-pointer flex items-center justify-center">
@@ -7596,7 +7663,6 @@ function renderRadialGsx(ap) {
         `;
     }
 }
-
 function revealGsxFile(safePath) {
     const p = decodeURIComponent(safePath || '');
     if (window.pywebview && window.pywebview.api) {
