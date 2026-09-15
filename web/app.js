@@ -4348,12 +4348,75 @@ function searchGsxProfileFromModal(icao) {
     }
 }
 
-function checkGsxDropConflictAndInstall(icao, installPayload) {
+function extractIcaoFromDroppedFile(filename, contentStr = '') {
+    const fn = (filename || '').toUpperCase();
+    const cleanFn = fn.replace(/\.DISABLED$/, '').replace(/\.INI$/, '').replace(/\.ZIP$/, '');
+    
+    // Check afcad_path in content if provided
+    if (contentStr) {
+        const afcadMatch = contentStr.match(/afcad_path\s*=\s*([^\r\n]+)/i);
+        if (afcadMatch) {
+            const afcadVal = afcadMatch[1].toUpperCase();
+            const bglMatch = afcadVal.match(/([A-Z]{4})(?:-[A-Z0-9]+)?(?:-SCENE)?\.BGL/i) || afcadVal.match(/[-_\\/]([A-Z]{4})[-_\\/]/i);
+            if (bglMatch && bglMatch[1]) {
+                const cand = bglMatch[1].toUpperCase();
+                if (typeof getAirportByIcao === 'function' && getAirportByIcao(cand)) return cand;
+                if (typeof WORLD_CAPITAL_AIRPORTS !== 'undefined' && WORLD_CAPITAL_AIRPORTS[cand]) return cand;
+                return cand;
+            }
+        }
+    }
+
+    // Direct 4-letter token in filename
+    const tokens = cleanFn.split(/[-_ .]+/);
+    for (const tok of tokens) {
+        if (tok.length === 4 && /^[A-Z]{4}$/.test(tok)) {
+            if (typeof getAirportByIcao === 'function' && getAirportByIcao(tok)) return tok;
+            return tok;
+        }
+    }
+    return null;
+}
+
+function checkGsxDropConflictAndInstall(icao, installPayload, rawContent = '') {
     const targetIcao = (icao || '').toUpperCase();
+    const newFilename = installPayload.filename || (installPayload.filePath ? installPayload.filePath.split(/[\\/]/).pop() : 'new_profile.ini');
+    const detectedIcao = extractIcaoFromDroppedFile(newFilename, rawContent);
+
+    // 1. ICAO Mismatch check
+    if (detectedIcao && targetIcao && detectedIcao !== targetIcao) {
+        showCustomModal({
+            title: t('gsx.drop_mismatch_title', '⚠️ ICAO Mismatch Detected'),
+            message: `
+                <div class="space-y-3">
+                    <p class="text-xs text-slate-300 leading-relaxed">
+                        ${t('gsx.drop_mismatch_msg', `The dropped profile (<strong>${escapeHtml(newFilename)}</strong>) appears to be for airport <strong>${detectedIcao}</strong>, but you are currently viewing <strong>${targetIcao}</strong>.<br><br>Where would you like to install it?`, { filename: newFilename, detected: detectedIcao, target: targetIcao })}
+                    </p>
+                </div>
+            `,
+            type: 'warning',
+            confirmText: t('gsx.install_for_detected', `Install for ${detectedIcao} (Recommended)`, { detected: detectedIcao }),
+            cancelText: t('gsx.install_for_target', `Force for ${targetIcao}`, { target: targetIcao }),
+            showCancel: true,
+            confirmClass: 'px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition-colors border-0 cursor-pointer shadow-md shadow-cyan-950/40',
+            onConfirm: () => {
+                proceedWithGsxDropInstallation(detectedIcao, installPayload);
+            },
+            onCancel: () => {
+                proceedWithGsxDropInstallation(targetIcao, installPayload);
+            }
+        });
+        return;
+    }
+
+    proceedWithGsxDropInstallation(targetIcao || detectedIcao || 'GSX', installPayload);
+}
+
+function proceedWithGsxDropInstallation(targetIcao, installPayload) {
     const auditEntry = window.gsxAuditData && window.gsxAuditData.by_icao ? window.gsxAuditData.by_icao[targetIcao] : null;
     const existingFiles = auditEntry && auditEntry.files ? auditEntry.files : [];
     const activeExisting = existingFiles.filter(f => !f.is_disabled);
-    const newFilename = installPayload.filename || (installPayload.filePath ? installPayload.filePath.split(/[\/]/).pop() : 'new_profile.ini');
+    const newFilename = installPayload.filename || (installPayload.filePath ? installPayload.filePath.split(/[\\/]/).pop() : 'new_profile.ini');
 
     if (activeExisting.length > 0 || existingFiles.length > 0) {
         const existingNames = (activeExisting.length > 0 ? activeExisting : existingFiles).map(f => f.filename).join(', ');
@@ -4396,7 +4459,6 @@ function checkGsxDropConflictAndInstall(icao, installPayload) {
     }
 }
 window.checkGsxDropConflictAndInstall = checkGsxDropConflictAndInstall;
-
 async function executeGsxInstallationForIcao(icao, { filePath = '', base64Data = '', filename = '', replaceExisting = false } = {}) {
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.install_gsx_profile) return;
     try {
@@ -6867,8 +6929,7 @@ function isMatchingScenerySource(s, folderName) {
     const n1 = fn1.replace(/^(community|official)?(fs20|fs24)?-?/, '');
     const n2 = fn2.replace(/^(community|official)?(fs20|fs24)?-?/, '');
     if (n1 === n2) return true;
-    if (n1 && n2 && (n1.includes(n2) || n2.includes(n1))) return true;
-    if ((s.is_asobo_official || fn1.includes('asobo') || fn1.includes('microsoft')) && (fn2.includes('asobo') || fn2.includes('microsoft'))) {
+    if ((s.is_asobo_official || fn1.includes('asobo') || fn1.includes('microsoft')) && (fn2.includes('asobo') || fn2.includes('microsoft')) && (fn1 === fn2 || n1 === n2)) {
         return true;
     }
     return false;
@@ -6882,13 +6943,7 @@ function stageRadialSceneryVariant(e, icao, folderName) {
 
     if (!currentRadialAirport || currentRadialAirport.icao !== icao) return;
 
-    const activeSrc = getActiveSource(currentRadialAirport);
-    const activePkgName = activeSrc ? activeSrc.folder_name : 'DEFAULT';
-
-    const isSame = (folderName === 'DEFAULT' && activePkgName === 'DEFAULT') ||
-        (folderName !== 'DEFAULT' && activePkgName !== 'DEFAULT' && isMatchingScenerySource({ folder_name: activePkgName }, folderName));
-
-    if (isSame) {
+    if (stagedRadialScenerySelection && stagedRadialScenerySelection.icao === icao && stagedRadialScenerySelection.target === folderName) {
         stagedRadialScenerySelection = null;
     } else {
         stagedRadialScenerySelection = { icao: icao, target: folderName };
@@ -6936,7 +6991,6 @@ async function applyRadialScenerySelection(e, icao) {
             renderRadialSceneriesExtension(currentRadialAirport, false);
             setTimeout(() => updateStats(allAirportsData), 0);
 
-            // Re-sync GSX audit quietly so any open GSX audit window updates instantly!
             await refreshGsxAuditQuietly();
 
             const displayName = (targetPkg === 'DEFAULT') ? 'Default MSFS' : targetPkg;
@@ -6955,16 +7009,6 @@ async function applyRadialScenerySelection(e, icao) {
     } finally {
         isToggleInProgress = false;
     }
-}
-
-async function activateRadialSceneryVariant(e, icao, folderName) {
-    stageRadialSceneryVariant(e, icao, folderName);
-    await applyRadialScenerySelection(e, icao);
-}
-
-async function activateRadialDefaultScenery(e, icao) {
-    stageRadialSceneryVariant(e, icao, 'DEFAULT');
-    await applyRadialScenerySelection(e, icao);
 }
 
 async function activateRadialFixPackage(e, path, icao) {

@@ -1160,11 +1160,14 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
                 'recommend_reason': None
             })
 
+        db_ap = airports_db.get(icao, {}) if airports_db else {}
+        is_known_world_airport = bool(db_ap)
+
         # Diagnosis logic
         if len(active_entries) == 0:
             status = 'DISABLED'
             reason = 'GSX profile(s) currently disabled.'
-        elif not ap:
+        elif not ap and not is_known_world_airport:
             status = 'ORPHAN'
             reason = 'Airport not found in your MSFS library.'
             summary['orphan'] += 1
@@ -1175,9 +1178,9 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
             summary['duplicate'] += 1
 
             # Smart duplicate recommendation analysis
-            active_src = next((s for s in ap.get('all_sources', []) if not s.get('is_disabled') and not s.get('is_fix_patch') and not s.get('is_addon')), None)
+            active_src = next((s for s in ap.get('all_sources', []) if not s.get('is_disabled') and not s.get('is_fix_patch') and not s.get('is_addon')), None) if ap else None
             active_folder = (active_src.get('folder_name') or '').lower() if active_src else ''
-            active_vendor = (active_src.get('vendor') or ap.get('vendor') or '').lower() if active_src else (ap.get('vendor') or '').lower()
+            active_vendor = (active_src.get('vendor') or (ap.get('vendor') if ap else '') or '').lower()
             act_studio = (
                 detect_studio_from_text(active_vendor) or
                 detect_studio_from_text(active_folder)
@@ -1231,10 +1234,7 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
             sorted_cand = sorted(parsed_files, key=lambda x: x.get('score', 0), reverse=True)
             if len(sorted_cand) >= 2 and (sorted_cand[0]['score'] - sorted_cand[1]['score'] >= 10):
                 sorted_cand[0]['is_recommended'] = True
-                sorted_cand[0]['recommend_reason'] = ", ".join(sorted_cand[0]['score_reasons']) if sorted_cand[0]['score_reasons'] else "Newer build with more gates"
-        elif len(active_entries) == 0 and len(file_entries) > 0:
-            status = 'DISABLED'
-            reason = 'GSX profile(s) currently disabled.'
+                sorted_cand[0]['recommend_reason'] = ", ".join(sorted_cand[0]['score_reasons']) if sorted_cand[0]['score_reasons'] else "Best matching profile"
         else:
             pf = next((p for p in parsed_files if not p['is_disabled']), parsed_files[0])
             status, reason = evaluate_gsx_studio_match(pf, ap)
@@ -1245,14 +1245,13 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
             elif status == 'ORPHAN':
                 summary['orphan'] += 1
 
-        db_ap = airports_db.get(icao, {}) if airports_db else {}
         results[icao] = {
             'icao': icao,
-            'name': ap.get('name') if ap else db_ap.get('name', icao),
-            'city': ap.get('city') if ap else db_ap.get('city', ''),
-            'country': ap.get('country') if ap else db_ap.get('country', ''),
-            'lat': ap.get('lat') if ap else db_ap.get('lat'),
-            'lon': ap.get('lon') if ap else db_ap.get('lon'),
+            'name': ap.get('name') if (ap and ap.get('name')) else db_ap.get('name', f"{icao} Airport"),
+            'city': ap.get('city') if (ap and ap.get('city')) else db_ap.get('municipality', db_ap.get('city', '')),
+            'country': ap.get('country') if (ap and ap.get('country')) else db_ap.get('iso_country', db_ap.get('country', '')),
+            'lat': ap.get('lat') if ap else float(db_ap.get('latitude_deg', 0.0) or 0.0),
+            'lon': ap.get('lon') if ap else float(db_ap.get('longitude_deg', 0.0) or 0.0),
             'status': status,
             'reason': reason,
             'files': parsed_files
