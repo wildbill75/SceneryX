@@ -2523,7 +2523,11 @@ function updateInvestmentBanner() {
     if (cardEl) {
         const avgPriceEur = distinctPackageCount > 0 ? (totalSpentEur / distinctPackageCount) : 0;
         const avgFormatted = formatCurrency(avgPriceEur);
-        cardEl.title = `Total basé sur ${distinctPackageCount} packs/scènes payware achetés (${paywareCount} aéroports couverts). Moyenne : ${avgFormatted} / produit.`;
+        cardEl.title = t('header.payware_tooltip', `Total based on {count} purchased payware packages ({airports} airports covered). Average: {avg} / product.`, {
+            count: distinctPackageCount,
+            airports: paywareCount,
+            avg: avgFormatted
+        });
     }
 }
 
@@ -2909,7 +2913,7 @@ function renderGsxAuditModal() {
     const totalBadge = document.getElementById('gsx-audit-total-badge');
     if (totalBadge) {
         if (totalIssues > 0) {
-            totalBadge.innerText = `${totalIssues} Issue${totalIssues !== 1 ? 's' : ''}`;
+            totalBadge.innerText = totalIssues === 1 ? t('gsx.issue_single', '1 Issue', { count: 1 }) : t('gsx.issues_plural', '{count} Issues', { count: totalIssues });
             totalBadge.className = 'text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-amber-500 text-slate-950 border-0';
             totalBadge.classList.remove('hidden');
         } else {
@@ -2967,9 +2971,9 @@ function renderGsxAuditModal() {
             container.innerHTML = `
                 <div class="py-12 px-6 text-center space-y-2">
                     <div class="text-base sm:text-lg font-bold text-white tracking-wide">
-                        All addons have GSX profiles
+                        ${t('gsx.empty_all_title', 'All addons have GSX profiles')}
                     </div>
-                    <p class="text-xs font-mono text-slate-400">All scanned custom airport sceneries currently have an active GSX profile.</p>
+                    <p class="text-xs font-mono text-slate-400">${t('gsx.empty_all_desc', 'All scanned custom airport sceneries currently have an active GSX profile.')}</p>
                 </div>
             `;
             return;
@@ -3068,18 +3072,18 @@ function renderGsxAuditModal() {
                 container.innerHTML = `
                     <div class="py-12 px-6 text-center space-y-2">
                         <div class="text-base sm:text-lg font-bold text-white tracking-wide">
-                            No disabled profiles
+                            ${t('gsx.empty_disabled_title', 'No disabled profiles')}
                         </div>
-                        <p class="text-xs font-mono text-slate-400">You don't have any disabled GSX profiles in your directory.</p>
+                        <p class="text-xs font-mono text-slate-400">${t('gsx.empty_disabled_desc', "You don't have any disabled GSX profiles in your directory.")}</p>
                     </div>
                 `;
             } else {
                 container.innerHTML = `
                     <div class="py-12 px-6 text-center space-y-2">
                         <div class="text-base sm:text-lg font-bold text-white tracking-wide">
-                            No results matching filter
+                            ${t('gsx.empty_search_title', 'No results matching filter')}
                         </div>
-                        <p class="text-xs font-mono text-slate-400">Try clearing your search term.</p>
+                        <p class="text-xs font-mono text-slate-400">${t('gsx.empty_search_desc', 'Try clearing your search term.')}</p>
                     </div>
                 `;
             }
@@ -3245,54 +3249,54 @@ function renderGsxAuditModal() {
             container.innerHTML = `
                 <div class="py-12 px-6 text-center space-y-2">
                     <div class="text-base sm:text-lg font-bold text-white tracking-wide">
-                        No results matching filter
+                        ${t('gsx.empty_search_title', 'No results matching filter')}
                     </div>
-                    <p class="text-xs font-mono text-slate-400">Try clearing your search term.</p>
+                    <p class="text-xs font-mono text-slate-400">${t('gsx.empty_search_desc', 'Try clearing your search term.')}</p>
                 </div>
             `;
         } else if (currentGsxAuditFilter === 'ACTIVE') {
             container.innerHTML = `
                 <div class="py-12 px-6 text-center space-y-2">
                     <div class="text-base sm:text-lg font-bold text-white tracking-wide">
-                        No active profiles
+                        ${t('gsx.empty_active_title', 'No active profiles')}
                     </div>
-                    <p class="text-xs font-mono text-slate-400">No active GSX profiles found in your simulator.</p>
+                    <p class="text-xs font-mono text-slate-400">${t('gsx.empty_active_desc', 'No active GSX profiles found in your simulator.')}</p>
                 </div>
             `;
         } else if (currentGsxAuditFilter === 'DUPLICATE') {
             container.innerHTML = `
                 <div class="py-12 px-6 text-center space-y-2">
                     <div class="text-base sm:text-lg font-bold text-white tracking-wide">
-                        No duplicate profiles
+                        ${t('gsx.empty_duplicate_title', 'No duplicate profiles')}
                     </div>
-                    <p class="text-xs font-mono text-slate-400">Zero duplicate GSX profiles detected.</p>
+                    <p class="text-xs font-mono text-slate-400">${t('gsx.empty_duplicate_desc', 'Zero duplicate GSX profiles detected.')}</p>
                 </div>
             `;
         } else if (currentGsxAuditFilter === 'MISMATCH') {
             container.innerHTML = `
                 <div class="py-12 px-6 text-center space-y-2">
                     <div class="text-base sm:text-lg font-bold text-white tracking-wide">
-                        No mismatched profiles
+                        ${t('gsx.empty_mismatch_title', 'No mismatched profiles')}
                     </div>
-                    <p class="text-xs font-mono text-slate-400">All active profiles match their scenery packages.</p>
+                    <p class="text-xs font-mono text-slate-400">${t('gsx.empty_mismatch_desc', 'All active profiles match their scenery packages.')}</p>
                 </div>
             `;
         } else if (currentGsxAuditFilter === 'ORPHAN') {
             container.innerHTML = `
                 <div class="py-12 px-6 text-center space-y-2">
                     <div class="text-base sm:text-lg font-bold text-white tracking-wide">
-                        No orphan profiles
+                        ${t('gsx.empty_orphan_title', 'No orphan profiles')}
                     </div>
-                    <p class="text-xs font-mono text-slate-400">All active GSX profiles correspond to installed airports.</p>
+                    <p class="text-xs font-mono text-slate-400">${t('gsx.empty_orphan_desc', 'All active GSX profiles correspond to installed airports.')}</p>
                 </div>
             `;
         } else {
             container.innerHTML = `
                 <div class="py-12 px-6 text-center space-y-2">
                     <div class="text-base sm:text-lg font-bold text-white tracking-wide">
-                        No GSX profiles installed
+                        ${t('gsx.empty_all_title', 'No GSX profiles installed')}
                     </div>
-                    <p class="text-xs font-mono text-slate-400">No active GSX profiles found in your profiles directory.</p>
+                    <p class="text-xs font-mono text-slate-400">${t('gsx.empty_all_desc', 'No active GSX profiles found in your profiles directory.')}</p>
                 </div>
             `;
         }
@@ -3686,7 +3690,7 @@ function updateGsxHeaderAndTabBadges() {
     const totalBadge = document.getElementById('gsx-audit-total-badge');
     if (totalBadge) {
         if (totalIssues > 0) {
-            totalBadge.innerText = `${totalIssues} Issue${totalIssues !== 1 ? 's' : ''}`;
+            totalBadge.innerText = totalIssues === 1 ? t('gsx.issue_single', '1 Issue', { count: 1 }) : t('gsx.issues_plural', '{count} Issues', { count: totalIssues });
             totalBadge.className = 'text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-amber-500 text-slate-950 border-0';
             totalBadge.classList.remove('hidden');
         } else {
@@ -3876,11 +3880,11 @@ window.enableGsxProfileFromAudit = enableGsxProfileFromAudit;
 
 function confirmDeleteGsxProfile(icao, filename) {
     showCustomModal({
-        title: 'Delete GSX Profile',
-        message: `Do you really want to delete "${filename}" from your hard disk?`,
+        title: t('gsx.btn_delete', 'Delete') + ' GSX Profile',
+        message: t('gsx.delete_confirm', "Are you sure you want to permanently delete profile '{name}' from disk?", { name: filename }),
         type: 'error',
-        confirmText: 'Delete',
-        cancelText: 'Cancel',
+        confirmText: t('gsx.btn_delete', 'Delete'),
+        cancelText: t('common.cancel', 'Cancel'),
         showCancel: true,
         onConfirm: async () => {
             if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.delete_gsx_profile) return;
@@ -3930,11 +3934,11 @@ function confirmDeleteAllDisabledProfiles() {
     if (disabledCount === 0) return;
 
     showCustomModal({
-        title: 'Delete All Disabled Profiles',
-        message: `Do you really want to permanently delete all ${disabledCount} disabled GSX profile${disabledCount > 1 ? 's' : ''} from your hard disk?\n\nThis action cannot be undone.`,
+        title: t('gsx.btn_delete_all', 'Delete All Disabled ({count})', { count: disabledCount }),
+        message: t('gsx.delete_all_confirm', 'Are you sure you want to permanently delete all {count} disabled GSX profiles from disk?', { count: disabledCount }),
         type: 'error',
-        confirmText: `Delete All (${disabledCount})`,
-        cancelText: 'Cancel',
+        confirmText: t('gsx.btn_delete_all', 'Delete All ({count})', { count: disabledCount }),
+        cancelText: t('common.cancel', 'Cancel'),
         showCancel: true,
         onConfirm: async () => {
             if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.delete_all_disabled_gsx_profiles) return;
@@ -11014,68 +11018,68 @@ let filterRadialTier2Hovered = false;
 const FILTER_RADIAL_CATEGORIES = [
     {
         key: 'pricing',
-        label: 'PRICING MODEL',
+        get label() { return t('radial.category_pricing', 'PRICING MODEL'); },
         getSummary: () => {
-            if (selectedPricing.size === ALL_PRICING_LIST.length) return 'All Models';
-            return `${selectedPricing.size} Active`;
+            if (selectedPricing.size === ALL_PRICING_LIST.length) return t('radial.all_models', 'All Models');
+            return `${selectedPricing.size} ${t('common.active', 'Active')}`;
         }
     },
     {
         key: 'source',
-        label: 'SCENERY SOURCE',
+        get label() { return t('radial.category_source', 'SCENERY SOURCE'); },
         getSummary: () => {
-            if (selectedSources.size === ALL_SOURCES_LIST.length) return 'All Sources';
-            return `${selectedSources.size} Active`;
+            if (selectedSources.size === ALL_SOURCES_LIST.length) return t('radial.all_sources', 'All Sources');
+            return `${selectedSources.size} ${t('common.active', 'Active')}`;
         }
     },
     {
         key: 'region',
-        label: 'REGION',
+        get label() { return t('radial.category_region', 'REGION'); },
         getSummary: () => {
-            if (!selectedRegion) return 'Global (All)';
+            if (!selectedRegion) return t('radial.global_all', 'Global (All)');
             const names = {
-                'weurope': 'Western Europe',
-                'eeurope': 'Eastern Europe',
-                'namerica': 'North America',
-                'camerica_caribbean': 'C. America',
-                'samerica': 'South America',
-                'asia': 'Asia',
-                'middleeast': 'Middle East',
-                'nafrica': 'North Africa',
-                'ssafrica': 'Sub-Saharan Africa',
-                'oceania': 'Oceania',
-                'pacific': 'Pacific Ocean'
+                'weurope': t('radial.region_weurope', 'Western Europe'),
+                'eeurope': t('radial.region_eeurope', 'Eastern Europe'),
+                'namerica': t('radial.region_namerica', 'North America'),
+                'camerica_caribbean': t('radial.region_camerica', 'C. America'),
+                'samerica': t('radial.region_samerica', 'South America'),
+                'asia': t('radial.region_asia', 'Asia'),
+                'middleeast': t('radial.region_middleeast', 'Middle East'),
+                'nafrica': t('radial.region_nafrica', 'North Africa'),
+                'ssafrica': t('radial.region_ssafrica', 'Sub-Saharan Africa'),
+                'oceania': t('radial.region_oceania', 'Oceania'),
+                'pacific': t('radial.region_pacific', 'Pacific Ocean')
             };
             return names[selectedRegion] || selectedRegion;
         }
     },
     {
         key: 'type',
-        label: 'AIRPORT TYPE',
+        get label() { return t('radial.category_type', 'AIRPORT TYPE'); },
         getSummary: () => {
-            if (selectedTypes.size === ALL_TYPES_LIST.length) return 'All Types';
-            return `${selectedTypes.size} Active`;
+            if (selectedTypes.size === ALL_TYPES_LIST.length) return t('radial.all_types', 'All Types');
+            return `${selectedTypes.size} ${t('common.active', 'Active')}`;
         }
     },
     {
         key: 'gsx',
-        label: 'GSX PROFILE',
+        get label() { return t('radial.category_gsx', 'GSX PROFILE'); },
         getSummary: () => {
-            if (selectedGsxFilter === 'all') return 'All Profiles';
-            if (selectedGsxFilter === 'with') return 'With GSX Only';
-            return 'No GSX Profile';
+            if (selectedGsxFilter === 'all') return t('radial.all_profiles', 'All Profiles');
+            if (selectedGsxFilter === 'with') return t('radial.with_gsx_only', 'With GSX Only');
+            return t('radial.no_gsx_profile', 'No GSX Profile');
         }
     },
     {
         key: 'rating',
-        label: 'MIN RATING',
+        get label() { return t('radial.category_rating', 'MIN RATING'); },
         getSummary: () => {
-            if (!selectedMinRating || selectedMinRating === 0) return 'All Ratings (0★)';
-            return `${selectedMinRating}★ Minimum`;
+            if (!selectedMinRating || selectedMinRating === 0) return t('radial.all_ratings', 'All Ratings (0★)');
+            return t('radial.min_rating_val', '{rating}★ Minimum', { rating: selectedMinRating });
         },
         getHtmlSummary: () => {
-            if (!selectedMinRating || selectedMinRating === 0) return 'All Ratings <span class="text-amber-400 font-sans">(0★)</span>';
-            return `${selectedMinRating}<span class="text-amber-400 font-sans">★</span> Minimum`;
+            if (!selectedMinRating || selectedMinRating === 0) return `${t('radial.all_ratings', 'All Ratings')} <span class="text-amber-400 font-sans">(0★)</span>`;
+            return `${selectedMinRating}<span class="text-amber-400 font-sans">★</span> ${t('radial.minimum', 'Minimum')}`;
         }
     }
 ];
@@ -11304,10 +11308,10 @@ function getFilterRadialCategoryItems(categoryKey) {
         ];
     } else if (categoryKey === 'gsx') {
         return [
-            { id: 'all', label: 'All Profiles', isActive: selectedGsxFilter === 'all' },
-            { id: 'with', label: 'With GSX', isActive: selectedGsxFilter === 'with' },
-            { id: 'none', label: 'No Profile', isActive: selectedGsxFilter === 'none' },
-            { id: 'audit', label: 'Profiles Details', isActive: false }
+            { id: 'all', label: t('radial.all_profiles', 'All Profiles'), isActive: selectedGsxFilter === 'all' },
+            { id: 'with', label: t('radial.with_gsx', 'With GSX'), isActive: selectedGsxFilter === 'with' },
+            { id: 'none', label: t('radial.no_profile', 'No Profile'), isActive: selectedGsxFilter === 'none' },
+            { id: 'audit', label: t('radial.profiles_details', 'Profiles Details'), isActive: false }
         ];
     } else if (categoryKey === 'rating') {
         const createStarHtml = (ratingVal) => {
@@ -11410,10 +11414,10 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
     const count = currentlyFilteredAirports ? currentlyFilteredAirports.length : (allAirportsData ? allAirportsData.length : 0);
     hubEl.innerHTML = `
         <div class="flex flex-col items-center justify-center pointer-events-none select-none text-center">
-            <span class="text-[10px] font-bold tracking-widest text-slate-400 uppercase leading-tight">MAP VIEW</span>
-            <span class="text-[10px] font-bold tracking-widest text-slate-400 uppercase leading-tight mt-0.5">FILTERED BY</span>
+            <span class="text-[10px] font-bold tracking-widest text-slate-400 uppercase leading-tight">${t('radial.map_view', 'MAP VIEW')}</span>
+            <span class="text-[10px] font-bold tracking-widest text-slate-400 uppercase leading-tight mt-0.5">${t('radial.filtered_by', 'FILTERED BY')}</span>
             <span class="text-2xl font-black font-mono text-white leading-none mt-1.5 tracking-tight">${count}</span>
-            <span class="text-[9.5px] font-normal tracking-wider text-slate-400 uppercase leading-tight mt-0.5">AIRPORTS</span>
+            <span class="text-[9.5px] font-normal tracking-wider text-slate-400 uppercase leading-tight mt-0.5">${t('radial.airports_caps', 'AIRPORTS')}</span>
         </div>
     `;
 
@@ -11874,7 +11878,7 @@ function displayScanResults(delta, isStartup = false) {
                             </div>
                         </div>
                         <div class="flex items-center gap-2 shrink-0">
-                            <span class="text-xs font-bold px-3 py-1 rounded-full bg-purple-900 text-purple-200 border border-purple-700">GSX Profile</span>
+                            <span class="text-xs font-bold px-3 py-1 rounded-full bg-purple-900 text-purple-200 border border-purple-700">${t('rescan.gsx_profile_pill', 'GSX Profile')}</span>
                             ${statusBadge}
                         </div>
                     </div>
