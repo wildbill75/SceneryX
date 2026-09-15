@@ -7699,6 +7699,42 @@ async function openGsxAuditFromDetails(filter = 'ALL') {
 }
 window.openGsxAuditFromDetails = openGsxAuditFromDetails;
 
+async function disableGsxProfile(icao, filename) {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.disable_gsx_profile) return;
+    try {
+        const resStr = await window.pywebview.api.disable_gsx_profile(icao, filename);
+        const res = typeof resStr === 'string' ? JSON.parse(resStr) : resStr;
+        if (res && res.status === 'ok') {
+            window.gsxAuditData = res.data;
+            const currentAp = (typeof getAirportByIcao === 'function') ? getAirportByIcao(icao) : null;
+            if (currentAp) {
+                const auditEntry = window.gsxAuditData && window.gsxAuditData.by_icao ? window.gsxAuditData.by_icao[icao] : null;
+                const activeRemaining = auditEntry && auditEntry.files ? auditEntry.files.find(f => !f.is_disabled) : null;
+                currentAp.gsx_ini_file = activeRemaining ? activeRemaining.filename : null;
+                currentAp.has_gsx_profile = !!activeRemaining;
+                if (typeof renderRadialAirportDetails === 'function') {
+                    renderRadialAirportDetails(currentAp);
+                }
+                updateStats(allAirportsData);
+                filterAirports();
+            }
+            if (typeof renderGsxAuditModal === 'function' && window.isGsxAuditOpen) {
+                renderGsxAuditModal();
+            }
+            if (typeof updateGsxHeaderAndTabBadges === 'function') {
+                updateGsxHeaderAndTabBadges();
+            }
+            if (typeof showToast === 'function') {
+                showToast(`✓ GSX profile disabled: ${filename}`, 'info');
+            }
+        }
+    } catch (e) {
+        console.error("Error disabling GSX profile:", e);
+    }
+}
+window.disableGsxProfile = disableGsxProfile;
+window.disableGsxProfileFromAudit = disableGsxProfile;
+
 async function activateGsxDuplicate(icao, activeFilename) {
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.resolve_gsx_duplicate) return;
     try {

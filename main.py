@@ -2005,28 +2005,50 @@ class Api:
             if not gsx_dir or not os.path.exists(gsx_dir):
                 return json.dumps({"status": "error", "message": "GSX directory not found."})
 
-            target_icao = (icao or '').upper()
+            target_icao = (icao or '').upper().strip()
+            if not target_icao or len(target_icao) < 3:
+                target_icao = extract_icao_from_gsx_filename(active_filename, file_path=os.path.join(gsx_dir, active_filename)) or ''
 
             # If active_filename currently ends in .disabled, enable it
             active_path = os.path.join(gsx_dir, active_filename)
             if active_filename.endswith('.disabled'):
                 new_active_name = active_filename[:-9]
                 new_active_path = os.path.join(gsx_dir, new_active_name)
+                if os.path.exists(new_active_path):
+                    try: os.remove(new_active_path)
+                    except Exception: pass
                 if os.path.exists(active_path):
-                    os.rename(active_path, new_active_path)
+                    os.replace(active_path, new_active_path)
                 active_filename = new_active_name
 
             # If disable_filename specified, disable that specific one
             if disable_filename:
                 dis_path = os.path.join(gsx_dir, disable_filename)
                 if os.path.exists(dis_path) and not disable_filename.endswith('.disabled'):
-                    os.rename(dis_path, dis_path + '.disabled')
+                    target_dis = dis_path + '.disabled'
+                    if os.path.exists(target_dis):
+                        try: os.remove(target_dis)
+                        except Exception: pass
+                    os.replace(dis_path, target_dis)
             else:
-                # Disable all other active .ini profiles for this ICAO
-                for f in os.listdir(gsx_dir):
-                    if f.upper().startswith(target_icao) and f.endswith('.ini') and f != active_filename and f.lower() != 'configuration.ini':
+                # Disable all other active profiles for this ICAO ONLY if target_icao is valid!
+                if target_icao and len(target_icao) >= 3:
+                    for f in os.listdir(gsx_dir):
+                        if f == active_filename or f.lower() == 'configuration.ini' or f.endswith('.disabled'):
+                            continue
+                        if not f.lower().endswith(('.ini', '.py')):
+                            continue
                         fp = os.path.join(gsx_dir, f)
-                        os.rename(fp, fp + '.disabled')
+                        f_icao = extract_icao_from_gsx_filename(f, valid_icaos={target_icao}, file_path=fp)
+                        if f_icao == target_icao:
+                            dest_fp = fp + '.disabled'
+                            if os.path.exists(dest_fp):
+                                try: os.remove(dest_fp)
+                                except Exception: pass
+                            try:
+                                os.replace(fp, dest_fp)
+                            except Exception as e:
+                                print(f"Error disabling GSX file {f}:", e)
 
             audit_data = audit_all_gsx_profiles(gsx_dir=gsx_dir)
             return json.dumps({"status": "ok", "data": audit_data}, ensure_ascii=False)
@@ -2041,22 +2063,38 @@ class Api:
                 return json.dumps({"status": "error", "message": "GSX directory not found."})
 
             target_icao = (icao or '').upper().strip()
-            # Disable any other active .ini profile for this ICAO first
-            for f in os.listdir(gsx_dir):
-                if f.lower() == 'configuration.ini' or not f.endswith('.ini'):
-                    continue
-                fp = os.path.join(gsx_dir, f)
-                f_icao = extract_icao_from_gsx_filename(f, valid_icaos={target_icao} if target_icao else None, file_path=fp)
-                if (target_icao and f.upper().startswith(target_icao)) or (target_icao and f_icao == target_icao):
-                    os.rename(fp, fp + '.disabled')
+            if not target_icao or len(target_icao) < 3:
+                target_icao = extract_icao_from_gsx_filename(filename, file_path=os.path.join(gsx_dir, filename)) or ''
+
+            # Disable any other active profile for this ICAO first ONLY if target_icao is valid
+            if target_icao and len(target_icao) >= 3:
+                for f in os.listdir(gsx_dir):
+                    if f.lower() == 'configuration.ini' or f.endswith('.disabled') or f == filename:
+                        continue
+                    if not f.lower().endswith(('.ini', '.py')):
+                        continue
+                    fp = os.path.join(gsx_dir, f)
+                    f_icao = extract_icao_from_gsx_filename(f, valid_icaos={target_icao}, file_path=fp)
+                    if f_icao == target_icao:
+                        dest_fp = fp + '.disabled'
+                        if os.path.exists(dest_fp):
+                            try: os.remove(dest_fp)
+                            except Exception: pass
+                        try:
+                            os.replace(fp, dest_fp)
+                        except Exception as e:
+                            print(f"Error disabling GSX file {f}:", e)
 
             # Now enable target file
             old_fp = os.path.join(gsx_dir, filename)
             if filename.endswith('.disabled'):
                 new_name = filename[:-9]
                 new_fp = os.path.join(gsx_dir, new_name)
+                if os.path.exists(new_fp):
+                    try: os.remove(new_fp)
+                    except Exception: pass
                 if os.path.exists(old_fp):
-                    os.rename(old_fp, new_fp)
+                    os.replace(old_fp, new_fp)
 
             audit_data = audit_all_gsx_profiles(gsx_dir=gsx_dir)
             return json.dumps({"status": "ok", "data": audit_data}, ensure_ascii=False)
@@ -2070,9 +2108,16 @@ class Api:
             if not gsx_dir or not os.path.exists(gsx_dir):
                 return json.dumps({"status": "error", "message": "GSX directory not found."})
 
+            if not filename or '..' in filename or '/' in filename or '\\' in filename:
+                return json.dumps({"status": "error", "message": "Invalid filename."})
+
             fp = os.path.join(gsx_dir, filename)
             if os.path.exists(fp) and not filename.endswith('.disabled'):
-                os.rename(fp, fp + '.disabled')
+                dest_fp = fp + '.disabled'
+                if os.path.exists(dest_fp):
+                    try: os.remove(dest_fp)
+                    except Exception: pass
+                os.replace(fp, dest_fp)
 
             audit_data = audit_all_gsx_profiles(gsx_dir=gsx_dir)
             return json.dumps({"status": "ok", "data": audit_data}, ensure_ascii=False)

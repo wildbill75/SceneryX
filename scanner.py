@@ -1092,6 +1092,7 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
 
     for icao, file_entries in by_icao.items():
         ap = installed_map.get(icao)
+        active_src = next((s for s in ap.get('all_sources', []) if not s.get('is_disabled') and not s.get('is_fix_patch') and not s.get('is_addon')), None) if ap else None
         parsed_files = []
         active_entries = [e for e in file_entries if not e['is_disabled']]
 
@@ -1250,7 +1251,7 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
             elif status == 'ORPHAN':
                 summary['orphan'] += 1
 
-                results[icao] = {
+        results[icao] = {
             'icao': icao,
             'name': ap.get('name') if (ap and ap.get('name')) else db_ap.get('name', f"{icao} Airport"),
             'city': ap.get('city') if (ap and ap.get('city')) else db_ap.get('city', ''),
@@ -1483,17 +1484,63 @@ def audit_single_airport_gsx(icao, gsx_dir=None, ap=None, airports_db=None):
     if len(active_entries) == 0:
         status = 'DISABLED'
         reason = 'GSX profile(s) currently disabled.'
+        for pf in parsed_files:
+            f_status, f_reason = evaluate_gsx_studio_match(pf, ap)
+            pf['match_status'] = f_status
+            pf['match_reason'] = f_reason
     elif not ap:
         status = 'ORPHAN'
         reason = 'Airport not found in your MSFS library.'
+        for pf in parsed_files:
+            pf['match_status'] = 'ORPHAN'
+            pf['match_reason'] = 'Airport not found in your MSFS library.'
     elif len(active_entries) > 1:
         status = 'DUPLICATE'
         active_names = [e['filename'] for e in active_entries]
         reason = f'{len(active_entries)} conflicting active profiles found for this airport ({", ".join(active_names)}).'
+        for pf in parsed_files:
+            f_status, f_reason = evaluate_gsx_studio_match(pf, ap)
+            pf['match_status'] = f_status
+            pf['match_reason'] = f_reason
+            score = 0
+            reasons = []
+            if f_status == 'MATCHED':
+                score += 200
+                reasons.append("Aligned with active scenery")
+            elif f_status == 'MISMATCH_STUDIO':
+                score -= 200
+                reasons.append("Designed for a different scenery add-on")
+            elif f_status == 'MISMATCH_DEFAULT':
+                score -= 150
+                reasons.append("Designed for default MSFS")
+            if pf.get('is_2024'):
+                score += 50
+                reasons.append("MSFS 2024 edition")
+            elif pf.get('is_2020') and any(other.get('is_2024') for other in parsed_files):
+                score -= 50
+            ts = pf.get('mtime_ts') or 0
+            score += int(ts / (86400 * 30))
+            gates = pf.get('gates_count') or 0
+            score += min(50, gates)
+            if gates >= 50:
+                reasons.append(f"{gates} gates configured")
+            pf['score'] = score
+            pf['score_reasons'] = reasons
+
+        active_cands = [p for p in parsed_files if not p['is_disabled']]
+        sorted_cand = sorted(active_cands if active_cands else parsed_files, key=lambda x: x.get('score', 0), reverse=True)
+        if sorted_cand:
+            sorted_cand[0]['is_recommended'] = True
+            top_reasons = [r for r in sorted_cand[0].get('score_reasons', []) if not r.startswith('Designed for')]
+            sorted_cand[0]['recommend_reason'] = ", ".join(top_reasons) if top_reasons else "Best matching profile"
     else:
         active_f = active_entries[0]
         active_pf = next((pf for pf in parsed_files if pf['filename'] == active_f['filename']), None)
         status, reason = evaluate_gsx_studio_match(active_pf, ap)
+        for other in parsed_files:
+            o_status, o_reason = evaluate_gsx_studio_match(other, ap)
+            other['match_status'] = o_status
+            other['match_reason'] = o_reason
 
     return {
         'status': status,
