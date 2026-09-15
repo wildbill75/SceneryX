@@ -3673,8 +3673,15 @@ function renderGsxAuditModal() {
     entries.forEach(entry => {
         const icao = String(entry.icao || '').toUpperCase();
         const ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao(icao) : null;
-        const apName = ap ? (ap.name || entry.name || icao) : (entry.name || icao);
-        const cityCountry = ap ? [ap.city, ap.country].filter(Boolean).join(', ') : ([entry.city, entry.country].filter(Boolean).join(', ') || '');
+        const rawApName = (ap && ap.name) || entry.name || (icao + ' Airport');
+        const apName = (typeof getCleanAirportName === 'function') ? getCleanAirportName(rawApName, (ap && ap.city) || entry.city) : rawApName;
+        
+        let rawCity = (ap && ap.city) || entry.city || '';
+        let city = (typeof getCleanCityName === 'function') ? getCleanCityName(rawCity) : rawCity;
+        let rawCountry = (ap && ap.country) || entry.country || '';
+        let country = (typeof getCountryName === 'function') ? getCountryName(rawCountry) : rawCountry;
+        const cityCountry = [city, country].filter(Boolean).join(', ');
+
         const addonVendor = (ap && ap.vendor) || entry.addon_vendor || entry.vendor || '';
         const addonVer = (ap && ap.version) || entry.addon_version || entry.version || '';
         const addonPkg = (ap && ap.package_name) || entry.addon_name || entry.package_name || '';
@@ -3711,13 +3718,17 @@ function renderGsxAuditModal() {
         }
 
         let pricingBadge = '';
-        const pt = (ap && ap.pricing_type) || entry.pricing_type;
+        const pt = (ap && ap.pricing_type) || entry.pricing_type || '';
         const vendor = (ap && ap.vendor) || entry.vendor || '';
-        if (pt === 'Payware') {
+        const isAsobo = !!((ap && (ap.is_asobo || ap.is_asobo_official)) || entry.is_asobo || vendor === 'Microsoft / Asobo' || pt === 'Asobo');
+        const isPayware = !!((ap && ap.is_payware) || entry.is_payware || pt.toLowerCase().includes('payware'));
+        const isFreeware = !!((ap && ap.is_freeware) || entry.is_freeware || pt.toLowerCase().includes('freeware'));
+
+        if (isPayware) {
             pricingBadge = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-purple-600 text-white border-0">${t('pricing.payware_caps', 'PAYWARE')}</span>`;
-        } else if (pt === 'Asobo' || vendor === 'Microsoft / Asobo' || entry.is_asobo) {
+        } else if (isAsobo) {
             pricingBadge = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-amber-500 text-slate-950 border-0">ASOBO</span>`;
-        } else if (pt === 'Freeware' || pt === 'Freeware / Flightsim.to' || entry.is_freeware) {
+        } else if (isFreeware) {
             pricingBadge = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-cyan-600 text-white border-0">${t('pricing.freeware_caps', 'FREEWARE')}</span>`;
         }
 
@@ -4188,7 +4199,7 @@ async function activateGsxDuplicateFromModal(icao, filename) {
                 showToast(`✓ Duplicate resolved for ${icao}: kept ${filename}`, 'success');
             }
             updateGsxHeaderAndTabBadges();
-            markGsxCardResolved(icao, `✓ Kept ${filename} - Duplicates Disabled`);
+            renderGsxAuditModal();
         }
     } catch (e) {
         console.error("Error activating GSX duplicate profile:", e);
@@ -4222,7 +4233,7 @@ async function disableGsxProfileFromModal(icao, filename) {
                 showToast(`✓ Profile disabled for ${icao}`, 'info');
             }
             updateGsxHeaderAndTabBadges();
-            markGsxCardResolved(icao, '✓ Profile Disabled');
+            renderGsxAuditModal();
         }
     } catch (e) {
         console.error("Error disabling GSX profile:", e);
@@ -4532,7 +4543,7 @@ async function executeGsxInstallationForIcao(icao, { filePath = '', base64Data =
                 showToast(`✓ GSX profile installed for ${icao}${fileMsg}`, 'success');
             }
 
-            markGsxCardResolved(icao, `✓ GSX Profile Installed & Matched${fileMsg}`);
+            renderGsxAuditModal();
             renderGsxAuditModal();
             updateGsxHeaderAndTabBadges();
         } else if (parsed && parsed.status === 'error') {
