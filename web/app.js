@@ -4554,10 +4554,13 @@ async function installGsxProfileFromModal(icao) {
 function handleGsxAuditDragOver(e, icao) {
     e.preventDefault();
     e.stopPropagation();
+    if (e.dataTransfer) {
+        e.dataTransfer.dropEffect = 'copy';
+    }
     const zone = document.getElementById(`gsx-dropzone-${icao}`);
     if (zone) {
-        zone.classList.add('border-cyan-400', 'bg-cyan-950/40');
-        zone.classList.remove('border-slate-800', 'bg-slate-950/60');
+        zone.classList.add('border-cyan-400', 'bg-cyan-950/80', 'scale-[1.03]', 'shadow-lg', 'shadow-cyan-500/25');
+        zone.classList.remove('border-slate-700', 'border-slate-800', 'bg-slate-950');
     }
 }
 
@@ -4566,8 +4569,8 @@ function handleGsxAuditDragLeave(e, icao) {
     e.stopPropagation();
     const zone = document.getElementById(`gsx-dropzone-${icao}`);
     if (zone) {
-        zone.classList.remove('border-cyan-400', 'bg-cyan-950/40');
-        zone.classList.add('border-slate-800', 'bg-slate-950/60');
+        zone.classList.remove('border-cyan-400', 'bg-cyan-950/80', 'scale-[1.03]', 'shadow-lg', 'shadow-cyan-500/25');
+        zone.classList.add('border-slate-700', 'bg-slate-950');
     }
 }
 
@@ -7484,15 +7487,16 @@ function renderRadialGsx(ap) {
     const dropZoneHtml = `
         <div id="radial-gsx-dropzone" 
              ondragover="handleRadialGsxDragOver(event)" 
+             ondragenter="handleRadialGsxDragOver(event)" 
              ondragleave="handleRadialGsxDragLeave(event)" 
              ondrop="handleRadialGsxDrop(event, '${ap.icao}')"
              onclick="triggerRadialGsxFileBrowse('${ap.icao}')"
-             class="p-2.5 rounded-xl border border-dashed border-slate-700/80 hover:border-cyan-500 bg-slate-950/40 hover:bg-slate-900/60 transition-all flex flex-col items-center justify-center cursor-pointer group mt-2">
-            <div class="text-[11px] font-mono font-bold text-slate-300 group-hover:text-cyan-300 transition-colors flex items-center gap-1.5">
-                <i class="fa-solid fa-file-arrow-up text-xs text-slate-400 group-hover:text-cyan-400"></i>
+             class="p-2.5 rounded-xl border-2 border-dashed border-slate-700/80 hover:border-cyan-400 hover:bg-cyan-950/30 bg-slate-950/60 transition-all duration-200 flex flex-col items-center justify-center cursor-pointer group mt-2 select-none shadow-sm">
+            <div id="radial-gsx-drop-text" class="text-[11px] font-mono font-bold text-slate-300 group-hover:text-cyan-300 transition-colors flex items-center gap-1.5 pointer-events-none">
+                <i class="fa-solid fa-file-arrow-up text-xs text-slate-400 group-hover:text-cyan-400 group-hover:scale-110 transition-transform"></i>
                 <span>DROP .ZIP OR .INI HERE TO INSTALL</span>
             </div>
-            <div class="text-[9px] font-mono text-slate-400 mt-0.5">OR CLICK TO BROWSE FILE</div>
+            <div id="radial-gsx-drop-subtext" class="text-[9px] font-mono text-slate-400 group-hover:text-slate-300 mt-0.5 pointer-events-none transition-colors">OR CLICK TO BROWSE FILE</div>
         </div>
     `;
 
@@ -7783,58 +7787,78 @@ function triggerGsxStudioSearch(icao) {
 function handleRadialGsxDragOver(e) {
     e.preventDefault();
     e.stopPropagation();
-    const zone = document.getElementById('radial-gsx-drop-zone');
+    if (e.dataTransfer) {
+        e.dataTransfer.dropEffect = 'copy';
+    }
+    const zone = document.getElementById('radial-gsx-dropzone') || document.getElementById('radial-gsx-drop-zone');
     if (zone) {
-        zone.classList.add('border-cyan-500', 'bg-cyan-500/10');
+        zone.classList.remove('border-slate-700/80', 'bg-slate-950/60', 'hover:border-cyan-400', 'hover:bg-cyan-950/30');
+        zone.classList.add('border-cyan-400', 'bg-cyan-950/80', 'scale-[1.02]', 'shadow-lg', 'shadow-cyan-500/25');
+        const textSpan = zone.querySelector('#radial-gsx-drop-text span');
+        if (textSpan && !zone.dataset.origText) {
+            zone.dataset.origText = textSpan.innerText;
+            textSpan.innerText = '✨ DROP PROFILE HERE TO INSTALL';
+        }
     }
 }
 
 function handleRadialGsxDragLeave(e) {
     e.preventDefault();
     e.stopPropagation();
-    const zone = document.getElementById('radial-gsx-drop-zone');
+    const zone = document.getElementById('radial-gsx-dropzone') || document.getElementById('radial-gsx-drop-zone');
     if (zone) {
-        zone.classList.remove('border-cyan-500', 'bg-cyan-500/10');
+        zone.classList.remove('border-cyan-400', 'bg-cyan-950/80', 'scale-[1.02]', 'shadow-lg', 'shadow-cyan-500/25');
+        zone.classList.add('border-slate-700/80', 'bg-slate-950/60');
+        const textSpan = zone.querySelector('#radial-gsx-drop-text span');
+        if (textSpan && zone.dataset.origText) {
+            textSpan.innerText = zone.dataset.origText;
+            delete zone.dataset.origText;
+        }
     }
 }
 
-async function handleRadialGsxDrop(e) {
+async function handleRadialGsxDrop(e, icao) {
     e.preventDefault();
     e.stopPropagation();
-    const zone = document.getElementById('radial-gsx-drop-zone');
+    const zone = document.getElementById('radial-gsx-dropzone') || document.getElementById('radial-gsx-drop-zone');
     if (zone) {
-        zone.classList.remove('border-cyan-500', 'bg-cyan-500/10');
+        zone.classList.remove('border-cyan-400', 'bg-cyan-950/80', 'scale-[1.02]', 'shadow-lg', 'shadow-cyan-500/25');
+        zone.classList.add('border-slate-700/80', 'bg-slate-950/60');
+        const textSpan = zone.querySelector('#radial-gsx-drop-text span');
+        if (textSpan) {
+            textSpan.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Installing profile...';
+        }
     }
 
     if (!e.dataTransfer || !e.dataTransfer.files || e.dataTransfer.files.length === 0) return;
     const file = e.dataTransfer.files[0];
     const path = file.path || '';
+    const targetIcao = icao || (currentRadialAirport ? currentRadialAirport.icao : '') || (selectedAirport ? selectedAirport.icao : '');
 
     if (currentRadialAirport) {
         selectedAirport = currentRadialAirport;
     }
 
     if (path) {
-        await executeGsxInstallation({ filePath: path });
+        checkGsxDropConflictAndInstall(targetIcao, { filePath: path });
     } else {
         const reader = new FileReader();
-        reader.onload = async function(event) {
+        reader.onload = function(event) {
             const base64Data = event.target.result;
-            await executeGsxInstallation({ base64Data: base64Data, filename: file.name });
+            checkGsxDropConflictAndInstall(targetIcao, { base64Data: base64Data, filename: file.name });
         };
         reader.onerror = function() {
             showCustomModal({ title: 'File Read Error', message: 'Unable to read the dropped file.', type: 'error' });
         };
         reader.readAsDataURL(file);
     }
-    if (currentRadialAirport) {
-        const updatedAp = getAirportByIcao(currentRadialAirport.icao);
-        if (updatedAp) {
-            currentRadialAirport = updatedAp;
-            renderRadialGsx(currentRadialAirport);
-        }
-    }
 }
+
+function triggerRadialGsxFileBrowse(icao) {
+    const targetIcao = icao || (currentRadialAirport ? currentRadialAirport.icao : '') || (selectedAirport ? selectedAirport.icao : '');
+    executeGsxInstallationForIcao(targetIcao, { filePath: '' });
+}
+window.triggerRadialGsxFileBrowse = triggerRadialGsxFileBrowse;
 
 async function triggerRadialInstallGsxProfile() {
     if (currentRadialAirport) {

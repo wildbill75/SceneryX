@@ -1762,7 +1762,7 @@ class Api:
             return True
         return False
 
-    def _extract_archive_files(self, archive_path_or_bytes, ext, gsx_dir, icao=""):
+    def _extract_archive_files(self, archive_path_or_bytes, ext, gsx_dir, icao="", replace_existing=False):
         import shutil
         import tempfile
         import subprocess
@@ -1821,18 +1821,20 @@ class Api:
                     except Exception as e:
                         print("tar.exe extraction error:", e)
 
-            # 4. Clean up old GSX files for this ICAO if target ICAO is specified
-            target_icao = (icao or '').upper()
-            if target_icao and len(target_icao) == 4:
+            # 4. Clean up old GSX files for this ICAO ONLY if replace_existing is True
+            target_icao = (icao or '').upper().strip()
+            if replace_existing and target_icao and len(target_icao) >= 3:
                 try:
                     for existing_f in os.listdir(gsx_dir):
                         if existing_f.lower() == 'configuration.ini':
                             continue
-                        if existing_f.upper().startswith(target_icao) and existing_f.lower().endswith(('.ini', '.py')):
-                            old_path = os.path.join(gsx_dir, existing_f)
+                        fp = os.path.join(gsx_dir, existing_f)
+                        f_icao = extract_icao_from_gsx_filename(existing_f, valid_icaos={target_icao}, file_path=fp)
+                        if f_icao == target_icao:
                             try:
-                                os.remove(old_path)
-                                print(f"Cleaned up old GSX profile for {target_icao}: {existing_f}")
+                                if os.path.isfile(fp):
+                                    os.remove(fp)
+                                    print(f"Cleaned up old GSX profile for {target_icao}: {existing_f}")
                             except Exception as e:
                                 print(f"Could not remove old GSX file {existing_f}:", e)
                 except Exception as e:
@@ -1861,21 +1863,21 @@ class Api:
             os.makedirs(gsx_dir, exist_ok=True)
             
         installed_files = []
-        target_icao = (icao or '').upper()
+        target_icao = (icao or '').upper().strip()
         
         try:
-            # Clean up existing old GSX profile files for this ICAO if replacing existing
-            if replace_existing and target_icao and len(target_icao) == 4:
+            # Clean up existing old GSX profile files for this ICAO ONLY if replace_existing is True
+            if replace_existing and target_icao and len(target_icao) >= 3:
                 try:
                     for existing_f in os.listdir(gsx_dir):
                         if existing_f.lower() == 'configuration.ini':
                             continue
-                        f_upper = existing_f.upper()
-                        if f_upper.startswith(target_icao) or target_icao in re.split(r'[-_ .]+', f_upper):
-                            old_path = os.path.join(gsx_dir, existing_f)
+                        fp = os.path.join(gsx_dir, existing_f)
+                        f_icao = extract_icao_from_gsx_filename(existing_f, valid_icaos={target_icao}, file_path=fp)
+                        if f_icao == target_icao:
                             try:
-                                if os.path.isfile(old_path):
-                                    os.remove(old_path)
+                                if os.path.isfile(fp):
+                                    os.remove(fp)
                             except Exception: pass
                 except Exception: pass
 
@@ -1888,7 +1890,7 @@ class Api:
                 ext = os.path.splitext(filename)[1].lower()
                 
                 if ext in ['.zip', '.rar', '.7z', '.tar', '.gz']:
-                    installed_files = self._extract_archive_files(file_bytes, ext, gsx_dir, icao=target_icao)
+                    installed_files = self._extract_archive_files(file_bytes, ext, gsx_dir, icao=target_icao, replace_existing=replace_existing)
                 elif ext in ['.ini', '.py']:
                     if filename and filename.lower() != 'configuration.ini':
                         target_p = os.path.join(gsx_dir, filename)
@@ -1903,7 +1905,7 @@ class Api:
                     
                 ext = os.path.splitext(file_path)[1].lower()
                 if ext in ['.zip', '.rar', '.7z', '.tar', '.gz']:
-                    installed_files = self._extract_archive_files(file_path, ext, gsx_dir, icao=target_icao)
+                    installed_files = self._extract_archive_files(file_path, ext, gsx_dir, icao=target_icao, replace_existing=replace_existing)
                 elif ext in ['.ini', '.py']:
                     fname = os.path.basename(file_path)
                     if fname and fname.lower() != 'configuration.ini':
@@ -1921,18 +1923,43 @@ class Api:
                         file_types=('GSX Profiles & Archives (*.zip;*.rar;*.7z;*.ini;*.py)', 'All files (*.*)')
                     )
                     if result and len(result) > 0:
-                        return self.install_gsx_profile(icao=icao, file_path=result[0])
+                        return self.install_gsx_profile(icao=icao, file_path=result[0], replace_existing=replace_existing)
                 except Exception as e:
                     return json.dumps({"status": "error", "message": str(e)})
 
             if not installed_files:
                 return json.dumps({"status": "error", "message": "No valid GSX profile file (.ini or .py) found in this archive."})
 
-            airports = run_scan()
+            # Fast in-place sync of installed_airports.json (milliseconds instead of re-scanning all GBs on SSD)
+            airports = []
+            if os.path.exists(OUTPUT_JSON_PATH):
+                try:
+                    with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as fh:
+                        airports = json.load(fh)
+                    
+                    if target_icao:
+                        for ap in airports:
+                            if ap.get('icao') == target_icao:
+                                ap['has_gsx_profile'] = True
+                                if installed_files:
+                                    ini_f = next((f for f in installed_files if f.lower().endswith('.ini')), installed_files[0])
+                                    ap['gsx_profile_filename'] = ini_f
+                                    ap['gsx_ini_file'] = ini_f
+                                    ap['gsx_profile_path'] = os.path.join(gsx_dir, ini_f)
+                                break
+                        tmp_p = OUTPUT_JSON_PATH + '.tmp'
+                        with open(tmp_p, 'w', encoding='utf-8') as fh:
+                            json.dump(airports, fh, ensure_ascii=False)
+                        os.replace(tmp_p, OUTPUT_JSON_PATH)
+                except Exception as e:
+                    print("Error fast-updating installed_airports.json:", e)
+
+            audit_data = audit_all_gsx_profiles(gsx_dir=gsx_dir)
             return json.dumps({
                 "status": "ok",
                 "installed_files": installed_files,
-                "airports": airports
+                "airports": airports,
+                "audit": audit_data
             }, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
