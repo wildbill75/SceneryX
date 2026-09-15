@@ -11465,17 +11465,18 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
         const summary = cat.getSummary();
         const summaryHtml = cat.getHtmlSummary ? cat.getHtmlSummary() : escapeHtml(summary);
         const formattedCatLabel = formatFilterRadialLabel(cat.label);
+        const catAriaLabel = escapeHtml((cat.label || '').replace(/<br\s*\/?>/gi, ' '));
 
         innerSvgHtml += `
             <g class="radial-filter-sector ${isCatActive ? 'is-category-active' : ''} pointer-events-auto cursor-pointer group"
                onclick="handleFilterRadialCategoryClick('${cat.key}')"
                onmouseenter="handleFilterRadialCategoryHover('${cat.key}')"
                onmouseleave="handleFilterRadialCategoryMouseLeave()"
-               role="button" aria-label="${escapeHtml(cat.label)}">
+               role="button" aria-label="${catAriaLabel}">
                 <path class="radial-filter-sector-path" d="${pathD}" />
-                <foreignObject x="${(tx - 58).toFixed(1)}" y="${(ty - 23).toFixed(1)}" width="116" height="46" class="pointer-events-none">
+                <foreignObject x="${(tx - 58).toFixed(1)}" y="${(ty - 26).toFixed(1)}" width="116" height="52" class="pointer-events-none">
                     <div class="w-full h-full flex flex-col items-center justify-center text-center leading-none px-1">
-                        <span class="text-[10px] font-black tracking-wider uppercase leading-tight whitespace-nowrap ${isCatActive ? 'text-white font-extrabold' : 'text-slate-200 group-hover:text-white'}">${formattedCatLabel}</span>
+                        <span class="text-[9.5px] font-black tracking-wider uppercase leading-tight text-center ${isCatActive ? 'text-white font-extrabold' : 'text-slate-200 group-hover:text-white'}">${formattedCatLabel}</span>
                         <span class="text-[10px] font-mono font-bold ${isCatActive ? 'text-white' : 'text-sky-400'} truncate max-w-[108px] mt-1">${summaryHtml}</span>
                     </div>
                 </foreignObject>
