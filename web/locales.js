@@ -1,6 +1,12 @@
 // SceneryX Multi-Language Localization Engine
 const LOCALES = {
     en: {
+        "gsx.drop_conflict_title": "GSX Profile Conflict ({icao})",
+        "gsx.drop_conflict_msg": "One or more GSX profile(s) already exist for <strong>{icao}</strong>:",
+        "gsx.drop_new_incoming": "Incoming new profile:",
+        "gsx.drop_choice_help": "Choose whether you want to replace the existing profile (recommended) or keep both as duplicates.",
+        "gsx.btn_replace": "Replace Existing (Recommended)",
+        "gsx.btn_keep_both": "Keep Both (Duplicate)",
         "header.payware_tooltip": "Total based on {count} purchased payware packages ({airports} airports covered). Average: {avg} / product.",
         "general.view_on_map": "Click to view on map",
         "general.airports": "airports indexed",
@@ -483,6 +489,12 @@ const LOCALES = {
         "funstats.global_reach_tooltip": "Click to reset filters and view your global world coverage.",
     },
     fr: {
+        "gsx.drop_conflict_title": "Conflit de Profil GSX ({icao})",
+        "gsx.drop_conflict_msg": "Un ou plusieurs profil(s) GSX existent déjà pour <strong>{icao}</strong> :",
+        "gsx.drop_new_incoming": "Nouveau profil à installer :",
+        "gsx.drop_choice_help": "Choisissez si vous souhaitez remplacer le profil existant (recommandé) ou conserver les deux en doublon.",
+        "gsx.btn_replace": "Remplacer l'existant (Recommandé)",
+        "gsx.btn_keep_both": "Conserver les deux (Doublon)",
         "header.payware_tooltip": "Total basé sur {count} packs/scènes payware achetés ({airports} aéroports couverts). Moyenne : {avg} / produit.",
         "general.view_on_map": "Cliquer pour afficher sur la carte",
         "general.airports": "aéroports indexés",
@@ -965,6 +977,12 @@ const LOCALES = {
         "funstats.global_reach_tooltip": "Cliquez pour réinitialiser les filtres et voir votre couverture mondiale.",
     },
     de: {
+        "gsx.drop_conflict_title": "GSX-Profilkonflikt ({icao})",
+        "gsx.drop_conflict_msg": "Ein oder mehrere GSX-Profile existieren bereits für <strong>{icao}</strong>:",
+        "gsx.drop_new_incoming": "Neues eingehendes Profil:",
+        "gsx.drop_choice_help": "Wählen Sie, ob Sie das bestehende Profil ersetzen (empfohlen) oder beide als Duplikate behalten möchten.",
+        "gsx.btn_replace": "Bestehendes ersetzen (Empfohlen)",
+        "gsx.btn_keep_both": "Beide behalten (Duplikat)",
         "header.payware_tooltip": "Gesamt basiert auf {count} gekauften Payware-Paketen ({airports} abgedeckte Flughäfen). Durchschnitt: {avg} / Produkt.",
         "general.view_on_map": "Klicken, um auf der Karte anzuzeigen",
         "general.airports": "Flughäfen indexiert",
@@ -1445,6 +1463,12 @@ const LOCALES = {
         "funstats.global_reach_tooltip": "Klicken, um die Filter zurückzusetzen und die weltweite Abdeckung zu sehen.",
     },
     es: {
+        "gsx.drop_conflict_title": "Conflicto de Perfil GSX ({icao})",
+        "gsx.drop_conflict_msg": "Uno o más perfil(es) GSX ya existen para <strong>{icao}</strong>:",
+        "gsx.drop_new_incoming": "Nuevo perfil entrante:",
+        "gsx.drop_choice_help": "Elija si desea reemplazar el perfil existente (recomendado) o conservar ambos como duplicados.",
+        "gsx.btn_replace": "Reemplazar existente (Recomendado)",
+        "gsx.btn_keep_both": "Conservar ambos (Duplicado)",
         "header.payware_tooltip": "Total basado en {count} paquetes payware comprados ({airports} aeropuertos cubiertos). Promedio: {avg} / producto.",
         "general.view_on_map": "Haga clic para ver en el mapa",
         "general.airports": "aeropuertos indexados",

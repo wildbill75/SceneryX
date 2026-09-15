@@ -4348,14 +4348,64 @@ function searchGsxProfileFromModal(icao) {
     }
 }
 
-async function executeGsxInstallationForIcao(icao, { filePath = '', base64Data = '', filename = '' } = {}) {
+function checkGsxDropConflictAndInstall(icao, installPayload) {
+    const targetIcao = (icao || '').toUpperCase();
+    const auditEntry = window.gsxAuditData && window.gsxAuditData.by_icao ? window.gsxAuditData.by_icao[targetIcao] : null;
+    const existingFiles = auditEntry && auditEntry.files ? auditEntry.files : [];
+    const activeExisting = existingFiles.filter(f => !f.is_disabled);
+    const newFilename = installPayload.filename || (installPayload.filePath ? installPayload.filePath.split(/[\/]/).pop() : 'new_profile.ini');
+
+    if (activeExisting.length > 0 || existingFiles.length > 0) {
+        const existingNames = (activeExisting.length > 0 ? activeExisting : existingFiles).map(f => f.filename).join(', ');
+        
+        showCustomModal({
+            title: t('gsx.drop_conflict_title', `GSX Profile Conflict (${targetIcao})`, { icao: targetIcao }),
+            message: `
+                <div class="space-y-3">
+                    <p class="text-xs text-slate-300 leading-relaxed">
+                        ${t('gsx.drop_conflict_msg', `One or more GSX profile(s) already exist for <strong>${targetIcao}</strong>:`, { icao: targetIcao })}
+                    </p>
+                    <div class="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono font-bold text-amber-300">
+                        <i class="fa-solid fa-file-lines mr-1.5 text-amber-400"></i> ${escapeHtml(existingNames)}
+                    </div>
+                    <p class="text-xs text-slate-300 leading-relaxed">
+                        ${t('gsx.drop_new_incoming', 'Incoming new profile:')}
+                    </p>
+                    <div class="p-2.5 rounded-xl bg-slate-950 border border-cyan-800/80 text-xs font-mono font-bold text-cyan-300">
+                        <i class="fa-solid fa-file-arrow-up mr-1.5 text-cyan-400"></i> ${escapeHtml(newFilename)}
+                    </div>
+                    <p class="text-[11px] text-slate-400">
+                        ${t('gsx.drop_choice_help', 'Choose whether you want to replace the existing profile (recommended) or keep both as duplicates.')}
+                    </p>
+                </div>
+            `,
+            type: 'info',
+            confirmText: t('gsx.btn_replace', 'Replace Existing (Recommended)'),
+            cancelText: t('gsx.btn_keep_both', 'Keep Both (Duplicate)'),
+            showCancel: true,
+            confirmClass: 'px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors border-0 cursor-pointer shadow-md shadow-emerald-950/40',
+            onConfirm: async () => {
+                await executeGsxInstallationForIcao(targetIcao, { ...installPayload, replaceExisting: true });
+            },
+            onCancel: async () => {
+                await executeGsxInstallationForIcao(targetIcao, { ...installPayload, replaceExisting: false });
+            }
+        });
+    } else {
+        executeGsxInstallationForIcao(targetIcao, { ...installPayload, replaceExisting: false });
+    }
+}
+window.checkGsxDropConflictAndInstall = checkGsxDropConflictAndInstall;
+
+async function executeGsxInstallationForIcao(icao, { filePath = '', base64Data = '', filename = '', replaceExisting = false } = {}) {
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.install_gsx_profile) return;
     try {
         const raw = await window.pywebview.api.install_gsx_profile(
             icao || '',
             filePath || '',
             base64Data || '',
-            filename || ''
+            filename || '',
+            replaceExisting
         );
         const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
         if (parsed && parsed.status === 'ok') {
@@ -4398,6 +4448,8 @@ async function executeGsxInstallationForIcao(icao, { filePath = '', base64Data =
             }
 
             markGsxCardResolved(icao, `✓ GSX Profile Installed & Matched${fileMsg}`);
+            renderGsxAuditModal();
+            updateGsxHeaderAndTabBadges();
         } else if (parsed && parsed.status === 'error') {
             if (typeof showToast === 'function') {
                 showToast(parsed.message || 'Failed to install GSX profile', 'error');
@@ -4410,7 +4462,6 @@ async function executeGsxInstallationForIcao(icao, { filePath = '', base64Data =
         }
     }
 }
-
 async function installGsxProfileFromModal(icao) {
     await executeGsxInstallationForIcao(icao, { filePath: '' });
 }
@@ -4455,14 +4506,14 @@ async function handleGsxAuditDrop(e, icao) {
         return;
     }
 
-    const path = file.path || '';
+        const path = file.path || '';
     if (path) {
-        await executeGsxInstallationForIcao(icao, { filePath: path });
+        checkGsxDropConflictAndInstall(icao, { filePath: path });
     } else {
         const reader = new FileReader();
-        reader.onload = async function(event) {
+        reader.onload = function(event) {
             const base64Data = event.target.result;
-            await executeGsxInstallationForIcao(icao, { base64Data: base64Data, filename: file.name });
+            checkGsxDropConflictAndInstall(icao, { base64Data: base64Data, filename: file.name });
         };
         reader.onerror = function() {
             if (typeof showToast === 'function') {
@@ -12607,13 +12658,14 @@ async function handleGsxDrop(e) {
     const file = e.dataTransfer.files[0];
     const path = file.path || '';
 
+    const targetIcao = selectedAirport ? (selectedAirport.icao || '') : '';
     if (path) {
-        await executeGsxInstallation({ filePath: path });
+        checkGsxDropConflictAndInstall(targetIcao, { filePath: path });
     } else {
         const reader = new FileReader();
-        reader.onload = async function(event) {
+        reader.onload = function(event) {
             const base64Data = event.target.result;
-            await executeGsxInstallation({ base64Data: base64Data, filename: file.name });
+            checkGsxDropConflictAndInstall(targetIcao, { base64Data: base64Data, filename: file.name });
         };
         reader.onerror = function() {
             showCustomModal({ title: 'File Read Error', message: 'Unable to read the dropped file.', type: 'error' });
@@ -12623,10 +12675,11 @@ async function handleGsxDrop(e) {
 }
 
 async function triggerInstallGsxProfile() {
-    await executeGsxInstallation({ filePath: '' });
+    const targetIcao = selectedAirport ? (selectedAirport.icao || '') : '';
+    await executeGsxInstallationForIcao(targetIcao, { filePath: '' });
 }
 
-async function executeGsxInstallation({ filePath = '', base64Data = '', filename = '' } = {}) {
+async function executeGsxInstallation({ filePath = '', base64Data = '', filename = '', replaceExisting = false } = {}) {
     if (!selectedAirport) return;
     try {
         if (window.pywebview) {
@@ -12634,7 +12687,8 @@ async function executeGsxInstallation({ filePath = '', base64Data = '', filename
                 selectedAirport.icao || '',
                 filePath || '',
                 base64Data || '',
-                filename || ''
+                filename || '',
+                replaceExisting
             );
             const res = JSON.parse(resStr);
             if (res.status === 'ok') {
@@ -13193,6 +13247,12 @@ function showCustomModal(titleOrObj, messageStr, typeStr = 'info') {
             cancelBtn.classList.toggle('hidden', !showCancel);
         }
     }
+
+    const iconBg = document.getElementById('custom-modal-icon-bg');
+
+
+    const iconEl = document.getElementById('custom-modal-icon');
+
 
     if (iconBg && iconEl) {
         iconBg.className = "w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-inner ";

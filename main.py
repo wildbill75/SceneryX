@@ -1850,7 +1850,7 @@ class Api:
 
         return installed_files
 
-    def install_gsx_profile(self, icao="", file_path="", base64_data="", filename=""):
+    def install_gsx_profile(self, icao="", file_path="", base64_data="", filename="", replace_existing=False):
         import shutil
         import base64
         
@@ -1864,16 +1864,18 @@ class Api:
         target_icao = (icao or '').upper()
         
         try:
-            # Clean up existing old GSX profile files for this ICAO if installing direct single .ini or .py
-            if target_icao and len(target_icao) == 4:
+            # Clean up existing old GSX profile files for this ICAO if replacing existing
+            if replace_existing and target_icao and len(target_icao) == 4:
                 try:
                     for existing_f in os.listdir(gsx_dir):
                         if existing_f.lower() == 'configuration.ini':
                             continue
-                        if existing_f.upper().startswith(target_icao) and existing_f.lower().endswith(('.ini', '.py')):
+                        f_upper = existing_f.upper()
+                        if f_upper.startswith(target_icao) or target_icao in re.split(r'[-_ .]+', f_upper):
                             old_path = os.path.join(gsx_dir, existing_f)
                             try:
-                                os.remove(old_path)
+                                if os.path.isfile(old_path):
+                                    os.remove(old_path)
                             except Exception: pass
                 except Exception: pass
 
