@@ -3671,10 +3671,24 @@ function renderGsxAuditModal() {
 
     let html = '';
     entries.forEach(entry => {
-        const icao = entry.icao || '';
+        const icao = String(entry.icao || '').toUpperCase();
         const ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao(icao) : null;
-        const apName = ap ? (ap.name || icao) : (entry.name || icao);
-        const location = ap ? [ap.city, ap.country].filter(Boolean).join(', ') : ([entry.city, entry.country].filter(Boolean).join(', ') || '');
+        const apName = ap ? (ap.name || entry.name || icao) : (entry.name || icao);
+        const cityCountry = ap ? [ap.city, ap.country].filter(Boolean).join(', ') : ([entry.city, entry.country].filter(Boolean).join(', ') || '');
+        const addonVendor = (ap && ap.vendor) || entry.addon_vendor || entry.vendor || '';
+        const addonVer = (ap && ap.version) || entry.addon_version || entry.version || '';
+        const addonPkg = (ap && ap.package_name) || entry.addon_name || entry.package_name || '';
+        
+        let addonLabel = '';
+        if (addonVendor && addonVendor !== 'Unknown' && addonVendor !== 'Microsoft / Asobo') {
+            addonLabel = addonVer ? `${addonVendor} (${addonVer})` : addonVendor;
+        } else if (addonPkg) {
+            addonLabel = addonVer ? `${addonPkg} (${addonVer})` : addonPkg;
+        } else if (addonVer) {
+            addonLabel = addonVer;
+        }
+
+        const location = [cityCountry, addonLabel].filter(Boolean).join(' • ');
         const files = entry.files || [];
 
         let badgeHtml = '';
@@ -3729,7 +3743,7 @@ function renderGsxAuditModal() {
                         <span class="text-xs font-bold text-white truncate ${hoverTextClass} transition-colors">${escapeHtml(apName)}</span>
                         ${iconHtml}
                     </div>
-                    <div class="text-[11px] font-mono text-slate-400 truncate">${escapeHtml(location)}</div>
+                    <div class="text-[11px] font-mono text-slate-400 truncate mt-0.5">${escapeHtml(location)}</div>
                 </div>
                 <div class="flex items-center gap-1.5 shrink-0">
                     ${pricingBadge}
@@ -6551,7 +6565,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
 
                         <!-- Title with native mouseover hover tooltip -->
                         <div class="min-w-0 flex-1" title="${safePkgName}">
-                            <span class="text-xs font-bold text-white truncate block hover:text-cyan-300 transition-colors cursor-help" title="${safePkgName}">${titleLabel}</span>
+                            <span class="text-xs font-bold text-white truncate block hover:text-cyan-300 transition-colors cursor-help" title="${safePkgName}">${titleLabel} ${src.version ? `<span class="text-[10px] font-mono text-cyan-400 font-normal ml-1">(${escapeHtml(src.version)})</span>` : ''}</span>
                         </div>
 
                         <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded ${badgeBg} shrink-0 uppercase leading-tight">${getPricingBadgeLabel(pType)}</span>

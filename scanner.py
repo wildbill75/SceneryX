@@ -1250,7 +1250,7 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
             elif status == 'ORPHAN':
                 summary['orphan'] += 1
 
-        results[icao] = {
+                results[icao] = {
             'icao': icao,
             'name': ap.get('name') if (ap and ap.get('name')) else db_ap.get('name', f"{icao} Airport"),
             'city': ap.get('city') if (ap and ap.get('city')) else db_ap.get('city', ''),
@@ -1259,6 +1259,12 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
             'lon': ap.get('lon') if ap else float(db_ap.get('lon', 0.0) or 0.0),
             'pricing_type': ap.get('pricing_type') if ap else ('Default' if is_known_world_airport else 'Unknown'),
             'vendor': ap.get('vendor') if ap else ('Microsoft / Asobo' if is_known_world_airport else ''),
+            'version': ap.get('version') if ap else None,
+            'package_name': ap.get('package_name') if ap else None,
+            'addon_vendor': (active_src.get('vendor') if active_src else ap.get('vendor')) if ap else None,
+            'addon_version': (active_src.get('version') if active_src else ap.get('version')) if ap else None,
+            'addon_name': (active_src.get('folder_name') if active_src else ap.get('package_name')) if ap else None,
+            'addon_size': (active_src.get('size_str') if active_src else ap.get('size_str')) if ap else None,
             'is_asobo': bool(ap.get('is_asobo')) if ap else False,
             'is_freeware': (ap.get('pricing_type') == 'Freeware / Flightsim.to') if ap else False,
             'is_payware': (ap.get('pricing_type') == 'Payware') if ap else False,
