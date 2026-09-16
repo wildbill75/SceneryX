@@ -3169,6 +3169,7 @@ function closeGsxAuditModal() {
 }
 
 function setGsxAuditFilter(filter) {
+    if (filter === 'MATCHED') filter = 'ACTIVE';
     currentGsxAuditFilter = filter || 'ALL';
     const buttons = [
         { id: 'gsx-filter-btn-all', key: 'ALL' },
@@ -3665,12 +3666,19 @@ function renderGsxAuditModal() {
 
     let html = '';
     entries.forEach(entry => {
-        const icao = String(entry.icao || '').toUpperCase();
+        let icao = String(entry.icao || '').toUpperCase();
+        if (!icao || icao === 'AIRPORT') {
+            if (entry.files && entry.files.length > 0 && entry.files[0].filename) {
+                icao = (extractIcaoFromDroppedFile(entry.files[0].filename) || '').toUpperCase();
+            } else if (entry.filename) {
+                icao = (extractIcaoFromDroppedFile(entry.filename) || '').toUpperCase();
+            }
+        }
         const ap = (typeof getAirportByIcao === 'function' && icao) ? getAirportByIcao(icao) : null;
         const rawApName = (ap && ap.name) || entry.name || (icao ? `${icao} Airport` : 'Airport');
         let apName = (typeof getCleanAirportName === 'function') ? getCleanAirportName(rawApName, (ap && ap.city) || entry.city) : rawApName;
-        if (!apName || apName.length < 2) {
-            apName = rawApName || icao;
+        if (!apName || apName.length < 2 || apName.toLowerCase() === 'airport') {
+            apName = (ap && ap.name) || rawApName || icao;
         }
         
         let rawCity = (ap && ap.city) || entry.city || '';
@@ -7709,12 +7717,8 @@ function revealGsxFile(safePath) {
 }
 
 async function openGsxAuditFromDetails(filter = 'ALL') {
-    if (typeof closeRadialDetailsModal === 'function') {
-        closeRadialDetailsModal();
-    }
-    if (typeof closeAirportRadialMenu === 'function') {
-        closeAirportRadialMenu();
-    }
+    if (filter === 'MATCHED') filter = 'ACTIVE';
+    // Do NOT close airport details modal or radial menu so they stay open concurrently
     await openGsxAuditModal(filter);
 }
 window.openGsxAuditFromDetails = openGsxAuditFromDetails;
