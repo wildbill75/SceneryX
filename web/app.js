@@ -3665,8 +3665,8 @@ function renderGsxAuditModal() {
 
     let html = '';
     entries.forEach(entry => {
-        const icao = String(entry.icao || (ap && ap.icao) || '').toUpperCase();
-        const ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao(icao) : null;
+        const icao = String(entry.icao || '').toUpperCase();
+        const ap = (typeof getAirportByIcao === 'function' && icao) ? getAirportByIcao(icao) : null;
         const rawApName = (ap && ap.name) || entry.name || (icao ? `${icao} Airport` : 'Airport');
         let apName = (typeof getCleanAirportName === 'function') ? getCleanAirportName(rawApName, (ap && ap.city) || entry.city) : rawApName;
         if (!apName || apName.length < 2) {
@@ -7530,14 +7530,14 @@ function renderRadialGsx(ap) {
                         ${fMeta ? `<div class="text-[10px] font-mono text-slate-400 truncate mt-0.5">${escapeHtml(fMeta)}</div>` : ''}
                     </div>
                     <div class="flex items-center gap-1.5 shrink-0">
+                        <button onclick="openGsxAuditFromDetails('MATCHED')" title="Open GSX Profiles Details on map" class="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-cyan-950 text-slate-300 hover:text-cyan-300 border border-slate-700/60 hover:border-cyan-700 text-[10px] font-mono font-bold cursor-pointer shrink-0 transition-colors">
+                            VIEW LIST
+                        </button>
                         <button onclick="disableGsxProfileFromModal('${ap.icao}', '${escapeJsStr(activeFile.filename || `${ap.icao}.ini`)}')" title="Disable this GSX profile" class="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-rose-900 text-slate-300 hover:text-white border border-slate-700/60 hover:border-rose-700 text-[10px] font-mono font-bold cursor-pointer shrink-0 transition-colors">
                             Disable
                         </button>
                         <button onclick="revealGsxFile('${safePath}')" title="Reveal in Windows Explorer" class="w-7 h-7 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs border border-slate-700/60 cursor-pointer shrink-0 transition-colors flex items-center justify-center">
                             <i class="fa-solid fa-folder-open text-xs"></i>
-                        </button>
-                        <button onclick="openGsxAuditFromDetails('MATCHED')" title="Open GSX Profiles Details on map" class="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-cyan-950 text-slate-300 hover:text-cyan-300 border border-slate-700/60 hover:border-cyan-700 text-[10px] font-mono font-bold cursor-pointer shrink-0 transition-colors">
-                            VIEW LIST
                         </button>
                     </div>
                 </div>
@@ -7632,14 +7632,14 @@ function renderRadialGsx(ap) {
                             ${activeFile.scenario ? `<div class="text-[10px] font-mono text-slate-400 truncate mt-0.5">${escapeHtml(activeFile.scenario)}</div>` : ''}
                         </div>
                         <div class="flex items-center gap-1.5 shrink-0">
+                            <button onclick="openGsxAuditFromDetails('MISMATCH')" title="Open GSX Profiles Details on map" class="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-cyan-950 text-slate-300 hover:text-cyan-300 border border-slate-700/60 hover:border-cyan-700 text-[10px] font-mono font-bold cursor-pointer shrink-0 transition-colors">
+                                VIEW LIST
+                            </button>
                             <button onclick="disableGsxProfileFromModal('${ap.icao}', '${escapeJsStr(activeFile.filename || `${ap.icao}.ini`)}')" title="Disable mismatched profile" class="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-rose-900 text-slate-300 hover:text-white border border-slate-700/60 hover:border-rose-700 text-[10px] font-mono font-bold cursor-pointer shrink-0 transition-colors">
                                 Disable
                             </button>
                             <button onclick="revealGsxFile('${safePath}')" title="Reveal in Windows Explorer" class="w-7 h-7 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs border border-slate-700/60 cursor-pointer shrink-0 transition-colors flex items-center justify-center">
                                 <i class="fa-solid fa-folder-open text-xs"></i>
-                            </button>
-                            <button onclick="openGsxAuditFromDetails('MISMATCH')" title="Open GSX Profiles Details on map" class="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-cyan-950 text-slate-300 hover:text-cyan-300 border border-slate-700/60 hover:border-cyan-700 text-[10px] font-mono font-bold cursor-pointer shrink-0 transition-colors">
-                                VIEW LIST
                             </button>
                         </div>
                     </div>
