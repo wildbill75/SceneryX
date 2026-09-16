@@ -3031,10 +3031,6 @@ async function openGsxAuditModal(filter = 'ALL') {
 }
 
 function panCameraToGsxAirport(icao) {
-    if (!gsxAuditFloatingMode) {
-        // Direct pan is inhibited until user clicks "Open Map"
-        return;
-    }
     if (!icao) return;
     let ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao(icao) : null;
 
@@ -3358,17 +3354,16 @@ function renderGsxAuditModal() {
                 pricingBadge = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-cyan-600 text-white border-0">${t('pricing.freeware_caps', 'FREEWARE')}</span>`;
             }
 
-            const canPan = !!gsxAuditFloatingMode;
-            const clickAttr = canPan ? `onclick="panCameraToGsxAirport('${icao}')"` : '';
-            const cursorClass = canPan ? 'cursor-pointer group/hdr hover:opacity-90' : 'cursor-default';
-            const titleAttr = canPan ? 'Click to view and center camera on airport' : '';
-            const underlineClass = canPan ? 'group-hover/hdr:underline' : '';
-            const hoverTextClass = canPan ? 'group-hover/hdr:text-cyan-300' : '';
-            const iconHtml = canPan ? `
+            const clickAttr = `onclick="panCameraToGsxAirport('${icao}')"`;
+            const cursorClass = 'cursor-pointer group/hdr hover:opacity-90';
+            const titleAttr = 'Click to view and center camera on airport';
+            const underlineClass = 'group-hover/hdr:underline';
+            const hoverTextClass = 'group-hover/hdr:text-cyan-300';
+            const iconHtml = `
                 <svg class="w-3 h-3 text-cyan-400 opacity-0 group-hover/hdr:opacity-100 transition-opacity shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <circle cx="12" cy="12" r="3" stroke-width="2"/>
                     <circle cx="12" cy="12" r="8" stroke-width="2" stroke-dasharray="2 2"/>
-                </svg>` : '';
+                </svg>`;
 
             html += `
                 <div id="gsx-card-${icao}" class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2 transition-all duration-500">
@@ -3477,17 +3472,16 @@ function renderGsxAuditModal() {
         disabledList.forEach(item => {
             const icao = item.icao || '';
             const location = [item.city, item.country].filter(Boolean).join(', ');
-            const canPan = !!gsxAuditFloatingMode;
-            const clickAttr = canPan ? `onclick="panCameraToGsxAirport('${icao}')"` : '';
-            const cursorClass = canPan ? 'cursor-pointer group/hdr hover:opacity-90' : 'cursor-default';
-            const titleAttr = canPan ? 'Click to view and center camera on airport' : '';
-            const underlineClass = canPan ? 'group-hover/hdr:underline' : '';
-            const hoverTextClass = canPan ? 'group-hover/hdr:text-cyan-300' : '';
-            const iconHtml = canPan ? `
+            const clickAttr = `onclick="panCameraToGsxAirport('${icao}')"`;
+            const cursorClass = 'cursor-pointer group/hdr hover:opacity-90';
+            const titleAttr = 'Click to view and center camera on airport';
+            const underlineClass = 'group-hover/hdr:underline';
+            const hoverTextClass = 'group-hover/hdr:text-cyan-300';
+            const iconHtml = `
                 <svg class="w-3 h-3 text-cyan-400 opacity-0 group-hover/hdr:opacity-100 transition-opacity shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <circle cx="12" cy="12" r="3" stroke-width="2"/>
                     <circle cx="12" cy="12" r="8" stroke-width="2" stroke-dasharray="2 2"/>
-                </svg>` : '';
+                </svg>`;
 
             const safeId = 'gsx-dis-' + String(item.filename).replace(/[^a-zA-Z0-9_-]/g, '_');
 
@@ -3671,10 +3665,13 @@ function renderGsxAuditModal() {
 
     let html = '';
     entries.forEach(entry => {
-        const icao = String(entry.icao || '').toUpperCase();
+        const icao = String(entry.icao || (ap && ap.icao) || '').toUpperCase();
         const ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao(icao) : null;
-        const rawApName = (ap && ap.name) || entry.name || (icao + ' Airport');
-        const apName = (typeof getCleanAirportName === 'function') ? getCleanAirportName(rawApName, (ap && ap.city) || entry.city) : rawApName;
+        const rawApName = (ap && ap.name) || entry.name || (icao ? `${icao} Airport` : 'Airport');
+        let apName = (typeof getCleanAirportName === 'function') ? getCleanAirportName(rawApName, (ap && ap.city) || entry.city) : rawApName;
+        if (!apName || apName.length < 2) {
+            apName = rawApName || icao;
+        }
         
         let rawCity = (ap && ap.city) || entry.city || '';
         let city = (typeof getCleanCityName === 'function') ? getCleanCityName(rawCity) : rawCity;
@@ -3732,17 +3729,16 @@ function renderGsxAuditModal() {
             pricingBadge = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-cyan-600 text-white border-0">${t('pricing.freeware_caps', 'FREEWARE')}</span>`;
         }
 
-        const canPan = !!gsxAuditFloatingMode;
-        const clickAttr = canPan ? `onclick="panCameraToGsxAirport('${icao}')"` : '';
-        const cursorClass = canPan ? 'cursor-pointer group/hdr hover:opacity-90' : 'cursor-default';
-        const titleAttr = canPan ? 'Click to view and center camera on airport' : '';
-        const underlineClass = canPan ? 'group-hover/hdr:underline' : '';
-        const hoverTextClass = canPan ? 'group-hover/hdr:text-cyan-300' : '';
-        const iconHtml = canPan ? `
+        const clickAttr = `onclick="panCameraToGsxAirport('${icao}')"`;
+        const cursorClass = 'cursor-pointer group/hdr hover:opacity-90';
+        const titleAttr = 'Click to view and center camera on airport';
+        const underlineClass = 'group-hover/hdr:underline';
+        const hoverTextClass = 'group-hover/hdr:text-cyan-300';
+        const iconHtml = `
             <svg class="w-3 h-3 text-cyan-400 opacity-0 group-hover/hdr:opacity-100 transition-opacity shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <circle cx="12" cy="12" r="3" stroke-width="2"/>
                 <circle cx="12" cy="12" r="8" stroke-width="2" stroke-dasharray="2 2"/>
-            </svg>` : '';
+            </svg>`;
 
         html += `<div id="gsx-card-${icao}" class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2 transition-all duration-500">`;
 
@@ -4190,6 +4186,9 @@ async function activateGsxDuplicateFromModal(icao, filename) {
                     currentRadialAirport.has_gsx_profile = true;
                     if (typeof renderRadialAirportDetails === 'function') {
                         renderRadialAirportDetails(currentRadialAirport);
+                    }
+                    if (typeof renderRadialGsx === 'function') {
+                        renderRadialGsx(currentRadialAirport);
                     }
                 }
                 updateStats(allAirportsData);
@@ -7531,6 +7530,9 @@ function renderRadialGsx(ap) {
                         ${fMeta ? `<div class="text-[10px] font-mono text-slate-400 truncate mt-0.5">${escapeHtml(fMeta)}</div>` : ''}
                     </div>
                     <div class="flex items-center gap-1.5 shrink-0">
+                        <button onclick="disableGsxProfileFromModal('${ap.icao}', '${escapeJsStr(activeFile.filename || `${ap.icao}.ini`)}')" title="Disable this GSX profile" class="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-rose-900 text-slate-300 hover:text-white border border-slate-700/60 hover:border-rose-700 text-[10px] font-mono font-bold cursor-pointer shrink-0 transition-colors">
+                            Disable
+                        </button>
                         <button onclick="revealGsxFile('${safePath}')" title="Reveal in Windows Explorer" class="w-7 h-7 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs border border-slate-700/60 cursor-pointer shrink-0 transition-colors flex items-center justify-center">
                             <i class="fa-solid fa-folder-open text-xs"></i>
                         </button>
@@ -7630,6 +7632,9 @@ function renderRadialGsx(ap) {
                             ${activeFile.scenario ? `<div class="text-[10px] font-mono text-slate-400 truncate mt-0.5">${escapeHtml(activeFile.scenario)}</div>` : ''}
                         </div>
                         <div class="flex items-center gap-1.5 shrink-0">
+                            <button onclick="disableGsxProfileFromModal('${ap.icao}', '${escapeJsStr(activeFile.filename || `${ap.icao}.ini`)}')" title="Disable mismatched profile" class="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-rose-900 text-slate-300 hover:text-white border border-slate-700/60 hover:border-rose-700 text-[10px] font-mono font-bold cursor-pointer shrink-0 transition-colors">
+                                Disable
+                            </button>
                             <button onclick="revealGsxFile('${safePath}')" title="Reveal in Windows Explorer" class="w-7 h-7 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs border border-slate-700/60 cursor-pointer shrink-0 transition-colors flex items-center justify-center">
                                 <i class="fa-solid fa-folder-open text-xs"></i>
                             </button>
@@ -11741,8 +11746,12 @@ function initDraggableFilterRadial() {
 }
 
 function openFilterRadialMenu(clientX, clientY) {
-    if (typeof closeAirportRadialMenu === 'function') {
-        closeAirportRadialMenu();
+    if (!isAirlinesModalOpen() && !isDetailsModalOpen()) {
+        const radialEl = document.getElementById('airport-radial-menu');
+        if (radialEl) {
+            radialEl.classList.add('hidden');
+            radialEl.classList.remove('animate-radial-open');
+        }
     }
 
     const menuEl = document.getElementById('filter-radial-menu');
