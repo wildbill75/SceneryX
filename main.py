@@ -1974,25 +1974,18 @@ class Api:
         target_icao = (icao or '').upper().strip()
         
         try:
-            # Clean up or disable existing old GSX profile files for this ICAO to guarantee NO active duplicates
+            # Clean up all existing old GSX profile files for this ICAO to guarantee NO active duplicates or lingering disabled files
             if target_icao and len(target_icao) >= 3:
                 try:
                     for existing_f in os.listdir(gsx_dir):
-                        if existing_f.lower() == 'configuration.ini' or existing_f.lower().endswith('.disabled'):
+                        if existing_f.lower() == 'configuration.ini':
                             continue
                         fp = os.path.join(gsx_dir, existing_f)
                         f_icao = extract_icao_from_gsx_filename(existing_f, valid_icaos={target_icao}, file_path=fp)
                         if f_icao == target_icao:
                             try:
-                                if replace_existing:
-                                    if os.path.isfile(fp):
-                                        os.remove(fp)
-                                else:
-                                    dest_dis = fp + '.disabled'
-                                    if os.path.exists(dest_dis):
-                                        try: os.remove(dest_dis)
-                                        except Exception: pass
-                                    os.replace(fp, dest_dis)
+                                if os.path.isfile(fp):
+                                    os.remove(fp)
                             except Exception: pass
                 except Exception: pass
 

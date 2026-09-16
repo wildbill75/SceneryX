@@ -4582,6 +4582,9 @@ function proceedWithGsxDropInstallation(targetIcao, installPayload, evalRes) {
                     if (typeof showToast === 'function') {
                         showToast(`Current active profile preserved for ${targetIcao}`, 'info');
                     }
+                    if (typeof refreshAirportGsxStatus === 'function') {
+                        refreshAirportGsxStatus(targetIcao);
+                    }
                 },
                 onCancel: async () => {
                     await executeGsxInstallationForIcao(targetIcao, { ...installPayload, replaceExisting: true });
@@ -7790,10 +7793,13 @@ function renderRadialGsx(ap) {
                         <div class="p-2 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center justify-between gap-2">
                             <span class="text-xs font-mono text-slate-300 truncate">${escapeHtml(f.filename)}</span>
                             <div class="flex items-center gap-1.5 shrink-0">
-                                <button onclick="enableGsxProfile('${ap.icao}', '${escapeJsStr(f.filename)}')" class="px-2 py-0.5 rounded bg-cyan-700 hover:bg-cyan-600 text-white text-[10px] font-mono font-bold border-0 cursor-pointer">
+                                <button onclick="enableGsxProfile('${ap.icao}', '${escapeJsStr(f.filename)}')" class="px-2 py-0.5 rounded bg-cyan-700 hover:bg-cyan-600 text-white text-[10px] font-mono font-bold border-0 cursor-pointer transition-colors">
                                     Enable
                                 </button>
-                                <button onclick="revealGsxFile('${safePath}')" title="Reveal in Windows Explorer" class="w-6 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs border border-slate-700/60 cursor-pointer flex items-center justify-center">
+                                <button onclick="confirmDeleteGsxProfile('${ap.icao}', '${escapeJsStr(f.filename)}')" title="Delete from disk" class="w-6 h-6 rounded-lg bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 text-xs border border-slate-700/60 cursor-pointer flex items-center justify-center transition-colors">
+                                    <i class="fa-solid fa-trash text-[10px]"></i>
+                                </button>
+                                <button onclick="revealGsxFile('${safePath}')" title="Reveal in Windows Explorer" class="w-6 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs border border-slate-700/60 cursor-pointer flex items-center justify-center transition-colors">
                                     <i class="fa-solid fa-folder-open text-[10px]"></i>
                                 </button>
                             </div>
