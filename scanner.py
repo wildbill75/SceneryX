@@ -1016,6 +1016,79 @@ def evaluate_gsx_studio_match(pf, ap):
     return ('MATCHED', 'Active GSX profile.')
 
 
+def parse_single_gsx_ini(content='', filename='', file_path='', is_disabled=False):
+    afcad = None
+    scenario = None
+    creator = None
+    gates_count = 0
+    target_pkg = None
+    ver_str = None
+    mtime_str = None
+    mtime_ts = 0
+
+    if file_path and os.path.exists(file_path):
+        try:
+            mtime_ts = os.path.getmtime(file_path)
+            mtime_str = datetime.datetime.fromtimestamp(mtime_ts).strftime('%Y-%m-%d')
+        except Exception:
+            pass
+
+    if content:
+        afcad_m = re.search(r'afcad_path\s*=\s*(.+)', content)
+        if afcad_m:
+            afcad = afcad_m.group(1).strip()
+        scenario_m = re.search(r'scenario\s*=\s*(.+)', content)
+        if scenario_m:
+            scenario = scenario_m.group(1).strip()
+        creator_m = re.search(r'creator\s*=\s*(.+)', content)
+        if creator_m:
+            creator = creator_m.group(1).strip()
+        gates_count = len(re.findall(r'\[(?:gate|rwy|parking)\s+[^\]]+\]', content, re.IGNORECASE))
+        v_m = re.search(r'version\s*=\s*["\']?([^"\'\r\n]+)["\']?', content)
+        if v_m:
+            ver_str = v_m.group(1).strip()
+
+    if afcad:
+        parts = afcad.replace('/', '\\').split('\\')
+        for i, p in enumerate(parts):
+            p_l = p.lower()
+            if p_l in ('community', 'official', 'streamedpackages'):
+                if i + 1 < len(parts):
+                    next_p = parts[i + 1]
+                    if next_p.lower() in ('onestore', 'steam') and i + 2 < len(parts):
+                        target_pkg = parts[i + 2]
+                    else:
+                        target_pkg = next_p
+                    break
+
+    f_lower = (filename or '').lower()
+    is_2024 = '2024' in f_lower or bool(re.search(r'msfs2024only\s*=\s*1', content or ''))
+    is_2020 = '2020' in f_lower
+
+    vdgs_type = None
+    if 'asvdgs' in f_lower or 'asxvdgs' in f_lower:
+        vdgs_type = 'Aerosoft VDGS'
+    elif 'gsxvdgs' in f_lower:
+        vdgs_type = 'GSX SafeDock'
+
+    return {
+        'filename': filename,
+        'path': file_path,
+        'is_disabled': is_disabled or (filename.lower().endswith('.disabled') if filename else False),
+        'afcad_path': afcad,
+        'target_pkg': target_pkg,
+        'scenario': scenario,
+        'creator': creator,
+        'gates_count': gates_count,
+        'mtime': mtime_str,
+        'mtime_ts': mtime_ts,
+        'version': ver_str,
+        'is_2024': is_2024,
+        'is_2020': is_2020,
+        'vdgs_type': vdgs_type
+    }
+
+
 def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
     if not gsx_dir:
         gsx_dir = get_default_gsx_path()

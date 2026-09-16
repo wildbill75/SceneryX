@@ -1852,6 +1852,114 @@ class Api:
 
         return installed_files
 
+    def evaluate_incoming_gsx_profile(self, icao="", file_path="", base64_data="", filename=""):
+        try:
+            import base64
+            import zipfile
+            import io
+            
+            settings = get_settings()
+            gsx_dir = settings.get("gsx_profile_path", get_default_gsx_path())
+            
+            content_str = ""
+            actual_filename = filename or (os.path.basename(file_path) if file_path else "profile.ini")
+            
+            if base64_data:
+                if "," in base64_data:
+                    base64_data = base64_data.split(",", 1)[1]
+                file_bytes = base64.b64decode(base64_data)
+                ext = os.path.splitext(actual_filename)[1].lower()
+                if ext in ['.zip', '.rar', '.7z', '.tar', '.gz']:
+                    try:
+                        with zipfile.ZipFile(io.BytesIO(file_bytes)) as zf:
+                            for zname in zf.namelist():
+                                if zname.lower().endswith('.ini') and not zname.lower().endswith('configuration.ini'):
+                                    content_str = zf.read(zname).decode('utf-8', errors='ignore')
+                                    actual_filename = os.path.basename(zname)
+                                    break
+                    except Exception: pass
+                else:
+                    content_str = file_bytes.decode('utf-8', errors='ignore')
+            elif file_path and os.path.exists(file_path):
+                ext = os.path.splitext(file_path)[1].lower()
+                if ext == '.zip':
+                    try:
+                        with zipfile.ZipFile(file_path) as zf:
+                            for zname in zf.namelist():
+                                if zname.lower().endswith('.ini') and not zname.lower().endswith('configuration.ini'):
+                                    content_str = zf.read(zname).decode('utf-8', errors='ignore')
+                                    actual_filename = os.path.basename(zname)
+                                    break
+                    except Exception: pass
+                else:
+                    try:
+                        with open(file_path, 'r', encoding='utf-8', errors='ignore') as fh:
+                            content_str = fh.read()
+                    except Exception: pass
+            
+            from scanner import parse_single_gsx_ini, evaluate_gsx_studio_match, extract_icao_from_gsx_filename, OUTPUT_JSON_PATH
+            parsed_incoming = parse_single_gsx_ini(content_str, filename=actual_filename, file_path=file_path)
+            
+            target_icao = (icao or '').upper().strip()
+            detected_icao = extract_icao_from_gsx_filename(actual_filename, file_path=file_path)
+            if not target_icao:
+                target_icao = (detected_icao or "").upper().strip()
+            
+            # Load airport from installed_airports.json
+            installed_map = {}
+            if os.path.exists(OUTPUT_JSON_PATH):
+                try:
+                    with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
+                        installed_list = json.load(f)
+                        installed_map = {ap['icao']: ap for ap in installed_list if isinstance(ap, dict) and 'icao' in ap}
+                except Exception: pass
+            
+            ap = installed_map.get(target_icao)
+            status, reason = evaluate_gsx_studio_match(parsed_incoming, ap)
+            parsed_incoming['status'] = status
+            parsed_incoming['reason'] = reason
+            
+            # Get existing active files for target_icao
+            existing_active = []
+            if gsx_dir and os.path.exists(gsx_dir) and target_icao:
+                for f in os.listdir(gsx_dir):
+                    if f.lower() == 'configuration.ini' or f.endswith('.disabled'):
+                        continue
+                    fp = os.path.join(gsx_dir, f)
+                    f_icao = extract_icao_from_gsx_filename(f, valid_icaos={target_icao}, file_path=fp)
+                    if f_icao == target_icao:
+                        try:
+                            with open(fp, 'r', encoding='utf-8', errors='ignore') as fh:
+                                f_content = fh.read()
+                        except Exception:
+                            f_content = ""
+                        p_exist = parse_single_gsx_ini(f_content, filename=f, file_path=fp)
+                        e_status, e_reason = evaluate_gsx_studio_match(p_exist, ap)
+                        p_exist['status'] = e_status
+                        p_exist['reason'] = e_reason
+                        existing_active.append(p_exist)
+            
+            active_scenery = None
+            if ap:
+                active_src = next((s for s in ap.get('all_sources', []) if not s.get('is_disabled') and not s.get('is_fix_patch') and not s.get('is_addon')), None)
+                active_scenery = {
+                    'vendor': (active_src.get('vendor') if active_src else ap.get('vendor')) or ap.get('vendor') or 'Unknown',
+                    'version': (active_src.get('version') if active_src else ap.get('version')) or ap.get('version') or '',
+                    'package_name': (active_src.get('folder_name') if active_src else ap.get('package_name')) or ap.get('package_name') or '',
+                    'pricing_type': ap.get('pricing_type', 'Default')
+                }
+            
+            return json.dumps({
+                "status": "ok",
+                "target_icao": target_icao,
+                "detected_icao": detected_icao,
+                "incoming": parsed_incoming,
+                "existing_active": existing_active,
+                "active_scenery": active_scenery
+            }, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
     def install_gsx_profile(self, icao="", file_path="", base64_data="", filename="", replace_existing=False):
         import shutil
         import base64
@@ -1866,18 +1974,25 @@ class Api:
         target_icao = (icao or '').upper().strip()
         
         try:
-            # Clean up existing old GSX profile files for this ICAO ONLY if replace_existing is True
-            if replace_existing and target_icao and len(target_icao) >= 3:
+            # Clean up or disable existing old GSX profile files for this ICAO to guarantee NO active duplicates
+            if target_icao and len(target_icao) >= 3:
                 try:
                     for existing_f in os.listdir(gsx_dir):
-                        if existing_f.lower() == 'configuration.ini':
+                        if existing_f.lower() == 'configuration.ini' or existing_f.lower().endswith('.disabled'):
                             continue
                         fp = os.path.join(gsx_dir, existing_f)
                         f_icao = extract_icao_from_gsx_filename(existing_f, valid_icaos={target_icao}, file_path=fp)
                         if f_icao == target_icao:
                             try:
-                                if os.path.isfile(fp):
-                                    os.remove(fp)
+                                if replace_existing:
+                                    if os.path.isfile(fp):
+                                        os.remove(fp)
+                                else:
+                                    dest_dis = fp + '.disabled'
+                                    if os.path.exists(dest_dis):
+                                        try: os.remove(dest_dis)
+                                        except Exception: pass
+                                    os.replace(fp, dest_dis)
                             except Exception: pass
                 except Exception: pass
 

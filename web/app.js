@@ -4419,10 +4419,29 @@ function extractIcaoFromDroppedFile(filename, contentStr = '') {
     return null;
 }
 
-function checkGsxDropConflictAndInstall(icao, installPayload, rawContent = '') {
-    const targetIcao = (icao || '').toUpperCase();
-    const newFilename = installPayload.filename || (installPayload.filePath ? installPayload.filePath.split(/[\\/]/).pop() : 'new_profile.ini');
-    const detectedIcao = extractIcaoFromDroppedFile(newFilename, rawContent);
+async function checkGsxDropConflictAndInstall(icao, installPayload, rawContent = '') {
+    let targetIcao = (icao || '').toUpperCase();
+    let newFilename = installPayload.filename || (installPayload.filePath ? installPayload.filePath.split(/[\\/]/).pop() : 'new_profile.ini');
+
+    let evalRes = null;
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.evaluate_incoming_gsx_profile) {
+        try {
+            const raw = await window.pywebview.api.evaluate_incoming_gsx_profile(
+                targetIcao,
+                installPayload.filePath || '',
+                installPayload.base64Data || '',
+                installPayload.filename || newFilename
+            );
+            evalRes = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        } catch (e) {
+            console.error("Evaluation error:", e);
+        }
+    }
+
+    const detectedIcao = (evalRes && evalRes.detected_icao) || extractIcaoFromDroppedFile(newFilename, rawContent);
+    if (!targetIcao && detectedIcao) {
+        targetIcao = detectedIcao;
+    }
 
     // 1. ICAO Mismatch check
     if (detectedIcao && targetIcao && detectedIcao !== targetIcao) {
@@ -4441,63 +4460,161 @@ function checkGsxDropConflictAndInstall(icao, installPayload, rawContent = '') {
             showCancel: true,
             confirmClass: 'px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition-colors border-0 cursor-pointer shadow-md shadow-cyan-950/40',
             onConfirm: () => {
-                proceedWithGsxDropInstallation(detectedIcao, installPayload);
+                checkGsxDropConflictAndInstall(detectedIcao, installPayload, rawContent);
             },
             onCancel: () => {
-                proceedWithGsxDropInstallation(targetIcao, installPayload);
+                proceedWithGsxDropInstallation(targetIcao, installPayload, evalRes);
             }
         });
         return;
     }
 
-    proceedWithGsxDropInstallation(targetIcao || detectedIcao || 'GSX', installPayload);
+    proceedWithGsxDropInstallation(targetIcao || 'GSX', installPayload, evalRes);
 }
 
-function proceedWithGsxDropInstallation(targetIcao, installPayload) {
-    const auditEntry = window.gsxAuditData && window.gsxAuditData.by_icao ? window.gsxAuditData.by_icao[targetIcao] : null;
-    const existingFiles = auditEntry && auditEntry.files ? auditEntry.files : [];
-    const activeExisting = existingFiles.filter(f => !f.is_disabled);
-    const newFilename = installPayload.filename || (installPayload.filePath ? installPayload.filePath.split(/[\\/]/).pop() : 'new_profile.ini');
+function proceedWithGsxDropInstallation(targetIcao, installPayload, evalRes) {
+    const incoming = (evalRes && evalRes.incoming) || {};
+    const existingActive = (evalRes && evalRes.existing_active) || [];
+    const activeScenery = (evalRes && evalRes.active_scenery) || null;
+    const newFilename = installPayload.filename || (installPayload.filePath ? installPayload.filePath.split(/[\\/]/).pop() : (incoming.filename || 'new_profile.ini'));
 
-    if (activeExisting.length > 0 || existingFiles.length > 0) {
-        const existingNames = (activeExisting.length > 0 ? activeExisting : existingFiles).map(f => f.filename).join(', ');
-        
+    const isIncomingMismatch = (incoming.status || '').startsWith('MISMATCH');
+    const isIncomingMatched = incoming.status === 'MATCHED';
+    const hasExistingActive = existingActive.length > 0;
+    const existingBest = existingActive[0] || null;
+    const isExistingMatched = existingBest && existingBest.status === 'MATCHED';
+
+    if (hasExistingActive || isIncomingMismatch) {
+        let alertBoxHtml = '';
+        if (isIncomingMismatch) {
+            alertBoxHtml = `
+                <div class="p-3 rounded-xl bg-rose-950/70 border border-rose-800/80 space-y-1">
+                    <div class="flex items-center gap-1.5 text-xs font-mono font-bold text-rose-300">
+                        <i class="fa-solid fa-triangle-exclamation text-rose-400"></i>
+                        <span>${t('gsx.drop_mismatch_warning_title', 'Incompatible Profile Warning')}</span>
+                    </div>
+                    <p class="text-[11px] font-mono text-rose-200/90 leading-relaxed">
+                        ${escapeHtml(incoming.reason || 'This profile does not match your active scenery.')}
+                    </p>
+                </div>
+            `;
+        } else if (isIncomingMatched) {
+            alertBoxHtml = `
+                <div class="p-3 rounded-xl bg-emerald-950/60 border border-emerald-800/70 space-y-1">
+                    <div class="flex items-center gap-1.5 text-xs font-mono font-bold text-emerald-300">
+                        <i class="fa-solid fa-circle-check text-emerald-400"></i>
+                        <span>${t('gsx.drop_compatible_title', 'Compatible Profile')}</span>
+                    </div>
+                    <p class="text-[11px] font-mono text-emerald-200/90 leading-relaxed">
+                        ${escapeHtml(incoming.reason || 'Profile matches your installed scenery.')}
+                    </p>
+                </div>
+            `;
+        }
+
+        let existingListHtml = '';
+        if (hasExistingActive) {
+            existingListHtml = `
+                <div class="space-y-1.5 pt-1">
+                    <div class="text-[11px] font-mono text-slate-400">
+                        ${t('gsx.drop_current_active', 'Current active profile (will be replaced):')}
+                    </div>
+                    ${existingActive.map(f => `
+                        <div class="p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-2">
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xs font-mono font-bold text-slate-200 truncate">${escapeHtml(f.filename)}</span>
+                                    <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded leading-tight ${f.status === 'MATCHED' ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300'}">
+                                        ${escapeHtml(f.status || 'ACTIVE')}
+                                    </span>
+                                </div>
+                                <div class="text-[10px] font-mono text-slate-400 truncate mt-0.5">
+                                    ${[f.gates_count ? `${f.gates_count} gates` : '', f.creator ? `By ${f.creator}` : '', f.target_pkg || ''].filter(Boolean).join(' • ')}
+                                </div>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+
+        let incomingHtml = `
+            <div class="space-y-1.5 pt-1">
+                <div class="text-[11px] font-mono text-slate-400">
+                    ${t('gsx.drop_incoming_title', 'Incoming new profile:')}
+                </div>
+                <div class="p-2.5 rounded-xl bg-slate-950 border ${isIncomingMismatch ? 'border-rose-800/80' : 'border-cyan-800/80'} flex items-center justify-between gap-2">
+                    <div class="min-w-0 flex-1">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs font-mono font-bold ${isIncomingMismatch ? 'text-rose-200' : 'text-cyan-200'} truncate">${escapeHtml(newFilename)}</span>
+                            <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded leading-tight ${isIncomingMismatch ? 'bg-rose-600 text-white' : 'bg-emerald-600 text-white'}">
+                                ${escapeHtml(incoming.status || 'NEW')}
+                            </span>
+                        </div>
+                        <div class="text-[10px] font-mono text-slate-400 truncate mt-0.5">
+                            ${[incoming.gates_count ? `${incoming.gates_count} gates` : '', incoming.creator ? `By ${incoming.creator}` : '', incoming.target_pkg || ''].filter(Boolean).join(' • ')}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        if (isIncomingMismatch && isExistingMatched) {
+            showCustomModal({
+                title: t('gsx.drop_conflict_title', `⚠️ GSX Profile Warning (${targetIcao})`, { icao: targetIcao }),
+                message: `
+                    <div class="space-y-2.5 text-left">
+                        ${alertBoxHtml}
+                        ${existingListHtml}
+                        ${incomingHtml}
+                        <p class="text-[11px] font-mono text-slate-400 pt-1">
+                            ${t('gsx.drop_mismatch_recommend_cancel', 'Your current profile is already aligned with your scenery. Installing this file is not recommended.')}
+                        </p>
+                    </div>
+                `,
+                type: 'warning',
+                confirmText: t('gsx.btn_cancel_keep', 'Keep Current Profile (Recommended)'),
+                cancelText: t('gsx.btn_force_replace', 'Force Install (Replace Current)'),
+                showCancel: true,
+                confirmClass: 'px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors border-0 cursor-pointer shadow-md shadow-emerald-950/40',
+                cancelClass: 'px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-rose-900 text-rose-300 hover:text-white font-bold text-xs transition-colors border border-slate-700 hover:border-rose-700 cursor-pointer',
+                onConfirm: () => {
+                    if (typeof showToast === 'function') {
+                        showToast(`Current active profile preserved for ${targetIcao}`, 'info');
+                    }
+                },
+                onCancel: async () => {
+                    await executeGsxInstallationForIcao(targetIcao, { ...installPayload, replaceExisting: true });
+                }
+            });
+            return;
+        }
+
         showCustomModal({
-            title: t('gsx.drop_conflict_title', `GSX Profile Conflict (${targetIcao})`, { icao: targetIcao }),
+            title: t('gsx.drop_conflict_title', `Install GSX Profile (${targetIcao})`, { icao: targetIcao }),
             message: `
-                <div class="space-y-3">
-                    <p class="text-xs text-slate-300 leading-relaxed">
-                        ${t('gsx.drop_conflict_msg', `One or more GSX profile(s) already exist for <strong>${targetIcao}</strong>:`, { icao: targetIcao })}
-                    </p>
-                    <div class="p-2.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono font-bold text-amber-300">
-                        <i class="fa-solid fa-file-lines mr-1.5 text-amber-400"></i> ${escapeHtml(existingNames)}
-                    </div>
-                    <p class="text-xs text-slate-300 leading-relaxed">
-                        ${t('gsx.drop_new_incoming', 'Incoming new profile:')}
-                    </p>
-                    <div class="p-2.5 rounded-xl bg-slate-950 border border-cyan-800/80 text-xs font-mono font-bold text-cyan-300">
-                        <i class="fa-solid fa-file-arrow-up mr-1.5 text-cyan-400"></i> ${escapeHtml(newFilename)}
-                    </div>
-                    <p class="text-[11px] text-slate-400">
-                        ${t('gsx.drop_choice_help', 'Choose whether you want to replace the existing profile (recommended) or keep both as duplicates.')}
+                <div class="space-y-2.5 text-left">
+                    ${alertBoxHtml}
+                    ${existingListHtml}
+                    ${incomingHtml}
+                    <p class="text-[11px] font-mono text-slate-400 pt-1">
+                        ${t('gsx.drop_replace_notice', 'Installing this profile will automatically replace and disable previous profiles for this airport.')}
                     </p>
                 </div>
             `,
-            type: 'info',
-            confirmText: t('gsx.btn_replace', 'Replace Existing (Recommended)'),
-            cancelText: t('gsx.btn_keep_both', 'Keep Both (Duplicate)'),
+            type: isIncomingMismatch ? 'warning' : 'info',
+            confirmText: t('gsx.btn_replace_current', 'Install & Replace (Recommended)'),
+            cancelText: t('common.cancel', 'Cancel'),
             showCancel: true,
-            confirmClass: 'px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors border-0 cursor-pointer shadow-md shadow-emerald-950/40',
+            confirmClass: 'px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition-colors border-0 cursor-pointer shadow-md shadow-cyan-950/40',
             onConfirm: async () => {
                 await executeGsxInstallationForIcao(targetIcao, { ...installPayload, replaceExisting: true });
-            },
-            onCancel: async () => {
-                await executeGsxInstallationForIcao(targetIcao, { ...installPayload, replaceExisting: false });
             }
         });
-    } else {
-        executeGsxInstallationForIcao(targetIcao, { ...installPayload, replaceExisting: false });
+        return;
     }
+
+    executeGsxInstallationForIcao(targetIcao, { ...installPayload, replaceExisting: true });
 }
 window.checkGsxDropConflictAndInstall = checkGsxDropConflictAndInstall;
 async function executeGsxInstallationForIcao(icao, { filePath = '', base64Data = '', filename = '', replaceExisting = false } = {}) {
