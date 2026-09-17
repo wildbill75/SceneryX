@@ -776,9 +776,9 @@ KNOWN_STUDIO_ALIASES = {
     'francevfr': ['francevfr', 'fvfr', 'france vfr'],
     'fsdreamteam': ['fsdreamteam', 'fsdt', 'virtuali'],
     'latinvfr': ['latinvfr', 'lvfr', 'latin vfr'],
-    'flytampa': ['flytampa', 'fly tampa'],
+    'flytampa': ['flytampa', 'fly tampa', 'ft ams', 'ft eham', 'ft lgav', 'ft ekch', 'ft klga', 'ftyb', 'ft-ams', 'ft_ams', 'ftams', 'ft eham', 'ft-eham'],
     'mkstudios': ['mkstudios', 'mk studios', 'mk-studios', 'mk'],
-    'drzewiecki': ['drzewiecki', 'drzewiecki design', 'dd'],
+    'drzewiecki': ['drzewiecki', 'drzewiecki design', 'drzewieckidesign', 'dd'],
     'pyreegue': ['pyreegue', 'pyreegue dev co', 'pyreegue dev co.'],
     'flightbeam': ['flightbeam', 'flightbeam studios'],
     'nza': ['nza', 'nza simulations', 'nzasimulations'],
@@ -803,10 +803,7 @@ KNOWN_STUDIO_ALIASES = {
     'deimos': ['deimos', 'deimos inc'],
     'lhsimulations': ['lhsimulations', 'lh simulations', 'lhsim'],
     'macco': ['macco', 'macco simulations'],
-    'jopp': ['jopp'],
-    'lazerbeam': ['lazerbeam'],
     'slhsimdesigns': ['slhsimdesigns', 'slh'],
-    'atelic': ['atelic'],
     'justflight': ['justflight', 'just flight', 'jf'],
     'euroscene': ['euroscene', 'euro scene'],
     'burningblue': ['burningblue', 'burningbluedesign', 'burning blue'],
@@ -859,10 +856,7 @@ STUDIO_DISPLAY_NAMES = {
     'deimos': 'DeimoS Inc',
     'lhsimulations': 'LHSimulations',
     'macco': 'Macco Simulations',
-    'jopp': 'JOPP',
-    'lazerbeam': 'Lazerbeam',
     'slhsimdesigns': 'SLH Sim Designs',
-    'atelic': 'Atelic',
     'justflight': 'Just Flight',
     'euroscene': 'EuroScene',
     'burningblue': 'Burning Blue Design',
@@ -980,9 +974,12 @@ def evaluate_gsx_studio_match(pf, ap):
     scenery_tokens = extract_distinctive_tokens(f"{active_vendor} {active_folder} {active_pkg_name}", icao=icao)
     
     pkg_tokens = extract_distinctive_tokens(target_pkg, icao=icao)
-    scen_comment_tokens = extract_distinctive_tokens(f"{comment_scenery} {scenario}", icao=icao)
+    scen_tokens = extract_distinctive_tokens(scenario, icao=icao)
+    comment_tokens = extract_distinctive_tokens(comment_scenery, icao=icao)
     fn_tokens = extract_distinctive_tokens(filename, icao=icao)
+    afcad_tokens = extract_distinctive_tokens(afcad, icao=icao)
 
+    # Note: creator and comment_author are community profile authors, never treated as scenery publisher studios!
     prof_studio = (
         detect_studio_from_text(target_pkg) or
         detect_studio_from_text(comment_scenery) or
@@ -1002,41 +999,27 @@ def evaluate_gsx_studio_match(pf, ap):
         clean_active = re.sub(r'[^a-z0-9]', '', active_folder.lower())
         if clean_target == clean_active or clean_target in clean_active or clean_active in clean_target or _normalize_pkg(target_pkg) == _normalize_pkg(active_folder):
             return ('MATCHED', f'Profile perfectly aligned with active scenery ({active_desc}).')
-        
-        # If target_pkg has distinctive tokens that do not match active_folder
-        if pkg_tokens and not (pkg_tokens & scenery_tokens):
-            target_disp = STUDIO_DISPLAY_NAMES.get(detect_studio_from_text(target_pkg), target_pkg)
-            if pricing_type == 'Default' and not is_asobo:
-                return ('MISMATCH_DEFAULT', f'Profile designed for "{target_disp}", but active scenery is "Microsoft Flight Simulator (Default)".')
-            return ('MISMATCH_STUDIO', f'Profile designed for "{target_disp}", but active scenery is "{active_desc}".')
 
-    # 4. Semantic Comment / Scenario comparison (Tier 2)
-    if comment_scenery or scenario:
-        target_name = comment_scenery or scenario
-        if scen_comment_tokens & scenery_tokens:
-            return ('MATCHED', f'Profile perfectly aligned with active scenery ({active_desc}).')
-        
-        scen_studio = detect_studio_from_text(target_name)
-        if scen_studio and act_studio:
-            if scen_studio == act_studio:
-                return ('MATCHED', f'Profile perfectly aligned with active scenery ({active_desc}).')
-            else:
-                prof_disp = STUDIO_DISPLAY_NAMES.get(scen_studio, target_name)
-                return ('MISMATCH_STUDIO', f'Profile designed for "{prof_disp}", but active scenery is "{active_desc}".')
-        
-        if scen_comment_tokens and not (scen_comment_tokens & scenery_tokens):
-            author_tokens = extract_distinctive_tokens(f"{creator} {comment_author}", icao=icao)
-            studio_only_tokens = scen_comment_tokens - author_tokens
-            if studio_only_tokens:
-                return ('MISMATCH_STUDIO', f'Profile designed for "{target_name}", but active scenery is "{active_desc}".')
+    # 4. Positive alignment matches
+    if prof_studio and act_studio and prof_studio == act_studio:
+        return ('MATCHED', f'Profile perfectly aligned with active scenery ({active_desc}).')
 
-    # 5. Known Studio Aliases Cross-Check
-    if prof_studio and act_studio:
-        if prof_studio == act_studio:
-            return ('MATCHED', f'Profile perfectly aligned with active scenery ({active_desc}).')
-        else:
-            prof_disp = STUDIO_DISPLAY_NAMES.get(prof_studio, prof_studio.title())
-            return ('MISMATCH_STUDIO', f'Profile designed for "{prof_disp}", but active scenery is "{active_desc}".')
+    if afcad_tokens and (afcad_tokens & scenery_tokens):
+        return ('MATCHED', f'Profile aligned with active scenery ({active_desc}).')
+
+    if fn_tokens and (fn_tokens & scenery_tokens):
+        return ('MATCHED', f'Profile aligned with active scenery ({active_desc}).')
+
+    if pkg_tokens and (pkg_tokens & scenery_tokens):
+        return ('MATCHED', f'Profile aligned with active scenery ({active_desc}).')
+
+    if (scen_tokens | comment_tokens) & scenery_tokens:
+        return ('MATCHED', f'Profile aligned with active scenery ({active_desc}).')
+
+    # 5. Studio Mismatch / Conflicting Studio Checks
+    if prof_studio and act_studio and prof_studio != act_studio:
+        prof_disp = STUDIO_DISPLAY_NAMES.get(prof_studio, prof_studio.title())
+        return ('MISMATCH_STUDIO', f'Profile designed for "{prof_disp}", but active scenery is "{active_desc}".')
 
     if prof_studio and not act_studio:
         prof_disp = STUDIO_DISPLAY_NAMES.get(prof_studio, prof_studio.title())
@@ -1047,11 +1030,14 @@ def evaluate_gsx_studio_match(pf, ap):
         elif not is_asobo and (active_vendor or active_folder):
             return ('MISMATCH_STUDIO', f'Profile designed for "{prof_disp}", but active scenery is "{active_desc}".')
 
-    # 6. Filename token alignment
-    if fn_tokens & scenery_tokens:
-        return ('MATCHED', f'Profile aligned with active scenery ({active_desc}).')
+    if target_pkg and active_folder:
+        if pkg_tokens and not (pkg_tokens & scenery_tokens):
+            target_disp = STUDIO_DISPLAY_NAMES.get(detect_studio_from_text(target_pkg), target_pkg)
+            if pricing_type == 'Default' and not is_asobo:
+                return ('MISMATCH_DEFAULT', f'Profile designed for "{target_disp}", but active scenery is "Microsoft Flight Simulator (Default)".')
+            return ('MISMATCH_STUDIO', f'Profile designed for "{target_disp}", but active scenery is "{active_desc}".')
 
-    # 7. Asobo / Gaya partner check
+    # 6. Asobo / Gaya partner check
     if is_asobo:
         fn_lower = filename.lower()
         if prof_studio == 'gaya':
@@ -1059,16 +1045,20 @@ def evaluate_gsx_studio_match(pf, ap):
         if any(k in fn_lower for k in ('asobo', 'microsoft', 'worldupdate', 'world-update', 'wu1', 'wu2', 'wu3', 'wu4', 'wu5', 'wu6', 'wu7', 'wu8', 'wu9')):
             return ('MATCHED', f'Profile aligned with active scenery ({asobo_desc}).')
 
-    # 8. Unverified / Generic vs Matched
+    # 7. Residual scenario mismatch if scenario explicitly mentions a studio not in active
+    if comment_scenery or scenario:
+        target_name = comment_scenery or scenario
+        scen_studio = detect_studio_from_text(target_name)
+        if scen_studio:
+            prof_disp = STUDIO_DISPLAY_NAMES.get(scen_studio, target_name)
+            if pricing_type == 'Default' and not is_asobo:
+                return ('MISMATCH_DEFAULT', f'Profile designed for "{prof_disp}", but active scenery is "Microsoft Flight Simulator (Default)".')
+            return ('MISMATCH_STUDIO', f'Profile designed for "{prof_disp}", but active scenery is "{active_desc}".')
+
     if pricing_type == 'Default' and not is_asobo:
-        return ('MATCHED', 'Profile aligned with Default MSFS airport.')
+        return ('MATCHED', 'Profile active for Default MSFS airport.')
 
-    if not target_pkg and not comment_scenery and not scenario:
-        if creator:
-            return ('MATCHED', f'Active GSX profile by {creator}.')
-        return ('GENERIC', 'Generic GSX profile without specific studio signature.')
-
-    return ('MATCHED', 'Active GSX profile.')
+    return ('MATCHED', f'Profile aligned with active scenery ({active_desc}).')
 
 def parse_single_gsx_ini(content='', filename='', file_path='', is_disabled=False):
     afcad = None

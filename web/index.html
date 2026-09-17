@@ -915,13 +915,13 @@
                     </div>
                 </div>
 
-            <!-- OPERATING AIRLINES MODAL (Normal floating modal, independent of radial zoom scale, anchored under airport) -->
+            <!-- OPERATING AIRLINES MODAL (Left-anchored drawer modal, matching GSX audit list layout) -->
             <div id="radial-airlines-modal"
                  onclick="event.stopPropagation();"
                  onmousedown="event.stopPropagation();"
                  onpointerdown="event.stopPropagation();"
-                 class="hidden absolute flex flex-col rounded-3xl shadow-xl shadow-black/50 p-4 select-none max-w-[940px] pointer-events-auto z-[1550] transition-opacity duration-200 ease-out"
-                 style="transform: translateX(-50%); width: 940px;">
+                 class="hidden absolute flex flex-col rounded-3xl shadow-2xl p-4 select-none w-[580px] max-w-[92vw] h-[calc(100%-32px)] max-h-[calc(100%-32px)] top-[16px] left-[20px] pointer-events-auto z-[1550] bg-slate-900/95 border border-slate-800 transition-all duration-200 ease-out"
+                 style="width: 580px;">
                 
                 <!-- Drag Handle & Modal Header -->
                 <div id="radial-airlines-modal-header" class="h-9 flex items-center justify-between pb-2 border-b border-slate-700/40 shrink-0 cursor-grab active:cursor-grabbing">
@@ -946,15 +946,26 @@
                     </div>
                 </div>
 
-                <!-- Horizontal Multi-Column Grid (Dynamic columns, auto-height up to 188px max) -->
-                <div id="radial-airlines-list" class="grid gap-2 overflow-y-auto custom-scrollbar pr-1 max-h-[188px] h-auto shrink-0 py-1">
+                <!-- Horizontal Multi-Column Grid (5 columns per row, max-h-[44%] for 50/50 split) -->
+                <div id="radial-airlines-list" class="grid gap-2 overflow-y-auto custom-scrollbar pr-1 max-h-[44%] shrink-0 py-1">
                     <!-- Dynamic airline cards rendered here -->
                 </div>
 
-                <!-- DESTINATIONS NETWORK SECTION (Visible when an airline is selected) -->
-                <div id="radial-airlines-destinations-section" class="hidden flex flex-col pt-3 border-t border-slate-700/40 min-h-0 space-y-2.5">
+                <!-- DESTINATIONS NETWORK SECTION (Always visible as bottom 50% pane) -->
+                <div id="radial-airlines-destinations-section" class="flex-1 min-h-0 flex flex-col pt-3 border-t border-slate-700/40 space-y-2.5 overflow-hidden">
+                    <!-- Placeholder card when no airline is selected -->
+                    <div id="radial-airlines-destinations-placeholder" class="hidden flex-1 flex flex-col items-center justify-center p-6 rounded-2xl bg-slate-950/40 border border-slate-800/80 text-center my-auto">
+                        <div class="w-12 h-12 rounded-2xl bg-slate-800/60 border border-slate-700/60 flex items-center justify-center text-cyan-400 mb-3 text-lg shadow-inner">
+                            <i class="fa-solid fa-plane-departure"></i>
+                        </div>
+                        <span class="text-sm font-black font-mono tracking-wider text-white uppercase mb-1 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">SELECT AN AIRLINE ABOVE</span>
+                        <p class="text-xs text-slate-400 max-w-xs leading-relaxed">
+                            Click any operating airline logo to view flight routes and destination scenery details.
+                        </p>
+                    </div>
+
                     <!-- Stats / Completion bar -->
-                    <div id="radial-airline-stats-bar" class="p-3.5 rounded-2xl bg-slate-950/50 border border-slate-700/60 space-y-2.5">
+                    <div id="radial-airline-stats-bar" class="p-3.5 rounded-2xl bg-slate-950/50 border border-slate-700/60 space-y-2.5 shrink-0">
                         <!-- Header with Airline Name & Completion % -->
                         <div class="flex items-center justify-between gap-2 flex-wrap">
                             <span id="radial-airline-dest-title" class="text-sm font-black font-mono tracking-wider text-white uppercase truncate drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
@@ -1005,7 +1016,7 @@
                     </div>
 
                     <!-- Scrollable Destination Cards Container -->
-                    <div id="radial-airlines-destinations-list" class="space-y-2 max-h-[340px] overflow-y-auto custom-scrollbar pr-1">
+                    <div id="radial-airlines-destinations-list" class="flex-1 min-h-0 space-y-2 overflow-y-auto custom-scrollbar pr-1">
                         <!-- Destination items rendered here -->
                     </div>
                 </div>

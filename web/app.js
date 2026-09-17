@@ -3804,6 +3804,11 @@ function renderGsxAuditModal() {
                                 <span class="text-xs font-mono font-bold text-slate-200 truncate" title="${escapeHtml(activeFile.filename)}">
                                     ${escapeHtml(activeFile.filename)}
                                 </span>
+                                ${activeFile.has_python_script ? `
+                                    <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-cyan-900 text-cyan-200 border-0 shrink-0" title="${t('gsx.includes_python', 'Includes Python dynamic script companion')}">
+                                        + Python Script
+                                    </span>
+                                ` : ''}
                                 ${vdgsBadge}
                                 <span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded-lg leading-tight bg-emerald-600 text-white border-0">ACTIVE</span>
                             </div>
@@ -3891,6 +3896,11 @@ function renderGsxAuditModal() {
                         <div class="min-w-0 flex-1">
                             <div class="flex items-center gap-1.5 flex-wrap">
                                 <span class="text-xs font-mono font-bold text-slate-200 truncate">${escapeHtml(f.filename)}</span>
+                                ${f.has_python_script ? `
+                                    <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-cyan-900 text-cyan-200 border-0 shrink-0" title="${t('gsx.includes_python', 'Includes Python dynamic script companion')}">
+                                        + Python Script
+                                    </span>
+                                ` : ''}
                                 ${statusBadge}
                                 ${vdgsBadge}
                                 ${isActive ? `<span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded-lg leading-tight bg-slate-800 text-slate-300 border-0">ACTIVE</span>` : `<span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded-lg leading-tight bg-slate-950 text-slate-600 border-0">DISABLED</span>`}
@@ -3946,8 +3956,15 @@ function renderGsxAuditModal() {
                 html += `
                     <div class="flex items-center justify-between p-2 rounded-xl bg-slate-950 border border-slate-800 gap-2">
                         <div class="min-w-0 flex-1">
-                            <div class="text-xs font-mono font-bold text-slate-200 truncate">${escapeHtml(activeFile.filename)}</div>
-                            <div class="text-[11px] font-mono text-slate-400 truncate">${escapeHtml(activeMeta)}</div>
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                <span class="text-xs font-mono font-bold text-slate-200 truncate">${escapeHtml(activeFile.filename)}</span>
+                                ${activeFile.has_python_script ? `
+                                    <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-cyan-900 text-cyan-200 border-0 shrink-0" title="${t('gsx.includes_python', 'Includes Python dynamic script companion')}">
+                                        + Python Script
+                                    </span>
+                                ` : ''}
+                            </div>
+                            <div class="text-[11px] font-mono text-slate-400 truncate mt-0.5">${escapeHtml(activeMeta)}</div>
                         </div>
                         <div class="flex items-center gap-1.5 shrink-0">
                             <button onclick="revealGsxFileInExplorer('${escapeJsStr(activeFile.path || activeFile.filename)}')" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 cursor-pointer transition-colors" title="Reveal in Windows Explorer">Reveal</button>
@@ -7623,8 +7640,8 @@ function renderRadialGsx(ap) {
                         <div class="flex items-center gap-2 flex-wrap">
                             <span class="text-xs font-mono font-bold text-white truncate">${escapeHtml(activeFile.filename || `${ap.icao}.ini`)}</span>
                             ${activeFile.has_python_script ? `
-                                <span class="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-700/60 flex items-center gap-1 shadow-sm" title="${t('gsx.includes_python', 'Includes Python dynamic script companion')}">
-                                    <i class="fa-brands fa-python text-amber-400"></i> + Python Script
+                                <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-cyan-900 text-cyan-200 border-0 shrink-0" title="${t('gsx.includes_python', 'Includes Python dynamic script companion')}">
+                                    + Python Script
                                 </span>
                             ` : ''}
                         </div>
