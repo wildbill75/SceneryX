@@ -2220,16 +2220,24 @@ class Api:
                         except Exception as e:
                             print(f"Error disabling GSX file {f}:", e)
 
-            # Now enable target file
-            old_fp = os.path.join(gsx_dir, filename)
-            if filename.endswith('.disabled'):
-                new_name = filename[:-9]
-                new_fp = os.path.join(gsx_dir, new_name)
-                if os.path.exists(new_fp):
-                    try: os.remove(new_fp)
-                    except Exception: pass
-                if os.path.exists(old_fp):
-                    os.replace(old_fp, new_fp)
+            # Now enable target file and any companion scripts (.py.disabled, _handler.py.disabled)
+            stem = filename[:-9] if filename.lower().endswith('.disabled') else filename
+            stem_base = os.path.splitext(stem)[0].lower()
+            
+            for f in os.listdir(gsx_dir):
+                f_clean = f[:-9] if f.lower().endswith('.disabled') else f
+                f_base = os.path.splitext(f_clean)[0].lower()
+                if f == filename or f_base == stem_base or f_base.startswith(stem_base) or stem_base.startswith(f_base):
+                    fp = os.path.join(gsx_dir, f)
+                    if f.lower().endswith('.disabled'):
+                        target_name = f[:-9]
+                        target_fp = os.path.join(gsx_dir, target_name)
+                        if os.path.exists(target_fp):
+                            try: os.remove(target_fp)
+                            except Exception: pass
+                        if os.path.exists(fp):
+                            try: os.replace(fp, target_fp)
+                            except Exception: pass
 
             audit_data = audit_all_gsx_profiles(gsx_dir=gsx_dir)
             return json.dumps({"status": "ok", "data": audit_data}, ensure_ascii=False)
@@ -2246,13 +2254,20 @@ class Api:
             if not filename or '..' in filename or '/' in filename or '\\' in filename:
                 return json.dumps({"status": "error", "message": "Invalid filename."})
 
-            fp = os.path.join(gsx_dir, filename)
-            if os.path.exists(fp) and not filename.endswith('.disabled'):
-                dest_fp = fp + '.disabled'
-                if os.path.exists(dest_fp):
-                    try: os.remove(dest_fp)
-                    except Exception: pass
-                os.replace(fp, dest_fp)
+            stem = filename[:-9] if filename.lower().endswith('.disabled') else filename
+            stem_base = os.path.splitext(stem)[0].lower()
+            for f in os.listdir(gsx_dir):
+                f_clean = f[:-9] if f.lower().endswith('.disabled') else f
+                f_base = os.path.splitext(f_clean)[0].lower()
+                if f == filename or f_base == stem_base or f_base.startswith(stem_base) or stem_base.startswith(f_base):
+                    fp = os.path.join(gsx_dir, f)
+                    if os.path.exists(fp) and not f.lower().endswith('.disabled'):
+                        dest_fp = fp + '.disabled'
+                        if os.path.exists(dest_fp):
+                            try: os.remove(dest_fp)
+                            except Exception: pass
+                        try: os.replace(fp, dest_fp)
+                        except Exception: pass
 
             audit_data = audit_all_gsx_profiles(gsx_dir=gsx_dir)
             return json.dumps({"status": "ok", "data": audit_data}, ensure_ascii=False)
@@ -2269,10 +2284,20 @@ class Api:
             if not filename or '..' in filename or '/' in filename or '\\' in filename:
                 return json.dumps({"status": "error", "message": "Invalid filename."})
 
-            fp = os.path.join(gsx_dir, filename)
-            if os.path.exists(fp) and os.path.isfile(fp):
-                os.remove(fp)
-            else:
+            stem = filename[:-9] if filename.lower().endswith('.disabled') else filename
+            stem_base = os.path.splitext(stem)[0].lower()
+            deleted_any = False
+            for f in os.listdir(gsx_dir):
+                f_clean = f[:-9] if f.lower().endswith('.disabled') else f
+                f_base = os.path.splitext(f_clean)[0].lower()
+                if f == filename or f_base == stem_base or f_base.startswith(stem_base) or stem_base.startswith(f_base):
+                    fp = os.path.join(gsx_dir, f)
+                    if os.path.exists(fp) and os.path.isfile(fp):
+                        try:
+                            os.remove(fp)
+                            deleted_any = True
+                        except Exception: pass
+            if not deleted_any:
                 return json.dumps({"status": "error", "message": f"File '{filename}' not found."})
 
             audit_data = audit_all_gsx_profiles(gsx_dir=gsx_dir)

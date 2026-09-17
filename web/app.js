@@ -7620,8 +7620,13 @@ function renderRadialGsx(ap) {
             <div class="space-y-1.5">
                 <div class="p-2.5 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between gap-2">
                     <div class="min-w-0 flex-1">
-                        <div class="flex items-center gap-2">
+                        <div class="flex items-center gap-2 flex-wrap">
                             <span class="text-xs font-mono font-bold text-white truncate">${escapeHtml(activeFile.filename || `${ap.icao}.ini`)}</span>
+                            ${activeFile.has_python_script ? `
+                                <span class="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-700/60 flex items-center gap-1 shadow-sm" title="${t('gsx.includes_python', 'Includes Python dynamic script companion')}">
+                                    <i class="fa-brands fa-python text-amber-400"></i> + Python Script
+                                </span>
+                            ` : ''}
                         </div>
                         ${fMeta ? `<div class="text-[10px] font-mono text-slate-400 truncate mt-0.5">${escapeHtml(fMeta)}</div>` : ''}
                     </div>

@@ -813,6 +813,19 @@ KNOWN_STUDIO_ALIASES = {
     'feelthere': ['feelthere', 'feel there'],
     'flightsimdevelopment': ['flightsimdevelopment', 'fsdg'],
     'samscene': ['samscene', 'samscene3d', 'sam scene'],
+    'cloudsurfasia': ['cloudsurfasia', 'cloudsurf asia', 'cloudsurf', 'cloudsurf-asia'],
+    'siamflight': ['siamflight', 'siam flight', 'siam-flight'],
+    'blackbean': ['blackbean', 'black bean', 'black-bean'],
+    'philscenerydev': ['philscenerydev', 'phil scenery dev', 'philscenery'],
+    'taimodels': ['taimodels', 'tai models', 'tai-models'],
+    'dominicdesign': ['dominicdesignteam', 'dominic design team', 'dominicdesign', 'ddt'],
+    'wfscenery': ['wfscenery', 'wf scenery studio', 'wfscenery studio'],
+    'rdpresets': ['rdpresets', 'rdpreset'],
+    'fsimstudios': ['fsimstudios', 'fsimstudio', 'fss'],
+    'axonos': ['axonos'],
+    'taxi2gate': ['taxi2gate', 't2g'],
+    'imaginesim': ['imaginesim'],
+    'bmw': ['bmw', 'bmw scenery', 'bmw-scenery']
 }
 
 STUDIO_DISPLAY_NAMES = {
@@ -856,6 +869,19 @@ STUDIO_DISPLAY_NAMES = {
     'feelthere': 'FeelThere',
     'flightsimdevelopment': 'FSDG',
     'samscene': 'SamScene3D',
+    'cloudsurfasia': 'Cloudsurf Asia',
+    'siamflight': 'SiamFlight',
+    'blackbean': 'Blackbean',
+    'philscenerydev': 'Philscenerydev',
+    'taimodels': 'TaiModels',
+    'dominicdesign': 'Dominic Design Team',
+    'wfscenery': 'WF Scenery Studio',
+    'rdpresets': 'RDPresets',
+    'fsimstudios': 'FSimStudios',
+    'axonos': 'Axonos',
+    'taxi2gate': 'Taxi2Gate',
+    'imaginesim': 'ImagineSim',
+    'bmw': 'BMW Scenery'
 }
 
 GENERIC_GSX_WORDS = {
@@ -1145,6 +1171,56 @@ def parse_single_gsx_ini(content='', filename='', file_path='', is_disabled=Fals
         'recommend_reason': None
     }
 
+def bundle_gsx_files(file_entries):
+    """
+    Groups files for an ICAO into primary profiles and attaches companion files (.py scripts, handlers).
+    Returns list of primary profile entries with 'companion_files' and 'has_python_script'.
+    """
+    ini_entries = [e for e in file_entries if e['filename'].lower().endswith(('.ini', '.ini.disabled'))]
+    py_entries = [e for e in file_entries if e['filename'].lower().endswith(('.py', '.py.disabled'))]
+
+    primary_entries = []
+    paired_py_filenames = set()
+
+    for ini_e in ini_entries:
+        ini_fn = ini_e['filename']
+        ini_clean = ini_fn[:-9] if ini_fn.lower().endswith('.disabled') else ini_fn
+        ini_stem = os.path.splitext(ini_clean)[0].lower()
+        
+        companions = []
+        for py_e in py_entries:
+            py_fn = py_e['filename']
+            py_clean = py_fn[:-9] if py_fn.lower().endswith('.disabled') else py_fn
+            py_stem = os.path.splitext(py_clean)[0].lower()
+            if (py_stem == ini_stem or 
+                py_stem.startswith(ini_stem) or 
+                ini_stem.startswith(py_stem) or 
+                py_stem.replace('-', '_') == ini_stem.replace('-', '_') or
+                py_stem.replace('_', '-') == ini_stem.replace('_', '-')):
+                companions.append(py_fn)
+                paired_py_filenames.add(py_fn)
+        
+        ini_e['companion_files'] = companions
+        ini_e['has_python_script'] = len(companions) > 0
+        primary_entries.append(ini_e)
+
+    # Any remaining standalone PY entries (e.g. VTBS-Fuwarii.py without .ini)
+    for py_e in py_entries:
+        py_fn = py_e['filename']
+        if py_fn not in paired_py_filenames:
+            if py_fn.lower().endswith(('_handler.py', '_handler.py.disabled')):
+                continue
+            py_clean = py_fn[:-9] if py_fn.lower().endswith('.disabled') else py_fn
+            py_stem = os.path.splitext(py_clean)[0].lower()
+            companions = [other['filename'] for other in py_entries if other['filename'] != py_fn and other['filename'] not in paired_py_filenames and (py_stem in other['filename'].lower())]
+            for c in companions:
+                paired_py_filenames.add(c)
+            py_e['companion_files'] = companions
+            py_e['has_python_script'] = True
+            primary_entries.append(py_e)
+
+    return primary_entries
+
 def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
     if not gsx_dir:
         gsx_dir = get_default_gsx_path()
@@ -1222,10 +1298,13 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
     for icao, file_entries in by_icao.items():
         ap = installed_map.get(icao)
         active_src = next((s for s in ap.get('all_sources', []) if not s.get('is_disabled') and not s.get('is_fix_patch') and not s.get('is_addon')), None) if ap else None
+        
+        # Bundle companion files (.ini + companion .py scripts)
+        bundled_entries = bundle_gsx_files(file_entries)
         parsed_files = []
-        active_entries = [e for e in file_entries if not e['is_disabled']]
+        active_entries = [e for e in bundled_entries if not e['is_disabled']]
 
-        for entry in file_entries:
+        for entry in bundled_entries:
             f = entry['filename']
             fp = os.path.join(gsx_dir, f)
             content = ""
@@ -1235,6 +1314,8 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
             except Exception:
                 pass
             p_obj = parse_single_gsx_ini(content, filename=f, file_path=fp, is_disabled=entry['is_disabled'])
+            p_obj['companion_files'] = entry.get('companion_files', [])
+            p_obj['has_python_script'] = entry.get('has_python_script', False)
             parsed_files.append(p_obj)
 
         db_ap = airports_db.get(icao, {}) if airports_db else {}
@@ -1464,10 +1545,12 @@ def audit_single_airport_gsx(icao, gsx_dir=None, ap=None, airports_db=None):
         return {'status': 'NONE', 'files': [], 'reason': 'No GSX profile installed.'}
 
     import datetime
+    # Bundle companion files (.ini + companion .py scripts)
+    bundled_matches = bundle_gsx_files(matching_files)
     parsed_files = []
-    active_entries = [e for e in matching_files if not e['is_disabled']]
+    active_entries = [e for e in bundled_matches if not e['is_disabled']]
 
-    for entry in matching_files:
+    for entry in bundled_matches:
         f = entry['filename']
         fp = entry['path']
         content = ""
@@ -1477,6 +1560,8 @@ def audit_single_airport_gsx(icao, gsx_dir=None, ap=None, airports_db=None):
         except Exception:
             pass
         p_obj = parse_single_gsx_ini(content, filename=f, file_path=fp, is_disabled=entry['is_disabled'])
+        p_obj['companion_files'] = entry.get('companion_files', [])
+        p_obj['has_python_script'] = entry.get('has_python_script', False)
         parsed_files.append(p_obj)
 
     if len(active_entries) == 0:
