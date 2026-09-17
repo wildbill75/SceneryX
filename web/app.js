@@ -3714,6 +3714,8 @@ function renderGsxAuditModal() {
             badgeHtml = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-slate-800 text-slate-400 border-0">ORPHAN</span>`;
         } else if (entry.status === 'MATCHED') {
             badgeHtml = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-emerald-600 text-white border-0">MATCHED</span>`;
+        } else if (entry.status === 'GENERIC' || entry.status === 'UNVERIFIED') {
+            badgeHtml = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-indigo-950 text-indigo-200 border border-indigo-700/80">GENERIC</span>`;
         } else if (entry.status === 'NO_PROFILE') {
             badgeHtml = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-slate-800 text-slate-300 border-0">NO PROFILE</span>`;
         } else if (entry.status === 'DISABLED') {
@@ -5275,6 +5277,7 @@ let isAirlinesModalDragging = false;
 let airlinesModalUserOffset = { x: 0, y: 0 };
 let hasUserDraggedAirlinesModal = false;
 let airlinesModalDragStart = { x: 0, y: 0 };
+let operatingAirlinesOriginAirport = null;
 
 let isDetailsModalDragging = false;
 let detailsModalUserOffset = { x: 0, y: 0 };
@@ -5316,6 +5319,7 @@ function closeAirportRadialMenu() {
     hasUserDraggedAirlinesModal = false;
     airlinesModalUserOffset = { x: 0, y: 0 };
     isAirlinesModalDragging = false;
+    operatingAirlinesOriginAirport = null;
     const sectorScenery = document.getElementById('radial-sector-scenery');
     if (sectorScenery) {
         sectorScenery.classList.remove('active-radial-sector');
@@ -5463,40 +5467,12 @@ function updateRadialMenuPosition(force = false) {
 function updateRadialAirlinesModalPosition(force = false) {
     const modal = document.getElementById('radial-airlines-modal');
     if (!modal || (!force && modal.classList.contains('hidden'))) return;
-    if (!currentRadialAirport || !map) return;
-
-    // Use currentRadialAirport coordinates directly
-    const latLng = getWrappedAirportLatLng(currentRadialAirport);
-    if (!latLng) return;
-    const point = (typeof map.latLngToContainerPoint === 'function') ? map.latLngToContainerPoint(latLng) : null;
-    if (!point) return;
-
-    const mapSize = (typeof map.getSize === 'function') ? map.getSize() : null;
-    const containerW = mapSize ? mapSize.x : (modal.offsetParent ? modal.offsetParent.offsetWidth : window.innerWidth);
-    const containerH = mapSize ? mapSize.y : (modal.offsetParent ? modal.offsetParent.offsetHeight : window.innerHeight);
-    const modalWidth = modal.offsetWidth || 940;
-    const modalHeight = modal.offsetHeight || 340;
 
     if (!hasUserDraggedAirlinesModal) {
-        // Place to the LEFT of the airport marker (Screen 1) with clearance
-        const desiredLeft = Math.round(point.x) - modalWidth - 28;
-        let finalLeft = desiredLeft;
-
-        if (desiredLeft < 16) {
-            // Not enough space on the left: place to the RIGHT of the airport if fits
-            const rightPos = Math.round(point.x) + 36;
-            if (rightPos + modalWidth <= containerW - 16) {
-                finalLeft = rightPos;
-            } else {
-                finalLeft = 16;
-            }
-        }
-
-        modal.style.left = `${finalLeft}px`;
-
-        // Align vertically around airport marker level, clamped within viewport
-        const desiredTop = Math.max(64, Math.min(containerH - modalHeight - 16, Math.round(point.y) - 60));
-        modal.style.top = `${desiredTop}px`;
+        modal.style.left = '20px';
+        modal.style.top = '16px';
+        modal.style.bottom = '16px';
+        modal.style.height = 'calc(100% - 32px)';
         modal.style.transform = 'none';
     } else {
         modal.style.transform = `translate(${airlinesModalUserOffset.x}px, ${airlinesModalUserOffset.y}px)`;
@@ -5699,42 +5675,16 @@ function openAirportRadialMenu(ap, marker, e) {
         }
 
         if (isAirlinesOpen) {
-            // Persist Operating Airlines mode across airport selections:
-            // 1. Clear previous airport route selection
-            if (selectedAirlines.size > 0 || activeRouteOrigin) {
-                selectedAirlines.clear();
-                selectedAirline = null;
-                activeRouteOrigin = null;
-                if (activeRouteLinesGroup) activeRouteLinesGroup.clearLayers();
-                filterAirports();
-                updateFilterUI();
-            }
-            // 2. Reset manual drag offsets so the modal cleanly re-anchors below the new airport
-            hasUserDraggedAirlinesModal = false;
-            airlinesModalUserOffset = { x: 0, y: 0 };
-            isAirlinesModalDragging = false;
-            airlinesModal.classList.remove('user-dragged');
-
-            // Close detail drawer if open so modal has full screen width
-            const detailDrawer = document.getElementById('detail-drawer');
-            if (detailDrawer && !detailDrawer.classList.contains('translate-x-full')) {
-                closeDrawerWithoutCameraChange();
-            }
-
-            // 3. Render new airport's operating airlines
-            renderRadialOperatingAirlines(ap);
             if (sectorAirlines) {
-                sectorAirlines.classList.add('active-radial-sector');
+                if (operatingAirlinesOriginAirport && operatingAirlinesOriginAirport.icao === latestAp.icao) {
+                    sectorAirlines.classList.add('active-radial-sector');
+                } else {
+                    sectorAirlines.classList.remove('active-radial-sector');
+                }
             }
         } else {
             airlinesModal.classList.add('hidden');
             airlinesModal.classList.remove('user-dragged', 'is-inverted');
-            airlinesModal.style.transform = 'translateX(-50%)';
-            airlinesModal.style.top = '545px';
-            airlinesModal.style.bottom = 'auto';
-            hasUserDraggedAirlinesModal = false;
-            airlinesModalUserOffset = { x: 0, y: 0 };
-            isAirlinesModalDragging = false;
             if (sectorAirlines) {
                 sectorAirlines.classList.remove('active-radial-sector');
             }
@@ -5848,19 +5798,13 @@ function openAirportRadialMenu(ap, marker, e) {
         icaoEl.className = `font-mono font-black text-3xl tracking-tight leading-none ${icaoColor}`;
     }
 
-    if (isAirlinesOpen) {
-        // En mode Operating Airlines : le menu radial doit complètement disparaître !
-        radialEl.classList.add('hidden');
-        updateRadialAirlinesModalPosition(true);
-    } else {
-        // Reveal Radial Menu with snappy bounce & circular cascade animation
-        radialEl.classList.remove('hidden', 'radial-quadrants-collapsed');
-        updateRadialMenuPosition(true);
+    // Reveal Radial Menu with snappy bounce & circular cascade animation
+    radialEl.classList.remove('hidden', 'radial-quadrants-collapsed');
+    updateRadialMenuPosition(true);
 
-        radialEl.classList.remove('animate-radial-open');
-        void radialEl.offsetWidth; // Force reflow to retrigger animation reliably
-        radialEl.classList.add('animate-radial-open');
-    }
+    radialEl.classList.remove('animate-radial-open');
+    void radialEl.offsetWidth; // Force reflow to retrigger animation reliably
+    radialEl.classList.add('animate-radial-open');
 }
 
 function triggerRadialFlightPlan() {
@@ -5882,16 +5826,13 @@ function triggerRadialOperatingAirlines() {
         triggerRadialScenerySelector();
     }
 
-    // If Details modal is open, close it
-    if (isDetailsModalOpen()) {
-        closeRadialDetailsModal();
-    }
-
-    if (!modal.classList.contains('hidden')) {
+    if (!modal.classList.contains('hidden') && operatingAirlinesOriginAirport && operatingAirlinesOriginAirport.icao === currentRadialAirport.icao) {
         // Toggle OFF (exit Operating Airlines mode)
         closeRadialAirlinesModal();
     } else {
-        // Toggle ON: Entire radial menu wheel completely disappears!
+        operatingAirlinesOriginAirport = currentRadialAirport;
+
+        // Toggle ON: Radial menu wheel of this airport disappears when entering Operating Airlines mode for it
         if (radialEl) {
             radialEl.classList.add('hidden');
         }
@@ -5907,10 +5848,9 @@ function triggerRadialOperatingAirlines() {
         isAirlinesModalDragging = false;
         modal.classList.remove('user-dragged');
 
-        renderRadialOperatingAirlines(currentRadialAirport);
+        renderRadialOperatingAirlines(operatingAirlinesOriginAirport, true);
         modal.classList.remove('hidden');
 
-        // Smoothly adjust camera so airport sits in upper portion with modal systematically below it!
         panMapToAirport(currentRadialAirport);
         updateRadialAirlinesModalPosition(true);
     }
@@ -5929,10 +5869,9 @@ function closeRadialAirlinesModal(event) {
     hasUserDraggedAirlinesModal = false;
     airlinesModalUserOffset = { x: 0, y: 0 };
     isAirlinesModalDragging = false;
+    operatingAirlinesOriginAirport = null;
     expandedAirlineDestIcao = null;
     currentAirlineDestFilter = 'ALL';
-    const destSection = document.getElementById('radial-airlines-destinations-section');
-    if (destSection) destSection.classList.add('hidden');
     if (sectorAirlines) {
         sectorAirlines.classList.remove('active-radial-sector');
     }
@@ -5949,7 +5888,6 @@ function closeRadialAirlinesModal(event) {
     }
     // Restore the full radial menu wheel on the last selected airport with bounce animation
     if (radialEl && currentRadialAirport) {
-        // Re-center camera on airport for radial wheel (since isAirlinesModalOpen() is now false, yOffset = 0)
         panMapToAirport(currentRadialAirport);
 
         radialEl.classList.remove('hidden', 'radial-quadrants-collapsed');
@@ -6050,12 +5988,14 @@ function restoreRadialQuadrants() {
     updateRadialMenuPosition(true);
 }
 
-function renderRadialOperatingAirlines(ap) {
+function renderRadialOperatingAirlines(ap, autoSelectFirst = false) {
     const listEl = document.getElementById('radial-airlines-list');
     const countEl = document.getElementById('radial-airlines-count');
     const clearBtn = document.getElementById('radial-airlines-clear-btn');
     const hintEl = document.getElementById('radial-airlines-hint');
     if (!listEl || !ap) return;
+
+    operatingAirlinesOriginAirport = ap;
 
     initDraggableAirlinesModal();
 
@@ -6070,21 +6010,33 @@ function renderRadialOperatingAirlines(ap) {
     });
 
     const modal = document.getElementById('radial-airlines-modal');
-    const count = airlines.length;
-    const cols = 8;
-    const targetWidth = 940;
+    const cols = 5;
+    const targetWidth = 580;
 
     if (modal) {
         modal.style.width = `${targetWidth}px`;
-        modal.style.maxWidth = 'min(940px, 96vw)';
+        modal.style.maxWidth = 'min(580px, 96vw)';
     }
 
     listEl.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
-    listEl.style.maxHeight = '188px';
+    listEl.style.maxHeight = '45%';
     listEl.style.height = 'auto';
 
     if (countEl) {
         countEl.innerText = `${airlines.length} ${t('drawer.airlines_operating_from', 'Airlines operating from')} ${ap.icao}`.toUpperCase();
+    }
+
+    // Auto-select 1st airline by default on initial opening if no active selection for this airport
+    if (autoSelectFirst && airlines.length > 0) {
+        if (selectedAirlines.size === 0 || !activeRouteOrigin || activeRouteOrigin.icao !== ap.icao) {
+            const firstAl = airlines[0];
+            selectedAirlines.clear();
+            selectedAirlines.add(firstAl);
+            selectedAirline = firstAl;
+            activeRouteOrigin = ap;
+            filterAirports();
+            updateFilterUI();
+        }
     }
 
     const hasActiveAirline = selectedAirlines.size > 0 && (activeRouteOrigin && activeRouteOrigin.icao === ap.icao);
@@ -6098,13 +6050,19 @@ function renderRadialOperatingAirlines(ap) {
         }
     }
 
+    const statsBar = document.getElementById('radial-airline-stats-bar');
+    const destListEl = document.getElementById('radial-airlines-destinations-list');
+    const placeholderEl = document.getElementById('radial-airlines-destinations-placeholder');
+
     if (hasActiveAirline) {
-        listEl.style.maxHeight = '112px';
+        if (statsBar) statsBar.classList.remove('hidden');
+        if (destListEl) destListEl.classList.remove('hidden');
+        if (placeholderEl) placeholderEl.classList.add('hidden');
         renderAirlineDestinationsList(ap);
     } else {
-        listEl.style.maxHeight = '188px';
-        const destSection = document.getElementById('radial-airlines-destinations-section');
-        if (destSection) destSection.classList.add('hidden');
+        if (statsBar) statsBar.classList.add('hidden');
+        if (destListEl) destListEl.classList.add('hidden');
+        if (placeholderEl) placeholderEl.classList.remove('hidden');
     }
 
     if (airlines.length === 0) {
@@ -6174,8 +6132,9 @@ let expandedAirlineDestIcao = null;
 
 function setAirlineDestFilterCategory(cat) {
     currentAirlineDestFilter = cat;
-    if (currentRadialAirport) {
-        renderAirlineDestinationsList(currentRadialAirport);
+    const originAp = operatingAirlinesOriginAirport || currentRadialAirport;
+    if (originAp) {
+        renderAirlineDestinationsList(originAp);
     }
 }
 window.setAirlineDestFilterCategory = setAirlineDestFilterCategory;
@@ -6199,8 +6158,9 @@ function toggleAirlineDestAccordion(destIcao, event) {
             });
         }
     }
-    if (currentRadialAirport) {
-        renderAirlineDestinationsList(currentRadialAirport);
+    const originAp = operatingAirlinesOriginAirport || currentRadialAirport;
+    if (originAp) {
+        renderAirlineDestinationsList(originAp);
     }
 }
 window.toggleAirlineDestAccordion = toggleAirlineDestAccordion;
@@ -6347,23 +6307,31 @@ function renderAirlineDestAccordionContent(destIcao) {
 function renderAirlineDestinationsList(originAp) {
     const listEl = document.getElementById('radial-airlines-destinations-list');
     const destSection = document.getElementById('radial-airlines-destinations-section');
+    const statsBar = document.getElementById('radial-airline-stats-bar');
+    const placeholderEl = document.getElementById('radial-airlines-destinations-placeholder');
     if (!listEl || !destSection) return;
 
     const activeAl = selectedAirline || (selectedAirlines.size > 0 ? Array.from(selectedAirlines)[0] : null);
     if (!activeAl || !originAp || !originAp.routes || !originAp.routes[activeAl]) {
-        destSection.classList.add('hidden');
+        if (statsBar) statsBar.classList.add('hidden');
+        if (listEl) listEl.classList.add('hidden');
+        if (placeholderEl) placeholderEl.classList.remove('hidden');
         listEl.innerHTML = '';
         return;
     }
 
     const destIcaos = originAp.routes[activeAl].slice();
     if (destIcaos.length === 0) {
-        destSection.classList.add('hidden');
+        if (statsBar) statsBar.classList.add('hidden');
+        if (listEl) listEl.classList.add('hidden');
+        if (placeholderEl) placeholderEl.classList.remove('hidden');
         listEl.innerHTML = '';
         return;
     }
 
-    destSection.classList.remove('hidden');
+    if (statsBar) statsBar.classList.remove('hidden');
+    if (listEl) listEl.classList.remove('hidden');
+    if (placeholderEl) placeholderEl.classList.add('hidden');
 
     const destList = destIcaos.map(icao => {
         let ap = getAirportByIcao(icao);
@@ -6531,9 +6499,9 @@ function renderAirlineDestinationsList(originAp) {
 
 function radialFilterByAirline(airlineName, btnEl, event) {
     if (event) event.stopPropagation();
-    if (!currentRadialAirport) return;
+    const originAp = operatingAirlinesOriginAirport || currentRadialAirport;
+    if (!originAp) return;
 
-    const originAp = currentRadialAirport;
     selectedAirport = originAp;
 
     if (!activeRouteOrigin || activeRouteOrigin.icao !== originAp.icao) {
@@ -6586,8 +6554,9 @@ function clearRadialAirlineFilter(event) {
     }
     filterAirports();
     updateFilterUI();
-    if (currentRadialAirport) {
-        renderRadialOperatingAirlines(currentRadialAirport);
+    const originAp = operatingAirlinesOriginAirport || currentRadialAirport;
+    if (originAp) {
+        renderRadialOperatingAirlines(originAp);
     }
 }
 
@@ -7250,10 +7219,6 @@ function triggerRadialFullDetails() {
     if (sceneriesExt && !sceneriesExt.classList.contains('hidden')) {
         triggerRadialScenerySelector();
     }
-    // If Airlines modal is open, close it
-    if (isAirlinesModalOpen()) {
-        closeRadialAirlinesModal();
-    }
 
     if (!modal.classList.contains('hidden')) {
         // Toggle OFF
@@ -7600,6 +7565,9 @@ function renderRadialGsx(ap) {
     if (status === 'MATCHED') {
         statusLabel = 'MATCH';
         statusBadgeClass = 'text-white bg-emerald-600 border-0 font-bold';
+    } else if (status === 'GENERIC' || status === 'UNVERIFIED') {
+        statusLabel = 'GENERIC';
+        statusBadgeClass = 'text-indigo-200 bg-indigo-950 border border-indigo-700/80 font-bold';
     } else if (status === 'DUPLICATE') {
         statusLabel = 'DUPLICATE';
         statusBadgeClass = 'text-white bg-amber-600 border-0 font-bold';

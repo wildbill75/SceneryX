@@ -858,6 +858,27 @@ STUDIO_DISPLAY_NAMES = {
     'samscene': 'SamScene3D',
 }
 
+GENERIC_GSX_WORDS = {
+    'airport', 'airports', 'scenery', 'sceneries', 'scene', 'msfs', 'msfs2020', 'msfs2024',
+    'fs20', 'fs24', 'fs2020', 'fs2024', 'microsoft', 'asobo', 'gsx', 'profile', 'profiles',
+    'pro', 'vfr', 'addon', 'package', 'pack', 'version', 'ver', 'community', 'official',
+    'streamedpackages', 'onestore', 'steam', 'bgl', 'ini', 'py', 'disabled', 'by', 'for',
+    'customized', 'terminal', 'gate', 'parking', 'stand', 'freeware', 'payware', 'default',
+    'full', 'lite', 'safe', 'dock', 'vdgs', 'asvdgs', 'asxvdgs', 'gsxvdgs'
+}
+
+def extract_distinctive_tokens(text, icao=None):
+    if not text:
+        return set()
+    cleaned = text.lower().replace('-', ' ').replace('_', ' ').replace('.', ' ')
+    raw_tokens = re.split(r'[^a-z0-9]+', cleaned)
+    icao_l = (icao or '').lower()
+    res = set()
+    for t in raw_tokens:
+        if len(t) >= 3 and t not in GENERIC_GSX_WORDS and t != icao_l:
+            res.add(t)
+    return res
+
 def _normalize_pkg(pkg_name):
     if not pkg_name:
         return ''
@@ -894,16 +915,19 @@ def evaluate_gsx_studio_match(pf, ap):
     """
     Evaluates whether a GSX profile matches the installed airport scenery.
     Returns (status, reason)
-    status is one of: 'MATCHED', 'MISMATCH_STUDIO', 'MISMATCH_DEFAULT', 'ORPHAN'
+    status is one of: 'MATCHED', 'MISMATCH_STUDIO', 'MISMATCH_DEFAULT', 'GENERIC', 'ORPHAN'
     """
     if not ap:
         return ('ORPHAN', 'Airport not found in your MSFS library.')
 
     target_pkg = pf.get('target_pkg')
-    filename = pf.get('filename')
-    scenario = pf.get('scenario')
-    creator = pf.get('creator')
-    afcad = pf.get('afcad_path')
+    filename = pf.get('filename') or ''
+    scenario = pf.get('scenario') or ''
+    creator = pf.get('creator') or ''
+    afcad = pf.get('afcad_path') or ''
+    comment_scenery = pf.get('comment_scenery') or ''
+    comment_author = pf.get('comment_author') or ''
+    icao = (ap.get('icao') or '').upper()
 
     pricing_type = ap.get('pricing_type', 'Default')
     is_asobo = bool(ap.get('is_asobo') or (ap.get('vendor') or '').lower() in ('asobo', 'microsoft / asobo', 'microsoft') or any(s.get('is_asobo_official') for s in ap.get('all_sources', [])))
@@ -913,108 +937,112 @@ def evaluate_gsx_studio_match(pf, ap):
     active_folder = (active_src.get('folder_name') or '').lower() if active_src else ''
     active_vendor = (active_src.get('vendor') or ap.get('vendor') or '').strip() if active_src else (ap.get('vendor') or '').strip()
     active_pkg_name = (active_src.get('package_name') or ap.get('package_name') or '').strip() if active_src else (ap.get('package_name') or '').strip()
+    active_desc = active_vendor if (active_vendor and active_vendor != 'Unknown') else (active_pkg_name or active_folder or 'Custom Scenery')
 
-    is_default_target = (target_pkg and 'default' in target_pkg.lower()) or (filename and ('default' in filename.lower() or 'stock' in filename.lower()))
+    # 1. Default / Stock MSFS target detection
+    is_default_target = (
+        (target_pkg and any(k in target_pkg.lower() for k in ('default', 'stock', 'fs-base', 'genericairports', 'asobo-base'))) or
+        (filename and any(k in filename.lower() for k in ('default', 'stock'))) or
+        (afcad and any(k in afcad.lower() for k in ('fs-base', 'genericairports', 'microsoft-base')))
+    )
     if is_default_target:
         if pricing_type != 'Default' and not is_asobo:
-            active_desc = active_vendor if (active_vendor and active_vendor != 'Unknown') else (active_pkg_name or active_folder or 'Custom Scenery')
             return ('MISMATCH_DEFAULT', f'Profile designed for Default MSFS, but active scenery is "{active_desc}".')
         return ('MATCHED', 'Profile designed for Default MSFS airport.')
 
-    # Direct folder/package exact match with active scenery
-    if target_pkg and active_folder:
-        clean_target = re.sub(r'[^a-z0-9]', '', target_pkg.lower())
-        clean_active = re.sub(r'[^a-z0-9]', '', active_folder.lower())
-        if clean_target == clean_active or clean_target in clean_active or clean_active in clean_target or _normalize_pkg(target_pkg) == _normalize_pkg(active_folder):
-            disp_name = active_vendor if (active_vendor and active_vendor != 'Unknown') else target_pkg
-            return ('MATCHED', f'Profile perfectly aligned with active scenery ({disp_name}).')
+    # 2. Extract distinctive tokens
+    scenery_tokens = extract_distinctive_tokens(f"{active_vendor} {active_folder} {active_pkg_name}", icao=icao)
+    
+    pkg_tokens = extract_distinctive_tokens(target_pkg, icao=icao)
+    scen_comment_tokens = extract_distinctive_tokens(f"{comment_scenery} {scenario}", icao=icao)
+    fn_tokens = extract_distinctive_tokens(filename, icao=icao)
 
-    # Studio identification
     prof_studio = (
         detect_studio_from_text(target_pkg) or
-        detect_studio_from_text(filename) or
+        detect_studio_from_text(comment_scenery) or
         detect_studio_from_text(scenario) or
-        detect_studio_from_text(creator) or
+        detect_studio_from_text(filename) or
         detect_studio_from_text(afcad)
     )
-
     act_studio = (
         detect_studio_from_text(active_vendor) or
         detect_studio_from_text(active_folder) or
         detect_studio_from_text(active_pkg_name)
     )
 
-    norm_vendor = normalize_studio_name(active_vendor)
-    norm_target = normalize_studio_name(target_pkg)
-    norm_fn = normalize_studio_name(filename)
+    # 3. Direct AFCAD Package comparison (Tier 1)
+    if target_pkg and active_folder:
+        clean_target = re.sub(r'[^a-z0-9]', '', target_pkg.lower())
+        clean_active = re.sub(r'[^a-z0-9]', '', active_folder.lower())
+        if clean_target == clean_active or clean_target in clean_active or clean_active in clean_target or _normalize_pkg(target_pkg) == _normalize_pkg(active_folder):
+            return ('MATCHED', f'Profile perfectly aligned with active scenery ({active_desc}).')
+        
+        # If target_pkg has distinctive tokens that do not match active_folder
+        if pkg_tokens and not (pkg_tokens & scenery_tokens):
+            target_disp = STUDIO_DISPLAY_NAMES.get(detect_studio_from_text(target_pkg), target_pkg)
+            if pricing_type == 'Default' and not is_asobo:
+                return ('MISMATCH_DEFAULT', f'Profile designed for "{target_disp}", but active scenery is "Microsoft Flight Simulator (Default)".')
+            return ('MISMATCH_STUDIO', f'Profile designed for "{target_disp}", but active scenery is "{active_desc}".')
 
-    # 1. If detected studio keys match exactly
-    if prof_studio and act_studio and prof_studio == act_studio:
-        studio_display = active_vendor if (active_vendor and active_vendor != 'Unknown') else STUDIO_DISPLAY_NAMES.get(prof_studio, prof_studio.title())
-        return ('MATCHED', f'Profile perfectly aligned with active scenery ({studio_display}).')
+    # 4. Semantic Comment / Scenario comparison (Tier 2)
+    if comment_scenery or scenario:
+        target_name = comment_scenery or scenario
+        if scen_comment_tokens & scenery_tokens:
+            return ('MATCHED', f'Profile perfectly aligned with active scenery ({active_desc}).')
+        
+        scen_studio = detect_studio_from_text(target_name)
+        if scen_studio and act_studio:
+            if scen_studio == act_studio:
+                return ('MATCHED', f'Profile perfectly aligned with active scenery ({active_desc}).')
+            else:
+                prof_disp = STUDIO_DISPLAY_NAMES.get(scen_studio, target_name)
+                return ('MISMATCH_STUDIO', f'Profile designed for "{prof_disp}", but active scenery is "{active_desc}".')
+        
+        if scen_comment_tokens and not (scen_comment_tokens & scenery_tokens):
+            author_tokens = extract_distinctive_tokens(f"{creator} {comment_author}", icao=icao)
+            studio_only_tokens = scen_comment_tokens - author_tokens
+            if studio_only_tokens:
+                return ('MISMATCH_STUDIO', f'Profile designed for "{target_name}", but active scenery is "{active_desc}".')
 
-    # 1b. Gaya / Asobo partner relationship for Asobo official handcrafted sceneries
-    if is_asobo:
-        fn_lower = (filename or '').lower()
-        scen_lower = (scenario or '').lower()
-        if prof_studio == 'gaya':
-            return ('MATCHED', f'Profile aligned with Asobo handcrafted scenery by Gaya Simulations ({asobo_desc}).')
-        if any(k in fn_lower or k in scen_lower for k in ['asobo', 'microsoft', 'worldupdate', 'world-update', 'world_update', 'wu1', 'wu2', 'wu3', 'wu4', 'wu5', 'wu6', 'wu7', 'wu8', 'wu9']):
-            return ('MATCHED', f'Profile aligned with active scenery ({asobo_desc}).')
-
-    # 2. If normalized vendor appears in target_pkg, filename, scenario or afcad
-    if norm_vendor and len(norm_vendor) >= 3:
-        if (norm_vendor in norm_target or 
-            norm_vendor in norm_fn or 
-            (scenario and norm_vendor in normalize_studio_name(scenario)) or
-            (creator and norm_vendor in normalize_studio_name(creator)) or
-            (afcad and norm_vendor in normalize_studio_name(afcad))):
-            return ('MATCHED', f'Profile perfectly aligned with active scenery ({active_vendor}).')
-
-    # 3. If studio in profile is explicitly known AND active scenery has a different known studio or is default
-    if prof_studio:
-        prof_display = STUDIO_DISPLAY_NAMES.get(prof_studio, target_pkg or prof_studio.title())
-        if pricing_type == 'Default' and not is_asobo:
-            return ('MISMATCH_DEFAULT', f'Profile designed for "{prof_display}", but active scenery is "Microsoft Flight Simulator (Default)".')
-        elif is_asobo:
-            return ('MISMATCH_STUDIO', f'Profile designed for "{prof_display}", but active scenery is "{asobo_desc}".')
-        elif act_studio and prof_studio != act_studio:
-            active_desc = active_vendor if (active_vendor and active_vendor != 'Unknown') else (active_pkg_name or active_folder)
-            return ('MISMATCH_STUDIO', f'Profile designed for "{prof_display}", but active scenery is "{active_desc}".')
-        elif not act_studio and (active_vendor or active_folder):
-            active_desc = active_vendor if (active_vendor and active_vendor != 'Unknown') else active_folder
-            return ('MISMATCH_STUDIO', f'Profile designed for "{prof_display}", but active scenery is "{active_desc}".')
-
-    # 4. If target_pkg is given, check for mismatch against active scenery
-    if target_pkg:
-        prof_disp = STUDIO_DISPLAY_NAMES.get(detect_studio_from_text(target_pkg), target_pkg)
-        if pricing_type == 'Default' and not is_asobo:
-            return ('MISMATCH_DEFAULT', f'Profile designed for "{prof_disp}", but active scenery is "Microsoft Flight Simulator (Default)".')
-        elif is_asobo:
-            return ('MISMATCH_STUDIO', f'Profile designed for "{prof_disp}", but active scenery is "{asobo_desc}".')
+    # 5. Known Studio Aliases Cross-Check
+    if prof_studio and act_studio:
+        if prof_studio == act_studio:
+            return ('MATCHED', f'Profile perfectly aligned with active scenery ({active_desc}).')
         else:
-            active_desc = active_vendor if (active_vendor and active_vendor != 'Unknown') else (active_pkg_name or active_folder)
+            prof_disp = STUDIO_DISPLAY_NAMES.get(prof_studio, prof_studio.title())
             return ('MISMATCH_STUDIO', f'Profile designed for "{prof_disp}", but active scenery is "{active_desc}".')
 
-    # 5. Scenario check: ONLY a mismatch if scenario names a KNOWN OTHER STUDIO that contradicts active scenery
-    if scenario:
-        scen_studio = detect_studio_from_text(scenario)
-        if scen_studio:
-            if pricing_type == 'Default' and not is_asobo:
-                return ('MISMATCH_DEFAULT', f'Profile mentions "{scenario}", but active scenery is "Microsoft Flight Simulator (Default)".')
-            elif is_asobo:
-                if scen_studio == 'gaya':
-                    return ('MATCHED', f'Profile aligned with Asobo handcrafted scenery by Gaya Simulations ({asobo_desc}).')
-                return ('MISMATCH_STUDIO', f'Profile mentions "{scenario}", but active scenery is "{asobo_desc}".')
-            elif act_studio and scen_studio != act_studio:
-                return ('MISMATCH_STUDIO', f'Profile mentions "{scenario}", but active scenery is "{active_vendor or active_folder}".')
+    if prof_studio and not act_studio:
+        prof_disp = STUDIO_DISPLAY_NAMES.get(prof_studio, prof_studio.title())
+        if pricing_type == 'Default' and not is_asobo:
+            return ('MISMATCH_DEFAULT', f'Profile designed for "{prof_disp}", but active scenery is "Microsoft Flight Simulator (Default)".')
+        elif is_asobo and prof_studio != 'gaya':
+            return ('MISMATCH_STUDIO', f'Profile designed for "{prof_disp}", but active scenery is "{asobo_desc}".')
+        elif not is_asobo and (active_vendor or active_folder):
+            return ('MISMATCH_STUDIO', f'Profile designed for "{prof_disp}", but active scenery is "{active_desc}".')
 
-    # 6. Default or generic profile matching
+    # 6. Filename token alignment
+    if fn_tokens & scenery_tokens:
+        return ('MATCHED', f'Profile aligned with active scenery ({active_desc}).')
+
+    # 7. Asobo / Gaya partner check
+    if is_asobo:
+        fn_lower = filename.lower()
+        if prof_studio == 'gaya':
+            return ('MATCHED', f'Profile aligned with Asobo handcrafted scenery by Gaya Simulations ({asobo_desc}).')
+        if any(k in fn_lower for k in ('asobo', 'microsoft', 'worldupdate', 'world-update', 'wu1', 'wu2', 'wu3', 'wu4', 'wu5', 'wu6', 'wu7', 'wu8', 'wu9')):
+            return ('MATCHED', f'Profile aligned with active scenery ({asobo_desc}).')
+
+    # 8. Unverified / Generic vs Matched
     if pricing_type == 'Default' and not is_asobo:
         return ('MATCHED', 'Profile aligned with Default MSFS airport.')
 
-    return ('MATCHED', 'Active GSX profile.')
+    if not target_pkg and not comment_scenery and not scenario:
+        if creator:
+            return ('MATCHED', f'Active GSX profile by {creator}.')
+        return ('GENERIC', 'Generic GSX profile without specific studio signature.')
 
+    return ('MATCHED', 'Active GSX profile.')
 
 def parse_single_gsx_ini(content='', filename='', file_path='', is_disabled=False):
     afcad = None
@@ -1023,30 +1051,52 @@ def parse_single_gsx_ini(content='', filename='', file_path='', is_disabled=Fals
     gates_count = 0
     target_pkg = None
     ver_str = None
+    comment_scenery = None
+    comment_author = None
     mtime_str = None
     mtime_ts = 0
 
     if file_path and os.path.exists(file_path):
         try:
+            import datetime
             mtime_ts = os.path.getmtime(file_path)
             mtime_str = datetime.datetime.fromtimestamp(mtime_ts).strftime('%Y-%m-%d')
         except Exception:
             pass
 
     if content:
-        afcad_m = re.search(r'afcad_path\s*=\s*(.+)', content)
-        if afcad_m:
-            afcad = afcad_m.group(1).strip()
-        scenario_m = re.search(r'scenario\s*=\s*(.+)', content)
-        if scenario_m:
-            scenario = scenario_m.group(1).strip()
-        creator_m = re.search(r'creator\s*=\s*(.+)', content)
-        if creator_m:
-            creator = creator_m.group(1).strip()
+        for line in content.splitlines():
+            line_s = line.strip()
+            if not line_s:
+                continue
+            if line_s.startswith(('#', ';', '//', '--')):
+                c_text = line_s.lstrip('#;/ -').strip()
+                m_scen = re.search(r'^(?:scenery|scene|studio|designed\s+for|for\s+scenery|for|target)\s*[-:=]\s*(.+)', c_text, re.IGNORECASE)
+                if m_scen and not comment_scenery:
+                    comment_scenery = m_scen.group(1).strip()
+                m_auth = re.search(r'^(?:creator|author|by|made\s+by)\s*[-:=]\s*(.+)', c_text, re.IGNORECASE)
+                if m_auth and not comment_author:
+                    comment_author = m_auth.group(1).strip()
+                m_ver = re.search(r'^version\s*[-:=]?\s*([0-9.]+)', c_text, re.IGNORECASE)
+                if m_ver and not ver_str:
+                    ver_str = m_ver.group(1).strip()
+            
+            afcad_m = re.search(r'^afcad_path\s*=\s*(.+)', line_s, re.IGNORECASE)
+            if afcad_m and not afcad:
+                afcad = afcad_m.group(1).strip()
+            scen_m = re.search(r'^scenario\s*=\s*(.+)', line_s, re.IGNORECASE)
+            if scen_m and not scenario:
+                scenario = scen_m.group(1).strip()
+            creat_m = re.search(r'^creator\s*=\s*(.+)', line_s, re.IGNORECASE)
+            if creat_m and not creator:
+                creator = creat_m.group(1).strip()
+            v_m = re.search(r'^version\s*=\s*["\']?([^"\'\r\n]+)["\']?', line_s, re.IGNORECASE)
+            if v_m and not ver_str:
+                ver_str = v_m.group(1).strip()
+
         gates_count = len(re.findall(r'\[(?:gate|rwy|parking)\s+[^\]]+\]', content, re.IGNORECASE))
-        v_m = re.search(r'version\s*=\s*["\']?([^"\'\r\n]+)["\']?', content)
-        if v_m:
-            ver_str = v_m.group(1).strip()
+        if gates_count == 0:
+            gates_count = len(re.findall(r'CustomizedName\s*\(', content, re.IGNORECASE))
 
     if afcad:
         parts = afcad.replace('/', '\\').split('\\')
@@ -1071,6 +1121,9 @@ def parse_single_gsx_ini(content='', filename='', file_path='', is_disabled=Fals
     elif 'gsxvdgs' in f_lower:
         vdgs_type = 'GSX SafeDock'
 
+    if not creator and comment_author:
+        creator = comment_author
+
     return {
         'filename': filename,
         'path': file_path,
@@ -1079,15 +1132,18 @@ def parse_single_gsx_ini(content='', filename='', file_path='', is_disabled=Fals
         'target_pkg': target_pkg,
         'scenario': scenario,
         'creator': creator,
+        'comment_scenery': comment_scenery,
+        'comment_author': comment_author,
         'gates_count': gates_count,
         'mtime': mtime_str,
         'mtime_ts': mtime_ts,
         'version': ver_str,
         'is_2024': is_2024,
         'is_2020': is_2020,
-        'vdgs_type': vdgs_type
+        'vdgs_type': vdgs_type,
+        'is_recommended': False,
+        'recommend_reason': None
     }
-
 
 def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
     if not gsx_dir:
@@ -1114,8 +1170,8 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
     except Exception:
         all_dir_files = []
 
-    active_ini_files = [f for f in all_dir_files if f.endswith('.ini') and f.lower() != 'configuration.ini']
-    disabled_ini_files = [f for f in all_dir_files if f.lower().endswith('.disabled') and not f.lower().startswith('configuration')]
+    active_ini_files = [f for f in all_dir_files if (f.endswith('.ini') or f.endswith('.py')) and f.lower() != 'configuration.ini' and not f.lower().endswith('_handler.py')]
+    disabled_ini_files = [f for f in all_dir_files if f.lower().endswith('.disabled') and not f.lower().startswith('configuration') and not f.lower().endswith('_handler.py.disabled')]
 
     airports_db = {}
     try:
@@ -1172,81 +1228,14 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
         for entry in file_entries:
             f = entry['filename']
             fp = os.path.join(gsx_dir, f)
-            afcad = None
-            scenario = None
-            creator = None
-            gates_count = 0
-            target_pkg = None
-            mtime_str = None
-            mtime_ts = 0
-            ver_str = None
-
-            try:
-                mtime_ts = os.path.getmtime(fp)
-                mtime_str = datetime.datetime.fromtimestamp(mtime_ts).strftime('%Y-%m-%d')
-            except Exception:
-                pass
-
+            content = ""
             try:
                 with open(fp, 'r', encoding='utf-8', errors='ignore') as file_h:
                     content = file_h.read()
-                afcad_m = re.search(r'afcad_path\s*=\s*(.+)', content)
-                if afcad_m:
-                    afcad = afcad_m.group(1).strip()
-                scenario_m = re.search(r'scenario\s*=\s*(.+)', content)
-                if scenario_m:
-                    scenario = scenario_m.group(1).strip()
-                creator_m = re.search(r'creator\s*=\s*(.+)', content)
-                if creator_m:
-                    creator = creator_m.group(1).strip()
-                gates_count = len(re.findall(r'\[(?:gate|rwy|parking)\s+[^\]]+\]', content, re.IGNORECASE))
-                v_m = re.search(r'version\s*=\s*["\']?([^"\'\r\n]+)["\']?', content)
-                if v_m:
-                    ver_str = v_m.group(1).strip()
             except Exception:
                 pass
-
-            if afcad:
-                parts = afcad.replace('/', '\\').split('\\')
-                for i, p in enumerate(parts):
-                    p_l = p.lower()
-                    if p_l in ('community', 'official', 'streamedpackages'):
-                        if i + 1 < len(parts):
-                            next_p = parts[i + 1]
-                            if next_p.lower() in ('onestore', 'steam') and i + 2 < len(parts):
-                                target_pkg = parts[i + 2]
-                            else:
-                                target_pkg = next_p
-                            break
-
-            f_lower = f.lower()
-            is_2024 = '2024' in f_lower or bool(re.search(r'msfs2024only\s*=\s*1', content if 'content' in locals() else ''))
-            is_2020 = '2020' in f_lower
-
-            vdgs_type = None
-            if 'asvdgs' in f_lower or 'asxvdgs' in f_lower:
-                vdgs_type = 'Aerosoft VDGS'
-            elif 'gsxvdgs' in f_lower or ('gsx.ini' in f_lower and any('asvdgs' in other['filename'].lower() or 'asxvdgs' in other['filename'].lower() for other in file_entries)):
-                vdgs_type = 'GSX SafeDock'
-
-            parsed_files.append({
-                'filename': f,
-                'path': fp,
-                'is_disabled': entry['is_disabled'],
-                'afcad_path': afcad,
-                'target_pkg': target_pkg,
-                'scenario': scenario,
-                'creator': creator,
-                'gates_count': gates_count,
-                'mtime': mtime_str,
-                'mtime_ts': mtime_ts,
-                'version': ver_str,
-                'is_2024': is_2024,
-                'is_2020': is_2020,
-                'vdgs_type': vdgs_type,
-                'is_recommended': False,
-                'recommend_reason': None
-            })
+            p_obj = parse_single_gsx_ini(content, filename=f, file_path=fp, is_disabled=entry['is_disabled'])
+            parsed_files.append(p_obj)
 
         db_ap = airports_db.get(icao, {}) if airports_db else {}
         is_known_world_airport = bool(db_ap)
@@ -1457,7 +1446,10 @@ def audit_single_airport_gsx(icao, gsx_dir=None, ap=None, airports_db=None):
 
     matching_files = []
     for f in all_files:
-        if not f.endswith('.ini') and not f.endswith('.ini.disabled'):
+        f_lower = f.lower()
+        if f_lower == 'configuration.ini' or f_lower.endswith('_handler.py') or f_lower.endswith('_handler.py.disabled'):
+            continue
+        if not (f_lower.endswith('.ini') or f_lower.endswith('.py') or f_lower.endswith('.disabled')):
             continue
         fp = os.path.join(gsx_dir, f)
         f_icao = extract_icao_from_gsx_filename(f, valid_icaos={target_icao}, file_path=fp)
@@ -1478,81 +1470,14 @@ def audit_single_airport_gsx(icao, gsx_dir=None, ap=None, airports_db=None):
     for entry in matching_files:
         f = entry['filename']
         fp = entry['path']
-        afcad = None
-        scenario = None
-        creator = None
-        gates_count = 0
-        target_pkg = None
-        mtime_str = None
-        mtime_ts = 0
-        ver_str = None
-
-        try:
-            mtime_ts = os.path.getmtime(fp)
-            mtime_str = datetime.datetime.fromtimestamp(mtime_ts).strftime('%Y-%m-%d')
-        except Exception:
-            pass
-
+        content = ""
         try:
             with open(fp, 'r', encoding='utf-8', errors='ignore') as file_h:
                 content = file_h.read()
-            afcad_m = re.search(r'afcad_path\s*=\s*(.+)', content)
-            if afcad_m:
-                afcad = afcad_m.group(1).strip()
-            scenario_m = re.search(r'scenario\s*=\s*(.+)', content)
-            if scenario_m:
-                scenario = scenario_m.group(1).strip()
-            creator_m = re.search(r'creator\s*=\s*(.+)', content)
-            if creator_m:
-                creator = creator_m.group(1).strip()
-            gates_count = len(re.findall(r'\[(?:gate|rwy|parking)\s+[^\]]+\]', content, re.IGNORECASE))
-            v_m = re.search(r'version\s*=\s*["\']?([^"\'\r\n]+)["\']?', content)
-            if v_m:
-                ver_str = v_m.group(1).strip()
         except Exception:
             pass
-
-        if afcad:
-            parts = afcad.replace('/', '\\').split('\\')
-            for i, p in enumerate(parts):
-                p_l = p.lower()
-                if p_l in ('community', 'official', 'streamedpackages'):
-                    if i + 1 < len(parts):
-                        next_p = parts[i + 1]
-                        if next_p.lower() in ('onestore', 'steam') and i + 2 < len(parts):
-                            target_pkg = parts[i + 2]
-                        else:
-                            target_pkg = next_p
-                        break
-
-        f_lower = f.lower()
-        is_2024 = '2024' in f_lower or bool(re.search(r'msfs2024only\s*=\s*1', content if 'content' in locals() else ''))
-        is_2020 = '2020' in f_lower
-
-        vdgs_type = None
-        if 'asvdgs' in f_lower or 'asxvdgs' in f_lower:
-            vdgs_type = 'Aerosoft VDGS'
-        elif 'gsxvdgs' in f_lower or ('gsx.ini' in f_lower and any('asvdgs' in other['filename'].lower() or 'asxvdgs' in other['filename'].lower() for other in matching_files)):
-            vdgs_type = 'GSX SafeDock'
-
-        parsed_files.append({
-            'filename': f,
-            'path': fp,
-            'is_disabled': entry['is_disabled'],
-            'afcad_path': afcad,
-            'target_pkg': target_pkg,
-            'scenario': scenario,
-            'creator': creator,
-            'gates_count': gates_count,
-            'mtime': mtime_str,
-            'mtime_ts': mtime_ts,
-            'version': ver_str,
-            'is_2024': is_2024,
-            'is_2020': is_2020,
-            'vdgs_type': vdgs_type,
-            'is_recommended': False,
-            'recommend_reason': None
-        })
+        p_obj = parse_single_gsx_ini(content, filename=f, file_path=fp, is_disabled=entry['is_disabled'])
+        parsed_files.append(p_obj)
 
     if len(active_entries) == 0:
         status = 'DISABLED'
@@ -2258,14 +2183,15 @@ def run_scan():
                 detected_map[h_u] = {
                     "icao": h_u,
                     "name": ap_info.get('name', 'Unknown Airport'),
-                    "city": ap_info.get('municipality', ''),
-                    "country": ap_info.get('iso_country', ''),
-                    "lat": float(ap_info.get('latitude_deg', 0.0)),
-                    "lon": float(ap_info.get('longitude_deg', 0.0)),
+                    "city": ap_info.get('city') or ap_info.get('municipality', ''),
+                    "country": ap_info.get('country') or ap_info.get('iso_country', ''),
+                    "lat": float(ap_info.get('lat') if ap_info.get('lat') is not None else ap_info.get('latitude_deg', 0.0)),
+                    "lon": float(ap_info.get('lon') if ap_info.get('lon') is not None else ap_info.get('longitude_deg', 0.0)),
                     "type": ap_info.get('type', 'airport'),
                     "english_type": english_type,
-                    "elevation": int(float(ap_info.get('elevation_ft', 0))) if ap_info.get('elevation_ft') else None,
-                    "elevation_ft": int(float(ap_info.get('elevation_ft', 0))) if ap_info.get('elevation_ft') else None,
+                    "elevation": int(float(ap_info.get('elevation') if ap_info.get('elevation') is not None else ap_info.get('elevation_ft', 0))) if (ap_info.get('elevation') is not None or ap_info.get('elevation_ft') is not None) else None,
+                    "elevation_ft": int(float(ap_info.get('elevation') if ap_info.get('elevation') is not None else ap_info.get('elevation_ft', 0))) if (ap_info.get('elevation') is not None or ap_info.get('elevation_ft') is not None) else None,
+                    "iata": ap_info.get('iata', ''),
                     "has_custom_scenery": True,
                     "package_name": f"fs24-asobo-airport-{h_icao.lower()}",
                     "package_path": "",
