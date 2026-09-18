@@ -939,7 +939,7 @@ def evaluate_gsx_studio_match(pf, ap):
     """
     Evaluates whether a GSX profile matches the installed airport scenery.
     Returns (status, reason)
-    status is one of: 'MATCHED', 'MISMATCH_STUDIO', 'MISMATCH_DEFAULT', 'GENERIC', 'ORPHAN'
+    status is one of: 'MATCHED', 'MISMATCH_VERSION', 'MISMATCH_DEFAULT', 'GENERIC', 'ORPHAN'
     """
     if not ap:
         return ('ORPHAN', 'Airport not found in your MSFS library.')
@@ -1009,16 +1009,16 @@ def evaluate_gsx_studio_match(pf, ap):
             return ('MATCHED', f'Profile perfectly aligned with active scenery ({active_desc}).')
         else:
             prof_disp = STUDIO_DISPLAY_NAMES.get(prof_studio, prof_studio.title())
-            return ('MISMATCH_STUDIO', f'Profile designed for "{prof_disp}", but active scenery is "{active_desc}".')
+            return ('MISMATCH_VERSION', f'Profile designed for "{prof_disp}", but active scenery is "{active_desc}".')
 
     if prof_studio and not act_studio:
         prof_disp = STUDIO_DISPLAY_NAMES.get(prof_studio, prof_studio.title())
         if pricing_type == 'Default' and not is_asobo:
             return ('MISMATCH_DEFAULT', f'Profile designed for "{prof_disp}", but active scenery is "Microsoft Flight Simulator (Default)".')
         elif is_asobo and prof_studio != 'gaya':
-            return ('MISMATCH_STUDIO', f'Profile designed for "{prof_disp}", but active scenery is "{asobo_desc}".')
+            return ('MISMATCH_VERSION', f'Profile designed for "{prof_disp}", but active scenery is "{asobo_desc}".')
         elif not is_asobo and (active_vendor or active_folder):
-            return ('MISMATCH_STUDIO', f'Profile designed for "{prof_disp}", but active scenery is "{active_desc}".')
+            return ('MISMATCH_VERSION', f'Profile designed for "{prof_disp}", but active scenery is "{active_desc}".')
 
     # 4. Token-based matching (excluding geographic tokens)
     scenery_tokens = extract_distinctive_tokens(f"{active_vendor} {active_folder} {active_pkg_name}", icao=icao, geo_tokens=geo_tokens)
@@ -1046,7 +1046,7 @@ def evaluate_gsx_studio_match(pf, ap):
             target_disp = STUDIO_DISPLAY_NAMES.get(detect_studio_from_text(target_pkg), target_pkg)
             if pricing_type == 'Default' and not is_asobo:
                 return ('MISMATCH_DEFAULT', f'Profile designed for "{target_disp}", but active scenery is "Microsoft Flight Simulator (Default)".')
-            return ('MISMATCH_STUDIO', f'Profile designed for "{target_disp}", but active scenery is "{active_desc}".')
+            return ('MISMATCH_VERSION', f'Profile designed for "{target_disp}", but active scenery is "{active_desc}".')
 
     # 5. Asobo / Gaya partner check
     if is_asobo:
@@ -1064,7 +1064,7 @@ def evaluate_gsx_studio_match(pf, ap):
             prof_disp = STUDIO_DISPLAY_NAMES.get(scen_studio, target_name)
             if pricing_type == 'Default' and not is_asobo:
                 return ('MISMATCH_DEFAULT', f'Profile designed for "{prof_disp}", but active scenery is "Microsoft Flight Simulator (Default)".')
-            return ('MISMATCH_STUDIO', f'Profile designed for "{prof_disp}", but active scenery is "{active_desc}".')
+            return ('MISMATCH_VERSION', f'Profile designed for "{prof_disp}", but active scenery is "{active_desc}".')
 
     if pricing_type == 'Default' and not is_asobo:
         return ('MATCHED', 'Profile active for Default MSFS airport.')
@@ -1347,7 +1347,7 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
                 if f_status == 'MATCHED':
                     score += 200
                     reasons.append("Aligned with active scenery")
-                elif f_status == 'MISMATCH_STUDIO':
+                elif f_status in ('MISMATCH_STUDIO', 'MISMATCH_VERSION'):
                     score -= 200
                     reasons.append("Designed for a different scenery add-on")
                 elif f_status == 'MISMATCH_DEFAULT':
@@ -1390,7 +1390,7 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
                     other['match_reason'] = o_reason
             if status == 'MATCHED':
                 summary['matched'] += 1
-            elif status in ('MISMATCH_STUDIO', 'MISMATCH_DEFAULT'):
+            elif status in ('MISMATCH_STUDIO', 'MISMATCH_VERSION', 'MISMATCH_DEFAULT'):
                 summary['mismatch'] += 1
             elif status == 'ORPHAN':
                 summary['orphan'] += 1
@@ -1591,7 +1591,7 @@ def audit_single_airport_gsx(icao, gsx_dir=None, ap=None, airports_db=None):
             if f_status == 'MATCHED':
                 score += 200
                 reasons.append("Aligned with active scenery")
-            elif f_status == 'MISMATCH_STUDIO':
+            elif f_status in ('MISMATCH_STUDIO', 'MISMATCH_VERSION'):
                 score -= 200
                 reasons.append("Designed for a different scenery add-on")
             elif f_status == 'MISMATCH_DEFAULT':

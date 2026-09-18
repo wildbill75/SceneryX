@@ -3597,7 +3597,7 @@ function renderGsxAuditModal() {
         });
     }
 
-    const orderMap = { 'DUPLICATE': 1, 'MISMATCH_DEFAULT': 2, 'MISMATCH_STUDIO': 2, 'ORPHAN': 3, 'MATCHED': 4, 'NO_PROFILE': 5, 'DISABLED': 6 };
+    const orderMap = { 'DUPLICATE': 1, 'MISMATCH_DEFAULT': 2, 'MISMATCH_VERSION': 2, 'MISMATCH_STUDIO': 2, 'ORPHAN': 3, 'MATCHED': 4, 'NO_PROFILE': 5, 'DISABLED': 6 };
     entries.sort((a, b) => {
         const rankA = orderMap[a.status] || 99;
         const rankB = orderMap[b.status] || 99;
@@ -3708,8 +3708,8 @@ function renderGsxAuditModal() {
             badgeHtml = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-amber-600 text-white border-0">DUPLICATE</span>`;
         } else if (entry.status === 'MISMATCH_DEFAULT') {
             badgeHtml = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-rose-600 text-white border-0">MISMATCH DEFAULT</span>`;
-        } else if (entry.status === 'MISMATCH_STUDIO') {
-            badgeHtml = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-rose-600 text-white border-0">MISMATCH STUDIO</span>`;
+        } else if (entry.status === 'MISMATCH_STUDIO' || entry.status === 'MISMATCH_VERSION') {
+            badgeHtml = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-rose-600 text-white border-0">MISMATCH VERSION</span>`;
         } else if (entry.status === 'ORPHAN') {
             badgeHtml = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-slate-800 text-slate-400 border-0">ORPHAN</span>`;
         } else if (entry.status === 'MATCHED') {
@@ -3874,7 +3874,7 @@ function renderGsxAuditModal() {
                         statusNote = `<span class="text-emerald-400 font-mono text-[10px] font-bold block mt-0.5">✓ ${escapeHtml(f.recommend_reason)}</span>`;
                     }
                 } else if (isMismatch) {
-                    const mismatchLabel = f.match_status === 'MISMATCH_DEFAULT' ? 'MISMATCH DEFAULT' : 'MISMATCH STUDIO';
+                    const mismatchLabel = f.match_status === 'MISMATCH_DEFAULT' ? 'MISMATCH DEFAULT' : 'MISMATCH VERSION';
                     statusBadge = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg leading-tight bg-rose-600 text-white border-0 shrink-0">${mismatchLabel}</span>`;
                     if (f.match_reason) {
                         statusNote = `<span class="text-rose-400/90 font-mono text-[10px] block mt-0.5">${escapeHtml(f.match_reason)}</span>`;
@@ -4503,21 +4503,65 @@ function proceedWithGsxDropInstallation(targetIcao, installPayload, evalRes) {
     const existingBest = existingActive[0] || null;
     const isExistingMatched = existingBest && existingBest.status === 'MATCHED';
 
-    if (hasExistingActive || isIncomingMismatch) {
-        let alertBoxHtml = '';
-        if (isIncomingMismatch) {
-            alertBoxHtml = `
-                <div class="p-3 rounded-xl bg-rose-950/70 border border-rose-800/80 space-y-1">
-                    <div class="flex items-center gap-1.5 text-xs font-mono font-bold text-rose-300">
-                        <i class="fa-solid fa-triangle-exclamation text-rose-400"></i>
-                        <span>${t('gsx.drop_mismatch_warning_title', 'Incompatible Profile Warning')}</span>
+    if (isIncomingMismatch) {
+        showCustomModal({
+            title: t('gsx.drop_mismatch_title', `Incompatible GSX Profile (${targetIcao})`, { icao: targetIcao }),
+            message: `
+                <div class="space-y-3 text-left">
+                    <div class="p-3.5 rounded-2xl bg-rose-950/60 border border-rose-800/70 space-y-1.5">
+                        <div class="flex items-center gap-2 text-xs font-mono font-bold text-rose-300">
+                            <i class="fa-solid fa-triangle-exclamation text-rose-400"></i>
+                            <span>${t('gsx.drop_mismatch_warning_title', 'Incompatible Profile Warning')}</span>
+                        </div>
+                        <p class="text-xs font-mono text-rose-200/90 leading-relaxed">
+                            ${escapeHtml(incoming.reason || 'This GSX profile is not compatible with your installed scenery version.')}
+                        </p>
                     </div>
-                    <p class="text-[11px] font-mono text-rose-200/90 leading-relaxed">
-                        ${escapeHtml(incoming.reason || 'This profile does not match your active scenery.')}
-                    </p>
+
+                    <div class="p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-2">
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-mono font-bold text-slate-200 truncate">${escapeHtml(newFilename)}</span>
+                                <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded leading-tight bg-rose-600 text-white">
+                                    MISMATCH VERSION
+                                </span>
+                            </div>
+                            ${(incoming.gates_count || incoming.creator || incoming.target_pkg) ? `
+                                <div class="text-[10px] font-mono text-slate-400 truncate mt-0.5">
+                                    ${[incoming.gates_count ? `${incoming.gates_count} gates` : '', incoming.creator ? `By ${incoming.creator}` : '', incoming.target_pkg || ''].filter(Boolean).join(' • ')}
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+
+                    ${hasExistingActive ? `
+                        <div class="text-[11px] font-mono text-slate-400 px-0.5">
+                            ${t('gsx.drop_existing_preserved_note', 'Current active profile will be preserved if you cancel.')}
+                        </div>
+                    ` : ''}
                 </div>
-            `;
-        } else if (isIncomingMatched) {
+            `,
+            type: 'warning',
+            confirmText: t('gsx.btn_force_install', 'Install (Not Recommended)'),
+            cancelText: t('common.cancel', 'Cancel'),
+            showCancel: true,
+            confirmClass: 'px-5 py-2.5 rounded-xl bg-amber-700/90 hover:bg-amber-600 text-white font-bold text-xs transition-colors border-0 cursor-pointer shadow-md shadow-amber-950/40',
+            cancelClass: 'px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs border border-slate-700 cursor-pointer transition-colors',
+            onCancel: () => {
+                if (typeof refreshAirportGsxStatus === 'function') {
+                    refreshAirportGsxStatus(targetIcao);
+                }
+            },
+            onConfirm: async () => {
+                await executeGsxInstallationForIcao(targetIcao, { ...installPayload, replaceExisting: true });
+            }
+        });
+        return;
+    }
+
+    if (hasExistingActive) {
+        let alertBoxHtml = '';
+        if (isIncomingMatched) {
             alertBoxHtml = `
                 <div class="p-3 rounded-xl bg-emerald-950/60 border border-emerald-800/70 space-y-1">
                     <div class="flex items-center gap-1.5 text-xs font-mono font-bold text-emerald-300">
@@ -4531,42 +4575,39 @@ function proceedWithGsxDropInstallation(targetIcao, installPayload, evalRes) {
             `;
         }
 
-        let existingListHtml = '';
-        if (hasExistingActive) {
-            existingListHtml = `
-                <div class="space-y-1.5 pt-1">
-                    <div class="text-[11px] font-mono text-slate-400">
-                        ${t('gsx.drop_current_active', 'Current active profile (will be replaced):')}
-                    </div>
-                    ${existingActive.map(f => `
-                        <div class="p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-2">
-                            <div class="min-w-0 flex-1">
-                                <div class="flex items-center gap-2">
-                                    <span class="text-xs font-mono font-bold text-slate-200 truncate">${escapeHtml(f.filename)}</span>
-                                    <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded leading-tight ${f.status === 'MATCHED' ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300'}">
-                                        ${escapeHtml(f.status || 'ACTIVE')}
-                                    </span>
-                                </div>
-                                <div class="text-[10px] font-mono text-slate-400 truncate mt-0.5">
-                                    ${[f.gates_count ? `${f.gates_count} gates` : '', f.creator ? `By ${f.creator}` : '', f.target_pkg || ''].filter(Boolean).join(' • ')}
-                                </div>
+        let existingListHtml = `
+            <div class="space-y-1.5 pt-1">
+                <div class="text-[11px] font-mono text-slate-400">
+                    ${t('gsx.drop_current_active', 'Current active profile (will be replaced):')}
+                </div>
+                ${existingActive.map(f => `
+                    <div class="p-2.5 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-2">
+                        <div class="min-w-0 flex-1">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs font-mono font-bold text-slate-200 truncate">${escapeHtml(f.filename)}</span>
+                                <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded leading-tight ${f.status === 'MATCHED' ? 'bg-emerald-600 text-white' : 'bg-slate-700 text-slate-300'}">
+                                    ${escapeHtml(f.status || 'ACTIVE')}
+                                </span>
+                            </div>
+                            <div class="text-[10px] font-mono text-slate-400 truncate mt-0.5">
+                                ${[f.gates_count ? `${f.gates_count} gates` : '', f.creator ? `By ${f.creator}` : '', f.target_pkg || ''].filter(Boolean).join(' • ')}
                             </div>
                         </div>
-                    `).join('')}
-                </div>
-            `;
-        }
+                    </div>
+                `).join('')}
+            </div>
+        `;
 
         let incomingHtml = `
             <div class="space-y-1.5 pt-1">
                 <div class="text-[11px] font-mono text-slate-400">
                     ${t('gsx.drop_incoming_title', 'Incoming new profile:')}
                 </div>
-                <div class="p-2.5 rounded-xl bg-slate-950 border ${isIncomingMismatch ? 'border-rose-800/80' : 'border-cyan-800/80'} flex items-center justify-between gap-2">
+                <div class="p-2.5 rounded-xl bg-slate-950 border border-cyan-800/80 flex items-center justify-between gap-2">
                     <div class="min-w-0 flex-1">
                         <div class="flex items-center gap-2">
-                            <span class="text-xs font-mono font-bold ${isIncomingMismatch ? 'text-rose-200' : 'text-cyan-200'} truncate">${escapeHtml(newFilename)}</span>
-                            <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded leading-tight ${isIncomingMismatch ? 'bg-rose-600 text-white' : 'bg-emerald-600 text-white'}">
+                            <span class="text-xs font-mono font-bold text-cyan-200 truncate">${escapeHtml(newFilename)}</span>
+                            <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded leading-tight bg-emerald-600 text-white">
                                 ${escapeHtml(incoming.status || 'NEW')}
                             </span>
                         </div>
@@ -4577,40 +4618,6 @@ function proceedWithGsxDropInstallation(targetIcao, installPayload, evalRes) {
                 </div>
             </div>
         `;
-
-        if (isIncomingMismatch && isExistingMatched) {
-            showCustomModal({
-                title: t('gsx.drop_conflict_title', `⚠️ GSX Profile Warning (${targetIcao})`, { icao: targetIcao }),
-                message: `
-                    <div class="space-y-2.5 text-left">
-                        ${alertBoxHtml}
-                        ${existingListHtml}
-                        ${incomingHtml}
-                        <p class="text-[11px] font-mono text-slate-400 pt-1">
-                            ${t('gsx.drop_mismatch_recommend_cancel', 'Your current profile is already aligned with your scenery. Installing this file is not recommended.')}
-                        </p>
-                    </div>
-                `,
-                type: 'warning',
-                confirmText: t('gsx.btn_cancel_keep', 'Keep Current Profile (Recommended)'),
-                cancelText: t('gsx.btn_force_replace', 'Force Install (Replace Current)'),
-                showCancel: true,
-                confirmClass: 'px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors border-0 cursor-pointer shadow-md shadow-emerald-950/40',
-                cancelClass: 'px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-rose-900 text-rose-300 hover:text-white font-bold text-xs transition-colors border border-slate-700 hover:border-rose-700 cursor-pointer',
-                onConfirm: () => {
-                    if (typeof showToast === 'function') {
-                        showToast(`Current active profile preserved for ${targetIcao}`, 'info');
-                    }
-                    if (typeof refreshAirportGsxStatus === 'function') {
-                        refreshAirportGsxStatus(targetIcao);
-                    }
-                },
-                onCancel: async () => {
-                    await executeGsxInstallationForIcao(targetIcao, { ...installPayload, replaceExisting: true });
-                }
-            });
-            return;
-        }
 
         showCustomModal({
             title: t('gsx.drop_conflict_title', `Install GSX Profile (${targetIcao})`, { icao: targetIcao }),
@@ -4624,11 +4631,17 @@ function proceedWithGsxDropInstallation(targetIcao, installPayload, evalRes) {
                     </p>
                 </div>
             `,
-            type: isIncomingMismatch ? 'warning' : 'info',
+            type: 'info',
             confirmText: t('gsx.btn_replace_current', 'Install & Replace (Recommended)'),
             cancelText: t('common.cancel', 'Cancel'),
             showCancel: true,
             confirmClass: 'px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition-colors border-0 cursor-pointer shadow-md shadow-cyan-950/40',
+            cancelClass: 'px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs border border-slate-700 cursor-pointer transition-colors',
+            onCancel: () => {
+                if (typeof refreshAirportGsxStatus === 'function') {
+                    refreshAirportGsxStatus(targetIcao);
+                }
+            },
             onConfirm: async () => {
                 await executeGsxInstallationForIcao(targetIcao, { ...installPayload, replaceExisting: true });
             }
@@ -7591,8 +7604,8 @@ function renderRadialGsx(ap) {
     } else if (status === 'MISMATCH_DEFAULT') {
         statusLabel = 'MISMATCH DEFAULT';
         statusBadgeClass = 'text-white bg-rose-600 border-0 font-bold';
-    } else if (status === 'MISMATCH_STUDIO') {
-        statusLabel = 'MISMATCH STUDIO';
+    } else if (status === 'MISMATCH_STUDIO' || status === 'MISMATCH_VERSION') {
+        statusLabel = 'MISMATCH VERSION';
         statusBadgeClass = 'text-white bg-rose-600 border-0 font-bold';
     } else if (status === 'DISABLED') {
         statusLabel = 'DISABLED';
@@ -7735,7 +7748,7 @@ function renderRadialGsx(ap) {
                 ${dropZoneHtml}
             </div>
         `;
-    } else if (status === 'MISMATCH_DEFAULT' || status === 'MISMATCH_STUDIO') {
+    } else if (status === 'MISMATCH_DEFAULT' || status === 'MISMATCH_STUDIO' || status === 'MISMATCH_VERSION') {
         const activeFile = files.find(f => !f.is_disabled) || files[0];
         const safePath = encodeURIComponent(activeFile ? activeFile.path : '');
         container.innerHTML = `
@@ -7930,7 +7943,7 @@ function handleRadialGsxDragOver(e) {
         const textSpan = zone.querySelector('#radial-gsx-drop-text span');
         if (textSpan && !zone.dataset.origText) {
             zone.dataset.origText = textSpan.innerText;
-            textSpan.innerText = '✨ DROP PROFILE HERE TO INSTALL';
+            textSpan.innerText = 'DROP PROFILE HERE TO INSTALL';
         }
     }
 }
@@ -13539,6 +13552,11 @@ function showCustomModal(titleOrObj, messageStr, typeStr = 'info') {
         if (cancelBtn) {
             cancelBtn.innerText = cancelText;
             cancelBtn.classList.toggle('hidden', !showCancel);
+            if (typeof titleOrObj === 'object' && titleOrObj && titleOrObj.cancelClass) {
+                cancelBtn.className = titleOrObj.cancelClass;
+            } else {
+                cancelBtn.className = "px-4 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 hover:text-white text-xs font-bold transition-all";
+            }
         }
     }
 
