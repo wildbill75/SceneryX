@@ -701,11 +701,32 @@ async function executeFlightOptimizer() {
     }
 }
 
+function applyRestoredAirportsData(airports) {
+    if (airports && airports.length > 0) {
+        allAirportsData = airports;
+        allAirportsData.forEach(ap => {
+            if (userRatingsMap && userRatingsMap[ap.icao] !== undefined) {
+                ap.rating = userRatingsMap[ap.icao];
+            } else {
+                ap.rating = ap.rating || 0;
+            }
+            if (typeof buildAirportSearchKey === 'function') {
+                ap._searchKey = buildAirportSearchKey(ap);
+            }
+        });
+        rebuildAirportsByIcaoIndex();
+        updateStats(allAirportsData);
+        updateFilterUI();
+    }
+}
+
 async function executeRestoreAllSceneries() {
     // Clear all departure & arrival flight selections completely
     flightOriginAirport = null;
     flightDestAirport = null;
     isFlightOptimizerActive = false;
+    isFlightCorridorOptimized = false;
+    flightCorridorDisabledCount = 0;
     if (flightRouteLineGroup) {
         flightRouteLineGroup.clearLayers();
     }
@@ -724,16 +745,18 @@ async function executeRestoreAllSceneries() {
 
     try {
         if (window.pywebview) {
-            const resRaw = await window.pywebview.api.restore_all_sceneries();
+            const apiFn = window.pywebview.api.restore_all_sceneries || window.pywebview.api.restore_all_flight_sceneries;
+            const resRaw = await apiFn.call(window.pywebview.api);
             const res = JSON.parse(resRaw);
-            if (res.status === 'ok') {
-                allAirportsData = res.airports;
-                updateStats(allAirportsData);
+            if (res.status === 'ok' || res.status === 'success') {
+                applyRestoredAirportsData(res.airports);
                 updateFlightOptimizerUI();
+                updateFlightModeBannerUI({ active: false, icaos: [] });
+                updatePersistentFlightBannerUI({ active: false });
                 filterAirports();
                 showCustomModal(
                     "All Sceneries Restored!",
-                    `Successfully re-enabled ${res.re_enabled_count} sceneries. All your add-ons are now active.`,
+                    `Successfully re-enabled ${res.re_enabled_count || 0} sceneries. All your add-ons are now active.`,
                     "success"
                 );
             } else {
@@ -8638,16 +8661,14 @@ async function restoreFlightCorridorSceneries() {
             const res = JSON.parse(resRaw);
             if (res.status === 'ok' || res.status === 'success') {
                 isFlightCorridorOptimized = false;
+                isFlightOptimizerActive = false;
                 flightCorridorDisabledCount = 0;
 
-                if (res.airports && res.airports.length > 0) {
-                    allAirportsData = res.airports;
-                }
+                applyRestoredAirportsData(res.airports);
 
-                if (res.airports && res.airports.length > 0) {
-                    allAirportsData = res.airports;
-                }
-
+                updateFlightModeBannerUI({ active: false, icaos: [] });
+                updatePersistentFlightBannerUI({ active: false });
+                updateFlightPlanningBannerUI();
                 closePlanningBannerClean();
                 filterAirports();
 
@@ -13893,11 +13914,10 @@ function restoreAllFlightSceneriesUI() {
         try {
             const res = JSON.parse(resStr);
             if (res.status === 'ok' || res.status === 'success') {
-                if (res.airports && res.airports.length > 0) {
-                    allAirportsData = res.airports;
-                }
+                applyRestoredAirportsData(res.airports);
                 isFlightOptimizerActive = false;
                 isFlightCorridorOptimized = false;
+                flightCorridorDisabledCount = 0;
                 updateFlightModeBannerUI({ active: false, icaos: [] });
                 updatePersistentFlightBannerUI({ active: false });
                 updateFlightPlanningBannerUI();

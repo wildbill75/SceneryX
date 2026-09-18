@@ -2575,6 +2575,11 @@ def build_library_snapshot(airports):
             if not fn or fn.startswith('msfs-default-') or s.get('pricing_type') == 'Default':
                 continue
 
+            # Ephemeral cloud-streaming packages from MSFS 2024 should never trigger user library alerts
+            src_folder = s.get('source_folder', '')
+            if 'streamed' in src_folder.lower():
+                continue
+
             clean_fn = fn[:-9] if fn.lower().endswith('.disabled') else fn
             clean_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_fn.lower())
             key = f"pkg:{icao.lower()}:{clean_norm}"
@@ -2638,11 +2643,15 @@ def compute_scan_delta(new_airports, update_snapshot=True):
 
     added = []
     for k, item in current_snapshot.items():
+        if 'streamed' in item.get('source_folder', '').lower():
+            continue
         if k not in prev_snapshot:
             added.append(item)
 
     removed = []
     for k, item in prev_snapshot.items():
+        if 'streamed' in item.get('source_folder', '').lower():
+            continue
         if k not in current_snapshot:
             removed.append(item)
 

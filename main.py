@@ -348,12 +348,17 @@ def update_msfs_content_xml(keep_icaos=None, restore_flight_mode=False, flight_d
             changed = False
 
             if restore_flight_mode:
+                flight_disabled_set_lower = {x.lower() for x in (flight_disabled_xml or [])}
+                flight_added_set_lower = {x.lower() for x in (flight_added_xml or [])}
                 for elem in list(tree.findall('Package')):
                     name = elem.get('name', '')
-                    if name in flight_added_set:
+                    name_clean = name[:-9] if name.endswith('.disabled') else name
+                    name_lower = name.lower()
+                    name_clean_lower = name_clean.lower()
+                    if name_lower in flight_added_set_lower or name_clean_lower in flight_added_set_lower:
                         tree.remove(elem)
                         changed = True
-                    elif name in flight_disabled_set:
+                    elif name_lower in flight_disabled_set_lower or name_clean_lower in flight_disabled_set_lower or (not flight_disabled_set_lower and elem.get('active') == 'UserDisabled'):
                         if elem.get('active') == 'UserDisabled':
                             elem.set('active', 'Activated')
                             changed = True
@@ -883,121 +888,10 @@ class Api:
             return json.dumps({"status": "error", "message": f"Error fetching SimBrief data: {str(e)}"})
 
     def optimize_flight(self, flight_icaos_json):
-        try:
-            if isinstance(flight_icaos_json, str):
-                flight_icaos = json.loads(flight_icaos_json)
-            else:
-                flight_icaos = flight_icaos_json
-
-            flight_icaos = [str(x).upper() for x in flight_icaos]
-            flight_set = set(flight_icaos)
-            airports = run_scan()
-
-            disabled_count = 0
-            content_xml_path = get_content_xml_path()
-            if os.path.exists(content_xml_path):
-                import xml.etree.ElementTree as ET
-                tree = ET.parse(content_xml_path)
-                root = tree.getroot()
-                changed = False
-
-                for p in root.findall('Package'):
-                    name = p.get('name', '')
-                    clean_folder = name[:-9] if name.endswith('.disabled') else name
-                    p_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_folder.lower())
-
-                    matched_ap = None
-                    for ap in airports:
-                        if ap.get('pricing_type') != 'Asobo':
-                            for src in ap.get('all_sources', []):
-                                fn = src.get('folder_name', '').lower()
-                                s_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn)
-                                if p_norm == s_norm or p_norm in s_norm or s_norm in p_norm:
-                                    matched_ap = ap
-                                    break
-                            if matched_ap:
-                                break
-
-                    if matched_ap:
-                        if matched_ap['icao'] in flight_set:
-                            if p.get('active') == 'UserDisabled':
-                                p.set('active', 'Activated')
-                                changed = True
-                        else:
-                            if p.get('active') != 'UserDisabled':
-                                p.set('active', 'UserDisabled')
-                                changed = True
-                                disabled_count += 1
-
-                if changed:
-                    tree.write(content_xml_path, encoding='utf-8', xml_declaration=True)
-
-            st = get_settings()
-            st['flight_mode'] = {
-                'active': True,
-                'icaos': flight_icaos,
-                'disabled_count': disabled_count
-            }
-            save_settings(st)
-
-            updated_airports = run_scan()
-            return json.dumps({
-                "status": "success",
-                "airports": updated_airports,
-                "disabled_count": disabled_count,
-                "flight_icaos": flight_icaos
-            }, ensure_ascii=False)
-        except Exception as e:
-            return json.dumps({"status": "error", "message": str(e)})
+        return self.optimize_flight_mode(flight_icaos_json)
 
     def restore_all_flight_sceneries(self):
-        try:
-            content_xml_path = get_content_xml_path()
-            if os.path.exists(content_xml_path):
-                import xml.etree.ElementTree as ET
-                tree = ET.parse(content_xml_path)
-                root = tree.getroot()
-                changed = False
-
-                # Get physical folders across all scan paths to avoid activating deleted/absent packages
-                st_cfg = get_settings()
-                scan_paths_cfg = st_cfg.get("scan_paths", [])
-
-                physical_folders_lower = set()
-                for cfg in scan_paths_cfg:
-                    if not cfg.get('enabled', True):
-                        continue
-                    dp = cfg.get('path', '')
-                    if os.path.exists(dp):
-                        try:
-                            for item in os.listdir(dp):
-                                physical_folders_lower.add(item.lower())
-                        except Exception:
-                            pass
-
-                for p in root.findall('Package'):
-                    name = p.get('name', '')
-                    clean = name[:-9] if name.endswith('.disabled') else name
-                    folder_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean.lower())
-                    
-                    exists_on_disk = any(folder_norm in f or f in folder_norm for f in physical_folders_lower)
-                    if exists_on_disk and p.get('active') == 'UserDisabled':
-                        p.set('active', 'Activated')
-                        changed = True
-                if changed:
-                    tree.write(content_xml_path, encoding='utf-8', xml_declaration=True)
-
-            st = get_settings()
-            st['flight_mode'] = {'active': False, 'icaos': []}
-            save_settings(st)
-
-            airports = run_scan()
-            return json.dumps({
-                "status": "success",
-                "airports": airports
-            }, ensure_ascii=False)
-        except Exception as e:
-            return json.dumps({"status": "error", "message": str(e)})
+        return self.restore_all_sceneries(full_reset=False)
 
     def toggle_airport_disabled(self, icao):
         try:
@@ -1651,6 +1545,8 @@ class Api:
             flight_disabled_xml = set(flight_mode_cfg.get('disabled_xml_packages', []))
             flight_added_xml = set(flight_mode_cfg.get('added_xml_packages', []))
 
+            flight_disabled_folders_lower = {f.lower() for f in flight_disabled_folders}
+
             for cfg in scan_paths_cfg:
                 dp = cfg.get('path', '')
                 if not os.path.exists(dp):
@@ -1666,8 +1562,10 @@ class Api:
                         for item in os.listdir(td):
                             if item.endswith('.disabled'):
                                 item_clean = item[:-9]
+                                item_lower = item.lower()
+                                item_clean_lower = item_clean.lower()
                                 # If full_reset is False and we have flight_disabled_folders, only restore folders disabled by flight mode!
-                                if not full_reset and flight_disabled_folders and (item_clean not in flight_disabled_folders and item not in flight_disabled_folders):
+                                if not full_reset and flight_disabled_folders_lower and (item_clean_lower not in flight_disabled_folders_lower and item_lower not in flight_disabled_folders_lower):
                                     continue
 
                                 dis_p = os.path.join(td, item)
@@ -1690,6 +1588,7 @@ class Api:
             settings['flight_mode'] = {
                 'active': False,
                 'icaos': [],
+                'disabled_count': 0,
                 'disabled_folders': [],
                 'disabled_xml_packages': [],
                 'added_xml_packages': []
