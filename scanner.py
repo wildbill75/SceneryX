@@ -804,7 +804,7 @@ KNOWN_STUDIO_ALIASES = {
     'lhsimulations': ['lhsimulations', 'lh simulations', 'lhsim'],
     'macco': ['macco', 'macco simulations'],
     'slhsimdesigns': ['slhsimdesigns', 'slh'],
-    'justflight': ['justflight', 'just flight', 'jf'],
+    'justflight': ['justflight', 'just flight', 'jf', 'jspco'],
     'euroscene': ['euroscene', 'euro scene'],
     'burningblue': ['burningblue', 'burningbluedesign', 'burning blue'],
     'feelthere': ['feelthere', 'feel there'],
@@ -822,6 +822,7 @@ KNOWN_STUDIO_ALIASES = {
     'axonos': ['axonos'],
     'taxi2gate': ['taxi2gate', 't2g'],
     'imaginesim': ['imaginesim'],
+    'atelic': ['atelic', 'atelic simulations', 'atelic-simulations', 'atelicsim'],
     'bmw': ['bmw', 'bmw scenery', 'bmw-scenery']
 }
 
@@ -875,6 +876,7 @@ STUDIO_DISPLAY_NAMES = {
     'axonos': 'Axonos',
     'taxi2gate': 'Taxi2Gate',
     'imaginesim': 'ImagineSim',
+    'atelic': 'Atelic',
     'bmw': 'BMW Scenery'
 }
 
@@ -884,18 +886,20 @@ GENERIC_GSX_WORDS = {
     'pro', 'vfr', 'addon', 'package', 'pack', 'version', 'ver', 'community', 'official',
     'streamedpackages', 'onestore', 'steam', 'bgl', 'ini', 'py', 'disabled', 'by', 'for',
     'customized', 'terminal', 'gate', 'parking', 'stand', 'freeware', 'payware', 'default',
-    'full', 'lite', 'safe', 'dock', 'vdgs', 'asvdgs', 'asxvdgs', 'gsxvdgs'
+    'full', 'lite', 'safe', 'dock', 'vdgs', 'asvdgs', 'asxvdgs', 'gsxvdgs', 'international',
+    'intl', 'intercontinental', 'national', 'regional', 'municipal'
 }
 
-def extract_distinctive_tokens(text, icao=None):
+def extract_distinctive_tokens(text, icao=None, geo_tokens=None):
     if not text:
         return set()
     cleaned = text.lower().replace('-', ' ').replace('_', ' ').replace('.', ' ')
     raw_tokens = re.split(r'[^a-z0-9]+', cleaned)
     icao_l = (icao or '').lower()
+    geo_set = geo_tokens or set()
     res = set()
     for t in raw_tokens:
-        if len(t) >= 3 and t not in GENERIC_GSX_WORDS and t != icao_l:
+        if len(t) >= 3 and t not in GENERIC_GSX_WORDS and t != icao_l and t not in geo_set:
             res.add(t)
     return res
 
@@ -970,16 +974,15 @@ def evaluate_gsx_studio_match(pf, ap):
             return ('MISMATCH_DEFAULT', f'Profile designed for Default MSFS, but active scenery is "{active_desc}".')
         return ('MATCHED', 'Profile designed for Default MSFS airport.')
 
-    # 2. Extract distinctive tokens
-    scenery_tokens = extract_distinctive_tokens(f"{active_vendor} {active_folder} {active_pkg_name}", icao=icao)
-    
-    pkg_tokens = extract_distinctive_tokens(target_pkg, icao=icao)
-    scen_tokens = extract_distinctive_tokens(scenario, icao=icao)
-    comment_tokens = extract_distinctive_tokens(comment_scenery, icao=icao)
-    fn_tokens = extract_distinctive_tokens(filename, icao=icao)
-    afcad_tokens = extract_distinctive_tokens(afcad, icao=icao)
+    # 2. Extract geographic tokens for this airport (to exclude city/airport/region name false matches)
+    geo_tokens = set()
+    for field in [icao, ap.get('iata'), ap.get('city'), ap.get('name'), ap.get('country')]:
+        if field:
+            for t in re.split(r'[^a-z0-9]+', str(field).lower()):
+                if len(t) >= 3 and t not in KNOWN_STUDIO_ALIASES:
+                    geo_tokens.add(t)
 
-    # Note: creator and comment_author are community profile authors, never treated as scenery publisher studios!
+    # 3. Detect known studios (creator and comment_author are community profile authors, never treated as publisher studios)
     prof_studio = (
         detect_studio_from_text(target_pkg) or
         detect_studio_from_text(comment_scenery) or
@@ -993,16 +996,37 @@ def evaluate_gsx_studio_match(pf, ap):
         detect_studio_from_text(active_pkg_name)
     )
 
-    # 3. Direct AFCAD Package comparison (Tier 1)
+    # Direct AFCAD Package comparison (Tier 1)
     if target_pkg and active_folder:
         clean_target = re.sub(r'[^a-z0-9]', '', target_pkg.lower())
         clean_active = re.sub(r'[^a-z0-9]', '', active_folder.lower())
         if clean_target == clean_active or clean_target in clean_active or clean_active in clean_target or _normalize_pkg(target_pkg) == _normalize_pkg(active_folder):
             return ('MATCHED', f'Profile perfectly aligned with active scenery ({active_desc}).')
 
-    # 4. Positive alignment matches
-    if prof_studio and act_studio and prof_studio == act_studio:
-        return ('MATCHED', f'Profile perfectly aligned with active scenery ({active_desc}).')
+    # Studio conflict check (Tier 2) - MUST run before generic token checks!
+    if prof_studio and act_studio:
+        if prof_studio == act_studio:
+            return ('MATCHED', f'Profile perfectly aligned with active scenery ({active_desc}).')
+        else:
+            prof_disp = STUDIO_DISPLAY_NAMES.get(prof_studio, prof_studio.title())
+            return ('MISMATCH_STUDIO', f'Profile designed for "{prof_disp}", but active scenery is "{active_desc}".')
+
+    if prof_studio and not act_studio:
+        prof_disp = STUDIO_DISPLAY_NAMES.get(prof_studio, prof_studio.title())
+        if pricing_type == 'Default' and not is_asobo:
+            return ('MISMATCH_DEFAULT', f'Profile designed for "{prof_disp}", but active scenery is "Microsoft Flight Simulator (Default)".')
+        elif is_asobo and prof_studio != 'gaya':
+            return ('MISMATCH_STUDIO', f'Profile designed for "{prof_disp}", but active scenery is "{asobo_desc}".')
+        elif not is_asobo and (active_vendor or active_folder):
+            return ('MISMATCH_STUDIO', f'Profile designed for "{prof_disp}", but active scenery is "{active_desc}".')
+
+    # 4. Token-based matching (excluding geographic tokens)
+    scenery_tokens = extract_distinctive_tokens(f"{active_vendor} {active_folder} {active_pkg_name}", icao=icao, geo_tokens=geo_tokens)
+    pkg_tokens = extract_distinctive_tokens(target_pkg, icao=icao, geo_tokens=geo_tokens)
+    scen_tokens = extract_distinctive_tokens(scenario, icao=icao, geo_tokens=geo_tokens)
+    comment_tokens = extract_distinctive_tokens(comment_scenery, icao=icao, geo_tokens=geo_tokens)
+    fn_tokens = extract_distinctive_tokens(filename, icao=icao, geo_tokens=geo_tokens)
+    afcad_tokens = extract_distinctive_tokens(afcad, icao=icao, geo_tokens=geo_tokens)
 
     if afcad_tokens and (afcad_tokens & scenery_tokens):
         return ('MATCHED', f'Profile aligned with active scenery ({active_desc}).')
@@ -1016,20 +1040,7 @@ def evaluate_gsx_studio_match(pf, ap):
     if (scen_tokens | comment_tokens) & scenery_tokens:
         return ('MATCHED', f'Profile aligned with active scenery ({active_desc}).')
 
-    # 5. Studio Mismatch / Conflicting Studio Checks
-    if prof_studio and act_studio and prof_studio != act_studio:
-        prof_disp = STUDIO_DISPLAY_NAMES.get(prof_studio, prof_studio.title())
-        return ('MISMATCH_STUDIO', f'Profile designed for "{prof_disp}", but active scenery is "{active_desc}".')
-
-    if prof_studio and not act_studio:
-        prof_disp = STUDIO_DISPLAY_NAMES.get(prof_studio, prof_studio.title())
-        if pricing_type == 'Default' and not is_asobo:
-            return ('MISMATCH_DEFAULT', f'Profile designed for "{prof_disp}", but active scenery is "Microsoft Flight Simulator (Default)".')
-        elif is_asobo and prof_studio != 'gaya':
-            return ('MISMATCH_STUDIO', f'Profile designed for "{prof_disp}", but active scenery is "{asobo_desc}".')
-        elif not is_asobo and (active_vendor or active_folder):
-            return ('MISMATCH_STUDIO', f'Profile designed for "{prof_disp}", but active scenery is "{active_desc}".')
-
+    # If target_pkg has studio tokens that don't match active
     if target_pkg and active_folder:
         if pkg_tokens and not (pkg_tokens & scenery_tokens):
             target_disp = STUDIO_DISPLAY_NAMES.get(detect_studio_from_text(target_pkg), target_pkg)
@@ -1037,7 +1048,7 @@ def evaluate_gsx_studio_match(pf, ap):
                 return ('MISMATCH_DEFAULT', f'Profile designed for "{target_disp}", but active scenery is "Microsoft Flight Simulator (Default)".')
             return ('MISMATCH_STUDIO', f'Profile designed for "{target_disp}", but active scenery is "{active_desc}".')
 
-    # 6. Asobo / Gaya partner check
+    # 5. Asobo / Gaya partner check
     if is_asobo:
         fn_lower = filename.lower()
         if prof_studio == 'gaya':
@@ -1045,7 +1056,7 @@ def evaluate_gsx_studio_match(pf, ap):
         if any(k in fn_lower for k in ('asobo', 'microsoft', 'worldupdate', 'world-update', 'wu1', 'wu2', 'wu3', 'wu4', 'wu5', 'wu6', 'wu7', 'wu8', 'wu9')):
             return ('MATCHED', f'Profile aligned with active scenery ({asobo_desc}).')
 
-    # 7. Residual scenario mismatch if scenario explicitly mentions a studio not in active
+    # 6. Residual scenario mismatch if scenario explicitly mentions a studio not in active
     if comment_scenery or scenario:
         target_name = comment_scenery or scenario
         scen_studio = detect_studio_from_text(target_name)
