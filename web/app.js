@@ -3427,6 +3427,17 @@ function renderGsxAuditModal() {
                                 </span>
                             </div>
 
+                            ${(() => {
+                                const bProf = item.bundled_gsx_profile || (((typeof allAirportsData !== 'undefined' && Array.isArray(allAirportsData)) ? allAirportsData.find(a => a.icao === icao) : (window.allAirports || []).find(a => a.icao === icao)) || {}).bundled_gsx_profile;
+                                if (bProf && bProf.ini_path && !bProf.is_installed) {
+                                    return `
+                                        <button onclick="installBundledGsxProfile('${icao}')" class="text-[10px] font-mono font-bold px-3 py-2.5 h-10 rounded-xl leading-tight bg-emerald-600 hover:bg-emerald-500 text-white border-0 cursor-pointer transition-colors shrink-0 flex items-center justify-center">
+                                            <span>${t('gsx.install_bundled', 'Installer le profil officiel')}</span>
+                                        </button>
+                                    `;
+                                }
+                                return '';
+                            })()}
                             <button onclick="searchGsxProfileFromModal('${icao}')" class="text-[10px] font-mono font-bold px-3.5 py-2.5 h-10 rounded-xl leading-tight bg-cyan-700 hover:bg-cyan-600 text-white border-0 cursor-pointer transition-colors shrink-0 flex items-center justify-center" title="Search on Flightsim.to">
                                 <span>Search on Flightsim.to</span>
                             </button>
@@ -4743,6 +4754,78 @@ async function executeGsxInstallationForIcao(icao, { filePath = '', base64Data =
 async function installGsxProfileFromModal(icao) {
     await executeGsxInstallationForIcao(icao, { filePath: '' });
 }
+
+async function installBundledGsxProfile(icao) {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.install_bundled_gsx_profile) return;
+    try {
+        if (typeof showToast === 'function') {
+            showToast(t('gsx.installing_bundled', 'Installing official GSX profile...'), 'info');
+        }
+        const raw = await window.pywebview.api.install_bundled_gsx_profile(icao);
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (parsed && parsed.status === 'ok') {
+            if (parsed.airports && Array.isArray(parsed.airports)) {
+                allAirportsData = parsed.airports;
+            }
+            const targetIcao = (icao || '').toUpperCase();
+            const ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao(targetIcao) : null;
+            if (ap) {
+                ap.has_gsx_profile = true;
+                if (ap.bundled_gsx_profile) {
+                    ap.bundled_gsx_profile.is_installed = true;
+                }
+                if (parsed.installed_files && parsed.installed_files.length > 0) {
+                    const iniF = parsed.installed_files.find(f => f.toLowerCase().endsWith('.ini')) || parsed.installed_files[0];
+                    ap.gsx_ini_file = iniF;
+                    ap.gsx_profile_filename = iniF;
+                }
+            }
+            if (typeof updateStats === 'function') updateStats(allAirportsData);
+            if (typeof filterAirports === 'function') filterAirports();
+
+            if (window.pywebview.api.scan_gsx_audit) {
+                const auditRaw = await window.pywebview.api.scan_gsx_audit();
+                const auditParsed = typeof auditRaw === 'string' ? JSON.parse(auditRaw) : auditRaw;
+                if (auditParsed && auditParsed.status === 'ok') {
+                    window.gsxAuditData = auditParsed.data;
+                }
+            }
+
+            if (typeof currentRadialAirport !== 'undefined' && currentRadialAirport && currentRadialAirport.icao === targetIcao) {
+                const updatedAp = (typeof getAirportByIcao === 'function') ? getAirportByIcao(targetIcao) : ap;
+                if (updatedAp) {
+                    currentRadialAirport = updatedAp;
+                    if (typeof renderRadialAirportDetails === 'function') {
+                        renderRadialAirportDetails(currentRadialAirport);
+                    } else if (typeof renderRadialGsx === 'function') {
+                        renderRadialGsx(currentRadialAirport);
+                    }
+                }
+            }
+
+            if (typeof renderGsxAuditModal === 'function' && window.isGsxAuditOpen) {
+                renderGsxAuditModal();
+            }
+            if (typeof updateGsxHeaderAndTabBadges === 'function') {
+                updateGsxHeaderAndTabBadges();
+            }
+
+            if (typeof showToast === 'function') {
+                showToast(t('gsx.bundled_installed_success', 'Profil GSX officiel installé avec succès'), 'success');
+            }
+        } else {
+            if (typeof showToast === 'function') {
+                showToast((parsed && parsed.message) || 'Failed to install official GSX profile', 'error');
+            }
+        }
+    } catch (e) {
+        console.error("Error installing bundled GSX profile:", e);
+        if (typeof showToast === 'function') {
+            showToast(`Error: ${e.message || String(e)}`, 'error');
+        }
+    }
+}
+window.installBundledGsxProfile = installBundledGsxProfile;
 
 function handleGsxAuditDragOver(e, icao) {
     e.preventDefault();
@@ -7611,6 +7694,16 @@ function renderRadialGsx(ap) {
         }];
     }
 
+    const bundled = ap.bundled_gsx_profile || (audit && audit.bundled_gsx_profile);
+    const hasBundled = !!(bundled && bundled.ini_path);
+    const isBundledInstalled = hasBundled && (bundled.is_installed || (status === 'MATCHED' && files.some(f => f.filename === bundled.filename)));
+
+    const bundledButtonHtml = (hasBundled && !isBundledInstalled) ? `
+        <button onclick="installBundledGsxProfile('${ap.icao}')" class="w-full py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors cursor-pointer border-0 text-center shadow-sm">
+            ${t('gsx.install_bundled', 'Installer le profil officiel')}
+        </button>
+    ` : '';
+
     // Diagnostic badge styling
     let statusLabel = 'NONE';
     let statusBadgeClass = 'text-slate-300 bg-slate-700 border-0 font-bold';
@@ -7798,6 +7891,7 @@ function renderRadialGsx(ap) {
                         </div>
                     </div>
                 ` : ''}
+                ${bundledButtonHtml ? `<div class="mb-1.5">${bundledButtonHtml}</div>` : ''}
                 <button onclick="triggerGsxStudioSearch('${ap.icao}')" class="w-full py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 hover:text-white text-xs font-mono font-bold transition-colors border border-slate-700/60 text-center cursor-pointer">
                     Search GSX Profile for ${ap.icao} on Flightsim.to
                 </button>
@@ -7832,23 +7926,34 @@ function renderRadialGsx(ap) {
                         </div>
                     `;
                 }).join('')}
+                ${bundledButtonHtml ? `<div class="mt-1">${bundledButtonHtml}</div>` : ''}
                 ${dropZoneHtml}
             </div>
         `;
     } else {
         container.innerHTML = `
             <div class="space-y-1.5">
-                <div class="p-2 rounded-xl bg-slate-900/40 border border-slate-800/80 flex items-center justify-between text-xs font-mono text-slate-400 gap-2">
-                    <span>No GSX profile installed</span>
-                    <div class="flex items-center gap-1.5 shrink-0">
-                        <button onclick="triggerRadialSearchGsxProfile()" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-cyan-400 hover:text-white text-[10px] font-mono font-bold border border-slate-700/60 cursor-pointer">
-                            Search Flightsim.to
-                        </button>
-                        <button onclick="openGsxAuditFromDetails('NO_PROFILE')" title="Open GSX Profiles Details on map" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-cyan-950 text-slate-300 hover:text-cyan-300 border border-slate-700/60 hover:border-cyan-700 text-[10px] font-mono font-bold cursor-pointer shrink-0 transition-colors">
-                            VIEW LIST
-                        </button>
+                ${bundledButtonHtml ? `
+                    <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800 space-y-2">
+                        <div class="flex items-center justify-between text-xs font-mono">
+                            <span class="text-slate-300 font-bold truncate">${escapeHtml(bundled.filename)}</span>
+                            <span class="text-[9px] px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800 font-bold shrink-0">OFFICIAL</span>
+                        </div>
+                        ${bundledButtonHtml}
                     </div>
-                </div>
+                ` : `
+                    <div class="p-2 rounded-xl bg-slate-900/40 border border-slate-800/80 flex items-center justify-between text-xs font-mono text-slate-400 gap-2">
+                        <span>No GSX profile installed</span>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <button onclick="triggerRadialSearchGsxProfile()" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-cyan-400 hover:text-white text-[10px] font-mono font-bold border border-slate-700/60 cursor-pointer">
+                                Search Flightsim.to
+                            </button>
+                            <button onclick="openGsxAuditFromDetails('NO_PROFILE')" title="Open GSX Profiles Details on map" class="px-2 py-0.5 rounded bg-slate-800 hover:bg-cyan-950 text-slate-300 hover:text-cyan-300 border border-slate-700/60 hover:border-cyan-700 text-[10px] font-mono font-bold cursor-pointer shrink-0 transition-colors">
+                                VIEW LIST
+                            </button>
+                        </div>
+                    </div>
+                `}
                 ${dropZoneHtml}
             </div>
         `;

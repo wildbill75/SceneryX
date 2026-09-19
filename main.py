@@ -5,7 +5,7 @@ import re
 import urllib.request
 import webbrowser
 import webview
-from scanner import run_scan, get_settings, save_settings, load_ratings, save_rating, save_custom_price, save_custom_category, load_custom_prices, get_estimated_price, get_default_gsx_path, load_airport_database, SPECIAL_BUNDLE_MAP, OUTPUT_JSON_PATH, compute_scan_delta, build_library_snapshot, SNAPSHOT_JSON_PATH, get_resource_file_path, audit_all_gsx_profiles, audit_single_airport_gsx, extract_icao_from_gsx_filename
+from scanner import run_scan, get_settings, save_settings, load_ratings, save_rating, save_custom_price, save_custom_category, load_custom_prices, get_estimated_price, get_default_gsx_path, load_airport_database, SPECIAL_BUNDLE_MAP, OUTPUT_JSON_PATH, compute_scan_delta, build_library_snapshot, SNAPSHOT_JSON_PATH, get_resource_file_path, audit_all_gsx_profiles, audit_single_airport_gsx, extract_icao_from_gsx_filename, find_bundled_gsx
 
 AIRPORTS_DB_CACHE = None
 
@@ -1920,6 +1920,25 @@ class Api:
                         shutil.copy2(file_path, target_p)
                         installed_files.append(fname)
 
+                        # Also copy any companion .py or _handler.py files located in the same directory
+                        src_dir = os.path.dirname(file_path)
+                        stem = os.path.splitext(fname)[0].lower()
+                        try:
+                            for sibling in os.listdir(src_dir):
+                                s_lower = sibling.lower()
+                                if s_lower == fname.lower() or s_lower == 'configuration.ini':
+                                    continue
+                                if s_lower.endswith('.py'):
+                                    s_stem = os.path.splitext(s_lower)[0]
+                                    if (stem in s_stem or s_stem in stem or
+                                        s_stem.replace('_', '-') == stem.replace('_', '-') or
+                                        s_stem.replace('-', '_') == stem.replace('-', '_')):
+                                        s_target = os.path.join(gsx_dir, sibling)
+                                        shutil.copy2(os.path.join(src_dir, sibling), s_target)
+                                        installed_files.append(sibling)
+                        except Exception as e:
+                            print(f"Error copying companion GSX files from {src_dir}:", e)
+
             # 3. No path/data provided -> Open File Dialog
             else:
                 try:
@@ -2020,6 +2039,72 @@ class Api:
                 "has_gsx_profile": has_profile,
                 "audit": audit
             }, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
+    def install_bundled_gsx_profile(self, icao):
+        try:
+            target_icao = (icao or '').upper().strip()
+            if not target_icao:
+                return json.dumps({"status": "error", "message": "No ICAO provided"})
+
+            ini_path = None
+            if os.path.exists(OUTPUT_JSON_PATH):
+                try:
+                    with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
+                        airports = json.load(f)
+                    for ap in airports:
+                        if ap.get('icao') == target_icao:
+                            b_prof = ap.get('bundled_gsx_profile')
+                            if b_prof and b_prof.get('ini_path') and os.path.exists(b_prof['ini_path']):
+                                ini_path = b_prof['ini_path']
+                            break
+                except Exception as e:
+                    print("Error reading airports JSON for bundled GSX:", e)
+
+            # Fallback direct scan of packages if not in JSON yet
+            if not ini_path and os.path.exists(OUTPUT_JSON_PATH):
+                try:
+                    with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
+                        airports = json.load(f)
+                    for ap in airports:
+                        if ap.get('icao') == target_icao:
+                            for s in ap.get('all_sources', []):
+                                pkg_p = s.get('package_path')
+                                if pkg_p and os.path.exists(pkg_p):
+                                    found_b = find_bundled_gsx(pkg_p, icao=target_icao)
+                                    if found_b and os.path.exists(found_b['ini_path']):
+                                        ini_path = found_b['ini_path']
+                                        break
+                            if ini_path:
+                                break
+                except Exception:
+                    pass
+
+            if not ini_path or not os.path.exists(ini_path):
+                return json.dumps({"status": "error", "message": f"No official bundled GSX profile found on disk for {target_icao}."})
+
+            res_str = self.install_gsx_profile(icao=target_icao, file_path=ini_path, replace_existing=True)
+            res = json.loads(res_str) if isinstance(res_str, str) else res_str
+
+            # Update bundled_gsx_profile.is_installed in installed_airports.json
+            if res.get('status') == 'ok' and os.path.exists(OUTPUT_JSON_PATH):
+                try:
+                    with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
+                        airports = json.load(f)
+                    for ap in airports:
+                        if ap.get('icao') == target_icao:
+                            if ap.get('bundled_gsx_profile'):
+                                ap['bundled_gsx_profile']['is_installed'] = True
+                            break
+                    tmp_p = OUTPUT_JSON_PATH + '.tmp'
+                    with open(tmp_p, 'w', encoding='utf-8') as f:
+                        json.dump(airports, f, ensure_ascii=False)
+                    os.replace(tmp_p, OUTPUT_JSON_PATH)
+                except Exception as e:
+                    print("Error updating bundled_gsx_profile.is_installed in JSON:", e)
+
+            return json.dumps(res, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
 

@@ -781,6 +781,103 @@ def scan_gsx_profiles(gsx_dir):
         pass
     return gsx_map
 
+def find_bundled_gsx(package_path, icao=None):
+    """
+    Scans a scenery package directory for official bundled GSX profiles
+    (e.g. 'Official GSX Profile', 'GSX profile', 'GSXProfile', etc.).
+    Returns dict with ini_path, filename, rel_dir, companions, is_installed.
+    """
+    if not package_path or not os.path.exists(package_path):
+        return None
+
+    target_icao = (icao or '').upper().strip()
+
+    try:
+        candidates = []
+        for root, dirs, files in os.walk(package_path):
+            rel = os.path.relpath(root, package_path)
+            depth = rel.count(os.sep) if rel != '.' else 0
+            if depth >= 3:
+                dirs.clear()
+                continue
+
+            r_name = os.path.basename(root).lower()
+            is_gsx_dir = 'gsx' in r_name
+
+            ini_files = [
+                f for f in files 
+                if f.lower().endswith(('.ini', '.py')) 
+                and f.lower() not in ('configuration.ini', 'sound.ini', 'cameras.ini', 'flight_model.ini')
+                and not f.lower().endswith('_handler.py')
+            ]
+
+            if not ini_files:
+                continue
+
+            for f in ini_files:
+                f_path = os.path.join(root, f)
+                f_lower = f.lower()
+                
+                is_profile = False
+                if is_gsx_dir or 'gsx' in f_lower:
+                    is_profile = True
+                else:
+                    try:
+                        with open(f_path, 'r', encoding='utf-8', errors='ignore') as chk:
+                            head = chk.read(2048).lower()
+                            if 'afcad_path' in head or '[gate' in head or 'customizedname' in head:
+                                is_profile = True
+                    except Exception:
+                        pass
+
+                if not is_profile:
+                    continue
+
+                if target_icao and len(target_icao) >= 3:
+                    f_icao = extract_icao_from_gsx_filename(f, file_path=f_path)
+                    if f_icao and f_icao != target_icao:
+                        continue
+
+                candidates.append((f_path, f, root))
+
+        if not candidates:
+            return None
+
+        def candidate_score(c):
+            f_path, f, root = c
+            score = 0
+            if f.lower().endswith('.ini'):
+                score += 10
+            if target_icao and target_icao.lower() in f.lower():
+                score += 20
+            if 'official' in root.lower():
+                score += 5
+            return score
+
+        candidates.sort(key=candidate_score, reverse=True)
+        best_path, best_filename, best_root = candidates[0]
+
+        companions = []
+        try:
+            for s in os.listdir(best_root):
+                if s.lower() == best_filename.lower() or s.lower() == 'configuration.ini':
+                    continue
+                if s.lower().endswith('.py'):
+                    companions.append(s)
+        except Exception:
+            pass
+
+        return {
+            'ini_path': best_path,
+            'filename': best_filename,
+            'rel_dir': os.path.relpath(best_root, package_path),
+            'companions': companions,
+            'is_installed': False
+        }
+    except Exception as e:
+        print(f"Error checking bundled GSX in {package_path}:", e)
+        return None
+
 KNOWN_STUDIO_ALIASES = {
     'francevfr': ['francevfr', 'fvfr', 'france vfr'],
     'fsdreamteam': ['fsdreamteam', 'fsdt', 'virtuali'],
@@ -1422,6 +1519,7 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
             'is_asobo': bool(ap.get('is_asobo')) if ap else False,
             'is_freeware': (ap.get('pricing_type') == 'Freeware / Flightsim.to') if ap else False,
             'is_payware': (ap.get('pricing_type') == 'Payware') if ap else False,
+            'bundled_gsx_profile': ap.get('bundled_gsx_profile') if ap else None,
             'status': status,
             'reason': reason,
             'files': parsed_files
@@ -1449,7 +1547,8 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
                     'pricing_type': 'Payware' if is_payware else ('Asobo' if is_asobo else 'Freeware'),
                     'is_payware': is_payware,
                     'is_asobo': is_asobo,
-                    'is_freeware': is_freeware
+                    'is_freeware': is_freeware,
+                    'bundled_gsx_profile': ap.get('bundled_gsx_profile')
                 })
 
     missing_rank = {'Payware': 1, 'Freeware': 2, 'Asobo': 3}
@@ -1552,7 +1651,12 @@ def audit_single_airport_gsx(icao, gsx_dir=None, ap=None, airports_db=None):
             })
 
     if not matching_files:
-        return {'status': 'NONE', 'files': [], 'reason': 'No GSX profile installed.'}
+        return {
+            'status': 'NONE', 
+            'files': [], 
+            'reason': 'No GSX profile installed.',
+            'bundled_gsx_profile': ap.get('bundled_gsx_profile') if ap else None
+        }
 
     import datetime
     # Bundle companion files (.ini + companion .py scripts)
@@ -1638,7 +1742,8 @@ def audit_single_airport_gsx(icao, gsx_dir=None, ap=None, airports_db=None):
     return {
         'status': status,
         'reason': reason,
-        'files': parsed_files
+        'files': parsed_files,
+        'bundled_gsx_profile': ap.get('bundled_gsx_profile') if ap else None
     }
 
 def get_settings():
@@ -2569,6 +2674,24 @@ def run_scan():
             item['has_gsx_profile'] = False
             item['gsx_profile_filename'] = ''
             item['gsx_profile_path'] = ''
+
+        # Detect bundled GSX profiles in scenery package folders
+        bundled_prof = None
+        for s in item.get('all_sources', []):
+            pkg_p = s.get('package_path')
+            if pkg_p and os.path.exists(pkg_p):
+                found_b = find_bundled_gsx(pkg_p, icao=icao)
+                if found_b:
+                    bundled_prof = found_b
+                    break
+        if bundled_prof:
+            b_fn = bundled_prof['filename']
+            if gsx_path_cfg and os.path.exists(gsx_path_cfg):
+                installed_p = os.path.join(gsx_path_cfg, b_fn)
+                bundled_prof['is_installed'] = os.path.exists(installed_p)
+            item['bundled_gsx_profile'] = bundled_prof
+        else:
+            item['bundled_gsx_profile'] = None
 
     detected_airports = list(detected_map.values())
 

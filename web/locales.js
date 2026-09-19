@@ -1,6 +1,9 @@
 // SceneryX Multi-Language Localization Engine
 const LOCALES = {
     en: {
+        "gsx.install_bundled": "Install Official Profile",
+        "gsx.installing_bundled": "Installing official GSX profile...",
+        "gsx.bundled_installed_success": "Official GSX profile installed successfully",
         "gsx.drop_mismatch_title": "⚠️ ICAO Mismatch Detected",
         "gsx.drop_mismatch_msg": "The dropped profile (<strong>{filename}</strong>) appears to be for airport <strong>{detected}</strong>, but you are currently on <strong>{target}</strong>.<br><br>Where would you like to install it?",
         "gsx.install_for_detected": "Install for {detected} (Recommended)",
@@ -501,6 +504,9 @@ const LOCALES = {
         "funstats.global_reach_tooltip": "Click to reset filters and view your global world coverage.",
     },
     fr: {
+        "gsx.install_bundled": "Installer le profil officiel",
+        "gsx.installing_bundled": "Installation du profil GSX officiel...",
+        "gsx.bundled_installed_success": "Profil GSX officiel installé avec succès",
         "gsx.drop_mismatch_title": "⚠️ Incohérence de code ICAO détectée",
         "gsx.drop_mismatch_msg": "Le profil déposé (<strong>{filename}</strong>) semble être conçu pour l'aéroport <strong>{detected}</strong>, mais vous êtes actuellement sur <strong>{target}</strong>.<br><br>Pour quel aéroport souhaitez-vous l'installer ?",
         "gsx.install_for_detected": "Installer pour {detected} (Recommandé)",
@@ -1001,6 +1007,9 @@ const LOCALES = {
         "funstats.global_reach_tooltip": "Cliquez pour réinitialiser les filtres et voir votre couverture mondiale.",
     },
     de: {
+        "gsx.install_bundled": "Offizielles Profil installieren",
+        "gsx.installing_bundled": "Offizielles GSX-Profil wird installiert...",
+        "gsx.bundled_installed_success": "Offizielles GSX-Profil erfolgreich installiert",
         "gsx.drop_mismatch_title": "⚠️ ICAO-Nichtübereinstimmung erkannt",
         "gsx.drop_mismatch_msg": "Das abgelegte Profil (<strong>{filename}</strong>) scheint für den Flughafen <strong>{detected}</strong> zu sein, Sie befinden sich jedoch bei <strong>{target}</strong>.<br><br>Wo möchten Sie es installieren?",
         "gsx.install_for_detected": "Für {detected} installieren (Empfohlen)",
@@ -1499,6 +1508,9 @@ const LOCALES = {
         "funstats.global_reach_tooltip": "Klicken, um die Filter zurückzusetzen und die weltweite Abdeckung zu sehen.",
     },
     es: {
+        "gsx.install_bundled": "Instalar perfil oficial",
+        "gsx.installing_bundled": "Instalando perfil oficial de GSX...",
+        "gsx.bundled_installed_success": "Perfil oficial de GSX instalado con éxito",
         "gsx.drop_mismatch_title": "⚠️ Incoherencia de código ICAO detectada",
         "gsx.drop_mismatch_msg": "El perfil soltado (<strong>{filename}</strong>) parece ser para el aeropuerto <strong>{detected}</strong>, pero actualmente está en <strong>{target}</strong>.<br><br>¿Dónde desea instalarlo?",
         "gsx.install_for_detected": "Instalar para {detected} (Recomendado)",
