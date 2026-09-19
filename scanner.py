@@ -453,7 +453,13 @@ SPECIAL_BUNDLE_MAP = {
         'LFLU', 'LFLY', 'LFMA', 'LFMC', 'LFMD', 'LFME', 'LFMH', 'LFMI', 'LFMO', 'LFMQ', 'LFMR', 'LFMV', 
         'LFMY', 'LFMZ', 'LFNB', 'LFNF', 'LFNR', 'LFNT', 'LFTH', 'LFTZ', 'LFYS'
     ],
-    'francevfr-800-marseille': ['LFML']
+    'francevfr-800-marseille': ['LFML'],
+
+    # iniBuilds Skydive Dubai & Landmarks
+    'inibuilds-airport-omdu-skydive-dubai': ['OMDU'],
+    'fs24-inibuilds-airport-omdu-skydive-dubai': ['OMDU'],
+    'fs20-inibuilds-airport-omdu-skydive-dubai': ['OMDU'],
+    'airport-omdu-skydive-dubai': ['OMDU']
 }
 
 BUNDLE_PACKAGE_PRICES = {
@@ -472,10 +478,13 @@ KNOWN_PAYWARE_PRICES = {
     'fs20-aerosoft-paderborn': 0.0,
     'inibuilds-airport-at98-wolfsfang': 0.0,
     'inibuilds-airport-kmke-milwaukee': 0.0,
+    'inibuilds-airport-omdu-skydive-dubai': 0.0,
     'at98-wolfsfang': 0.0,
     'kmke-milwaukee': 0.0,
+    'omdu-skydive-dubai': 0.0,
     'inibuilds-at98': 0.0,
     'inibuilds-kmke': 0.0,
+    'inibuilds-omdu': 0.0,
     'wolfsfang': 0.0,
 
     # Specific Package Folder Patterns
@@ -1673,6 +1682,20 @@ def load_airport_database():
     city_index = {}
     name_index = {}
 
+    # In-memory alias injection for well-known community/addon ICAOs
+    if 'OMDU' not in airports:
+        airports['OMDU'] = {
+            'ident': 'OMDU',
+            'name': 'Skydive Dubai Airport',
+            'city': 'Dubai',
+            'country': 'AE',
+            'lat': 25.090037,
+            'lon': 55.132345,
+            'elevation': 3,
+            'type': 'small_airport',
+            'iata': ''
+        }
+
     for icao, ap in airports.items():
         city = ap.get('city')
         if city:
@@ -1728,8 +1751,8 @@ def get_clean_vendor(folder_name, manifest_data):
                 return candidate
 
     # 4. Fallback for Asobo / Microsoft
-    if 'asobo' in clean_fn or 'microsoft' in clean_fn:
-        return 'Microsoft / Asobo'
+    if any(k in clean_fn for k in ['asobo', 'microsoft']):
+        return "Microsoft / Asobo"
 
     # 5. Extract first valid segment from cleaned folder name
     parts = clean_fn.split('-')
@@ -1737,8 +1760,6 @@ def get_clean_vendor(folder_name, manifest_data):
         for p in parts:
             if p and p not in ['airport', 'scenery', 'handcrafted', 'france', 'pack', 'project', 'z', 'zzz', 'zzzz', 'msfs2024', 'msfs2020', 'msfs', 'fs20', 'fs24']:
                 return p.capitalize()
-
-    return 'Community Creator'
 
     return 'Community Creator'
 
@@ -1767,10 +1788,10 @@ def determine_pricing(source_folder, folder_name, vendor, manifest_data, icao=No
 
     s_lower = source_folder.lower()
 
-    # Known Official Freeware Releases (Paderborn Aerosoft, iniBuilds AT98 & KMKE giveaways)
+    # Known Official Freeware Releases (Paderborn Aerosoft, iniBuilds AT98, KMKE & OMDU giveaways)
     if 'paderborn' in fn_lower:
         return "Freeware / Flightsim.to", False
-    if icao in ['AT98', 'KMKE'] and ('wolf' in fn_lower or 'at98' in fn_lower or 'milwaukee' in fn_lower or 'kmke' in fn_lower):
+    if icao in ['AT98', 'KMKE', 'OMDU'] and ('wolf' in fn_lower or 'at98' in fn_lower or 'milwaukee' in fn_lower or 'kmke' in fn_lower or 'skydive' in fn_lower or 'omdu' in fn_lower):
         return "Freeware / Flightsim.to", False
 
     # 3rd-Party Payware Marketplace sceneries (France VFR, Gaya, Deimos, BMW, Orbx, Sim Design Group, etc.)
