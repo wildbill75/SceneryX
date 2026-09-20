@@ -11887,7 +11887,11 @@ function updateFilterUI() {
 }
 
 function toggleGsxFilter(val) {
-    selectedGsxFilter = val;
+    if (selectedGsxFilter === val && val !== 'all') {
+        selectedGsxFilter = 'all';
+    } else {
+        selectedGsxFilter = val;
+    }
     updateGsxFilterUI();
     filterAirports();
 }
@@ -12194,19 +12198,20 @@ function getFilterRadialCategoryItems(categoryKey) {
             { id: 'Official', label: t('filter.source_official', 'Official'), isActive: selectedSources.has('Official') }
         ];
     } else if (categoryKey === 'region') {
+        const isAllRegions = !selectedRegion;
         return [
-            { id: 'all', label: t('radial.all_regions', 'All Regions'), isActive: !selectedRegion },
-            { id: 'weurope', label: t('radial.region_weurope', 'West Europe'), isActive: selectedRegion === 'weurope' },
-            { id: 'eeurope', label: t('radial.region_eeurope', 'East Europe'), isActive: selectedRegion === 'eeurope' },
-            { id: 'namerica', label: t('radial.region_namerica', 'North America'), isActive: selectedRegion === 'namerica' },
-            { id: 'camerica_caribbean', label: t('radial.region_camerica', 'Central America'), isActive: selectedRegion === 'camerica_caribbean' },
-            { id: 'samerica', label: t('radial.region_samerica', 'South America'), isActive: selectedRegion === 'samerica' },
-            { id: 'asia', label: t('radial.region_asia', 'Asia'), isActive: selectedRegion === 'asia' },
-            { id: 'middleeast', label: t('radial.region_middleeast', 'Middle East'), isActive: selectedRegion === 'middleeast' },
-            { id: 'nafrica', label: t('radial.region_nafrica', 'North Africa'), isActive: selectedRegion === 'nafrica' },
-            { id: 'ssafrica', label: t('radial.region_ssafrica', 'Sub-Sahara Africa'), isActive: selectedRegion === 'ssafrica' },
-            { id: 'oceania', label: t('radial.region_oceania', 'Oceania'), isActive: selectedRegion === 'oceania' },
-            { id: 'pacific', label: t('radial.region_pacific', 'Pacific'), isActive: selectedRegion === 'pacific' }
+            { id: 'all', label: t('radial.all_regions', 'All Regions'), isActive: isAllRegions },
+            { id: 'weurope', label: t('radial.region_weurope', 'West Europe'), isActive: isAllRegions || selectedRegion === 'weurope' },
+            { id: 'eeurope', label: t('radial.region_eeurope', 'East Europe'), isActive: isAllRegions || selectedRegion === 'eeurope' },
+            { id: 'namerica', label: t('radial.region_namerica', 'North America'), isActive: isAllRegions || selectedRegion === 'namerica' },
+            { id: 'camerica_caribbean', label: t('radial.region_camerica', 'Central America'), isActive: isAllRegions || selectedRegion === 'camerica_caribbean' },
+            { id: 'samerica', label: t('radial.region_samerica', 'South America'), isActive: isAllRegions || selectedRegion === 'samerica' },
+            { id: 'asia', label: t('radial.region_asia', 'Asia'), isActive: isAllRegions || selectedRegion === 'asia' },
+            { id: 'middleeast', label: t('radial.region_middleeast', 'Middle East'), isActive: isAllRegions || selectedRegion === 'middleeast' },
+            { id: 'nafrica', label: t('radial.region_nafrica', 'North Africa'), isActive: isAllRegions || selectedRegion === 'nafrica' },
+            { id: 'ssafrica', label: t('radial.region_ssafrica', 'Sub-Sahara Africa'), isActive: isAllRegions || selectedRegion === 'ssafrica' },
+            { id: 'oceania', label: t('radial.region_oceania', 'Oceania'), isActive: isAllRegions || selectedRegion === 'oceania' },
+            { id: 'pacific', label: t('radial.region_pacific', 'Pacific'), isActive: isAllRegions || selectedRegion === 'pacific' }
         ];
     } else if (categoryKey === 'type') {
         return [
@@ -12217,11 +12222,12 @@ function getFilterRadialCategoryItems(categoryKey) {
             { id: 'Heli / Water', label: t('radial.type_heli', 'Heli / Water'), isActive: selectedTypes.has('Heli / Water') }
         ];
     } else if (categoryKey === 'gsx') {
+        const isAllProfiles = (selectedGsxFilter === 'all');
         return [
-            { id: 'all', label: t('radial.all_profiles', 'All Profiles'), isActive: selectedGsxFilter === 'all' },
-            { id: 'with', label: t('radial.with_gsx', 'With GSX'), isActive: selectedGsxFilter === 'with' },
-            { id: 'none', label: t('radial.no_profile', 'No Profile'), isActive: selectedGsxFilter === 'none' },
-            { id: 'audit', label: t('radial.profiles_details', 'Profiles Details'), isActive: false }
+            { id: 'all', label: t('radial.all_profiles', 'All Profiles'), isActive: isAllProfiles },
+            { id: 'with', label: t('radial.with_gsx', 'With GSX'), isActive: isAllProfiles || selectedGsxFilter === 'with' },
+            { id: 'none', label: t('radial.no_profile', 'No Profile'), isActive: isAllProfiles || selectedGsxFilter === 'none' },
+            { id: 'audit', label: t('radial.profiles_details', 'Profiles Details'), isActive: isAllProfiles }
         ];
     } else if (categoryKey === 'rating') {
         const createStarHtml = (ratingVal) => {
@@ -12238,13 +12244,14 @@ function getFilterRadialCategoryItems(categoryKey) {
             return s;
         };
 
+        const isAllRatings = (!selectedMinRating || selectedMinRating === 0);
         return [
-            { id: '0', label: t('radial.all_ratings', 'All Ratings'), htmlLabel: `<span>${t('radial.all_ratings', 'ALL RATINGS')}</span>`, isActive: !selectedMinRating || selectedMinRating === 0 },
-            { id: '3.0', label: `3.0★ ${t('radial.and_up', '& Up')}`, htmlLabel: `${createStarHtml(3.0)}<span>${t('radial.and_up', '& UP')}</span>`, isActive: selectedMinRating === 3.0 },
-            { id: '3.5', label: `3.5★ ${t('radial.and_up', '& Up')}`, htmlLabel: `${createStarHtml(3.5)}<span>${t('radial.and_up', '& UP')}</span>`, isActive: selectedMinRating === 3.5 },
-            { id: '4.0', label: `4.0★ ${t('radial.and_up', '& Up')}`, htmlLabel: `${createStarHtml(4.0)}<span>& UP</span>`, isActive: selectedMinRating === 4.0 },
-            { id: '4.5', label: `4.5★ ${t('radial.and_up', '& Up')}`, htmlLabel: `${createStarHtml(4.5)}<span>${t('radial.and_up', '& UP')}</span>`, isActive: selectedMinRating === 4.5 },
-            { id: '5.0', label: `5.0★ ${t('radial.only', 'Only')}`, htmlLabel: `${createStarHtml(5.0)}<span>${t('radial.only', 'ONLY')}</span>`, isActive: selectedMinRating === 5.0 }
+            { id: '0', label: t('radial.all_ratings', 'All Ratings'), htmlLabel: `<span>${t('radial.all_ratings', 'ALL RATINGS')}</span>`, isActive: isAllRatings },
+            { id: '3.0', label: `3.0★ ${t('radial.and_up', '& Up')}`, htmlLabel: `${createStarHtml(3.0)}<span>${t('radial.and_up', '& UP')}</span>`, isActive: isAllRatings || selectedMinRating === 3.0 },
+            { id: '3.5', label: `3.5★ ${t('radial.and_up', '& Up')}`, htmlLabel: `${createStarHtml(3.5)}<span>${t('radial.and_up', '& UP')}</span>`, isActive: isAllRatings || selectedMinRating === 3.5 },
+            { id: '4.0', label: `4.0★ ${t('radial.and_up', '& Up')}`, htmlLabel: `${createStarHtml(4.0)}<span>& UP</span>`, isActive: isAllRatings || selectedMinRating === 4.0 },
+            { id: '4.5', label: `4.5★ ${t('radial.and_up', '& Up')}`, htmlLabel: `${createStarHtml(4.5)}<span>${t('radial.and_up', '& UP')}</span>`, isActive: isAllRatings || selectedMinRating === 4.5 },
+            { id: '5.0', label: `5.0★ ${t('radial.only', 'Only')}`, htmlLabel: `${createStarHtml(5.0)}<span>${t('radial.only', 'ONLY')}</span>`, isActive: isAllRatings || selectedMinRating === 5.0 }
         ];
     }
     return [];
