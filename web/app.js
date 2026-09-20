@@ -11370,8 +11370,121 @@ function airportMatchesSourceFilter(ap) {
     });
 }
 
+/**
+ * Resets all active filters to default mode (startup default pricing, all sources, all types,
+ * no region, all gsx, rating 0, no airlines/routes, map mode).
+ * Called automatically as soon as the user starts typing in the search bar.
+ */
+function resetAllFiltersToDefault(skipFilter = false) {
+    let hasChanged = false;
+
+    // 1. Reset Pricing to default startup pricing (Payware, Freeware, Asobo)
+    const isDefaultPricing = (selectedPricing.size === DEFAULT_STARTUP_PRICING.length &&
+                              DEFAULT_STARTUP_PRICING.every(p => selectedPricing.has(p)));
+    if (!isDefaultPricing) {
+        selectedPricing = new Set(DEFAULT_STARTUP_PRICING);
+        hasChanged = true;
+    }
+
+    // 2. Reset Sources to all sources
+    if (selectedSources.size !== ALL_SOURCES_LIST.length) {
+        selectedSources = new Set(ALL_SOURCES_LIST);
+        hasChanged = true;
+    }
+
+    // 3. Reset Airport Types to all types
+    if (selectedTypes.size !== ALL_TYPES_LIST.length) {
+        selectedTypes = new Set(ALL_TYPES_LIST);
+        hasChanged = true;
+    }
+
+    // 4. Reset Region to null (Global)
+    if (selectedRegion !== null) {
+        selectedRegion = null;
+        updateRegionPillUI();
+        hasChanged = true;
+    }
+
+    // 5. Reset GSX filter to 'all'
+    if (selectedGsxFilter !== 'all') {
+        selectedGsxFilter = 'all';
+        updateGsxFilterUI();
+        hasChanged = true;
+    }
+
+    // 6. Reset Min Rating to 0
+    if (selectedMinRating !== 0) {
+        selectedMinRating = 0;
+        renderFilterStarWidget(0);
+        hasChanged = true;
+    }
+
+    // 7. Reset Operating Airlines & active routes
+    if (selectedAirlines.size > 0 || selectedAirline !== null || activeRouteOrigin !== null) {
+        selectedAirlines.clear();
+        selectedAirline = null;
+        activeRouteOrigin = null;
+        if (activeRouteLinesGroup) activeRouteLinesGroup.clearLayers();
+        hasChanged = true;
+    }
+
+    // 8. Reset Flight Corridor
+    if (flightCorridorArrivalAirport !== null) {
+        flightCorridorArrivalAirport = null;
+        hasChanged = true;
+    }
+
+    // 9. Reset Country Mode & Drawer if open
+    if (selectedCountryCode !== null || activeDrawerMode !== 'MAP') {
+        selectedCountryCode = null;
+        selectedCountryName = '';
+        expandedCountryIcao = null;
+        activeDrawerMode = 'MAP';
+        closeDrawerWithoutCameraChange();
+        preCountryModeFilters = null;
+        hasChanged = true;
+    }
+
+    // 10. Close any open radial menus
+    if (isFilterRadialOpen) {
+        closeFilterRadialMenu();
+    }
+    if (typeof isAirlinesModalOpen === 'function' && isAirlinesModalOpen()) {
+        if (typeof closeRadialAirlinesModal === 'function') closeRadialAirlinesModal();
+    }
+    if (typeof isDetailsModalOpen === 'function' && isDetailsModalOpen()) {
+        if (typeof closeRadialDetailsModal === 'function') closeRadialDetailsModal();
+    }
+
+    if (hasChanged) {
+        updateFilterUI();
+        if (isFilterRadialOpen) {
+            updateFilterRadialUI();
+        }
+    }
+
+    if (!skipFilter && hasChanged) {
+        filterAirports();
+    }
+
+    return hasChanged;
+}
+
 let searchDebounceTimer = null;
 function debouncedFilterAirports() {
+    const searchInp = document.getElementById('search-input');
+    const rawVal = searchInp ? searchInp.value : '';
+    const searchVal = rawVal.trim ? rawVal.trim() : rawVal;
+
+    // As soon as the user starts typing in the search bar, immediately clear/cut all active filters
+    // and revert to default mode so the search executes cleanly across the default collection!
+    if (searchVal.length > 0) {
+        resetAllFiltersToDefault(true);
+    }
+
+    const clearBtn = document.getElementById('clear-search');
+    if (clearBtn) clearBtn.classList.toggle('hidden', searchVal.length === 0);
+
     if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
     searchDebounceTimer = setTimeout(() => {
         filterAirports();
@@ -11538,8 +11651,13 @@ function filterAirports() {
             if (isPureDefault) {
                 // Pure procedural MSFS default airport (from the 19,129 generic database):
                 // ONLY show if user explicitly clicked the 'Default' pricing filter!
+                // Exception: if user explicitly searched for this airport by exact ICAO, show it!
                 if (!selectedPricing.has('Default')) {
-                    return false;
+                    if (search && search.length >= 2 && ap.icao === search.toUpperCase()) {
+                        // Allow exact match in search!
+                    } else {
+                        return false;
+                    }
                 }
             } else {
                 // Managed airport with custom addon options (in user's scenery collection):
@@ -11647,6 +11765,11 @@ function filterAirports() {
 
 function handleSearchKeyDown(e) {
     if (e.key === 'Enter') {
+        const searchInp = document.getElementById('search-input');
+        const rawSearch = searchInp ? searchInp.value.trim() : '';
+        if (rawSearch.length > 0) {
+            resetAllFiltersToDefault(true);
+        }
         triggerSearchFocus();
     }
 }
