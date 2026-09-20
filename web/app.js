@@ -904,10 +904,32 @@ function initMap() {
         if (isFilterRadialOpen) {
             closeFilterRadialMenu();
         }
-        if (isAirlinesModalOpen() || isDetailsModalOpen()) {
-            // In airlines or details mode: map clicks MUST NOT dismiss or exit. Only close button does.
+
+        const radialEl = document.getElementById('airport-radial-menu');
+        const isRadialWheelOpen = radialEl && !radialEl.classList.contains('hidden');
+
+        if (isAirlinesModalOpen()) {
+            if (isRadialWheelOpen || currentRadialAirport) {
+                // An airport (e.g. LFBH) was selected while in airlines mode: deselect it immediately!
+                closeAirportRadialMenu(true);
+                selectedAirport = null;
+                return;
+            }
+            // If no secondary radial wheel is open, clicking neutral map frees the user from airlines mode
+            closeRadialAirlinesModal();
             return;
         }
+
+        if (isDetailsModalOpen()) {
+            if (isRadialWheelOpen || currentRadialAirport) {
+                closeAirportRadialMenu(true);
+                selectedAirport = null;
+                return;
+            }
+            closeRadialDetailsModal();
+            return;
+        }
+
         closeAirportRadialMenu();
         if (countryClickTimeout) {
             clearTimeout(countryClickTimeout);
@@ -915,6 +937,12 @@ function initMap() {
         }
         if (activeDrawerMode !== 'MAP' || selectedAirport || selectedCountryCode) {
             closeDrawerWithoutCameraChange();
+        }
+        selectedAirport = null;
+        if (flightCorridorArrivalAirport) {
+            flightCorridorArrivalAirport = null;
+            if (activeRouteLinesGroup) activeRouteLinesGroup.clearLayers();
+            filterAirports();
         }
     });
 
@@ -1104,10 +1132,32 @@ async function loadCountryOverlays() {
                     click: (e) => {
                         L.DomEvent.stopPropagation(e);
                         if (isMapDragging) return;
-                        if (isAirlinesModalOpen() || isDetailsModalOpen()) {
-                            // In airlines or details mode: clicking on map/country MUST NOT exit mode. Only close button does.
+
+                        const radialEl = document.getElementById('airport-radial-menu');
+                        const isRadialWheelOpen = radialEl && !radialEl.classList.contains('hidden');
+
+                        if (isAirlinesModalOpen()) {
+                            if (isRadialWheelOpen || currentRadialAirport) {
+                                // An airport (e.g. LFBH) was selected while in airlines mode: deselect it immediately!
+                                closeAirportRadialMenu(true);
+                                selectedAirport = null;
+                                return;
+                            }
+                            // In airlines mode with no secondary airport selected: close airlines mode
+                            closeRadialAirlinesModal();
                             return;
                         }
+
+                        if (isDetailsModalOpen()) {
+                            if (isRadialWheelOpen || currentRadialAirport) {
+                                closeAirportRadialMenu(true);
+                                selectedAirport = null;
+                                return;
+                            }
+                            closeRadialDetailsModal();
+                            return;
+                        }
+
                         // When zoomed in, country clicks are completely disabled
                         if (map && typeof map.getZoom === 'function' && map.getZoom() > MAX_COUNTRY_INTERACTION_ZOOM) {
                             if (currentRadialAirport || selectedAirport || activeDrawerMode !== 'MAP') {
@@ -1154,11 +1204,15 @@ async function loadCountryOverlays() {
                         if (isFilterRadialOpen) {
                             closeFilterRadialMenu();
                         }
-                        if (isAirlinesModalOpen() || isDetailsModalOpen()) {
-                            // In airlines or details mode: clicking on map/country MUST NOT exit mode. Only close button does.
-                            return;
+                        if (isAirlinesModalOpen()) {
+                            closeAirportRadialMenu(true);
+                            closeRadialAirlinesModal();
+                        } else if (isDetailsModalOpen()) {
+                            closeAirportRadialMenu(true);
+                            closeRadialDetailsModal();
+                        } else {
+                            closeAirportRadialMenu();
                         }
-                        closeAirportRadialMenu();
                         if (countryClickTimeout) {
                             clearTimeout(countryClickTimeout);
                             countryClickTimeout = null;
@@ -5375,10 +5429,8 @@ function renderAirportsOnMap(airports) {
                 } else if (activeDrawerMode === 'COUNTRY') {
                     focusAirportInCountryMode(currentAp);
                 } else {
-                    if (isAirlinesModalOpen() || isDetailsModalOpen()) {
-                        openAirportRadialMenu(currentAp, this, e);
-                    } else if (currentRadialAirport && currentRadialAirport.icao === currentAp.icao) {
-                        closeAirportRadialMenu();
+                    if (currentRadialAirport && currentRadialAirport.icao === currentAp.icao) {
+                        closeAirportRadialMenu(isAirlinesModalOpen() || isDetailsModalOpen());
                     } else {
                         openAirportRadialMenu(currentAp, this, e);
                     }
@@ -5437,7 +5489,7 @@ function isDetailsModalOpen() {
     return !!(modal && !modal.classList.contains('hidden'));
 }
 
-function closeAirportRadialMenu() {
+function closeAirportRadialMenu(keepModals = false) {
     const radialEl = document.getElementById('airport-radial-menu');
     if (radialEl) {
         radialEl.classList.add('hidden');
@@ -5451,18 +5503,20 @@ function closeAirportRadialMenu() {
         extEl.classList.add('hidden');
         extEl.innerHTML = '';
     }
-    const airlinesModal = document.getElementById('radial-airlines-modal');
-    if (airlinesModal) {
-        airlinesModal.classList.add('hidden');
-        airlinesModal.classList.remove('user-dragged', 'is-inverted');
-        airlinesModal.style.transform = 'translateX(-50%)';
-        airlinesModal.style.top = '545px';
-        airlinesModal.style.bottom = 'auto';
+    if (!keepModals) {
+        const airlinesModal = document.getElementById('radial-airlines-modal');
+        if (airlinesModal) {
+            airlinesModal.classList.add('hidden');
+            airlinesModal.classList.remove('user-dragged', 'is-inverted');
+            airlinesModal.style.transform = 'translateX(-50%)';
+            airlinesModal.style.top = '545px';
+            airlinesModal.style.bottom = 'auto';
+        }
+        hasUserDraggedAirlinesModal = false;
+        airlinesModalUserOffset = { x: 0, y: 0 };
+        isAirlinesModalDragging = false;
+        operatingAirlinesOriginAirport = null;
     }
-    hasUserDraggedAirlinesModal = false;
-    airlinesModalUserOffset = { x: 0, y: 0 };
-    isAirlinesModalDragging = false;
-    operatingAirlinesOriginAirport = null;
     const sectorScenery = document.getElementById('radial-sector-scenery');
     if (sectorScenery) {
         sectorScenery.classList.remove('active-radial-sector');
@@ -5471,15 +5525,17 @@ function closeAirportRadialMenu() {
     if (sectorAirlines) {
         sectorAirlines.classList.remove('active-radial-sector');
     }
-    const detailsModal = document.getElementById('radial-details-modal');
-    if (detailsModal) {
-        detailsModal.classList.add('hidden');
-        detailsModal.classList.remove('user-dragged');
-        detailsModal.style.transform = 'translateX(-50%)';
+    if (!keepModals) {
+        const detailsModal = document.getElementById('radial-details-modal');
+        if (detailsModal) {
+            detailsModal.classList.add('hidden');
+            detailsModal.classList.remove('user-dragged');
+            detailsModal.style.transform = 'translateX(-50%)';
+        }
+        hasUserDraggedDetailsModal = false;
+        detailsModalUserOffset = { x: 0, y: 0 };
+        isDetailsModalDragging = false;
     }
-    hasUserDraggedDetailsModal = false;
-    detailsModalUserOffset = { x: 0, y: 0 };
-    isDetailsModalDragging = false;
     const sectorDetails = document.getElementById('radial-sector-details');
     if (sectorDetails) {
         sectorDetails.classList.remove('active-radial-sector');
@@ -6029,31 +6085,14 @@ function closeRadialAirlinesModal(event) {
         filterAirports();
         updateFilterUI();
     }
-    // Restore the full radial menu wheel on the last selected airport with bounce animation
-    if (radialEl && currentRadialAirport) {
-        panMapToAirport(currentRadialAirport);
-
-        radialEl.classList.remove('hidden', 'radial-quadrants-collapsed');
-        const disc = document.getElementById('radial-backdrop-disc');
-        const sectors = radialEl.querySelectorAll('.radial-sector');
-        const core = document.getElementById('radial-core');
-        if (disc) {
-            disc.style.animation = 'none';
-            void disc.offsetWidth;
-            disc.style.animation = 'radialBackdropPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards';
-        }
-        if (core) {
-            core.style.animation = 'none';
-            void core.offsetWidth;
-            core.style.animation = 'radialCoreBounce 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards';
-        }
-        sectors.forEach((sec, idx) => {
-            sec.style.animation = 'none';
-            void sec.offsetWidth;
-            sec.style.animation = `radialSectorCircularBounce 0.36s cubic-bezier(0.34, 1.56, 0.64, 1) ${(idx * 0.05).toFixed(2)}s both`;
-        });
-        updateRadialMenuPosition(true);
+    // Cleanly close radial menu wheel and reset selected airport
+    if (radialEl) {
+        radialEl.classList.add('hidden');
+        radialEl.classList.remove('radial-quadrants-collapsed');
     }
+    currentRadialAirport = null;
+    currentRadialMarker = null;
+    selectedAirport = null;
 }
 
 function initDraggableAirlinesModal() {
@@ -7389,10 +7428,11 @@ function triggerRadialFullDetails() {
     }
 }
 
-function closeRadialDetailsModal(event) {
+function closeRadialDetailsModal(event, keepRadial = false) {
     if (event) event.stopPropagation();
     const modal = document.getElementById('radial-details-modal');
     const sectorDetails = document.getElementById('radial-sector-details');
+    const radialEl = document.getElementById('airport-radial-menu');
     if (modal) {
         modal.classList.add('hidden');
         modal.classList.remove('user-dragged');
@@ -7404,9 +7444,16 @@ function closeRadialDetailsModal(event) {
     if (sectorDetails) {
         sectorDetails.classList.remove('active-radial-sector');
     }
-    if (currentRadialAirport) {
+    if (keepRadial && currentRadialAirport) {
         panMapToAirport(currentRadialAirport);
         updateRadialMenuPosition(true);
+    } else {
+        if (radialEl) {
+            radialEl.classList.add('hidden');
+        }
+        currentRadialAirport = null;
+        currentRadialMarker = null;
+        selectedAirport = null;
     }
 }
 
@@ -8367,17 +8414,27 @@ window.addEventListener('click', function (e) {
     if (e.button !== 0) return; // Strict Left-Click ONLY
     if (isMapDragging) return; // Do NOT dismiss on drag / pan release
     if (!currentRadialAirport) return;
+
+    const radialEl = document.getElementById('airport-radial-menu');
+    const airlinesModal = document.getElementById('radial-airlines-modal');
+    const detailsModal = document.getElementById('radial-details-modal');
+    const drawerEl = document.getElementById('detail-drawer');
+
+    if (radialEl && radialEl.contains(e.target)) return;
+    if (airlinesModal && airlinesModal.contains(e.target)) return;
+    if (detailsModal && detailsModal.contains(e.target)) return;
+    if (drawerEl && drawerEl.contains(e.target)) return;
+    if (e.target.closest && (e.target.closest('.custom-map-marker') || e.target.closest('#filter-radial-menu'))) return;
+
     if (isAirlinesModalOpen() || isDetailsModalOpen()) {
-        // In airlines or details mode: clicking outside on map MUST NOT exit mode. Only close button does.
+        closeAirportRadialMenu(true);
+        selectedAirport = null;
         return;
     }
 
-    const radialEl = document.getElementById('airport-radial-menu');
     if (radialEl && !radialEl.classList.contains('hidden')) {
-        // If click was outside radial menu and not on an airport marker
-        if (!radialEl.contains(e.target) && !e.target.closest('.custom-map-marker')) {
-            closeAirportRadialMenu();
-        }
+        closeAirportRadialMenu();
+        selectedAirport = null;
     }
 });
 
