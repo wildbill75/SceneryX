@@ -12235,10 +12235,10 @@ function getFilterRadialCategoryItems(categoryKey) {
             const hasHalf = (ratingVal % 1 !== 0);
             let s = '<span class="inline-flex items-center justify-center pointer-events-none select-none" style="color: #fbbf24 !important; gap: 2px;">';
             for (let i = 0; i < full; i++) {
-                s += '<i class="fa-solid fa-star" style="color: #fbbf24 !important; font-size: 19px !important; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.85));"></i>';
+                s += '<i class="fa-solid fa-star" style="color: #fbbf24 !important; font-size: 14.5px !important; filter: drop-shadow(0 1.5px 3px rgba(0,0,0,0.85));"></i>';
             }
             if (hasHalf) {
-                s += '<i class="fa-solid fa-star-half-stroke" style="color: #fbbf24 !important; font-size: 19px !important; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.85));"></i>';
+                s += '<i class="fa-solid fa-star-half-stroke" style="color: #fbbf24 !important; font-size: 14.5px !important; filter: drop-shadow(0 1.5px 3px rgba(0,0,0,0.85));"></i>';
             }
             s += '</span>';
             return s;
