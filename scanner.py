@@ -26,6 +26,33 @@ SNAPSHOT_JSON_PATH = os.path.join(USER_DATA_DIR, "library_snapshot.json")
 
 _CACHED_CONTENT_XML_PATH = None
 
+# High-Performance In-Memory Database Caches
+_AIRPORT_DB_CACHE = None
+_AIRLINES_DB_CACHE = None
+_ROUTES_DB_CACHE = None
+_RUNWAYS_DB_CACHE = None
+
+# Precompiled Regular Expressions for High-Throughput Scanning
+RE_CLEAN_PREFIX = re.compile(r'^(community|official)?(fs20|fs24)?-?', re.IGNORECASE)
+RE_SPLIT_SEPARATORS = re.compile(r'[-_ ]+')
+RE_SPLIT_DOT_SEPARATORS = re.compile(r'[-_.\s]+')
+RE_SPLIT_NON_ALPHANUM = re.compile(r'[^a-z0-9]+')
+RE_NON_ALPHANUM = re.compile(r'[^a-z0-9]')
+RE_GSX_AFCAD = re.compile(r'^\s*afcad_path\s*=\s*(.+)', re.IGNORECASE)
+RE_GSX_SCENARIO = re.compile(r'^\s*scenario\s*=\s*(.+)', re.IGNORECASE)
+RE_GSX_CREATOR = re.compile(r'^\s*creator\s*=\s*(.+)', re.IGNORECASE)
+RE_GSX_VERSION = re.compile(r'^\s*version\s*=\s*["\']?([^"\'\r\n]+)["\']?', re.IGNORECASE)
+RE_GSX_GATE_COUNT = re.compile(r'\[(?:gate|rwy|parking)\s+[^\]]+\]', re.IGNORECASE)
+RE_GSX_CUSTOMIZED_NAME = re.compile(r'CustomizedName\s*\(', re.IGNORECASE)
+RE_GSX_COMMENT_SCENERY = re.compile(r'^(?:scenery|scene|studio|designed\s+for|for\s+scenery|for|target)\s*[-:=]\s*(.+)', re.IGNORECASE)
+RE_GSX_COMMENT_AUTHOR = re.compile(r'^(?:creator|author|by|made\s+by)\s*[-:=]\s*(.+)', re.IGNORECASE)
+RE_GSX_COMMENT_VERSION = re.compile(r'^version\s*[-:=]?\s*([0-9.]+)', re.IGNORECASE)
+RE_AIRPORT_CLEAN_WORDS = re.compile(r'\b(airport|international|heliport|regional|airbase|field|afb|rnas|raf)\b')
+RE_TOKEN_PREFIX_ICAO = re.compile(r'^([a-zA-Z]{4})(?:light|fix|lighting|night|scene|patch|jetway|taxiway|rwy|runway|\d)')
+RE_ISOLATED_ICAO = re.compile(r'(?:^|[-_ \d])([A-Za-z]{4})(?=$|[-_ \d])')
+RE_BGL_ICAO = re.compile(r'(?:^|[/\-_])([a-zA-Z]{4})(?:[-_.](?:airport|scenery|ap|runway|fix|patch))?\.bgl', re.IGNORECASE)
+RE_SCENERY_ICAO = re.compile(r'scenery[/\\](?:airports[/\\])?(?:world[/\\]scenery[/\\])?(?:airport-)?([A-Za-z]{4})[._/\\]', re.IGNORECASE)
+
 def get_content_xml_path():
     global _CACHED_CONTENT_XML_PATH
     if _CACHED_CONTENT_XML_PATH and os.path.exists(_CACHED_CONTENT_XML_PATH):
@@ -182,6 +209,15 @@ VENDOR_MAP = {
     'redwing': 'Redwing Simulations',
     'jetstream': 'Jetstream Designs',
     'fsdreamteam': 'FSDreamTeam'
+}
+
+VENDOR_SHORT_KEYS_RE = {
+    key: re.compile(rf'(^|[-_ ]){re.escape(key)}([-_ ]|$)')
+    for key in VENDOR_MAP if len(key) <= 3
+}
+VENDOR_SHORT_KEYS_WORD_RE = {
+    key: re.compile(rf'\b{re.escape(key)}\b')
+    for key in VENDOR_MAP if len(key) <= 3
 }
 
 EXCLUDE_WORDS = {
@@ -1017,18 +1053,6 @@ def _normalize_pkg(pkg_name):
     cleaned = re.sub(r'(airport|scenery|scene)$', '', cleaned)
     return cleaned
 
-def normalize_studio_name(name):
-    if not name:
-        return ''
-    cleaned = re.sub(r'[^a-z0-9]', '', name.lower())
-    for suffix in ['simulations', 'simulation', 'studios', 'studio', 'designs', 'design', 'scenery', 'sceneries', 'airports', 'airport', 'team', 'devco', 'dev']:
-        if cleaned.endswith(suffix) and len(cleaned) > len(suffix) + 2:
-            cleaned = cleaned[:-len(suffix)]
-            break
-    if cleaned.endswith('s') and len(cleaned) > 4:
-        cleaned = cleaned[:-1]
-    return cleaned
-
 def detect_studio_from_text(text):
     if not text:
         return None
@@ -1204,32 +1228,32 @@ def parse_single_gsx_ini(content='', filename='', file_path='', is_disabled=Fals
                 continue
             if line_s.startswith(('#', ';', '//', '--')):
                 c_text = line_s.lstrip('#;/ -').strip()
-                m_scen = re.search(r'^(?:scenery|scene|studio|designed\s+for|for\s+scenery|for|target)\s*[-:=]\s*(.+)', c_text, re.IGNORECASE)
+                m_scen = RE_GSX_COMMENT_SCENERY.search(c_text)
                 if m_scen and not comment_scenery:
                     comment_scenery = m_scen.group(1).strip()
-                m_auth = re.search(r'^(?:creator|author|by|made\s+by)\s*[-:=]\s*(.+)', c_text, re.IGNORECASE)
+                m_auth = RE_GSX_COMMENT_AUTHOR.search(c_text)
                 if m_auth and not comment_author:
                     comment_author = m_auth.group(1).strip()
-                m_ver = re.search(r'^version\s*[-:=]?\s*([0-9.]+)', c_text, re.IGNORECASE)
+                m_ver = RE_GSX_COMMENT_VERSION.search(c_text)
                 if m_ver and not ver_str:
                     ver_str = m_ver.group(1).strip()
             
-            afcad_m = re.search(r'^afcad_path\s*=\s*(.+)', line_s, re.IGNORECASE)
+            afcad_m = RE_GSX_AFCAD.search(line_s)
             if afcad_m and not afcad:
                 afcad = afcad_m.group(1).strip()
-            scen_m = re.search(r'^scenario\s*=\s*(.+)', line_s, re.IGNORECASE)
+            scen_m = RE_GSX_SCENARIO.search(line_s)
             if scen_m and not scenario:
                 scenario = scen_m.group(1).strip()
-            creat_m = re.search(r'^creator\s*=\s*(.+)', line_s, re.IGNORECASE)
+            creat_m = RE_GSX_CREATOR.search(line_s)
             if creat_m and not creator:
                 creator = creat_m.group(1).strip()
-            v_m = re.search(r'^version\s*=\s*["\']?([^"\'\r\n]+)["\']?', line_s, re.IGNORECASE)
+            v_m = RE_GSX_VERSION.search(line_s)
             if v_m and not ver_str:
                 ver_str = v_m.group(1).strip()
 
-        gates_count = len(re.findall(r'\[(?:gate|rwy|parking)\s+[^\]]+\]', content, re.IGNORECASE))
+        gates_count = len(RE_GSX_GATE_COUNT.findall(content))
         if gates_count == 0:
-            gates_count = len(re.findall(r'CustomizedName\s*\(', content, re.IGNORECASE))
+            gates_count = len(RE_GSX_CUSTOMIZED_NAME.findall(content))
 
     if afcad:
         parts = afcad.replace('/', '\\').split('\\')
@@ -1778,6 +1802,10 @@ def save_settings(settings_data):
     return settings_data
 
 def load_airport_database():
+    global _AIRPORT_DB_CACHE
+    if _AIRPORT_DB_CACHE is not None:
+        return _AIRPORT_DB_CACHE
+
     if not os.path.exists(AIRPORT_DB_PATH):
         return {}, {}, {}
     
@@ -1813,24 +1841,26 @@ def load_airport_database():
         name = ap.get('name')
         if name:
             n_lower = name.lower().strip()
-            clean_n = re.sub(r'\b(airport|international|heliport|regional|airbase|field|afb|rnas|raf)\b', '', n_lower).strip()
+            clean_n = RE_AIRPORT_CLEAN_WORDS.sub('', n_lower).strip()
             if len(clean_n) > 3:
                 if clean_n not in name_index:
                     name_index[clean_n] = []
                 name_index[clean_n].append(ap)
                 
-    return airports, city_index, name_index
+    _AIRPORT_DB_CACHE = (airports, city_index, name_index)
+    return _AIRPORT_DB_CACHE
 
 def get_clean_vendor(folder_name, manifest_data):
     fn_lower = folder_name.lower()
 
     # Strip system prefixes (e.g. communityfs20-, fs24-, etc.)
-    clean_fn = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn_lower)
+    clean_fn = RE_CLEAN_PREFIX.sub('', fn_lower)
 
     # 1. Check cleaned folder name against VENDOR_MAP first (Folder naming is almost always higher quality than manifest fields)
     for key, pretty_name in VENDOR_MAP.items():
         if len(key) <= 3:
-            if re.search(rf'(^|[-_ ]){re.escape(key)}([-_ ]|$)', clean_fn):
+            pat = VENDOR_SHORT_KEYS_RE.get(key)
+            if pat and pat.search(clean_fn):
                 return pretty_name
         elif key in clean_fn:
             return pretty_name
@@ -1845,7 +1875,8 @@ def get_clean_vendor(folder_name, manifest_data):
 
         for key, pretty_name in VENDOR_MAP.items():
             if len(key) <= 3:
-                if re.search(rf'\b{re.escape(key)}\b', c_check):
+                pat = VENDOR_SHORT_KEYS_WORD_RE.get(key)
+                if pat and pat.search(c_check):
                     return pretty_name
             elif key in c_check:
                 return pretty_name
@@ -1925,6 +1956,8 @@ def run_scan():
 
     content_xml_status = {}
     content_xml_packages = []
+    disabled_in_xml = set()
+    pkg_names_scanned = set()
     content_xml_path = get_content_xml_path()
     if os.path.exists(content_xml_path):
         try:
@@ -1933,15 +1966,21 @@ def run_scan():
             root = tree.getroot()
             for p in root.findall('Package'):
                 pkg_name = p.get('name', '')
+                clean_pkg = pkg_name.lower()
+                pkg_names_scanned.add(clean_pkg)
                 act = p.get('active', 'Activated')
                 clean_folder = pkg_name[:-9] if pkg_name.endswith('.disabled') else pkg_name
-                folder_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_folder.lower())
+                clean_lower = clean_folder.lower()
+                folder_norm = RE_CLEAN_PREFIX.sub('', clean_lower)
                 is_active = (act == 'Activated')
 
-                if clean_folder.lower() not in content_xml_status:
-                    content_xml_status[clean_folder.lower()] = is_active
+                if act == 'UserDisabled' or not is_active:
+                    disabled_in_xml.add(clean_lower)
+
+                if clean_lower not in content_xml_status:
+                    content_xml_status[clean_lower] = is_active
                 else:
-                    content_xml_status[clean_folder.lower()] = content_xml_status[clean_folder.lower()] or is_active
+                    content_xml_status[clean_lower] = content_xml_status[clean_lower] or is_active
 
                 if folder_norm not in content_xml_status:
                     content_xml_status[folder_norm] = is_active
@@ -1978,40 +2017,25 @@ def run_scan():
                 pass
 
     # Dynamic discovery of StreamedPackages & Official packages listed in Content.xml
-    def _normalize_pkg(f_name):
+    def _normalize_streamed_pkg(f_name):
         c = f_name[:-9] if f_name.lower().endswith('.disabled') else f_name
-        n = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', c.lower())
+        n = RE_CLEAN_PREFIX.sub('', c.lower())
         n = re.sub(r'-(airport|scenery|pack|project)-', '-', n)
         n = re.sub(r'-(munich|istanbul|london|paris|frankfurt|berlin|tokyo|chicago|newyork|barcelona|madrid|rome)-', '-', n)
         return n
 
-    existing_norms = {_normalize_pkg(f) for _, f, _, _ in all_packages}
+    existing_norms = {_normalize_streamed_pkg(f) for _, f, _, _ in all_packages}
     for pkg_name, clean_f, is_dis in content_xml_packages:
         # Ignore uninstalled 3rd-party community packages left over in Content.xml
         p_lower = pkg_name.lower()
         if p_lower.startswith('community') or 'community' in p_lower:
             continue
-        fn_norm = _normalize_pkg(clean_f)
+        fn_norm = _normalize_streamed_pkg(clean_f)
         if fn_norm not in existing_norms:
             all_packages.append(("MSFS 2024 - StreamedPackages", clean_f, "", is_dis))
             existing_norms.add(fn_norm)
 
     detected_map = {}
-
-    disabled_in_xml = set()
-    content_xml_path = get_content_xml_path()
-    if os.path.exists(content_xml_path):
-        try:
-            import xml.etree.ElementTree as ET
-            tree = ET.parse(content_xml_path)
-            root = tree.getroot()
-            for p in root.findall('Package'):
-                if p.get('active') == 'UserDisabled':
-                    name = p.get('name', '').lower()
-                    clean = name[:-9] if name.endswith('.disabled') else name
-                    disabled_in_xml.add(clean.lower())
-        except Exception:
-            pass
 
     def get_source_priority(cat_name):
         c_lower = cat_name.lower()
@@ -2324,24 +2348,12 @@ def run_scan():
         dynamic_asobo_set.update(ASOBO_PREMIUM_DELUXE_ICAOS)
 
     # Scan package names from Content.xml and physical/streamed folders for new official airports
-    pkg_names_scanned = set()
-    content_xml_path = get_content_xml_path()
-    if os.path.exists(content_xml_path):
-        try:
-            import xml.etree.ElementTree as ET
-            tree = ET.parse(content_xml_path)
-            root = tree.getroot()
-            for p in root.findall('Package'):
-                name = p.get('name', '').lower()
-                pkg_names_scanned.add(name)
-        except Exception: pass
-
     for _, f_item, _, _ in all_packages:
         pkg_names_scanned.add(f_item.lower())
 
     for p_name in pkg_names_scanned:
         if any(k in p_name for k in ['asobo-airport-', 'microsoft-airport-', 'worldupdate', 'cityupdate']):
-            tokens = re.split(r'[-_ ]+', p_name)
+            tokens = RE_SPLIT_SEPARATORS.split(p_name)
             for t in tokens:
                 t_u = t.upper()
                 if len(t_u) == 4 and t_u in airports and t_u not in dynamic_asobo_set:
@@ -2441,7 +2453,7 @@ def run_scan():
             )
             for s in sorted_srcs:
                 fn = s.get('folder_name', '')
-                fn_norm = _normalize_pkg(fn)
+                fn_norm = _normalize_streamed_pkg(fn)
                 if fn_norm not in seen_norms:
                     seen_norms.add(fn_norm)
                     unique_srcs.append(s)
@@ -2571,33 +2583,46 @@ def run_scan():
             if not item.get('is_custom_price'):
                 item['price_eur'] = round(b_total / max(1, b_count), 2)
 
-    # Load Operating Airlines Database & Routes Database
-    AIRLINES_DB = {}
-    AIRLINES_DB_PATH = get_resource_file_path("airport_airlines.json")
-    if os.path.exists(AIRLINES_DB_PATH):
-        try:
-            with open(AIRLINES_DB_PATH, 'r', encoding='utf-8') as f:
-                AIRLINES_DB = json.load(f)
-        except Exception as e:
-            print("Error loading airport_airlines.json:", e)
+    # Load Operating Airlines Database & Routes Database (In-Memory Cached)
+    global _AIRLINES_DB_CACHE, _ROUTES_DB_CACHE, _RUNWAYS_DB_CACHE
+    if _AIRLINES_DB_CACHE is None:
+        AIRLINES_DB_PATH = get_resource_file_path("airport_airlines.json")
+        if os.path.exists(AIRLINES_DB_PATH):
+            try:
+                with open(AIRLINES_DB_PATH, 'r', encoding='utf-8') as f:
+                    _AIRLINES_DB_CACHE = json.load(f)
+            except Exception as e:
+                print("Error loading airport_airlines.json:", e)
+                _AIRLINES_DB_CACHE = {}
+        else:
+            _AIRLINES_DB_CACHE = {}
+    AIRLINES_DB = _AIRLINES_DB_CACHE
 
-    ROUTES_DB = {}
-    ROUTES_DB_PATH = get_resource_file_path("airport_routes.json")
-    if os.path.exists(ROUTES_DB_PATH):
-        try:
-            with open(ROUTES_DB_PATH, 'r', encoding='utf-8') as f:
-                ROUTES_DB = json.load(f)
-        except Exception as e:
-            print("Error loading airport_routes.json:", e)
+    if _ROUTES_DB_CACHE is None:
+        ROUTES_DB_PATH = get_resource_file_path("airport_routes.json")
+        if os.path.exists(ROUTES_DB_PATH):
+            try:
+                with open(ROUTES_DB_PATH, 'r', encoding='utf-8') as f:
+                    _ROUTES_DB_CACHE = json.load(f)
+            except Exception as e:
+                print("Error loading airport_routes.json:", e)
+                _ROUTES_DB_CACHE = {}
+        else:
+            _ROUTES_DB_CACHE = {}
+    ROUTES_DB = _ROUTES_DB_CACHE
 
-    RUNWAYS_DB = {}
-    RUNWAYS_DB_PATH = get_resource_file_path("airport_runways.json")
-    if os.path.exists(RUNWAYS_DB_PATH):
-        try:
-            with open(RUNWAYS_DB_PATH, 'r', encoding='utf-8') as f:
-                RUNWAYS_DB = json.load(f)
-        except Exception as e:
-            print("Error loading airport_runways.json:", e)
+    if _RUNWAYS_DB_CACHE is None:
+        RUNWAYS_DB_PATH = get_resource_file_path("airport_runways.json")
+        if os.path.exists(RUNWAYS_DB_PATH):
+            try:
+                with open(RUNWAYS_DB_PATH, 'r', encoding='utf-8') as f:
+                    _RUNWAYS_DB_CACHE = json.load(f)
+            except Exception as e:
+                print("Error loading airport_runways.json:", e)
+                _RUNWAYS_DB_CACHE = {}
+        else:
+            _RUNWAYS_DB_CACHE = {}
+    RUNWAYS_DB = _RUNWAYS_DB_CACHE
 
     # Scan GSX Profiles
     gsx_path_cfg = settings.get("gsx_profile_path", get_default_gsx_path())

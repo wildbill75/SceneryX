@@ -59,6 +59,8 @@ window.gsxAuditData = null;
 const airportMarkerCache = new Map();
 const customDivIconCache = new Map();
 let airportsByIcao = new Map();
+let isAirportsIndexDirty = true;
+let lastIndexedAirportsRef = null;
 
 function rebuildAirportsByIcaoIndex() {
     airportsByIcao.clear();
@@ -68,11 +70,13 @@ function rebuildAirportsByIcaoIndex() {
             airportsByIcao.set(String(ap.icao).toUpperCase().trim(), ap);
         }
     }
+    isAirportsIndexDirty = false;
+    lastIndexedAirportsRef = allAirportsData;
 }
 
 function getAirportByIcao(icao) {
     if (!icao) return null;
-    if (airportsByIcao.size !== allAirportsData.length) {
+    if (isAirportsIndexDirty || lastIndexedAirportsRef !== allAirportsData || airportsByIcao.size === 0) {
         rebuildAirportsByIcaoIndex();
     }
     const clean = String(icao).toUpperCase().trim();
@@ -312,9 +316,12 @@ function getCountryFlagEmoji(iso) {
 
 function buildAirportSearchKey(ap) {
     if (!ap) return '';
+    if (ap._searchKey) return ap._searchKey;
     const raw = `${ap.icao || ''} ${ap.iata || ''} ${ap.name || ''} ${ap.city || ''} ${ap.country || ''} ${ap.iso_country || ''} ${ap.package_name || ''} ${ap.vendor || ''}`.toLowerCase();
     const normalized = raw.normalize ? raw.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : raw;
-    return raw + ' ' + normalized;
+    const key = raw + ' ' + normalized;
+    ap._searchKey = key;
+    return key;
 }
 
 let selectedCountryPricingFilters = new Set(['PAYWARE', 'FREEWARE', 'ASOBO', 'DEFAULT']);
@@ -4539,7 +4546,7 @@ function proceedWithGsxDropInstallation(targetIcao, installPayload, evalRes) {
 
     if (isIncomingMismatch) {
         showCustomModal({
-            title: t('gsx.drop_mismatch_title', `Incompatible GSX Profile (${targetIcao})`, { icao: targetIcao }),
+            title: t('gsx.drop_incompatible_title', `Incompatible GSX Profile (${targetIcao})`, { icao: targetIcao }),
             message: `
                 <div class="space-y-3 text-left">
                     <div class="p-3.5 rounded-2xl bg-rose-950/60 border border-rose-800/70 space-y-1.5">
@@ -11344,13 +11351,15 @@ function filterAirports() {
         }
     }
 
+    const searchIso = search ? (COUNTRY_NAME_TO_ISO[search] || (search.length === 2 ? search.toUpperCase() : null)) : null;
+    const normalizedSearch = (search && search.normalize) ? search.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : search;
+
     currentlyFilteredAirports = allAirportsData.filter(ap => {
         // High Priority: Origin Airport & Direct Airline Route Destinations (Bypasses global filters)
         if (activeRouteDestIcaos) {
             if (ap.icao === activeRouteOrigin.icao || activeRouteDestIcaos.has(ap.icao)) {
                 if (search && search.length > 0) {
-                    const searchStr = buildAirportSearchKey(ap);
-                    const normalizedSearch = search.normalize ? search.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : search;
+                    const searchStr = ap._searchKey || buildAirportSearchKey(ap);
                     if (!searchStr.includes(search) && !searchStr.includes(normalizedSearch)) return false;
                 }
                 return true;
@@ -11496,18 +11505,13 @@ function filterAirports() {
 
         // High-performance search text filtering via pre-computed _searchKey
         if (search) {
-            const searchIso = COUNTRY_NAME_TO_ISO[search] || (search.length === 2 ? search.toUpperCase() : null);
-            const apIso = ((ap.country || ap.iso_country || '').toString()).toUpperCase().trim();
-
             if (searchIso) {
                 // If search query is a country name, match airports in that country ISO!
+                const apIso = ((ap.country || ap.iso_country || '').toString()).toUpperCase().trim();
                 if (apIso !== searchIso) return false;
             } else {
-                if (!ap._searchKey) {
-                    ap._searchKey = buildAirportSearchKey(ap);
-                }
-                const normalizedSearch = search.normalize ? search.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : search;
-                if (!ap._searchKey.includes(search) && !ap._searchKey.includes(normalizedSearch)) return false;
+                const searchStr = ap._searchKey || buildAirportSearchKey(ap);
+                if (!searchStr.includes(search) && !searchStr.includes(normalizedSearch)) return false;
             }
         }
 
