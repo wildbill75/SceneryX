@@ -12233,26 +12233,39 @@ function getFilterRadialCategoryItems(categoryKey) {
         const createStarHtml = (ratingVal) => {
             const full = Math.floor(ratingVal);
             const hasHalf = (ratingVal % 1 !== 0);
-            let s = '<span class="inline-flex items-center text-amber-400 mr-1.5 gap-[1px] pointer-events-none">';
+            let s = '<span class="inline-flex items-center justify-center pointer-events-none select-none" style="color: #fbbf24 !important; gap: 2px;">';
             for (let i = 0; i < full; i++) {
-                s += '<i class="fa-solid fa-star text-[9px]"></i>';
+                s += '<i class="fa-solid fa-star" style="color: #fbbf24 !important; font-size: 19px !important; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.85));"></i>';
             }
             if (hasHalf) {
-                s += '<i class="fa-solid fa-star-half-stroke text-[9px]"></i>';
+                s += '<i class="fa-solid fa-star-half-stroke" style="color: #fbbf24 !important; font-size: 19px !important; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.85));"></i>';
             }
             s += '</span>';
             return s;
         };
 
         const isAllRatings = (!selectedMinRating || selectedMinRating === 0);
-        return [
-            { id: '0', label: t('radial.all_ratings', 'All Ratings'), htmlLabel: `<span>${t('radial.all_ratings', 'ALL RATINGS')}</span>`, isActive: isAllRatings },
-            { id: '3.0', label: `3.0★ ${t('radial.and_up', '& Up')}`, htmlLabel: `${createStarHtml(3.0)}<span>${t('radial.and_up', '& UP')}</span>`, isActive: isAllRatings || selectedMinRating === 3.0 },
-            { id: '3.5', label: `3.5★ ${t('radial.and_up', '& Up')}`, htmlLabel: `${createStarHtml(3.5)}<span>${t('radial.and_up', '& UP')}</span>`, isActive: isAllRatings || selectedMinRating === 3.5 },
-            { id: '4.0', label: `4.0★ ${t('radial.and_up', '& Up')}`, htmlLabel: `${createStarHtml(4.0)}<span>& UP</span>`, isActive: isAllRatings || selectedMinRating === 4.0 },
-            { id: '4.5', label: `4.5★ ${t('radial.and_up', '& Up')}`, htmlLabel: `${createStarHtml(4.5)}<span>${t('radial.and_up', '& UP')}</span>`, isActive: isAllRatings || selectedMinRating === 4.5 },
-            { id: '5.0', label: `5.0★ ${t('radial.only', 'Only')}`, htmlLabel: `${createStarHtml(5.0)}<span>${t('radial.only', 'ONLY')}</span>`, isActive: isAllRatings || selectedMinRating === 5.0 }
+        const ratingSteps = [1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0];
+
+        const ratingItems = [
+            {
+                id: '0',
+                label: t('radial.all_ratings', 'All Ratings'),
+                htmlLabel: `<span class="text-[10.5px] font-black tracking-wider uppercase">${t('radial.all_ratings', 'ALL RATINGS')}</span>`,
+                isActive: isAllRatings
+            }
         ];
+
+        ratingSteps.forEach(val => {
+            ratingItems.push({
+                id: val.toFixed(1),
+                label: `${val.toFixed(1)}★`,
+                htmlLabel: createStarHtml(val),
+                isActive: isAllRatings || selectedMinRating === val
+            });
+        });
+
+        return ratingItems;
     }
     return [];
 }
@@ -12395,9 +12408,9 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
         let itemSpan = 360 / itemCount;
         let startAngle = -90;
 
-        if (itemCount < 10) {
+        if (filterRadialActiveCategory !== 'region') {
             // Fan out symmetrically centered on the active category (Screen 1 style)
-            itemSpan = itemCount <= 4 ? 42 : (itemCount === 5 ? 38 : 34);
+            itemSpan = itemCount <= 4 ? 42 : (itemCount === 5 ? 38 : (itemCount <= 6 ? 34 : 29.5));
             const totalSpan = itemCount * itemSpan;
             startAngle = catMidAngle - (totalSpan / 2);
         }
@@ -12436,6 +12449,11 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
             }
 
             const formattedItemLabel = item.htmlLabel || formatFilterRadialLabel(item.label);
+            const isRatingCategory = (filterRadialActiveCategory === 'rating');
+            const foW = isRatingCategory ? 122 : 112;
+            const foH = isRatingCategory ? 46 : 40;
+            const foX = (tx - (foW / 2)).toFixed(1);
+            const foY = (ty - (foH / 2)).toFixed(1);
 
             outerSvgHtml += `
                 <g class="radial-filter-sector radial-filter-tier2-sector ${animClass} ${specificClass} ${isActive ? 'is-item-active' : ''} pointer-events-auto cursor-pointer group"
@@ -12445,9 +12463,9 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
                    onclick="handleFilterRadialSubItemClick('${filterRadialActiveCategory}', '${escapeJsStr(item.id)}')"
                    role="button" aria-label="${escapeHtml(item.label)}">
                     <path class="radial-filter-sector-path" ${inlinePathStyle} d="${pathD}" />
-                    <foreignObject x="${(tx - 56).toFixed(1)}" y="${(ty - 20).toFixed(1)}" width="112" height="40" class="pointer-events-none">
+                    <foreignObject x="${foX}" y="${foY}" width="${foW}" height="${foH}" class="pointer-events-none">
                         <div class="w-full h-full flex items-center justify-center text-center px-1">
-                            <span class="text-[9.5px] font-bold tracking-tight uppercase leading-tight inline-flex items-center justify-center text-center ${isActive ? 'text-white font-extrabold' : 'text-slate-200 group-hover:text-white'}">${formattedItemLabel}</span>
+                            <span class="${isRatingCategory ? '' : 'text-[9.5px] font-bold tracking-tight uppercase leading-tight'} inline-flex items-center justify-center text-center ${isActive ? 'text-white font-extrabold' : 'text-slate-200 group-hover:text-white'}">${formattedItemLabel}</span>
                         </div>
                     </foreignObject>
                 </g>
