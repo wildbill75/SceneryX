@@ -1604,10 +1604,32 @@ class Api:
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
 
-    def browse_folder(self):
+    def browse_folder(self, initial_directory=""):
         try:
             window = webview.windows[0]
-            result = window.create_file_dialog(webview.FOLDER_DIALOG)
+            valid_dir = ""
+            if initial_directory and isinstance(initial_directory, str):
+                cleaned = initial_directory.strip().strip('"').strip("'")
+                if cleaned:
+                    norm = os.path.normpath(cleaned)
+                    if os.path.isdir(norm):
+                        valid_dir = norm
+                    elif os.path.isfile(norm):
+                        valid_dir = os.path.dirname(norm)
+                    else:
+                        parent = os.path.dirname(norm)
+                        while parent and parent != norm:
+                            if os.path.isdir(parent):
+                                valid_dir = parent
+                                break
+                            norm = parent
+                            parent = os.path.dirname(norm)
+
+            if not valid_dir or not os.path.exists(valid_dir):
+                valid_dir = os.path.expanduser("~")
+
+            valid_dir = os.path.abspath(valid_dir)
+            result = window.create_file_dialog(webview.FOLDER_DIALOG, directory=valid_dir)
             if result and len(result) > 0:
                 return result[0]
         except Exception as e:

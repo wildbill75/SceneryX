@@ -1646,8 +1646,11 @@
                     <label data-i18n="settings.gsx_directory" class="text-xs font-bold text-slate-400 uppercase tracking-wider block">GSX Profile Directory (.ini)</label>
                     <div class="flex items-center gap-2">
                         <input type="text" id="cfg-gsx-path" placeholder="C:\Users\...\AppData\Roaming\Virtuali\GSX\MSFS" class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500">
-                        <button onclick="browseGsxFolder()" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition-colors flex items-center gap-1.5 shrink-0 border-0 cursor-pointer group">
+                        <button onclick="browseGsxFolder()" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition-colors flex items-center gap-1.5 shrink-0 border-0 cursor-pointer group" title="Browse / Change Folder">
                             <i class="fa-solid fa-folder text-slate-400 group-hover:text-white transition-colors"></i> <span data-i18n="settings.browse">Browse</span>
+                        </button>
+                        <button onclick="openGsxFolderInExplorer()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition-colors flex items-center justify-center shrink-0 border-0 cursor-pointer group" title="Open in Windows Explorer">
+                            <i class="fa-solid fa-arrow-up-right-from-square text-slate-400 group-hover:text-white transition-colors"></i>
                         </button>
                     </div>
                 </div>

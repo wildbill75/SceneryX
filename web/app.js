@@ -13714,14 +13714,24 @@ async function executeGsxInstallation({ filePath = '', base64Data = '', filename
 async function browseGsxFolder() {
     try {
         if (window.pywebview) {
-            const folder = await window.pywebview.api.browse_folder();
+            const inputEl = document.getElementById('cfg-gsx-path');
+            const currentPath = (inputEl && inputEl.value.trim()) || currentSettings.gsx_profile_path || '';
+            const folder = await window.pywebview.api.browse_folder(currentPath);
             if (folder) {
-                document.getElementById('cfg-gsx-path').value = folder;
+                if (inputEl) inputEl.value = folder;
                 currentSettings.gsx_profile_path = folder;
             }
         }
     } catch (e) {
         console.error("Browse GSX folder error:", e);
+    }
+}
+
+function openGsxFolderInExplorer() {
+    const inputEl = document.getElementById('cfg-gsx-path');
+    const p = (inputEl && inputEl.value.trim()) || currentSettings.gsx_profile_path;
+    if (window.pywebview && window.pywebview.api && p) {
+        window.pywebview.api.open_folder(p);
     }
 }
 
@@ -13821,8 +13831,11 @@ function renderSettingsPathsList() {
                     <input type="text" value="${item.path || ''}" 
                            oninput="updatePathValue(${index}, this.value)"
                            class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs font-mono text-slate-300 focus:outline-none focus:border-cyan-500">
-                    <button onclick="browsePathFolder(${index})" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs transition-colors flex items-center gap-1.5 border-0 cursor-pointer" title="Browse Folder">
+                    <button onclick="browsePathFolder(${index})" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs transition-colors flex items-center gap-1.5 border-0 cursor-pointer" title="Browse / Change Folder">
                         <i class="fa-solid fa-folder text-slate-400 group-hover:text-white transition-colors"></i>
+                    </button>
+                    <button onclick="openPathInExplorer(${index})" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs transition-colors flex items-center justify-center border-0 cursor-pointer" title="Open in Windows Explorer">
+                        <i class="fa-solid fa-arrow-up-right-from-square text-slate-400 group-hover:text-white transition-colors"></i>
                     </button>
                 </div>
             </div>
@@ -13861,9 +13874,19 @@ function togglePathEnabled(index, checked) {
     }
 }
 
+function openPathInExplorer(index) {
+    const item = currentSettings.scan_paths && currentSettings.scan_paths[index];
+    const p = (item && item.path) ? item.path.trim() : '';
+    if (window.pywebview && window.pywebview.api && p) {
+        window.pywebview.api.open_folder(p);
+    }
+}
+
 async function browsePathFolder(index) {
     if (window.pywebview) {
-        const folder = await window.pywebview.api.browse_folder();
+        const item = currentSettings.scan_paths && currentSettings.scan_paths[index];
+        const currentPath = (item && item.path) ? item.path.trim() : '';
+        const folder = await window.pywebview.api.browse_folder(currentPath);
         if (folder) {
             currentSettings.scan_paths[index].path = folder;
             renderSettingsPathsList();
