@@ -979,11 +979,19 @@ function initMap() {
     window.addEventListener('resize', () => updateRadialMenuPosition(false));
 
     // Double click on neutral map area: resets camera according to priority hierarchy
+    // If in search mode, acts exactly like clearing search (full reset + camera fly to startup region)
     map.on('dblclick', () => {
         if (countryClickTimeout) {
             clearTimeout(countryClickTimeout);
             countryClickTimeout = null;
         }
+        const searchInp = document.getElementById('search-input');
+        const isSearchActive = (searchInp && searchInp.value.trim().length > 0) || Boolean(selectedCountryCode);
+        if (isSearchActive) {
+            clearSearch(true);
+            return;
+        }
+
         if (activeDrawerMode !== 'MAP' || selectedAirport || selectedCountryCode) {
             closeDrawerWithoutCameraChange();
         }
@@ -1041,6 +1049,21 @@ function setDrawerSlidePosition(mode) {
     }
 }
 
+function resetCameraToStartupRegion() {
+    if (!map) return;
+    const PAN_DURATION = (currentSettings && currentSettings.camera_pan_duration !== undefined)
+        ? parseFloat(currentSettings.camera_pan_duration)
+        : 0.8;
+    const regKey = currentSettings && currentSettings.camera_startup_region;
+    if (regKey && regKey !== 'world' && regKey !== 'default' && REGION_VIEWPORTS[regKey]) {
+        const vp = REGION_VIEWPORTS[regKey];
+        map.flyTo(vp.center, vp.zoom, { animate: true, duration: PAN_DURATION });
+        return;
+    }
+    // Default global World view
+    map.flyTo([25.0, 10.0], 3.0, { animate: true, duration: PAN_DURATION });
+}
+
 function resetCameraToDefaultView() {
     if (!map) return;
     const PAN_DURATION = (currentSettings && currentSettings.camera_pan_duration !== undefined)
@@ -1052,15 +1075,8 @@ function resetCameraToDefaultView() {
         map.flyTo(vp.center, vp.zoom, { animate: true, duration: PAN_DURATION });
         return;
     }
-    // Priority 2: Startup camera region configured in user Settings
-    const regKey = currentSettings && currentSettings.camera_startup_region;
-    if (regKey && regKey !== 'world' && regKey !== 'default' && REGION_VIEWPORTS[regKey]) {
-        const vp = REGION_VIEWPORTS[regKey];
-        map.flyTo(vp.center, vp.zoom, { animate: true, duration: PAN_DURATION });
-        return;
-    }
-    // Priority 3: Default global World view
-    map.flyTo([25.0, 10.0], 3.0, { animate: true, duration: PAN_DURATION });
+    // Priority 2 & 3: Startup camera region configured in user Settings or World view
+    resetCameraToStartupRegion();
 }
 
 function closeDrawerWithoutCameraChange() {
@@ -1217,6 +1233,14 @@ async function loadCountryOverlays() {
                             clearTimeout(countryClickTimeout);
                             countryClickTimeout = null;
                         }
+
+                        const searchInp = document.getElementById('search-input');
+                        const isSearchActive = (searchInp && searchInp.value.trim().length > 0) || Boolean(selectedCountryCode);
+                        if (isSearchActive) {
+                            clearSearch(true);
+                            return;
+                        }
+
                         if (activeDrawerMode !== 'MAP' || selectedAirport || selectedCountryCode) {
                             closeDrawerWithoutCameraChange();
                         }
@@ -11642,10 +11666,14 @@ function resetAllFiltersToDefault(skipFilter = false) {
 }
 
 let searchDebounceTimer = null;
+let previousSearchValue = '';
 function debouncedFilterAirports() {
     const searchInp = document.getElementById('search-input');
     const rawVal = searchInp ? searchInp.value : '';
     const searchVal = rawVal.trim ? rawVal.trim() : rawVal;
+
+    const hadSearchQuery = Boolean(previousSearchValue && previousSearchValue.trim().length > 0);
+    previousSearchValue = searchVal;
 
     // As soon as the user starts typing in the search bar, immediately clear/cut all active filters
     // and revert to default mode so the search executes cleanly across the default collection!
@@ -11663,6 +11691,11 @@ function debouncedFilterAirports() {
         if (selectedCountryCode && typeof exitCountryMode === 'function') {
             if (preCountryModeFilters) preCountryModeFilters.search = '';
             exitCountryMode(false);
+        }
+        // If the user manually erased the search query to empty, reset everything and recalibrate camera according to the active default startup region!
+        if (hadSearchQuery) {
+            clearSearch(true);
+            return;
         }
     }
 
@@ -11955,6 +11988,8 @@ function handleSearchKeyDown(e) {
             resetAllFiltersToDefault(true);
         }
         triggerSearchFocus();
+    } else if (e.key === 'Escape') {
+        clearSearch(true);
     }
 }
 
@@ -11996,19 +12031,45 @@ function triggerSearchFocus() {
     }
 }
 
-function clearSearch() {
+function clearSearch(flyToDefaultStartup = true) {
     const searchInp = document.getElementById('search-input');
-    if (searchInp) searchInp.value = '';
+    const wasSearchActive = (searchInp && searchInp.value.trim().length > 0) || Boolean(selectedCountryCode) || Boolean(lastFocusedIcao);
+
+    if (searchInp) {
+        searchInp.value = '';
+        searchInp.blur();
+    }
     const clearBtn = document.getElementById('clear-search');
     if (clearBtn) clearBtn.classList.add('hidden');
     lastFocusedIcao = null;
+    previousSearchValue = '';
+
+    // Close any open radial menu or modals
+    if (typeof closeAirportRadialMenu === 'function') {
+        closeAirportRadialMenu();
+    }
+    if (typeof isFilterRadialOpen !== 'undefined' && isFilterRadialOpen) {
+        if (typeof closeFilterRadialMenu === 'function') closeFilterRadialMenu();
+    }
+    if (typeof closeRadialDetailsModal === 'function') {
+        closeRadialDetailsModal();
+    }
+    if (typeof closeRadialAirlinesModal === 'function') {
+        closeRadialAirlinesModal();
+    }
+
     if (selectedCountryCode) {
         if (preCountryModeFilters) {
             preCountryModeFilters.search = '';
         }
         exitCountryMode(false);
-    } else {
-        filterAirports();
+    }
+
+    resetAllFiltersToDefault(true);
+    filterAirports();
+
+    if (wasSearchActive && flyToDefaultStartup) {
+        resetCameraToStartupRegion();
     }
 }
 
@@ -13898,6 +13959,10 @@ function resetCameraSettingsToDefault() {
     if (durSlider) durSlider.value = 0.8;
 
     updateCameraSettingsPreview();
+    if (typeof showToast === 'function') {
+        const msg = (typeof getTranslation === 'function' ? getTranslation('settings.reset_default') : null) || 'Reset to Default';
+        showToast(`✓ ${msg}`, 'info');
+    }
 }
 
 async function saveCameraSettingsOnly() {
