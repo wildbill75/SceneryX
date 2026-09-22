@@ -7,6 +7,13 @@ import webbrowser
 import webview
 from scanner import run_scan, get_settings, save_settings, load_ratings, save_rating, save_custom_price, save_custom_category, load_custom_prices, get_estimated_price, get_default_gsx_path, load_airport_database, SPECIAL_BUNDLE_MAP, OUTPUT_JSON_PATH, compute_scan_delta, build_library_snapshot, SNAPSHOT_JSON_PATH, get_resource_file_path, audit_all_gsx_profiles, audit_single_airport_gsx, extract_icao_from_gsx_filename, find_bundled_gsx
 
+try:
+    import webview.platforms.winforms as wf
+    if hasattr(wf, 'OpenFolderDialog'):
+        wf.OpenFolderDialog.foldersFilter = 'All Files (*.*)|*.*'
+except Exception:
+    pass
+
 AIRPORTS_DB_CACHE = None
 
 def resolve_package_icaos(pkg_name):
@@ -1631,7 +1638,10 @@ class Api:
             valid_dir = os.path.abspath(valid_dir)
             result = window.create_file_dialog(webview.FOLDER_DIALOG, directory=valid_dir)
             if result and len(result) > 0:
-                return result[0]
+                selected = result[0]
+                if os.path.isfile(selected):
+                    selected = os.path.dirname(selected)
+                return selected
         except Exception as e:
             print("Folder dialog error:", e)
         return ""

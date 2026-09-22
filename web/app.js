@@ -13899,16 +13899,55 @@ function removePathRow(index) {
     renderSettingsPathsList();
 }
 
-function addCustomPathRow() {
+async function addCustomPathRow() {
+    let selectedFolder = null;
+    if (window.pywebview && window.pywebview.api) {
+        let defaultDir = '';
+        if (currentSettings.scan_paths && currentSettings.scan_paths.length > 0) {
+            for (let i = currentSettings.scan_paths.length - 1; i >= 0; i--) {
+                if (currentSettings.scan_paths[i] && currentSettings.scan_paths[i].path) {
+                    const p = currentSettings.scan_paths[i].path.trim();
+                    if (p) {
+                        defaultDir = p;
+                        break;
+                    }
+                }
+            }
+        }
+        selectedFolder = await window.pywebview.api.browse_folder(defaultDir);
+        if (!selectedFolder) {
+            return; // User cancelled
+        }
+    } else {
+        selectedFolder = "D:\\Custom_MSFS_Sceneries";
+    }
+
+    let folderName = selectedFolder.replace(/[/\\]+$/, '').split(/[/\\]/).pop() || 'Custom Scenery';
     const newId = String(Date.now());
+    if (!currentSettings.scan_paths) {
+        currentSettings.scan_paths = [];
+    }
     currentSettings.scan_paths.push({
         id: newId,
-        name: "Custom Scenery Directory",
-        path: "D:\\Custom_MSFS_Sceneries",
+        name: folderName,
+        path: selectedFolder,
         enabled: true
     });
     renderSettingsPathsList();
+
+    const container = document.getElementById('settings-paths-list');
+    if (container) {
+        container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+        const lastRow = container.lastElementChild;
+        if (lastRow) {
+            lastRow.classList.add('ring-2', 'ring-cyan-400', 'transition-all');
+            setTimeout(() => {
+                lastRow.classList.remove('ring-2', 'ring-cyan-400');
+            }, 2000);
+        }
+    }
 }
+
 
 async function saveSettings() {
     currentSettings.auto_scan_on_startup = document.getElementById('cfg-auto-scan').checked;
