@@ -5134,6 +5134,7 @@ window.handleGsxAuditDragOver = handleGsxAuditDragOver;
 window.handleGsxAuditDragLeave = handleGsxAuditDragLeave;
 window.handleGsxAuditDrop = handleGsxAuditDrop;
 window.stageRadialSceneryVariant = stageRadialSceneryVariant;
+window.stageRadialFixToggle = stageRadialFixToggle;
 window.applyRadialScenerySelection = applyRadialScenerySelection;
 window.executeGsxInstallationForIcao = executeGsxInstallationForIcao;
 
@@ -6932,6 +6933,7 @@ function triggerRadialScenerySelector() {
             extEl.classList.add('hidden');
             extEl.style.opacity = '';
             extEl.innerHTML = '';
+            stagedRadialScenerySelection = null;
         }, 160);
     } else {
         // If Details modal is open, close it
@@ -6961,14 +6963,29 @@ function renderRadialSceneriesExtension(ap, animate = false) {
     const activePkgName = activeSrc ? activeSrc.folder_name : 'DEFAULT';
 
     // Staged selection for this specific airport
-    const stagedPkg = (stagedRadialScenerySelection && stagedRadialScenerySelection.icao === ap.icao)
+    const stagedPkg = (stagedRadialScenerySelection && stagedRadialScenerySelection.icao === ap.icao && stagedRadialScenerySelection.target !== undefined && stagedRadialScenerySelection.target !== null)
         ? stagedRadialScenerySelection.target
         : activePkgName;
 
-    // Check if there is an unapplied change
+    // Check if there is an unapplied variant change
     const isSameAsActive = (stagedPkg === 'DEFAULT' && activePkgName === 'DEFAULT') ||
         (stagedPkg !== 'DEFAULT' && activePkgName !== 'DEFAULT' && isMatchingScenerySource({ folder_name: activePkgName }, stagedPkg));
-    const hasPendingChange = !isSameAsActive;
+    const hasVariantChange = !isSameAsActive;
+
+    // Check if there is an unapplied fixes change
+    let hasFixesChange = false;
+    if (stagedRadialScenerySelection && stagedRadialScenerySelection.icao === ap.icao && stagedRadialScenerySelection.fixes) {
+        for (const src of fixSources) {
+            const cleanName = (src.folder_name || '').replace(/\.disabled$/i, '');
+            const desiredActive = stagedRadialScenerySelection.fixes[cleanName];
+            if (desiredActive !== undefined && desiredActive !== (!src.is_disabled)) {
+                hasFixesChange = true;
+                break;
+            }
+        }
+    }
+
+    const hasPendingChange = hasVariantChange || hasFixesChange;
 
     let html = '';
     let pillIndex = 0;
@@ -7105,8 +7122,14 @@ function renderRadialSceneriesExtension(ap, animate = false) {
 
         fixSources.forEach(src => {
             const idx = sources.indexOf(src);
-            const isActive = !src.is_disabled;
-            const pkgPath = (src.folder_name || '').replace(/'/g, "\\'");
+            const diskActive = !src.is_disabled;
+            const cleanName = (src.folder_name || '').replace(/\.disabled$/i, '');
+            const stagedActive = (stagedRadialScenerySelection && stagedRadialScenerySelection.icao === ap.icao && stagedRadialScenerySelection.fixes && stagedRadialScenerySelection.fixes[cleanName] !== undefined)
+                ? stagedRadialScenerySelection.fixes[cleanName]
+                : diskActive;
+
+            const isActive = stagedActive;
+            const safeCleanName = cleanName.replace(/'/g, "\\'");
             const fixBorderClass = isActive
                 ? 'border-2 border-emerald-500 shadow-lg shadow-emerald-950/40 bg-slate-950/60 ring-1 ring-emerald-500/30'
                 : 'border border-slate-700/50 hover:border-slate-500/70 bg-slate-950/40 hover:bg-slate-900/60 shadow-sm';
@@ -7116,7 +7139,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
             pillIndex++;
 
             html += `
-                <div onclick="event.stopPropagation(); activateRadialFixPackage(event, '${pkgPath}', '${ap.icao}')"
+                <div onclick="event.stopPropagation(); stageRadialFixToggle(event, '${ap.icao}', '${safeCleanName}')"
                      onmousedown="event.stopPropagation();"
                      onpointerdown="event.stopPropagation();"
                      ${fixAnimDelay}
@@ -7131,8 +7154,8 @@ function renderRadialSceneriesExtension(ap, animate = false) {
                                 </div>
                             </div>
 
-                            <div class="min-w-0 flex-1" title="${pkgPath}">
-                                <span class="text-xs font-bold text-white truncate block hover:text-emerald-300 transition-colors cursor-help" title="${pkgPath}">${src.folder_name}</span>
+                            <div class="min-w-0 flex-1" title="${safeCleanName}">
+                                <span class="text-xs font-bold text-white truncate block hover:text-emerald-300 transition-colors cursor-help" title="${safeCleanName}">${cleanName}</span>
                             </div>
 
                             <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-600 text-white shrink-0 uppercase leading-tight">FIX</span>
@@ -7429,13 +7452,71 @@ function stageRadialSceneryVariant(e, icao, folderName) {
 
     if (!currentRadialAirport || currentRadialAirport.icao !== icao) return;
 
-    if (stagedRadialScenerySelection && stagedRadialScenerySelection.icao === icao && stagedRadialScenerySelection.target === folderName) {
-        stagedRadialScenerySelection = null;
+    const activeSrc = getActiveSource(currentRadialAirport);
+    const activePkgName = activeSrc ? activeSrc.folder_name : 'DEFAULT';
+
+    if (!stagedRadialScenerySelection || stagedRadialScenerySelection.icao !== icao) {
+        stagedRadialScenerySelection = { icao: icao, target: activePkgName, fixes: {} };
+    }
+    if (!stagedRadialScenerySelection.fixes) {
+        stagedRadialScenerySelection.fixes = {};
+    }
+
+    if (stagedRadialScenerySelection.target === folderName) {
+        stagedRadialScenerySelection.target = activePkgName;
     } else {
-        stagedRadialScenerySelection = { icao: icao, target: folderName };
+        stagedRadialScenerySelection.target = folderName;
     }
 
     renderRadialSceneriesExtension(currentRadialAirport, false);
+}
+
+function stageRadialFixToggle(e, icao, cleanName) {
+    if (e && e.stopPropagation) e.stopPropagation();
+    if (window.event) window.event.cancelBubble = true;
+
+    if (!currentRadialAirport || currentRadialAirport.icao !== icao) return;
+
+    const activeSrc = getActiveSource(currentRadialAirport);
+    const activePkgName = activeSrc ? activeSrc.folder_name : 'DEFAULT';
+
+    if (!stagedRadialScenerySelection || stagedRadialScenerySelection.icao !== icao) {
+        stagedRadialScenerySelection = {
+            icao: icao,
+            target: activePkgName,
+            fixes: {}
+        };
+    }
+    if (!stagedRadialScenerySelection.fixes) {
+        stagedRadialScenerySelection.fixes = {};
+    }
+
+    const fixSources = (currentRadialAirport.all_sources || []).filter(s => isFixOrOverlay(s));
+    const targetClean = (cleanName || '').toLowerCase().replace(/\.disabled$/, '');
+    const src = fixSources.find(s => {
+        const fnClean = (s.folder_name || '').toLowerCase().replace(/\.disabled$/, '');
+        return fnClean === targetClean;
+    });
+
+    const diskActive = src ? !src.is_disabled : false;
+    const currentStaged = (stagedRadialScenerySelection.fixes[cleanName] !== undefined)
+        ? stagedRadialScenerySelection.fixes[cleanName]
+        : diskActive;
+
+    const nextState = !currentStaged;
+    if (nextState === diskActive) {
+        delete stagedRadialScenerySelection.fixes[cleanName];
+    } else {
+        stagedRadialScenerySelection.fixes[cleanName] = nextState;
+    }
+
+    renderRadialSceneriesExtension(currentRadialAirport, false);
+}
+
+function activateRadialFixPackage(e, path, icao) {
+    const targetIcao = icao || (currentRadialAirport && currentRadialAirport.icao) || '';
+    const cleanName = (path || '').replace(/\.disabled$/i, '');
+    stageRadialFixToggle(e, targetIcao, cleanName);
 }
 
 async function applyRadialScenerySelection(e, icao) {
@@ -7443,8 +7524,29 @@ async function applyRadialScenerySelection(e, icao) {
     if (window.event) window.event.cancelBubble = true;
 
     if (!stagedRadialScenerySelection || stagedRadialScenerySelection.icao !== icao) return;
-    const targetPkg = stagedRadialScenerySelection.target;
-    if (!targetPkg) return;
+
+    const activeSrc = getActiveSource(currentRadialAirport);
+    const activePkgName = activeSrc ? activeSrc.folder_name : 'DEFAULT';
+    const stagedPkg = stagedRadialScenerySelection.target || activePkgName;
+
+    const isSameAsActive = (stagedPkg === 'DEFAULT' && activePkgName === 'DEFAULT') ||
+        (stagedPkg !== 'DEFAULT' && activePkgName !== 'DEFAULT' && isMatchingScenerySource({ folder_name: activePkgName }, stagedPkg));
+    const hasVariantChange = !isSameAsActive;
+
+    let hasFixesChange = false;
+    const fixSources = (currentRadialAirport.all_sources || []).filter(s => isFixOrOverlay(s));
+    if (stagedRadialScenerySelection.fixes) {
+        for (const src of fixSources) {
+            const cleanName = (src.folder_name || '').replace(/\.disabled$/i, '');
+            const desiredActive = stagedRadialScenerySelection.fixes[cleanName];
+            if (desiredActive !== undefined && desiredActive !== (!src.is_disabled)) {
+                hasFixesChange = true;
+                break;
+            }
+        }
+    }
+
+    if (!hasVariantChange && !hasFixesChange) return;
 
     const btn = document.getElementById('radial-scenery-apply-btn');
     if (btn) {
@@ -7455,9 +7557,24 @@ async function applyRadialScenerySelection(e, icao) {
 
     isToggleInProgress = true;
     try {
-        const resStr = await window.pywebview.api.select_scenery_option(icao, targetPkg);
-        const res = JSON.parse(resStr);
-        if (res.status === 'ok') {
+        const targetPkgParam = hasVariantChange ? stagedPkg : '';
+        const fixesJsonParam = JSON.stringify(stagedRadialScenerySelection.fixes || {});
+
+        let res;
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.apply_scenery_config) {
+            const resStr = await window.pywebview.api.apply_scenery_config(icao, targetPkgParam, fixesJsonParam);
+            res = JSON.parse(resStr);
+        } else if (window.pywebview && window.pywebview.api) {
+            if (hasVariantChange) {
+                await window.pywebview.api.select_scenery_option(icao, targetPkgParam);
+            }
+            for (const [fixName, fixActive] of Object.entries(stagedRadialScenerySelection.fixes || {})) {
+                await window.pywebview.api.toggle_fix_patch(fixName, icao);
+            }
+            res = { status: 'ok' };
+        }
+
+        if (res && res.status === 'ok') {
             const updatedAp = res.updated_airport || (res.airports ? res.airports.find(a => a.icao === icao) : null);
             if (updatedAp) {
                 if (userRatingsMap[updatedAp.icao] !== undefined) {
@@ -7473,16 +7590,25 @@ async function applyRadialScenerySelection(e, icao) {
                 updateSingleAirportMarker(updatedAp);
                 updateRadialCoreBadge(updatedAp);
             }
+
+            const hadFixes = hasFixesChange;
+            const hadVariant = hasVariantChange;
             stagedRadialScenerySelection = null;
             renderRadialSceneriesExtension(currentRadialAirport, false);
             setTimeout(() => updateStats(allAirportsData), 0);
 
             await refreshGsxAuditQuietly();
 
-            const displayName = (targetPkg === 'DEFAULT') ? 'Default MSFS' : targetPkg;
-            showToast(`✓ Scenery Applied: ${displayName}`, 'success');
+            const appliedParts = [];
+            if (hadVariant) {
+                appliedParts.push((targetPkgParam === 'DEFAULT') ? 'Default MSFS' : targetPkgParam);
+            }
+            if (hadFixes) {
+                appliedParts.push('Fixes & Overlays');
+            }
+            showToast(`✓ Scenery Configuration Applied: ${appliedParts.join(' & ')}`, 'success');
         } else {
-            showToast(`Error: ${res.message || 'Failed to apply scenery'}`, 'error');
+            showToast(`Error: ${(res && res.message) || 'Failed to apply scenery configuration'}`, 'error');
             if (btn) {
                 btn.disabled = false;
                 btn.className = 'px-5 py-2 rounded-xl text-xs font-mono font-bold transition-all bg-cyan-600 hover:bg-cyan-500 text-white shadow-md shadow-cyan-600/30 cursor-pointer border-0 active:scale-95';
@@ -7491,75 +7617,12 @@ async function applyRadialScenerySelection(e, icao) {
         }
     } catch (err) {
         console.error("Error applying scenery selection:", err);
-        showToast('Error applying scenery', 'error');
+        showToast('Error applying scenery configuration', 'error');
     } finally {
         isToggleInProgress = false;
     }
 }
 
-async function activateRadialFixPackage(e, path, icao) {
-    if (e && e.stopPropagation) {
-        e.stopPropagation();
-    } else if (typeof e === 'string') {
-        icao = path;
-        path = e;
-    }
-    if (window.event) window.event.cancelBubble = true;
-
-    if (!window.pywebview || isToggleInProgress || !path) return;
-
-    // 1. Immediate OPTIMISTIC UI update
-    if (currentRadialAirport && currentRadialAirport.all_sources) {
-        const cleanPath = (path || '').toLowerCase().replace(/\.disabled$/, '');
-        const src = currentRadialAirport.all_sources.find(s => {
-            const fn = (s.folder_name || '').toLowerCase().replace(/\.disabled$/, '');
-            const pp = (s.package_path || '').toLowerCase().replace(/\.disabled$/, '');
-            return fn === cleanPath || pp.endsWith(cleanPath) || cleanPath.includes(fn) || fn.includes(cleanPath);
-        });
-        if (src) {
-            src.is_disabled = !src.is_disabled;
-            renderRadialSceneriesExtension(currentRadialAirport, false);
-        }
-    }
-
-    isToggleInProgress = true;
-    try {
-        const resStr = await window.pywebview.api.toggle_fix_patch(path, icao || '');
-        const res = JSON.parse(resStr);
-        if (res.status === 'ok') {
-            const updatedAp = res.updated_airport || (res.airports ? res.airports.find(a => a.icao === icao) : null);
-            if (updatedAp) {
-                if (userRatingsMap[updatedAp.icao] !== undefined) {
-                    updatedAp.rating = userRatingsMap[updatedAp.icao];
-                }
-                const idx = allAirportsData.findIndex(a => a.icao === updatedAp.icao);
-                if (idx !== -1) allAirportsData[idx] = updatedAp;
-
-                currentRadialAirport = updatedAp;
-                if (selectedAirport && selectedAirport.icao === icao) {
-                    selectedAirport = updatedAp;
-                }
-                renderRadialSceneriesExtension(updatedAp, false);
-                updateRadialCoreBadge(updatedAp);
-                updateSingleAirportMarker(updatedAp);
-
-                const detailDrawer = document.getElementById('detail-drawer');
-                if (detailDrawer && !detailDrawer.classList.contains('translate-x-full')) {
-                    renderUnifiedScenerySelector(updatedAp);
-                }
-            } else if (res.airports) {
-                allAirportsData = res.airports;
-            }
-            setTimeout(() => updateStats(allAirportsData), 0);
-            const statusLabel = res.enabled ? 'Enabled' : 'Disabled';
-            showToast(`✓ Fix/Overlay ${statusLabel}`, 'success');
-        }
-    } catch (e) {
-        console.error("Failed to toggle fix patch:", e);
-    } finally {
-        isToggleInProgress = false;
-    }
-}
 
 function triggerRadialFullDetails() {
     if (!currentRadialAirport) return;

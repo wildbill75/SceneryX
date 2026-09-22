@@ -1365,6 +1365,192 @@ class Api:
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
 
+    def apply_scenery_config(self, icao, target_folder_name="", fixes_json="{}"):
+        try:
+            if not icao:
+                return json.dumps({"status": "error", "message": "No ICAO provided"})
+
+            fixes_dict = {}
+            if fixes_json:
+                try:
+                    fixes_dict = json.loads(fixes_json)
+                except Exception:
+                    fixes_dict = {}
+
+            content_xml_path = get_content_xml_path()
+            target_clean = ""
+            target_norm = ""
+            if target_folder_name:
+                target_clean = target_folder_name[:-9] if target_folder_name.lower().endswith('.disabled') else target_folder_name
+                target_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', target_clean.lower())
+
+            global AIRPORTS_CACHE
+            if AIRPORTS_CACHE is None:
+                if os.path.exists(OUTPUT_JSON_PATH):
+                    with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
+                        AIRPORTS_CACHE = json.load(f)
+                else:
+                    AIRPORTS_CACHE = run_scan()
+            scanned_airports = AIRPORTS_CACHE
+            ap_obj = next((a for a in scanned_airports if a['icao'].upper() == icao.upper()), None)
+
+            # 1. Update Content.xml if needed
+            if os.path.exists(content_xml_path):
+                import xml.etree.ElementTree as ET
+                tree = ET.parse(content_xml_path)
+                root = tree.getroot()
+                changed = False
+                seen = set()
+                seen_norms = set()
+                to_remove = []
+
+                airport_pkg_names = set()
+                airport_pkg_norms = set()
+                if ap_obj and ap_obj.get('all_sources'):
+                    for src in ap_obj['all_sources']:
+                        fn = src.get('folder_name', '')
+                        fn_c = fn[:-9] if fn.lower().endswith('.disabled') else fn
+                        fn_c_lower = fn_c.lower()
+                        airport_pkg_names.add(fn_c_lower)
+                        fn_n = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn_c_lower)
+                        airport_pkg_norms.add(fn_n)
+
+                for p in list(root.findall('Package')):
+                    name = p.get('name', '')
+                    clean = name[:-9] if name.lower().endswith('.disabled') else name
+                    clean_lower = clean.lower()
+                    clean_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_lower)
+                    p.set('name', clean)
+
+                    if clean_lower in seen:
+                        to_remove.append(p)
+                        changed = True
+                        continue
+                    seen.add(clean_lower)
+                    seen_norms.add(clean_norm)
+
+                    # Check if this package is one of the fixes being updated
+                    matched_fix = None
+                    for fix_name, fix_enabled in fixes_dict.items():
+                        c_fix = fix_name[:-9] if fix_name.lower().endswith('.disabled') else fix_name
+                        if clean_lower == c_fix.lower() or c_fix.lower() in clean_lower or clean_lower in c_fix.lower():
+                            matched_fix = (c_fix, fix_enabled)
+                            break
+
+                    if matched_fix is not None:
+                        p.set('active', 'Activated' if matched_fix[1] else 'UserDisabled')
+                        changed = True
+                        continue
+
+                    # If variant is specified, update main scenery packages belonging to this airport
+                    if target_clean:
+                        is_pkg_for_icao = (clean_lower in airport_pkg_names) or (clean_norm in airport_pkg_norms) or (icao.lower() in clean_lower)
+                        if is_pkg_for_icao:
+                            is_target = (target_clean != 'DEFAULT') and (
+                                clean_lower == target_clean.lower() 
+                                or clean_norm == target_norm
+                                or (clean_norm and target_norm and (clean_norm in target_norm or target_norm in clean_norm))
+                                or ((clean_lower.startswith('fs20-asobo-') or clean_lower.startswith('fs24-asobo-') or clean_lower.startswith('fs20-microsoft-') or clean_lower.startswith('fs24-microsoft-')) and ('asobo' in target_clean.lower() or 'microsoft' in target_clean.lower()))
+                            )
+                            p.set('active', 'Activated' if is_target else 'UserDisabled')
+                            changed = True
+
+                for p in to_remove:
+                    root.remove(p)
+
+                if target_clean and ap_obj and ap_obj.get('all_sources'):
+                    for src in ap_obj['all_sources']:
+                        if src.get('is_fix_patch') or src.get('is_addon'):
+                            continue
+                        fn = src.get('folder_name', '')
+                        fn_clean = fn[:-9] if fn.lower().endswith('.disabled') else fn
+                        fn_clean_lower = fn_clean.lower()
+                        fn_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn_clean_lower)
+
+                        is_target = (target_clean != 'DEFAULT') and (
+                            fn_clean_lower == target_clean.lower() 
+                            or fn_norm == target_norm
+                            or (fn_norm and target_norm and (fn_norm in target_norm or target_norm in fn_norm))
+                            or (src.get('is_asobo_official') and ('asobo' in target_clean.lower() or 'microsoft' in target_clean.lower()))
+                        )
+
+                        if fn_clean_lower not in seen and fn_norm not in seen_norms:
+                            new_p = ET.SubElement(root, 'Package')
+                            new_p.set('name', fn_clean)
+                            new_p.set('active', 'Activated' if is_target else 'UserDisabled')
+                            seen.add(fn_clean_lower)
+                            seen_norms.add(fn_norm)
+                            changed = True
+
+                if changed:
+                    tree.write(content_xml_path, encoding='utf-8', xml_declaration=True)
+
+            # 2. Physical package enable/disable for Main Sceneries
+            if target_clean and ap_obj and ap_obj.get('all_sources'):
+                for src in ap_obj['all_sources']:
+                    if src.get('is_fix_patch') or src.get('is_addon'):
+                        continue
+                    fn = src.get('folder_name', '')
+                    pkg_p = src.get('package_path', '')
+                    fn_clean = fn[:-9] if fn.lower().endswith('.disabled') else fn
+                    fn_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn_clean.lower())
+
+                    is_target = (target_clean != 'DEFAULT') and (
+                        fn_clean.lower() == target_clean.lower() 
+                        or fn_norm == target_norm
+                        or (fn_norm and target_norm and (fn_norm in target_norm or target_norm in fn_norm))
+                        or (src.get('is_asobo_official') and ('asobo' in target_clean.lower() or 'microsoft' in target_clean.lower()))
+                    )
+                    if is_target:
+                        set_package_state_for_icao(pkg_p, icao, should_enable=True)
+                    else:
+                        set_package_state_for_icao(pkg_p, icao, should_enable=False)
+
+            # 3. Physical package enable/disable for Fixes & Overlays
+            if fixes_dict and ap_obj and ap_obj.get('all_sources'):
+                for fix_name, fix_enabled in fixes_dict.items():
+                    c_fix = fix_name[:-9] if fix_name.lower().endswith('.disabled') else fix_name
+                    for src in ap_obj['all_sources']:
+                        fn = src.get('folder_name', '')
+                        fn_clean = fn[:-9] if fn.lower().endswith('.disabled') else fn
+                        if fn_clean.lower() == c_fix.lower() or c_fix.lower() in fn_clean.lower() or fn_clean.lower() in c_fix.lower():
+                            pkg_p = src.get('package_path', '')
+                            if fix_enabled:
+                                enable_physical_package(pkg_p)
+                            else:
+                                disable_physical_package(pkg_p)
+                            break
+
+            # 4. Update cache
+            airports = fast_update_airport_cache(icao, target_pkg_name=(target_clean if target_clean else None))
+            target_ap = next((a for a in airports if a['icao'].upper() == icao.upper()), None)
+
+            # 5. Synchronize fix states in target_ap
+            if target_ap and fixes_dict:
+                for fix_name, fix_enabled in fixes_dict.items():
+                    c_fix = fix_name[:-9] if fix_name.lower().endswith('.disabled') else fix_name
+                    for s in target_ap.get('all_sources', []):
+                        fn = s.get('folder_name', '')
+                        fn_clean = fn[:-9] if fn.lower().endswith('.disabled') else fn
+                        if fn_clean.lower() == c_fix.lower() or c_fix.lower() in fn_clean.lower() or fn_clean.lower() in c_fix.lower():
+                            s['is_disabled'] = not fix_enabled
+                            s['folder_name'] = fn_clean if fix_enabled else (fn_clean + '.disabled')
+                            p = s.get('package_path', '')
+                            clean_p = p[:-9] if p and p.endswith('.disabled') else p
+                            if clean_p:
+                                s['package_path'] = clean_p if fix_enabled else (clean_p + '.disabled')
+
+            if os.path.exists(OUTPUT_JSON_PATH):
+                try:
+                    with open(OUTPUT_JSON_PATH, 'w', encoding='utf-8') as f:
+                        json.dump(airports, f, indent=2, ensure_ascii=False)
+                except Exception:
+                    pass
+
+            return json.dumps({"status": "ok", "updated_airport": target_ap}, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
     def toggle_fix_patch(self, path, icao):
         try:
             if not path:
