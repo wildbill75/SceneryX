@@ -13883,11 +13883,10 @@ function renderSettingsPathsList() {
 
         row.innerHTML = `
             <div class="space-y-1.5 flex-1">
-                <div class="flex items-center justify-between">
-                    <input type="text" value="${item.name || 'MSFS Scenery Path'}" 
-                           oninput="updatePathName(${index}, this.value)"
-                           placeholder="Folder Name (e.g. MSFS 2024 - Community)"
-                           class="bg-transparent text-xs font-bold text-cyan-400 border-b border-slate-700/60 hover:border-cyan-500 focus:border-cyan-400 focus:outline-none px-1 py-0.5 w-full max-w-md transition-all">
+                <div class="flex items-center justify-between pb-0.5 select-none">
+                    <span class="text-xs font-bold text-cyan-400 tracking-wide truncate" title="${escapeHtml(item.name || 'MSFS Scenery Path')}">
+                        ${escapeHtml(item.name || 'MSFS Scenery Path')}
+                    </span>
                 </div>
 
                 <div class="flex items-center gap-2">
@@ -13919,12 +13918,6 @@ function renderSettingsPathsList() {
     });
 }
 
-function updatePathName(index, val) {
-    if (currentSettings.scan_paths[index]) {
-        currentSettings.scan_paths[index].name = val;
-    }
-}
-
 function updatePathValue(index, val) {
     if (currentSettings.scan_paths[index]) {
         currentSettings.scan_paths[index].path = val;
@@ -13952,6 +13945,11 @@ async function browsePathFolder(index) {
         const folder = await window.pywebview.api.browse_folder(currentPath);
         if (folder) {
             currentSettings.scan_paths[index].path = folder;
+            const isOfficialDefault = item.id && (item.id.includes('official') || item.id.includes('streamed') || item.id.includes('community'));
+            if (!isOfficialDefault) {
+                const folderName = folder.replace(/[/\\]+$/, '').split(/[/\\]/).pop() || 'Custom Scenery';
+                currentSettings.scan_paths[index].name = folderName;
+            }
             renderSettingsPathsList();
         }
     }
