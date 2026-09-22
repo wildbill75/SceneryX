@@ -4292,6 +4292,99 @@ function markGsxCardResolved(icao, successMsg = '✓ GSX Profile Active & Synced
     }, 1100);
 }
 
+function syncAirportGsxState(icao, { hasProfile = false, filename = null, path = null, auditEntry = null } = {}) {
+    const cleanIcao = (icao || '').toUpperCase().trim();
+    if (!cleanIcao) return;
+
+    const ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao(cleanIcao) : null;
+    if (ap) {
+        ap.has_gsx_profile = !!hasProfile;
+        if (hasProfile && filename) {
+            ap.gsx_profile_filename = filename;
+            ap.gsx_ini_file = filename;
+            if (path) ap.gsx_profile_path = path;
+        } else {
+            ap.has_gsx_profile = false;
+            delete ap.gsx_profile_filename;
+            delete ap.gsx_ini_file;
+            delete ap.gsx_profile_path;
+        }
+    }
+
+    if (typeof currentRadialAirport !== 'undefined' && currentRadialAirport && currentRadialAirport.icao === cleanIcao) {
+        currentRadialAirport.has_gsx_profile = !!hasProfile;
+        if (hasProfile && filename) {
+            currentRadialAirport.gsx_profile_filename = filename;
+            currentRadialAirport.gsx_ini_file = filename;
+            if (path) currentRadialAirport.gsx_profile_path = path;
+        } else {
+            currentRadialAirport.has_gsx_profile = false;
+            delete currentRadialAirport.gsx_profile_filename;
+            delete currentRadialAirport.gsx_ini_file;
+            delete currentRadialAirport.gsx_profile_path;
+        }
+    }
+
+    if (typeof selectedAirport !== 'undefined' && selectedAirport && selectedAirport.icao === cleanIcao) {
+        selectedAirport.has_gsx_profile = !!hasProfile;
+        if (hasProfile && filename) {
+            selectedAirport.gsx_profile_filename = filename;
+            selectedAirport.gsx_ini_file = filename;
+            if (path) selectedAirport.gsx_profile_path = path;
+        } else {
+            selectedAirport.has_gsx_profile = false;
+            delete selectedAirport.gsx_profile_filename;
+            delete selectedAirport.gsx_ini_file;
+            delete selectedAirport.gsx_profile_path;
+        }
+    }
+
+    // Update marker cache if exists
+    if (typeof airportMarkerCache !== 'undefined' && airportMarkerCache && airportMarkerCache.has(cleanIcao)) {
+        const marker = airportMarkerCache.get(cleanIcao);
+        if (marker && marker._airportData) {
+            marker._airportData.has_gsx_profile = !!hasProfile;
+            if (hasProfile && filename) {
+                marker._airportData.gsx_profile_filename = filename;
+                marker._airportData.gsx_ini_file = filename;
+            } else {
+                marker._airportData.has_gsx_profile = false;
+                delete marker._airportData.gsx_profile_filename;
+                delete marker._airportData.gsx_ini_file;
+                delete marker._airportData.gsx_profile_path;
+            }
+        }
+    }
+
+    // Refresh radial details modal if currently open for this airport
+    const detailsModal = document.getElementById('radial-details-modal');
+    if (detailsModal && !detailsModal.classList.contains('hidden')) {
+        const modalIcao = detailsModal.dataset.icao || (currentRadialAirport ? currentRadialAirport.icao : null);
+        if (modalIcao === cleanIcao) {
+            const renderTarget = currentRadialAirport || ap;
+            if (renderTarget && typeof renderRadialGsx === 'function') {
+                renderRadialGsx(renderTarget);
+            }
+        }
+    }
+
+    // Refresh drawer if open for this airport
+    const drawer = document.getElementById('detail-drawer');
+    if (drawer && !drawer.classList.contains('translate-x-full')) {
+        if (selectedAirport && selectedAirport.icao === cleanIcao && typeof renderDetails === 'function') {
+            renderDetails(selectedAirport);
+        }
+    }
+
+    if (typeof updateStats === 'function' && typeof allAirportsData !== 'undefined') {
+        updateStats(allAirportsData);
+    }
+    if (typeof filterAirports === 'function') {
+        filterAirports();
+    }
+}
+window.syncAirportGsxState = syncAirportGsxState;
+
 async function activateGsxDuplicateFromModal(icao, filename) {
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.resolve_gsx_duplicate) return;
     try {
@@ -4299,25 +4392,16 @@ async function activateGsxDuplicateFromModal(icao, filename) {
         const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
         if (parsed && parsed.status === 'ok') {
             window.gsxAuditData = parsed.data;
-            const ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao(icao) : null;
-            if (ap) {
-                ap.gsx_ini_file = filename.replace(/\.disabled$/, '');
-                ap.has_gsx_profile = true;
-                if (typeof currentRadialAirport !== 'undefined' && currentRadialAirport && currentRadialAirport.icao === icao) {
-                    currentRadialAirport.gsx_ini_file = ap.gsx_ini_file;
-                    currentRadialAirport.has_gsx_profile = true;
-                    if (typeof renderRadialAirportDetails === 'function') {
-                        renderRadialAirportDetails(currentRadialAirport);
-                    }
-                    if (typeof renderRadialGsx === 'function') {
-                        renderRadialGsx(currentRadialAirport);
-                    }
-                }
-                updateStats(allAirportsData);
-                filterAirports();
-            }
+            const cleanName = filename.replace(/\.disabled$/, '');
+            const auditEntry = window.gsxAuditData && window.gsxAuditData.by_icao ? window.gsxAuditData.by_icao[icao] : null;
+            const activeRemaining = auditEntry && auditEntry.files ? auditEntry.files.find(f => !f.is_disabled) : null;
+            syncAirportGsxState(icao, {
+                hasProfile: true,
+                filename: activeRemaining ? activeRemaining.filename : cleanName,
+                path: activeRemaining ? activeRemaining.path : null
+            });
             if (typeof showToast === 'function') {
-                showToast(`✓ Duplicate resolved for ${icao}: kept ${filename}`, 'success');
+                showToast(`✓ Duplicate resolved for ${icao}: kept ${cleanName}`, 'success');
             }
             updateGsxHeaderAndTabBadges();
             renderGsxAuditModal();
@@ -4334,22 +4418,13 @@ async function disableGsxProfileFromModal(icao, filename) {
         const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
         if (parsed && parsed.status === 'ok') {
             window.gsxAuditData = parsed.data;
-            const ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao(icao) : null;
-            if (ap) {
-                const auditEntry = window.gsxAuditData && window.gsxAuditData.by_icao ? window.gsxAuditData.by_icao[icao] : null;
-                const activeRemaining = auditEntry && auditEntry.files ? auditEntry.files.find(f => !f.is_disabled) : null;
-                ap.gsx_ini_file = activeRemaining ? activeRemaining.filename : null;
-                ap.has_gsx_profile = !!activeRemaining;
-                if (typeof currentRadialAirport !== 'undefined' && currentRadialAirport && currentRadialAirport.icao === icao) {
-                    currentRadialAirport.gsx_ini_file = ap.gsx_ini_file;
-                    currentRadialAirport.has_gsx_profile = ap.has_gsx_profile;
-                    if (typeof renderRadialAirportDetails === 'function') {
-                        renderRadialAirportDetails(currentRadialAirport);
-                    }
-                }
-                updateStats(allAirportsData);
-                filterAirports();
-            }
+            const auditEntry = window.gsxAuditData && window.gsxAuditData.by_icao ? window.gsxAuditData.by_icao[icao] : null;
+            const activeRemaining = auditEntry && auditEntry.files ? auditEntry.files.find(f => !f.is_disabled) : null;
+            syncAirportGsxState(icao, {
+                hasProfile: !!activeRemaining,
+                filename: activeRemaining ? activeRemaining.filename : null,
+                path: activeRemaining ? activeRemaining.path : null
+            });
             if (typeof showToast === 'function') {
                 showToast(`✓ Profile disabled for ${icao}`, 'info');
             }
@@ -4368,22 +4443,16 @@ async function enableGsxProfileFromAudit(icao, filename) {
         const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
         if (parsed && parsed.status === 'ok') {
             window.gsxAuditData = parsed.data;
-            const ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao(icao) : null;
-            if (ap) {
-                ap.gsx_ini_file = filename.replace(/\.disabled$/, '');
-                ap.has_gsx_profile = true;
-                if (typeof currentRadialAirport !== 'undefined' && currentRadialAirport && currentRadialAirport.icao === icao) {
-                    currentRadialAirport.gsx_ini_file = ap.gsx_ini_file;
-                    currentRadialAirport.has_gsx_profile = true;
-                    if (typeof renderRadialAirportDetails === 'function') {
-                        renderRadialAirportDetails(currentRadialAirport);
-                    }
-                }
-                updateStats(allAirportsData);
-                filterAirports();
-            }
+            const cleanName = filename.replace(/\.disabled$/, '');
+            const auditEntry = window.gsxAuditData && window.gsxAuditData.by_icao ? window.gsxAuditData.by_icao[icao] : null;
+            const activeRemaining = auditEntry && auditEntry.files ? auditEntry.files.find(f => !f.is_disabled) : null;
+            syncAirportGsxState(icao, {
+                hasProfile: true,
+                filename: activeRemaining ? activeRemaining.filename : cleanName,
+                path: activeRemaining ? activeRemaining.path : null
+            });
             if (typeof showToast === 'function') {
-                showToast(`✓ Profile enabled: ${filename.replace(/\.disabled$/, '')}`, 'success');
+                showToast(`✓ Profile enabled: ${cleanName}`, 'success');
             }
             renderGsxAuditModal();
             updateGsxHeaderAndTabBadges();
@@ -4413,22 +4482,13 @@ function confirmDeleteGsxProfile(icao, filename) {
                 const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
                 if (parsed && parsed.status === 'ok') {
                     window.gsxAuditData = parsed.data;
-                    const ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao(icao) : null;
-                    if (ap) {
-                        const auditEntry = window.gsxAuditData && window.gsxAuditData.by_icao ? window.gsxAuditData.by_icao[icao] : null;
-                        const activeRemaining = auditEntry && auditEntry.files ? auditEntry.files.find(f => !f.is_disabled) : null;
-                        ap.gsx_ini_file = activeRemaining ? activeRemaining.filename : null;
-                        ap.has_gsx_profile = !!activeRemaining;
-                        if (typeof currentRadialAirport !== 'undefined' && currentRadialAirport && currentRadialAirport.icao === icao) {
-                            currentRadialAirport.gsx_ini_file = ap.gsx_ini_file;
-                            currentRadialAirport.has_gsx_profile = ap.has_gsx_profile;
-                            if (typeof renderRadialAirportDetails === 'function') {
-                                renderRadialAirportDetails(currentRadialAirport);
-                            }
-                        }
-                        updateStats(allAirportsData);
-                        filterAirports();
-                    }
+                    const auditEntry = window.gsxAuditData && window.gsxAuditData.by_icao ? window.gsxAuditData.by_icao[icao] : null;
+                    const activeRemaining = auditEntry && auditEntry.files ? auditEntry.files.find(f => !f.is_disabled) : null;
+                    syncAirportGsxState(icao, {
+                        hasProfile: !!activeRemaining,
+                        filename: activeRemaining ? activeRemaining.filename : null,
+                        path: activeRemaining ? activeRemaining.path : null
+                    });
                     if (typeof showToast === 'function') {
                         showToast(`✓ File deleted: ${filename}`, 'info');
                     }
@@ -4467,6 +4527,16 @@ function confirmDeleteAllDisabledProfiles() {
                 const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
                 if (parsed && parsed.status === 'ok') {
                     window.gsxAuditData = parsed.data;
+                    if (window.gsxAuditData && window.gsxAuditData.by_icao) {
+                        for (const [icao, entry] of Object.entries(window.gsxAuditData.by_icao)) {
+                            const actRemaining = entry.files ? entry.files.find(f => !f.is_disabled) : null;
+                            syncAirportGsxState(icao, {
+                                hasProfile: !!actRemaining,
+                                filename: actRemaining ? actRemaining.filename : null,
+                                path: actRemaining ? actRemaining.path : null
+                            });
+                        }
+                    }
                     if (typeof showToast === 'function') {
                         showToast(`✓ Deleted ${parsed.deleted_count !== undefined ? parsed.deleted_count : disabledCount} disabled GSX profile(s)`, 'info');
                     }
@@ -4772,20 +4842,6 @@ async function executeGsxInstallationForIcao(icao, { filePath = '', base64Data =
             if (parsed.airports && Array.isArray(parsed.airports)) {
                 allAirportsData = parsed.airports;
             }
-            const ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao(targetIcao) : null;
-            if (ap) {
-                ap.has_gsx_profile = true;
-                if (parsed.installed_files && parsed.installed_files.length > 0) {
-                    const iniF = parsed.installed_files.find(f => f.toLowerCase().endsWith('.ini')) || parsed.installed_files[0];
-                    ap.gsx_ini_file = iniF;
-                    ap.gsx_profile_filename = iniF;
-                }
-                if (parsed.airport) {
-                    Object.assign(ap, parsed.airport);
-                }
-            }
-            if (typeof updateStats === 'function') updateStats(allAirportsData);
-            if (typeof filterAirports === 'function') filterAirports();
 
             if (parsed.audit) {
                 window.gsxAuditData = parsed.audit;
@@ -4797,26 +4853,45 @@ async function executeGsxInstallationForIcao(icao, { filePath = '', base64Data =
                 }
             }
 
-            // Update radial details modal if active
-            if (typeof currentRadialAirport !== 'undefined' && currentRadialAirport) {
-                const updatedAp = getAirportByIcao(currentRadialAirport.icao);
-                if (updatedAp) {
-                    currentRadialAirport = updatedAp;
-                    if (typeof renderRadialAirportDetails === 'function') {
-                        renderRadialAirportDetails(currentRadialAirport);
-                    } else if (typeof renderRadialGsx === 'function') {
-                        renderRadialGsx(currentRadialAirport);
-                    }
+            const auditEntry = (window.gsxAuditData && window.gsxAuditData.by_icao) ? window.gsxAuditData.by_icao[targetIcao] : null;
+            let iniF = null;
+            let filePath = null;
+            if (parsed.installed_files && parsed.installed_files.length > 0) {
+                iniF = parsed.installed_files.find(f => f.toLowerCase().endsWith('.ini')) || parsed.installed_files[0];
+            } else if (auditEntry && auditEntry.files) {
+                const actF = auditEntry.files.find(f => !f.is_disabled);
+                if (actF) {
+                    iniF = actF.filename;
+                    filePath = actF.path;
                 }
             }
 
-            // Update right drawer if active
-            if (typeof selectedAirport !== 'undefined' && selectedAirport) {
-                const updatedSel = getAirportByIcao(selectedAirport.icao);
-                if (updatedSel) {
-                    selectedAirport = updatedSel;
-                    if (typeof renderDetails === 'function') {
-                        renderDetails(selectedAirport);
+            syncAirportGsxState(targetIcao, {
+                hasProfile: true,
+                filename: iniF || filename,
+                path: filePath,
+                auditEntry: auditEntry
+            });
+
+            if (parsed.airport) {
+                const ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao(targetIcao) : null;
+                if (ap) Object.assign(ap, parsed.airport);
+                if (typeof currentRadialAirport !== 'undefined' && currentRadialAirport && currentRadialAirport.icao === targetIcao) {
+                    Object.assign(currentRadialAirport, parsed.airport);
+                }
+                if (typeof selectedAirport !== 'undefined' && selectedAirport && selectedAirport.icao === targetIcao) {
+                    Object.assign(selectedAirport, parsed.airport);
+                }
+            }
+
+            // Explicitly re-render details modal if open for targetIcao
+            const detailsModal = document.getElementById('radial-details-modal');
+            if (detailsModal && !detailsModal.classList.contains('hidden')) {
+                const modalIcao = detailsModal.dataset.icao || (currentRadialAirport ? currentRadialAirport.icao : null);
+                if (modalIcao === targetIcao) {
+                    const renderTarget = currentRadialAirport || ((typeof getAirportByIcao === 'function') ? getAirportByIcao(targetIcao) : null);
+                    if (renderTarget && typeof renderRadialGsx === 'function') {
+                        renderRadialGsx(renderTarget);
                     }
                 }
             }
@@ -4866,20 +4941,6 @@ async function installBundledGsxProfile(icao) {
                 allAirportsData = parsed.airports;
             }
             const targetIcao = (icao || '').toUpperCase();
-            const ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao(targetIcao) : null;
-            if (ap) {
-                ap.has_gsx_profile = true;
-                if (ap.bundled_gsx_profile) {
-                    ap.bundled_gsx_profile.is_installed = true;
-                }
-                if (parsed.installed_files && parsed.installed_files.length > 0) {
-                    const iniF = parsed.installed_files.find(f => f.toLowerCase().endsWith('.ini')) || parsed.installed_files[0];
-                    ap.gsx_ini_file = iniF;
-                    ap.gsx_profile_filename = iniF;
-                }
-            }
-            if (typeof updateStats === 'function') updateStats(allAirportsData);
-            if (typeof filterAirports === 'function') filterAirports();
 
             if (window.pywebview.api.scan_gsx_audit) {
                 const auditRaw = await window.pywebview.api.scan_gsx_audit();
@@ -4889,14 +4950,42 @@ async function installBundledGsxProfile(icao) {
                 }
             }
 
-            if (typeof currentRadialAirport !== 'undefined' && currentRadialAirport && currentRadialAirport.icao === targetIcao) {
-                const updatedAp = (typeof getAirportByIcao === 'function') ? getAirportByIcao(targetIcao) : ap;
-                if (updatedAp) {
-                    currentRadialAirport = updatedAp;
-                    if (typeof renderRadialAirportDetails === 'function') {
-                        renderRadialAirportDetails(currentRadialAirport);
-                    } else if (typeof renderRadialGsx === 'function') {
-                        renderRadialGsx(currentRadialAirport);
+            const auditEntry = (window.gsxAuditData && window.gsxAuditData.by_icao) ? window.gsxAuditData.by_icao[targetIcao] : null;
+            let iniF = null;
+            let filePath = null;
+            if (parsed.installed_files && parsed.installed_files.length > 0) {
+                iniF = parsed.installed_files.find(f => f.toLowerCase().endsWith('.ini')) || parsed.installed_files[0];
+            } else if (auditEntry && auditEntry.files) {
+                const actF = auditEntry.files.find(f => !f.is_disabled);
+                if (actF) {
+                    iniF = actF.filename;
+                    filePath = actF.path;
+                }
+            }
+
+            syncAirportGsxState(targetIcao, {
+                hasProfile: true,
+                filename: iniF,
+                path: filePath,
+                auditEntry: auditEntry
+            });
+
+            const ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao(targetIcao) : null;
+            if (ap && ap.bundled_gsx_profile) {
+                ap.bundled_gsx_profile.is_installed = true;
+            }
+            if (currentRadialAirport && currentRadialAirport.icao === targetIcao && currentRadialAirport.bundled_gsx_profile) {
+                currentRadialAirport.bundled_gsx_profile.is_installed = true;
+            }
+
+            // Explicitly re-render details modal if open for targetIcao
+            const detailsModal = document.getElementById('radial-details-modal');
+            if (detailsModal && !detailsModal.classList.contains('hidden')) {
+                const modalIcao = detailsModal.dataset.icao || (currentRadialAirport ? currentRadialAirport.icao : null);
+                if (modalIcao === targetIcao) {
+                    const renderTarget = currentRadialAirport || ap;
+                    if (renderTarget && typeof renderRadialGsx === 'function') {
+                        renderRadialGsx(renderTarget);
                     }
                 }
             }
@@ -5567,19 +5656,20 @@ function closeAirportRadialMenu(keepModals = false) {
         if (detailsModal) {
             detailsModal.classList.add('hidden');
             detailsModal.classList.remove('user-dragged');
+            detailsModal.dataset.icao = '';
             detailsModal.style.transform = 'translateX(-50%)';
         }
         hasUserDraggedDetailsModal = false;
         detailsModalUserOffset = { x: 0, y: 0 };
         isDetailsModalDragging = false;
+        currentRadialAirport = null;
+        currentRadialMarker = null;
+        currentRadialOpenZoom = null;
     }
     const sectorDetails = document.getElementById('radial-sector-details');
     if (sectorDetails) {
         sectorDetails.classList.remove('active-radial-sector');
     }
-    currentRadialAirport = null;
-    currentRadialMarker = null;
-    currentRadialOpenZoom = null;
     isCameraPanningToRadial = false;
 }
 
@@ -7473,6 +7563,7 @@ function closeRadialDetailsModal(event, keepRadial = false) {
     if (modal) {
         modal.classList.add('hidden');
         modal.classList.remove('user-dragged');
+        modal.dataset.icao = '';
         modal.style.transform = 'translateX(-50%)';
     }
     hasUserDraggedDetailsModal = false;
@@ -7573,6 +7664,10 @@ function formatAirportCategoryDisplay(ap) {
 function renderRadialAirportDetails(ap) {
     if (!ap) return;
     initDraggableDetailsModal();
+
+    const modal = document.getElementById('radial-details-modal');
+    if (modal) modal.dataset.icao = ap.icao;
+    currentRadialAirport = ap;
 
     // Trigger seamless background GSX status check
     if (typeof refreshAirportGsxStatus === 'function') {
@@ -7715,40 +7810,13 @@ async function refreshAirportGsxStatus(icao, callback) {
                 window.gsxAuditData.missing_profiles = window.gsxAuditData.missing_profiles.filter(m => m.icao !== icao);
             }
 
-            const ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao(icao) : null;
-            if (ap) {
-                ap.has_gsx_profile = res.has_gsx_profile;
-                const activeFile = (auditEntry.files || []).find(f => !f.is_disabled);
-                if (activeFile) {
-                    ap.gsx_profile_filename = activeFile.filename;
-                    ap.gsx_ini_file = activeFile.filename;
-                    ap.gsx_profile_path = activeFile.path || '';
-                } else if (!res.has_gsx_profile) {
-                    ap.has_gsx_profile = false;
-                    delete ap.gsx_profile_filename;
-                    delete ap.gsx_ini_file;
-                    delete ap.gsx_profile_path;
-                }
-            }
-
-            if (currentRadialAirport && currentRadialAirport.icao === icao) {
-                currentRadialAirport.has_gsx_profile = res.has_gsx_profile;
-                const activeFile = (auditEntry.files || []).find(f => !f.is_disabled);
-                if (activeFile) {
-                    currentRadialAirport.gsx_profile_filename = activeFile.filename;
-                    currentRadialAirport.gsx_ini_file = activeFile.filename;
-                    currentRadialAirport.gsx_profile_path = activeFile.path || '';
-                } else if (!res.has_gsx_profile) {
-                    currentRadialAirport.has_gsx_profile = false;
-                    delete currentRadialAirport.gsx_profile_filename;
-                    delete currentRadialAirport.gsx_ini_file;
-                    delete currentRadialAirport.gsx_profile_path;
-                }
-                const modal = document.getElementById('radial-details-modal');
-                if (modal && !modal.classList.contains('hidden')) {
-                    renderRadialGsx(currentRadialAirport);
-                }
-            }
+            const activeFile = (auditEntry.files || []).find(f => !f.is_disabled);
+            syncAirportGsxState(icao, {
+                hasProfile: res.has_gsx_profile,
+                filename: activeFile ? activeFile.filename : null,
+                path: activeFile ? activeFile.path : null,
+                auditEntry: auditEntry
+            });
 
             updateGsxHeaderAndTabBadges();
 
@@ -7776,6 +7844,15 @@ function renderRadialGsx(ap) {
         status = audit.status || 'NONE';
         reason = audit.reason || '';
         files = audit.files || [];
+    } else if (window.gsxAuditData && window.gsxAuditData.by_icao) {
+        // Complete audit has loaded, and this ICAO is NOT in by_icao:
+        // This means 0 profiles exist on disk!
+        status = 'NONE';
+        files = [];
+        ap.has_gsx_profile = false;
+        delete ap.gsx_profile_filename;
+        delete ap.gsx_ini_file;
+        delete ap.gsx_profile_path;
     } else if (ap.has_gsx_profile) {
         status = 'MATCHED';
         files = [{
@@ -8075,18 +8152,14 @@ async function disableGsxProfile(icao, filename) {
         const res = typeof resStr === 'string' ? JSON.parse(resStr) : resStr;
         if (res && res.status === 'ok') {
             window.gsxAuditData = res.data;
-            const currentAp = (typeof getAirportByIcao === 'function') ? getAirportByIcao(icao) : null;
-            if (currentAp) {
-                const auditEntry = window.gsxAuditData && window.gsxAuditData.by_icao ? window.gsxAuditData.by_icao[icao] : null;
-                const activeRemaining = auditEntry && auditEntry.files ? auditEntry.files.find(f => !f.is_disabled) : null;
-                currentAp.gsx_ini_file = activeRemaining ? activeRemaining.filename : null;
-                currentAp.has_gsx_profile = !!activeRemaining;
-                if (typeof renderRadialAirportDetails === 'function') {
-                    renderRadialAirportDetails(currentAp);
-                }
-                updateStats(allAirportsData);
-                filterAirports();
-            }
+            const auditEntry = window.gsxAuditData && window.gsxAuditData.by_icao ? window.gsxAuditData.by_icao[icao] : null;
+            const activeRemaining = auditEntry && auditEntry.files ? auditEntry.files.find(f => !f.is_disabled) : null;
+            syncAirportGsxState(icao, {
+                hasProfile: !!activeRemaining,
+                filename: activeRemaining ? activeRemaining.filename : null,
+                path: activeRemaining ? activeRemaining.path : null,
+                auditEntry: auditEntry
+            });
             if (typeof renderGsxAuditModal === 'function' && window.isGsxAuditOpen) {
                 renderGsxAuditModal();
             }
@@ -8111,9 +8184,20 @@ async function activateGsxDuplicate(icao, activeFilename) {
         const res = typeof resStr === 'string' ? JSON.parse(resStr) : resStr;
         if (res && res.status === 'ok') {
             window.gsxAuditData = res.data;
-            const currentAp = getAirportByIcao(icao);
-            if (currentAp) {
-                renderRadialAirportDetails(currentAp);
+            const cleanName = activeFilename.replace(/\.disabled$/, '');
+            const auditEntry = window.gsxAuditData && window.gsxAuditData.by_icao ? window.gsxAuditData.by_icao[icao] : null;
+            const activeRemaining = auditEntry && auditEntry.files ? auditEntry.files.find(f => !f.is_disabled) : null;
+            syncAirportGsxState(icao, {
+                hasProfile: true,
+                filename: activeRemaining ? activeRemaining.filename : cleanName,
+                path: activeRemaining ? activeRemaining.path : null,
+                auditEntry: auditEntry
+            });
+            if (typeof renderGsxAuditModal === 'function' && window.isGsxAuditOpen) {
+                renderGsxAuditModal();
+            }
+            if (typeof updateGsxHeaderAndTabBadges === 'function') {
+                updateGsxHeaderAndTabBadges();
             }
             showToast(`✓ Active GSX profile set to ${activeFilename}`, 'success');
         }
@@ -8129,9 +8213,20 @@ async function enableGsxProfile(icao, filename) {
         const res = typeof resStr === 'string' ? JSON.parse(resStr) : resStr;
         if (res && res.status === 'ok') {
             window.gsxAuditData = res.data;
-            const currentAp = getAirportByIcao(icao);
-            if (currentAp) {
-                renderRadialAirportDetails(currentAp);
+            const cleanName = filename.replace(/\.disabled$/, '');
+            const auditEntry = window.gsxAuditData && window.gsxAuditData.by_icao ? window.gsxAuditData.by_icao[icao] : null;
+            const activeRemaining = auditEntry && auditEntry.files ? auditEntry.files.find(f => !f.is_disabled) : null;
+            syncAirportGsxState(icao, {
+                hasProfile: true,
+                filename: activeRemaining ? activeRemaining.filename : cleanName,
+                path: activeRemaining ? activeRemaining.path : null,
+                auditEntry: auditEntry
+            });
+            if (typeof renderGsxAuditModal === 'function' && window.isGsxAuditOpen) {
+                renderGsxAuditModal();
+            }
+            if (typeof updateGsxHeaderAndTabBadges === 'function') {
+                updateGsxHeaderAndTabBadges();
             }
             showToast(`✓ GSX profile enabled: ${filename}`, 'success');
         }

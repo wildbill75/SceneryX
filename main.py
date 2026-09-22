@@ -1859,6 +1859,53 @@ class Api:
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
 
+    def sync_airport_gsx_in_json(self, icao, has_profile, filename=None, file_path=None):
+        target_icao = (icao or '').upper().strip()
+        if not target_icao:
+            return None
+
+        updated_ap = None
+        json_paths = [OUTPUT_JSON_PATH]
+        local_json = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'installed_airports.json')
+        if os.path.exists(local_json) and os.path.abspath(local_json) != os.path.abspath(OUTPUT_JSON_PATH):
+            json_paths.append(local_json)
+
+        for j_path in json_paths:
+            if os.path.exists(j_path):
+                try:
+                    with open(j_path, 'r', encoding='utf-8') as f:
+                        airports = json.load(f)
+                    changed = False
+                    for ap in airports:
+                        if ap.get('icao') == target_icao:
+                            old_has = bool(ap.get('has_gsx_profile'))
+                            old_file = ap.get('gsx_profile_filename')
+                            if old_has != has_profile or old_file != filename:
+                                ap['has_gsx_profile'] = bool(has_profile)
+                                if has_profile and filename:
+                                    ap['gsx_profile_filename'] = filename
+                                    ap['gsx_ini_file'] = filename
+                                    if file_path:
+                                        ap['gsx_profile_path'] = file_path
+                                else:
+                                    ap['has_gsx_profile'] = False
+                                    ap.pop('gsx_profile_filename', None)
+                                    ap.pop('gsx_ini_file', None)
+                                    ap.pop('gsx_profile_path', None)
+                                changed = True
+                            if not updated_ap:
+                                updated_ap = ap
+                            break
+                    if changed:
+                        tmp_p = j_path + '.tmp'
+                        with open(tmp_p, 'w', encoding='utf-8') as f:
+                            json.dump(airports, f, ensure_ascii=False)
+                        os.replace(tmp_p, j_path)
+                except Exception as e:
+                    print(f"Error syncing {j_path} for {target_icao}:", e)
+
+        return updated_ap
+
     def install_gsx_profile(self, icao="", file_path="", base64_data="", filename="", replace_existing=False):
         import shutil
         import base64
@@ -1956,33 +2003,11 @@ class Api:
             if not installed_files:
                 return json.dumps({"status": "error", "message": "No valid GSX profile file (.ini or .py) found in this archive."})
 
-            # Fast in-place sync of installed_airports.json (milliseconds instead of re-scanning all GBs on SSD)
-            airports = []
-            if os.path.exists(OUTPUT_JSON_PATH):
-                try:
-                    with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as fh:
-                        airports = json.load(fh)
-                    
-                    if target_icao:
-                        for ap in airports:
-                            if ap.get('icao') == target_icao:
-                                ap['has_gsx_profile'] = True
-                                if installed_files:
-                                    ini_f = next((f for f in installed_files if f.lower().endswith('.ini')), installed_files[0])
-                                    ap['gsx_profile_filename'] = ini_f
-                                    ap['gsx_ini_file'] = ini_f
-                                    ap['gsx_profile_path'] = os.path.join(gsx_dir, ini_f)
-                                break
-                        tmp_p = OUTPUT_JSON_PATH + '.tmp'
-                        with open(tmp_p, 'w', encoding='utf-8') as fh:
-                            json.dump(airports, fh, ensure_ascii=False)
-                        os.replace(tmp_p, OUTPUT_JSON_PATH)
-                except Exception as e:
-                    print("Error fast-updating installed_airports.json:", e)
-
+            # Fast in-place sync of installed_airports.json
             updated_ap = None
             if target_icao:
-                updated_ap = next((ap for ap in airports if ap.get('icao') == target_icao), None)
+                ini_f = next((f for f in installed_files if f.lower().endswith('.ini')), (installed_files[0] if installed_files else None))
+                updated_ap = self.sync_airport_gsx_in_json(target_icao, True, ini_f, os.path.join(gsx_dir, ini_f) if ini_f else None)
 
             audit_data = audit_all_gsx_profiles(gsx_dir=gsx_dir)
             return json.dumps({
@@ -2007,36 +2032,8 @@ class Api:
             active_file = next((f for f in audit.get('files', []) if not f.get('is_disabled')), None)
             filename = active_file['filename'] if active_file else None
 
-            # Sync into installed_airports.json if changed
-            changed = False
-            if os.path.exists(OUTPUT_JSON_PATH):
-                try:
-                    with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
-                        airports = json.load(f)
-                    for ap in airports:
-                        if ap.get('icao') == target_icao:
-                            old_has = bool(ap.get('has_gsx_profile'))
-                            old_file = ap.get('gsx_profile_filename')
-                            if old_has != has_profile or old_file != filename:
-                                ap['has_gsx_profile'] = has_profile
-                                if filename:
-                                    ap['gsx_profile_filename'] = filename
-                                    ap['gsx_ini_file'] = filename
-                                    ap['gsx_profile_path'] = active_file.get('path', '')
-                                else:
-                                    ap['has_gsx_profile'] = False
-                                    ap.pop('gsx_profile_filename', None)
-                                    ap.pop('gsx_ini_file', None)
-                                    ap.pop('gsx_profile_path', None)
-                                changed = True
-                            break
-                    if changed:
-                        tmp_p = OUTPUT_JSON_PATH + '.tmp'
-                        with open(tmp_p, 'w', encoding='utf-8') as f:
-                            json.dump(airports, f, ensure_ascii=False)
-                        os.replace(tmp_p, OUTPUT_JSON_PATH)
-                except Exception as e:
-                    print("Error syncing airport GSX status into JSON:", e)
+            # Sync into installed_airports.json
+            self.sync_airport_gsx_in_json(target_icao, has_profile, filename, active_file.get('path', '') if active_file else None)
 
             return json.dumps({
                 "status": "ok",
@@ -2093,21 +2090,28 @@ class Api:
             res = json.loads(res_str) if isinstance(res_str, str) else res_str
 
             # Update bundled_gsx_profile.is_installed in installed_airports.json
-            if res.get('status') == 'ok' and os.path.exists(OUTPUT_JSON_PATH):
-                try:
-                    with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
-                        airports = json.load(f)
-                    for ap in airports:
-                        if ap.get('icao') == target_icao:
-                            if ap.get('bundled_gsx_profile'):
-                                ap['bundled_gsx_profile']['is_installed'] = True
-                            break
-                    tmp_p = OUTPUT_JSON_PATH + '.tmp'
-                    with open(tmp_p, 'w', encoding='utf-8') as f:
-                        json.dump(airports, f, ensure_ascii=False)
-                    os.replace(tmp_p, OUTPUT_JSON_PATH)
-                except Exception as e:
-                    print("Error updating bundled_gsx_profile.is_installed in JSON:", e)
+            if res.get('status') == 'ok':
+                json_paths = [OUTPUT_JSON_PATH]
+                local_json = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'installed_airports.json')
+                if os.path.exists(local_json) and os.path.abspath(local_json) != os.path.abspath(OUTPUT_JSON_PATH):
+                    json_paths.append(local_json)
+
+                for j_path in json_paths:
+                    if os.path.exists(j_path):
+                        try:
+                            with open(j_path, 'r', encoding='utf-8') as f:
+                                airports = json.load(f)
+                            for ap in airports:
+                                if ap.get('icao') == target_icao:
+                                    if ap.get('bundled_gsx_profile'):
+                                        ap['bundled_gsx_profile']['is_installed'] = True
+                                    break
+                            tmp_p = j_path + '.tmp'
+                            with open(tmp_p, 'w', encoding='utf-8') as f:
+                                json.dump(airports, f, ensure_ascii=False)
+                            os.replace(tmp_p, j_path)
+                        except Exception as e:
+                            print(f"Error updating bundled_gsx_profile.is_installed in {j_path}:", e)
 
             return json.dumps(res, ensure_ascii=False)
         except Exception as e:
@@ -2212,6 +2216,7 @@ class Api:
             # Now enable target file and any companion scripts (.py.disabled, _handler.py.disabled)
             stem = filename[:-9] if filename.lower().endswith('.disabled') else filename
             stem_base = os.path.splitext(stem)[0].lower()
+            target_ini_name = stem if (stem.lower().endswith('.ini') or stem.lower().endswith('.py')) else (stem + '.ini')
             
             for f in os.listdir(gsx_dir):
                 f_clean = f[:-9] if f.lower().endswith('.disabled') else f
@@ -2227,6 +2232,12 @@ class Api:
                         if os.path.exists(fp):
                             try: os.replace(fp, target_fp)
                             except Exception: pass
+                        if target_name.lower().endswith('.ini'):
+                            target_ini_name = target_name
+
+            target_icao = (icao or '').upper().strip()
+            if target_icao:
+                self.sync_airport_gsx_in_json(target_icao, True, target_ini_name, os.path.join(gsx_dir, target_ini_name))
 
             audit_data = audit_all_gsx_profiles(gsx_dir=gsx_dir)
             return json.dumps({"status": "ok", "data": audit_data}, ensure_ascii=False)
@@ -2243,6 +2254,7 @@ class Api:
             if not filename or '..' in filename or '/' in filename or '\\' in filename:
                 return json.dumps({"status": "error", "message": "Invalid filename."})
 
+            target_icao = (icao or '').upper().strip()
             stem = filename[:-9] if filename.lower().endswith('.disabled') else filename
             stem_base = os.path.splitext(stem)[0].lower()
             for f in os.listdir(gsx_dir):
@@ -2257,6 +2269,21 @@ class Api:
                             except Exception: pass
                         try: os.replace(fp, dest_fp)
                         except Exception: pass
+
+            # Determine remaining active file for target_icao
+            active_file = None
+            has_profile = False
+            if target_icao:
+                for f in os.listdir(gsx_dir):
+                    if f.lower() == 'configuration.ini' or f.lower().endswith('.disabled'):
+                        continue
+                    fp = os.path.join(gsx_dir, f)
+                    f_icao = extract_icao_from_gsx_filename(f, valid_icaos={target_icao}, file_path=fp)
+                    if f_icao == target_icao:
+                        active_file = f
+                        has_profile = True
+                        break
+                self.sync_airport_gsx_in_json(target_icao, has_profile, active_file, os.path.join(gsx_dir, active_file) if active_file else None)
 
             audit_data = audit_all_gsx_profiles(gsx_dir=gsx_dir)
             return json.dumps({"status": "ok", "data": audit_data}, ensure_ascii=False)
@@ -2273,6 +2300,7 @@ class Api:
             if not filename or '..' in filename or '/' in filename or '\\' in filename:
                 return json.dumps({"status": "error", "message": "Invalid filename."})
 
+            target_icao = (icao or '').upper().strip()
             stem = filename[:-9] if filename.lower().endswith('.disabled') else filename
             stem_base = os.path.splitext(stem)[0].lower()
             deleted_any = False
@@ -2288,6 +2316,21 @@ class Api:
                         except Exception: pass
             if not deleted_any:
                 return json.dumps({"status": "error", "message": f"File '{filename}' not found."})
+
+            # Determine remaining active file for target_icao
+            active_file = None
+            has_profile = False
+            if target_icao:
+                for f in os.listdir(gsx_dir):
+                    if f.lower() == 'configuration.ini' or f.lower().endswith('.disabled'):
+                        continue
+                    fp = os.path.join(gsx_dir, f)
+                    f_icao = extract_icao_from_gsx_filename(f, valid_icaos={target_icao}, file_path=fp)
+                    if f_icao == target_icao:
+                        active_file = f
+                        has_profile = True
+                        break
+                self.sync_airport_gsx_in_json(target_icao, has_profile, active_file, os.path.join(gsx_dir, active_file) if active_file else None)
 
             audit_data = audit_all_gsx_profiles(gsx_dir=gsx_dir)
             return json.dumps({"status": "ok", "data": audit_data}, ensure_ascii=False)
@@ -2313,6 +2356,10 @@ class Api:
                         print(f"Error removing {fp}: {e}")
 
             audit_data = audit_all_gsx_profiles(gsx_dir=gsx_dir)
+            for a_icao, entry in audit_data.get('by_icao', {}).items():
+                act_f = next((f['filename'] for f in entry.get('files', []) if not f.get('is_disabled')), None)
+                self.sync_airport_gsx_in_json(a_icao, bool(act_f), act_f, os.path.join(gsx_dir, act_f) if act_f else None)
+
             return json.dumps({"status": "ok", "deleted_count": deleted_count, "data": audit_data}, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
