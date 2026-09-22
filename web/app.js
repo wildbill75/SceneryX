@@ -179,59 +179,59 @@ let activeRouteLinesGroup = null;
 // Global Country Name to ISO Lookup Map
 const COUNTRY_NAME_TO_ISO = {
     'antarctica': 'AQ', 'antarctique': 'AQ', 'antartida': 'AQ', 'antarktis': 'AQ',
-    'afghanistan': 'AF', 'albania': 'AL', 'algeria': 'DZ', 'andorra': 'AD', 'angola': 'AO',
-    'argentina': 'AR', 'armenia': 'AM', 'australia': 'AU', 'austria': 'AT', 'azerbaijan': 'AZ',
-    'bahamas': 'BS', 'bahrain': 'BH', 'bangladesh': 'BD', 'barbados': 'BB', 'belarus': 'BY',
-    'belgium': 'BE', 'belize': 'BZ', 'benin': 'BJ', 'bhutan': 'BT', 'bolivia': 'BO',
-    'bosnia': 'BA', 'bosnia and herzegovina': 'BA', 'botswana': 'BW', 'brazil': 'BR', 'brunei': 'BN',
-    'bulgaria': 'BG', 'burkina faso': 'BF', 'burundi': 'BI',
-    'cambodia': 'KH', 'cameroon': 'CM', 'canada': 'CA', 'cape verde': 'CV', 'central african republic': 'CF',
-    'chad': 'TD', 'chile': 'CL', 'china': 'CN', 'colombia': 'CO', 'comoros': 'KM',
-    'congo': 'CG', 'dr congo': 'CD', 'democratic republic of the congo': 'CD', 'costa rica': 'CR', 'croatia': 'HR', 'cuba': 'CU',
-    'cyprus': 'CY', 'czech republic': 'CZ', 'czechia': 'CZ',
-    'denmark': 'DK', 'djibouti': 'DJ', 'dominica': 'DM', 'dominican republic': 'DO',
-    'ecuador': 'EC', 'egypt': 'EG', 'el salvador': 'SV', 'equatorial guinea': 'GQ', 'eritrea': 'ER',
-    'estonia': 'EE', 'eswatini': 'SZ', 'ethiopia': 'ET',
-    'faroe islands': 'FO', 'faroe': 'FO', 'iles feroe': 'FO', 'îles féroé': 'FO', 'faroer': 'FO', 'islas feroe': 'FO', 'fiji': 'FJ', 'finland': 'FI', 'france': 'FR', 'french guiana': 'GF', 'french polynesia': 'PF', 'tahiti': 'PF', 'polynesie': 'PF', 'polynésie': 'PF', 'polynesie francaise': 'PF', 'polynésie française': 'PF',
-    'gabon': 'GA', 'gambia': 'GM', 'georgia': 'GE', 'germany': 'DE', 'ghana': 'GH',
-    'greece': 'GR', 'greenland': 'GL', 'grenada': 'GD', 'guatemala': 'GT', 'guinea': 'GN',
-    'guinea-bissau': 'GW', 'guyana': 'GY',
-    'haiti': 'HT', 'honduras': 'HN', 'hong kong': 'HK', 'hungary': 'HU',
-    'iceland': 'IS', 'india': 'IN', 'indonesia': 'ID', 'iran': 'IR', 'iraq': 'IQ',
-    'ireland': 'IE', 'israel': 'IL', 'italy': 'IT', 'ivory coast': 'CI',
-    'jamaica': 'JM', 'japan': 'JP', 'jordan': 'JO',
-    'kazakhstan': 'KZ', 'kenya': 'KE', 'kiribati': 'KI', 'north korea': 'KP', 'south korea': 'KR', 'korea': 'KR',
-    'kosovo': 'XK', 'kuwait': 'KW', 'kyrgyzstan': 'KG',
-    'laos': 'LA', 'latvia': 'LV', 'lebanon': 'LB', 'lesotho': 'LS', 'liberia': 'LR',
-    'libya': 'LY', 'liechtenstein': 'LI', 'lithuania': 'LT', 'luxembourg': 'LU',
-    'macao': 'MO', 'macedonia': 'MK', 'north macedonia': 'MK', 'madagascar': 'MG', 'malawi': 'MW',
-    'malaysia': 'MY', 'maldives': 'MV', 'mali': 'ML', 'malta': 'MT', 'marshall islands': 'MH',
-    'mauritania': 'MR', 'mauritius': 'MU', 'mexico': 'MX', 'micronesia': 'FM', 'moldova': 'MD',
-    'monaco': 'MC', 'mongolia': 'MN', 'montenegro': 'ME', 'morocco': 'MA', 'mozambique': 'MZ',
-    'myanmar': 'MM',
-    'namibia': 'NA', 'nauru': 'NR', 'nepal': 'NP', 'netherlands': 'NL', 'holland': 'NL',
-    'new caledonia': 'NC', 'new zealand': 'NZ', 'nicaragua': 'NI', 'niger': 'NE', 'nigeria': 'NG',
-    'norway': 'NO',
+    'afghanistan': 'AF', 'albania': 'AL', 'albanie': 'AL', 'algeria': 'DZ', 'algerie': 'DZ', 'algérie': 'DZ', 'andorra': 'AD', 'andorre': 'AD', 'angola': 'AO',
+    'argentina': 'AR', 'argentine': 'AR', 'armenia': 'AM', 'armenie': 'AM', 'arménie': 'AM', 'australia': 'AU', 'australie': 'AU', 'austria': 'AT', 'autriche': 'AT', 'azerbaijan': 'AZ', 'azerbaidjan': 'AZ', 'azerbaïdjan': 'AZ',
+    'bahamas': 'BS', 'bahrain': 'BH', 'bahrein': 'BH', 'bahreïn': 'BH', 'bangladesh': 'BD', 'barbados': 'BB', 'barbade': 'BB', 'belarus': 'BY', 'bielorussie': 'BY', 'biélorussie': 'BY',
+    'belgium': 'BE', 'belgique': 'BE', 'belize': 'BZ', 'benin': 'BJ', 'bhutan': 'BT', 'bhoutan': 'BT', 'bolivia': 'BO', 'bolivie': 'BO',
+    'bosnia': 'BA', 'bosnia and herzegovina': 'BA', 'bosnie': 'BA', 'bosnie-herzegovine': 'BA', 'bosnie-herzégovine': 'BA', 'botswana': 'BW', 'brazil': 'BR', 'bresil': 'BR', 'brésil': 'BR', 'brunei': 'BN',
+    'bulgaria': 'BG', 'bulgarie': 'BG', 'burkina faso': 'BF', 'burundi': 'BI',
+    'cambodia': 'KH', 'cambodge': 'KH', 'cameroon': 'CM', 'cameroun': 'CM', 'canada': 'CA', 'cape verde': 'CV', 'cap-vert': 'CV', 'central african republic': 'CF', 'centrafrique': 'CF',
+    'chad': 'TD', 'tchad': 'TD', 'chile': 'CL', 'chili': 'CL', 'china': 'CN', 'chine': 'CN', 'colombia': 'CO', 'colombie': 'CO', 'comoros': 'KM', 'comores': 'KM',
+    'congo': 'CG', 'dr congo': 'CD', 'democratic republic of the congo': 'CD', 'rd congo': 'CD', 'costa rica': 'CR', 'croatia': 'HR', 'croatie': 'HR', 'cuba': 'CU',
+    'cyprus': 'CY', 'chypre': 'CY', 'czech republic': 'CZ', 'czechia': 'CZ', 'republique tcheque': 'CZ', 'république tchèque': 'CZ', 'tchequie': 'CZ', 'tchéquie': 'CZ',
+    'denmark': 'DK', 'danemark': 'DK', 'djibouti': 'DJ', 'dominica': 'DM', 'dominique': 'DM', 'dominican republic': 'DO', 'republique dominicaine': 'DO', 'république dominicaine': 'DO',
+    'ecuador': 'EC', 'equateur': 'EC', 'équateur': 'EC', 'egypt': 'EG', 'egypte': 'EG', 'égypte': 'EG', 'el salvador': 'SV', 'equatorial guinea': 'GQ', 'guinee equatoriale': 'GQ', 'guinée équatoriale': 'GQ', 'eritrea': 'ER', 'erythree': 'ER', 'érythrée': 'ER',
+    'estonia': 'EE', 'estonie': 'EE', 'eswatini': 'SZ', 'ethiopia': 'ET', 'ethiopie': 'ET', 'éthiopie': 'ET',
+    'faroe islands': 'FO', 'faroe': 'FO', 'iles feroe': 'FO', 'îles féroé': 'FO', 'faroer': 'FO', 'islas feroe': 'FO', 'fiji': 'FJ', 'fidji': 'FJ', 'finland': 'FI', 'finlande': 'FI', 'france': 'FR', 'french guiana': 'GF', 'guyane': 'GF', 'french polynesia': 'PF', 'tahiti': 'PF', 'polynesie': 'PF', 'polynésie': 'PF', 'polynesie francaise': 'PF', 'polynésie française': 'PF',
+    'gabon': 'GA', 'gambia': 'GM', 'gambie': 'GM', 'georgia': 'GE', 'georgie': 'GE', 'géorgie': 'GE', 'germany': 'DE', 'allemagne': 'DE', 'ghana': 'GH',
+    'greece': 'GR', 'grece': 'GR', 'grèce': 'GR', 'greenland': 'GL', 'groenland': 'GL', 'grenada': 'GD', 'grenade': 'GD', 'guatemala': 'GT', 'guinea': 'GN', 'guinee': 'GN', 'guinée': 'GN',
+    'guinea-bissau': 'GW', 'guinee-bissau': 'GW', 'guinée-bissau': 'GW', 'guyana': 'GY',
+    'haiti': 'HT', 'haïti': 'HT', 'honduras': 'HN', 'hong kong': 'HK', 'hungary': 'HU', 'hongrie': 'HU',
+    'iceland': 'IS', 'islande': 'IS', 'india': 'IN', 'inde': 'IN', 'indonesia': 'ID', 'indonesie': 'ID', 'indonésie': 'ID', 'iran': 'IR', 'iraq': 'IQ', 'irak': 'IQ',
+    'ireland': 'IE', 'irlande': 'IE', 'israel': 'IL', 'israël': 'IL', 'italy': 'IT', 'italie': 'IT', 'ivory coast': 'CI', 'cote d\'ivoire': 'CI', 'côte d\'ivoire': 'CI',
+    'jamaica': 'JM', 'jamaique': 'JM', 'jamaïque': 'JM', 'japan': 'JP', 'japon': 'JP', 'jordan': 'JO', 'jordanie': 'JO',
+    'kazakhstan': 'KZ', 'kenya': 'KE', 'kiribati': 'KI', 'north korea': 'KP', 'south korea': 'KR', 'korea': 'KR', 'coree': 'KR', 'corée': 'KR', 'coree du sud': 'KR', 'corée du sud': 'KR', 'coree du nord': 'KP', 'corée du nord': 'KP',
+    'kosovo': 'XK', 'kuwait': 'KW', 'koweit': 'KW', 'koweït': 'KW', 'kyrgyzstan': 'KG', 'kirghizistan': 'KG',
+    'laos': 'LA', 'latvia': 'LV', 'lettonie': 'LV', 'lebanon': 'LB', 'liban': 'LB', 'lesotho': 'LS', 'liberia': 'LR',
+    'libya': 'LY', 'libye': 'LY', 'liechtenstein': 'LI', 'lithuania': 'LT', 'lituanie': 'LT', 'luxembourg': 'LU',
+    'macao': 'MO', 'macedonia': 'MK', 'north macedonia': 'MK', 'macedoine': 'MK', 'macédoine': 'MK', 'madagascar': 'MG', 'malawi': 'MW',
+    'malaysia': 'MY', 'malaisie': 'MY', 'maldives': 'MV', 'mali': 'ML', 'malta': 'MT', 'malte': 'MT', 'marshall islands': 'MH', 'iles marshall': 'MH', 'îles marshall': 'MH',
+    'mauritania': 'MR', 'mauritanie': 'MR', 'mauritius': 'MU', 'maurice': 'MU', 'ile maurice': 'MU', 'île maurice': 'MU', 'mexico': 'MX', 'mexique': 'MX', 'micronesia': 'FM', 'micronesie': 'FM', 'micronésie': 'FM', 'moldova': 'MD', 'moldavie': 'MD',
+    'monaco': 'MC', 'mongolia': 'MN', 'mongolie': 'MN', 'montenegro': 'ME', 'monténégro': 'ME', 'morocco': 'MA', 'maroc': 'MA', 'mozambique': 'MZ',
+    'myanmar': 'MM', 'birmanie': 'MM',
+    'namibia': 'NA', 'namibie': 'NA', 'nauru': 'NR', 'nepal': 'NP', 'netherlands': 'NL', 'holland': 'NL', 'pays-bas': 'NL', 'pays bas': 'NL',
+    'new caledonia': 'NC', 'nouvelle-caledonie': 'NC', 'nouvelle-calédonie': 'NC', 'nouvelle caledonie': 'NC', 'nouvelle calédonie': 'NC', 'new zealand': 'NZ', 'nouvelle-zelande': 'NZ', 'nouvelle-zélande': 'NZ', 'nouvelle zelande': 'NZ', 'nouvelle zélande': 'NZ', 'nicaragua': 'NI', 'niger': 'NE', 'nigeria': 'NG',
+    'norway': 'NO', 'norvege': 'NO', 'norvège': 'NO',
     'oman': 'OM',
-    'pakistan': 'PK', 'palau': 'PW', 'palestine': 'PS', 'panama': 'PA', 'papua new guinea': 'PG',
-    'paraguay': 'PY', 'peru': 'PE', 'philippines': 'PH', 'poland': 'PL', 'portugal': 'PT', 'puerto rico': 'PR',
+    'pakistan': 'PK', 'palau': 'PW', 'palestine': 'PS', 'panama': 'PA', 'papua new guinea': 'PG', 'papouasie': 'PG', 'papouasie-nouvelle-guinee': 'PG',
+    'paraguay': 'PY', 'peru': 'PE', 'perou': 'PE', 'pérou': 'PE', 'philippines': 'PH', 'poland': 'PL', 'pologne': 'PL', 'portugal': 'PT', 'puerto rico': 'PR', 'porto rico': 'PR',
     'qatar': 'QA',
-    'romania': 'RO', 'russia': 'RU', 'rwanda': 'RW',
-    'samoa': 'WS', 'san marino': 'SM', 'saudi arabia': 'SA', 'senegal': 'SN', 'serbia': 'RS',
-    'seychelles': 'SC', 'sierra leone': 'SL', 'singapore': 'SG', 'slovakia': 'SK', 'slovenia': 'SI',
-    'solomon islands': 'SB', 'somalia': 'SO', 'south africa': 'ZA', 'south sudan': 'SS',
-    'spain': 'ES', 'espana': 'ES', 'sri lanka': 'LK', 'sudan': 'SD', 'suriname': 'SR',
-    'sweden': 'SE', 'switzerland': 'CH', 'syria': 'SY',
-    'taiwan': 'TW', 'tajikistan': 'TJ', 'tanzania': 'TZ', 'thailand': 'TH', 'timor-leste': 'TL',
-    'togo': 'TG', 'tonga': 'TO', 'trinidad': 'TT', 'trinidad and tobago': 'TT', 'tunisia': 'TN',
-    'turkey': 'TR', 'turkiye': 'TR', 'turkmenistan': 'TM', 'tuvalu': 'TV',
-    'uganda': 'UG', 'ukraine': 'UA', 'united arab emirates': 'AE', 'uae': 'AE',
-    'united kingdom': 'GB', 'uk': 'GB', 'england': 'GB', 'scotland': 'GB', 'wales': 'GB',
-    'united states': 'US', 'united states of america': 'US', 'usa': 'US', 'us': 'US',
-    'uruguay': 'UY', 'uzbekistan': 'UZ',
-    'vanuatu': 'VU', 'venezuela': 'VE', 'vietnam': 'VN', 'viet nam': 'VN',
+    'romania': 'RO', 'roumanie': 'RO', 'russia': 'RU', 'russie': 'RU', 'rwanda': 'RW',
+    'samoa': 'WS', 'san marino': 'SM', 'saint-marin': 'SM', 'saudi arabia': 'SA', 'arabie saoudite': 'SA', 'senegal': 'SN', 'sénégal': 'SN', 'serbia': 'RS', 'serbie': 'RS',
+    'seychelles': 'SC', 'sierra leone': 'SL', 'singapore': 'SG', 'singapour': 'SG', 'slovakia': 'SK', 'slovaquie': 'SK', 'slovenia': 'SI', 'slovenie': 'SI', 'slovénie': 'SI',
+    'solomon islands': 'SB', 'iles salomon': 'SB', 'îles salomon': 'SB', 'somalia': 'SO', 'somalie': 'SO', 'south africa': 'ZA', 'afrique du sud': 'ZA', 'south sudan': 'SS', 'soudan du sud': 'SS',
+    'spain': 'ES', 'espana': 'ES', 'espagne': 'ES', 'sri lanka': 'LK', 'sudan': 'SD', 'soudan': 'SD', 'suriname': 'SR',
+    'sweden': 'SE', 'suede': 'SE', 'suède': 'SE', 'switzerland': 'CH', 'suisse': 'CH', 'syria': 'SY', 'syrie': 'SY',
+    'taiwan': 'TW', 'tajikistan': 'TJ', 'tadjikistan': 'TJ', 'tanzania': 'TZ', 'tanzanie': 'TZ', 'thailand': 'TH', 'thailande': 'TH', 'thaïlande': 'TH', 'timor-leste': 'TL',
+    'togo': 'TG', 'tonga': 'TO', 'trinidad': 'TT', 'trinidad and tobago': 'TT', 'trinite-et-tobago': 'TT', 'tunisia': 'TN', 'tunisie': 'TN',
+    'turkey': 'TR', 'turkiye': 'TR', 'turquie': 'TR', 'turkmenistan': 'TM', 'turkmenistan': 'TM', 'tuvalu': 'TV',
+    'uganda': 'UG', 'ouganda': 'UG', 'ukraine': 'UA', 'united arab emirates': 'AE', 'uae': 'AE', 'emirats arabes unis': 'AE', 'émirats arabes unis': 'AE',
+    'united kingdom': 'GB', 'uk': 'GB', 'england': 'GB', 'scotland': 'GB', 'wales': 'GB', 'royaume-uni': 'GB', 'royaume uni': 'GB', 'angleterre': 'GB', 'ecosse': 'GB', 'écosse': 'GB', 'pays de galles': 'GB',
+    'united states': 'US', 'united states of america': 'US', 'usa': 'US', 'us': 'US', 'etats-unis': 'US', 'états-unis': 'US', 'etats unis': 'US', 'états unis': 'US',
+    'uruguay': 'UY', 'uzbekistan': 'UZ', 'ouzbekistan': 'UZ',
+    'vanuatu': 'VU', 'venezuela': 'VE', 'vietnam': 'VN', 'viet nam': 'VN', 'viêt nam': 'VN',
     'yemen': 'YE',
-    'zambia': 'ZM', 'zimbabwe': 'ZW'
+    'zambia': 'ZM', 'zambie': 'ZM', 'zimbabwe': 'ZW'
 };
 
 // Authoritative ISO to Full English Country Name Map
@@ -1913,7 +1913,7 @@ function resetConflictingFiltersForCountrySelection() {
     selectedAirport = null;
 }
 
-function toggleCountrySelection(iso, countryName, layer, forceSelect = false) {
+function toggleCountrySelection(iso, countryName, layer, forceSelect = false, keepSearchInput = false) {
     if (!iso || iso === '-99') return;
 
     const isoUpper = iso.toUpperCase().trim();
@@ -1934,7 +1934,7 @@ function toggleCountrySelection(iso, countryName, layer, forceSelect = false) {
             types: new Set(selectedTypes),
             minRating: selectedMinRating,
             gsxFilter: selectedGsxFilter,
-            search: document.getElementById('search-input') ? document.getElementById('search-input').value : ''
+            search: keepSearchInput ? '' : (document.getElementById('search-input') ? document.getElementById('search-input').value : '')
         };
     }
 
@@ -1944,11 +1944,20 @@ function toggleCountrySelection(iso, countryName, layer, forceSelect = false) {
     selectedTypes = new Set(DEFAULT_COUNTRY_TYPES);
     selectedMinRating = 0;
     selectedGsxFilter = 'all';
+
     const searchInp = document.getElementById('search-input');
-    if (searchInp) {
-        searchInp.value = '';
-        const clearBtn = document.getElementById('clear-search');
-        if (clearBtn) clearBtn.classList.add('hidden');
+    const clearBtn = document.getElementById('clear-search');
+    if (!keepSearchInput) {
+        if (searchInp) {
+            searchInp.value = '';
+        }
+        if (clearBtn) {
+            clearBtn.classList.add('hidden');
+        }
+    } else {
+        if (clearBtn) {
+            clearBtn.classList.remove('hidden');
+        }
     }
     updateFilterUI();
     renderFilterStarWidget(0);
@@ -11641,7 +11650,20 @@ function debouncedFilterAirports() {
     // As soon as the user starts typing in the search bar, immediately clear/cut all active filters
     // and revert to default mode so the search executes cleanly across the default collection!
     if (searchVal.length > 0) {
+        if (selectedCountryCode) {
+            const currentSearchIso = COUNTRY_NAME_TO_ISO[searchVal.toLowerCase()] || (searchVal.length === 2 ? searchVal.toUpperCase() : null);
+            if (currentSearchIso !== selectedCountryCode) {
+                if (typeof exitCountryMode === 'function') {
+                    exitCountryMode(false);
+                }
+            }
+        }
         resetAllFiltersToDefault(true);
+    } else {
+        if (selectedCountryCode && typeof exitCountryMode === 'function') {
+            if (preCountryModeFilters) preCountryModeFilters.search = '';
+            exitCountryMode(false);
+        }
     }
 
     const clearBtn = document.getElementById('clear-search');
@@ -11962,7 +11984,7 @@ function triggerSearchFocus() {
         }
 
         const countryName = rawSearch.charAt(0).toUpperCase() + rawSearch.slice(1);
-        toggleCountrySelection(targetIso, countryName, countryLayer);
+        toggleCountrySelection(targetIso, countryName, countryLayer, false, true);
         return;
     }
 
@@ -11975,9 +11997,19 @@ function triggerSearchFocus() {
 }
 
 function clearSearch() {
-    document.getElementById('search-input').value = '';
+    const searchInp = document.getElementById('search-input');
+    if (searchInp) searchInp.value = '';
+    const clearBtn = document.getElementById('clear-search');
+    if (clearBtn) clearBtn.classList.add('hidden');
     lastFocusedIcao = null;
-    filterAirports();
+    if (selectedCountryCode) {
+        if (preCountryModeFilters) {
+            preCountryModeFilters.search = '';
+        }
+        exitCountryMode(false);
+    } else {
+        filterAirports();
+    }
 }
 
 function filterByPricingPill(pricing) {
