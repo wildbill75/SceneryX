@@ -4646,6 +4646,9 @@ function proceedWithGsxDropInstallation(targetIcao, installPayload, evalRes) {
                 if (typeof refreshAirportGsxStatus === 'function') {
                     refreshAirportGsxStatus(targetIcao);
                 }
+                if (typeof resetRadialGsxDropzoneUI === 'function') {
+                    resetRadialGsxDropzoneUI();
+                }
             },
             onConfirm: async () => {
                 await executeGsxInstallationForIcao(targetIcao, { ...installPayload, replaceExisting: true });
@@ -4736,6 +4739,9 @@ function proceedWithGsxDropInstallation(targetIcao, installPayload, evalRes) {
                 if (typeof refreshAirportGsxStatus === 'function') {
                     refreshAirportGsxStatus(targetIcao);
                 }
+                if (typeof resetRadialGsxDropzoneUI === 'function') {
+                    resetRadialGsxDropzoneUI();
+                }
             },
             onConfirm: async () => {
                 await executeGsxInstallationForIcao(targetIcao, { ...installPayload, replaceExisting: true });
@@ -4748,7 +4754,10 @@ function proceedWithGsxDropInstallation(targetIcao, installPayload, evalRes) {
 }
 window.checkGsxDropConflictAndInstall = checkGsxDropConflictAndInstall;
 async function executeGsxInstallationForIcao(icao, { filePath = '', base64Data = '', filename = '', replaceExisting = false } = {}) {
-    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.install_gsx_profile) return;
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.install_gsx_profile) {
+        if (typeof resetRadialGsxDropzoneUI === 'function') resetRadialGsxDropzoneUI();
+        return;
+    }
     try {
         const raw = await window.pywebview.api.install_gsx_profile(
             icao || '',
@@ -4759,31 +4768,28 @@ async function executeGsxInstallationForIcao(icao, { filePath = '', base64Data =
         );
         const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
         if (parsed && parsed.status === 'ok') {
+            const targetIcao = (parsed.target_icao || icao || '').toUpperCase();
             if (parsed.airports && Array.isArray(parsed.airports)) {
                 allAirportsData = parsed.airports;
             }
-            const ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao(icao) : null;
+            const ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao(targetIcao) : null;
             if (ap) {
                 ap.has_gsx_profile = true;
                 if (parsed.installed_files && parsed.installed_files.length > 0) {
-                    ap.gsx_ini_file = parsed.installed_files[0];
-                    ap.gsx_profile_filename = parsed.installed_files[0];
+                    const iniF = parsed.installed_files.find(f => f.toLowerCase().endsWith('.ini')) || parsed.installed_files[0];
+                    ap.gsx_ini_file = iniF;
+                    ap.gsx_profile_filename = iniF;
+                }
+                if (parsed.airport) {
+                    Object.assign(ap, parsed.airport);
                 }
             }
-            updateStats(allAirportsData);
-            filterAirports();
+            if (typeof updateStats === 'function') updateStats(allAirportsData);
+            if (typeof filterAirports === 'function') filterAirports();
 
-            if (typeof currentRadialAirport !== 'undefined' && currentRadialAirport && currentRadialAirport.icao === icao) {
-                const updatedAp = getAirportByIcao(icao);
-                if (updatedAp) {
-                    currentRadialAirport = updatedAp;
-                    if (typeof renderRadialAirportDetails === 'function') {
-                        renderRadialAirportDetails(currentRadialAirport);
-                    }
-                }
-            }
-
-            if (window.pywebview.api.scan_gsx_audit) {
+            if (parsed.audit) {
+                window.gsxAuditData = parsed.audit;
+            } else if (window.pywebview.api.scan_gsx_audit) {
                 const auditRaw = await window.pywebview.api.scan_gsx_audit();
                 const auditParsed = typeof auditRaw === 'string' ? JSON.parse(auditRaw) : auditRaw;
                 if (auditParsed && auditParsed.status === 'ok') {
@@ -4791,15 +4797,42 @@ async function executeGsxInstallationForIcao(icao, { filePath = '', base64Data =
                 }
             }
 
+            // Update radial details modal if active
+            if (typeof currentRadialAirport !== 'undefined' && currentRadialAirport) {
+                const updatedAp = getAirportByIcao(currentRadialAirport.icao);
+                if (updatedAp) {
+                    currentRadialAirport = updatedAp;
+                    if (typeof renderRadialAirportDetails === 'function') {
+                        renderRadialAirportDetails(currentRadialAirport);
+                    } else if (typeof renderRadialGsx === 'function') {
+                        renderRadialGsx(currentRadialAirport);
+                    }
+                }
+            }
+
+            // Update right drawer if active
+            if (typeof selectedAirport !== 'undefined' && selectedAirport) {
+                const updatedSel = getAirportByIcao(selectedAirport.icao);
+                if (updatedSel) {
+                    selectedAirport = updatedSel;
+                    if (typeof renderDetails === 'function') {
+                        renderDetails(selectedAirport);
+                    }
+                }
+            }
+
+            if (typeof renderGsxAuditModal === 'function' && window.isGsxAuditOpen) {
+                renderGsxAuditModal();
+            }
+            if (typeof updateGsxHeaderAndTabBadges === 'function') {
+                updateGsxHeaderAndTabBadges();
+            }
+
             const fileCount = (parsed.installed_files || []).length;
             const fileMsg = fileCount > 0 ? `: ${parsed.installed_files.join(', ')}` : '';
             if (typeof showToast === 'function') {
-                showToast(`✓ GSX profile installed for ${icao}${fileMsg}`, 'success');
+                showToast(`✓ GSX profile installed for ${targetIcao}${fileMsg}`, 'success');
             }
-
-            renderGsxAuditModal();
-            renderGsxAuditModal();
-            updateGsxHeaderAndTabBadges();
         } else if (parsed && parsed.status === 'error') {
             if (typeof showToast === 'function') {
                 showToast(parsed.message || 'Failed to install GSX profile', 'error');
@@ -4809,6 +4842,10 @@ async function executeGsxInstallationForIcao(icao, { filePath = '', base64Data =
         console.error("Error installing GSX profile for icao:", e);
         if (typeof showToast === 'function') {
             showToast(`Installation error: ${e.message || String(e)}`, 'error');
+        }
+    } finally {
+        if (typeof resetRadialGsxDropzoneUI === 'function') {
+            resetRadialGsxDropzoneUI();
         }
     }
 }
@@ -8112,6 +8149,20 @@ function triggerGsxStudioSearch(icao) {
     }
 }
 
+function resetRadialGsxDropzoneUI() {
+    const zone = document.getElementById('radial-gsx-dropzone') || document.getElementById('radial-gsx-drop-zone');
+    if (zone) {
+        zone.classList.remove('border-cyan-400', 'bg-cyan-950/80', 'scale-[1.02]', 'shadow-lg', 'shadow-cyan-500/25');
+        zone.classList.add('border-slate-700/80', 'bg-slate-950/60');
+        const textSpan = zone.querySelector('#radial-gsx-drop-text span');
+        if (textSpan) {
+            textSpan.innerHTML = zone.dataset.origText || 'DROP .ZIP OR .INI HERE TO INSTALL';
+        }
+        delete zone.dataset.origText;
+    }
+}
+window.resetRadialGsxDropzoneUI = resetRadialGsxDropzoneUI;
+
 function handleRadialGsxDragOver(e) {
     e.preventDefault();
     e.stopPropagation();
@@ -8148,6 +8199,23 @@ function handleRadialGsxDragLeave(e) {
 async function handleRadialGsxDrop(e, icao) {
     e.preventDefault();
     e.stopPropagation();
+
+    if (!e.dataTransfer || !e.dataTransfer.files || e.dataTransfer.files.length === 0) {
+        resetRadialGsxDropzoneUI();
+        return;
+    }
+
+    const file = e.dataTransfer.files[0];
+    const ext = (file.name || '').split('.').pop().toLowerCase();
+    const validExts = ['ini', 'py', 'zip', 'rar', '7z', 'tar', 'gz'];
+    if (!validExts.includes(ext)) {
+        resetRadialGsxDropzoneUI();
+        if (typeof showToast === 'function') {
+            showToast('Please drop a GSX profile (.ini) or archive (.zip, .rar, .7z)', 'warning');
+        }
+        return;
+    }
+
     const zone = document.getElementById('radial-gsx-dropzone') || document.getElementById('radial-gsx-drop-zone');
     if (zone) {
         zone.classList.remove('border-cyan-400', 'bg-cyan-950/80', 'scale-[1.02]', 'shadow-lg', 'shadow-cyan-500/25');
@@ -8158,8 +8226,6 @@ async function handleRadialGsxDrop(e, icao) {
         }
     }
 
-    if (!e.dataTransfer || !e.dataTransfer.files || e.dataTransfer.files.length === 0) return;
-    const file = e.dataTransfer.files[0];
     const path = file.path || '';
     const targetIcao = icao || (currentRadialAirport ? currentRadialAirport.icao : '') || (selectedAirport ? selectedAirport.icao : '');
 
@@ -8176,6 +8242,7 @@ async function handleRadialGsxDrop(e, icao) {
             checkGsxDropConflictAndInstall(targetIcao, { base64Data: base64Data, filename: file.name });
         };
         reader.onerror = function() {
+            resetRadialGsxDropzoneUI();
             showCustomModal({ title: 'File Read Error', message: 'Unable to read the dropped file.', type: 'error' });
         };
         reader.readAsDataURL(file);
@@ -13298,9 +13365,17 @@ async function handleGsxDrop(e) {
     if (!e.dataTransfer || !e.dataTransfer.files || e.dataTransfer.files.length === 0) return;
 
     const file = e.dataTransfer.files[0];
-    const path = file.path || '';
+    const ext = (file.name || '').split('.').pop().toLowerCase();
+    const validExts = ['ini', 'py', 'zip', 'rar', '7z', 'tar', 'gz'];
+    if (!validExts.includes(ext)) {
+        if (typeof showToast === 'function') {
+            showToast('Please drop a GSX profile (.ini) or archive (.zip, .rar, .7z)', 'warning');
+        }
+        return;
+    }
 
-    const targetIcao = selectedAirport ? (selectedAirport.icao || '') : '';
+    const path = file.path || '';
+    const targetIcao = selectedAirport ? (selectedAirport.icao || '') : (currentRadialAirport ? currentRadialAirport.icao : '');
     if (path) {
         checkGsxDropConflictAndInstall(targetIcao, { filePath: path });
     } else {
@@ -13317,29 +13392,40 @@ async function handleGsxDrop(e) {
 }
 
 async function triggerInstallGsxProfile() {
-    const targetIcao = selectedAirport ? (selectedAirport.icao || '') : '';
+    const targetIcao = selectedAirport ? (selectedAirport.icao || '') : (currentRadialAirport ? currentRadialAirport.icao : '');
     await executeGsxInstallationForIcao(targetIcao, { filePath: '' });
 }
 
 async function executeGsxInstallation({ filePath = '', base64Data = '', filename = '', replaceExisting = false } = {}) {
-    if (!selectedAirport) return;
+    if (!selectedAirport && !currentRadialAirport) return;
+    const targetIcao = selectedAirport ? (selectedAirport.icao || '') : (currentRadialAirport ? currentRadialAirport.icao : '');
     try {
         if (window.pywebview) {
             const resStr = await window.pywebview.api.install_gsx_profile(
-                selectedAirport.icao || '',
+                targetIcao,
                 filePath || '',
                 base64Data || '',
                 filename || '',
                 replaceExisting
             );
-            const res = JSON.parse(resStr);
+            const res = typeof resStr === 'string' ? JSON.parse(resStr) : resStr;
             if (res.status === 'ok') {
-                allAirportsData = res.airports;
-                allAirportsData.forEach(ap => {
-                    if (userRatingsMap[ap.icao] !== undefined) {
-                        ap.rating = userRatingsMap[ap.icao];
+                if (res.airports && Array.isArray(res.airports)) {
+                    allAirportsData = res.airports;
+                }
+                const actualIcao = (res.target_icao || targetIcao).toUpperCase();
+                const ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao(actualIcao) : null;
+                if (ap) {
+                    ap.has_gsx_profile = true;
+                    if (res.installed_files && res.installed_files.length > 0) {
+                        const iniF = res.installed_files.find(f => f.toLowerCase().endsWith('.ini')) || res.installed_files[0];
+                        ap.gsx_ini_file = iniF;
+                        ap.gsx_profile_filename = iniF;
                     }
-                });
+                    if (res.airport) {
+                        Object.assign(ap, res.airport);
+                    }
+                }
                 updateStats(allAirportsData);
                 filterAirports();
 

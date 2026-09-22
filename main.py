@@ -1980,11 +1980,16 @@ class Api:
                 except Exception as e:
                     print("Error fast-updating installed_airports.json:", e)
 
+            updated_ap = None
+            if target_icao:
+                updated_ap = next((ap for ap in airports if ap.get('icao') == target_icao), None)
+
             audit_data = audit_all_gsx_profiles(gsx_dir=gsx_dir)
             return json.dumps({
                 "status": "ok",
                 "installed_files": installed_files,
-                "airports": airports,
+                "target_icao": target_icao,
+                "airport": updated_ap,
                 "audit": audit_data
             }, ensure_ascii=False)
         except Exception as e:
