@@ -92,7 +92,11 @@ def is_core_or_library_package(pkg_name):
     return any(k in nl for k in [
         'modellib', 'commonlibrary', 'projectairports', 'genericairports',
         'travelbook', 'worlddiscovery', 'bush-trip', 'activities',
-        'instruments', 'navdata', 'fs-base'
+        'instruments', 'navdata', 'fs-base', 'autofps', 'beyondatc',
+        'toolbar', 'simbridge', 'sayintentions', 'chaseplane', 'p42-util',
+        'aircraft', 'livery', 'liveries', 'fleet', 'gsx', 'mobiflight',
+        'fsuipc', 'fslabs', 'fsrealistic', 'raas', 'wwtwasm', 'traffic',
+        'simbrief', 'fsipanel', 'gaist', 'asfs', 'navigraph'
     ])
 
 _CACHED_CONTENT_XML_PATH = None
@@ -103,11 +107,15 @@ def get_content_xml_paths():
     limitless_cache = os.path.join(local_appdata, r'Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache')
 
     return [
+        os.path.join(limitless_cache, r'ThirdBuk\Content.xml'),
         os.path.join(limitless_cache, 'Content.xml'),
         os.path.join(local_appdata, r'Packages\Microsoft.FlightSimulator_8wekyb3d8bbwe\LocalCache\Content.xml'),
         os.path.join(appdata, r'Microsoft Flight Simulator 2024\Content.xml'),
         os.path.join(appdata, r'Microsoft Flight Simulator\Content.xml')
     ]
+
+def get_existing_content_xml_paths():
+    return [p for p in get_content_xml_paths() if os.path.exists(p)]
 
 def get_content_xml_path():
     global _CACHED_CONTENT_XML_PATH
@@ -362,7 +370,7 @@ def update_msfs_content_xml(keep_icaos=None, restore_flight_mode=False, flight_d
                     name_clean = name[:-9] if name.endswith('.disabled') else name
                     name_lower = name.lower()
                     name_clean_lower = name_clean.lower()
-                    if name_lower in flight_added_set_lower or name_clean_lower in flight_added_set_lower:
+                    if name_lower.endswith('.disabled') or name_lower in flight_added_set_lower or name_clean_lower in flight_added_set_lower:
                         tree.remove(elem)
                         changed = True
                     elif name_lower in flight_disabled_set_lower or name_clean_lower in flight_disabled_set_lower or (not flight_disabled_set_lower and elem.get('active') == 'UserDisabled'):
@@ -385,12 +393,19 @@ def update_msfs_content_xml(keep_icaos=None, restore_flight_mode=False, flight_d
                     if pkg_icaos:
                         is_keep = any(k in target_icaos for k in pkg_icaos)
                         if is_keep:
-                            pass
+                            if elem.get('active') == 'UserDisabled':
+                                elem.set('active', 'Activated')
+                                changed = True
                         else:
                             if elem.get('active') == 'Activated':
                                 elem.set('active', 'UserDisabled')
                                 disabled_xml_packages.add(name)
                                 changed = True
+                    elif name.endswith('.disabled'):
+                        if elem.get('active') == 'Activated':
+                            elem.set('active', 'UserDisabled')
+                            disabled_xml_packages.add(name)
+                            changed = True
 
                 if all_airports:
                     for ap in all_airports:
@@ -419,14 +434,6 @@ def update_msfs_content_xml(keep_icaos=None, restore_flight_mode=False, flight_d
                 with open(xml_path, 'w', encoding='utf-8') as f:
                     f.write('<?xml version="1.0" encoding="utf-8"?>\n' + xml_str)
                 print(f"Successfully updated MSFS Content.xml at {xml_path}")
-
-                if 'ThirdBuk' in xml_path and os.path.exists(limitless_cache):
-                    mirror_path = os.path.join(limitless_cache, 'Content.xml')
-                    try:
-                        with open(mirror_path, 'w', encoding='utf-8') as mf:
-                            mf.write('<?xml version="1.0" encoding="utf-8"?>\n' + xml_str)
-                    except Exception as me:
-                        print(f"Could not mirror Content.xml to {mirror_path}: {me}")
         except Exception as e:
             print(f"Error updating Content.xml at {xml_path}: {e}")
 
@@ -903,13 +910,9 @@ class Api:
     def toggle_airport_disabled(self, icao):
         try:
             icao_target = str(icao).strip().upper()
-            content_xml_path = get_content_xml_path()
-            if not os.path.exists(content_xml_path):
+            target_xml_paths = get_existing_content_xml_paths()
+            if not target_xml_paths:
                 return json.dumps({"status": "error", "message": "Content.xml not found"})
-
-            import xml.etree.ElementTree as ET
-            tree = ET.parse(content_xml_path)
-            root = tree.getroot()
 
             airports = run_scan()
             ap = next((a for a in airports if a['icao'] == icao_target), None)
@@ -922,21 +925,28 @@ class Api:
             curr_disabled = ap.get('is_disabled', False)
             new_active_val = 'UserDisabled' if not curr_disabled else 'Activated'
 
-            changed = False
-            for p in root.findall('Package'):
-                name = p.get('name', '')
-                clean = name[:-9] if name.endswith('.disabled') else name
-                p_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean.lower())
+            import xml.etree.ElementTree as ET
+            for content_xml_path in target_xml_paths:
+                try:
+                    tree = ET.parse(content_xml_path)
+                    root = tree.getroot()
+                    changed = False
+                    for p in root.findall('Package'):
+                        name = p.get('name', '')
+                        clean = name[:-9] if name.endswith('.disabled') else name
+                        p_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean.lower())
 
-                for src in ap.get('all_sources', []):
-                    fn = src.get('folder_name', '').lower()
-                    s_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn)
-                    if p_norm == s_norm or p_norm in s_norm or s_norm in p_norm:
-                        p.set('active', new_active_val)
-                        changed = True
+                        for src in ap.get('all_sources', []):
+                            fn = src.get('folder_name', '').lower()
+                            s_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn)
+                            if p_norm == s_norm or p_norm in s_norm or s_norm in p_norm:
+                                p.set('active', new_active_val)
+                                changed = True
 
-            if changed:
-                tree.write(content_xml_path, encoding='utf-8', xml_declaration=True)
+                    if changed:
+                        tree.write(content_xml_path, encoding='utf-8', xml_declaration=True)
+                except Exception as ex:
+                    print(f"Error updating {content_xml_path}: {ex}")
 
             updated_airports = fast_update_airport_cache(icao_target, toggle_all=True)
             return json.dumps({
@@ -973,10 +983,7 @@ class Api:
     def exit_app(self, restore=False):
         try:
             if restore:
-                update_msfs_content_xml(restore_all=True)
-                st = get_settings()
-                st['flight_mode'] = {'active': False, 'icaos': []}
-                save_settings(st)
+                self.restore_all_sceneries(full_reset=True)
 
             self._force_closing = True
             import threading, os
@@ -1192,40 +1199,43 @@ class Api:
             if not icao:
                 return json.dumps({"status": "error", "message": "No ICAO provided"})
             
-            content_xml_path = get_content_xml_path()
+            target_xml_paths = get_existing_content_xml_paths()
 
             with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
                 scanned_airports = json.load(f)
             ap_obj = next((a for a in scanned_airports if a['icao'].upper() == icao.upper()), None)
 
-            if os.path.exists(content_xml_path):
-                import xml.etree.ElementTree as ET
-                tree = ET.parse(content_xml_path)
-                root = tree.getroot()
-                changed = False
-                seen_dis = set()
-                for p in root.findall('Package'):
-                    name = p.get('name', '')
-                    clean = name[:-9] if name.lower().endswith('.disabled') else name
-                    p.set('name', clean)
-                    seen_dis.add(clean.lower())
-                    if icao.lower() in clean.lower():
-                        p.set('active', 'UserDisabled')
-                        changed = True
-
-                if ap_obj and ap_obj.get('all_sources'):
-                    for src in ap_obj['all_sources']:
-                        fn = src.get('folder_name', '')
-                        fn_clean = fn[:-9] if fn.lower().endswith('.disabled') else fn
-                        if fn_clean.lower() not in seen_dis:
-                            new_p = ET.SubElement(root, 'Package')
-                            new_p.set('name', fn_clean)
-                            new_p.set('active', 'UserDisabled')
-                            seen_dis.add(fn_clean.lower())
+            import xml.etree.ElementTree as ET
+            for content_xml_path in target_xml_paths:
+                try:
+                    tree = ET.parse(content_xml_path)
+                    root = tree.getroot()
+                    changed = False
+                    seen_dis = set()
+                    for p in root.findall('Package'):
+                        name = p.get('name', '')
+                        clean = name[:-9] if name.lower().endswith('.disabled') else name
+                        p.set('name', clean)
+                        seen_dis.add(clean.lower())
+                        if icao.lower() in clean.lower():
+                            p.set('active', 'UserDisabled')
                             changed = True
 
-                if changed:
-                    tree.write(content_xml_path, encoding='utf-8', xml_declaration=True)
+                    if ap_obj and ap_obj.get('all_sources'):
+                        for src in ap_obj['all_sources']:
+                            fn = src.get('folder_name', '')
+                            fn_clean = fn[:-9] if fn.lower().endswith('.disabled') else fn
+                            if fn_clean.lower() not in seen_dis:
+                                new_p = ET.SubElement(root, 'Package')
+                                new_p.set('name', fn_clean)
+                                new_p.set('active', 'UserDisabled')
+                                seen_dis.add(fn_clean.lower())
+                                changed = True
+
+                    if changed:
+                        tree.write(content_xml_path, encoding='utf-8', xml_declaration=True)
+                except Exception as ex:
+                    print(f"Error updating {content_xml_path}: {ex}")
 
             if ap_obj and ap_obj.get('all_sources'):
                 for src in ap_obj['all_sources']:
@@ -1242,7 +1252,7 @@ class Api:
             if not icao or not target_folder_name:
                 return json.dumps({"status": "error", "message": "Missing arguments"})
 
-            content_xml_path = get_content_xml_path()
+            target_xml_paths = get_existing_content_xml_paths()
 
             target_clean = target_folder_name[:-9] if target_folder_name.lower().endswith('.disabled') else target_folder_name
             target_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', target_clean.lower())
@@ -1269,75 +1279,78 @@ class Api:
                     fn_n = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn_c_lower)
                     airport_pkg_norms.add(fn_n)
 
-            if os.path.exists(content_xml_path):
-                import xml.etree.ElementTree as ET
-                tree = ET.parse(content_xml_path)
-                root = tree.getroot()
-                changed = False
-                seen = set()
-                seen_norms = set()
-                to_remove = []
+            import xml.etree.ElementTree as ET
+            for content_xml_path in target_xml_paths:
+                try:
+                    tree = ET.parse(content_xml_path)
+                    root = tree.getroot()
+                    changed = False
+                    seen = set()
+                    seen_norms = set()
+                    to_remove = []
 
-                for p in list(root.findall('Package')):
-                    name = p.get('name', '')
-                    clean = name[:-9] if name.lower().endswith('.disabled') else name
-                    clean_lower = clean.lower()
-                    clean_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_lower)
-                    p.set('name', clean)
+                    for p in list(root.findall('Package')):
+                        name = p.get('name', '')
+                        clean = name[:-9] if name.lower().endswith('.disabled') else name
+                        clean_lower = clean.lower()
+                        clean_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_lower)
+                        p.set('name', clean)
 
-                    if clean_lower in seen:
-                        to_remove.append(p)
-                        changed = True
-                        continue
-                    seen.add(clean_lower)
-                    seen_norms.add(clean_norm)
-
-                    # Only update package if it belongs to this airport
-                    is_pkg_for_icao = (clean_lower in airport_pkg_names) or (clean_norm in airport_pkg_norms) or (icao.lower() in clean_lower)
-
-                    if is_pkg_for_icao:
-                        is_target = (target_clean != 'DEFAULT') and (
-                            clean_lower == target_clean.lower() 
-                            or clean_norm == target_norm
-                            or (clean_norm and target_norm and (clean_norm in target_norm or target_norm in clean_norm))
-                            or ((clean_lower.startswith('fs20-asobo-') or clean_lower.startswith('fs24-asobo-') or clean_lower.startswith('fs20-microsoft-') or clean_lower.startswith('fs24-microsoft-')) and ('asobo' in target_clean.lower() or 'microsoft' in target_clean.lower()))
-                        )
-                        if is_target:
-                            p.set('active', 'Activated')
-                        else:
-                            p.set('active', 'UserDisabled')
-                        changed = True
-
-                for p in to_remove:
-                    root.remove(p)
-
-                # Ensure all sources for this airport (including streamed/Asobo) are represented in Content.xml
-                if ap_obj and ap_obj.get('all_sources'):
-                    for src in ap_obj['all_sources']:
-                        if src.get('is_fix_patch') or src.get('is_addon'):
+                        if clean_lower in seen:
+                            to_remove.append(p)
+                            changed = True
                             continue
-                        fn = src.get('folder_name', '')
-                        fn_clean = fn[:-9] if fn.lower().endswith('.disabled') else fn
-                        fn_clean_lower = fn_clean.lower()
-                        fn_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn_clean_lower)
+                        seen.add(clean_lower)
+                        seen_norms.add(clean_norm)
 
-                        is_target = (target_clean != 'DEFAULT') and (
-                            fn_clean_lower == target_clean.lower() 
-                            or fn_norm == target_norm
-                            or (fn_norm and target_norm and (fn_norm in target_norm or target_norm in fn_norm))
-                            or (src.get('is_asobo_official') and ('asobo' in target_clean.lower() or 'microsoft' in target_clean.lower()))
-                        )
+                        # Only update package if it belongs to this airport
+                        is_pkg_for_icao = (clean_lower in airport_pkg_names) or (clean_norm in airport_pkg_norms) or (icao.lower() in clean_lower)
 
-                        if fn_clean_lower not in seen and fn_norm not in seen_norms:
-                            new_p = ET.SubElement(root, 'Package')
-                            new_p.set('name', fn_clean)
-                            new_p.set('active', 'Activated' if is_target else 'UserDisabled')
-                            seen.add(fn_clean_lower)
-                            seen_norms.add(fn_norm)
+                        if is_pkg_for_icao:
+                            is_target = (target_clean != 'DEFAULT') and (
+                                clean_lower == target_clean.lower() 
+                                or clean_norm == target_norm
+                                or (clean_norm and target_norm and (clean_norm in target_norm or target_norm in clean_norm))
+                                or ((clean_lower.startswith('fs20-asobo-') or clean_lower.startswith('fs24-asobo-') or clean_lower.startswith('fs20-microsoft-') or clean_lower.startswith('fs24-microsoft-')) and ('asobo' in target_clean.lower() or 'microsoft' in target_clean.lower()))
+                            )
+                            if is_target:
+                                p.set('active', 'Activated')
+                            else:
+                                p.set('active', 'UserDisabled')
                             changed = True
 
-                if changed:
-                    tree.write(content_xml_path, encoding='utf-8', xml_declaration=True)
+                    for p in to_remove:
+                        root.remove(p)
+
+                    # Ensure all sources for this airport (including streamed/Asobo) are represented in Content.xml
+                    if ap_obj and ap_obj.get('all_sources'):
+                        for src in ap_obj['all_sources']:
+                            if src.get('is_fix_patch') or src.get('is_addon'):
+                                continue
+                            fn = src.get('folder_name', '')
+                            fn_clean = fn[:-9] if fn.lower().endswith('.disabled') else fn
+                            fn_clean_lower = fn_clean.lower()
+                            fn_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn_clean_lower)
+
+                            is_target = (target_clean != 'DEFAULT') and (
+                                fn_clean_lower == target_clean.lower() 
+                                or fn_norm == target_norm
+                                or (fn_norm and target_norm and (fn_norm in target_norm or target_norm in fn_norm))
+                                or (src.get('is_asobo_official') and ('asobo' in target_clean.lower() or 'microsoft' in target_clean.lower()))
+                            )
+
+                            if fn_clean_lower not in seen and fn_norm not in seen_norms:
+                                new_p = ET.SubElement(root, 'Package')
+                                new_p.set('name', fn_clean)
+                                new_p.set('active', 'Activated' if is_target else 'UserDisabled')
+                                seen.add(fn_clean_lower)
+                                seen_norms.add(fn_norm)
+                                changed = True
+
+                    if changed:
+                        tree.write(content_xml_path, encoding='utf-8', xml_declaration=True)
+                except Exception as ex:
+                    print(f"Error updating {content_xml_path}: {ex}")
 
             if ap_obj and ap_obj.get('all_sources'):
                 for src in ap_obj['all_sources']:
@@ -1377,7 +1390,7 @@ class Api:
                 except Exception:
                     fixes_dict = {}
 
-            content_xml_path = get_content_xml_path()
+            target_xml_paths = get_existing_content_xml_paths()
             target_clean = ""
             target_norm = ""
             if target_folder_name:
@@ -1395,95 +1408,98 @@ class Api:
             ap_obj = next((a for a in scanned_airports if a['icao'].upper() == icao.upper()), None)
 
             # 1. Update Content.xml if needed
-            if os.path.exists(content_xml_path):
-                import xml.etree.ElementTree as ET
-                tree = ET.parse(content_xml_path)
-                root = tree.getroot()
-                changed = False
-                seen = set()
-                seen_norms = set()
-                to_remove = []
+            import xml.etree.ElementTree as ET
+            for content_xml_path in target_xml_paths:
+                try:
+                    tree = ET.parse(content_xml_path)
+                    root = tree.getroot()
+                    changed = False
+                    seen = set()
+                    seen_norms = set()
+                    to_remove = []
 
-                airport_pkg_names = set()
-                airport_pkg_norms = set()
-                if ap_obj and ap_obj.get('all_sources'):
-                    for src in ap_obj['all_sources']:
-                        fn = src.get('folder_name', '')
-                        fn_c = fn[:-9] if fn.lower().endswith('.disabled') else fn
-                        fn_c_lower = fn_c.lower()
-                        airport_pkg_names.add(fn_c_lower)
-                        fn_n = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn_c_lower)
-                        airport_pkg_norms.add(fn_n)
+                    airport_pkg_names = set()
+                    airport_pkg_norms = set()
+                    if ap_obj and ap_obj.get('all_sources'):
+                        for src in ap_obj['all_sources']:
+                            fn = src.get('folder_name', '')
+                            fn_c = fn[:-9] if fn.lower().endswith('.disabled') else fn
+                            fn_c_lower = fn_c.lower()
+                            airport_pkg_names.add(fn_c_lower)
+                            fn_n = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn_c_lower)
+                            airport_pkg_norms.add(fn_n)
 
-                for p in list(root.findall('Package')):
-                    name = p.get('name', '')
-                    clean = name[:-9] if name.lower().endswith('.disabled') else name
-                    clean_lower = clean.lower()
-                    clean_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_lower)
-                    p.set('name', clean)
+                    for p in list(root.findall('Package')):
+                        name = p.get('name', '')
+                        clean = name[:-9] if name.lower().endswith('.disabled') else name
+                        clean_lower = clean.lower()
+                        clean_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_lower)
+                        p.set('name', clean)
 
-                    if clean_lower in seen:
-                        to_remove.append(p)
-                        changed = True
-                        continue
-                    seen.add(clean_lower)
-                    seen_norms.add(clean_norm)
-
-                    # Check if this package is one of the fixes being updated
-                    matched_fix = None
-                    for fix_name, fix_enabled in fixes_dict.items():
-                        c_fix = fix_name[:-9] if fix_name.lower().endswith('.disabled') else fix_name
-                        if clean_lower == c_fix.lower() or c_fix.lower() in clean_lower or clean_lower in c_fix.lower():
-                            matched_fix = (c_fix, fix_enabled)
-                            break
-
-                    if matched_fix is not None:
-                        p.set('active', 'Activated' if matched_fix[1] else 'UserDisabled')
-                        changed = True
-                        continue
-
-                    # If variant is specified, update main scenery packages belonging to this airport
-                    if target_clean:
-                        is_pkg_for_icao = (clean_lower in airport_pkg_names) or (clean_norm in airport_pkg_norms) or (icao.lower() in clean_lower)
-                        if is_pkg_for_icao:
-                            is_target = (target_clean != 'DEFAULT') and (
-                                clean_lower == target_clean.lower() 
-                                or clean_norm == target_norm
-                                or (clean_norm and target_norm and (clean_norm in target_norm or target_norm in clean_norm))
-                                or ((clean_lower.startswith('fs20-asobo-') or clean_lower.startswith('fs24-asobo-') or clean_lower.startswith('fs20-microsoft-') or clean_lower.startswith('fs24-microsoft-')) and ('asobo' in target_clean.lower() or 'microsoft' in target_clean.lower()))
-                            )
-                            p.set('active', 'Activated' if is_target else 'UserDisabled')
+                        if clean_lower in seen:
+                            to_remove.append(p)
                             changed = True
-
-                for p in to_remove:
-                    root.remove(p)
-
-                if target_clean and ap_obj and ap_obj.get('all_sources'):
-                    for src in ap_obj['all_sources']:
-                        if src.get('is_fix_patch') or src.get('is_addon'):
                             continue
-                        fn = src.get('folder_name', '')
-                        fn_clean = fn[:-9] if fn.lower().endswith('.disabled') else fn
-                        fn_clean_lower = fn_clean.lower()
-                        fn_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn_clean_lower)
+                        seen.add(clean_lower)
+                        seen_norms.add(clean_norm)
 
-                        is_target = (target_clean != 'DEFAULT') and (
-                            fn_clean_lower == target_clean.lower() 
-                            or fn_norm == target_norm
-                            or (fn_norm and target_norm and (fn_norm in target_norm or target_norm in fn_norm))
-                            or (src.get('is_asobo_official') and ('asobo' in target_clean.lower() or 'microsoft' in target_clean.lower()))
-                        )
+                        # Check if this package is one of the fixes being updated
+                        matched_fix = None
+                        for fix_name, fix_enabled in fixes_dict.items():
+                            c_fix = fix_name[:-9] if fix_name.lower().endswith('.disabled') else fix_name
+                            if clean_lower == c_fix.lower() or c_fix.lower() in clean_lower or clean_lower in c_fix.lower():
+                                matched_fix = (c_fix, fix_enabled)
+                                break
 
-                        if fn_clean_lower not in seen and fn_norm not in seen_norms:
-                            new_p = ET.SubElement(root, 'Package')
-                            new_p.set('name', fn_clean)
-                            new_p.set('active', 'Activated' if is_target else 'UserDisabled')
-                            seen.add(fn_clean_lower)
-                            seen_norms.add(fn_norm)
+                        if matched_fix is not None:
+                            p.set('active', 'Activated' if matched_fix[1] else 'UserDisabled')
                             changed = True
+                            continue
 
-                if changed:
-                    tree.write(content_xml_path, encoding='utf-8', xml_declaration=True)
+                        # If variant is specified, update main scenery packages belonging to this airport
+                        if target_clean:
+                            is_pkg_for_icao = (clean_lower in airport_pkg_names) or (clean_norm in airport_pkg_norms) or (icao.lower() in clean_lower)
+                            if is_pkg_for_icao:
+                                is_target = (target_clean != 'DEFAULT') and (
+                                    clean_lower == target_clean.lower() 
+                                    or clean_norm == target_norm
+                                    or (clean_norm and target_norm and (clean_norm in target_norm or target_norm in clean_norm))
+                                    or ((clean_lower.startswith('fs20-asobo-') or clean_lower.startswith('fs24-asobo-') or clean_lower.startswith('fs20-microsoft-') or clean_lower.startswith('fs24-microsoft-')) and ('asobo' in target_clean.lower() or 'microsoft' in target_clean.lower()))
+                                )
+                                p.set('active', 'Activated' if is_target else 'UserDisabled')
+                                changed = True
+
+                    for p in to_remove:
+                        root.remove(p)
+
+                    if target_clean and ap_obj and ap_obj.get('all_sources'):
+                        for src in ap_obj['all_sources']:
+                            if src.get('is_fix_patch') or src.get('is_addon'):
+                                continue
+                            fn = src.get('folder_name', '')
+                            fn_clean = fn[:-9] if fn.lower().endswith('.disabled') else fn
+                            fn_clean_lower = fn_clean.lower()
+                            fn_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn_clean_lower)
+
+                            is_target = (target_clean != 'DEFAULT') and (
+                                fn_clean_lower == target_clean.lower() 
+                                or fn_norm == target_norm
+                                or (fn_norm and target_norm and (fn_norm in target_norm or target_norm in fn_norm))
+                                or (src.get('is_asobo_official') and ('asobo' in target_clean.lower() or 'microsoft' in target_clean.lower()))
+                            )
+
+                            if fn_clean_lower not in seen and fn_norm not in seen_norms:
+                                new_p = ET.SubElement(root, 'Package')
+                                new_p.set('name', fn_clean)
+                                new_p.set('active', 'Activated' if is_target else 'UserDisabled')
+                                seen.add(fn_clean_lower)
+                                seen_norms.add(fn_norm)
+                                changed = True
+
+                    if changed:
+                        tree.write(content_xml_path, encoding='utf-8', xml_declaration=True)
+                except Exception as ex:
+                    print(f"Error updating {content_xml_path}: {ex}")
 
             # 2. Physical package enable/disable for Main Sceneries
             if target_clean and ap_obj and ap_obj.get('all_sources'):
@@ -1556,7 +1572,7 @@ class Api:
             if not path:
                 return json.dumps({"status": "error", "message": "No path provided"})
 
-            content_xml_path = get_content_xml_path()
+            target_xml_paths = get_existing_content_xml_paths()
             
             clean_name = os.path.basename(path)
             if clean_name.lower().endswith('.disabled'):
@@ -1586,20 +1602,23 @@ class Api:
             is_currently_disabled = target_path.endswith('.disabled') or os.path.exists(os.path.join(target_path, 'manifest.json.disabled')) or os.path.exists(target_path + '.disabled')
             should_enable = is_currently_disabled
 
-            if os.path.exists(content_xml_path):
-                import xml.etree.ElementTree as ET
-                tree = ET.parse(content_xml_path)
-                root = tree.getroot()
-                changed = False
-                for p in root.findall('Package'):
-                    name = p.get('name', '')
-                    clean = name[:-9] if name.lower().endswith('.disabled') else name
-                    p.set('name', clean)
-                    if clean.lower() == clean_name.lower() or clean_name.lower() in clean.lower() or clean.lower() in clean_name.lower():
-                        p.set('active', 'Activated' if should_enable else 'UserDisabled')
-                        changed = True
-                if changed:
-                    tree.write(content_xml_path, encoding='utf-8', xml_declaration=True)
+            import xml.etree.ElementTree as ET
+            for content_xml_path in target_xml_paths:
+                try:
+                    tree = ET.parse(content_xml_path)
+                    root = tree.getroot()
+                    changed = False
+                    for p in root.findall('Package'):
+                        name = p.get('name', '')
+                        clean = name[:-9] if name.lower().endswith('.disabled') else name
+                        p.set('name', clean)
+                        if clean.lower() == clean_name.lower() or clean_name.lower() in clean.lower() or clean.lower() in clean_name.lower():
+                            p.set('active', 'Activated' if should_enable else 'UserDisabled')
+                            changed = True
+                    if changed:
+                        tree.write(content_xml_path, encoding='utf-8', xml_declaration=True)
+                except Exception as ex:
+                    print(f"Error updating {content_xml_path}: {ex}")
 
             if should_enable:
                 enable_physical_package(target_path)
@@ -1655,11 +1674,16 @@ class Api:
 
                             item_clean = item[:-9] if item.endswith('.disabled') else item
                             item_clean_lower = item_clean.lower()
-                            pkg_icaos = folder_to_icaos.get(item_clean_lower) or resolve_package_icaos(item_clean)
+                            item_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', item_clean_lower)
+
+                            if is_core_or_library_package(item_clean):
+                                continue
+
+                            pkg_icaos = folder_to_icaos.get(item_clean_lower) or folder_to_icaos.get(item_norm)
 
                             # ONLY process packages that actually represent airport sceneries!
                             # NEVER rename liveries, aircraft, tools, GSX, or utilities!
-                            is_airport_pkg = bool(pkg_icaos) or (item_clean_lower in third_party_airport_pkgs)
+                            is_airport_pkg = bool(pkg_icaos) or (item_clean_lower in third_party_airport_pkgs) or (item_norm in third_party_airport_pkgs)
                             if not is_airport_pkg:
                                 continue
 
@@ -1669,17 +1693,16 @@ class Api:
                                 try:
                                     if is_keep:
                                         if item.endswith('.disabled'):
-                                            orig_p = os.path.join(td, item[:-9])
-                                            if safe_rename_path(item_p, orig_p):
-                                                enabled_count += 1
+                                            enable_physical_package(item_p)
+                                            enabled_count += 1
                                     else:
                                         if not item.endswith('.disabled'):
-                                            dis_p = item_p + '.disabled'
-                                            if safe_rename_path(item_p, dis_p):
+                                            dis_p = disable_physical_package(item_p)
+                                            if dis_p and dis_p.endswith('.disabled'):
                                                 disabled_count += 1
                                                 disabled_by_flight_mode.append(item)
                                 except Exception as rename_err:
-                                    print(f"Skipping rename for {item}: {rename_err}")
+                                    print(f"Skipping package state change for {item}: {rename_err}")
                     except Exception as e:
                         print(f"Error processing {td} during flight optimizer:", e)
 
@@ -1762,10 +1785,9 @@ class Api:
                                     continue
 
                                 dis_p = os.path.join(td, item)
-                                orig_p = os.path.join(td, item_clean)
                                 try:
-                                    if safe_rename_path(dis_p, orig_p):
-                                        re_enabled_count += 1
+                                    enable_physical_package(dis_p)
+                                    re_enabled_count += 1
                                 except Exception as e:
                                     print(f"Error restoring {dis_p}:", e)
                     except Exception as e:
