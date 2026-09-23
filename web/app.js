@@ -1934,7 +1934,7 @@ function resetConflictingFiltersForCountrySelection() {
         airlinePill.classList.remove('flex');
     }
 
-    // 2. Clear active Flight Corridor (Alt+Click) & vector lines (only if not in Flight Planning Mode)
+    // 2. Clear active Flight Corridor & vector lines (only if not in Flight Planning Mode)
     if (!isFlightPlanningMode) {
         if (flightCorridorLayerGroup && map) {
             flightCorridorLayerGroup.clearLayers();
@@ -5505,13 +5505,14 @@ function getAirportPopupHtml(ap) {
                 <span>${ap.english_type || ap.type}</span>
                 ${(ap.is_etops_alternate || (typeof GLOBAL_ETOPS_ALTERNATES !== 'undefined' && GLOBAL_ETOPS_ALTERNATES[ap.icao])) ? '<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-950 text-indigo-300 border border-indigo-500/40">✈ ETOPS ALTERNATE</span>' : ''}
             </div>
+            ${(isFlightPlanningMode && flightPlanningDeparture && ap.icao !== flightPlanningDeparture.icao) ? `
             <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs">
-                <span class="flex items-center gap-2 text-slate-300 font-medium">
-                    <span class="font-mono font-bold text-cyan-400">Alt+Click</span>
-                    <span class="text-slate-300 text-xs">${isFlightPlanningMode && flightPlanningDeparture ? 'Set as Destination' : 'Optimize flight route (DEP / ARR)'}</span>
+                <span class="flex items-center gap-2 text-cyan-300 font-medium">
+                    <span>✈</span>
+                    <span class="text-xs">${t('optimizer.set_as_destination', 'Click to set as Destination')}</span>
                 </span>
-                ${isFlightPlanningMode ? '<span class="text-[10px] font-mono text-cyan-400 font-bold tracking-wide">ACTIVE</span>' : ''}
-            </div>
+                <span class="text-[10px] font-mono text-cyan-400 font-bold tracking-wide">ACTIVE</span>
+            </div>` : ''}
         </div>
     `;
 }
@@ -5586,7 +5587,7 @@ function renderAirportsOnMap(airports) {
             marker._airportData = ap;
             marker._iconKey = iconKey;
 
-            // Left-Click event: Alt+Click for Flight Planning, or focus in Country Mode, or open/toggle Radial Menu
+            // Left-Click event: select Destination in Flight Planning, focus in Country Mode, or open/toggle Radial Menu
             marker.on('click', function (e) {
                 if (typeof closeFilterRadialMenu === 'function') {
                     closeFilterRadialMenu();
@@ -5595,8 +5596,8 @@ function renderAirportsOnMap(airports) {
                     L.DomEvent.stopPropagation(e.originalEvent);
                 }
                 const currentAp = this._airportData || ap;
-                if (e.originalEvent && (e.originalEvent.altKey || e.originalEvent.metaKey)) {
-                    handleFlightPlanningAltClick(currentAp);
+                if (isFlightPlanningMode && flightPlanningDeparture && !flightPlanningDestination) {
+                    handleFlightPlanningAirport(currentAp, false);
                 } else if (activeDrawerMode === 'COUNTRY') {
                     focusAirportInCountryMode(currentAp);
                 } else {
@@ -6182,7 +6183,7 @@ function triggerRadialFlightPlan() {
     if (!currentRadialAirport) return;
     const targetAp = currentRadialAirport;
     closeAirportRadialMenu();
-    handleFlightPlanningAltClick(targetAp);
+    handleFlightPlanningAirport(targetAp, true);
 }
 
 function triggerRadialOperatingAirlines() {
@@ -8840,7 +8841,7 @@ function positionFlightPlanningBanner(ap) {
     const containerW = mapEl ? mapEl.clientWidth : window.innerWidth;
     const containerH = mapEl ? mapEl.clientHeight : window.innerHeight;
 
-    // Horizontally center banner exactly on the Alt+Click airport point
+    // Horizontally center banner exactly on the departure airport point
     let targetLeft = Math.round(pt.x - (bannerW / 2));
     // Vertically place just below the airport marker (24px below center)
     let targetTop = Math.round(pt.y + 24);
@@ -8943,11 +8944,13 @@ function initDraggableFlightPlanningBanner() {
     });
 }
 
-function handleFlightPlanningAltClick(ap) {
+function handleFlightPlanningAirport(ap, isInitiateFromMenu = false) {
     if (!ap) return;
 
     if (!isFlightPlanningMode) {
-        // 1. First Alt+Click: Enter Flight Planning Mode & set Departure
+        // Can ONLY enter Flight Planning Mode if initiated from menu (e.g. radial menu)
+        if (!isInitiateFromMenu) return;
+
         isFlightPlanningMode = true;
         flightPlanningDeparture = ap;
         flightPlanningDestination = null;
@@ -8961,16 +8964,16 @@ function handleFlightPlanningAltClick(ap) {
         updateFlightPlanningBannerUI();
         positionFlightPlanningBanner(ap);
         initDraggableFlightPlanningBanner();
-        showToast(`✈ Flight Optimizer: ${ap.icao} set as Departure. Alt+Click another airport to set Destination.`, 'info');
+        showToast(`✈ Flight Optimizer: ${ap.icao} set as Departure. Click an airport to set Destination.`, 'info');
     } else {
-        // 2. Already in Flight Planning Mode
+        // Already in Flight Planning Mode
         if (!flightPlanningDeparture) {
             flightPlanningDeparture = ap;
             selectedAirport = ap;
             updateFlightPlanningBannerUI();
             positionFlightPlanningBanner(ap);
         } else if (flightPlanningDeparture.icao === ap.icao) {
-            showToast(`${ap.icao} is already set as Departure. Alt+Click another airport for Destination, or press Esc to exit.`, 'warning');
+            showToast(`${ap.icao} is already set as Departure. Click another airport for Destination, or press Esc to exit.`, 'warning');
         } else {
             // Set as Destination & Render Corridor!
             flightPlanningDestination = ap;
@@ -8981,6 +8984,7 @@ function handleFlightPlanningAltClick(ap) {
         }
     }
 }
+const handleFlightPlanningAltClick = handleFlightPlanningAirport;
 
 function getCorridorAddonsList() {
     if (!flightPlanningDeparture || !flightPlanningDestination) return [];
@@ -9282,7 +9286,7 @@ function updateFlightPlanningBannerUI() {
             // Waiting for arrival selection
             if (guideText) {
                 guideText.classList.remove('hidden');
-                guideText.innerText = t('optimizer.guide_destination', 'Alt+Click an airport to set Destination');
+                guideText.innerText = t('optimizer.guide_destination', 'Click an airport to set Destination');
             }
             if (actionsContainer) {
                 actionsContainer.classList.add('hidden');
@@ -9686,7 +9690,7 @@ function isAirportInCorridor(ap, depAp, arrAp) {
 
 function setArrivalAirportCorridor(arrAp) {
     if (!selectedAirport) {
-        showToast('Click an Airport first (Departure), then Alt+Click an Arrival airport.', 'warning');
+        showToast('Select Departure from the airport radial menu, then click an Arrival airport.', 'warning');
         return;
     }
 
