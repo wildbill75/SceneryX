@@ -91,12 +91,14 @@ def is_core_or_library_package(pkg_name):
     nl = pkg_name.lower()
     return any(k in nl for k in [
         'modellib', 'commonlibrary', 'projectairports', 'genericairports',
-        'travelbook', 'worlddiscovery', 'bush-trip', 'activities',
-        'instruments', 'navdata', 'fs-base', 'autofps', 'beyondatc',
-        'toolbar', 'simbridge', 'sayintentions', 'chaseplane', 'p42-util',
-        'aircraft', 'livery', 'liveries', 'fleet', 'gsx', 'mobiflight',
-        'fsuipc', 'fslabs', 'fsrealistic', 'raas', 'wwtwasm', 'traffic',
-        'simbrief', 'fsipanel', 'gaist', 'asfs', 'navigraph'
+        'travelbook', 'worlddiscovery', 'bush-trip', 'bushtrip', 'activities',
+        'instruments', 'navdata', 'fs-base', 'freeflight', 'mission',
+        'tutorial', 'discovery', 'point-of-interest', 'simobjects',
+        'passiveaircraft', 'ships', 'animals', 'vehicles', 'pgg',
+        'autofps', 'beyondatc', 'toolbar', 'simbridge', 'sayintentions',
+        'chaseplane', 'p42-util', 'aircraft', 'livery', 'liveries', 'fleet',
+        'gsx', 'mobiflight', 'fsuipc', 'fslabs', 'fsrealistic', 'raas',
+        'wwtwasm', 'traffic', 'simbrief', 'fsipanel', 'gaist', 'asfs', 'navigraph'
     ])
 
 _CACHED_CONTENT_XML_PATH = None
@@ -105,12 +107,14 @@ def get_content_xml_paths():
     local_appdata = os.getenv('LOCALAPPDATA', '')
     appdata = os.getenv('APPDATA', '')
     limitless_cache = os.path.join(local_appdata, r'Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache')
+    msfs24_steam = os.path.join(appdata, r'Microsoft Flight Simulator 2024')
 
     return [
         os.path.join(limitless_cache, r'ThirdBuk\Content.xml'),
         os.path.join(limitless_cache, 'Content.xml'),
+        os.path.join(msfs24_steam, r'ThirdBuk\Content.xml'),
+        os.path.join(msfs24_steam, 'Content.xml'),
         os.path.join(local_appdata, r'Packages\Microsoft.FlightSimulator_8wekyb3d8bbwe\LocalCache\Content.xml'),
-        os.path.join(appdata, r'Microsoft Flight Simulator 2024\Content.xml'),
         os.path.join(appdata, r'Microsoft Flight Simulator\Content.xml')
     ]
 
