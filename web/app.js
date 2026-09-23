@@ -11861,6 +11861,16 @@ function filterAirports() {
         } else if (isFlightPlanningMode && flightPlanningDeparture && ap.icao === flightPlanningDeparture.icao) {
             // While setting up flight plan (departure selected, waiting for arrival), keep departure airport visible
             return true;
+        } else if (currentFlightMode && currentFlightMode.active && currentFlightMode.icaos && currentFlightMode.icaos.length > 0) {
+            // When Flight Isolation Mode is active: ONLY keep the flight's isolated airports (bypassing region and source filters)
+            if (!currentFlightMode.icaos.includes(ap.icao)) {
+                return false;
+            }
+            if (search && search.length > 0) {
+                const searchStr = ap._searchKey || buildAirportSearchKey(ap);
+                if (!searchStr.includes(search) && !searchStr.includes(normalizedSearch)) return false;
+            }
+            return true;
         }
 
         // GSX Audit Temporary Marker Override:

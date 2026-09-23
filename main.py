@@ -109,14 +109,39 @@ def get_content_xml_paths():
     limitless_cache = os.path.join(local_appdata, r'Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache')
     msfs24_steam = os.path.join(appdata, r'Microsoft Flight Simulator 2024')
 
-    return [
-        os.path.join(limitless_cache, r'ThirdBuk\Content.xml'),
-        os.path.join(limitless_cache, 'Content.xml'),
-        os.path.join(msfs24_steam, r'ThirdBuk\Content.xml'),
-        os.path.join(msfs24_steam, 'Content.xml'),
-        os.path.join(local_appdata, r'Packages\Microsoft.FlightSimulator_8wekyb3d8bbwe\LocalCache\Content.xml'),
-        os.path.join(appdata, r'Microsoft Flight Simulator\Content.xml')
-    ]
+    paths = []
+
+    # 1. MSFS 2024 Store / Game Pass (Limitless) - Dynamically discover Xbox Gamertag profile folder
+    if os.path.exists(limitless_cache):
+        try:
+            for item in os.listdir(limitless_cache):
+                sub = os.path.join(limitless_cache, item)
+                if os.path.isdir(sub) and item not in ('Packages', 'PC', '$PC$', 'ModelLibCache', 'SceneryIndexes', 'SimObjects'):
+                    sub_xml = os.path.join(sub, 'Content.xml')
+                    if os.path.exists(sub_xml):
+                        paths.append(sub_xml)
+        except Exception:
+            pass
+        paths.append(os.path.join(limitless_cache, 'Content.xml'))
+
+    # 2. MSFS 2024 Steam - Dynamically discover user profile folder
+    if os.path.exists(msfs24_steam):
+        try:
+            for item in os.listdir(msfs24_steam):
+                sub = os.path.join(msfs24_steam, item)
+                if os.path.isdir(sub):
+                    sub_xml = os.path.join(sub, 'Content.xml')
+                    if os.path.exists(sub_xml):
+                        paths.append(sub_xml)
+        except Exception:
+            pass
+        paths.append(os.path.join(msfs24_steam, 'Content.xml'))
+
+    # 3. MSFS 2020 Store & Steam
+    paths.append(os.path.join(local_appdata, r'Packages\Microsoft.FlightSimulator_8wekyb3d8bbwe\LocalCache\Content.xml'))
+    paths.append(os.path.join(appdata, r'Microsoft Flight Simulator\Content.xml'))
+
+    return paths
 
 def get_existing_content_xml_paths():
     return [p for p in get_content_xml_paths() if os.path.exists(p)]
