@@ -892,12 +892,33 @@ class Api:
                 dest_name = data.get('destination', {}).get('name', dest_icao)
 
                 alternates = []
-                for alt_key in ['alternate', 'alternate_2', 'alternate_3', 'alternate_4']:
+                alt_raw = data.get('alternate')
+                if alt_raw:
+                    if isinstance(alt_raw, list):
+                        for item in alt_raw:
+                            if isinstance(item, dict) and item.get('icao_code'):
+                                alternates.append({
+                                    'icao': item.get('icao_code').upper().strip(),
+                                    'name': item.get('name', item.get('icao_code')),
+                                    'lat': float(item.get('pos_lat')) if item.get('pos_lat') else None,
+                                    'lon': float(item.get('pos_long')) if item.get('pos_long') else None
+                                })
+                    elif isinstance(alt_raw, dict) and alt_raw.get('icao_code'):
+                        alternates.append({
+                            'icao': alt_raw.get('icao_code').upper().strip(),
+                            'name': alt_raw.get('name', alt_raw.get('icao_code')),
+                            'lat': float(alt_raw.get('pos_lat')) if alt_raw.get('pos_lat') else None,
+                            'lon': float(alt_raw.get('pos_long')) if alt_raw.get('pos_long') else None
+                        })
+
+                for alt_key in ['alternate_2', 'alternate_3', 'alternate_4']:
                     alt_data = data.get(alt_key)
                     if alt_data and isinstance(alt_data, dict) and alt_data.get('icao_code'):
                         alternates.append({
-                            'icao': alt_data.get('icao_code'),
-                            'name': alt_data.get('name', alt_data.get('icao_code'))
+                            'icao': alt_data.get('icao_code').upper().strip(),
+                            'name': alt_data.get('name', alt_data.get('icao_code')),
+                            'lat': float(alt_data.get('pos_lat')) if alt_data.get('pos_lat') else None,
+                            'lon': float(alt_data.get('pos_long')) if alt_data.get('pos_long') else None
                         })
 
                 general = data.get('general', {})

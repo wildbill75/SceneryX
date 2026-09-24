@@ -5410,13 +5410,14 @@ function createCustomIcon(ap) {
         }
 
         const isSimBriefAlt = (flightCorridorProfile === 'SIMBRIEF' && typeof currentSimBriefAlternates !== 'undefined' && Array.isArray(currentSimBriefAlternates) && currentSimBriefAlternates.some(a => a && a.icao === ap.icao));
-        const altBadge = isSimBriefAlt ? `<span class="bg-indigo-950 text-indigo-300 border border-indigo-400/50 font-mono font-black text-[9px] px-1 py-0.5 rounded shadow-sm shrink-0">ALT</span>` : '';
+        const altBadge = isSimBriefAlt ? `<span class="bg-indigo-600 text-white font-mono font-bold text-[9px] px-1.5 py-0.5 rounded uppercase tracking-wider shadow-sm shrink-0">ALT</span>` : '';
 
         const icaoSpan = (showIcao && ap.icao) ? `<span class="font-mono font-black ${icaoColorClass} text-[11px] shrink-0 tracking-wide">${safeIcao}</span>` : '';
         const nameSpan = (showName && safeName) ? `<span class="font-bold ${nameColorClass} text-[11px] truncate max-w-[150px]">${safeName}</span>` : '';
         const citySpan = (showCity && safeCity) ? `<span class="${cityColorClass} font-semibold text-[10px] truncate max-w-[110px]">• ${safeCity}</span>` : '';
 
-        const isForceVisible = (currentlyHighlightedIcao && currentlyHighlightedIcao === ap.icao) || isSimBriefAlt;
+        const isEndpoint = (selectedAirport && ap.icao === selectedAirport.icao) || (flightCorridorArrivalAirport && ap.icao === flightCorridorArrivalAirport.icao);
+        const isForceVisible = (currentlyHighlightedIcao && currentlyHighlightedIcao === ap.icao) || isSimBriefAlt || isEndpoint;
 
         labelHtml = `
             <div class="airport-map-label airport-label-tier-${tier} ${isForceVisible ? 'label-force-visible' : ''} inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md ${labelBgClass} shadow-md whitespace-nowrap leading-tight pointer-events-auto ml-1.5 border-0">
@@ -9772,6 +9773,24 @@ function renderFlightCorridor() {
 
     flightCorridorLayerGroup.addLayer(corridorLine);
 
+    // In SimBrief profile: Draw dashed routes from destination to each alternate
+    const allBoundsPts = [...arcPts];
+    if (flightCorridorProfile === 'SIMBRIEF' && typeof currentSimBriefAlternates !== 'undefined' && Array.isArray(currentSimBriefAlternates)) {
+        currentSimBriefAlternates.forEach(alt => {
+            if (alt && alt.lat && alt.lon) {
+                allBoundsPts.push([alt.lat, alt.lon]);
+                const altArcPts = createBezierArcPoints(arr.lat, arr.lon, alt.lat, alt.lon, 20);
+                const altLine = L.polyline(altArcPts, {
+                    color: '#6366f1',
+                    weight: 2.5,
+                    dashArray: '6, 6',
+                    opacity: 0.85
+                });
+                flightCorridorLayerGroup.addLayer(altLine);
+            }
+        });
+    }
+
     // Filter airports to display only sceneries/airports inside corridor
     filterAirports();
 
@@ -9798,8 +9817,8 @@ function renderFlightCorridor() {
     // Update floating banner UI with the accurate filtered count
     updateFlightPlanningBannerUI();
 
-    // Smoothly zoom map to fit both departure & arrival airports
-    map.fitBounds(arcPts, { padding: [60, 60], animate: true });
+    // Smoothly zoom map to fit departure, arrival and all alternates
+    map.fitBounds(allBoundsPts, { padding: [80, 80], animate: true });
 }
 
 function createBezierArcPoints(lat1, lon1, lat2, lon2, numPoints = 30) {
@@ -14617,7 +14636,20 @@ async function syncSimBriefFlightPlan() {
             flight.alternates.forEach(alt => {
                 const altIcao = (alt.icao || '').toUpperCase().trim();
                 let altAp = allAirportsData.find(a => a.icao === altIcao);
-                if (altAp) currentSimBriefAlternates.push(altAp);
+                if (!altAp) {
+                    altAp = {
+                        icao: altIcao,
+                        name: alt.name || altIcao,
+                        city: alt.name || altIcao,
+                        pricing_type: 'Default',
+                        type: 'Airport',
+                        is_default: true,
+                        lat: alt.lat,
+                        lon: alt.lon
+                    };
+                    allAirportsData.push(altAp);
+                }
+                currentSimBriefAlternates.push(altAp);
             });
         }
 
@@ -14634,17 +14666,8 @@ async function syncSimBriefFlightPlan() {
         positionFlightPlanningBanner(depAp);
         initDraggableFlightPlanningBanner();
 
-        // 5. Render corridor
+        // 5. Render corridor, alternates, and fit map bounds
         renderFlightCorridor();
-
-        // 6. Camera: fit bounds nicely to show whole route
-        if (map && depAp.lat && depAp.lon && arrAp.lat && arrAp.lon) {
-            const boundsPts = [[depAp.lat, depAp.lon], [arrAp.lat, arrAp.lon]];
-            currentSimBriefAlternates.forEach(alt => {
-                if (alt.lat && alt.lon) boundsPts.push([alt.lat, alt.lon]);
-            });
-            map.fitBounds(boundsPts, { padding: [100, 100], maxZoom: 8, animate: true, duration: 1.2 });
-        }
 
         const altCount = currentSimBriefAlternates.length;
         const flightNum = flight.flight_number ? `${flight.flight_number} • ` : '';
