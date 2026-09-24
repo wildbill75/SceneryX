@@ -513,7 +513,6 @@ def fast_update_airport_cache(icao_target, target_pkg_name=None, toggle_all=Fals
                 is_match = (
                     fn_clean.lower() == t_clean.lower() 
                     or fn_norm == t_norm 
-                    or (fn_norm and t_norm and (fn_norm in t_norm or t_norm in fn_norm))
                     or (s.get('is_asobo_official') and ('asobo' in t_clean.lower() or 'microsoft' in t_clean.lower()))
                 )
 
@@ -1335,7 +1334,6 @@ class Api:
                             is_target = (target_clean != 'DEFAULT') and (
                                 clean_lower == target_clean.lower() 
                                 or clean_norm == target_norm
-                                or (clean_norm and target_norm and (clean_norm in target_norm or target_norm in clean_norm))
                                 or ((clean_lower.startswith('fs20-asobo-') or clean_lower.startswith('fs24-asobo-') or clean_lower.startswith('fs20-microsoft-') or clean_lower.startswith('fs24-microsoft-')) and ('asobo' in target_clean.lower() or 'microsoft' in target_clean.lower()))
                             )
                             if is_target:
@@ -1360,7 +1358,6 @@ class Api:
                             is_target = (target_clean != 'DEFAULT') and (
                                 fn_clean_lower == target_clean.lower() 
                                 or fn_norm == target_norm
-                                or (fn_norm and target_norm and (fn_norm in target_norm or target_norm in fn_norm))
                                 or (src.get('is_asobo_official') and ('asobo' in target_clean.lower() or 'microsoft' in target_clean.lower()))
                             )
 
@@ -1389,7 +1386,6 @@ class Api:
                     is_target = (target_clean != 'DEFAULT') and (
                         fn_clean.lower() == target_clean.lower() 
                         or fn_norm == target_norm
-                        or (fn_norm and target_norm and (fn_norm in target_norm or target_norm in fn_norm))
                         or (src.get('is_asobo_official') and ('asobo' in target_clean.lower() or 'microsoft' in target_clean.lower()))
                     )
                     if is_target:
@@ -1488,7 +1484,6 @@ class Api:
                                 is_target = (target_clean != 'DEFAULT') and (
                                     clean_lower == target_clean.lower() 
                                     or clean_norm == target_norm
-                                    or (clean_norm and target_norm and (clean_norm in target_norm or target_norm in clean_norm))
                                     or ((clean_lower.startswith('fs20-asobo-') or clean_lower.startswith('fs24-asobo-') or clean_lower.startswith('fs20-microsoft-') or clean_lower.startswith('fs24-microsoft-')) and ('asobo' in target_clean.lower() or 'microsoft' in target_clean.lower()))
                                 )
                                 p.set('active', 'Activated' if is_target else 'UserDisabled')
@@ -1509,7 +1504,6 @@ class Api:
                             is_target = (target_clean != 'DEFAULT') and (
                                 fn_clean_lower == target_clean.lower() 
                                 or fn_norm == target_norm
-                                or (fn_norm and target_norm and (fn_norm in target_norm or target_norm in fn_norm))
                                 or (src.get('is_asobo_official') and ('asobo' in target_clean.lower() or 'microsoft' in target_clean.lower()))
                             )
 
@@ -1539,7 +1533,6 @@ class Api:
                     is_target = (target_clean != 'DEFAULT') and (
                         fn_clean.lower() == target_clean.lower() 
                         or fn_norm == target_norm
-                        or (fn_norm and target_norm and (fn_norm in target_norm or target_norm in fn_norm))
                         or (src.get('is_asobo_official') and ('asobo' in target_clean.lower() or 'microsoft' in target_clean.lower()))
                     )
                     if is_target:
