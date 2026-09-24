@@ -5302,10 +5302,12 @@ function getCustomIconKey(ap) {
     const hasAnyLabel = showIcao || showName || showCity;
     const labelKey = `${showIcao ? 1 : 0}${showName ? 1 : 0}${showCity ? 1 : 0}`;
 
+    const isSimBriefAlt = (flightCorridorProfile === 'SIMBRIEF' && typeof currentSimBriefAlternates !== 'undefined' && Array.isArray(currentSimBriefAlternates) && currentSimBriefAlternates.some(a => a && a.icao === ap.icao));
+
     if (hasAnyLabel) {
-        return `${ap.icao}_${cat}_${isApDisabled ? 1 : 0}_${hasActiveFix ? 1 : 0}_${hasConflict ? 1 : 0}_${labelKey}`;
+        return `${ap.icao}_${cat}_${isApDisabled ? 1 : 0}_${hasActiveFix ? 1 : 0}_${hasConflict ? 1 : 0}_${isSimBriefAlt ? 1 : 0}_${labelKey}`;
     }
-    return `${cat}_${isApDisabled ? 1 : 0}_${hasActiveFix ? 1 : 0}_${hasConflict ? 1 : 0}_000`;
+    return `${cat}_${isApDisabled ? 1 : 0}_${hasActiveFix ? 1 : 0}_${hasConflict ? 1 : 0}_${isSimBriefAlt ? 1 : 0}_000`;
 }
 
 function createCustomIcon(ap) {
@@ -5407,17 +5409,21 @@ function createCustomIcon(ap) {
             cityColorClass = 'text-cyan-100';
         }
 
+        const isSimBriefAlt = (flightCorridorProfile === 'SIMBRIEF' && typeof currentSimBriefAlternates !== 'undefined' && Array.isArray(currentSimBriefAlternates) && currentSimBriefAlternates.some(a => a && a.icao === ap.icao));
+        const altBadge = isSimBriefAlt ? `<span class="bg-indigo-950 text-indigo-300 border border-indigo-400/50 font-mono font-black text-[9px] px-1 py-0.5 rounded shadow-sm shrink-0">ALT</span>` : '';
+
         const icaoSpan = (showIcao && ap.icao) ? `<span class="font-mono font-black ${icaoColorClass} text-[11px] shrink-0 tracking-wide">${safeIcao}</span>` : '';
         const nameSpan = (showName && safeName) ? `<span class="font-bold ${nameColorClass} text-[11px] truncate max-w-[150px]">${safeName}</span>` : '';
         const citySpan = (showCity && safeCity) ? `<span class="${cityColorClass} font-semibold text-[10px] truncate max-w-[110px]">• ${safeCity}</span>` : '';
 
-        const isForceVisible = (currentlyHighlightedIcao && currentlyHighlightedIcao === ap.icao);
+        const isForceVisible = (currentlyHighlightedIcao && currentlyHighlightedIcao === ap.icao) || isSimBriefAlt;
 
         labelHtml = `
             <div class="airport-map-label airport-label-tier-${tier} ${isForceVisible ? 'label-force-visible' : ''} inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md ${labelBgClass} shadow-md whitespace-nowrap leading-tight pointer-events-auto ml-1.5 border-0">
                 ${icaoSpan}
                 ${nameSpan}
                 ${citySpan}
+                ${altBadge}
             </div>
         `;
     }
@@ -9038,11 +9044,14 @@ async function executeFlightCorridorOptimization() {
     keepIcaosSet.add(dep.icao);
     keepIcaosSet.add(arr.icao);
 
-    // Keep any SimBrief Alternates active in SimBrief, Corridor and Direct modes!
-    if (typeof currentSimBriefAlternates !== 'undefined' && Array.isArray(currentSimBriefAlternates)) {
-        currentSimBriefAlternates.forEach(alt => {
-            if (alt && alt.icao) keepIcaosSet.add(alt.icao);
-        });
+    // Keep SimBrief Alternates active ONLY in SimBrief mode!
+    // Direct mode stays strictly between DEP and ARR (A and B).
+    if (flightCorridorProfile === 'SIMBRIEF') {
+        if (typeof currentSimBriefAlternates !== 'undefined' && Array.isArray(currentSimBriefAlternates)) {
+            currentSimBriefAlternates.forEach(alt => {
+                if (alt && alt.icao) keepIcaosSet.add(alt.icao);
+            });
+        }
     }
 
     if (flightCorridorProfile === 'CORRIDOR' || flightCorridorProfile === 'SIMBRIEF') {
@@ -11861,7 +11870,7 @@ function filterAirports() {
 
         // Active Flight Corridor Filter
         if (selectedAirport && flightCorridorArrivalAirport) {
-            const isCorridorEndpoint = (ap.icao === selectedAirport.icao || ap.icao === flightCorridorArrivalAirport.icao || (typeof currentSimBriefAlternates !== 'undefined' && currentSimBriefAlternates.some(alt => alt.icao === ap.icao)));
+            const isCorridorEndpoint = (ap.icao === selectedAirport.icao || ap.icao === flightCorridorArrivalAirport.icao || (flightCorridorProfile === 'SIMBRIEF' && typeof currentSimBriefAlternates !== 'undefined' && currentSimBriefAlternates.some(alt => alt.icao === ap.icao)));
 
             if (isCorridorEndpoint) {
                 // EXCEPTION TO THE RULE:

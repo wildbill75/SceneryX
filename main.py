@@ -421,11 +421,7 @@ def update_msfs_content_xml(keep_icaos=None, restore_flight_mode=False, flight_d
                     pkg_icaos = get_package_icaos(name)
                     if pkg_icaos:
                         is_keep = any(k in target_icaos for k in pkg_icaos)
-                        if is_keep:
-                            if elem.get('active') == 'UserDisabled':
-                                elem.set('active', 'Activated')
-                                changed = True
-                        else:
+                        if not is_keep:
                             if elem.get('active') == 'Activated':
                                 elem.set('active', 'UserDisabled')
                                 disabled_xml_packages.add(name)
@@ -1720,16 +1716,13 @@ class Api:
 
                             if is_community:
                                 try:
-                                    if is_keep:
-                                        if item.endswith('.disabled'):
-                                            enable_physical_package(item_p)
-                                            enabled_count += 1
-                                    else:
-                                        if not item.endswith('.disabled'):
-                                            dis_p = disable_physical_package(item_p)
-                                            if dis_p and dis_p.endswith('.disabled'):
-                                                disabled_count += 1
-                                                disabled_by_flight_mode.append(item)
+                                    # Never re-enable packages that were already disabled prior to flight mode
+                                    # (avoids resurrecting resolved conflicts or duplicate sceneries!)
+                                    if not is_keep and not item.endswith('.disabled'):
+                                        dis_p = disable_physical_package(item_p)
+                                        if dis_p and dis_p.endswith('.disabled'):
+                                            disabled_count += 1
+                                            disabled_by_flight_mode.append(item)
                                 except Exception as rename_err:
                                     print(f"Skipping package state change for {item}: {rename_err}")
                     except Exception as e:
