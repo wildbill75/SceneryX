@@ -1156,62 +1156,62 @@
             </div>
 
             <!-- FLOATING FLIGHT OPTIMIZER BANNER (ACTIVATED VIA ALT+CLICK, DRAGGABLE) -->
-            <div id="flight-planning-banner" class="hidden absolute z-[1000] px-4 py-2.5 rounded-2xl shadow-xl shadow-black/50 items-center gap-3.5 select-none cursor-grab active:cursor-grabbing pointer-events-auto transition-all">
+            <div id="flight-planning-banner" class="hidden absolute z-[1000] px-4 py-2.5 rounded-2xl shadow-xl shadow-black/50 items-center gap-3.5 select-none cursor-grab active:cursor-grabbing pointer-events-auto transition-all whitespace-nowrap flex-nowrap shrink-0">
                 <!-- DRAG HANDLE GRIP -->
-                <div class="text-slate-400 opacity-75 hover:opacity-100 flex items-center pr-1 cursor-grab active:cursor-grabbing" title="Click and drag banner to move">
+                <div class="text-slate-400 opacity-75 hover:opacity-100 flex items-center pr-1 cursor-grab active:cursor-grabbing shrink-0" title="Click and drag banner to move">
                     <i class="fa-solid fa-grip-vertical text-xs"></i>
                 </div>
 
-                <div id="fp-title-zone" class="flex items-center gap-2 cursor-default transition-colors">
+                <div id="fp-title-zone" class="flex items-center gap-2 cursor-default transition-colors whitespace-nowrap shrink-0">
                     <span id="fp-status-dot" class="relative hidden h-2.5 w-2.5">
                         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                         <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                     </span>
-                    <span data-i18n="optimizer.title" class="text-xs font-black font-mono uppercase tracking-wider text-slate-200 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">Flight Scenery Optimizer</span>
+                    <span data-i18n="optimizer.title" class="text-xs font-black font-mono uppercase tracking-wider text-slate-200 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] whitespace-nowrap">Flight Scenery Optimizer</span>
                 </div>
 
-                <div class="h-4 w-px bg-slate-700/40"></div>
+                <div class="h-4 w-px bg-slate-700/40 shrink-0"></div>
 
-                <div class="flex items-center gap-2 font-mono">
-                    <span id="fp-origin-tag" class="font-bold text-xs bg-slate-900/60 px-2.5 py-1 rounded-lg text-slate-300 border border-slate-700/40">----</span>
-                    <span class="text-slate-500 text-xs">➔</span>
-                    <span id="fp-dest-tag" class="font-bold text-xs bg-slate-900/60 px-2.5 py-1 rounded-lg text-slate-300 border border-slate-700/40">----</span>
+                <div class="flex items-center gap-2 font-mono whitespace-nowrap shrink-0">
+                    <span id="fp-origin-tag" class="font-bold text-xs bg-slate-900/60 px-2.5 py-1 rounded-lg text-slate-300 border border-slate-700/40 whitespace-nowrap shrink-0">----</span>
+                    <span class="text-slate-500 text-xs shrink-0">➔</span>
+                    <span id="fp-dest-tag" class="font-bold text-xs bg-slate-900/60 px-2.5 py-1 rounded-lg text-slate-300 border border-slate-700/40 whitespace-nowrap shrink-0">----</span>
                 </div>
 
-                <div class="h-4 w-px bg-slate-700/40"></div>
+                <div class="h-4 w-px bg-slate-700/40 shrink-0"></div>
 
                 <!-- Segmented Profile Selector (3 Positions: SimBrief, En-Route, Direct) -->
-                <div id="fp-profile-toggle" class="flex items-center bg-slate-950/60 p-0.5 rounded-xl border border-slate-700/50 transition-all">
-                    <button id="fp-btn-simbrief" onclick="setFlightCorridorProfile('SIMBRIEF')" class="px-3 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 transition-all cursor-pointer" data-i18n-title="simbrief.import_tooltip" title="Import active SimBrief flight plan (OFP)">
+                <div id="fp-profile-toggle" class="flex items-center bg-slate-950/60 p-0.5 rounded-xl border border-slate-700/50 transition-all whitespace-nowrap shrink-0">
+                    <button id="fp-btn-simbrief" onclick="setFlightCorridorProfile('SIMBRIEF')" class="px-3 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 transition-all cursor-pointer whitespace-nowrap shrink-0" data-i18n-title="simbrief.import_tooltip" title="Import active SimBrief flight plan (OFP)">
                         <span data-i18n="simbrief.import_btn_short">SimBrief</span>
                     </button>
-                    <button id="fp-btn-corridor" onclick="setFlightCorridorProfile('CORRIDOR')" class="px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer bg-cyan-600 text-white shadow-sm shadow-cyan-600/30" data-i18n-title="optimizer.en_route_tooltip" title="Keeps active your departure, arrival, and all custom sceneries along your flight path. Disables everything else.">
+                    <button id="fp-btn-corridor" onclick="setFlightCorridorProfile('CORRIDOR')" class="px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer bg-cyan-600 text-white shadow-sm shadow-cyan-600/30 whitespace-nowrap shrink-0" data-i18n-title="optimizer.en_route_tooltip" title="Keeps active your departure, arrival, and all custom sceneries along your flight path. Disables everything else.">
                         <span id="fp-corridor-label" data-i18n="optimizer.en_route">En-Route</span>
                     </button>
-                    <button id="fp-btn-direct" onclick="setFlightCorridorProfile('DIRECT')" class="px-3 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 transition-all cursor-pointer" data-i18n-title="optimizer.direct_tooltip" title="Maximum FPS boost: only keeps active your departure and arrival airports. Disables all other 3rd-party sceneries.">
+                    <button id="fp-btn-direct" onclick="setFlightCorridorProfile('DIRECT')" class="px-3 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 transition-all cursor-pointer whitespace-nowrap shrink-0" data-i18n-title="optimizer.direct_tooltip" title="Maximum FPS boost: only keeps active your departure and arrival airports. Disables all other 3rd-party sceneries.">
                         <span data-i18n="optimizer.direct">Direct</span>
                     </button>
                 </div>
 
-                <span id="fp-guide-text" data-i18n="optimizer.guide_destination" class="text-xs text-slate-300 font-medium drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">Click an airport to set Destination</span>
+                <span id="fp-guide-text" data-i18n="optimizer.guide_destination" class="text-xs text-slate-300 font-medium drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] whitespace-nowrap shrink-0">Click an airport to set Destination</span>
 
                 <!-- OPTIMIZATION ACTIONS (VISIBLE WHEN ARRIVAL IS SELECTED OR SIMBRIEF LOADED) -->
-                <div id="fp-actions" class="hidden items-center gap-2">
+                <div id="fp-actions" class="hidden items-center gap-2 whitespace-nowrap shrink-0">
                     <!-- Optimize Button -->
-                    <button id="fp-btn-optimize" onclick="executeFlightCorridorOptimization()" class="px-3.5 py-1 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition-all cursor-pointer active:scale-95 border-0" data-i18n-title="optimizer.optimize_tooltip" title="Apply optimization: disables non-flight sceneries in MSFS to boost FPS and reduce loading times">
+                    <button id="fp-btn-optimize" onclick="executeFlightCorridorOptimization()" class="px-3.5 py-1 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition-all cursor-pointer active:scale-95 border-0 whitespace-nowrap shrink-0" data-i18n-title="optimizer.optimize_tooltip" title="Apply optimization: disables non-flight sceneries in MSFS to boost FPS and reduce loading times">
                         <span data-i18n="optimizer.optimize">Optimize</span>
                     </button>
 
                     <!-- Restore Button (visible when flight mode active) -->
-                    <button id="fp-btn-restore" onclick="restoreFlightCorridorSceneries()" class="hidden px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all cursor-pointer active:scale-95 border-0 shadow-sm" data-i18n-title="optimizer.restore_tooltip" title="Restore all previously disabled sceneries back to normal">
+                    <button id="fp-btn-restore" onclick="restoreFlightCorridorSceneries()" class="hidden px-3 py-1 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-all cursor-pointer active:scale-95 border-0 shadow-sm whitespace-nowrap shrink-0" data-i18n-title="optimizer.restore_tooltip" title="Restore all previously disabled sceneries back to normal">
                         <span data-i18n="optimizer.restore">Restore</span>
                     </button>
                 </div>
 
                 <!-- Active Optimization Status: Plain text in white, no pill -->
-                <span id="fp-optimized-text" class="hidden text-xs font-semibold text-white whitespace-nowrap drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">0 addons disabled</span>
+                <span id="fp-optimized-text" class="hidden text-xs font-semibold text-white whitespace-nowrap drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)] shrink-0">0 addons disabled</span>
 
-                <button onclick="exitFlightPlanningMode()" class="ml-1 px-3 py-1 rounded-xl bg-slate-800/60 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold border border-slate-700/50 transition-all cursor-pointer active:scale-95" data-i18n-title="optimizer.exit_tooltip" title="Exit Flight Optimizer (or press Escape)">
+                <button onclick="exitFlightPlanningMode()" class="ml-1 px-3 py-1 rounded-xl bg-slate-800/60 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold border border-slate-700/50 transition-all cursor-pointer active:scale-95 whitespace-nowrap shrink-0" data-i18n-title="optimizer.exit_tooltip" title="Exit Flight Optimizer (or press Escape)">
                     <span data-i18n="optimizer.exit">Exit</span>
                 </button>
             </div>

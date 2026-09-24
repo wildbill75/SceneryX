@@ -8824,32 +8824,36 @@ let flightCorridorDisabledCount = 0;
 
 function positionFlightPlanningBanner(ap) {
     const banner = document.getElementById('flight-planning-banner');
-    if (!banner || !map || !ap || !ap.lat || !ap.lon) return;
+    if (!banner) return;
 
     // Ensure banner is displayed to accurately compute its rendered dimensions
     banner.classList.remove('hidden');
     banner.classList.add('flex');
 
-    // Convert airport Lat/Lon to pixel coordinates inside the map container
-    const pt = map.latLngToContainerPoint([ap.lat, ap.lon]);
-
-    // Measure rendered banner dimensions
-    const bannerW = banner.offsetWidth || 480;
-    const bannerH = banner.offsetHeight || 44;
-
     const mapEl = document.getElementById('map');
     const containerW = mapEl ? mapEl.clientWidth : window.innerWidth;
     const containerH = mapEl ? mapEl.clientHeight : window.innerHeight;
+    const bannerW = banner.offsetWidth || 560;
+    const bannerH = banner.offsetHeight || 44;
 
-    // Horizontally center banner exactly on the departure airport point
-    let targetLeft = Math.round(pt.x - (bannerW / 2));
-    // Vertically place just below the airport marker (24px below center)
-    let targetTop = Math.round(pt.y + 24);
+    // If banner has already been positioned, preserve user position (clamped to screen)
+    if (banner.style.left && banner.style.top && banner.style.left !== 'auto') {
+        const curLeft = parseInt(banner.style.left, 10);
+        const curTop = parseInt(banner.style.top, 10);
+        if (!isNaN(curLeft) && !isNaN(curTop) && curLeft > 0 && curTop > 0 && curLeft < containerW - 60 && curTop < containerH - 60) {
+            const pad = 12;
+            const clampedLeft = Math.max(pad, Math.min(containerW - bannerW - pad, curLeft));
+            const clampedTop = Math.max(pad, Math.min(containerH - bannerH - pad, curTop));
+            banner.style.left = `${clampedLeft}px`;
+            banner.style.top = `${clampedTop}px`;
+            banner.style.transform = 'none';
+            return;
+        }
+    }
 
-    // Clamp inside map container with padding so it never spawns outside visible bounds
-    const pad = 12;
-    targetLeft = Math.max(pad, Math.min(containerW - bannerW - pad, targetLeft));
-    targetTop = Math.max(pad, Math.min(containerH - bannerH - pad, targetTop));
+    // Default position: Centered horizontally at the bottom of the map above the toolbar
+    const targetLeft = Math.max(12, Math.round((containerW - bannerW) / 2));
+    const targetTop = Math.max(12, containerH - bannerH - 85);
 
     banner.style.left = `${targetLeft}px`;
     banner.style.top = `${targetTop}px`;
@@ -8868,12 +8872,19 @@ function initDraggableFlightPlanningBanner() {
         L.DomEvent.disableScrollPropagation(banner);
     }
 
+    const simbriefBtn = document.getElementById('fp-btn-simbrief');
+    if (simbriefBtn && !simbriefBtn._attached) {
+        simbriefBtn._attached = true;
+        simbriefBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+        });
+    }
+
     const corridorBtn = document.getElementById('fp-btn-corridor');
     if (corridorBtn && !corridorBtn._attached) {
         corridorBtn._attached = true;
         corridorBtn.addEventListener('click', function(e) {
             e.stopPropagation();
-            setFlightCorridorProfile('CORRIDOR');
         });
     }
 
@@ -8882,7 +8893,6 @@ function initDraggableFlightPlanningBanner() {
         directBtn._attached = true;
         directBtn.addEventListener('click', function(e) {
             e.stopPropagation();
-            setFlightCorridorProfile('DIRECT');
         });
     }
 
@@ -9006,14 +9016,7 @@ function getCorridorAddonsList() {
 function setFlightCorridorProfile(profile) {
     if (isFlightCorridorOptimized) return;
     if (profile === 'SIMBRIEF') {
-        if (!currentSimBriefFlight || flightCorridorProfile === 'SIMBRIEF') {
-            syncSimBriefFlightPlan();
-            return;
-        }
-        flightCorridorProfile = 'SIMBRIEF';
-        filterAirports();
-        updateFlightPlanningBannerUI();
-        showToast('Flight Profile: SimBrief (Alternates Protected)', 'info');
+        syncSimBriefFlightPlan();
         return;
     }
     flightCorridorProfile = profile;
@@ -14517,7 +14520,9 @@ async function validateSimBriefFieldQuietly(val) {
     }
 }
 
+let isSyncingSimBrief = false;
 async function syncSimBriefFlightPlan() {
+    if (isSyncingSimBrief) return;
     const sbUser = currentSettings.simbrief_username || currentSettings.simbrief_userid || '';
     if (!sbUser) {
         openSettingsModal();
@@ -14532,6 +14537,7 @@ async function syncSimBriefFlightPlan() {
         return;
     }
 
+    isSyncingSimBrief = true;
     const fpBtn = document.getElementById('fp-btn-simbrief');
     let originalHtml = '';
     if (fpBtn) {
@@ -14640,6 +14646,7 @@ async function syncSimBriefFlightPlan() {
         console.error("SimBrief sync error:", e);
         showToast(`Failed to sync SimBrief: ${e.message}`, 'error');
     } finally {
+        isSyncingSimBrief = false;
         if (fpBtn && originalHtml) {
             fpBtn.innerHTML = originalHtml;
         }
