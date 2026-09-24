@@ -3438,7 +3438,77 @@ class Api:
             return json.dumps({"status": "error", "message": str(e)})
 
 
+_SINGLE_INSTANCE_MUTEX = None
+
+def ensure_single_instance():
+    global _SINGLE_INSTANCE_MUTEX
+    if sys.platform != 'win32' and os.name != 'nt':
+        return True
+
+    try:
+        import ctypes
+        ERROR_ALREADY_EXISTS = 183
+        mutex_name = "SceneryX_SingleInstance_Mutex"
+        _SINGLE_INSTANCE_MUTEX = ctypes.windll.kernel32.CreateMutexW(None, False, mutex_name)
+        last_error = ctypes.windll.kernel32.GetLastError()
+
+        if last_error == ERROR_ALREADY_EXISTS:
+            # 1. Bring already running SceneryX window to front and restore if minimized
+            hwnd = ctypes.windll.user32.FindWindowW(None, "SceneryX")
+            if hwnd:
+                SW_RESTORE = 9
+                ctypes.windll.user32.ShowWindow(hwnd, SW_RESTORE)
+                ctypes.windll.user32.SetForegroundWindow(hwnd)
+
+            # 2. Determine user's preferred language (settings fallback to Windows UI locale)
+            lang = 'en'
+            try:
+                st = get_settings()
+                lang = (st.get('language') or '').lower()
+            except Exception:
+                pass
+
+            if not lang:
+                try:
+                    lang_id = ctypes.windll.kernel32.GetUserDefaultUILanguage()
+                    if (lang_id & 0xFF) == 0x0C:  # LANG_FRENCH
+                        lang = 'fr'
+                    elif (lang_id & 0xFF) == 0x07:  # LANG_GERMAN
+                        lang = 'de'
+                    elif (lang_id & 0xFF) == 0x0A:  # LANG_SPANISH
+                        lang = 'es'
+                    else:
+                        lang = 'en'
+                except Exception:
+                    lang = 'en'
+
+            messages = {
+                'fr': "SceneryX est déjà ouvert.\n\nUne seule instance de l'application peut être exécutée à la fois.",
+                'en': "SceneryX is already running.\n\nOnly one instance of the application can run at a time.",
+                'de': "SceneryX wird bereits ausgeführt.\n\nEs kann nur eine Instanz der Anwendung gleichzeitig ausgeführt werden.",
+                'es': "SceneryX ya está abierto.\n\nSolo se puede ejecutar una instancia de la aplicación a la vez."
+            }
+            msg = messages.get(lang, messages['en'])
+            title = "SceneryX"
+
+            # MB_OK (0x0) | MB_ICONWARNING (0x30) | MB_TOPMOST (0x40000) | MB_SETFOREGROUND (0x10000)
+            MB_FLAGS = 0x00000000 | 0x00000030 | 0x00040000 | 0x00010000
+            ctypes.windll.user32.MessageBoxW(hwnd or 0, msg, title, MB_FLAGS)
+
+            if _SINGLE_INSTANCE_MUTEX:
+                ctypes.windll.kernel32.CloseHandle(_SINGLE_INSTANCE_MUTEX)
+                _SINGLE_INSTANCE_MUTEX = None
+            return False
+    except Exception as e:
+        print("Single-instance check error:", e)
+
+    return True
+
+
 def main():
+    if not ensure_single_instance():
+        sys.exit(0)
+
     web_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'web')
     html_file = os.path.join(web_dir, 'index.html')
 
