@@ -9025,6 +9025,13 @@ async function executeFlightCorridorOptimization() {
     keepIcaosSet.add(dep.icao);
     keepIcaosSet.add(arr.icao);
 
+    // Keep any SimBrief Alternates active in both Corridor and Direct modes!
+    if (typeof currentSimBriefAlternates !== 'undefined' && Array.isArray(currentSimBriefAlternates)) {
+        currentSimBriefAlternates.forEach(alt => {
+            if (alt && alt.icao) keepIcaosSet.add(alt.icao);
+        });
+    }
+
     if (flightCorridorProfile === 'CORRIDOR') {
         const corridorAddons = getCorridorAddonsList();
         corridorAddons.forEach(a => keepIcaosSet.add(a.icao));
@@ -9363,6 +9370,7 @@ function closePlanningBannerClean() {
     flightCorridorProfile = 'CORRIDOR';
     isFlightCorridorOptimized = false;
     flightCorridorDisabledCount = 0;
+    currentSimBriefAlternates = [];
 
     clearFlightCorridor();
     updateFlightPlanningBannerUI();
@@ -11835,9 +11843,9 @@ function filterAirports() {
             return false;
         }
 
-        // Active Flight Corridor Filter (Alt + Click)
+        // Active Flight Corridor Filter
         if (selectedAirport && flightCorridorArrivalAirport) {
-            const isCorridorEndpoint = (ap.icao === selectedAirport.icao || ap.icao === flightCorridorArrivalAirport.icao);
+            const isCorridorEndpoint = (ap.icao === selectedAirport.icao || ap.icao === flightCorridorArrivalAirport.icao || (typeof currentSimBriefAlternates !== 'undefined' && currentSimBriefAlternates.some(alt => alt.icao === ap.icao)));
 
             if (isCorridorEndpoint) {
                 // EXCEPTION TO THE RULE:
@@ -13869,6 +13877,7 @@ async function openSettingsModal() {
     const chkCity = document.getElementById('cfg-label-city');
     if (chkCity) chkCity.checked = currentSettings.show_label_city !== false;
 
+    loadSimBriefSettingsUI();
     renderSettingsPathsList();
     const modal = document.getElementById('settings-modal');
     if (modal) {
@@ -14064,6 +14073,16 @@ async function saveSettings() {
     if (chkName) currentSettings.show_label_name = chkName.checked;
     const chkCity = document.getElementById('cfg-label-city');
     if (chkCity) currentSettings.show_label_city = chkCity.checked;
+
+    const sbInput = document.getElementById('cfg-simbrief-id');
+    if (sbInput) {
+        const val = sbInput.value.trim();
+        if (val.match(/^\d+$/)) {
+            currentSettings.simbrief_userid = val;
+        } else {
+            currentSettings.simbrief_username = val;
+        }
+    }
 
     applyStartupCameraSettings();
 
@@ -14413,203 +14432,238 @@ function promptClosingFlightMode() {
 /* ================= SIMBRIEF FLIGHT OPTIMIZER UI ENGINE ================= */
 
 let currentSimBriefFlight = null;
+let currentSimBriefAlternates = [];
 
 function loadSimBriefSettingsUI() {
     if (!currentSettings) return;
-    if (currentSettings.simbrief_username) {
-        const uInput = document.getElementById('sb-username-input');
-        if (uInput) uInput.value = currentSettings.simbrief_username;
+    const currentSbUser = currentSettings.simbrief_username || currentSettings.simbrief_userid || '';
+    const sbInput = document.getElementById('cfg-simbrief-id');
+    const sbBadge = document.getElementById('sb-status-badge');
+    const sbDetails = document.getElementById('sb-account-details');
+    const sbText = document.getElementById('sb-account-text');
+
+    if (sbInput) sbInput.value = currentSbUser;
+    if (currentSbUser) {
+        if (sbBadge) {
+            sbBadge.className = "text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40";
+            sbBadge.innerText = t('settings.simbrief_linked', 'Connected');
+        }
+        if (sbDetails) sbDetails.classList.remove('hidden');
+        if (sbText) {
+            const extra = currentSettings.simbrief_userid && currentSettings.simbrief_username && currentSettings.simbrief_username !== currentSettings.simbrief_userid ? ` (Pilot ID: ${currentSettings.simbrief_userid})` : '';
+            sbText.innerText = `${t('settings.simbrief_linked', 'Connected')}: ${currentSettings.simbrief_username || currentSettings.simbrief_userid}${extra}`;
+        }
+    } else {
+        if (sbBadge) {
+            sbBadge.className = "text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700/60";
+            sbBadge.innerText = t('settings.simbrief_not_linked', 'NOT LINKED');
+        }
+        if (sbDetails) sbDetails.classList.add('hidden');
     }
-    if (currentSettings.simbrief_userid) {
-        const idInput = document.getElementById('sb-userid-input');
-        if (idInput) idInput.value = currentSettings.simbrief_userid;
-    }
+
     if (currentSettings.flight_mode && currentSettings.flight_mode.active) {
         updateFlightModeBannerUI(currentSettings.flight_mode);
     }
 }
 
-function autoSyncSimBrief(changedField) {
-    let val = '';
-    if (changedField === 'username') {
-        val = document.getElementById('sb-username-input').value.trim();
-    } else {
-        val = document.getElementById('sb-userid-input').value.trim();
-    }
-    if (!val || !window.pywebview) return;
+async function testAndLinkSimBriefAccount() {
+    const sbInput = document.getElementById('cfg-simbrief-id');
+    const sbBadge = document.getElementById('sb-status-badge');
+    const sbDetails = document.getElementById('sb-account-details');
+    const sbText = document.getElementById('sb-account-text');
+    const sbIcon = document.getElementById('sb-link-icon');
 
-    window.pywebview.api.fetch_simbrief(val).then(resStr => {
-        try {
+    if (!sbInput) return;
+    const val = sbInput.value.trim();
+    if (!val) {
+        showToast(t('simbrief.credentials_required', 'Please enter your SimBrief Username or Pilot ID'), 'warning');
+        return;
+    }
+
+    if (sbIcon) sbIcon.className = "fa-solid fa-spinner fa-spin text-xs";
+    if (sbBadge) {
+        sbBadge.className = "text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-amber-500/20 text-amber-400 border border-amber-500/40";
+        sbBadge.innerText = "CHECKING...";
+    }
+
+    try {
+        if (window.pywebview && window.pywebview.api) {
+            const resStr = await window.pywebview.api.fetch_simbrief(val);
             const res = JSON.parse(resStr);
-            if (res.status === 'success') {
-                if (res.username && document.getElementById('sb-username-input')) {
-                    document.getElementById('sb-username-input').value = res.username;
+            if (res.status === 'success' || (res.username && !res.message?.includes('No active flight plan'))) {
+                const uname = res.username || val;
+                const uid = res.userid || '';
+                currentSettings.simbrief_username = uname;
+                if (uid) currentSettings.simbrief_userid = uid;
+                await window.pywebview.api.save_settings(JSON.stringify(currentSettings));
+
+                if (sbBadge) {
+                    sbBadge.className = "text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40";
+                    sbBadge.innerText = t('settings.simbrief_linked', 'Connected');
                 }
-                if (res.userid && document.getElementById('sb-userid-input')) {
-                    document.getElementById('sb-userid-input').value = res.userid;
+                if (sbDetails) sbDetails.classList.remove('hidden');
+                if (sbText) {
+                    const extra = uid ? ` (Pilot ID: ${uid})` : '';
+                    sbText.innerText = `${t('settings.simbrief_linked', 'Connected')}: ${uname}${extra}`;
                 }
+                showToast(`✓ SimBrief account linked: ${uname}`, 'success');
+            } else if (res.message && res.message.includes('No active flight plan')) {
+                const uname = res.username || val;
+                const uid = res.userid || '';
+                currentSettings.simbrief_username = uname;
+                if (uid) currentSettings.simbrief_userid = uid;
+                await window.pywebview.api.save_settings(JSON.stringify(currentSettings));
+
+                if (sbBadge) {
+                    sbBadge.className = "text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40";
+                    sbBadge.innerText = t('settings.simbrief_linked', 'Connected');
+                }
+                if (sbDetails) sbDetails.classList.remove('hidden');
+                if (sbText) {
+                    sbText.innerText = `${t('settings.simbrief_linked', 'Connected')}: ${uname} (No active OFP yet)`;
+                }
+                showToast(`✓ SimBrief account linked: ${uname} (Generate a flight on simbrief.com to import)`, 'info');
+            } else {
+                if (sbBadge) {
+                    sbBadge.className = "text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-400 border border-rose-500/40";
+                    sbBadge.innerText = "ERROR";
+                }
+                showToast(res.message || 'SimBrief account not found', 'error');
             }
-        } catch(e){}
-    });
+        }
+    } catch (e) {
+        showToast(`SimBrief connection failed: ${e.message}`, 'error');
+    } finally {
+        if (sbIcon) sbIcon.className = "fa-solid fa-plug text-xs";
+    }
 }
 
-function triggerSimBriefImport() {
-    const uVal = document.getElementById('sb-username-input').value.trim();
-    const idVal = document.getElementById('sb-userid-input').value.trim();
-    const identifier = uVal || idVal;
-
-    if (!identifier) {
-        showCustomModal({
-            title: 'SimBrief Credentials Required',
-            message: 'Please enter your SimBrief Username or Pilot ID in the left sidebar to import your flight plan.',
-            type: 'warning',
-            confirmText: 'OK'
-        });
+async function syncSimBriefFlightPlan() {
+    const sbUser = currentSettings.simbrief_username || currentSettings.simbrief_userid || '';
+    if (!sbUser) {
+        openSettingsModal();
+        setTimeout(() => {
+            const input = document.getElementById('cfg-simbrief-id');
+            if (input) {
+                input.focus();
+                input.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }, 200);
+        showToast(t('simbrief.credentials_required', 'Please configure your SimBrief Username or Pilot ID in Settings.'), 'warning');
         return;
     }
 
     const icon = document.getElementById('sb-import-icon');
-    if (icon) icon.className = "fa-solid fa-spinner fa-spin text-amber-400";
+    const fpIcon = document.getElementById('fp-sb-icon');
+    if (icon) icon.className = "fa-solid fa-spinner fa-spin text-amber-400 text-xs";
+    if (fpIcon) fpIcon.className = "fa-solid fa-spinner fa-spin text-amber-400 text-[11px]";
 
-    if (!window.pywebview) return;
+    try {
+        if (!window.pywebview || !window.pywebview.api) {
+            showToast('SimBrief API not available in browser preview mode', 'warning');
+            return;
+        }
 
-    window.pywebview.api.fetch_simbrief(identifier).then(resStr => {
-        if (icon) icon.className = "fa-solid fa-cloud-arrow-down text-amber-400";
-        try {
-            const res = JSON.parse(resStr);
-            if (res.status === 'error') {
-                showCustomModal({
-                    title: 'SimBrief Import Error',
-                    message: res.message || 'Could not fetch flight plan from SimBrief.',
-                    type: 'error',
-                    confirmText: 'OK'
-                });
-                return;
-            }
+        const resStr = await window.pywebview.api.fetch_simbrief(sbUser);
+        const res = JSON.parse(resStr);
 
-            currentSimBriefFlight = res.flight;
-            if (res.username) document.getElementById('sb-username-input').value = res.username;
-            if (res.userid) document.getElementById('sb-userid-input').value = res.userid;
-
-            openSimBriefModal(res.flight);
-        } catch(e) {
+        if (res.status === 'error') {
             showCustomModal({
-                title: 'SimBrief Import Error',
-                message: 'Failed to parse response: ' + e.message,
-                type: 'error',
+                title: 'SimBrief Import',
+                message: `<div class="space-y-2 text-xs text-slate-300">` +
+                         `  <p class="font-bold text-amber-400">${escapeHtml(res.message || 'Could not fetch flight plan from SimBrief.')}</p>` +
+                         `  <p>Make sure you have generated an OFP on <strong class="text-white">simbrief.com</strong> for your account (<strong>${escapeHtml(sbUser)}</strong>).</p>` +
+                         `</div>`,
+                type: 'warning',
                 confirmText: 'OK'
             });
+            return;
         }
-    });
-}
 
-function openSimBriefModal(flight) {
-    const infoEl = document.getElementById('sb-modal-flight-info');
-    if (infoEl) infoEl.innerText = `${flight.flight_number ? flight.flight_number + ' | ' : ''}${flight.aircraft ? flight.aircraft + ' | ' : ''}OFP LOADED`;
-    
-    document.getElementById('sb-modal-origin-icao').innerText = flight.origin.icao;
-    document.getElementById('sb-modal-origin-name').innerText = flight.origin.name;
-
-    document.getElementById('sb-modal-dest-icao').innerText = flight.destination.icao;
-    document.getElementById('sb-modal-dest-name').innerText = flight.destination.name;
-
-    const altsContainer = document.getElementById('sb-modal-alternates-list');
-    altsContainer.innerHTML = '';
-    if (flight.alternates && flight.alternates.length > 0) {
-        flight.alternates.forEach(alt => {
-            const pill = document.createElement('div');
-            pill.className = "px-2.5 py-1 rounded-lg bg-slate-800 border border-slate-700 text-slate-200 font-mono font-bold flex items-center gap-1.5";
-            pill.innerHTML = `<span class="text-amber-400 font-black">${alt.icao}</span> <span class="text-[10px] text-slate-400 font-sans font-normal truncate max-w-[150px]">${alt.name}</span>`;
-            altsContainer.appendChild(pill);
-        });
-    } else {
-        altsContainer.innerHTML = `<span class="text-slate-500 italic">No alternate airports specified in OFP</span>`;
-    }
-
-    const routeIcaos = flight.flight_icaos || [];
-    const thirdPartyAirports = allAirportsData.filter(a => 
-        a.pricing_type !== 'Asobo' && 
-        a.pricing_type !== 'Default' && 
-        !a.is_default && 
-        !a.is_asobo_official
-    );
-    const toKeep = thirdPartyAirports.filter(a => routeIcaos.includes(a.icao));
-    const toDisableCount = thirdPartyAirports.length - toKeep.length;
-
-    const toKeepList = toKeep.map(a => a.icao).join(', ') || 'None';
-    const impactTemplate = t('simbrief_modal.impact_summary', '{toDisable} non-route 3rd-party sceneries will be disabled to boost FPS and stability. {toKeepCount} installed route scenery package(s) ({toKeepList}) will remain 100% active.');
-    const impactText = impactTemplate
-        .replace('{toDisable}', toDisableCount)
-        .replace('{toKeepCount}', toKeep.length)
-        .replace('{toKeepList}', toKeepList);
-    document.getElementById('sb-modal-impact-text').innerText = impactText;
-
-    const modal = document.getElementById('simbrief-modal');
-    if (modal) modal.classList.remove('hidden');
-}
-
-function closeSimBriefModal() {
-    const modal = document.getElementById('simbrief-modal');
-    if (modal) {
-        modal.classList.add('hidden');
-    }
-}
-
-function confirmSimBriefOptimization() {
-    closeSimBriefModal();
-    if (!currentSimBriefFlight || !window.pywebview) return;
-
-    const flightIcaos = currentSimBriefFlight.flight_icaos || [];
-    const origStr = (currentSimBriefFlight.origin && currentSimBriefFlight.origin.icao) ? currentSimBriefFlight.origin.icao : (typeof currentSimBriefFlight.origin === 'string' ? currentSimBriefFlight.origin : '');
-    const destStr = (currentSimBriefFlight.destination && currentSimBriefFlight.destination.icao) ? currentSimBriefFlight.destination.icao : (typeof currentSimBriefFlight.destination === 'string' ? currentSimBriefFlight.destination : '');
-    const routeName = (origStr && destStr) ? `${origStr} ➔ ${destStr}` : 'SimBrief Route';
-
-    showCustomModal({
-        title: '',
-        message: `<div class="flex flex-col items-center justify-center py-2 text-center">` +
-                 `  <p class="text-sm text-slate-100 font-bold mb-1">Optimizing MSFS Scenery Library</p>` +
-                 `  <p class="text-xs text-slate-400">Isolating non-flight sceneries (${routeName}) & updating Content.xml...</p>` +
-                 `  <p class="mt-3.5 text-sm font-bold text-slate-100">Please wait<span class="loading-dots ml-1"><span>.</span><span>.</span><span>.</span></span></p>` +
-                 `</div>`,
-        type: 'loading'
-    });
-
-    const apiFn = window.pywebview.api.optimize_flight_mode || window.pywebview.api.optimize_flight;
-    apiFn.call(window.pywebview.api, JSON.stringify(flightIcaos)).then(resStr => {
-        try {
-            const res = JSON.parse(resStr);
-            if (res.status === 'ok' || res.status === 'success') {
-                if (res.airports && res.airports.length > 0) {
-                    allAirportsData = res.airports;
-                }
-
-                const disabledNum = res.disabled_count !== undefined ? res.disabled_count : (res.disabledCount !== undefined ? res.disabledCount : 0);
-
-                updateFlightModeBannerUI({
-                    active: true,
-                    origin: origStr,
-                    destination: destStr,
-                    disabled_count: disabledNum,
-                    icaos: flightIcaos
-                });
-
-                filterAirports();
-
-                showCustomModal(
-                    'Flight Scenery Optimization Active',
-                    `Successfully isolated sceneries for flight ${routeName}.\n\nNon-route 3rd-party sceneries are disabled & MSFS Content.xml updated. Enjoy your flight!`,
-                    'success'
-                );
-            } else {
-                showCustomModal('Optimization Error', res.message || "Failed to optimize sceneries.", 'error');
-            }
-        } catch(e){
-            console.error("Error parsing flight optimization result:", e);
+        const flight = res.flight;
+        if (!flight || !flight.origin || !flight.destination) {
+            showToast('Invalid flight plan received from SimBrief', 'error');
+            return;
         }
-    }).catch(err => {
-        showCustomModal('Optimization Error', String(err), 'error');
-    });
+
+        currentSimBriefFlight = flight;
+        const depIcao = (flight.origin.icao || '').toUpperCase().trim();
+        const arrIcao = (flight.destination.icao || '').toUpperCase().trim();
+
+        // 1. Resolve origin and destination airports
+        let depAp = allAirportsData.find(a => a.icao === depIcao);
+        let arrAp = allAirportsData.find(a => a.icao === arrIcao);
+
+        if (!depAp) {
+            depAp = {
+                icao: depIcao,
+                name: flight.origin.name || depIcao,
+                city: flight.origin.name || depIcao,
+                pricing_type: 'Default',
+                type: 'Airport',
+                is_default: true
+            };
+        }
+        if (!arrAp) {
+            arrAp = {
+                icao: arrIcao,
+                name: flight.destination.name || arrIcao,
+                city: flight.destination.name || arrIcao,
+                pricing_type: 'Default',
+                type: 'Airport',
+                is_default: true
+            };
+        }
+
+        // 2. Resolve alternates
+        currentSimBriefAlternates = [];
+        if (flight.alternates && Array.isArray(flight.alternates)) {
+            flight.alternates.forEach(alt => {
+                const altIcao = (alt.icao || '').toUpperCase().trim();
+                let altAp = allAirportsData.find(a => a.icao === altIcao);
+                if (altAp) currentSimBriefAlternates.push(altAp);
+            });
+        }
+
+        // 3. Activate Flight Planning Mode
+        isFlightPlanningMode = true;
+        flightPlanningDeparture = depAp;
+        flightPlanningDestination = arrAp;
+        flightCorridorArrivalAirport = arrAp;
+        selectedAirport = depAp;
+
+        // 4. Update Banner UI
+        updateFlightPlanningBannerUI();
+        positionFlightPlanningBanner(depAp);
+        initDraggableFlightPlanningBanner();
+
+        // 5. Render corridor
+        renderFlightCorridor();
+
+        // 6. Camera: fit bounds nicely to show whole route
+        if (map && depAp.lat && depAp.lon && arrAp.lat && arrAp.lon) {
+            const boundsPts = [[depAp.lat, depAp.lon], [arrAp.lat, arrAp.lon]];
+            currentSimBriefAlternates.forEach(alt => {
+                if (alt.lat && alt.lon) boundsPts.push([alt.lat, alt.lon]);
+            });
+            map.fitBounds(boundsPts, { padding: [100, 100], maxZoom: 8, animate: true, duration: 1.2 });
+        }
+
+        const altCount = currentSimBriefAlternates.length;
+        const flightNum = flight.flight_number ? `${flight.flight_number} • ` : '';
+        const acType = flight.aircraft ? ` (${flight.aircraft})` : '';
+        showToast(`✈ SimBrief: ${flightNum}${depIcao} ➔ ${arrIcao}${acType} loaded! ${altCount > 0 ? `(${altCount} alternate(s) protected)` : ''}`, 'success');
+
+    } catch (e) {
+        console.error("SimBrief sync error:", e);
+        showToast(`Failed to sync SimBrief: ${e.message}`, 'error');
+    } finally {
+        if (icon) icon.className = "fa-solid fa-cloud-arrow-down text-amber-400 group-hover:text-slate-950 text-xs transition-colors";
+        if (fpIcon) fpIcon.className = "fa-solid fa-cloud-arrow-down text-[11px]";
+    }
 }
+
+const triggerSimBriefImport = syncSimBriefFlightPlan;
 
 function updateFlightModeBannerUI(flightMode) {
     currentFlightMode = flightMode || { active: false, icaos: [] };

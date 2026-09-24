@@ -692,7 +692,7 @@
         <div class="flex items-center shrink-0 z-10">
             <div class="flex items-center gap-2.5">
                 <img src="header_logo.png" alt="SceneryX" class="h-8 lg:h-9 w-auto object-contain select-none pointer-events-none" />
-                <span class="text-xs font-mono font-semibold text-slate-400" title="SceneryX v1.0.0">v1.0.0</span>
+                <span class="text-xs font-mono font-semibold text-slate-400" title="SceneryX v1.0.1">v1.0.1</span>
             </div>
         </div>
 
@@ -818,6 +818,12 @@
                 <button onclick="rescanMSFS()" data-i18n-title="footer.rescan_button" title="Rescan MSFS Packages" class="h-9 px-3.5 rounded-xl bg-cyan-600/85 hover:bg-cyan-500 text-white text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 shadow-lg shadow-cyan-600/20 border border-cyan-400/50 hover:border-cyan-300">
                     <i id="rescan-icon" class="fa-solid fa-arrows-rotate text-white text-xs"></i>
                     <span data-i18n="footer.rescan_button">Rescan</span>
+                </button>
+
+                <!-- SIMBRIEF 1-CLICK IMPORT BUTTON -->
+                <button onclick="syncSimBriefFlightPlan()" data-i18n-title="simbrief.import_tooltip" title="Import active SimBrief flight plan (OFP)" class="h-9 px-3.5 rounded-xl bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-slate-950 border border-amber-500/40 hover:border-amber-400 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 shadow-lg shadow-amber-500/10 group">
+                    <i id="sb-import-icon" class="fa-solid fa-cloud-arrow-down text-amber-400 group-hover:text-slate-950 text-xs transition-colors"></i>
+                    <span data-i18n="simbrief.import_btn_short">SimBrief</span>
                 </button>
 
                 <!-- SETTINGS GEAR BUTTON -->
@@ -1179,6 +1185,12 @@
                 </div>
 
                 <div class="h-4 w-px bg-slate-700/40"></div>
+
+                <!-- SYNC SIMBRIEF BUTTON IN BANNER -->
+                <button id="fp-btn-simbrief" onclick="syncSimBriefFlightPlan()" type="button" class="px-2.5 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500 text-amber-300 hover:text-slate-950 border border-amber-500/40 hover:border-amber-400 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-sm" data-i18n-title="simbrief.import_tooltip" title="Import active SimBrief flight plan (OFP)">
+                    <i id="fp-sb-icon" class="fa-solid fa-cloud-arrow-down text-[11px]"></i>
+                    <span>SimBrief</span>
+                </button>
 
                 <span id="fp-guide-text" data-i18n="optimizer.guide_destination" class="text-xs text-slate-300 font-medium drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">Click an airport to set Destination</span>
 
@@ -1652,6 +1664,37 @@
                         <button onclick="openGsxFolderInExplorer()" class="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-bold transition-colors flex items-center justify-center shrink-0 border-0 cursor-pointer group" title="Open in Windows Explorer">
                             <i class="fa-solid fa-arrow-up-right-from-square text-slate-400 group-hover:text-white transition-colors"></i>
                         </button>
+                    </div>
+                </div>
+
+                <!-- SIMBRIEF INTEGRATION CONFIG -->
+                <div class="pt-4 border-t border-slate-800/80 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <label data-i18n="settings.simbrief_section" class="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
+                            <i class="fa-solid fa-cloud text-amber-400"></i>
+                            <span>SimBrief Integration</span>
+                        </label>
+                        <span id="sb-status-badge" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700/60" data-i18n="settings.simbrief_not_linked">
+                            NOT LINKED
+                        </span>
+                    </div>
+
+                    <div class="space-y-2 bg-slate-950/60 p-3.5 rounded-xl border border-slate-800/80">
+                        <div class="flex items-center justify-between">
+                            <label data-i18n="settings.simbrief_id_label" for="cfg-simbrief-id" class="text-xs font-semibold text-slate-300">SimBrief Username or Pilot ID</label>
+                            <span data-i18n="settings.simbrief_hint" class="text-[10px] text-slate-500 font-mono">Found in SimBrief Account Settings</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <input type="text" id="cfg-simbrief-id" placeholder="e.g. 123456 or YourUsername" class="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-amber-500">
+                            <button onclick="testAndLinkSimBriefAccount()" type="button" class="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-colors flex items-center gap-1.5 shrink-0 border-0 cursor-pointer active:scale-95 shadow-sm shadow-amber-500/20" title="Check connection to SimBrief">
+                                <i id="sb-link-icon" class="fa-solid fa-plug text-xs"></i>
+                                <span data-i18n="settings.simbrief_link_btn">Link Account</span>
+                            </button>
+                        </div>
+                        <div id="sb-account-details" class="hidden text-[11px] font-mono text-emerald-400 flex items-center gap-1.5 pt-1">
+                            <i class="fa-solid fa-circle-check text-xs"></i>
+                            <span id="sb-account-text">Connected</span>
+                        </div>
                     </div>
                 </div>
 
@@ -2192,10 +2235,10 @@
     </div>
 
     <!-- LOCALES DICTIONARY SCRIPT -->
-    <script src="locales.js?v=1.0.0"></script>
+    <script src="locales.js?v=1.0.1"></script>
     <!-- WORLD CAPITALS DATABASE SCRIPT -->
-    <script src="capitals_data.js?v=1.0.0"></script>
+    <script src="capitals_data.js?v=1.0.1"></script>
     <!-- MAIN APP JS SCRIPT -->
-    <script src="app.js?v=1.0.0"></script>
+    <script src="app.js?v=1.0.1"></script>
 </body>
 </html>
