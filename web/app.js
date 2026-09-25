@@ -906,14 +906,24 @@ function initMap() {
         zoomControl: false,
         worldCopyJump: true,
         preferCanvas: true,
-        doubleClickZoom: false
+        doubleClickZoom: false,
+        wheelPxPerZoomLevel: 120, // Smooth mouse wheel zooming
+        wheelDebounceTime: 60,    // Debounce rapid wheel events to prevent animation queue lag
+        zoomAnimation: true,
+        fadeAnimation: true,
+        markerZoomAnimation: true,
+        renderer: L.canvas({ padding: 0.5 })
     });
 
     L.control.zoom({ position: 'topright' }).addTo(map);
 
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
         attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ',
-        maxZoom: 16
+        maxZoom: 16,
+        updateWhenIdle: true,     // DO NOT fetch/decode tiles during pan gestures (maintains 60+ fps panning!)
+        updateWhenZooming: false,  // DO NOT fetch intermediate tiles during zoom animations
+        keepBuffer: 8,             // Keep 8 tiles outside viewport in memory (no re-fetching on small pans)
+        crossOrigin: true
     }).addTo(map);
 
     // Dedicated map pane for operating airline route lines (z-index 550: above country polygons, below markers)
@@ -925,17 +935,19 @@ function initMap() {
 
     markerClusterGroup = L.markerClusterGroup({
         chunkedLoading: true,
-        chunkInterval: 100,
-        chunkDelay: 10,
+        chunkInterval: 120,
+        chunkDelay: 15,
         maxClusterRadius: function (zoom) {
-            if (zoom <= 3) return 45;
-            if (zoom <= 5) return 35;
-            return 25;
+            if (zoom <= 3) return 50;
+            if (zoom <= 5) return 40;
+            return 30;
         },
-        disableClusteringAtZoom: 7,
+        disableClusteringAtZoom: 8, // Keep clusters at regional level to avoid rendering hundreds of unclustered DOM nodes simultaneously
         spiderfyOnMaxZoom: true,
         showCoverageOnHover: false,
-        zoomToBoundsOnClick: true
+        zoomToBoundsOnClick: true,
+        animate: true,
+        animateAddingMarkers: false
     });
 
     map.addLayer(markerClusterGroup);
@@ -947,8 +959,8 @@ function initMap() {
         }
     });
 
-    // Hierarchical progressive disclosure of airport labels by zoom
-    map.on('zoom zoomend', updateMapZoomTier);
+    // Hierarchical progressive disclosure of airport labels by zoom (triggered on zoomend only)
+    map.on('zoomend', updateMapZoomTier);
     updateMapZoomTier();
 
     // Map drag tracking to distinguish panning from clean left-clicks
@@ -1036,9 +1048,20 @@ function initMap() {
         L.DomEvent.disableScrollPropagation(settingsModalEl);
     }
 
-    // Dynamically update radial menu position and scale during pan/zoom/resize so it stays anchored and resizes
-    map.on('move zoom viewreset moveend', () => updateRadialMenuPosition(false));
-    map.on('zoom viewreset zoomend', updateCountryInteractivityState);
+    // High-performance RAF-throttled radial menu updates during pan/zoom
+    let radialMenuMoveRaf = null;
+    function onMapMoveUpdateRadial() {
+        if (!currentRadialAirport && !isAirlinesModalOpen() && !isDetailsModalOpen()) return;
+        if (!radialMenuMoveRaf) {
+            radialMenuMoveRaf = requestAnimationFrame(() => {
+                radialMenuMoveRaf = null;
+                updateRadialMenuPosition(false);
+            });
+        }
+    }
+    map.on('move', onMapMoveUpdateRadial);
+    map.on('zoom viewreset moveend', () => updateRadialMenuPosition(false));
+    map.on('zoomend', updateCountryInteractivityState);
     window.addEventListener('resize', () => updateRadialMenuPosition(false));
 
     // Double-click on neutral map area: PANIC RESET (aborts all actions & returns to default startup state)
@@ -1057,11 +1080,15 @@ let selectedCountryCode = null;
 let selectedCountryPolygonLayer = null;
 let countryClickTimeout = null;
 const MAX_COUNTRY_INTERACTION_ZOOM = 6.5;
+let lastCountriesInactiveState = null;
 
 function updateCountryInteractivityState() {
     const mapEl = document.getElementById('map');
     if (!mapEl || !map) return;
     const isZoomedIn = (typeof map.getZoom === 'function') && map.getZoom() > MAX_COUNTRY_INTERACTION_ZOOM;
+    if (lastCountriesInactiveState === isZoomedIn) return;
+    lastCountriesInactiveState = isZoomedIn;
+
     if (isZoomedIn) {
         mapEl.classList.add('countries-inactive');
         if (countryGeoJsonLayer) {
@@ -1180,6 +1207,7 @@ async function loadCountryOverlays() {
 
                 layer.on({
                     mouseover: (e) => {
+                        if (isMapDragging) return;
                         // Only active at country/regional zoom level
                         if (map && typeof map.getZoom === 'function' && map.getZoom() > MAX_COUNTRY_INTERACTION_ZOOM) return;
                         // Do not show hover highlight on countries if radial menu is open or an airport is active
@@ -5252,6 +5280,10 @@ function getAirportLabelTier(ap) {
     return isCustom ? typeRank : (4 + typeRank);
 }
 
+let lastAppliedZoomTier = null;
+let lastCountryModeVal = null;
+let lastCountryZoomVal = null;
+
 function updateMapZoomTier() {
     if (!map) return;
     const z = map.getZoom();
@@ -5260,15 +5292,25 @@ function updateMapZoomTier() {
 
     const isCountryMode = Boolean(selectedCountryCode);
     if (isCountryMode) {
-        mapEl.setAttribute('data-country-mode', 'true');
+        if (lastCountryModeVal !== true) {
+            mapEl.setAttribute('data-country-mode', 'true');
+            lastCountryModeVal = true;
+        }
         let cZoom = 'none';
         if (z >= 6) cZoom = 'detail';
         else if (z >= 3) cZoom = 'wide';
         else cZoom = 'none';
-        mapEl.setAttribute('data-country-zoom', cZoom);
+        if (lastCountryZoomVal !== cZoom) {
+            mapEl.setAttribute('data-country-zoom', cZoom);
+            lastCountryZoomVal = cZoom;
+        }
     } else {
-        mapEl.removeAttribute('data-country-mode');
-        mapEl.removeAttribute('data-country-zoom');
+        if (lastCountryModeVal !== false) {
+            mapEl.removeAttribute('data-country-mode');
+            mapEl.removeAttribute('data-country-zoom');
+            lastCountryModeVal = false;
+            lastCountryZoomVal = null;
+        }
     }
 
     let tier = 0;
@@ -5282,7 +5324,10 @@ function updateMapZoomTier() {
     else if (z >= 4) tier = 1;
     else tier = 0;
 
-    mapEl.setAttribute('data-zoom-tier', String(tier));
+    if (lastAppliedZoomTier !== tier) {
+        mapEl.setAttribute('data-zoom-tier', String(tier));
+        lastAppliedZoomTier = tier;
+    }
 }
 
 let currentlyHighlightedIcao = null;

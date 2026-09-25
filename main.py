@@ -5,7 +5,7 @@ import re
 import urllib.request
 import webbrowser
 import webview
-from scanner import run_scan, get_settings, save_settings, load_ratings, save_rating, save_custom_price, save_custom_category, load_custom_prices, get_estimated_price, get_default_gsx_path, load_airport_database, SPECIAL_BUNDLE_MAP, OUTPUT_JSON_PATH, compute_scan_delta, build_library_snapshot, SNAPSHOT_JSON_PATH, get_resource_file_path, audit_all_gsx_profiles, audit_single_airport_gsx, extract_icao_from_gsx_filename, find_bundled_gsx
+from scanner import run_scan, get_settings, save_settings, load_ratings, save_rating, save_custom_price, save_custom_category, load_custom_prices, get_estimated_price, get_default_gsx_path, load_airport_database, SPECIAL_BUNDLE_MAP, OUTPUT_JSON_PATH, compute_scan_delta, build_library_snapshot, SNAPSHOT_JSON_PATH, get_resource_file_path, audit_all_gsx_profiles, audit_single_airport_gsx, extract_icao_from_gsx_filename, find_bundled_gsx, USER_DATA_DIR
 
 try:
     import webview.platforms.winforms as wf
@@ -3600,10 +3600,13 @@ def main():
     if not os.path.exists(icon_path):
         icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'icon.ico')
 
+    cache_dir = os.path.join(USER_DATA_DIR, 'web_cache')
+    os.makedirs(cache_dir, exist_ok=True)
+
     if os.path.exists(icon_path):
-        webview.start(debug=False, icon=icon_path)
+        webview.start(debug=False, private_mode=False, storage_path=cache_dir, icon=icon_path)
     else:
-        webview.start(debug=False)
+        webview.start(debug=False, private_mode=False, storage_path=cache_dir)
 
 if __name__ == '__main__':
     main()

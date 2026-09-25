@@ -65,9 +65,17 @@
         ::-webkit-scrollbar-thumb:hover {
             background: rgba(6, 182, 212, 0.8);
         }
+        /* High-Performance GPU Compositor Acceleration */
+        #map {
+            transform: translate3d(0, 0, 0);
+        }
+        .leaflet-tile-container img {
+            will-change: transform;
+        }
         /* Custom map marker styling to allow labels to flow cleanly */
         .custom-map-marker {
             overflow: visible !important;
+            contain: layout style;
         }
 
         /* Progressive Disclosure of Airport Labels by Zoom Level */
