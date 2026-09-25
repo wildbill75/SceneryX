@@ -8913,6 +8913,13 @@ function positionFlightPlanningBanner(ap) {
     const bannerW = banner.offsetWidth || 560;
     const bannerH = banner.offsetHeight || 44;
 
+    // Check if user has a saved position from dragging
+    let savedPos = null;
+    try {
+        const raw = localStorage.getItem('sceneryx_flight_banner_pos');
+        if (raw) savedPos = JSON.parse(raw);
+    } catch (e) {}
+
     // If banner has already been positioned, preserve user position (clamped to screen)
     if (banner.style.left && banner.style.top && banner.style.left !== 'auto') {
         const curLeft = parseInt(banner.style.left, 10);
@@ -8928,9 +8935,19 @@ function positionFlightPlanningBanner(ap) {
         }
     }
 
-    // Default position: Centered horizontally at the bottom of the map above the toolbar
-    const targetLeft = Math.max(12, Math.round((containerW - bannerW) / 2));
-    const targetTop = Math.max(12, containerH - bannerH - 85);
+    if (savedPos && typeof savedPos.left === 'number' && typeof savedPos.top === 'number') {
+        const pad = 12;
+        const clampedLeft = Math.max(pad, Math.min(containerW - bannerW - pad, savedPos.left));
+        const clampedTop = Math.max(pad, Math.min(containerH - bannerH - pad, savedPos.top));
+        banner.style.left = `${clampedLeft}px`;
+        banner.style.top = `${clampedTop}px`;
+        banner.style.transform = 'none';
+        return;
+    }
+
+    // Default position: Positioned on the LEFT side of the screen (never stacked over the bottom search bar)
+    const targetLeft = 32;
+    const targetTop = Math.max(90, Math.min(containerH - bannerH - 120, Math.round(containerH * 0.58)));
 
     banner.style.left = `${targetLeft}px`;
     banner.style.top = `${targetTop}px`;
@@ -9027,6 +9044,15 @@ function initDraggableFlightPlanningBanner() {
             isDragging = false;
             banner.classList.remove('cursor-grabbing');
             banner.classList.add('cursor-grab');
+            try {
+                const pos = {
+                    left: parseInt(banner.style.left, 10),
+                    top: parseInt(banner.style.top, 10)
+                };
+                if (!isNaN(pos.left) && !isNaN(pos.top)) {
+                    localStorage.setItem('sceneryx_flight_banner_pos', JSON.stringify(pos));
+                }
+            } catch (e) {}
         }
     });
 }
