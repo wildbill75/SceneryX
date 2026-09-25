@@ -1097,10 +1097,12 @@ function resetCameraToDefaultView() {
 }
 
 function closeDrawerWithoutCameraChange() {
+    if (isFlightPlanningMode) return;
     exitCountryMode(false);
 }
 
 function restoreMapToNeutralState(flyCamera = false) {
+    if (isFlightPlanningMode) return;
     exitCountryMode(flyCamera);
 }
 
@@ -6281,12 +6283,6 @@ function triggerRadialOperatingAirlines() {
             radialEl.classList.add('hidden');
         }
 
-        // Close detail drawer if open so modal has full screen width
-        const detailDrawer = document.getElementById('detail-drawer');
-        if (detailDrawer && !detailDrawer.classList.contains('translate-x-full')) {
-            closeDrawerWithoutCameraChange();
-        }
-
         hasUserDraggedAirlinesModal = false;
         airlinesModalUserOffset = { x: 0, y: 0 };
         isAirlinesModalDragging = false;
@@ -7717,12 +7713,6 @@ function triggerRadialFullDetails() {
         // Toggle OFF but KEEP radial menu intact
         closeRadialDetailsModal(null, true);
     } else {
-        // Close detail drawer if open so modal has full view
-        const detailDrawer = document.getElementById('detail-drawer');
-        if (detailDrawer && !detailDrawer.classList.contains('translate-x-full')) {
-            closeDrawerWithoutCameraChange();
-        }
-
         hasUserDraggedDetailsModal = false;
         detailsModalUserOffset = { x: 0, y: 0 };
         isDetailsModalDragging = false;
@@ -7763,9 +7753,9 @@ function closeRadialDetailsModal(event, keepRadial = false) {
         if (radialEl) {
             radialEl.classList.add('hidden');
         }
-        currentRadialAirport = null;
-        currentRadialMarker = null;
-        selectedAirport = null;
+        if (!isFlightPlanningMode) {
+            selectedAirport = null;
+        }
     }
 }
 
@@ -9834,15 +9824,14 @@ function clearFlightCorridor() {
 }
 
 function renderFlightCorridor() {
-    if (!map || !selectedAirport || !flightCorridorArrivalAirport) return;
+    const dep = (isFlightPlanningMode && flightPlanningDeparture) ? flightPlanningDeparture : selectedAirport;
+    const arr = (isFlightPlanningMode && flightPlanningDestination) ? flightPlanningDestination : flightCorridorArrivalAirport;
+    if (!map || !dep || !arr) return;
 
     if (!map.hasLayer(flightCorridorLayerGroup)) {
         map.addLayer(flightCorridorLayerGroup);
     }
     flightCorridorLayerGroup.clearLayers();
-
-    const dep = selectedAirport;
-    const arr = flightCorridorArrivalAirport;
 
     const distKm = getHaversineDistanceKm(dep.lat, dep.lon, arr.lat, arr.lon);
     const distNm = Math.round(distKm * 0.539957);
@@ -11246,8 +11235,10 @@ function exitCountryMode(flyCamera = false) {
         selectedCountryName = '';
         expandedCountryIcao = null;
         updateMapZoomTier();
-        selectedAirport = null;
-        flightCorridorArrivalAirport = null;
+        if (!isFlightPlanningMode) {
+            selectedAirport = null;
+            flightCorridorArrivalAirport = null;
+        }
 
         // 1. Hide Drawer & Reset Slide Track to Airport pane (0%)
         const drawer = document.getElementById('detail-drawer');
@@ -11975,12 +11966,15 @@ function filterAirports() {
         }
 
         // Active Flight Corridor Filter
-        if (selectedAirport && flightCorridorArrivalAirport) {
-            const isCorridorEndpoint = (ap.icao === selectedAirport.icao || ap.icao === flightCorridorArrivalAirport.icao || (flightCorridorProfile === 'SIMBRIEF' && typeof currentSimBriefAlternates !== 'undefined' && currentSimBriefAlternates.some(alt => alt.icao === ap.icao)));
+        const corridorDep = (isFlightPlanningMode && flightPlanningDeparture) ? flightPlanningDeparture : selectedAirport;
+        const corridorArr = (isFlightPlanningMode && flightPlanningDestination) ? flightPlanningDestination : flightCorridorArrivalAirport;
+
+        if (corridorDep && corridorArr) {
+            const isCorridorEndpoint = (ap.icao === corridorDep.icao || ap.icao === corridorArr.icao || (flightCorridorProfile === 'SIMBRIEF' && typeof currentSimBriefAlternates !== 'undefined' && currentSimBriefAlternates.some(alt => alt.icao === ap.icao)));
 
             if (isCorridorEndpoint) {
                 // EXCEPTION TO THE RULE:
-                // Departure and Destination airports MUST ALWAYS remain visible on the map,
+                // Departure, Destination and SimBrief Alternates MUST ALWAYS remain visible on the map,
                 // even if they are Default MSFS procedural airports!
                 // They bypass all exclusion rules, pricing filters, and geographic restrictions.
                 return true;
@@ -11998,7 +11992,7 @@ function filterAirports() {
                 return false;
             }
 
-            if (!isAirportInCorridor(ap, selectedAirport, flightCorridorArrivalAirport)) {
+            if (!isAirportInCorridor(ap, corridorDep, corridorArr)) {
                 return false;
             }
         } else if (isFlightPlanningMode && flightPlanningDeparture && ap.icao === flightPlanningDeparture.icao) {
