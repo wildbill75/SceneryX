@@ -1621,7 +1621,7 @@
     </div>
 
     <!-- SETTINGS MODAL -->
-    <div id="settings-modal" onclick="if(event.target === this) closeSettingsModal()" class="hidden fixed inset-0 z-[2000] items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 sm:p-6 transition-all duration-200">
+    <div id="settings-modal" onclick="event.stopPropagation(); if(event.target === this) closeSettingsModal()" onmousedown="event.stopPropagation()" class="hidden fixed inset-0 z-[2000] items-center justify-center bg-slate-950/80 backdrop-blur-md p-4 sm:p-6 transition-all duration-200">
         <div class="glass-modal w-full max-w-2xl max-h-[88vh] flex flex-col rounded-3xl shadow-2xl border border-slate-800 bg-slate-900/95 overflow-hidden">
             <!-- Pinned Header -->
             <div class="flex items-center justify-between border-b border-slate-700/40 px-6 py-4 shrink-0 bg-slate-950/30">

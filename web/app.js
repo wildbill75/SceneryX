@@ -946,7 +946,7 @@ function initMap() {
         openFilterRadialMenu(e.originalEvent.clientX, e.originalEvent.clientY);
     });
 
-    // Prevent clicks inside radial menu and sceneries extension from bubbling to Leaflet map
+    // Prevent clicks inside radial menu, sceneries extension, toolbar and modals from bubbling to Leaflet map
     const radialMenuEl = document.getElementById('airport-radial-menu');
     if (radialMenuEl) {
         L.DomEvent.disableClickPropagation(radialMenuEl);
@@ -962,6 +962,16 @@ function initMap() {
     if (radialExtEl) {
         L.DomEvent.disableClickPropagation(radialExtEl);
         L.DomEvent.disableScrollPropagation(radialExtEl);
+    }
+    const bottomToolbarEl = document.getElementById('bottom-map-toolbar');
+    if (bottomToolbarEl) {
+        L.DomEvent.disableClickPropagation(bottomToolbarEl);
+        L.DomEvent.disableScrollPropagation(bottomToolbarEl);
+    }
+    const settingsModalEl = document.getElementById('settings-modal');
+    if (settingsModalEl) {
+        L.DomEvent.disableClickPropagation(settingsModalEl);
+        L.DomEvent.disableScrollPropagation(settingsModalEl);
     }
 
     // Dynamically update radial menu position and scale during pan/zoom/resize so it stays anchored and resizes
@@ -1147,28 +1157,9 @@ async function loadCountryOverlays() {
                         L.DomEvent.stopPropagation(e);
                         if (isMapDragging) return;
 
-                        const radialEl = document.getElementById('airport-radial-menu');
-                        const isRadialWheelOpen = radialEl && !radialEl.classList.contains('hidden');
-
-                        if (isAirlinesModalOpen()) {
-                            if (isRadialWheelOpen || currentRadialAirport) {
-                                // An airport (e.g. LFBH) was selected while in airlines mode: deselect it immediately!
-                                closeAirportRadialMenu(true);
-                                selectedAirport = null;
-                                return;
-                            }
-                            // In airlines mode with no secondary airport selected: close airlines mode
-                            closeRadialAirlinesModal();
-                            return;
-                        }
-
-                        if (isDetailsModalOpen()) {
-                            if (isRadialWheelOpen || currentRadialAirport) {
-                                closeAirportRadialMenu(true);
-                                selectedAirport = null;
-                                return;
-                            }
-                            closeRadialDetailsModal();
+                        // When any radial sub-mode (Details, Airlines, Sceneries) is open,
+                        // clicking on the map/country should NEVER close the radial menu nor the window!
+                        if (isDetailsModalOpen() || isAirlinesModalOpen() || isSceneriesExtensionOpen()) {
                             return;
                         }
 
@@ -5676,6 +5667,11 @@ function isDetailsModalOpen() {
     return !!(modal && !modal.classList.contains('hidden'));
 }
 
+function isSceneriesExtensionOpen() {
+    const extEl = document.getElementById('radial-sceneries-extension');
+    return !!(extEl && !extEl.classList.contains('hidden'));
+}
+
 function closeAirportRadialMenu(keepModals = false) {
     const radialEl = document.getElementById('airport-radial-menu');
     if (radialEl) {
@@ -5779,8 +5775,8 @@ function updateRadialMenuPosition(force = false) {
     // Ne jamais fermer automatiquement pendant que la camera est en cours de vol/pan vers l'aeroport
     const MIN_RADIAL_ZOOM = 5.0;
     if (!isCameraPanningToRadial && currentZoom < MIN_RADIAL_ZOOM) {
-        if (isAirlinesModalOpen() || isDetailsModalOpen()) {
-            // In airlines/details mode: do not auto-close on zoom out
+        if (isAirlinesModalOpen() || isDetailsModalOpen() || isSceneriesExtensionOpen()) {
+            // In airlines/details/sceneries mode: do not auto-close on zoom out
             return;
         }
         closeAirportRadialMenu();
@@ -8760,17 +8756,30 @@ window.addEventListener('click', function (e) {
     const radialEl = document.getElementById('airport-radial-menu');
     const airlinesModal = document.getElementById('radial-airlines-modal');
     const detailsModal = document.getElementById('radial-details-modal');
+    const sceneriesExt = document.getElementById('radial-sceneries-extension');
     const drawerEl = document.getElementById('detail-drawer');
+    const settingsModal = document.getElementById('settings-modal');
+    const bottomToolbar = document.getElementById('bottom-map-toolbar');
+    const rescanModal = document.getElementById('rescan-modal');
+    const exportModal = document.getElementById('export-modal');
+    const bannerEl = document.getElementById('flight-planning-banner');
 
     if (radialEl && radialEl.contains(e.target)) return;
     if (airlinesModal && airlinesModal.contains(e.target)) return;
     if (detailsModal && detailsModal.contains(e.target)) return;
+    if (sceneriesExt && sceneriesExt.contains(e.target)) return;
     if (drawerEl && drawerEl.contains(e.target)) return;
-    if (e.target.closest && (e.target.closest('.custom-map-marker') || e.target.closest('#filter-radial-menu'))) return;
+    if (settingsModal && settingsModal.contains(e.target)) return;
+    if (bottomToolbar && bottomToolbar.contains(e.target)) return;
+    if (rescanModal && rescanModal.contains(e.target)) return;
+    if (exportModal && exportModal.contains(e.target)) return;
+    if (bannerEl && bannerEl.contains(e.target)) return;
+    if (e.target.closest && (e.target.closest('.custom-map-marker') || e.target.closest('#filter-radial-menu') || e.target.closest('#settings-modal') || e.target.closest('#bottom-map-toolbar'))) return;
 
-    if (isAirlinesModalOpen() || isDetailsModalOpen()) {
-        closeAirportRadialMenu(true);
-        selectedAirport = null;
+    // When in any of the radial inspection sub-modes (Details, Airlines, Sceneries),
+    // clicking outside on the map should NEVER dismiss the radial menu nor the window!
+    // The radial menu stays visible and anchored.
+    if (isAirlinesModalOpen() || isDetailsModalOpen() || isSceneriesExtensionOpen()) {
         return;
     }
 
@@ -9651,14 +9660,31 @@ function exitFlightPlanningMode(forceRestore = false) {
     closePlanningBannerClean();
 }
 
-// Global keyboard listener to exit Flight Planning Mode or Country Mode on Escape
+// Global keyboard listener to exit modals, Flight Planning Mode or Country Mode on Escape
 window.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' || e.key === 'Esc') {
-        closeAirportRadialMenu();
+        const settingsModal = document.getElementById('settings-modal');
+        if (settingsModal && !settingsModal.classList.contains('hidden')) {
+            closeSettingsModal();
+            return;
+        }
+        const exportModal = document.getElementById('export-modal');
+        if (exportModal && !exportModal.classList.contains('hidden')) {
+            closeExportModal();
+            return;
+        }
+        const rescanModal = document.getElementById('rescan-modal');
+        if (rescanModal && !rescanModal.classList.contains('hidden')) {
+            closeRescanModal();
+            return;
+        }
+
         if (isFilterRadialOpen) {
             closeFilterRadialMenu();
             return;
         }
+
+        closeAirportRadialMenu();
         if (isFlightPlanningMode) {
             exitFlightPlanningMode();
         } else if (selectedCountryCode || lastFocusedCountryCode) {
@@ -14156,6 +14182,13 @@ function closeSettingsModal() {
         modal.classList.add('hidden');
         modal.classList.remove('flex');
     }
+    if (currentRadialAirport) {
+        const radialEl = document.getElementById('airport-radial-menu');
+        if (radialEl) {
+            radialEl.classList.remove('hidden');
+        }
+        updateRadialMenuPosition(true);
+    }
 }
 
 function renderSettingsPathsList() {
@@ -14348,13 +14381,25 @@ async function saveSettings() {
         }
     }
 
-    applyStartupCameraSettings();
+    // Only apply startup camera if no airport is currently focused and not in flight planning mode
+    if (!currentRadialAirport && !selectedAirport && !isFlightPlanningMode) {
+        applyStartupCameraSettings();
+    }
 
     // Re-render map markers with updated label settings
     airportMarkerCache.clear();
     customDivIconCache.clear();
     if (map && currentlyFilteredAirports && currentlyFilteredAirports.length > 0) {
         renderAirportsOnMap(currentlyFilteredAirports);
+    }
+
+    if (currentRadialAirport) {
+        currentRadialMarker = airportMarkerCache.get(currentRadialAirport.icao) || null;
+        const radialEl = document.getElementById('airport-radial-menu');
+        if (radialEl) {
+            radialEl.classList.remove('hidden');
+        }
+        updateRadialMenuPosition(true);
     }
 
     try {
