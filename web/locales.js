@@ -2,6 +2,8 @@
 const LOCALES = {
     en: {
         "gsx.install_bundled": "Install Official Profile",
+        "gsx.locked_flight_plan": "GSX installation locked during Flight Plan mode",
+        "gsx.locked_in_flight": "Locked in flight",
         "gsx.installing_bundled": "Installing official GSX profile...",
         "gsx.bundled_installed_success": "Official GSX profile installed successfully",
         "gsx.drop_mismatch_title": "⚠️ ICAO Mismatch Detected",
@@ -508,6 +510,8 @@ const LOCALES = {
     },
     fr: {
         "gsx.install_bundled": "Installer le profil officiel",
+        "gsx.locked_flight_plan": "Installation GSX verrouillée pendant le mode Flight Plan",
+        "gsx.locked_in_flight": "Verrouillé en vol",
         "gsx.installing_bundled": "Installation du profil GSX officiel...",
         "gsx.bundled_installed_success": "Profil GSX officiel installé avec succès",
         "gsx.drop_mismatch_title": "⚠️ Incohérence de code ICAO détectée",
@@ -1014,6 +1018,8 @@ const LOCALES = {
     },
     de: {
         "gsx.install_bundled": "Offizielles Profil installieren",
+        "gsx.locked_flight_plan": "GSX-Installation während des Flugplanmodus gesperrt",
+        "gsx.locked_in_flight": "Im Flug gesperrt",
         "gsx.installing_bundled": "Offizielles GSX-Profil wird installiert...",
         "gsx.bundled_installed_success": "Offizielles GSX-Profil erfolgreich installiert",
         "gsx.drop_mismatch_title": "⚠️ ICAO-Nichtübereinstimmung erkannt",
@@ -1520,6 +1526,8 @@ const LOCALES = {
     },
     es: {
         "gsx.install_bundled": "Instalar perfil oficial",
+        "gsx.locked_flight_plan": "Instalación de GSX bloqueada durante el modo Plan de Vuelo",
+        "gsx.locked_in_flight": "Bloqueado en vuelo",
         "gsx.installing_bundled": "Instalando perfil oficial de GSX...",
         "gsx.bundled_installed_success": "Perfil oficial de GSX instalado con éxito",
         "gsx.drop_mismatch_title": "⚠️ Incoherencia de código ICAO detectada",

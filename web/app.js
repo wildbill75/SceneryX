@@ -906,39 +906,18 @@ function initMap() {
             closeFilterRadialMenu();
         }
 
+        // When any radial modal or extension is open (Airport Details, Operating Airlines, Sceneries),
+        // clicking outside on the map should NOT close the radial menu nor the window!
+        // It stays open so the user can inspect the map and jump between airports.
+        const sceneriesExt = document.getElementById('radial-sceneries-extension');
+        const isSceneriesOpen = sceneriesExt && !sceneriesExt.classList.contains('hidden');
+        if (isDetailsModalOpen() || isAirlinesModalOpen() || isSceneriesOpen) {
+            return;
+        }
+
         // Strict Flight Planning Mode Protection:
-        // In Flight Planning Mode, clicking neutral map dismisses open radial menu or modals.
-        // NOTHING may alter, reset, or exit the flight corridor except the dedicated "Exit" button!
         if (isFlightPlanningMode) {
-            if (isDetailsModalOpen()) {
-                closeRadialDetailsModal(null, true);
-            }
             closeAirportRadialMenu();
-            return;
-        }
-
-        const radialEl = document.getElementById('airport-radial-menu');
-        const isRadialWheelOpen = radialEl && !radialEl.classList.contains('hidden');
-
-        if (isAirlinesModalOpen()) {
-            if (isRadialWheelOpen || currentRadialAirport) {
-                // An airport (e.g. LFBH) was selected while in airlines mode: deselect it immediately!
-                closeAirportRadialMenu(true);
-                selectedAirport = null;
-                return;
-            }
-            // If no secondary radial wheel is open, clicking neutral map frees the user from airlines mode
-            closeRadialAirlinesModal();
-            return;
-        }
-
-        if (isDetailsModalOpen()) {
-            if (isRadialWheelOpen || currentRadialAirport) {
-                closeAirportRadialMenu(true);
-                selectedAirport = null;
-                return;
-            }
-            closeRadialDetailsModal();
             return;
         }
 
@@ -5638,7 +5617,7 @@ function renderAirportsOnMap(airports) {
                     focusAirportInCountryMode(currentAp);
                 } else {
                     if (currentRadialAirport && currentRadialAirport.icao === currentAp.icao) {
-                        closeAirportRadialMenu(isAirlinesModalOpen() || isDetailsModalOpen());
+                        closeAirportRadialMenu(false);
                     } else {
                         openAirportRadialMenu(currentAp, this, e);
                     }
@@ -6058,19 +6037,31 @@ function openAirportRadialMenu(ap, marker, e) {
     }
 
     const extEl = document.getElementById('radial-sceneries-extension');
+    const wasSceneriesOpen = extEl && !extEl.classList.contains('hidden');
     if (extEl) {
         if (!extEl._clickPropagationDisabled) {
             L.DomEvent.disableClickPropagation(extEl);
             L.DomEvent.disableScrollPropagation(extEl);
             extEl._clickPropagationDisabled = true;
         }
-        extEl.classList.add('hidden');
-        extEl.innerHTML = '';
     }
     const sectorScenery = document.getElementById('radial-sector-scenery');
-    if (sectorScenery) {
-        sectorScenery.classList.remove('active-radial-sector');
+    if (wasSceneriesOpen && !isFlightPlanningMode) {
+        renderRadialSceneriesExtension(latestAp, false);
+        extEl.classList.remove('hidden');
+        if (sectorScenery) {
+            sectorScenery.classList.add('active-radial-sector');
+        }
+    } else {
+        if (extEl) {
+            extEl.classList.add('hidden');
+            extEl.innerHTML = '';
+        }
+        if (sectorScenery) {
+            sectorScenery.classList.remove('active-radial-sector');
+        }
     }
+
     const isAirlinesOpen = isAirlinesModalOpen();
     const airlinesModal = document.getElementById('radial-airlines-modal');
     const sectorAirlines = document.getElementById('radial-sector-airlines');
@@ -6112,14 +6103,14 @@ function openAirportRadialMenu(ap, marker, e) {
             airlinesModal._clickPropagationDisabled = true;
         }
 
-        if (isAirlinesOpen) {
+        if (isAirlinesOpen && !isFlightPlanningMode) {
+            operatingAirlinesOriginAirport = latestAp;
+            renderRadialOperatingAirlines(latestAp, true);
+            airlinesModal.classList.remove('hidden');
             if (sectorAirlines) {
-                if (operatingAirlinesOriginAirport && operatingAirlinesOriginAirport.icao === latestAp.icao) {
-                    sectorAirlines.classList.add('active-radial-sector');
-                } else {
-                    sectorAirlines.classList.remove('active-radial-sector');
-                }
+                sectorAirlines.classList.add('active-radial-sector');
             }
+            updateRadialAirlinesModalPosition(true);
         } else {
             airlinesModal.classList.add('hidden');
             airlinesModal.classList.remove('user-dragged', 'is-inverted');
@@ -6146,10 +6137,12 @@ function openAirportRadialMenu(ap, marker, e) {
             isDetailsModalDragging = false;
             detailsModal.classList.remove('user-dragged');
 
-            renderRadialAirportDetails(ap);
+            renderRadialAirportDetails(latestAp);
+            detailsModal.classList.remove('hidden');
             if (sectorDetails) {
                 sectorDetails.classList.add('active-radial-sector');
             }
+            updateRadialDetailsModalPosition(true);
         } else {
             detailsModal.classList.add('hidden');
             detailsModal.classList.remove('user-dragged');
@@ -7710,8 +7703,8 @@ function triggerRadialFullDetails() {
     }
 
     if (!modal.classList.contains('hidden')) {
-        // Toggle OFF but KEEP radial menu intact
-        closeRadialDetailsModal(null, true);
+        // Toggle OFF: Close modal and radial menu
+        closeRadialDetailsModal(null, false);
     } else {
         hasUserDraggedDetailsModal = false;
         detailsModalUserOffset = { x: 0, y: 0 };
@@ -7753,6 +7746,8 @@ function closeRadialDetailsModal(event, keepRadial = false) {
         if (radialEl) {
             radialEl.classList.add('hidden');
         }
+        currentRadialAirport = null;
+        currentRadialMarker = null;
         if (!isFlightPlanningMode) {
             selectedAirport = null;
         }
@@ -8043,11 +8038,11 @@ function renderRadialGsx(ap) {
     const bundledButtonHtml = (hasBundled && !isBundledInstalled) ? (
         isFlightPlanningMode ? `
             <div class="w-full py-2 px-3 rounded-lg bg-slate-900 border border-slate-800 text-slate-500 font-bold text-xs text-center select-none cursor-not-allowed">
-                ${t('gsx.install_bundled', 'Installer le profil officiel')} (Verrouillé en vol)
+                ${t('gsx.install_bundled', 'Install Official Profile')} (${t('gsx.locked_in_flight', 'Locked in flight')})
             </div>
         ` : `
             <button onclick="installBundledGsxProfile('${ap.icao}')" class="w-full py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors cursor-pointer border-0 text-center shadow-sm">
-                ${t('gsx.install_bundled', 'Installer le profil officiel')}
+                ${t('gsx.install_bundled', 'Install Official Profile')}
             </button>
         `
     ) : '';
@@ -8087,7 +8082,7 @@ function renderRadialGsx(ap) {
     const dropZoneHtml = isFlightPlanningMode ? `
         <div class="p-2.5 rounded-xl border border-slate-800 bg-slate-950/40 text-slate-500 font-mono text-[10px] text-center flex items-center justify-center gap-2 mt-2 select-none cursor-not-allowed">
             <i class="fa-solid fa-lock text-xs text-slate-500"></i>
-            <span>Installation GSX verrouillée pendant le mode Flight Plan</span>
+            <span>${t('gsx.locked_flight_plan', 'GSX installation locked during Flight Plan mode')}</span>
         </div>
     ` : `
         <div id="radial-gsx-dropzone" 
