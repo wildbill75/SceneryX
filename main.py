@@ -1675,7 +1675,23 @@ class Api:
 
     def optimize_flight_mode(self, keep_icaos_json):
         try:
-            keep_icaos = set(json.loads(keep_icaos_json))
+            raw_param = json.loads(keep_icaos_json)
+            dep_icao = ''
+            arr_icao = ''
+            profile = 'CORRIDOR'
+            alternates = []
+            simbrief_flight = None
+
+            if isinstance(raw_param, dict):
+                keep_icaos = set(raw_param.get('keep_icaos', []))
+                dep_icao = raw_param.get('dep_icao', '')
+                arr_icao = raw_param.get('arr_icao', '')
+                profile = raw_param.get('profile', 'CORRIDOR')
+                alternates = raw_param.get('alternates', [])
+                simbrief_flight = raw_param.get('simbrief_flight', None)
+            else:
+                keep_icaos = set(raw_param)
+
             settings = get_settings()
             scan_paths_cfg = settings.get("scan_paths", [])
 
@@ -1767,6 +1783,11 @@ class Api:
                 'active': True,
                 'disabled_count': total_disabled_count,
                 'icaos': list(keep_icaos),
+                'dep_icao': dep_icao,
+                'arr_icao': arr_icao,
+                'profile': profile,
+                'alternates': alternates,
+                'simbrief_flight': simbrief_flight,
                 'disabled_folders': all_disabled_folders,
                 'disabled_xml_packages': all_disabled_xml,
                 'added_xml_packages': all_added_xml
@@ -1839,6 +1860,11 @@ class Api:
             settings['flight_mode'] = {
                 'active': False,
                 'icaos': [],
+                'dep_icao': '',
+                'arr_icao': '',
+                'profile': 'CORRIDOR',
+                'alternates': [],
+                'simbrief_flight': None,
                 'disabled_count': 0,
                 'disabled_folders': [],
                 'disabled_xml_packages': [],
