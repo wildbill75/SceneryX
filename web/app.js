@@ -906,6 +906,17 @@ function initMap() {
             closeFilterRadialMenu();
         }
 
+        // Strict Flight Planning Mode Protection:
+        // In Flight Planning Mode, clicking neutral map dismisses open radial menu or modals.
+        // NOTHING may alter, reset, or exit the flight corridor except the dedicated "Exit" button!
+        if (isFlightPlanningMode) {
+            if (isDetailsModalOpen()) {
+                closeRadialDetailsModal(null, true);
+            }
+            closeAirportRadialMenu();
+            return;
+        }
+
         const radialEl = document.getElementById('airport-radial-menu');
         const isRadialWheelOpen = radialEl && !radialEl.classList.contains('hidden');
 
@@ -4456,6 +4467,10 @@ async function activateGsxDuplicateFromModal(icao, filename) {
 }
 
 async function disableGsxProfileFromModal(icao, filename) {
+    if (isFlightPlanningMode) {
+        showToast('GSX profile changes are locked during Flight Planning mode.', 'warning');
+        return;
+    }
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.disable_gsx_profile) return;
     try {
         const raw = await window.pywebview.api.disable_gsx_profile(icao, filename);
@@ -4481,6 +4496,10 @@ async function disableGsxProfileFromModal(icao, filename) {
 }
 
 async function enableGsxProfileFromAudit(icao, filename) {
+    if (isFlightPlanningMode) {
+        showToast('GSX profile changes are locked during Flight Planning mode.', 'warning');
+        return;
+    }
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.enable_gsx_profile) return;
     try {
         const raw = await window.pywebview.api.enable_gsx_profile(icao, filename);
@@ -4969,10 +4988,18 @@ async function executeGsxInstallationForIcao(icao, { filePath = '', base64Data =
     }
 }
 async function installGsxProfileFromModal(icao) {
+    if (isFlightPlanningMode) {
+        showToast('GSX profile installation is locked during Flight Planning mode.', 'warning');
+        return;
+    }
     await executeGsxInstallationForIcao(icao, { filePath: '' });
 }
 
 async function installBundledGsxProfile(icao) {
+    if (isFlightPlanningMode) {
+        showToast('GSX profile installation is locked during Flight Planning mode.', 'warning');
+        return;
+    }
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.install_bundled_gsx_profile) return;
     try {
         if (typeof showToast === 'function') {
@@ -6045,6 +6072,36 @@ function openAirportRadialMenu(ap, marker, e) {
     const isAirlinesOpen = isAirlinesModalOpen();
     const airlinesModal = document.getElementById('radial-airlines-modal');
     const sectorAirlines = document.getElementById('radial-sector-airlines');
+    const sectorFlight = document.getElementById('radial-sector-flight');
+
+    // Contextual sector locking: When Flight Planning mode is active, lock airlines, flight plan & scenery modifications
+    if (isFlightPlanningMode) {
+        if (sectorFlight) {
+            sectorFlight.classList.add('is-sector-disabled');
+            sectorFlight.setAttribute('title', 'Flight Plan already active');
+        }
+        if (sectorAirlines) {
+            sectorAirlines.classList.add('is-sector-disabled');
+            sectorAirlines.setAttribute('title', 'Operating Airlines disabled in Flight Planning mode');
+        }
+        if (sectorScenery) {
+            sectorScenery.classList.add('is-sector-disabled');
+            sectorScenery.setAttribute('title', 'Scenery modification locked in Flight Planning mode');
+        }
+    } else {
+        if (sectorFlight) {
+            sectorFlight.classList.remove('is-sector-disabled');
+            sectorFlight.removeAttribute('title');
+        }
+        if (sectorAirlines) {
+            sectorAirlines.classList.remove('is-sector-disabled');
+            sectorAirlines.removeAttribute('title');
+        }
+        if (sectorScenery) {
+            sectorScenery.classList.remove('is-sector-disabled');
+            sectorScenery.removeAttribute('title');
+        }
+    }
 
     if (airlinesModal) {
         if (!airlinesModal._clickPropagationDisabled) {
@@ -6187,6 +6244,10 @@ function openAirportRadialMenu(ap, marker, e) {
 }
 
 function triggerRadialFlightPlan() {
+    if (isFlightPlanningMode) {
+        showToast('Flight Plan is already active. Use Exit in the flight banner to quit.', 'info');
+        return;
+    }
     if (!currentRadialAirport) return;
     const targetAp = currentRadialAirport;
     closeAirportRadialMenu();
@@ -6194,6 +6255,10 @@ function triggerRadialFlightPlan() {
 }
 
 function triggerRadialOperatingAirlines() {
+    if (isFlightPlanningMode) {
+        showToast('Operating Airlines is disabled during Flight Planning mode.', 'info');
+        return;
+    }
     if (!currentRadialAirport) return;
     const modal = document.getElementById('radial-airlines-modal');
     const radialEl = document.getElementById('airport-radial-menu');
@@ -6923,6 +6988,10 @@ function clearRadialAirlineFilter(event) {
 }
 
 function triggerRadialScenerySelector() {
+    if (isFlightPlanningMode) {
+        showToast('Scenery modification is locked during Flight Planning mode.', 'warning');
+        return;
+    }
     if (!currentRadialAirport) return;
     const extEl = document.getElementById('radial-sceneries-extension');
     const sectorScenery = document.getElementById('radial-sector-scenery');
@@ -6944,9 +7013,9 @@ function triggerRadialScenerySelector() {
             stagedRadialScenerySelection = null;
         }, 160);
     } else {
-        // If Details modal is open, close it
+        // If Details modal is open, close it but KEEP radial menu intact
         if (isDetailsModalOpen()) {
-            closeRadialDetailsModal();
+            closeRadialDetailsModal(null, true);
         }
         // Toggle ON: Render autonomous pills with bounce animation ONLY on opening!
         renderRadialSceneriesExtension(currentRadialAirport, true);
@@ -7645,8 +7714,8 @@ function triggerRadialFullDetails() {
     }
 
     if (!modal.classList.contains('hidden')) {
-        // Toggle OFF
-        closeRadialDetailsModal();
+        // Toggle OFF but KEEP radial menu intact
+        closeRadialDetailsModal(null, true);
     } else {
         // Close detail drawer if open so modal has full view
         const detailDrawer = document.getElementById('detail-drawer');
@@ -7981,11 +8050,17 @@ function renderRadialGsx(ap) {
     const hasBundled = !!(bundled && bundled.ini_path);
     const isBundledInstalled = hasBundled && (bundled.is_installed || (status === 'MATCHED' && files.some(f => f.filename === bundled.filename)));
 
-    const bundledButtonHtml = (hasBundled && !isBundledInstalled) ? `
-        <button onclick="installBundledGsxProfile('${ap.icao}')" class="w-full py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors cursor-pointer border-0 text-center shadow-sm">
-            ${t('gsx.install_bundled', 'Installer le profil officiel')}
-        </button>
-    ` : '';
+    const bundledButtonHtml = (hasBundled && !isBundledInstalled) ? (
+        isFlightPlanningMode ? `
+            <div class="w-full py-2 px-3 rounded-lg bg-slate-900 border border-slate-800 text-slate-500 font-bold text-xs text-center select-none cursor-not-allowed">
+                ${t('gsx.install_bundled', 'Installer le profil officiel')} (Verrouillé en vol)
+            </div>
+        ` : `
+            <button onclick="installBundledGsxProfile('${ap.icao}')" class="w-full py-2 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs transition-colors cursor-pointer border-0 text-center shadow-sm">
+                ${t('gsx.install_bundled', 'Installer le profil officiel')}
+            </button>
+        `
+    ) : '';
 
     // Diagnostic badge styling
     let statusLabel = 'NONE';
@@ -8019,7 +8094,12 @@ function renderRadialGsx(ap) {
         badgeEl.className = `text-[10px] font-mono px-2 py-0.5 rounded uppercase tracking-wider ${statusBadgeClass}`;
     }
 
-    const dropZoneHtml = `
+    const dropZoneHtml = isFlightPlanningMode ? `
+        <div class="p-2.5 rounded-xl border border-slate-800 bg-slate-950/40 text-slate-500 font-mono text-[10px] text-center flex items-center justify-center gap-2 mt-2 select-none cursor-not-allowed">
+            <i class="fa-solid fa-lock text-xs text-slate-500"></i>
+            <span>Installation GSX verrouillée pendant le mode Flight Plan</span>
+        </div>
+    ` : `
         <div id="radial-gsx-dropzone" 
              ondragover="handleRadialGsxDragOver(event)" 
              ondragenter="handleRadialGsxDragOver(event)" 
@@ -9023,11 +9103,18 @@ function getCorridorAddonsList() {
 function setFlightCorridorProfile(profile) {
     if (isFlightCorridorOptimized) return;
     if (profile === 'SIMBRIEF') {
+        if (currentSimBriefFlight && flightPlanningDeparture && flightPlanningDestination) {
+            flightCorridorProfile = 'SIMBRIEF';
+            renderFlightCorridor();
+            updateFlightPlanningBannerUI();
+            showToast('Flight Profile: SimBrief (OFP & Alternates)', 'info');
+            return;
+        }
         syncSimBriefFlightPlan();
         return;
     }
     flightCorridorProfile = profile;
-    filterAirports();
+    renderFlightCorridor();
     updateFlightPlanningBannerUI();
     const label = profile === 'CORRIDOR' ? 'En-Route (Path Addons)' : 'Direct (DEP + ARR Only)';
     showToast(`Flight Profile: ${label}`, 'info');

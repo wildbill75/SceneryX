@@ -287,6 +287,21 @@
         .radial-sector:active .radial-sector-path {
             filter: brightness(1.35);
         }
+        .radial-sector.is-sector-disabled {
+            pointer-events: none !important;
+            cursor: not-allowed !important;
+            opacity: 0.35 !important;
+        }
+        .radial-sector.is-sector-disabled .radial-sector-path {
+            fill: rgba(15, 23, 42, 0.40) !important;
+            stroke: rgba(71, 85, 105, 0.30) !important;
+            filter: grayscale(1) !important;
+            cursor: not-allowed !important;
+        }
+        .radial-sector.is-sector-disabled span {
+            color: rgba(100, 116, 139, 0.6) !important;
+            text-shadow: none !important;
+        }
 
         /* Snappy Bounce & Circular Cascade Keyframes */
         @keyframes radialCoreBounce {
@@ -1032,7 +1047,7 @@
                 
                 <!-- Drag Handle & Modal Header -->
                 <div id="radial-details-modal-header" class="h-9 flex items-center justify-end pb-2 border-b border-slate-700/40 shrink-0 cursor-grab active:cursor-grabbing">
-                    <button onclick="closeRadialDetailsModal(event)" title="Close" class="w-7 h-7 rounded-xl bg-slate-800/60 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition-colors border border-slate-700/50 cursor-pointer">
+                    <button onclick="closeRadialDetailsModal(event, true)" title="Close" class="w-7 h-7 rounded-xl bg-slate-800/60 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition-colors border border-slate-700/50 cursor-pointer">
                         ✕
                     </button>
                 </div>
