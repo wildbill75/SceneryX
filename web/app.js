@@ -836,6 +836,68 @@ window.addEventListener('pywebviewready', async () => {
 
 let isMapDragging = false;
 
+/* ================= MAP PANIC RESET (UNIVERSAL DOUBLE-CLICK RESET) ================= */
+function triggerMapPanicReset() {
+    if (countryClickTimeout) {
+        clearTimeout(countryClickTimeout);
+        countryClickTimeout = null;
+    }
+
+    // 1. Close overlay modals
+    if (typeof closeSettingsModal === 'function') closeSettingsModal();
+    if (typeof closeExportModal === 'function') closeExportModal();
+    if (typeof closeRescanModal === 'function') closeRescanModal();
+
+    // 2. Exit Flight Planning mode if active
+    if (typeof isFlightPlanningMode !== 'undefined' && isFlightPlanningMode && typeof exitFlightPlanningMode === 'function') {
+        exitFlightPlanningMode();
+    }
+
+    // 3. Clear temporary route preview & active selections
+    if (typeof flightCorridorArrivalAirport !== 'undefined' && flightCorridorArrivalAirport) {
+        flightCorridorArrivalAirport = null;
+        if (typeof activeRouteLinesGroup !== 'undefined' && activeRouteLinesGroup) activeRouteLinesGroup.clearLayers();
+    }
+    selectedAirport = null;
+    currentRadialAirport = null;
+    currentRadialMarker = null;
+
+    if (typeof closeDrawerWithoutCameraChange === 'function') {
+        closeDrawerWithoutCameraChange();
+    }
+
+    // 4. Clear search, reset country mode & restore default filters
+    if (typeof clearSearch === 'function') {
+        clearSearch(false);
+    }
+
+    // 5. Ensure all radial wheels and inspection modals are closed
+    if (typeof closeAirportRadialMenu === 'function') {
+        closeAirportRadialMenu();
+    }
+    if (typeof closeFilterRadialMenu === 'function') {
+        closeFilterRadialMenu();
+    }
+    if (typeof closeRadialDetailsModal === 'function') {
+        closeRadialDetailsModal();
+    }
+    if (typeof closeRadialAirlinesModal === 'function') {
+        closeRadialAirlinesModal();
+    }
+
+    // 6. Reset camera smoothly to configured startup region
+    if (typeof resetCameraToStartupRegion === 'function') {
+        resetCameraToStartupRegion();
+    } else if (typeof resetCameraToDefaultView === 'function') {
+        resetCameraToDefaultView();
+    }
+
+    // 7. Feedback toast
+    if (typeof showToast === 'function') {
+        showToast(t('map.panic_reset', 'Reset to default view & state'), 'info', 2200);
+    }
+}
+
 function initMap() {
     map = L.map('map', {
         center: [20.0, 0.0], // Global world view (Screenshot 3)
@@ -979,27 +1041,12 @@ function initMap() {
     map.on('zoom viewreset zoomend', updateCountryInteractivityState);
     window.addEventListener('resize', () => updateRadialMenuPosition(false));
 
-    // Double click on neutral map area: resets camera according to priority hierarchy
-    // If in search mode, acts exactly like clearing search (full reset + camera fly to startup region)
-    map.on('dblclick', () => {
-        if (countryClickTimeout) {
-            clearTimeout(countryClickTimeout);
-            countryClickTimeout = null;
+    // Double-click on neutral map area: PANIC RESET (aborts all actions & returns to default startup state)
+    map.on('dblclick', (e) => {
+        if (e && e.originalEvent) {
+            L.DomEvent.stopPropagation(e.originalEvent);
         }
-        const searchInp = document.getElementById('search-input');
-        const isSearchActive = (searchInp && searchInp.value.trim().length > 0) || 
-                               Boolean(selectedCountryCode) || 
-                               Boolean(lastFocusedCountryCode) || 
-                               Boolean(lastFocusedIcao);
-        if (isSearchActive) {
-            clearSearch(true);
-            return;
-        }
-
-        if (activeDrawerMode !== 'MAP' || selectedAirport || selectedCountryCode) {
-            closeDrawerWithoutCameraChange();
-        }
-        resetCameraToDefaultView();
+        triggerMapPanicReset();
     });
 
     loadCountryOverlays();
@@ -1206,37 +1253,7 @@ async function loadCountryOverlays() {
                     },
                     dblclick: (e) => {
                         L.DomEvent.stopPropagation(e);
-                        if (isFilterRadialOpen) {
-                            closeFilterRadialMenu();
-                        }
-                        if (isAirlinesModalOpen()) {
-                            closeAirportRadialMenu(true);
-                            closeRadialAirlinesModal();
-                        } else if (isDetailsModalOpen()) {
-                            closeAirportRadialMenu(true);
-                            closeRadialDetailsModal();
-                        } else {
-                            closeAirportRadialMenu();
-                        }
-                        if (countryClickTimeout) {
-                            clearTimeout(countryClickTimeout);
-                            countryClickTimeout = null;
-                        }
-
-                        const searchInp = document.getElementById('search-input');
-                        const isSearchActive = (searchInp && searchInp.value.trim().length > 0) || 
-                                               Boolean(selectedCountryCode) || 
-                                               Boolean(lastFocusedCountryCode) || 
-                                               Boolean(lastFocusedIcao);
-                        if (isSearchActive) {
-                            clearSearch(true);
-                            return;
-                        }
-
-                        if (activeDrawerMode !== 'MAP' || selectedAirport || selectedCountryCode) {
-                            closeDrawerWithoutCameraChange();
-                        }
-                        resetCameraToDefaultView();
+                        triggerMapPanicReset();
                     }
                 });
             }
