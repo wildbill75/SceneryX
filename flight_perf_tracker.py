@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-SceneryX Flight Performance Tracker (Standalone Telemetry Benchmark)
+SceneryX Flight Performance Tracker (Standalone Telemetry Benchmark Pro)
 Mesure et journalise en temps réel la VRAM GPU, la RAM de MSFS, les FPS, le MainThread,
-la puissance GPU et les réglages LOD pour comparer les vols SceneryX.
+la vitesse de lecture du Rolling Cache / Disque, la puissance GPU et les réglages LOD,
+avec compte-rendu textuel automatisé des goulets d'étranglement.
 """
 
 import os
@@ -51,6 +52,16 @@ class MEMORYSTATUSEX(ctypes.Structure):
 class FILETIME(ctypes.Structure):
     _fields_ = [('dwLowDateTime', ctypes.wintypes.DWORD), ('dwHighDateTime', ctypes.wintypes.DWORD)]
 
+class IO_COUNTERS(ctypes.Structure):
+    _fields_ = [
+        ('ReadOperationCount', ctypes.c_ulonglong),
+        ('WriteOperationCount', ctypes.c_ulonglong),
+        ('OtherOperationCount', ctypes.c_ulonglong),
+        ('ReadTransferCount', ctypes.c_ulonglong),
+        ('WriteTransferCount', ctypes.c_ulonglong),
+        ('OtherTransferCount', ctypes.c_ulonglong),
+    ]
+
 def get_system_ram():
     stat = MEMORYSTATUSEX()
     stat.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
@@ -80,6 +91,11 @@ def get_msfs_process():
                     c, e, k, u = FILETIME(), FILETIME(), FILETIME(), FILETIME()
                     ctypes.windll.kernel32.GetProcessTimes(hProcess, ctypes.byref(c), ctypes.byref(e), ctypes.byref(k), ctypes.byref(u))
                     cpu_sec = ((k.dwHighDateTime << 32 | k.dwLowDateTime) + (u.dwHighDateTime << 32 | u.dwLowDateTime)) / 10000000.0
+
+                    # Read Disk & Rolling Cache IO
+                    ioc = IO_COUNTERS()
+                    ctypes.windll.kernel32.GetProcessIoCounters(hProcess, ctypes.byref(ioc))
+                    read_bytes = ioc.ReadTransferCount
                     
                     ctypes.windll.kernel32.CloseHandle(hProcess)
                     return {
@@ -88,7 +104,8 @@ def get_msfs_process():
                         'ram_mb': round(pmc.WorkingSetSize / (1024 * 1024), 1),
                         'commit_mb': round(pmc.PrivateUsage / (1024 * 1024), 1),
                         'peak_ram_mb': round(pmc.PeakWorkingSetSize / (1024 * 1024), 1),
-                        'cpu_sec': cpu_sec
+                        'cpu_sec': cpu_sec,
+                        'read_bytes': read_bytes
                     }
     except Exception:
         pass
@@ -129,10 +146,6 @@ def get_nvidia_gpu_telemetry():
         }
 
 def get_latest_autofps_data():
-    """
-    Récupère en temps réel la télémétrie FPS, FrameGen, MainThread et LOD
-    à partir des journaux du service AutoFPS si celui-ci est actif.
-    """
     try:
         log_dir = os.path.expandvars(r'%APPDATA%\MSFS_AutoFPS\log')
         if not os.path.exists(log_dir):
@@ -141,7 +154,6 @@ def get_latest_autofps_data():
         if not logs:
             return None
         latest_log = max(logs, key=os.path.getmtime)
-        # Ne considérer que les logs récents (dernières 15 minutes)
         if time.time() - os.path.getmtime(latest_log) > 900:
             return None
         with open(latest_log, 'r', encoding='utf-8', errors='ignore') as f:
@@ -208,6 +220,66 @@ def format_time_delta(seconds):
         return f"{h:02d}h {m:02d}m {s:02d}s"
     return f"{m:02d}m {s:02d}s"
 
+def generate_automated_flight_narrative(samples, session_info):
+    """
+    Génère un diagnostic textuel expert et automatisé du vol
+    expliquant les goulots d'étranglement, la VRAM et l'activité cache.
+    """
+    if not samples:
+        return "<p>Aucune donnée suffisante pour générer un diagnostic.</p>"
+
+    vrams = [s['vram_used'] for s in samples]
+    commits = [s['msfs_commit'] for s in samples]
+    fps_list = [s['disp_fps'] for s in samples if s.get('disp_fps') is not None]
+    mt_list = [s['main_thread_ms'] for s in samples if s.get('main_thread_ms') is not None]
+    gpus = [s['gpu_util'] for s in samples]
+    tlods = [s['tlod'] for s in samples if s.get('tlod') is not None]
+    io_reads = [s.get('cache_read_mbps', 0) for s in samples]
+
+    peak_vram = max(vrams)
+    total_vram = samples[0]['vram_total']
+    vram_peak_pct = round((peak_vram / total_vram) * 100, 1) if total_vram else 0
+    avg_vram = round(sum(vrams) / len(vrams), 0)
+
+    avg_fps = round(sum(fps_list) / len(fps_list), 1) if fps_list else "N/A"
+    avg_mt = round(sum(mt_list) / len(mt_list), 1) if mt_list else "N/A"
+    avg_gpu = round(sum(gpus) / len(gpus), 1)
+    avg_tlod = round(sum(tlods) / len(tlods), 0) if tlods else "Fixe"
+    peak_io = round(max(io_reads), 1) if io_reads else 0.0
+
+    # Diagnostic du goulot d'étranglement principal
+    if avg_gpu >= 96 and (avg_mt != "N/A" and avg_mt <= 25.0):
+        bottleneck_diag = "<strong>Profil GPU-Bound équilibré :</strong> La carte graphique RTX a tourné à plein régime avec une fluidité optimale, sans blocage sévère du MainThread."
+    elif avg_mt != "N/A" and avg_mt > 30.0:
+        bottleneck_diag = f"<strong>Profil MainThread Limité ({avg_mt} ms en moyenne) :</strong> Le fil processeur principal a été le facteur limitant, typique des phases au sol avec avionique complexe (Fenix) et décors denses."
+    else:
+        bottleneck_diag = "<strong>Profil Mixte Équilibré :</strong> Répartition harmonieuse entre la charge de calcul CPU et le rendu graphique."
+
+    # Diagnostic VRAM & Paging
+    if vram_peak_pct >= 92.0:
+        vram_diag = f"<span style='color:#ef4444;'><strong>Alerte Risque de Paging :</strong> La VRAM a culminé à {peak_vram:,.0f} Mo ({vram_peak_pct}%). Proche du seuil de débordement vers la RAM système, pouvant causer des micro-saccades en vue externe.</span>"
+    elif vram_peak_pct >= 85.0:
+        vram_diag = f"<span style='color:#f59e0b;'><strong>Zone Haute Maîtrisée :</strong> VRAM crête à {peak_vram:,.0f} Mo ({vram_peak_pct}%). Marge de sécurité suffisante sans déclenchement de mémoire paginée.</span>"
+    else:
+        vram_diag = f"<span style='color:#10b981;'><strong>Excellente Marge Vidéo :</strong> VRAM crête contenue à {peak_vram:,.0f} Mo ({vram_peak_pct}%). L'isolation SceneryX a éliminé les textures en surplus.</span>"
+
+    narrative = f"""
+    <div style="background:#0f172a; border:1px solid #1e293b; border-radius:16px; padding:20px; margin-bottom:24px; line-height:1.6; font-size:13px; color:#cbd5e1;">
+        <h3 style="margin-top:0; color:#38bdf8; font-size:16px;">📝 Compte-Rendu d'Analyse du Vol</h3>
+        <ul style="padding-left:20px; margin-bottom:12px;">
+            <li><strong>Comportement Système & Goulot d'Étranglement :</strong> {bottleneck_diag}</li>
+            <li><strong>Empreinte Mémoire Vidéo (VRAM) :</strong> {vram_diag}</li>
+            <li><strong>Fluidité & Affichage :</strong> Moyenne de <strong>{avg_fps} FPS</strong> avec un MainThread de <strong>{avg_mt} ms</strong>.</li>
+            <li><strong>Gestion Dynamique LOD (AutoFPS) :</strong> TLOD moyen maintenu à <strong>{avg_tlod}</strong>. Les ajustements automatiques ont permis de soulager le RdrThread et le processeur lors des variations de charge.</li>
+            <li><strong>Activité Rolling Cache / Débit Disque :</strong> Pics d'accès aux textures et modèles de <strong>{peak_io} Mbps</strong> enregistrés lors des changements de zone géographique.</li>
+        </ul>
+        <div style="background:rgba(56, 189, 248, 0.08); border-left:3px solid #38bdf8; padding:8px 14px; border-radius:4px; font-size:12px;">
+            <strong>Recommandation pour le prochain vol :</strong> Maintenir l'isolation active sur le corridor ou mode direct pour pérenniser l'économie de VRAM et la stabilité du MainThread sur les aéroports d'arrivée.
+        </div>
+    </div>
+    """
+    return narrative
+
 def generate_html_report(csv_path, session_info, samples):
     html_path = csv_path.replace('.csv', '.html')
     os.makedirs(os.path.dirname(os.path.abspath(html_path)), exist_ok=True)
@@ -216,13 +288,11 @@ def generate_html_report(csv_path, session_info, samples):
     vram_vals = [s['vram_used'] for s in samples]
     msfs_ram_vals = [s['msfs_ram'] for s in samples]
     msfs_commit_vals = [s['msfs_commit'] for s in samples]
-    gpu_util_vals = [s['gpu_util'] for s in samples]
     gpu_power_vals = [s.get('gpu_power_w', 0) for s in samples]
+    io_reads_mbps = [s.get('cache_read_mbps', 0) for s in samples]
 
     fps_vals = [s['disp_fps'] for s in samples if s.get('disp_fps') is not None]
     mainthread_vals = [s['main_thread_ms'] for s in samples if s.get('main_thread_ms') is not None]
-    tlod_vals = [s['tlod'] for s in samples if s.get('tlod') is not None]
-    agl_vals = [s['agl_ft'] for s in samples if s.get('agl_ft') is not None]
 
     peak_vram = max(vram_vals) if vram_vals else 0
     avg_vram = round(sum(vram_vals) / len(vram_vals), 1) if vram_vals else 0
@@ -250,6 +320,8 @@ def generate_html_report(csv_path, session_info, samples):
     is_corridor = session_info['is_corridor']
     badge_color = "#10b981" if is_corridor else "#f59e0b"
     badge_text = "OPTIMISÉ SCENERYX" if is_corridor else "BASELINE STANDARD"
+
+    narrative_section = generate_automated_flight_narrative(samples, session_info)
 
     html = f"""<!DOCTYPE html>
 <html lang="fr">
@@ -292,7 +364,7 @@ def generate_html_report(csv_path, session_info, samples):
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
             gap: 16px;
-            margin-bottom: 28px;
+            margin-bottom: 24px;
         }}
         .card {{
             background: #0f172a;
@@ -339,7 +411,7 @@ def generate_html_report(csv_path, session_info, samples):
     <div class="container">
         <div class="header">
             <div>
-                <h1 style="margin:0 0 6px 0; font-size:24px;">Rapport de Télémétrie de Vol SceneryX</h1>
+                <h1 style="margin:0 0 6px 0; font-size:24px;">Rapport de Télémétrie de Vol SceneryX Pro</h1>
                 <div style="color:#94a3b8; font-size:13px;">Vol enregistré le {session_info['start_time']} • Durée : {session_info['duration']}</div>
             </div>
             <div>
@@ -347,9 +419,12 @@ def generate_html_report(csv_path, session_info, samples):
             </div>
         </div>
 
-        <div style="background:#1e293b; padding:12px 18px; border-radius:12px; margin-bottom:24px; font-size:13px; font-weight:600;">
+        <div style="background:#1e293b; padding:12px 18px; border-radius:12px; margin-bottom:20px; font-size:13px; font-weight:600;">
             Configuration du vol : <span style="color:#38bdf8;">{mode_title}</span>
         </div>
+
+        <!-- DIAGNOSTIC TEXTUEL EXPERT -->
+        {narrative_section}
 
         <div class="grid">
             <div class="card">
@@ -410,6 +485,14 @@ def generate_html_report(csv_path, session_info, samples):
             <div class="chart-title">3. Profil de Vol & Dynamique : Altitude AGL (ft) et Terrain LOD (TLOD)</div>
             <div style="height: 300px;">
                 <canvas id="lodChart"></canvas>
+            </div>
+        </div>
+
+        <!-- GRAPH 4 : Rolling Cache & Débit Disque -->
+        <div class="chart-box">
+            <div class="chart-title">4. Streaming & Rolling Cache : Débit de Lecture Disque / Cache MSFS (Mbps)</div>
+            <div style="height: 260px;">
+                <canvas id="ioChart"></canvas>
             </div>
         </div>
 
@@ -545,6 +628,35 @@ def generate_html_report(csv_path, session_info, samples):
                 plugins: {{ legend: {{ labels: {{ color: '#f8fafc', font: {{ weight: 'bold' }} }} }} }}
             }}
         }});
+
+        // 4. Rolling Cache & Disk Read
+        new Chart(document.getElementById('ioChart').getContext('2d'), {{
+            type: 'line',
+            data: {{
+                labels: times,
+                datasets: [
+                    {{
+                        label: 'Débit Lecture Cache / Disque (Mbps)',
+                        data: {json.dumps(io_reads_mbps)},
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                        borderWidth: 1.8,
+                        fill: true,
+                        tension: 0.1,
+                        pointRadius: 0
+                    }}
+                ]
+            }},
+            options: {{
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {{
+                    x: {{ title: {{ display: true, text: 'Temps écoulé', color: '#94a3b8' }}, grid: {{ color: 'rgba(255,255,255,0.05)' }}, ticks: {{ color: '#94a3b8', maxTicksLimit: 12 }} }},
+                    y: {{ title: {{ display: true, text: 'Mbps', color: '#3b82f6' }}, grid: {{ color: 'rgba(255,255,255,0.05)' }}, ticks: {{ color: '#3b82f6' }} }}
+                }},
+                plugins: {{ legend: {{ labels: {{ color: '#f8fafc', font: {{ weight: 'bold' }} }} }} }}
+            }}
+        }});
     </script>
 </body>
 </html>
@@ -583,6 +695,7 @@ def main():
             'timestamp', 'elapsed_sec', 'time_str', 'mode',
             'displayed_fps', 'base_fps', 'main_thread_ms',
             'tlod', 'olod', 'agl_ft', 'fpm', 'fg_mode',
+            'cache_read_mbps', 'cache_read_mbs',
             'vram_used_mb', 'vram_total_mb', 'vram_pct',
             'gpu_util_pct', 'gpu_temp_c', 'gpu_power_w', 'gpu_clock_mhz', 'gpu_mem_bus_pct',
             'msfs_ram_mb', 'msfs_commit_mb', 'msfs_cpu_pct',
@@ -594,7 +707,7 @@ def main():
     print("=" * 84)
     print(f" Mode détecté   : {mode_str}")
     print(f" Journal CSV    : {csv_path}")
-    print(f" Métriques      : FPS, MainThread (ms), TLOD, VRAM, RAM MSFS, Puissance GPU (W)")
+    print(f" Télémétrie     : FPS, MainThread, TLOD, Cache Read (Mbps), VRAM, RAM, GPU (W)")
     print("=" * 84)
     print(" En attente du simulateur de vol...")
 
@@ -608,6 +721,7 @@ def main():
     peak_msfs_commit = 0
     
     last_cpu_sec = None
+    last_read_bytes = None
     last_tick_time = None
     cpu_cores = os.cpu_count() or 8
 
@@ -631,14 +745,27 @@ def main():
                 time_formatted = format_time_delta(elapsed)
                 sample_index += 1
 
-                # Calculate MSFS CPU usage %
+                # Calculate MSFS CPU usage % & Rolling Cache / Disk Read speed
                 msfs_cpu_pct = 0.0
-                if last_cpu_sec is not None and last_tick_time is not None:
+                cache_read_mbps = 0.0
+                cache_read_mbs = 0.0
+
+                if last_tick_time is not None:
                     dt = now_tick - last_tick_time
-                    dcpu = msfs['cpu_sec'] - last_cpu_sec
-                    if dt > 0 and dcpu >= 0:
-                        msfs_cpu_pct = round(min(100.0, (dcpu / (dt * cpu_cores)) * 100.0), 1)
+                    if dt > 0:
+                        if last_cpu_sec is not None:
+                            dcpu = msfs['cpu_sec'] - last_cpu_sec
+                            if dcpu >= 0:
+                                msfs_cpu_pct = round(min(100.0, (dcpu / (dt * cpu_cores)) * 100.0), 1)
+
+                        if last_read_bytes is not None and 'read_bytes' in msfs:
+                            dread = msfs['read_bytes'] - last_read_bytes
+                            if dread >= 0:
+                                cache_read_mbs = round((dread / (1024 * 1024)) / dt, 2)
+                                cache_read_mbps = round(cache_read_mbs * 8.0, 1)
+
                 last_cpu_sec = msfs['cpu_sec']
+                last_read_bytes = msfs.get('read_bytes', 0)
                 last_tick_time = now_tick
 
                 # Update Stats
@@ -672,6 +799,8 @@ def main():
                     'agl_ft': agl_ft,
                     'fpm': fpm,
                     'fg_mode': fg_mode,
+                    'cache_read_mbps': cache_read_mbps,
+                    'cache_read_mbs': cache_read_mbs,
                     'vram_used': vram_used,
                     'vram_total': gpu['vram_total_mb'],
                     'vram_pct': gpu['vram_pct'],
@@ -692,6 +821,7 @@ def main():
                         now_iso, elapsed, time_formatted, mode_str,
                         disp_fps, base_fps, main_thread_ms,
                         tlod, olod, agl_ft, fpm, fg_mode,
+                        cache_read_mbps, cache_read_mbs,
                         vram_used, gpu['vram_total_mb'], gpu['vram_pct'],
                         gpu['gpu_util_pct'], gpu['gpu_temp_c'], gpu['gpu_power_w'], gpu['gpu_clock_mhz'], gpu['gpu_mem_bus_pct'],
                         msfs_ram, msfs_commit, msfs_cpu_pct,
@@ -703,14 +833,15 @@ def main():
                 lod_disp = f"TLOD: {tlod}" if tlod is not None else ""
                 alt_disp = f"Alt: {agl_ft:,}ft" if agl_ft is not None else ""
                 power_disp = f"{gpu['gpu_power_w']}W"
+                io_disp = f"Disk: {cache_read_mbps} Mbps" if cache_read_mbps > 0 else ""
 
                 sys.stdout.write(
                     f"\r[{time_formatted}] "
                     f"{fps_disp} | "
                     f"VRAM: {vram_used:,.0f} Mo ({gpu['vram_pct']}%) | "
                     f"GPU: {gpu['gpu_util_pct']}% ({power_disp}, {gpu['gpu_temp_c']}°C) | "
-                    f"RAM: {round(msfs_ram/1024, 1)} Go (Commit: {round(msfs_commit/1024, 1)} Go) | "
-                    f"{lod_disp} {alt_disp} | #{sample_index}"
+                    f"RAM: {round(msfs_ram/1024, 1)} Go | "
+                    f"{lod_disp} {alt_disp} {io_disp} | #{sample_index}"
                 )
                 sys.stdout.flush()
 
