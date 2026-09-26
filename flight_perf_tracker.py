@@ -145,17 +145,21 @@ def get_nvidia_gpu_telemetry():
             'gpu_clock_mhz': 0, 'gpu_mem_bus_pct': 0
         }
 
+_last_autofps_cache = None
+
 def get_latest_autofps_data():
+    global _last_autofps_cache
     try:
         log_dir = os.path.expandvars(r'%APPDATA%\MSFS_AutoFPS\log')
         if not os.path.exists(log_dir):
-            return None
+            return _last_autofps_cache
         logs = glob.glob(os.path.join(log_dir, 'MSFS_AutoFPS*.log'))
         if not logs:
-            return None
+            return _last_autofps_cache
         latest_log = max(logs, key=os.path.getmtime)
-        if time.time() - os.path.getmtime(latest_log) > 900:
-            return None
+        # Accepter les logs récents de la session (dernières 6 heures)
+        if time.time() - os.path.getmtime(latest_log) > 21600:
+            return _last_autofps_cache
         with open(latest_log, 'r', encoding='utf-8', errors='ignore') as f:
             lines = f.readlines()
         for line in reversed(lines):
@@ -181,7 +185,7 @@ def get_latest_autofps_data():
                     base_fps = raw_fps
                 main_thread_ms = round(1000.0 / base_fps, 1) if (base_fps and base_fps > 0) else None
                 
-                return {
+                _last_autofps_cache = {
                     'base_fps': base_fps,
                     'displayed_fps': disp_fps,
                     'main_thread_ms': main_thread_ms,
@@ -191,9 +195,10 @@ def get_latest_autofps_data():
                     'fpm': int(fpm_m.group(1)) if fpm_m else None,
                     'fg_mode': fg_mode
                 }
+                return _last_autofps_cache
     except Exception:
         pass
-    return None
+    return _last_autofps_cache
 
 def get_sceneryx_flight_mode():
     appdata = os.getenv('APPDATA', '')
