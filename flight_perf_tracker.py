@@ -120,15 +120,17 @@ def get_sceneryx_flight_mode():
                     dep = fm.get('dep_icao', 'DEP')
                     arr = fm.get('arr_icao', 'ARR')
                     dis = fm.get('disabled_count', 0)
-                    alts = fm.get('alternates', [])
+                    alts_raw = fm.get('alternates', [])
+                    alts = [a if isinstance(a, str) else a.get('icao', '') for a in alts_raw]
+                    alts = [a for a in alts if a]
                     profile = fm.get('profile', 'CORRIDOR').upper()
                     alt_str = f" [Alts: {','.join(alts)}]" if alts else ""
                     if profile == 'DIRECT':
-                        return f"SCENERYX DIRECT A➔B ({dep} ➔ {arr} | {dis} scènes isolées)", True, dep, arr, dis, 'direct'
+                        return f"SCENERYX DIRECT A->B ({dep} -> {arr} | {dis} scènes isolées)", True, dep, arr, dis, 'direct'
                     elif profile == 'SIMBRIEF':
-                        return f"SCENERYX SIMBRIEF ({dep} ➔ {arr}{alt_str} | {dis} scènes isolées)", True, dep, arr, dis, 'simbrief'
+                        return f"SCENERYX SIMBRIEF ({dep} -> {arr}{alt_str} | {dis} scènes isolées)", True, dep, arr, dis, 'simbrief'
                     else:
-                        return f"SCENERYX COULOIR ({dep} ➔ {arr}{alt_str} | {dis} scènes isolées)", True, dep, arr, dis, 'corridor'
+                        return f"SCENERYX COULOIR ({dep} -> {arr}{alt_str} | {dis} scènes isolées)", True, dep, arr, dis, 'corridor'
         except Exception:
             pass
     return "BASELINE STANDARD (Toutes scènes actives)", False, "", "", 0, "baseline_full"
