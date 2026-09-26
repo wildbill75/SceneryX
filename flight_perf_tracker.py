@@ -167,9 +167,18 @@ def get_latest_autofps_data():
                 fpm_m = re.search(r'FPM:(-?\d+)', line)
                 mode_m = re.search(r'Mode:([^\s]+(?:\s+[^\s]+)?)', line)
                 
-                base_fps = int(fps_m.group(1)) if fps_m else None
+                raw_fps = int(fps_m.group(1)) if fps_m else None
                 fg_mode = mode_m.group(1) if mode_m else ''
-                disp_fps = base_fps * 2 if ('2X' in fg_mode and base_fps) else base_fps
+                # AutoFPS rapporte le FPS final affiché si > 55 avec FG 2X
+                if '2X' in fg_mode and raw_fps and raw_fps > 55:
+                    disp_fps = raw_fps
+                    base_fps = round(raw_fps / 2)
+                elif '2X' in fg_mode and raw_fps:
+                    base_fps = raw_fps
+                    disp_fps = raw_fps * 2
+                else:
+                    disp_fps = raw_fps
+                    base_fps = raw_fps
                 main_thread_ms = round(1000.0 / base_fps, 1) if (base_fps and base_fps > 0) else None
                 
                 return {
