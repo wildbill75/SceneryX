@@ -120,19 +120,35 @@ $$\text{Cible FPS Affichés} = \frac{\text{Fréquence Écran (Hz)}}{N} \quad (N 
 
 ---
 
-## 5. Déroulement du Questionnaire & Expérience Utilisateur
+## 5. Impact de l'Avion et de son Studio de Développement
+
+L'architecture interne d'un appareil varie radicalement d'un éditeur à l'autre dans MSFS. Le module d'optimisation intègre une base de profils par studio :
+
+| Studio | Appareils Phares | Architecture Technique | Impact Spécifique | Réglage Recommandé |
+| :--- | :--- | :--- | :--- | :--- |
+| **Fenix Simulations** | A319 / A320 / A321 | Avionique déportée (ProSim) + Rendu écrans DirectX | **Gouffre VRAM & CoherentGT** (+1 à 1.5 Go VRAM pour les écrans) | `Display Rendering` sur CPU si VRAM $\le 16$ Go, `Terrain Detail` sur LOW obligatoire. |
+| **PMDG** | B737 (-600 à -900), B777-300ER | Code pur C++ compilé en WASM natif | **Très économe en VRAM**, forte dépendance à la fréquence CPU MainThread | VRAM très stable ; permet de monter le TLOD ou les textures en High sans risque de paging. |
+| **iniBuilds** | A300-600, A310, A320neo v2, A350 | Modélisation 3D ultra-dense (textures 8K/4K dans le cockpit et cabine) | **Monstre de VRAM** (+2 Go VRAM par rapport à PMDG) | Réduire la qualité des textures de cabine dans l'EFB, `Terrain Detail` sur LOW. |
+| **FlyByWire Simulations** | A32NX, A380X | Moteur WebAssembly c-wasm + Écrans React / JS | **Sollicitation CoherentGTUIThread** (charge CPU sur le fil interface) | Modérer la fréquence de rafraîchissement des écrans dans l'EFB, fermer les widgets de toolbar. |
+| **Just Flight** | BAe 146, F28, PA-28, Tomahawk | Cadrans à aiguilles vapeur + WASM / XML classique | **Pics sur Manipulators** (centaines de breakers et interrupteurs 3D) | Limiter les calculs de clickspots en vue externe. |
+| **Asobo / Working Title** | Citation Longitude, TBM 930, G1000/G3000 | Code natif Microsoft optimisé | **Empreinte neutre et minimale** | Permet d'augmenter le TLOD de 20 à 30 % par rapport à un liner tiers. |
+
+---
+
+## 6. Déroulement du Questionnaire & Expérience Utilisateur
 
 1. **Étape 1 : Diagnostic Automatique Instantané**
    * L'outil s'ouvre avec l'ensemble des données matérielles et logicielles déjà remplies.
+   * Détection automatique des appareils installés dans `Community` et `Official` (Fenix, PMDG, iniBuilds, FBW, etc.).
    * Des badges verts valident les points forts (*XMP Actif*, *RBar Actif*, *HAGS Actif*, *DLSS 3.10 Détecté*).
    * Des alertes orange indiquent d'éventuelles anomalies (*Attention : Cache shaders NVIDIA limité à 4 Go*).
 2. **Étape 2 : Validation & Ajustement Manuel**
-   * L'utilisateur peut modifier n'importe quel champ si besoin (par exemple s'il prévoit de changer d'écran ou de résolution).
-3. **Étape 3 : Choix de la Mission**
-   * Sélection de l'appareil (ex: *Fenix A320*).
-   * Sélection du type de vol (ex: *IFR Hub à Hub*).
-   * Addons de trafic en cours d'utilisation (*BeyondATC*, *FSLTL*, *SayIntentions*).
+   * L'utilisateur peut modifier n'importe quel champ en un clic (par exemple s'il veut simuler un autre écran ou modifier un paramètre).
+3. **Étape 3 : Choix de la Mission & de l'Appareil**
+   * **Studio & Avion** : Sélection précise (ex: *Fenix Simulations ➔ A320 CFM* ou *PMDG ➔ B777-300ER*).
+   * **Profil de vol** : Vol de ligne IFR (hautes altitudes, grands aéroports) ou Vol VFR basse altitude.
+   * **Addons de trafic** : *BeyondATC*, *FSLTL*, *SayIntentions*.
 4. **Étape 4 : Fiche Récapitulative et Estimation**
-   * **FPS Estimés** : Plage exacte prédite (ex: `90 FPS constants`).
-   * **Tableau comparatif** : Vos réglages actuels vs Réglages recommandés.
-   * **Bouton d'application** : Possibilité d'appliquer directement les réglages recommandés au simulateur ou à AutoFPS.
+   * **FPS Estimés** : Plage exacte prédite (ex: `90 FPS constants` sur écran 180 Hz).
+   * **Marge MainThread & VRAM** : Estimation chiffrée selon le couple Studio/GPU.
+   * **Tableau des réglages complets** : MSFS, NVIDIA App, AutoFPS et SceneryX.
