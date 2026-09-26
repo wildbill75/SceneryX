@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 SceneryX Flight Performance Tracker (Standalone Telemetry Benchmark)
-Mesure et journalise en temps réel la VRAM GPU, la RAM de MSFS et les performances système
-pour comparer les vols avec et sans le mode Flight Plan de SceneryX.
+Mesure et journalise en temps réel la VRAM GPU, la RAM de MSFS, les FPS, le MainThread,
+la puissance GPU et les réglages LOD pour comparer les vols SceneryX.
 """
 
 import os
@@ -11,6 +11,8 @@ import sys
 import time
 import json
 import csv
+import re
+import glob
 import ctypes
 import ctypes.wintypes
 import subprocess
@@ -46,6 +48,9 @@ class MEMORYSTATUSEX(ctypes.Structure):
         ('ullAvailExtendedVirtual', ctypes.c_ulonglong)
     ]
 
+class FILETIME(ctypes.Structure):
+    _fields_ = [('dwLowDateTime', ctypes.wintypes.DWORD), ('dwHighDateTime', ctypes.wintypes.DWORD)]
+
 def get_system_ram():
     stat = MEMORYSTATUSEX()
     stat.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
@@ -70,13 +75,20 @@ def get_msfs_process():
                     pmc = PROCESS_MEMORY_COUNTERS_EX()
                     pmc.cb = ctypes.sizeof(PROCESS_MEMORY_COUNTERS_EX)
                     ctypes.windll.psapi.GetProcessMemoryInfo(hProcess, ctypes.byref(pmc), pmc.cb)
+                    
+                    # Read CPU times
+                    c, e, k, u = FILETIME(), FILETIME(), FILETIME(), FILETIME()
+                    ctypes.windll.kernel32.GetProcessTimes(hProcess, ctypes.byref(c), ctypes.byref(e), ctypes.byref(k), ctypes.byref(u))
+                    cpu_sec = ((k.dwHighDateTime << 32 | k.dwLowDateTime) + (u.dwHighDateTime << 32 | u.dwLowDateTime)) / 10000000.0
+                    
                     ctypes.windll.kernel32.CloseHandle(hProcess)
                     return {
                         'name': name,
                         'pid': pid,
                         'ram_mb': round(pmc.WorkingSetSize / (1024 * 1024), 1),
                         'commit_mb': round(pmc.PrivateUsage / (1024 * 1024), 1),
-                        'peak_ram_mb': round(pmc.PeakWorkingSetSize / (1024 * 1024), 1)
+                        'peak_ram_mb': round(pmc.PeakWorkingSetSize / (1024 * 1024), 1),
+                        'cpu_sec': cpu_sec
                     }
     except Exception:
         pass
@@ -86,27 +98,81 @@ def get_nvidia_gpu_telemetry():
     try:
         cmd = [
             'nvidia-smi',
-            '--query-gpu=memory.used,memory.total,utilization.gpu,temperature.gpu',
+            '--query-gpu=memory.used,memory.total,utilization.gpu,temperature.gpu,power.draw,clocks.gr,utilization.memory',
             '--format=csv,noheader,nounits'
         ]
         out = subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL)
         line = out.strip().splitlines()[0]
-        used, total, util, temp = [int(v.strip()) for v in line.split(',')]
+        parts = [v.strip() for v in line.split(',')]
+        used = int(float(parts[0]))
+        total = int(float(parts[1]))
+        util = int(float(parts[2]))
+        temp = int(float(parts[3]))
+        power = round(float(parts[4]), 1) if len(parts) > 4 else 0.0
+        clock = int(float(parts[5])) if len(parts) > 5 else 0
+        mem_bus = int(float(parts[6])) if len(parts) > 6 else 0
         return {
             'vram_used_mb': used,
             'vram_total_mb': total,
             'vram_pct': round((used / total) * 100, 1),
             'gpu_util_pct': util,
-            'gpu_temp_c': temp
+            'gpu_temp_c': temp,
+            'gpu_power_w': power,
+            'gpu_clock_mhz': clock,
+            'gpu_mem_bus_pct': mem_bus
         }
     except Exception:
         return {
-            'vram_used_mb': 0,
-            'vram_total_mb': 0,
-            'vram_pct': 0.0,
-            'gpu_util_pct': 0,
-            'gpu_temp_c': 0
+            'vram_used_mb': 0, 'vram_total_mb': 0, 'vram_pct': 0.0,
+            'gpu_util_pct': 0, 'gpu_temp_c': 0, 'gpu_power_w': 0.0,
+            'gpu_clock_mhz': 0, 'gpu_mem_bus_pct': 0
         }
+
+def get_latest_autofps_data():
+    """
+    Récupère en temps réel la télémétrie FPS, FrameGen, MainThread et LOD
+    à partir des journaux du service AutoFPS si celui-ci est actif.
+    """
+    try:
+        log_dir = os.path.expandvars(r'%APPDATA%\MSFS_AutoFPS\log')
+        if not os.path.exists(log_dir):
+            return None
+        logs = glob.glob(os.path.join(log_dir, 'MSFS_AutoFPS*.log'))
+        if not logs:
+            return None
+        latest_log = max(logs, key=os.path.getmtime)
+        # Ne considérer que les logs récents (dernières 15 minutes)
+        if time.time() - os.path.getmtime(latest_log) > 900:
+            return None
+        with open(latest_log, 'r', encoding='utf-8', errors='ignore') as f:
+            lines = f.readlines()
+        for line in reversed(lines):
+            if 'UpdateVariables' in line and 'FPS:' in line:
+                fps_m = re.search(r'FPS:(\d+)', line)
+                tlod_m = re.search(r'TLOD:(\d+)', line)
+                olod_m = re.search(r'OLOD:(\d+)', line)
+                agl_m = re.search(r'AGL:(-?\d+)', line)
+                fpm_m = re.search(r'FPM:(-?\d+)', line)
+                mode_m = re.search(r'Mode:([^\s]+(?:\s+[^\s]+)?)', line)
+                
+                base_fps = int(fps_m.group(1)) if fps_m else None
+                fg_mode = mode_m.group(1) if mode_m else ''
+                disp_fps = base_fps * 2 if ('2X' in fg_mode and base_fps) else base_fps
+                main_thread_ms = round(1000.0 / base_fps, 1) if (base_fps and base_fps > 0) else None
+                
+                return {
+                    'base_fps': base_fps,
+                    'displayed_fps': disp_fps,
+                    'main_thread_ms': main_thread_ms,
+                    'tlod': int(tlod_m.group(1)) if tlod_m else None,
+                    'olod': int(olod_m.group(1)) if olod_m else None,
+                    'agl_ft': int(agl_m.group(1)) if agl_m else None,
+                    'fpm': int(fpm_m.group(1)) if fpm_m else None,
+                    'fg_mode': fg_mode
+                }
+    except Exception:
+        pass
+    return None
 
 def get_sceneryx_flight_mode():
     appdata = os.getenv('APPDATA', '')
@@ -151,6 +217,12 @@ def generate_html_report(csv_path, session_info, samples):
     msfs_ram_vals = [s['msfs_ram'] for s in samples]
     msfs_commit_vals = [s['msfs_commit'] for s in samples]
     gpu_util_vals = [s['gpu_util'] for s in samples]
+    gpu_power_vals = [s.get('gpu_power_w', 0) for s in samples]
+
+    fps_vals = [s['disp_fps'] for s in samples if s.get('disp_fps') is not None]
+    mainthread_vals = [s['main_thread_ms'] for s in samples if s.get('main_thread_ms') is not None]
+    tlod_vals = [s['tlod'] for s in samples if s.get('tlod') is not None]
+    agl_vals = [s['agl_ft'] for s in samples if s.get('agl_ft') is not None]
 
     peak_vram = max(vram_vals) if vram_vals else 0
     avg_vram = round(sum(vram_vals) / len(vram_vals), 1) if vram_vals else 0
@@ -163,9 +235,20 @@ def generate_html_report(csv_path, session_info, samples):
     peak_commit = max(msfs_commit_vals) if msfs_commit_vals else 0
     avg_commit = round(sum(msfs_commit_vals) / len(msfs_commit_vals), 1) if msfs_commit_vals else 0
 
+    avg_power = round(sum(gpu_power_vals) / len(gpu_power_vals), 1) if gpu_power_vals else 0
+    peak_power = max(gpu_power_vals) if gpu_power_vals else 0
+
+    avg_fps = round(sum(fps_vals) / len(fps_vals), 1) if fps_vals else "N/A"
+    max_fps = max(fps_vals) if fps_vals else "N/A"
+    min_fps = min(fps_vals) if fps_vals else "N/A"
+
+    avg_mt = round(sum(mainthread_vals) / len(mainthread_vals), 1) if mainthread_vals else "N/A"
+    min_mt = min(mainthread_vals) if mainthread_vals else "N/A"
+    max_mt = max(mainthread_vals) if mainthread_vals else "N/A"
+
     mode_title = session_info['mode_str']
     is_corridor = session_info['is_corridor']
-    badge_color = "#06b6d4" if is_corridor else "#f59e0b"
+    badge_color = "#10b981" if is_corridor else "#f59e0b"
     badge_text = "OPTIMISÉ SCENERYX" if is_corridor else "BASELINE STANDARD"
 
     html = f"""<!DOCTYPE html>
@@ -201,7 +284,7 @@ def generate_html_report(csv_path, session_info, samples):
             font-size: 12px;
             font-weight: 800;
             letter-spacing: 1px;
-            background: rgba(6, 182, 212, 0.15);
+            background: rgba(16, 185, 129, 0.15);
             color: {badge_color};
             border: 1px solid {badge_color};
         }}
@@ -270,8 +353,20 @@ def generate_html_report(csv_path, session_info, samples):
 
         <div class="grid">
             <div class="card">
+                <div class="card-title">FPS Affichés (Frame Gen)</div>
+                <div class="card-val" style="color: #10b981;">{avg_fps} <span style="font-size:16px;">FPS</span></div>
+                <div class="card-sub">Crête : {max_fps} FPS • Min : {min_fps} FPS</div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">MainThread CPU</div>
+                <div class="card-val" style="color: #f59e0b;">{avg_mt} <span style="font-size:16px;">ms</span></div>
+                <div class="card-sub">Meilleur : {min_mt} ms • Max : {max_mt} ms</div>
+            </div>
+
+            <div class="card">
                 <div class="card-title">VRAM GPU Maximale</div>
-                <div class="card-val" style="color: {'#ef4444' if peak_vram_pct > 88 else '#38bdf8'};">{peak_vram:,.0f} Mo</div>
+                <div class="card-val" style="color: #38bdf8;">{peak_vram:,.0f} Mo</div>
                 <div class="card-sub">{peak_vram_pct}% de {total_vram:,.0f} Mo • Moyenne : {avg_vram:,.0f} Mo</div>
             </div>
 
@@ -288,16 +383,33 @@ def generate_html_report(csv_path, session_info, samples):
             </div>
 
             <div class="card">
-                <div class="card-title">Échantillons Enregistrés</div>
-                <div class="card-val" style="color:#a855f7;">{len(samples)}</div>
-                <div class="card-sub">Fréquence : toutes les 2 secondes</div>
+                <div class="card-title">Puissance GPU (Watts)</div>
+                <div class="card-val" style="color: #eab308;">{avg_power} W</div>
+                <div class="card-sub">Moyenne vol • Crête : {peak_power} W</div>
             </div>
         </div>
 
+        <!-- GRAPH 1 : FPS & MainThread -->
         <div class="chart-box">
-            <div class="chart-title">Évolution de la VRAM GPU & de la RAM MSFS au fil du vol (Mo)</div>
-            <div style="height: 380px;">
+            <div class="chart-title">1. Fluidité & Latence : FPS Affichés vs MainThread (ms)</div>
+            <div style="height: 320px;">
+                <canvas id="fpsChart"></canvas>
+            </div>
+        </div>
+
+        <!-- GRAPH 2 : VRAM & RAM MSFS -->
+        <div class="chart-box">
+            <div class="chart-title">2. Empreinte Mémoire : VRAM GPU & RAM MSFS au fil du vol (Mo)</div>
+            <div style="height: 320px;">
                 <canvas id="perfChart"></canvas>
+            </div>
+        </div>
+
+        <!-- GRAPH 3 : Altitude & TLOD -->
+        <div class="chart-box">
+            <div class="chart-title">3. Profil de Vol & Dynamique : Altitude AGL (ft) et Terrain LOD (TLOD)</div>
+            <div style="height: 300px;">
+                <canvas id="lodChart"></canvas>
             </div>
         </div>
 
@@ -307,11 +419,52 @@ def generate_html_report(csv_path, session_info, samples):
     </div>
 
     <script>
-        const ctx = document.getElementById('perfChart').getContext('2d');
-        new Chart(ctx, {{
+        const times = {json.dumps(times)};
+
+        // 1. FPS & MainThread Chart
+        new Chart(document.getElementById('fpsChart').getContext('2d'), {{
             type: 'line',
             data: {{
-                labels: {json.dumps(times)},
+                labels: times,
+                datasets: [
+                    {{
+                        label: 'FPS Affichés (Frame Gen)',
+                        data: {json.dumps([s.get('disp_fps') for s in samples])},
+                        borderColor: '#10b981',
+                        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                        borderWidth: 2,
+                        tension: 0.2,
+                        yAxisID: 'yFps',
+                        pointRadius: 0
+                    }},
+                    {{
+                        label: 'MainThread (ms)',
+                        data: {json.dumps([s.get('main_thread_ms') for s in samples])},
+                        borderColor: '#f59e0b',
+                        borderWidth: 1.8,
+                        tension: 0.2,
+                        yAxisID: 'yMs',
+                        pointRadius: 0
+                    }}
+                ]
+            }},
+            options: {{
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {{
+                    x: {{ title: {{ display: true, text: 'Temps écoulé', color: '#94a3b8' }}, grid: {{ color: 'rgba(255,255,255,0.05)' }}, ticks: {{ color: '#94a3b8', maxTicksLimit: 12 }} }},
+                    yFps: {{ type: 'linear', position: 'left', title: {{ display: true, text: 'FPS', color: '#10b981' }}, grid: {{ color: 'rgba(255,255,255,0.05)' }}, ticks: {{ color: '#10b981' }} }},
+                    yMs: {{ type: 'linear', position: 'right', title: {{ display: true, text: 'MainThread (ms)', color: '#f59e0b' }}, grid: {{ drawOnChartArea: false }}, ticks: {{ color: '#f59e0b' }} }}
+                }},
+                plugins: {{ legend: {{ labels: {{ color: '#f8fafc', font: {{ weight: 'bold' }} }} }} }}
+            }}
+        }});
+
+        // 2. Memory Chart
+        new Chart(document.getElementById('perfChart').getContext('2d'), {{
+            type: 'line',
+            data: {{
+                labels: times,
                 datasets: [
                     {{
                         label: 'VRAM GPU Occupée (Mo)',
@@ -346,22 +499,50 @@ def generate_html_report(csv_path, session_info, samples):
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {{
-                    x: {{
-                        title: {{ display: true, text: 'Temps écoulé', color: '#94a3b8' }},
-                        grid: {{ color: 'rgba(255,255,255,0.05)' }},
-                        ticks: {{ color: '#94a3b8', maxTicksLimit: 12 }}
-                    }},
-                    y: {{
-                        title: {{ display: true, text: 'Mémoire (Mo)', color: '#94a3b8' }},
-                        grid: {{ color: 'rgba(255,255,255,0.05)' }},
-                        ticks: {{ color: '#94a3b8' }}
-                    }}
+                    x: {{ title: {{ display: true, text: 'Temps écoulé', color: '#94a3b8' }}, grid: {{ color: 'rgba(255,255,255,0.05)' }}, ticks: {{ color: '#94a3b8', maxTicksLimit: 12 }} }},
+                    y: {{ title: {{ display: true, text: 'Mémoire (Mo)', color: '#94a3b8' }}, grid: {{ color: 'rgba(255,255,255,0.05)' }}, ticks: {{ color: '#94a3b8' }} }}
                 }},
-                plugins: {{
-                    legend: {{
-                        labels: {{ color: '#f8fafc', font: {{ weight: 'bold' }} }}
+                plugins: {{ legend: {{ labels: {{ color: '#f8fafc', font: {{ weight: 'bold' }} }} }} }}
+            }}
+        }});
+
+        // 3. Flight Profile & LOD Chart
+        new Chart(document.getElementById('lodChart').getContext('2d'), {{
+            type: 'line',
+            data: {{
+                labels: times,
+                datasets: [
+                    {{
+                        label: 'Altitude AGL (ft)',
+                        data: {json.dumps([s.get('agl_ft') for s in samples])},
+                        borderColor: '#06b6d4',
+                        backgroundColor: 'rgba(6, 182, 212, 0.08)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.2,
+                        yAxisID: 'yAlt',
+                        pointRadius: 0
+                    }},
+                    {{
+                        label: 'Terrain LOD (TLOD)',
+                        data: {json.dumps([s.get('tlod') for s in samples])},
+                        borderColor: '#ec4899',
+                        borderWidth: 2,
+                        tension: 0.2,
+                        yAxisID: 'yLod',
+                        pointRadius: 0
                     }}
-                }}
+                ]
+            }},
+            options: {{
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {{
+                    x: {{ title: {{ display: true, text: 'Temps écoulé', color: '#94a3b8' }}, grid: {{ color: 'rgba(255,255,255,0.05)' }}, ticks: {{ color: '#94a3b8', maxTicksLimit: 12 }} }},
+                    yAlt: {{ type: 'linear', position: 'left', title: {{ display: true, text: 'Altitude AGL (ft)', color: '#06b6d4' }}, grid: {{ color: 'rgba(255,255,255,0.05)' }}, ticks: {{ color: '#06b6d4' }} }},
+                    yLod: {{ type: 'linear', position: 'right', title: {{ display: true, text: 'TLOD', color: '#ec4899' }}, grid: {{ drawOnChartArea: false }}, ticks: {{ color: '#ec4899' }} }}
+                }},
+                plugins: {{ legend: {{ labels: {{ color: '#f8fafc', font: {{ weight: 'bold' }} }} }} }}
             }}
         }});
     </script>
@@ -395,23 +576,26 @@ def main():
     csv_filename = f"benchmark_{prefix}_{timestamp_str}.csv"
     csv_path = os.path.join(benchmarks_dir, csv_filename)
 
-    # Initialize CSV File
+    # Initialize CSV File with expanded telemetry columns
     with open(csv_path, 'w', newline='', encoding='utf-8') as f:
         writer = csv.writer(f)
         writer.writerow([
             'timestamp', 'elapsed_sec', 'time_str', 'mode',
+            'displayed_fps', 'base_fps', 'main_thread_ms',
+            'tlod', 'olod', 'agl_ft', 'fpm', 'fg_mode',
             'vram_used_mb', 'vram_total_mb', 'vram_pct',
-            'gpu_util_pct', 'gpu_temp_c',
-            'msfs_ram_mb', 'msfs_commit_mb',
+            'gpu_util_pct', 'gpu_temp_c', 'gpu_power_w', 'gpu_clock_mhz', 'gpu_mem_bus_pct',
+            'msfs_ram_mb', 'msfs_commit_mb', 'msfs_cpu_pct',
             'sys_ram_used_mb', 'sys_ram_total_mb'
         ])
 
-    print("=" * 76)
-    print("           SCENERYX - FLIGHT PERFORMANCE TRACKER (STANDALONE)")
-    print("=" * 76)
-    print(f" Mode détecté : {mode_str}")
-    print(f" Journal CSV   : {csv_path}")
-    print("=" * 76)
+    print("=" * 84)
+    print("           SCENERYX - FLIGHT PERFORMANCE TRACKER (STANDALONE PRO)")
+    print("=" * 84)
+    print(f" Mode détecté   : {mode_str}")
+    print(f" Journal CSV    : {csv_path}")
+    print(f" Métriques      : FPS, MainThread (ms), TLOD, VRAM, RAM MSFS, Puissance GPU (W)")
+    print("=" * 84)
     print(" En attente du simulateur de vol...")
 
     samples = []
@@ -422,24 +606,40 @@ def main():
     min_vram = 999999
     peak_msfs_ram = 0
     peak_msfs_commit = 0
+    
+    last_cpu_sec = None
+    last_tick_time = None
+    cpu_cores = os.cpu_count() or 8
 
     try:
         while True:
             msfs = get_msfs_process()
             gpu = get_nvidia_gpu_telemetry()
             sys_ram_used, sys_ram_total = get_system_ram()
+            autofps = get_latest_autofps_data()
 
             now_dt = datetime.now()
             now_iso = now_dt.strftime("%Y-%m-%d %H:%M:%S")
 
             if msfs:
+                now_tick = time.time()
                 if start_time is None:
-                    start_time = time.time()
-                    print("\n>> MSFS 2024 DÉTECTÉ ET ACTIF ! Démarrage de l'enregistrement en direct...\n")
+                    start_time = now_tick
+                    print("\n>> MSFS 2024 DÉTECTÉ ET ACTIF ! Démarrage du tracking en direct...\n")
 
-                elapsed = round(time.time() - start_time, 1)
+                elapsed = round(now_tick - start_time, 1)
                 time_formatted = format_time_delta(elapsed)
                 sample_index += 1
+
+                # Calculate MSFS CPU usage %
+                msfs_cpu_pct = 0.0
+                if last_cpu_sec is not None and last_tick_time is not None:
+                    dt = now_tick - last_tick_time
+                    dcpu = msfs['cpu_sec'] - last_cpu_sec
+                    if dt > 0 and dcpu >= 0:
+                        msfs_cpu_pct = round(min(100.0, (dcpu / (dt * cpu_cores)) * 100.0), 1)
+                last_cpu_sec = msfs['cpu_sec']
+                last_tick_time = now_tick
 
                 # Update Stats
                 vram_used = gpu['vram_used_mb']
@@ -452,14 +652,37 @@ def main():
                 msfs_commit = msfs['commit_mb']
                 if msfs_commit > peak_msfs_commit: peak_msfs_commit = msfs_commit
 
-                # Append to memory sample list
+                disp_fps = autofps.get('displayed_fps') if autofps else None
+                base_fps = autofps.get('base_fps') if autofps else None
+                main_thread_ms = autofps.get('main_thread_ms') if autofps else None
+                tlod = autofps.get('tlod') if autofps else None
+                olod = autofps.get('olod') if autofps else None
+                agl_ft = autofps.get('agl_ft') if autofps else None
+                fpm = autofps.get('fpm') if autofps else None
+                fg_mode = autofps.get('fg_mode', '') if autofps else ''
+
+                # Append to sample list
                 samples.append({
                     'elapsed': time_formatted,
+                    'disp_fps': disp_fps,
+                    'base_fps': base_fps,
+                    'main_thread_ms': main_thread_ms,
+                    'tlod': tlod,
+                    'olod': olod,
+                    'agl_ft': agl_ft,
+                    'fpm': fpm,
+                    'fg_mode': fg_mode,
                     'vram_used': vram_used,
                     'vram_total': gpu['vram_total_mb'],
+                    'vram_pct': gpu['vram_pct'],
+                    'gpu_util': gpu['gpu_util_pct'],
+                    'gpu_temp': gpu['gpu_temp_c'],
+                    'gpu_power_w': gpu['gpu_power_w'],
+                    'gpu_clock_mhz': gpu['gpu_clock_mhz'],
+                    'gpu_mem_bus_pct': gpu['gpu_mem_bus_pct'],
                     'msfs_ram': msfs_ram,
                     'msfs_commit': msfs_commit,
-                    'gpu_util': gpu['gpu_util_pct']
+                    'msfs_cpu_pct': msfs_cpu_pct
                 })
 
                 # Write to CSV
@@ -467,19 +690,27 @@ def main():
                     writer = csv.writer(f)
                     writer.writerow([
                         now_iso, elapsed, time_formatted, mode_str,
+                        disp_fps, base_fps, main_thread_ms,
+                        tlod, olod, agl_ft, fpm, fg_mode,
                         vram_used, gpu['vram_total_mb'], gpu['vram_pct'],
-                        gpu['gpu_util_pct'], gpu['gpu_temp_c'],
-                        msfs_ram, msfs_commit,
+                        gpu['gpu_util_pct'], gpu['gpu_temp_c'], gpu['gpu_power_w'], gpu['gpu_clock_mhz'], gpu['gpu_mem_bus_pct'],
+                        msfs_ram, msfs_commit, msfs_cpu_pct,
                         sys_ram_used, sys_ram_total
                     ])
 
                 # Live Console Display (ANSI in-place rewrite)
+                fps_disp = f"FPS: {disp_fps} ({main_thread_ms}ms)" if disp_fps else "FPS: --"
+                lod_disp = f"TLOD: {tlod}" if tlod is not None else ""
+                alt_disp = f"Alt: {agl_ft:,}ft" if agl_ft is not None else ""
+                power_disp = f"{gpu['gpu_power_w']}W"
+
                 sys.stdout.write(
                     f"\r[{time_formatted}] "
-                    f"VRAM: {vram_used:,.0f} Mo ({gpu['vram_pct']}%) [Peak: {peak_vram:,.0f} Mo] | "
-                    f"GPU: {gpu['gpu_util_pct']}% ({gpu['gpu_temp_c']}°C) | "
-                    f"MSFS RAM: {round(msfs_ram/1024, 1)} Go (Commit: {round(msfs_commit/1024, 1)} Go) | "
-                    f"Échantillons: {sample_index}"
+                    f"{fps_disp} | "
+                    f"VRAM: {vram_used:,.0f} Mo ({gpu['vram_pct']}%) | "
+                    f"GPU: {gpu['gpu_util_pct']}% ({power_disp}, {gpu['gpu_temp_c']}°C) | "
+                    f"RAM: {round(msfs_ram/1024, 1)} Go (Commit: {round(msfs_commit/1024, 1)} Go) | "
+                    f"{lod_disp} {alt_disp} | #{sample_index}"
                 )
                 sys.stdout.flush()
 
@@ -502,16 +733,23 @@ def main():
         avg_vram = round(sum(s['vram_used'] for s in samples) / len(samples), 1)
         avg_ram = round(sum(s['msfs_ram'] for s in samples) / len(samples), 1)
 
-        print("\n" + "=" * 76)
-        print("               RÉSUMÉ DU VOL & BENCHMARK DE PERFORMANCE")
-        print("=" * 76)
+        valid_fps = [s['disp_fps'] for s in samples if s.get('disp_fps') is not None]
+        avg_fps_str = f"{round(sum(valid_fps)/len(valid_fps), 1)} FPS" if valid_fps else "N/A"
+
+        valid_mt = [s['main_thread_ms'] for s in samples if s.get('main_thread_ms') is not None]
+        avg_mt_str = f"{round(sum(valid_mt)/len(valid_mt), 1)} ms" if valid_mt else "N/A"
+
+        print("\n" + "=" * 80)
+        print("               RÉSUMÉ DU VOL & BENCHMARK DE PERFORMANCE PRO")
+        print("=" * 80)
         print(f" Mode Testé       : {mode_str}")
         print(f" Durée Enregistrée: {total_duration} ({len(samples)} échantillons)")
-        print("-" * 76)
+        print("-" * 80)
+        print(f" FPS Moyen        : {avg_fps_str}  (MainThread moyen : {avg_mt_str})")
         print(f" VRAM GPU Crête   : {peak_vram:,.0f} Mo  (Moyenne : {avg_vram:,.0f} Mo)")
         print(f" RAM MSFS Crête   : {peak_msfs_ram:,.0f} Mo  (Moyenne : {avg_ram:,.0f} Mo)")
         print(f" RAM Allouée Max  : {peak_msfs_commit:,.0f} Mo")
-        print("=" * 76)
+        print("=" * 80)
 
         session_info = {
             'mode_str': mode_str,
@@ -521,7 +759,7 @@ def main():
         }
         html_file = generate_html_report(csv_path, session_info, samples)
         if html_file and os.path.exists(html_file):
-            print(f"\n📊 Rapport graphique généré : {html_file}")
+            print(f"\n📊 Rapport graphique complet généré : {html_file}")
             print("Ouverture du rapport dans votre navigateur...")
             webbrowser.open(f"file:///{os.path.abspath(html_file)}")
         print(f"📄 Journal CSV complet : {csv_path}\n")
