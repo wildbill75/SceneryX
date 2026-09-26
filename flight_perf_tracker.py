@@ -121,11 +121,17 @@ def get_sceneryx_flight_mode():
                     arr = fm.get('arr_icao', 'ARR')
                     dis = fm.get('disabled_count', 0)
                     alts = fm.get('alternates', [])
+                    profile = fm.get('profile', 'CORRIDOR').upper()
                     alt_str = f" [Alts: {','.join(alts)}]" if alts else ""
-                    return f"SCENERYX CORRIDOR ({dep} ➔ {arr}{alt_str} | {dis} scènes isolées)", True, dep, arr, dis
+                    if profile == 'DIRECT':
+                        return f"SCENERYX DIRECT A➔B ({dep} ➔ {arr} | {dis} scènes isolées)", True, dep, arr, dis, 'direct'
+                    elif profile == 'SIMBRIEF':
+                        return f"SCENERYX SIMBRIEF ({dep} ➔ {arr}{alt_str} | {dis} scènes isolées)", True, dep, arr, dis, 'simbrief'
+                    else:
+                        return f"SCENERYX COULOIR ({dep} ➔ {arr}{alt_str} | {dis} scènes isolées)", True, dep, arr, dis, 'corridor'
         except Exception:
             pass
-    return "BASELINE STANDARD (Toutes scènes actives)", False, "", "", 0
+    return "BASELINE STANDARD (Toutes scènes actives)", False, "", "", 0, "baseline_full"
 
 def format_time_delta(seconds):
     m, s = divmod(int(seconds), 60)
@@ -381,9 +387,9 @@ def main():
     os.makedirs(benchmarks_dir, exist_ok=True)
 
     timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    mode_str, is_corridor, dep, arr, dis_count = get_sceneryx_flight_mode()
+    mode_str, is_corridor, dep, arr, dis_count, prof_slug = get_sceneryx_flight_mode()
 
-    prefix = f"corridor_{dep}_{arr}" if is_corridor else "baseline_full"
+    prefix = f"{prof_slug}_{dep}_{arr}" if is_corridor else "baseline_full"
     csv_filename = f"benchmark_{prefix}_{timestamp_str}.csv"
     csv_path = os.path.join(benchmarks_dir, csv_filename)
 
