@@ -2065,10 +2065,6 @@
                     <span id="opt-tab-rec-dot" class="hidden w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
                 </button>
             </div>
-
-            <button onclick="closeFlightOptimizerModal()" class="w-8 h-8 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-xs transition-all cursor-pointer">
-                <i class="fa-solid fa-xmark"></i>
-            </button>
         </div>
 
         <!-- TAB 1: ROUTE & SCENERIES -->
@@ -2340,8 +2336,9 @@
         <!-- FOOTER -->
         <div class="flex items-center justify-between border-t border-slate-800/80 pt-3 shrink-0 text-xs">
             <span class="text-slate-400 font-medium">SceneryX Suite v1.0.1 - Performance & Memory Controller</span>
-            <button onclick="closeFlightOptimizerModal()" class="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold transition-all cursor-pointer">
-                Close
+            <button onclick="exitFlightOptimizerMode()" class="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-950/60 text-slate-300 hover:text-rose-300 border border-slate-700/60 hover:border-rose-500/50 font-bold transition-all cursor-pointer flex items-center gap-1.5">
+                <i class="fa-solid fa-arrow-right-from-bracket text-xs"></i>
+                <span>Exit</span>
             </button>
         </div>
     </div>

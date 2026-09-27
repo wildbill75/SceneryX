@@ -843,10 +843,19 @@ function triggerMapPanicReset() {
         countryClickTimeout = null;
     }
 
-    // 1. Close overlay modals
+    // 1. Close overlay modals & suites
     if (typeof closeSettingsModal === 'function') closeSettingsModal();
     if (typeof closeExportModal === 'function') closeExportModal();
     if (typeof closeRescanModal === 'function') closeRescanModal();
+    if (typeof exitFlightOptimizerMode === 'function') {
+        exitFlightOptimizerMode();
+    } else {
+        const optModal = document.getElementById('flight-optimizer-modal');
+        if (optModal) {
+            optModal.classList.add('hidden');
+            optModal.classList.remove('flex');
+        }
+    }
 
     // 2. Exit Flight Planning mode if active
     if (typeof isFlightPlanningMode !== 'undefined' && isFlightPlanningMode && typeof exitFlightPlanningMode === 'function') {
@@ -9747,6 +9756,11 @@ window.addEventListener('keydown', function (e) {
             closeRescanModal();
             return;
         }
+        const optModal = document.getElementById('flight-optimizer-modal');
+        if (optModal && !optModal.classList.contains('hidden')) {
+            exitFlightOptimizerMode();
+            return;
+        }
 
         if (isFilterRadialOpen) {
             closeFilterRadialMenu();
@@ -15714,18 +15728,60 @@ function openFlightOptimizerModal(initialTab = 'route') {
     startBlackboxTelemetryPolling();
 }
 
-function closeFlightOptimizerModal() {
+function exitFlightOptimizerMode() {
     const modal = document.getElementById('flight-optimizer-modal');
     if (modal) {
         modal.classList.add('hidden');
         modal.classList.remove('flex');
     }
     closeAllComboboxes();
+
     if (blackboxTelemetryInterval && !isBlackboxRunning) {
         clearInterval(blackboxTelemetryInterval);
         blackboxTelemetryInterval = null;
     }
+
+    // Reset optimizer route & flight planning state
+    optimizerOrigin = null;
+    optimizerDest = null;
+    flightPlanningDeparture = null;
+    flightPlanningDestination = null;
+    flightOriginAirport = null;
+    flightDestAirport = null;
+    flightCorridorArrivalAirport = null;
+    isFlightPlanningMode = false;
+
+    // Clear flight route vector lines and corridor graphics on Leaflet map
+    if (flightCorridorLayerGroup && map) {
+        flightCorridorLayerGroup.clearLayers();
+    }
+    if (typeof activeRouteLinesGroup !== 'undefined' && activeRouteLinesGroup) {
+        activeRouteLinesGroup.clearLayers();
+    }
+    if (typeof clearFlightCorridor === 'function') {
+        clearFlightCorridor();
+    }
+
+    // Hide old flight planning banner if displayed
+    const banner = document.getElementById('flight-planning-banner');
+    if (banner) {
+        banner.classList.add('hidden');
+        banner.classList.remove('flex');
+    }
+
+    updateOptimizerRouteUI();
+
+    // Re-filter airports so normal map state is restored
+    if (typeof filterAirports === 'function') {
+        filterAirports();
+    }
+
+    if (typeof showToast === 'function') {
+        showToast("Exited Flight Optimizer mode.", "info");
+    }
 }
+
+const closeFlightOptimizerModal = exitFlightOptimizerMode;
 
 function switchOptimizerTab(tabName) {
     currentOptimizerTab = tabName;
