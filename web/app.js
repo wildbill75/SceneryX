@@ -595,41 +595,10 @@ function clearFlightSelection() {
 
 function updateFlightOptimizerUI() {
     const bar = document.getElementById('flight-optimizer-bar');
-    const originTag = document.getElementById('flight-origin-tag');
-    const destTag = document.getElementById('flight-dest-tag');
-    const badge = document.getElementById('flight-planner-badge');
-    const optBtn = document.getElementById('btn-run-flight-opt');
-
-    if (!bar) return;
-
-    if (flightOriginAirport || flightDestAirport) {
-        bar.classList.remove('hidden');
-        bar.classList.add('flex');
-
-        if (originTag) originTag.innerText = `DEP: ${flightOriginAirport ? flightOriginAirport.icao : '----'}`;
-        if (destTag) destTag.innerText = `ARR: ${flightDestAirport ? flightDestAirport.icao : '----'}`;
-
-        let count = 0;
-        if (flightOriginAirport) count++;
-        if (flightDestAirport) count++;
-        if (badge) {
-            badge.classList.remove('hidden');
-            badge.innerText = count;
-        }
-
-        if (optBtn) {
-            if (isFlightOptimizerActive) {
-                optBtn.className = "px-3.5 py-1.5 rounded-xl bg-emerald-500 text-slate-950 font-black text-xs transition-all shadow-md shadow-emerald-500/30 flex items-center gap-1.5 cursor-pointer ring-2 ring-emerald-400 animate-pulse";
-                optBtn.innerHTML = `<i class="fa-solid fa-check"></i> <span>Flight Active (+FPS)</span>`;
-            } else {
-                optBtn.className = "px-3.5 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition-all border-0 shadow-sm flex items-center gap-1.5 cursor-pointer";
-                optBtn.innerHTML = `<i class="fa-solid fa-bolt"></i> <span>Disable Rest (+FPS)</span>`;
-            }
-        }
-    } else {
+    if (bar) {
         bar.classList.add('hidden');
         bar.classList.remove('flex');
-        if (badge) badge.classList.add('hidden');
+        bar.style.display = 'none';
     }
 }
 
@@ -9309,6 +9278,9 @@ async function executeFlightCorridorOptimization() {
                 }
 
                 updateFlightPlanningBannerUI();
+                const restoreBtn = document.getElementById('opt-btn-restore-sceneries');
+                if (restoreBtn) restoreBtn.classList.remove('hidden');
+                updateOptimizerRouteUI();
                 filterAirports();
 
                 const guideHtml = 
@@ -9366,6 +9338,9 @@ async function restoreFlightCorridorSceneries() {
                 updatePersistentFlightBannerUI({ active: false });
                 updateFlightPlanningBannerUI();
                 closePlanningBannerClean();
+                const restoreBtn = document.getElementById('opt-btn-restore-sceneries');
+                if (restoreBtn) restoreBtn.classList.add('hidden');
+                updateOptimizerRouteUI();
                 filterAirports();
 
                 showCustomModal({
@@ -9403,174 +9378,10 @@ function getAirportPillClass(ap) {
 
 function updateFlightPlanningBannerUI() {
     const banner = document.getElementById('flight-planning-banner');
-    const titleZone = document.getElementById('fp-title-zone');
-    const statusDot = document.getElementById('fp-status-dot');
-    const originTag = document.getElementById('fp-origin-tag');
-    const destTag = document.getElementById('fp-dest-tag');
-    const guideText = document.getElementById('fp-guide-text');
-    const actionsContainer = document.getElementById('fp-actions');
-    const profileToggle = document.getElementById('fp-profile-toggle');
-    const simbriefBtn = document.getElementById('fp-btn-simbrief');
-    const corridorBtn = document.getElementById('fp-btn-corridor');
-    const directBtn = document.getElementById('fp-btn-direct');
-    const corridorLabel = document.getElementById('fp-corridor-label');
-    const optimizeBtn = document.getElementById('fp-btn-optimize');
-    const restoreBtn = document.getElementById('fp-btn-restore');
-    const optimizedBadge = document.getElementById('fp-optimized-badge');
-    const optimizedText = document.getElementById('fp-optimized-text');
-
-    if (!banner) return;
-
-    if (isFlightPlanningMode) {
-        banner.classList.remove('hidden');
-        banner.classList.add('flex');
-
-        // Status indicator dot & tooltip (only visible and pulsing green when filtering is active)
-        if (statusDot) {
-            if (isFlightCorridorOptimized) {
-                statusDot.classList.remove('hidden');
-                statusDot.classList.add('flex');
-            } else {
-                statusDot.classList.add('hidden');
-                statusDot.classList.remove('flex');
-            }
-        }
-
-        if (titleZone) {
-            if (isFlightCorridorOptimized) {
-                const modeLabel = flightCorridorProfile === 'SIMBRIEF' ? 'SimBrief' : (flightCorridorProfile === 'DIRECT' ? t('optimizer.direct', 'Direct') : t('optimizer.en_route', 'En-route'));
-                titleZone.title = `${t('optimizer.active_tooltip_prefix', 'Optimization active :')} ${modeLabel}`;
-            } else {
-                titleZone.removeAttribute('title');
-            }
-        }
-
-        // Airport Pills (Harmonized flat background according to addon type, no DEP/ARR prefix)
-        if (originTag) {
-            if (flightPlanningDeparture) {
-                originTag.innerText = flightPlanningDeparture.icao;
-                originTag.className = getAirportPillClass(flightPlanningDeparture);
-            } else {
-                originTag.innerText = '----';
-                originTag.className = getAirportPillClass(null);
-            }
-        }
-        if (destTag) {
-            if (flightPlanningDestination) {
-                destTag.innerText = flightPlanningDestination.icao;
-                destTag.className = getAirportPillClass(flightPlanningDestination);
-            } else {
-                destTag.innerText = '----';
-                destTag.className = getAirportPillClass(null);
-            }
-        }
-
-        // Style 3-position profile buttons & lock if optimized
-        const profileButtons = [
-            { id: 'SIMBRIEF', btn: simbriefBtn },
-            { id: 'CORRIDOR', btn: corridorBtn },
-            { id: 'DIRECT', btn: directBtn }
-        ];
-
-        profileButtons.forEach(item => {
-            if (!item.btn) return;
-            const isActive = (flightCorridorProfile === item.id);
-            if (isFlightCorridorOptimized) {
-                item.btn.disabled = true;
-                if (isActive) {
-                    item.btn.className = "px-3 py-1 rounded-lg text-xs font-bold bg-cyan-900/50 text-cyan-300/70 border border-cyan-500/30 cursor-not-allowed pointer-events-none";
-                } else {
-                    item.btn.className = "px-3 py-1 rounded-lg text-xs font-medium text-slate-600 cursor-not-allowed pointer-events-none";
-                }
-            } else {
-                item.btn.disabled = false;
-                if (isActive) {
-                    item.btn.className = "px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer bg-cyan-600 text-white shadow-sm shadow-cyan-600/30";
-                } else {
-                    item.btn.className = "px-3 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 transition-all cursor-pointer";
-                }
-            }
-        });
-
-        if (profileToggle) {
-            if (isFlightCorridorOptimized) {
-                profileToggle.className = "flex items-center bg-slate-950/40 p-0.5 rounded-xl border border-slate-800/40 opacity-50 cursor-not-allowed pointer-events-none transition-all";
-                profileToggle.title = "Profile mode is locked during flight. Click 'Restore' to reset your library.";
-            } else {
-                profileToggle.className = "flex items-center bg-slate-950/80 p-0.5 rounded-xl border border-slate-800 transition-all";
-                profileToggle.removeAttribute('title');
-            }
-        }
-
-        if (flightPlanningDestination) {
-            // Both Departure and Destination chosen: Show dual profile actions
-            if (guideText) {
-                guideText.classList.add('hidden');
-            }
-            if (actionsContainer) {
-                actionsContainer.classList.remove('hidden');
-                actionsContainer.classList.add('flex');
-            }
-
-            if (corridorLabel) {
-                corridorLabel.innerText = t('optimizer.en_route', 'En-Route');
-            }
-
-            // Optimization active status
-            if (isFlightCorridorOptimized) {
-                if (optimizeBtn) optimizeBtn.classList.add('hidden');
-                if (restoreBtn) restoreBtn.classList.remove('hidden');
-                if (optimizedBadge) {
-                    optimizedBadge.classList.remove('hidden');
-                    optimizedBadge.classList.add('flex');
-                }
-                if (optimizedText) {
-                    optimizedText.innerText = `${flightCorridorDisabledCount} ${t('optimizer.addons_disabled', 'addons disabled')}`;
-                    optimizedText.classList.remove('hidden');
-                }
-            } else {
-                if (optimizeBtn) optimizeBtn.classList.remove('hidden');
-                if (restoreBtn) restoreBtn.classList.add('hidden');
-                if (optimizedBadge) {
-                    optimizedBadge.classList.add('hidden');
-                    optimizedBadge.classList.remove('flex');
-                }
-                if (optimizedText) {
-                    optimizedText.classList.add('hidden');
-                }
-            }
-        } else {
-            // Waiting for arrival selection
-            if (guideText) {
-                guideText.classList.remove('hidden');
-                guideText.innerText = t('optimizer.guide_destination', 'Click an airport to set Destination');
-            }
-            if (actionsContainer) {
-                actionsContainer.classList.add('hidden');
-                actionsContainer.classList.remove('flex');
-            }
-            if (optimizedBadge) {
-                optimizedBadge.classList.add('hidden');
-                optimizedBadge.classList.remove('flex');
-            }
-            if (optimizedText) {
-                optimizedText.classList.add('hidden');
-            }
-        }
-    } else {
+    if (banner) {
         banner.classList.add('hidden');
         banner.classList.remove('flex');
-        if (actionsContainer) {
-            actionsContainer.classList.add('hidden');
-            actionsContainer.classList.remove('flex');
-        }
-        if (statusDot) {
-            statusDot.classList.add('hidden');
-            statusDot.classList.remove('flex');
-        }
-        if (titleZone) {
-            titleZone.removeAttribute('title');
-        }
+        banner.style.display = 'none';
     }
 }
 
@@ -9635,30 +9446,34 @@ function restoreFlightPlanningStateOnStartup() {
             };
         }
 
-        // Restore alternates if present
+        const profile = (savedFm && savedFm.profile) || (localFp && localFp.profile) || 'DIRECT';
+
+        // Restore alternates ONLY if profile is SIMBRIEF
         currentSimBriefAlternates = [];
-        const rawAlternates = (savedFm && savedFm.alternates) || (localFp && localFp.alternates);
-        if (Array.isArray(rawAlternates) && rawAlternates.length > 0) {
-            rawAlternates.forEach(alt => {
-                const altIcao = typeof alt === 'string' ? alt : (alt.icao || '');
-                if (altIcao) {
-                    let altAp = getAirportByIcao(altIcao);
-                    if (!altAp) {
-                        const coords = (window.worldAirportCoords && window.worldAirportCoords[altIcao]) || [alt.lat || 0, alt.lon || 0];
-                        altAp = {
-                            icao: altIcao,
-                            name: alt.name || altIcao,
-                            city: alt.city || altIcao,
-                            pricing_type: 'Default',
-                            type: 'Airport',
-                            is_default: true,
-                            lat: coords[0] || 0,
-                            lon: coords[1] || 0
-                        };
+        if (profile === 'SIMBRIEF') {
+            const rawAlternates = (savedFm && savedFm.alternates) || (localFp && localFp.alternates);
+            if (Array.isArray(rawAlternates) && rawAlternates.length > 0) {
+                rawAlternates.forEach(alt => {
+                    const altIcao = typeof alt === 'string' ? alt : (alt.icao || '');
+                    if (altIcao) {
+                        let altAp = getAirportByIcao(altIcao);
+                        if (!altAp) {
+                            const coords = (window.worldAirportCoords && window.worldAirportCoords[altIcao]) || [alt.lat || 0, alt.lon || 0];
+                            altAp = {
+                                icao: altIcao,
+                                name: alt.name || altIcao,
+                                city: alt.city || altIcao,
+                                pricing_type: 'Default',
+                                type: 'Airport',
+                                is_default: true,
+                                lat: coords[0] || 0,
+                                lon: coords[1] || 0
+                            };
+                        }
+                        currentSimBriefAlternates.push(altAp);
                     }
-                    currentSimBriefAlternates.push(altAp);
-                }
-            });
+                });
+            }
         }
 
         if (savedFm && savedFm.simbrief_flight) {
@@ -9667,9 +9482,7 @@ function restoreFlightPlanningStateOnStartup() {
             currentSimBriefFlight = localFp.simbrief_flight;
         }
 
-        const profile = (savedFm && savedFm.profile) || (localFp && localFp.profile) || 'CORRIDOR';
-
-        // Set state
+        // Set unified state
         isFlightPlanningMode = true;
         flightPlanningDeparture = depAp;
         flightPlanningDestination = arrAp;
@@ -9679,15 +9492,43 @@ function restoreFlightPlanningStateOnStartup() {
         isFlightCorridorOptimized = true;
         flightCorridorDisabledCount = (savedFm && savedFm.disabled_count) || (localFp && localFp.disabled_count) || 0;
 
-        // Render Banner and Corridor
-        updateFlightPlanningBannerUI();
-        positionFlightPlanningBanner(depAp);
-        initDraggableFlightPlanningBanner();
+        optimizerOrigin = depAp;
+        optimizerDest = arrAp;
+        optimizerMode = profile;
+        flightOriginAirport = depAp;
+        flightDestinationAirport = arrAp;
+
+        // Ensure old banners are permanently hidden
+        const oldBanner = document.getElementById('flight-planning-banner');
+        if (oldBanner) {
+            oldBanner.classList.add('hidden');
+            oldBanner.classList.remove('flex');
+            oldBanner.style.display = 'none';
+        }
+        const oldBar = document.getElementById('flight-optimizer-bar');
+        if (oldBar) {
+            oldBar.classList.add('hidden');
+            oldBar.classList.remove('flex');
+            oldBar.style.display = 'none';
+        }
+
+        // Open Flight Optimizer modal & update route UI
+        openFlightOptimizerModal('route', depAp);
+        updateOptimizerRouteUI();
+
         if (map) {
             map.invalidateSize();
         }
         renderFlightCorridor();
         filterAirports();
+
+        setTimeout(() => {
+            if (typeof panMapToAirport === 'function') {
+                panMapToAirport(depAp);
+            }
+            positionFlightOptimizerModal(depAp);
+            startOptimizerPanTracking(1200);
+        }, 350);
 
         console.log(`[FlightPlan] Restored flight plan mode on startup for ${depIcao} ➔ ${arrIcao} (${profile}, ${flightCorridorDisabledCount} addons disabled)`);
     } catch (e) {
@@ -14919,7 +14760,8 @@ async function validateSimBriefFieldQuietly(val) {
 let isSyncingSimBrief = false;
 async function syncSimBriefFlightPlan() {
     if (isSyncingSimBrief) return;
-    const sbUser = currentSettings.simbrief_username || currentSettings.simbrief_userid || '';
+    const sbUser = currentSettings.simbrief_username || currentSettings.simbrief_userid || 
+                   (currentSettings.settings && (currentSettings.settings.simbrief_username || currentSettings.settings.simbrief_userid)) || '';
     if (!sbUser) {
         openSettingsModal();
         setTimeout(() => {
@@ -14935,6 +14777,12 @@ async function syncSimBriefFlightPlan() {
 
     isSyncingSimBrief = true;
     const fpBtn = document.getElementById('fp-btn-simbrief');
+    const optIcon = document.querySelector('#opt-mode-card-simbrief i');
+    let originalOptIconClass = '';
+    if (optIcon) {
+        originalOptIconClass = optIcon.className;
+        optIcon.className = 'fa-solid fa-spinner fa-spin text-cyan-400 text-xs';
+    }
     let originalHtml = '';
     if (fpBtn) {
         originalHtml = fpBtn.innerHTML;
@@ -14974,28 +14822,36 @@ async function syncSimBriefFlightPlan() {
         const arrIcao = (flight.destination.icao || '').toUpperCase().trim();
 
         // 1. Resolve origin and destination airports
-        let depAp = allAirportsData.find(a => a.icao === depIcao);
-        let arrAp = allAirportsData.find(a => a.icao === arrIcao);
+        let depAp = getAirportByIcao(depIcao) || (allAirportsData && allAirportsData.find(a => a.icao === depIcao));
+        let arrAp = getAirportByIcao(arrIcao) || (allAirportsData && allAirportsData.find(a => a.icao === arrIcao));
 
         if (!depAp) {
+            const coords = (window.worldAirportCoords && window.worldAirportCoords[depIcao]) || [parseFloat(flight.origin.lat) || 0, parseFloat(flight.origin.lon) || 0];
             depAp = {
                 icao: depIcao,
                 name: flight.origin.name || depIcao,
                 city: flight.origin.name || depIcao,
                 pricing_type: 'Default',
                 type: 'Airport',
-                is_default: true
+                is_default: true,
+                lat: coords[0] || (flight.origin.lat ? parseFloat(flight.origin.lat) : 0),
+                lon: coords[1] || (flight.origin.lon ? parseFloat(flight.origin.lon) : 0)
             };
+            if (allAirportsData) allAirportsData.push(depAp);
         }
         if (!arrAp) {
+            const coords = (window.worldAirportCoords && window.worldAirportCoords[arrIcao]) || [parseFloat(flight.destination.lat) || 0, parseFloat(flight.destination.lon) || 0];
             arrAp = {
                 icao: arrIcao,
                 name: flight.destination.name || arrIcao,
                 city: flight.destination.name || arrIcao,
                 pricing_type: 'Default',
                 type: 'Airport',
-                is_default: true
+                is_default: true,
+                lat: coords[0] || (flight.destination.lat ? parseFloat(flight.destination.lat) : 0),
+                lon: coords[1] || (flight.destination.lon ? parseFloat(flight.destination.lon) : 0)
             };
+            if (allAirportsData) allAirportsData.push(arrAp);
         }
 
         // 2. Resolve alternates
@@ -15003,7 +14859,7 @@ async function syncSimBriefFlightPlan() {
         if (flight.alternates && Array.isArray(flight.alternates)) {
             flight.alternates.forEach(alt => {
                 const altIcao = (alt.icao || '').toUpperCase().trim();
-                let altAp = allAirportsData.find(a => a.icao === altIcao);
+                let altAp = getAirportByIcao(altIcao) || (allAirportsData && allAirportsData.find(a => a.icao === altIcao));
                 if (!altAp) {
                     altAp = {
                         icao: altIcao,
@@ -15012,10 +14868,10 @@ async function syncSimBriefFlightPlan() {
                         pricing_type: 'Default',
                         type: 'Airport',
                         is_default: true,
-                        lat: alt.lat,
-                        lon: alt.lon
+                        lat: parseFloat(alt.lat) || 0,
+                        lon: parseFloat(alt.lon) || 0
                     };
-                    allAirportsData.push(altAp);
+                    if (allAirportsData) allAirportsData.push(altAp);
                 }
                 currentSimBriefAlternates.push(altAp);
             });
@@ -15028,14 +14884,25 @@ async function syncSimBriefFlightPlan() {
         flightCorridorArrivalAirport = arrAp;
         selectedAirport = depAp;
         flightCorridorProfile = 'SIMBRIEF';
+        optimizerOrigin = depAp;
+        optimizerDest = arrAp;
+        optimizerMode = 'SIMBRIEF';
+        flightOriginAirport = depAp;
+        flightDestinationAirport = arrAp;
 
-        // 4. Update Banner UI
-        updateFlightPlanningBannerUI();
-        positionFlightPlanningBanner(depAp);
-        initDraggableFlightPlanningBanner();
+        // 4. Update Modal UI
+        openFlightOptimizerModal('route', depAp);
+        updateOptimizerRouteUI();
+
+        if (typeof panMapToAirport === 'function') {
+            panMapToAirport(depAp);
+        }
+        positionFlightOptimizerModal(depAp);
+        startOptimizerPanTracking(1200);
 
         // 5. Render corridor, alternates, and fit map bounds
         renderFlightCorridor();
+        filterAirports();
 
         const altCount = currentSimBriefAlternates.length;
         const flightNum = flight.flight_number ? `${flight.flight_number} • ` : '';
@@ -15050,8 +14917,13 @@ async function syncSimBriefFlightPlan() {
         if (fpBtn && originalHtml) {
             fpBtn.innerHTML = originalHtml;
         }
+        if (optIcon && originalOptIconClass) {
+            optIcon.className = originalOptIconClass;
+        }
     }
 }
+
+const importLatestSimBriefPlan = syncSimBriefFlightPlan;
 
 const triggerSimBriefImport = syncSimBriefFlightPlan;
 
@@ -15839,6 +15711,47 @@ function openFlightOptimizerModal(initialTab = 'route', targetAp = null) {
 }
 
 function exitFlightOptimizerMode() {
+    if (isFlightCorridorOptimized) {
+        const depIcao = optimizerOrigin?.icao || flightPlanningDeparture?.icao || '';
+        const arrIcao = optimizerDest?.icao || flightPlanningDestination?.icao || '';
+        const count = flightCorridorDisabledCount || 0;
+        showCustomModal({
+            title: 'Exit Flight Optimizer?',
+            message: `<div class="space-y-2 text-xs text-slate-300">` +
+                     `  <p>Your simulator is currently optimized for flight <strong>${depIcao} ➔ ${arrIcao}</strong> (<strong>${count} sceneries isolated</strong>).</p>` +
+                     `  <p>What would you like to do?</p>` +
+                     `</div>`,
+            type: 'info',
+            confirmText: 'Keep Optimization',
+            cancelText: 'Restore All Sceneries',
+            showCancel: true,
+            onConfirm: () => {
+                const modal = document.getElementById('flight-optimizer-modal');
+                if (modal) {
+                    modal.classList.add('hidden');
+                    modal.classList.remove('flex');
+                }
+                closeAllComboboxes();
+                hasUserDraggedOptimizerModal = false;
+                if (optimizerPanTrackingRaf) {
+                    cancelAnimationFrame(optimizerPanTrackingRaf);
+                    optimizerPanTrackingRaf = null;
+                }
+                showToast('Flight Mode Active — MSFS ready for departure!', 'success');
+            },
+            onCancel: () => {
+                restoreFlightCorridorSceneries().then(() => {
+                    forceExitOptimizerClean();
+                });
+            }
+        });
+        return;
+    }
+
+    forceExitOptimizerClean();
+}
+
+function forceExitOptimizerClean() {
     const modal = document.getElementById('flight-optimizer-modal');
     if (modal) {
         modal.classList.add('hidden');
@@ -15866,6 +15779,7 @@ function exitFlightOptimizerMode() {
     flightDestAirport = null;
     flightCorridorArrivalAirport = null;
     isFlightPlanningMode = false;
+    currentSimBriefAlternates = [];
 
     // Clear flight route vector lines and corridor graphics on Leaflet map
     if (flightCorridorLayerGroup && map) {
@@ -15883,6 +15797,7 @@ function exitFlightOptimizerMode() {
     if (banner) {
         banner.classList.add('hidden');
         banner.classList.remove('flex');
+        banner.style.display = 'none';
     }
 
     updateOptimizerRouteUI();
@@ -15949,12 +15864,25 @@ function updateOptimizerRouteUI() {
         const card = document.getElementById(`opt-mode-card-${m}`);
         if (card) {
             if (m.toUpperCase() === optimizerMode) {
-                card.className = 'p-3 rounded-2xl bg-cyan-950/40 border-2 border-cyan-500/80 cursor-pointer transition-all';
+                card.className = 'p-2.5 rounded-2xl bg-cyan-950/40 border-2 border-cyan-500/80 cursor-pointer transition-all';
+                const titleSpan = card.querySelector('span');
+                if (titleSpan) titleSpan.className = 'text-xs font-black text-white uppercase tracking-wider';
             } else {
-                card.className = 'p-3 rounded-2xl bg-slate-950/40 border border-slate-800 cursor-pointer hover:border-slate-700 transition-all';
+                card.className = 'p-2.5 rounded-2xl bg-slate-950/40 border border-slate-800 cursor-pointer hover:border-slate-700 transition-all';
+                const titleSpan = card.querySelector('span');
+                if (titleSpan) titleSpan.className = 'text-xs font-black text-slate-200 uppercase tracking-wider';
             }
         }
     });
+
+    const restoreBtn = document.getElementById('opt-btn-restore-sceneries');
+    if (restoreBtn) {
+        if (isFlightCorridorOptimized) {
+            restoreBtn.classList.remove('hidden');
+        } else {
+            restoreBtn.classList.add('hidden');
+        }
+    }
 
     updateOptimizerSavings();
 }
@@ -15972,6 +15900,15 @@ function updateOptimizerSavings() {
         return;
     }
 
+    if (isFlightCorridorOptimized && flightCorridorDisabledCount > 0) {
+        savingCountEl.textContent = `${flightCorridorDisabledCount} sceneries`;
+        const ramSavedGb = (flightCorridorDisabledCount * 0.0053).toFixed(2);
+        const vramSavedMb = Math.round(flightCorridorDisabledCount * 1.25);
+        if (savingRamEl) savingRamEl.textContent = `- ${ramSavedGb} GB`;
+        if (savingVramEl) savingVramEl.textContent = `- ${vramSavedMb} MB`;
+        return;
+    }
+
     const allThirdParty = (typeof allAirportsData !== 'undefined' && Array.isArray(allAirportsData))
         ? allAirportsData.filter(ap => {
             if (!ap) return false;
@@ -15985,6 +15922,10 @@ function updateOptimizerSavings() {
     if (optimizerMode === 'CORRIDOR' && typeof getCorridorAddonsList === 'function') {
         const corridorAddons = getCorridorAddonsList();
         keptCount = 2 + corridorAddons.length;
+    } else if (optimizerMode === 'SIMBRIEF') {
+        const altCount = (typeof currentSimBriefAlternates !== 'undefined' && Array.isArray(currentSimBriefAlternates)) ? currentSimBriefAlternates.length : 0;
+        const corridorAddons = (typeof getCorridorAddonsList === 'function') ? getCorridorAddonsList() : [];
+        keptCount = 2 + altCount + corridorAddons.length;
     }
 
     const disabledCount = Math.max(0, allThirdParty.length - keptCount);
@@ -16003,19 +15944,65 @@ function swapOptimizerRouteAirports() {
     flightPlanningDeparture = optimizerOrigin;
     flightPlanningDestination = optimizerDest;
     flightCorridorArrivalAirport = optimizerDest;
+    flightOriginAirport = optimizerOrigin;
+    flightDestinationAirport = optimizerDest;
     if (optimizerOrigin && optimizerDest && typeof renderFlightCorridor === 'function') {
         renderFlightCorridor();
     }
     updateOptimizerRouteUI();
+    if (optimizerOrigin) {
+        if (typeof panMapToAirport === 'function') {
+            panMapToAirport(optimizerOrigin);
+        }
+        positionFlightOptimizerModal(optimizerOrigin);
+        startOptimizerPanTracking(1200);
+    }
 }
 
-function setOptimizerMode(mode) {
+async function setOptimizerMode(mode) {
     optimizerMode = mode;
-    updateOptimizerRouteUI();
-    if (mode === 'SIMBRIEF') {
-        if (typeof importLatestSimBriefPlan === 'function') {
-            importLatestSimBriefPlan();
+    flightCorridorProfile = mode;
+    isFlightPlanningMode = true;
+
+    if (optimizerOrigin) {
+        flightPlanningDeparture = optimizerOrigin;
+        selectedAirport = optimizerOrigin;
+        flightOriginAirport = optimizerOrigin;
+    }
+    if (optimizerDest) {
+        flightPlanningDestination = optimizerDest;
+        flightCorridorArrivalAirport = optimizerDest;
+        flightDestinationAirport = optimizerDest;
+    }
+
+    if (mode === 'DIRECT') {
+        currentSimBriefAlternates = [];
+        if (currentFlightMode && currentFlightMode.active && optimizerOrigin && optimizerDest) {
+            currentFlightMode.icaos = [optimizerOrigin.icao, optimizerDest.icao];
         }
+        if (optimizerOrigin && optimizerDest) {
+            renderFlightCorridor();
+        } else {
+            filterAirports();
+        }
+        updateOptimizerRouteUI();
+        if (typeof showToast === 'function') {
+            showToast("Flight Mode: Direct A ➔ B (Departure & Destination only)", "info");
+        }
+    } else if (mode === 'CORRIDOR') {
+        currentSimBriefAlternates = [];
+        if (optimizerOrigin && optimizerDest) {
+            renderFlightCorridor();
+        } else {
+            filterAirports();
+        }
+        updateOptimizerRouteUI();
+        if (typeof showToast === 'function') {
+            showToast("Flight Mode: En-Route Corridor (Flight path & intermediate addons)", "info");
+        }
+    } else if (mode === 'SIMBRIEF') {
+        updateOptimizerRouteUI();
+        await syncSimBriefFlightPlan();
     }
 }
 
@@ -16028,23 +16015,15 @@ function applyOptimizerRouteSceneries() {
     flightDestinationAirport = optimizerDest;
     flightPlanningDeparture = optimizerOrigin;
     flightPlanningDestination = optimizerDest;
+    flightCorridorProfile = optimizerMode || 'DIRECT';
     isDirectRouteMode = (optimizerMode === 'DIRECT');
+    if (optimizerMode === 'DIRECT') {
+        currentSimBriefAlternates = [];
+    }
     
     if (typeof executeFlightCorridorOptimization === 'function') {
         executeFlightCorridorOptimization();
     }
-    if (typeof showToast === 'function') showToast("Sceneries isolated successfully for this flight! Memory headroom restored.", "success");
-    const restoreBtn = document.getElementById('opt-btn-restore-sceneries');
-    if (restoreBtn) restoreBtn.classList.remove('hidden');
-}
-
-function restoreFlightCorridorSceneries() {
-    if (typeof executeRestoreAllSceneries === 'function') {
-        executeRestoreAllSceneries();
-    }
-    if (typeof showToast === 'function') showToast("All sceneries restored successfully.", "info");
-    const restoreBtn = document.getElementById('opt-btn-restore-sceneries');
-    if (restoreBtn) restoreBtn.classList.add('hidden');
 }
 
 // -------------------------------------------------------------------------
