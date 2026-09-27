@@ -92,16 +92,17 @@ The graphics configuration interface features a 3-page lateral carousel with a c
 
 ---
 
-## 5. Lateral Carousel & Manual Numeric Input Design
-1. **Airy Dual-Row Header**:
+## 5. Lateral Carousel & Unified Combobox Input Design
+1. **Airy Header & Clean Minimalist Tab Bar**:
    - **Row 1**: Displays section title, 2D/VR display switcher, Airliner/GA mission profile switcher, VR refresh rate selector (72, 80, 90, 120 Hz), AutoFPS live indicator, Rollback button, and Profile Optimization button.
-   - **Row 2**: Displays carousel page navigation tabs (`1. CORE & DISPLAY`, `2. TERRAIN & WORLD`, `3. LIGHTING & AVIONICS`), left/right navigation arrows (`<` and `>`), and live page counter (`PAGE X / 3`).
+   - **Row 2**: Displays a streamlined, uncluttered segmented tab bar with exactly three clean group labels: `CORE & DISPLAY`, `TERRAIN & WORLD`, and `LIGHTING & AVIONICS`. All superfluous clutter (arrows, icons, numbers, helper text, and page counters) has been eliminated for optimal minimalism and ergonomics.
 2. **Carousel Viewport**:
    - Houses three full-width $3 \times 3$ grid panels sliding along the X-axis via CSS transform transitions (`translateX(-0%)`, `translateX(-100%)`, `translateX(-200%)`).
-3. **Manual Numeric Input System**:
-   - For `tlod`, `olod`, and `max_frame_rate`, users can either:
-     - Directly type any custom numeric value (e.g. 85, 115, 235, up to 400) and commit via Enter or field exit (blur).
-     - Select from an ergonomic preset dropdown that automatically synchronizes with the numeric field.
+3. **Single Unified Editable Combobox Design**:
+   - For numeric parameters (`tlod`, `olod`, and `max_frame_rate`), users interact with **a single unified field** instead of dual side-by-side controls:
+     - The single field displays the current value (e.g. `90`, `120`, or `Unlocked`).
+     - Clicking the field drops down the full list of calibrated presets.
+     - Users can freely type any custom value directly (e.g. `85`, `115`, `230`, up to 400) and commit with `Enter` or by clicking outside.
 
 ---
 

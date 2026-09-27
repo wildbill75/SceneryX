@@ -16264,28 +16264,16 @@ function updateCarouselUI() {
         track.style.transform = `translateX(-${currentGraphicsSettingsPage * 100}%)`;
     }
 
-    // Update Pills
+    // Update Tabs
     for (let i = 0; i < 3; i++) {
         const pill = document.getElementById(`opt-page-pill-${i}`);
         if (pill) {
             if (i === currentGraphicsSettingsPage) {
-                pill.className = 'px-3 py-1 rounded-lg bg-cyan-600 text-white transition-all cursor-pointer flex items-center gap-1.5 shadow-sm font-bold';
+                pill.className = 'px-4 py-1.5 rounded-lg bg-cyan-600 text-white transition-all cursor-pointer font-bold shadow-sm';
             } else {
-                pill.className = 'px-3 py-1 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer flex items-center gap-1.5 font-bold';
+                pill.className = 'px-4 py-1.5 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold';
             }
         }
-    }
-
-    // Update Prev / Next buttons
-    const btnPrev = document.getElementById('opt-btn-carousel-prev');
-    const btnNext = document.getElementById('opt-btn-carousel-next');
-    if (btnPrev) btnPrev.disabled = (currentGraphicsSettingsPage === 0);
-    if (btnNext) btnNext.disabled = (currentGraphicsSettingsPage === 2);
-
-    // Update Indicator text
-    const indicator = document.getElementById('opt-carousel-page-indicator');
-    if (indicator) {
-        indicator.textContent = `PAGE ${currentGraphicsSettingsPage + 1} / 3`;
     }
 }
 
@@ -16477,18 +16465,24 @@ function switchMsfsGraphicsMode(mode) {
 let isManualSettingUpdating = false;
 async function onMsfsManualSettingSubmitted(settingKey, value, minVal, maxVal) {
     if (isManualSettingUpdating) return;
-    const cleanStr = String(value || '').replace('Dynamic', '').replace('(', '').replace(')', '').replace('FPS', '').replace('LOD', '').trim();
-    if (!cleanStr) return;
-    let num = parseFloat(cleanStr);
-    if (isNaN(num)) return;
-    
-    if (typeof minVal === 'number' && num < minVal) num = minVal;
-    if (typeof maxVal === 'number' && num > maxVal) num = maxVal;
-    
-    const formattedVal = String(Math.round(num));
+    const rawStr = String(value || '').trim();
+    if (!rawStr) return;
+
+    let cleanVal;
+    if (rawStr.toLowerCase() === 'unlocked' || rawStr === '0') {
+        cleanVal = '0';
+    } else {
+        const cleanStr = rawStr.replace('Dynamic', '').replace('(', '').replace(')', '').replace('FPS', '').replace('LOD', '').trim();
+        let num = parseFloat(cleanStr);
+        if (isNaN(num)) return;
+        if (typeof minVal === 'number' && num < minVal) num = minVal;
+        if (typeof maxVal === 'number' && num > maxVal) num = maxVal;
+        cleanVal = String(Math.round(num));
+    }
+
     isManualSettingUpdating = true;
     try {
-        await onMsfsSettingChanged(settingKey, formattedVal);
+        await onMsfsSettingChanged(settingKey, cleanVal);
     } finally {
         setTimeout(() => { isManualSettingUpdating = false; }, 300);
     }
@@ -16575,34 +16569,35 @@ function renderMsfsSettingsMatrix() {
 
         let inputHtml = '';
         if (item.is_numeric) {
-            const rawNum = item.raw_value || String(item.value).replace(/[^0-9]/g, '') || '100';
-            let optionsHtml = '<option value="" disabled selected>Presets</option>';
-            if (Array.isArray(item.options)) {
-                optionsHtml += item.options.map(opt => {
-                    const optNum = String(opt).replace(/[^0-9]/g, '');
-                    const isSelected = (opt === item.value || opt === item.raw_value || (optNum && optNum === rawNum));
-                    return `<option value="${opt}" ${isSelected ? 'selected' : ''}>${opt}</option>`;
-                }).join('');
+            let displayVal = item.raw_value;
+            if (item.key === 'max_frame_rate') {
+                displayVal = (item.raw_value === '0' || item.value === '0' || String(item.value).toLowerCase().includes('unlocked')) ? 'Unlocked' : item.raw_value;
+            } else {
+                displayVal = item.raw_value || String(item.value).replace(/[^0-9]/g, '') || '100';
             }
-            const unitLabel = item.key === 'max_frame_rate' ? 'FPS' : 'LOD';
+
+            let datalistOptions = '';
+            if (Array.isArray(item.options)) {
+                datalistOptions = item.options.map(opt => `<option value="${opt}">`).join('');
+            }
+
             inputHtml = `
-                <div class="flex items-center gap-2 pt-0.5">
-                    <div class="relative flex-1">
-                        <input type="number" 
-                               min="${item.min_val ?? 10}" 
-                               max="${item.max_val ?? 400}" 
-                               step="${item.step ?? 5}" 
-                               value="${rawNum}" 
-                               id="opt-input-${item.key}"
-                               onkeydown="if(event.key==='Enter'){event.preventDefault(); onMsfsManualSettingSubmitted('${item.key}', this.value, ${item.min_val ?? 10}, ${item.max_val ?? 400});}"
-                               onblur="onMsfsManualSettingSubmitted('${item.key}', this.value, ${item.min_val ?? 10}, ${item.max_val ?? 400})"
-                               class="w-full bg-slate-950 border border-slate-700/80 focus:border-cyan-400 rounded-lg pl-2.5 pr-8 py-1 text-xs text-white font-mono font-bold focus:outline-none transition-colors" 
-                               title="Type any custom value (${item.min_val ?? 10}-${item.max_val ?? 400}) and press Enter or click outside">
-                        <span class="absolute right-2 top-1 text-[10px] font-mono text-slate-500 font-bold pointer-events-none">${unitLabel}</span>
-                    </div>
-                    <select onchange="onMsfsSettingChanged('${item.key}', this.value)" class="bg-slate-950 border border-slate-700/70 focus:border-cyan-400 rounded-lg px-2 py-1 text-xs text-slate-300 font-mono font-semibold focus:outline-none cursor-pointer max-w-[105px]" title="Quick Presets">
-                        ${optionsHtml}
-                    </select>
+                <div class="relative w-full pt-0.5">
+                    <input list="opt-datalist-${item.key}"
+                           type="text"
+                           id="opt-combo-${item.key}"
+                           value="${displayVal}"
+                           style="color-scheme: dark;"
+                           onclick="this.select(); try{this.showPicker();}catch(e){}"
+                           onfocus="this.select();"
+                           onkeydown="if(event.key==='Enter'){this.blur();}"
+                           onchange="onMsfsManualSettingSubmitted('${item.key}', this.value, ${item.min_val ?? 10}, ${item.max_val ?? 400})"
+                           class="w-full bg-slate-950 border border-slate-700/70 focus:border-cyan-400 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono font-semibold focus:outline-none cursor-pointer"
+                           placeholder="Select or enter value..."
+                           title="Select a preset from dropdown or type any custom value">
+                    <datalist id="opt-datalist-${item.key}">
+                        ${datalistOptions}
+                    </datalist>
                 </div>
             `;
         } else {
@@ -16615,7 +16610,7 @@ function renderMsfsSettingsMatrix() {
             }
             inputHtml = `
                 <div class="flex items-center justify-between gap-2 pt-0.5">
-                    <select onchange="onMsfsSettingChanged('${item.key}', this.value)" class="w-full bg-slate-950 border border-slate-700/70 focus:border-cyan-400 rounded-lg px-2 py-1 text-xs text-white font-mono font-semibold focus:outline-none cursor-pointer">
+                    <select onchange="onMsfsSettingChanged('${item.key}', this.value)" class="w-full bg-slate-950 border border-slate-700/70 focus:border-cyan-400 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono font-semibold focus:outline-none cursor-pointer">
                         ${optionsHtml}
                     </select>
                 </div>
