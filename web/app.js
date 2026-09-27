@@ -16241,7 +16241,7 @@ let msfsSettingsMatrixData = null;
 let userCfgBackupsList = [];
 
 function switchGraphicsSettingsPage(pageIndex) {
-    if (pageIndex < 0 || pageIndex > 2) return;
+    if (pageIndex < 0 || pageIndex > 6) return;
     currentGraphicsSettingsPage = pageIndex;
     updateCarouselUI();
 }
@@ -16253,7 +16253,7 @@ function prevGraphicsSettingsPage() {
 }
 
 function nextGraphicsSettingsPage() {
-    if (currentGraphicsSettingsPage < 2) {
+    if (currentGraphicsSettingsPage < 6) {
         switchGraphicsSettingsPage(currentGraphicsSettingsPage + 1);
     }
 }
@@ -16265,13 +16265,13 @@ function updateCarouselUI() {
     }
 
     // Update Tabs
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 7; i++) {
         const pill = document.getElementById(`opt-page-pill-${i}`);
         if (pill) {
             if (i === currentGraphicsSettingsPage) {
-                pill.className = 'px-4 py-1.5 rounded-lg bg-cyan-600 text-white transition-all cursor-pointer font-bold shadow-sm';
+                pill.className = 'px-3 py-1.5 rounded-lg bg-cyan-600 text-white transition-all cursor-pointer font-bold shadow-sm whitespace-nowrap';
             } else {
-                pill.className = 'px-4 py-1.5 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold';
+                pill.className = 'px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold whitespace-nowrap';
             }
         }
     }
@@ -16343,6 +16343,18 @@ async function loadRigDiagnostics() {
         if (gpuNameEl && det.gpu) {
             gpuNameEl.textContent = det.gpu.name || 'Unknown GPU';
             if (gpuVramEl) gpuVramEl.textContent = `${det.gpu.vram_total_gb || 16} GB VRAM • Driver ${det.gpu.driver_version || 'Latest'}`;
+        }
+
+        const displayHzEl = document.getElementById('opt-detected-display-hz');
+        const displayResEl = document.getElementById('opt-detected-display-res');
+        if (det.display) {
+            if (displayHzEl) {
+                const hz = det.display.refresh_rate_int || 60;
+                displayHzEl.textContent = `${hz} HZ REFRESH RATE`;
+            }
+            if (displayResEl) {
+                displayResEl.textContent = `${det.display.width || 2560} x ${det.display.height || 1440} Native`;
+            }
         }
 
         const ramValEl = document.getElementById('opt-detected-ram-val');
@@ -16488,10 +16500,38 @@ async function onMsfsManualSettingSubmitted(settingKey, value, minVal, maxVal) {
     }
 }
 
+function toggleComboboxDropdown(key, event) {
+    if (event) {
+        event.stopPropagation();
+    }
+    const menu = document.getElementById(`opt-combo-menu-${key}`);
+    if (!menu) return;
+    const isHidden = menu.classList.contains('hidden');
+    closeAllComboboxes();
+    if (isHidden) {
+        menu.classList.remove('hidden');
+    }
+}
+
+function closeAllComboboxes() {
+    document.querySelectorAll('[id^="opt-combo-menu-"]').forEach(m => m.classList.add('hidden'));
+}
+
+function selectComboboxPreset(key, value, minVal, maxVal) {
+    const input = document.getElementById(`opt-combo-input-${key}`);
+    if (input) input.value = value;
+    closeAllComboboxes();
+    onMsfsManualSettingSubmitted(key, value, minVal, maxVal);
+}
+
+// Global click outside listener to close comboboxes
+document.addEventListener('click', (e) => {
+    if (!e.target.closest('[id^="opt-combo-"]')) {
+        closeAllComboboxes();
+    }
+});
+
 function renderMsfsSettingsMatrix() {
-    const gridP1 = document.getElementById('opt-msfs-settings-grid-p1');
-    const gridP2 = document.getElementById('opt-msfs-settings-grid-p2');
-    const gridP3 = document.getElementById('opt-msfs-settings-grid-p3');
     if (!msfsSettingsMatrixData) return;
 
     const list = currentMsfsGraphicsMode === '2D' ? (msfsSettingsMatrixData.matrix_2d || []) : (msfsSettingsMatrixData.matrix_vr || []);
@@ -16540,7 +16580,7 @@ function renderMsfsSettingsMatrix() {
                 conflicts.forEach(c => {
                     interHtml += `
                         <div class="flex items-start gap-1.5 text-rose-400">
-                            <i class="fa-solid fa-triangle-exclamation text-[10px] mt-0.5 shrink-0"></i>
+                            <span class="px-1.5 py-0.2 rounded text-[8px] font-mono font-bold bg-rose-600 text-white shrink-0 mt-0.5">ALERT</span>
                             <span>${c}</span>
                         </div>
                     `;
@@ -16548,7 +16588,7 @@ function renderMsfsSettingsMatrix() {
                 synergies.forEach(s => {
                     interHtml += `
                         <div class="flex items-start gap-1.5 text-emerald-400">
-                            <i class="fa-solid fa-circle-check text-[10px] mt-0.5 shrink-0"></i>
+                            <span class="px-1.5 py-0.2 rounded text-[8px] font-mono font-bold bg-emerald-600 text-white shrink-0 mt-0.5">SYNERGY</span>
                             <span>${s}</span>
                         </div>
                     `;
@@ -16599,29 +16639,43 @@ function renderMsfsSettingsMatrix() {
                 displayVal = item.raw_value || String(item.value).replace(/[^0-9]/g, '') || '100';
             }
 
-            let datalistOptions = '';
+            let presetListItems = '';
             if (Array.isArray(item.options)) {
-                datalistOptions = item.options.map(opt => `<option value="${opt}">`).join('');
+                presetListItems = item.options.map(opt => {
+                    const isCur = String(opt).toLowerCase() === String(displayVal).toLowerCase();
+                    return `
+                        <div class="px-3 py-1.5 hover:bg-cyan-600 hover:text-white ${isCur ? 'bg-cyan-950/80 text-cyan-300 font-bold' : 'text-slate-200'} cursor-pointer transition-colors flex items-center justify-between text-xs font-mono"
+                             onmousedown="selectComboboxPreset('${item.key}', '${opt}', ${item.min_val ?? 10}, ${item.max_val ?? 400})">
+                            <span>${opt}</span>
+                            ${isCur ? '<span class="text-[9px] font-bold bg-cyan-700 text-white px-1.5 py-0.5 rounded">CURRENT</span>' : ''}
+                        </div>
+                    `;
+                }).join('');
             }
 
             inputHtml = `
-                <div class="relative w-full pt-0.5">
-                    <input list="opt-datalist-${item.key}"
-                           type="text"
-                           id="opt-combo-${item.key}"
+                <div class="relative w-full pt-0.5" id="opt-combo-wrapper-${item.key}">
+                    <input type="text"
+                           id="opt-combo-input-${item.key}"
                            value="${displayVal}"
-                           style="color-scheme: dark; -webkit-appearance: none; appearance: none;"
-                           onclick="this.select(); try{this.showPicker();}catch(e){}"
+                           style="color-scheme: dark;"
+                           onclick="toggleComboboxDropdown('${item.key}', event)"
                            onfocus="this.select();"
                            onkeydown="if(event.key==='Enter'){this.blur();}"
                            onchange="onMsfsManualSettingSubmitted('${item.key}', this.value, ${item.min_val ?? 10}, ${item.max_val ?? 400})"
-                           class="w-full appearance-none bg-slate-950 border border-slate-700/70 focus:border-cyan-400 rounded-lg pl-2.5 pr-8 py-1.5 text-xs text-white font-mono font-semibold focus:outline-none cursor-pointer"
+                           class="w-full bg-slate-950 border border-slate-700/70 focus:border-cyan-400 rounded-lg pl-2.5 pr-8 py-1.5 text-xs text-white font-mono font-semibold focus:outline-none cursor-pointer"
                            placeholder="Select or enter value..."
                            title="Select a preset from dropdown or enter custom value">
-                    ${chevronSvg}
-                    <datalist id="opt-datalist-${item.key}">
-                        ${datalistOptions}
-                    </datalist>
+                    <div class="cursor-pointer absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400 hover:text-white"
+                         onclick="toggleComboboxDropdown('${item.key}', event)">
+                        <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                    </div>
+                    <div id="opt-combo-menu-${item.key}"
+                         class="hidden absolute z-50 left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-slate-900 border border-slate-700 rounded-lg shadow-2xl py-1 divide-y divide-slate-800">
+                        ${presetListItems}
+                    </div>
                 </div>
             `;
         } else {
@@ -16676,14 +16730,14 @@ function renderMsfsSettingsMatrix() {
         `;
     };
 
-    // Partition into Page 1 (items 1-9), Page 2 (items 10-18), Page 3 (items 19-27)
-    const p1Items = list.filter(item => item.page === 1 || (!item.page && list.indexOf(item) < 9));
-    const p2Items = list.filter(item => item.page === 2 || (!item.page && list.indexOf(item) >= 9 && list.indexOf(item) < 18));
-    const p3Items = list.filter(item => item.page === 3 || (!item.page && list.indexOf(item) >= 18));
-
-    if (gridP1) gridP1.innerHTML = p1Items.map(renderCard).join('');
-    if (gridP2) gridP2.innerHTML = p2Items.map(renderCard).join('');
-    if (gridP3) gridP3.innerHTML = p3Items.map(renderCard).join('');
+    // Populate the 7 rubriques (2x2 per page)
+    for (let p = 1; p <= 7; p++) {
+        const grid = document.getElementById(`opt-msfs-settings-grid-p${p}`);
+        if (grid) {
+            const pageItems = list.filter(item => item.page === p);
+            grid.innerHTML = pageItems.map(renderCard).join('');
+        }
+    }
 
     updateCarouselUI();
 }
@@ -16746,7 +16800,7 @@ function openOptFeedbackModal(res) {
                 <div class="flex items-center gap-2 text-emerald-400 font-mono"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded">OK</span><span>Glass Cockpit Refresh: ${currentFlightMissionProfile === 'LINER' ? 'MEDIUM (Saves 5-8 ms MainThread frame time)' : 'HIGH (Full Synthetic Vision)'}</span></div>
                 <div class="flex items-center gap-2 text-emerald-400 font-mono"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded">OK</span><span>Terrain LOD (TLOD): ${currentFlightMissionProfile === 'LINER' ? '100 (Protects MainThread from WASM avionics)' : '150 (Smooth for VFR)'}</span></div>
                 <div class="flex items-center gap-2 text-emerald-400 font-mono"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded">OK</span><span>Anti-Aliasing & Pacing: DLSS (Quality) + Frame Generation DLSSG (2X)</span></div>
-                <div class="flex items-center gap-2 text-emerald-400 font-mono"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded">OK</span><span>Environment & Shadows: 27 Settings Calibrated across 3 Pages</span></div>
+                <div class="flex items-center gap-2 text-emerald-400 font-mono"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded">OK</span><span>Environment & Shadows: 27 Settings Calibrated across 7 Rubriques</span></div>
             `;
         } else {
             const targetVrFps = Math.max(30, Math.floor(currentVrRefreshRate / 2));
@@ -16797,8 +16851,8 @@ async function openUserCfgBackupModal() {
                 html += `
                     <div class="p-3 rounded-2xl bg-slate-950 border ${isLatest ? 'border-amber-500/50' : 'border-slate-800'} flex items-center justify-between gap-3">
                         <div class="flex items-center gap-2.5">
-                            <div class="w-7 h-7 rounded-xl ${isLatest ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-800 text-slate-400'} flex items-center justify-center shrink-0">
-                                <i class="fa-solid fa-file-shield text-xs"></i>
+                            <div class="w-8 h-8 rounded-xl ${isLatest ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-800 text-slate-400'} flex items-center justify-center shrink-0">
+                                <span class="font-mono text-[9px] font-black">BAK</span>
                             </div>
                             <div class="flex flex-col">
                                 <div class="flex items-center gap-2">
@@ -16808,7 +16862,7 @@ async function openUserCfgBackupModal() {
                                 <span class="text-[10px] font-mono text-slate-500 truncate max-w-[280px]">${b.filename} (${b.size_kb} KB)</span>
                             </div>
                         </div>
-                        <button onclick="restoreUserCfgBackupTarget('${b.filename}')" class="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all cursor-pointer active:scale-95 shrink-0">
+                        <button onclick="restoreUserCfgBackupTarget('${b.filename}')" class="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all cursor-pointer active:scale-95 shrink-0 uppercase tracking-wider">
                             Restore
                         </button>
                     </div>
@@ -16818,12 +16872,16 @@ async function openUserCfgBackupModal() {
         }
     }
 
+    modal.style.display = 'flex';
     modal.classList.remove('hidden');
 }
 
 function closeUserCfgBackupModal() {
     const modal = document.getElementById('user-cfg-backup-modal');
-    if (modal) modal.classList.add('hidden');
+    if (modal) {
+        modal.style.display = 'none';
+        modal.classList.add('hidden');
+    }
 }
 
 async function restoreUserCfgBackupTarget(filename) {

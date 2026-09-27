@@ -2146,7 +2146,7 @@
                     <span id="opt-rig-summary-desc" class="text-xs text-slate-400 truncate max-w-[520px]">High-end CPU, GPU, and RAM perfectly balanced for complex flight sim operations.</span>
                 </div>
                 <!-- Pure Informative Detected Hardware Cards (No Comboboxes) -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 text-xs font-mono">
+                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 text-xs font-mono">
                     <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-1" title="Detected CPU model, core architecture, and single-thread capabilities.">
                         <span class="text-[10px] text-slate-400 uppercase font-bold block">Processor (CPU)</span>
                         <div id="opt-detected-cpu-name" class="font-bold text-emerald-400 truncate">Detecting...</div>
@@ -2156,6 +2156,11 @@
                         <span class="text-[10px] text-slate-400 uppercase font-bold block">Graphics Card (GPU)</span>
                         <div id="opt-detected-gpu-name" class="font-bold text-emerald-400 truncate">Detecting...</div>
                         <div id="opt-detected-gpu-vram" class="text-[11px] text-slate-400">--</div>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-1" title="Detected primary display monitor resolution and native refresh rate frequency in Hz.">
+                        <span class="text-[10px] text-slate-400 uppercase font-bold block">Primary Display (Monitor)</span>
+                        <div id="opt-detected-display-hz" class="font-bold text-emerald-400 truncate">Detecting...</div>
+                        <div id="opt-detected-display-res" class="text-[11px] text-slate-400">--</div>
                     </div>
                     <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-1" title="Detected System RAM capacity, frequency, and XMP state.">
                         <span class="text-[10px] text-slate-400 uppercase font-bold block">System Memory (RAM)</span>
@@ -2177,7 +2182,7 @@
                 </div>
             </div>
 
-            <!-- SECTION 2: MSFS GRAPHICS SETTINGS (2D / VR SWITCHER & 3x3 SLIDING SETTINGS MATRIX) -->
+            <!-- SECTION 2: MSFS GRAPHICS SETTINGS (2D / VR SWITCHER & 2x2 SLIDING SETTINGS MATRIX) -->
             <div class="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3.5">
                 <!-- ROW 1: HEADER & PRIMARY CONTROLS (AIRY & CLEAN) -->
                 <div class="flex items-center justify-between flex-wrap gap-3 pb-2 border-b border-slate-900">
@@ -2226,39 +2231,79 @@
                     </div>
                 </div>
 
-                <!-- ROW 2: CLEAN MINIMALIST TABS -->
-                <div class="flex items-center bg-slate-900 p-1 rounded-xl border border-slate-800 text-xs font-mono font-bold w-fit">
-                    <button id="opt-page-pill-0" onclick="switchGraphicsSettingsPage(0)" class="px-4 py-1.5 rounded-lg bg-cyan-600 text-white transition-all cursor-pointer font-bold shadow-sm">
-                        CORE & DISPLAY
+                <!-- ROW 2: CLEAN MINIMALIST TABS (7 RUBRIQUES IN 2x2 SECTIONS) -->
+                <div class="flex items-center flex-wrap gap-1.5 bg-slate-900/90 p-1 rounded-xl border border-slate-800 text-[11px] font-mono font-bold w-full overflow-x-auto">
+                    <button id="opt-page-pill-0" onclick="switchGraphicsSettingsPage(0)" class="px-3 py-1.5 rounded-lg bg-cyan-600 text-white transition-all cursor-pointer font-bold shadow-sm whitespace-nowrap">
+                        DISPLAY & SYNC
                     </button>
-                    <button id="opt-page-pill-1" onclick="switchGraphicsSettingsPage(1)" class="px-4 py-1.5 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold">
-                        TERRAIN & WORLD
+                    <button id="opt-page-pill-1" onclick="switchGraphicsSettingsPage(1)" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold whitespace-nowrap">
+                        FRAME GEN & LATENCY
                     </button>
-                    <button id="opt-page-pill-2" onclick="switchGraphicsSettingsPage(2)" class="px-4 py-1.5 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold">
-                        LIGHTING & AVIONICS
+                    <button id="opt-page-pill-2" onclick="switchGraphicsSettingsPage(2)" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold whitespace-nowrap">
+                        TERRAIN & LOD
+                    </button>
+                    <button id="opt-page-pill-3" onclick="switchGraphicsSettingsPage(3)" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold whitespace-nowrap">
+                        ENVIRONMENT & FLORA
+                    </button>
+                    <button id="opt-page-pill-4" onclick="switchGraphicsSettingsPage(4)" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold whitespace-nowrap">
+                        SHADOWS & LIGHTS
+                    </button>
+                    <button id="opt-page-pill-5" onclick="switchGraphicsSettingsPage(5)" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold whitespace-nowrap">
+                        COCKPIT & AVIONICS
+                    </button>
+                    <button id="opt-page-pill-6" onclick="switchGraphicsSettingsPage(6)" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold whitespace-nowrap">
+                        WEATHER & REFLECTIONS
                     </button>
                 </div>
 
-                <!-- CAROUSEL TRACK VIEWPORT (LATERAL SLIDE CONTAINER) -->
+                <!-- CAROUSEL TRACK VIEWPORT (LATERAL SLIDE CONTAINER - 2x2 PER PAGE) -->
                 <div class="overflow-hidden relative w-full rounded-xl">
                     <div id="opt-msfs-carousel-track" class="flex transition-transform duration-300 ease-out" style="transform: translateX(0%);">
-                        <!-- PAGE 1: CORE & DISPLAY PACING (9 CARDS IN 3x3 GRID) -->
+                        <!-- PAGE 1: DISPLAY & SYNC (4 CARDS IN 2x2 GRID) -->
                         <div class="w-full shrink-0">
-                            <div id="opt-msfs-settings-grid-p1" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                            <div id="opt-msfs-settings-grid-p1" class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                                 <!-- Rendered dynamically by JS -->
                             </div>
                         </div>
 
-                        <!-- PAGE 2: TERRAIN & ENVIRONMENT WORLD (9 CARDS IN 3x3 GRID) -->
+                        <!-- PAGE 2: FRAME GEN & LATENCY (4 CARDS IN 2x2 GRID) -->
                         <div class="w-full shrink-0">
-                            <div id="opt-msfs-settings-grid-p2" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                            <div id="opt-msfs-settings-grid-p2" class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                                 <!-- Rendered dynamically by JS -->
                             </div>
                         </div>
 
-                        <!-- PAGE 3: LIGHTING, AVIONICS & POST-PROCESSING (9 CARDS IN 3x3 GRID) -->
+                        <!-- PAGE 3: TERRAIN & LOD (4 CARDS IN 2x2 GRID) -->
                         <div class="w-full shrink-0">
-                            <div id="opt-msfs-settings-grid-p3" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                            <div id="opt-msfs-settings-grid-p3" class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                                <!-- Rendered dynamically by JS -->
+                            </div>
+                        </div>
+
+                        <!-- PAGE 4: ENVIRONMENT & FLORA (4 CARDS IN 2x2 GRID) -->
+                        <div class="w-full shrink-0">
+                            <div id="opt-msfs-settings-grid-p4" class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                                <!-- Rendered dynamically by JS -->
+                            </div>
+                        </div>
+
+                        <!-- PAGE 5: SHADOWS & LIGHTS (4 CARDS IN 2x2 GRID) -->
+                        <div class="w-full shrink-0">
+                            <div id="opt-msfs-settings-grid-p5" class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                                <!-- Rendered dynamically by JS -->
+                            </div>
+                        </div>
+
+                        <!-- PAGE 6: COCKPIT & AVIONICS (4 CARDS IN 2x2 GRID) -->
+                        <div class="w-full shrink-0">
+                            <div id="opt-msfs-settings-grid-p6" class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                                <!-- Rendered dynamically by JS -->
+                            </div>
+                        </div>
+
+                        <!-- PAGE 7: WEATHER & REFLECTIONS (3 CARDS IN 2x2 GRID) -->
+                        <div class="w-full shrink-0">
+                            <div id="opt-msfs-settings-grid-p7" class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                                 <!-- Rendered dynamically by JS -->
                             </div>
                         </div>
@@ -2532,35 +2577,34 @@
                 <button onclick="agreeAndContinueApp()" data-i18n="disclaimer.agree" class="px-6 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs hover:scale-[1.02] active:scale-95 transition-all cursor-pointer border-0">
                     Agree & Continue
                 </button>
+            </div>
         </div>
     </div>
 
     <!-- USERCFG.OPT BACKUP ROLLBACK MODAL -->
-    <div id="user-cfg-backup-modal" class="hidden fixed inset-0 z-[3200] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div id="user-cfg-backup-modal" style="display: none;" class="fixed inset-0 z-[9999] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
         <div class="w-[560px] max-w-[95vw] rounded-3xl p-5 shadow-2xl border border-slate-700 bg-slate-900 flex flex-col space-y-3.5 text-slate-100 select-none">
             <div class="flex items-center justify-between pb-3 border-b border-slate-800">
                 <div class="flex items-center gap-2.5">
-                    <div class="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center">
-                        <i class="fa-solid fa-clock-rotate-left text-sm"></i>
-                    </div>
+                    <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-600 text-white uppercase">BACKUP</span>
                     <div>
-                        <h3 class="text-base font-bold text-white tracking-tight">Restore UserCfg.opt Backup</h3>
-                        <span class="text-xs text-slate-400">Revert your MSFS graphics configuration safely</span>
+                        <h3 class="text-base font-bold text-white tracking-tight uppercase">Restore UserCfg.opt Backup</h3>
+                        <span class="text-xs text-slate-400 font-mono">Revert your MSFS graphics configuration safely</span>
                     </div>
                 </div>
-                <button onclick="closeUserCfgBackupModal()" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition-all cursor-pointer">
-                    <i class="fa-solid fa-xmark text-sm"></i>
+                <button onclick="closeUserCfgBackupModal()" class="px-3 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-mono text-xs font-bold transition-all cursor-pointer">
+                    FERMER
                 </button>
             </div>
-            <div class="text-xs text-slate-300 font-medium">
+            <div class="text-xs text-slate-300 font-mono">
                 Choose a previous timestamped configuration to restore. A safety copy of your current file will be preserved automatically.
             </div>
             <div id="user-cfg-backup-list" class="space-y-2 max-h-[320px] overflow-y-auto custom-scrollbar pr-1">
                 <!-- Dynamically rendered backup cards -->
             </div>
             <div class="flex items-center justify-end pt-2 border-t border-slate-800">
-                <button onclick="closeUserCfgBackupModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition-all cursor-pointer">
-                    Close
+                <button onclick="closeUserCfgBackupModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition-all cursor-pointer font-mono uppercase">
+                    FERMER
                 </button>
             </div>
         </div>
@@ -2615,10 +2659,10 @@
     </div>
 
     <!-- LOCALES DICTIONARY SCRIPT -->
-    <script src="locales.js?v=1.0.1"></script>
+    <script src="locales.js?v=1.0.2"></script>
     <!-- WORLD CAPITALS DATABASE SCRIPT -->
-    <script src="capitals_data.js?v=1.0.1"></script>
+    <script src="capitals_data.js?v=1.0.2"></script>
     <!-- MAIN APP JS SCRIPT -->
-    <script src="app.js?v=1.0.1"></script>
+    <script src="app.js?v=1.0.2"></script>
 </body>
 </html>
