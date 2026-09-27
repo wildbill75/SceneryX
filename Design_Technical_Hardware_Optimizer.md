@@ -92,17 +92,28 @@ The graphics configuration interface features a 3-page lateral carousel with a c
 
 ---
 
-## 5. Lateral Carousel & Unified Combobox Input Design
+## 5. Ergonomics, Tag Nomenclature & Action Placement Design
 1. **Airy Header & Clean Minimalist Tab Bar**:
-   - **Row 1**: Displays section title, 2D/VR display switcher, Airliner/GA mission profile switcher, VR refresh rate selector (72, 80, 90, 120 Hz), AutoFPS live indicator, Rollback button, and Profile Optimization button.
-   - **Row 2**: Displays a streamlined, uncluttered segmented tab bar with exactly three clean group labels: `CORE & DISPLAY`, `TERRAIN & WORLD`, and `LIGHTING & AVIONICS`. All superfluous clutter (arrows, icons, numbers, helper text, and page counters) has been eliminated for optimal minimalism and ergonomics.
+   - **Row 1**: Displays section title, 2D/VR display switcher, Airliner/GA mission profile switcher, VR refresh rate selector (72, 80, 90, 120 Hz), and AutoFPS live indicator.
+   - **Row 2**: Displays a streamlined segmented tab bar with exactly three clean group labels: `CORE & DISPLAY`, `TERRAIN & WORLD`, and `LIGHTING & AVIONICS`. All icons, numbers, helper text, and page counters are eliminated for minimalism.
 2. **Carousel Viewport**:
    - Houses three full-width $3 \times 3$ grid panels sliding along the X-axis via CSS transform transitions (`translateX(-0%)`, `translateX(-100%)`, `translateX(-200%)`).
-3. **Single Unified Editable Combobox Design**:
-   - For numeric parameters (`tlod`, `olod`, and `max_frame_rate`), users interact with **a single unified field** instead of dual side-by-side controls:
-     - The single field displays the current value (e.g. `90`, `120`, or `Unlocked`).
-     - Clicking the field drops down the full list of calibrated presets.
-     - Users can freely type any custom value directly (e.g. `85`, `115`, `230`, up to 400) and commit with `Enter` or by clicking outside.
+3. **Strict Single-Word Uppercase Tag System**:
+   - Every graphics setting badge displays strictly one single uppercase word: `OPTIMUM`, `ACCEPTABLE`, `SUBOPTIMAL`, or `HAZARD`.
+   - Explanations in parentheses are banned entirely from the tag label.
+   - Solid, full-opacity background colors only: `bg-emerald-600`, `bg-amber-600`, `bg-orange-600`, `bg-rose-600`. All stroke, border, and glass opacity effects are removed.
+   - Hovering over any tag reveals a dedicated tooltip explaining the specific rationale for the assigned rating (e.g. Axel LFBO VRAM savings or MainThread throttling).
+4. **Structured 3-Part Setting Tooltips**:
+   - Each card provides a structured 3-part tooltip:
+     - `Description`: Exact functional description of what the graphics parameter controls.
+     - `Current`: Analysis of the currently selected value and its system impact.
+     - `Recommendation`: Concrete, actionable advice tailored to hardware capabilities and flight mission profile.
+5. **Uniform Combobox & Select Dropdown Chevrons**:
+   - Both standard `<select>` dropdowns and editable text/numeric fields (`tlod`, `olod`, `max_frame_rate`) share an identical SVG down-arrow chevron (`w-3.5 h-3.5 text-slate-400`).
+   - The chevron remains visible 100% of the time, in both free text typing mode and dropdown selection mode. Native browser indicators are hidden via CSS for visual consistency.
+6. **Bottom-Right Action Placement**:
+   - `ROLLBACK` and `OPTIMIZE PROFILE` action buttons are positioned at the bottom-right of the graphics settings block (beneath the carousel viewport).
+   - Icons are stripped from both buttons, adopting a clean, solid, uppercase typography.
 
 ---
 

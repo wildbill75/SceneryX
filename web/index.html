@@ -677,6 +677,11 @@
         #map.countries-inactive .leaflet-overlay-pane path {
             cursor: inherit !important;
             pointer-events: none !important;
+        /* Uniform styling for combobox inputs and select dropdowns */
+        input[list]::-webkit-calendar-picker-indicator {
+            display: none !important;
+            -webkit-appearance: none !important;
+            opacity: 0 !important;
         }
     </style>
 </head>
@@ -2206,20 +2211,12 @@
                         </div>
                     </div>
 
-                    <!-- Right Action Bar: AutoFPS pill + Rollback + Optimize -->
+                    <!-- Right Action Bar: AutoFPS status pill -->
                     <div class="flex items-center gap-2.5">
                         <div id="opt-autofps-status-pill" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-[10px] font-mono" title="AutoFPS status in background tasks. When active, TLOD and OLOD are dynamically calibrated in real-time.">
                             <span id="opt-autofps-status-dot" class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
                             <span id="opt-autofps-status-text" class="text-slate-400 font-bold">AUTOFPS INACTIVE</span>
                         </div>
-                        <button onclick="openUserCfgBackupModal()" id="opt-btn-restore-backup" class="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-sm" title="Rollback UserCfg.opt to a previous timestamped backup">
-                            <i class="fa-solid fa-clock-rotate-left text-xs text-amber-400"></i>
-                            <span>ROLLBACK</span>
-                        </button>
-                        <button onclick="applyOptimalMsfsSettingsCurrentMode()" class="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-emerald-600 text-slate-200 hover:text-white border border-slate-700 hover:border-emerald-500 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-sm" title="Apply optimal graphics profile across all 27 settings for current display mode and flight mission profile with automatic backup">
-                            <i class="fa-solid fa-wand-magic-sparkles text-xs text-emerald-400"></i>
-                            <span>OPTIMIZE PROFILE</span>
-                        </button>
                     </div>
                 </div>
 
@@ -2260,6 +2257,16 @@
                             </div>
                         </div>
                     </div>
+                </div>
+
+                <!-- BOTTOM ACTION BAR: ROLLBACK & OPTIMIZE PROFILE (BOTTOM RIGHT) -->
+                <div class="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-900">
+                    <button onclick="openUserCfgBackupModal()" id="opt-btn-restore-backup" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-mono font-bold transition-all cursor-pointer shadow-sm uppercase tracking-wider" title="Rollback UserCfg.opt to a previous timestamped backup">
+                        ROLLBACK
+                    </button>
+                    <button onclick="applyOptimalMsfsSettingsCurrentMode()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-mono font-bold transition-all cursor-pointer shadow-sm uppercase tracking-wider" title="Apply optimal graphics profile across all 27 settings for current display mode and flight mission profile with automatic backup">
+                        OPTIMIZE PROFILE
+                    </button>
                 </div>
             </div>
 

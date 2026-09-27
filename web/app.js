@@ -16560,12 +16560,35 @@ function renderMsfsSettingsMatrix() {
 
     // Helper to render individual setting card
     const renderCard = (item) => {
-        let badgeColorClass = 'text-emerald-400 bg-emerald-950/80 border-emerald-800/80';
-        if (item.rating_color === 'amber') badgeColorClass = 'text-amber-400 bg-amber-950/80 border-amber-800/80';
-        else if (item.rating_color === 'orange') badgeColorClass = 'text-orange-400 bg-orange-950/80 border-orange-800/80';
-        else if (item.rating_color === 'rose') badgeColorClass = 'text-rose-400 bg-rose-950/80 border-rose-800/80';
+        // Enforce clean, single-word uppercase tag without any parentheses
+        let cleanTag = (item.rating_label || 'OPTIMUM').toUpperCase().replace(/\(.*?\)/g, '').replace(/[^A-Z]/g, '').trim();
+        if (cleanTag.includes('HAZARD') || cleanTag.includes('NOGO') || cleanTag.includes('RISK') || cleanTag.includes('ALERT')) {
+            cleanTag = 'HAZARD';
+        } else if (cleanTag.includes('SUB') || cleanTag.includes('MISMATCH')) {
+            cleanTag = 'SUBOPTIMAL';
+        } else if (cleanTag.includes('ACCEPT') || cleanTag.includes('WATCH') || cleanTag.includes('PRESSURE')) {
+            cleanTag = 'ACCEPTABLE';
+        } else {
+            cleanTag = 'OPTIMUM';
+        }
 
-        const sharedBadge = item.shared ? '<span class="px-1 py-0.2 rounded text-[8px] font-mono font-bold bg-slate-800 text-sky-400 border border-slate-700/80" title="This setting is globally shared in MSFS between 2D and VR modes.">SHARED</span>' : '';
+        // Solid background colors without stroke or glass effects
+        let badgeColorClass = 'bg-emerald-600 text-white font-bold';
+        if (item.rating_color === 'amber' || cleanTag === 'ACCEPTABLE') badgeColorClass = 'bg-amber-600 text-white font-bold';
+        else if (item.rating_color === 'orange' || cleanTag === 'SUBOPTIMAL') badgeColorClass = 'bg-orange-600 text-white font-bold';
+        else if (item.rating_color === 'rose' || cleanTag === 'HAZARD') badgeColorClass = 'bg-rose-600 text-white font-bold';
+
+        const tagTooltip = (item.tag_reason || item.rating_reason || item.tooltip || cleanTag).replace(/"/g, '&quot;');
+        const sharedBadge = item.shared ? '<span class="px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-slate-700 text-slate-200 uppercase tracking-wider shrink-0" title="This setting is globally shared in MSFS between 2D and VR modes.">SHARED</span>' : '';
+
+        // Unified SVG down arrow chevron identical on both text/numeric inputs and select dropdowns
+        const chevronSvg = `
+            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                </svg>
+            </div>
+        `;
 
         let inputHtml = '';
         if (item.is_numeric) {
@@ -16592,9 +16615,10 @@ function renderMsfsSettingsMatrix() {
                            onfocus="this.select();"
                            onkeydown="if(event.key==='Enter'){this.blur();}"
                            onchange="onMsfsManualSettingSubmitted('${item.key}', this.value, ${item.min_val ?? 10}, ${item.max_val ?? 400})"
-                           class="w-full bg-slate-950 border border-slate-700/70 focus:border-cyan-400 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono font-semibold focus:outline-none cursor-pointer"
+                           class="w-full appearance-none bg-slate-950 border border-slate-700/70 focus:border-cyan-400 rounded-lg pl-2.5 pr-8 py-1.5 text-xs text-white font-mono font-semibold focus:outline-none cursor-pointer"
                            placeholder="Select or enter value..."
-                           title="Select a preset from dropdown or type any custom value">
+                           title="Select a preset from dropdown or enter custom value">
+                    ${chevronSvg}
                     <datalist id="opt-datalist-${item.key}">
                         ${datalistOptions}
                     </datalist>
@@ -16609,10 +16633,11 @@ function renderMsfsSettingsMatrix() {
                 }).join('');
             }
             inputHtml = `
-                <div class="flex items-center justify-between gap-2 pt-0.5">
-                    <select onchange="onMsfsSettingChanged('${item.key}', this.value)" class="w-full bg-slate-950 border border-slate-700/70 focus:border-cyan-400 rounded-lg px-2.5 py-1.5 text-xs text-white font-mono font-semibold focus:outline-none cursor-pointer">
+                <div class="relative w-full pt-0.5">
+                    <select onchange="onMsfsSettingChanged('${item.key}', this.value)" class="w-full appearance-none bg-slate-950 border border-slate-700/70 focus:border-cyan-400 rounded-lg pl-2.5 pr-8 py-1.5 text-xs text-white font-mono font-semibold focus:outline-none cursor-pointer">
                         ${optionsHtml}
                     </select>
+                    ${chevronSvg}
                 </div>
             `;
         }
@@ -16624,7 +16649,7 @@ function renderMsfsSettingsMatrix() {
                         <span class="text-xs font-mono font-bold text-slate-200">${item.name}</span>
                         ${sharedBadge}
                     </div>
-                    <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold border uppercase shrink-0 ${badgeColorClass}">${item.rating_label}</span>
+                    <span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider shrink-0 shadow-sm cursor-help ${badgeColorClass}" title="${tagTooltip}">${cleanTag}</span>
                 </div>
                 ${inputHtml}
             </div>
