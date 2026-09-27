@@ -16054,11 +16054,11 @@ function updateOptimizerRouteUI() {
         const hasRoute = !!(optimizerOrigin || optimizerDest);
         if (hasRoute) {
             clearRouteBtn.disabled = false;
-            clearRouteBtn.className = 'px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-blue-600 text-white border border-slate-600 hover:border-blue-500 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 shadow-sm';
+            clearRouteBtn.className = 'px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-blue-600 text-white border border-slate-600 hover:border-blue-500 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center shadow-sm';
             clearRouteBtn.title = 'Clear current flight route';
         } else {
             clearRouteBtn.disabled = true;
-            clearRouteBtn.className = 'px-4 py-2.5 rounded-xl bg-slate-800/60 text-slate-400 border border-slate-700/60 font-bold text-xs uppercase tracking-wider cursor-not-allowed opacity-60 flex items-center gap-1.5 pointer-events-none';
+            clearRouteBtn.className = 'px-4 py-2.5 rounded-xl bg-slate-800/60 text-slate-400 border border-slate-700/60 font-bold text-xs uppercase tracking-wider cursor-not-allowed opacity-60 flex items-center justify-center pointer-events-none';
             clearRouteBtn.title = 'No active flight route to reset';
         }
     }

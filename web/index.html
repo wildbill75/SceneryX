@@ -2040,13 +2040,13 @@
             <!-- TABS SWITCHER -->
             <div class="flex items-center bg-slate-950 p-1 rounded-2xl border border-slate-800 shrink-0">
                 <button id="opt-tab-btn-route" onclick="switchOptimizerTab('route')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer bg-cyan-600 text-white shadow-sm shadow-cyan-600/30 flex items-center gap-1.5">
-                    <span>Route & Sceneries</span>
+                    <span>ROUTE</span>
                 </button>
                 <button id="opt-tab-btn-rig" onclick="switchOptimizerTab('rig')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition-all cursor-pointer flex items-center gap-1.5">
-                    <span>Rig & Settings</span>
+                    <span>HARDWARE</span>
                 </button>
                 <button id="opt-tab-btn-blackbox" onclick="switchOptimizerTab('blackbox')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition-all cursor-pointer flex items-center gap-1.5">
-                    <span>Live Blackbox</span>
+                    <span>TELEMETRY</span>
                     <span id="opt-tab-rec-dot" class="hidden w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
                 </button>
             </div>
@@ -2113,9 +2113,8 @@
                     <button onclick="restoreFlightCorridorSceneries()" id="opt-btn-restore-sceneries" class="hidden px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer">
                         Restore All
                     </button>
-                    <button onclick="clearOptimizerRoutePlanning()" id="opt-btn-clear-route" class="px-4 py-2.5 rounded-xl bg-slate-800/60 text-slate-400 border border-slate-700/60 font-bold text-xs uppercase tracking-wider cursor-not-allowed opacity-60 flex items-center gap-1.5 pointer-events-none" title="No active flight route to reset">
-                        <i class="fa-solid fa-arrows-rotate text-xs"></i>
-                        <span>New Route</span>
+                    <button onclick="clearOptimizerRoutePlanning()" id="opt-btn-clear-route" class="px-4 py-2.5 rounded-xl bg-slate-800/60 text-slate-400 border border-slate-700/60 font-bold text-xs uppercase tracking-wider cursor-not-allowed opacity-60 flex items-center justify-center pointer-events-none" title="No active flight route to reset">
+                        <span>NEW ROUTE</span>
                     </button>
                     <button onclick="applyOptimizerRouteSceneries()" id="opt-btn-apply-sceneries" class="px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-sm uppercase tracking-wider transition-all cursor-pointer active:scale-95 shadow-lg shadow-emerald-500/20">
                         Optimize
@@ -2309,9 +2308,8 @@
 
         <!-- FOOTER -->
         <div class="flex items-center justify-end pt-1 shrink-0 text-xs">
-            <button onclick="exitFlightOptimizerMode()" class="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 hover:border-slate-500 font-bold transition-all cursor-pointer flex items-center gap-1.5">
-                <i class="fa-solid fa-arrow-right-from-bracket text-xs"></i>
-                <span>Exit</span>
+            <button onclick="exitFlightOptimizerMode()" class="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 hover:border-slate-500 font-bold transition-all cursor-pointer">
+                <span>EXIT</span>
             </button>
         </div>
     </div>
