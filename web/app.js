@@ -15685,15 +15685,20 @@ function positionFlightOptimizerModal(targetAp = null) {
     const point = (typeof map.latLngToContainerPoint === 'function') ? map.latLngToContainerPoint(latLng) : null;
     if (!point) return;
 
-    const mapSize = (typeof map.getSize === 'function') ? map.getSize() : null;
-    const containerW = mapSize ? mapSize.x : (modal.offsetParent ? modal.offsetParent.offsetWidth : window.innerWidth);
+    // Convert map container point to viewport screen coordinates (accounts for 118px top navbar)
+    const mapContainer = (typeof map.getContainer === 'function') ? map.getContainer() : document.getElementById('map');
+    const mapRect = mapContainer ? mapContainer.getBoundingClientRect() : { left: 0, top: 118, width: window.innerWidth, height: window.innerHeight - 118 };
+
+    const screenX = mapRect.left + point.x;
+    const screenY = mapRect.top + point.y;
 
     const modalWidth = modal.offsetWidth || 940;
     const halfWidth = modalWidth / 2;
 
-    const minLeft = halfWidth + 12;
-    const maxLeft = Math.max(minLeft, containerW - halfWidth - 12);
-    const clampedX = Math.max(minLeft, Math.min(maxLeft, Math.round(point.x)));
+    const pad = 12;
+    const minLeft = halfWidth + pad;
+    const maxLeft = Math.max(minLeft, window.innerWidth - halfWidth - pad);
+    const clampedX = Math.max(minLeft, Math.min(maxLeft, Math.round(screenX)));
 
     modal.style.left = `${clampedX}px`;
     modal.style.right = 'auto';
@@ -15701,7 +15706,21 @@ function positionFlightOptimizerModal(targetAp = null) {
 
     if (!hasUserDraggedOptimizerModal) {
         // Systematically position directly beneath the airport marker and its label (matching Screen 2)
-        const targetTop = Math.round(point.y) + 26;
+        let markerBottomY = screenY + 16;
+        if (typeof airportMarkerCache !== 'undefined' && ap.icao && airportMarkerCache.has(ap.icao)) {
+            const m = airportMarkerCache.get(ap.icao);
+            if (m && typeof m.getElement === 'function') {
+                const el = m.getElement();
+                if (el) {
+                    const elRect = el.getBoundingClientRect();
+                    if (elRect && elRect.bottom > 0) {
+                        markerBottomY = elRect.bottom;
+                    }
+                }
+            }
+        }
+
+        const targetTop = Math.round(markerBottomY) + 12;
         modal.style.top = `${targetTop}px`;
         modal.style.transform = 'translateX(-50%)';
     }
