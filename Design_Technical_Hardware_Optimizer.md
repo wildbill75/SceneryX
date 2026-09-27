@@ -188,4 +188,23 @@ To maximize readability and prevent visual clutter, the graphics configuration i
    - Triggered upon clicking `OPTIMIZE PROFILE`.
    - Renders a focused dialog displaying the target display mode, active flight mission profile, generated safety backup path, and an icon-free summary list with solid `[OK]` badges.
 
+---
+
+## 8. Automatic Cadence Calibration & Pacing Dialog Design
+1. **Silent Refresh Rate Detection**:
+   - **2D Display**: Silently inspects active desktop resolution and native refresh rate (e.g. `2560x1440 @ 165 Hz`) via Windows display APIs.
+   - **VR Headset**: Silently queries runtime configurations (Pimax runtime, SteamVR, OpenXR) to detect connected headset model and native cadence (e.g. `Pimax Crystal Light @ 72 Hz`). Manual selector buttons have been deprecated and eliminated from the UI.
+2. **Harmonic 1/2 Sync Divisor Calculation**:
+   - **VR Mode**: Targets exactly half native refresh rate ($f_{\text{target}} = \frac{f_{\text{native}}}{2}$, e.g. 36 FPS for 72 Hz, 40 FPS for 80 Hz, 45 FPS for 90 Hz, 60 FPS for 120 Hz) to deliver flawless 1:1 motion reprojection without judder.
+   - **2D Mode**: Calculates synchronized divisors for high-refresh panels (82 FPS for 165 Hz, 72 FPS for 144 Hz, 60 FPS for 120 Hz / 60 Hz) to maintain constant frame pacing and protect CPU MainThread headroom.
+3. **Proactive Cadence Explanation Dialog**:
+   - Pops up on first launch of the Flight Optimizer or whenever an active refresh rate change is detected on either the 2D display or VR headset.
+   - Clarifies the mathematical rationale: why locking to an exact half-rate sync divisor prevents reprojection drops, stabilizes CPU frame times, and avoids micro-stuttering.
+   - Clearly documents the **OFF** position (raw value `0`), allowing users with G-Sync/FreeSync or third-party frame limiters (RTSS / NVIDIA Control Panel) to run uncapped.
+4. **Max Frame Rate Dropdown Design**:
+   - Populated with universal display and VR frequencies and half-divisors: `["OFF", "30", "36", "40", "45", "60", "72", "80", "90", "120", "144", "165", "240"]`.
+   - Replaced ambiguous "Unlocked" label with standardized flight simulator terminology `OFF`.
+   - Combobox dropdown dynamically adapts positioning (opening upward for bottom-row cards) to prevent clipping against carousel viewport overflow boundaries.
+
+
 

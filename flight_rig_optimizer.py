@@ -956,7 +956,7 @@ def apply_setting_to_content(content: str, mode: str, setting_key: str, new_valu
     # 2. Max Frame Rate (2D / VR + FrameLimiter)
     elif setting_key in ['max_frame_rate', 'TargetFrameRate']:
         k = 'TargetFrameRate' if mode == '2D' else 'TargetFrameRateVR'
-        clean_val = str(new_value).replace('FPS', '').replace('Unlocked', '0').strip()
+        clean_val = str(new_value).replace('FPS', '').replace('Unlocked', '0').replace('OFF', '0').replace('off', '0').strip()
         content = re.sub(rf'({k}\s+)[^\r\n]+', rf'\g<1>{clean_val}', content, flags=re.IGNORECASE)
         if mode == '2D':
             content = re.sub(r'(FrameLimiter\s+)[^\r\n]+', rf'\g<1>{clean_val}', content, flags=re.IGNORECASE)
@@ -1592,11 +1592,12 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
 
     # VR Max Frame Rate Rating
     is_vr_fps_opt = (fps_vr == str(target_vr_fps))
-    vr_fps_rating = "optimum" if is_vr_fps_opt else "suboptimal"
-    vr_fps_color = "emerald" if is_vr_fps_opt else "orange"
-    vr_fps_label = "OPTIMUM" if is_vr_fps_opt else "SUBOPTIMAL"
-    vr_fps_tooltip = f"Description: VR frame rate cap in UserCfg.opt to synchronize with headset reprojection interval. Direct numeric input supported.\nCurrent: {fps_vr} FPS ({'Matched to 1/2 sync' if is_vr_fps_opt else 'Mismatched'}).\nRecommendation: Lock to {target_vr_fps} FPS (exact 1/2 sync divisor of your {vr_hz} Hz headset) to guarantee judder-free motion reprojection."
-    vr_fps_reason = f"Matches exact 1/2 sync divisor of {vr_hz} Hz headset ({target_vr_fps} FPS), delivering smooth motion reprojection." if is_vr_fps_opt else f"Target frame rate ({fps_vr} FPS) does not match the 1/2 sync divisor ({target_vr_fps} FPS) of your {vr_hz} Hz headset, causing motion judder."
+    is_vr_fps_off = (fps_vr == '0' or str(fps_vr).upper() == 'OFF')
+    vr_fps_rating = "optimum" if is_vr_fps_opt else ("acceptable" if is_vr_fps_off else "suboptimal")
+    vr_fps_color = "emerald" if is_vr_fps_opt else ("amber" if is_vr_fps_off else "orange")
+    vr_fps_label = "OPTIMUM" if is_vr_fps_opt else ("OFF" if is_vr_fps_off else "SUBOPTIMAL")
+    vr_fps_tooltip = f"Description: VR frame rate cap in UserCfg.opt to synchronize with headset reprojection interval. Direct numeric input supported.\nCurrent: {'OFF (Uncapped)' if is_vr_fps_off else f'{fps_vr} FPS'}.\nRecommendation: Lock to {target_vr_fps} FPS (exact 1/2 sync divisor of your {vr_hz} Hz headset) to guarantee judder-free motion reprojection."
+    vr_fps_reason = f"Matches exact 1/2 sync divisor of {vr_hz} Hz headset ({target_vr_fps} FPS), delivering smooth motion reprojection." if is_vr_fps_opt else (f"VR frame rate is uncapped (OFF). Locking to {target_vr_fps} FPS is recommended for reprojection." if is_vr_fps_off else f"Target frame rate ({fps_vr} FPS) does not match the 1/2 sync divisor ({target_vr_fps} FPS) of your {vr_hz} Hz headset, causing motion judder.")
 
     # ===============================================
     # PAGE 2: TERRAIN & ENVIRONMENT WORLD (9 SETTINGS)
@@ -1725,7 +1726,7 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
     wind_vr_val = q_map.get(wind_vr_raw, 'High')
 
     # Preset Options Lists
-    fps_options = ["Unlocked", "30", "36", "40", "45", "60", "72", "80", "82", "90", "120", "144", "165", "240"]
+    fps_options = ["OFF", "30", "36", "40", "45", "60", "72", "80", "90", "120", "144", "165", "240"]
     lod_options = ["50", "80", "100", "120", "150", "180", "200", "250", "300", "350", "400"]
     q_options = ["Ultra", "High", "Medium", "Low"]
     glass_options = ["High (Full)", "Medium (Half)", "Low (Quarter)"]
@@ -1749,13 +1750,20 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
     glass_vr_reason = "Quarter-rate avionics refresh in VR frees critical CPU MainThread cycles for stereo reprojection." if glass_vr_opt else "Avionics refresh above quarter-rate increases MainThread load in VR."
     glass_vr_tip = f"Description: Vector glass cockpit avionics redraw rate in VR.\nCurrent: {glass_vr_val}.\nRecommendation: Set to LOW (Quarter) in VR to preserve critical CPU frame time budget for headset reprojection."
 
-    # Build 2D Matrix (27 Items across 3 Pages of 9)
+    # 2D Max Frame Rate Rating
+    is_2d_fps_opt = fps_2d in ['30', '36', '40', '45', '60', '72', '80', '82', '90', '120', '144', '165', '240']
+    is_2d_fps_off = (fps_2d == '0' or str(fps_2d).upper() == 'OFF')
+    fps_2d_rating = "optimum" if is_2d_fps_opt else ("acceptable" if is_2d_fps_off else "suboptimal")
+    fps_2d_color = "emerald" if is_2d_fps_opt else ("amber" if is_2d_fps_off else "orange")
+    fps_2d_label = "OPTIMUM" if is_2d_fps_opt else ("OFF" if is_2d_fps_off else "SUBOPTIMAL")
+    fps_2d_reason = "Synchronized with monitor refresh divisor for zero judder." if is_2d_fps_opt else ("Max frame rate is OFF (uncapped). Frame pacing is free." if is_2d_fps_off else "Uncapped or mismatched framerate causes micro-stutters and uneven frame pacing.")
+
     # Build 2D Matrix (27 Items across 7 Pages in 2x2 Grid)
     matrix_2d = [
         # PAGE 1: DISPLAY & SYNC (4)
         make_setting_item("resolution", "Full Screen Resolution", res_formatted, res_raw, True, "optimum", "emerald", "OPTIMUM", f"Description: Native screen rendering resolution for MSFS.\nCurrent: {res_formatted} (shared with 2D windowing).\nRecommendation: Match physical monitor native resolution and leverage DLSS for optimal sharpness.", ["3840 x 2160", "2560 x 1440", "1920 x 1080"], page=1, tag_reason="Native display resolution ensures 1:1 pixel rendering clarity without scaling blur.", is_vr=False),
         make_setting_item("anti_aliasing", "Anti-Aliasing & Upscaling", val_aa_2d, aa_2d, False, "optimum" if "DLSS" in val_aa_2d else "acceptable", "emerald" if "DLSS" in val_aa_2d else "amber", "OPTIMUM" if "DLSS" in val_aa_2d else "ACCEPTABLE", f"Description: Anti-aliasing method and AI upscaling mode (DLSS/TAA/DLAA).\nCurrent: {val_aa_2d}.\nRecommendation: Use DLSS Quality on RTX GPUs for superior edge stability with 20-30% GPU performance headroom.", ["DLSS (Quality)", "DLSS (Balanced)", "DLSS (Performance)", "TAA", "DLAA"], page=1, tag_reason="DLSS delivers superior edge stability and GPU headroom." if "DLSS" in val_aa_2d else "TAA provides native clarity at higher raster workload.", is_vr=False),
-        make_setting_item("max_frame_rate", "Max Frame Rate", f"{fps_2d} FPS" if fps_2d != '0' else "Unlocked", fps_2d, False, "optimum" if fps_2d in ['60', '72', '80', '82', '90', '120', '144', '165'] else "suboptimal", "emerald" if fps_2d in ['60', '72', '80', '82', '90', '120', '144', '165'] else "orange", "OPTIMUM" if fps_2d in ['60', '72', '80', '82', '90', '120', '144', '165'] else "SUBOPTIMAL", f"Description: Frame rate limiter to synchronize frame delivery with monitor refresh intervals. Direct numeric input supported.\nCurrent: {fps_2d} FPS ({'Synchronized' if fps_2d in ['60', '72', '80', '82', '90', '120', '144', '165'] else 'Unlocked/Custom'}).\nRecommendation: Lock to an exact sync divisor of your monitor (e.g. 60, 72, 80, 82, 90 FPS) to eliminate frame pacing jitter.", fps_options, page=1, is_numeric=True, min_val=0, max_val=240, step=1, tag_reason="Synchronized with monitor refresh divisor for zero judder." if fps_2d in ['60', '72', '80', '82', '90', '120', '144', '165'] else "Uncapped or mismatched framerate causes micro-stutters and uneven frame pacing.", is_vr=False),
+        make_setting_item("max_frame_rate", "Max Frame Rate", f"{fps_2d} FPS" if not is_2d_fps_off else "OFF", fps_2d, False, fps_2d_rating, fps_2d_color, fps_2d_label, f"Description: Frame rate limiter to synchronize frame delivery with monitor refresh intervals. Direct numeric input supported.\nCurrent: {'OFF (Uncapped)' if is_2d_fps_off else f'{fps_2d} FPS'} ({'Synchronized' if is_2d_fps_opt else ('OFF / Uncapped' if is_2d_fps_off else 'Custom')}).\nRecommendation: Lock to an exact sync divisor of your monitor (e.g. 60, 72, 80, 82, 90 FPS) to eliminate frame pacing jitter, or OFF if using external limiter.", fps_options, page=1, is_numeric=True, min_val=0, max_val=240, step=1, tag_reason=fps_2d_reason, is_vr=False),
         make_setting_item("vsync", "V-Sync", vsync_val, vsync_raw, True, "optimum" if vsync_val == "ON" else "acceptable", "emerald" if vsync_val == "ON" else "amber", "OPTIMUM" if vsync_val == "ON" else "ACCEPTABLE", f"Description: Vertical synchronization with physical monitor refresh cycle.\nCurrent: {vsync_val}.\nRecommendation: Keep ON with G-Sync/FreeSync and frame rate limiter to eliminate screen tearing.", ["ON", "OFF"], page=1, tag_reason="V-Sync locks buffer presentation to refresh boundaries, eliminating tearing." if vsync_val == "ON" else "V-Sync OFF may cause horizontal tearing lines during fast camera pans.", is_vr=False),
 
         # PAGE 2: FRAME GEN & LATENCY (4)
@@ -1799,7 +1807,7 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
         # PAGE 1: DISPLAY & SYNC (4)
         make_setting_item("resolution", "Full Screen Resolution", res_formatted, res_raw, True, "optimum", "emerald", "OPTIMUM", f"Description: Desktop mirror resolution for MSFS VR mode.\nCurrent: {res_formatted} (shared with 2D windowing).\nRecommendation: Match your native screen resolution.", ["3840 x 2160", "2560 x 1440", "1920 x 1080"], page=1, tag_reason="Desktop mirror resolution.", is_vr=True),
         make_setting_item("anti_aliasing", "Anti-Aliasing & Upscaling", val_aa_vr, aa_vr, False, "optimum" if "DLSS" in val_aa_vr else "acceptable", "emerald" if "DLSS" in val_aa_vr else "amber", "OPTIMUM" if "DLSS" in val_aa_vr else "ACCEPTABLE", f"Description: Anti-aliasing and upscaling mode in VR stereo.\nCurrent: {val_aa_vr}.\nRecommendation: DLSS Balanced or Quality is essential in VR to reduce stereo rendering load.", ["DLSS (Quality)", "DLSS (Balanced)", "DLSS (Performance)", "TAA"], page=1, tag_reason="DLSS reduces VR stereo rendering load while preserving cockpit clarity.", is_vr=True),
-        make_setting_item("max_frame_rate", "Max Frame Rate", f"{fps_vr} FPS" if fps_vr != '0' else "Unlocked", fps_vr, False, vr_fps_rating, vr_fps_color, vr_fps_label, vr_fps_tooltip, fps_options, page=1, is_numeric=True, min_val=0, max_val=240, step=1, tag_reason=vr_fps_reason, is_vr=True),
+        make_setting_item("max_frame_rate", "Max Frame Rate", f"{fps_vr} FPS" if not is_vr_fps_off else "OFF", fps_vr, False, vr_fps_rating, vr_fps_color, vr_fps_label, vr_fps_tooltip, fps_options, page=1, is_numeric=True, min_val=0, max_val=240, step=1, tag_reason=vr_fps_reason, is_vr=True),
         make_setting_item("vsync", "V-Sync", vsync_val, vsync_raw, True, "optimum", "emerald", "OPTIMUM", f"Description: Global V-Sync state.\nCurrent: {vsync_val}.\nRecommendation: Handled by VR compositor.", ["ON", "OFF"], page=1, tag_reason="VR compositor manages display synchronization.", is_vr=True),
 
         # PAGE 2: FRAME GEN & LATENCY (4)
@@ -1982,6 +1990,32 @@ def apply_recommended_msfs_settings(mode: str, flight_profile: str = 'LINER', vr
         vr_hz = 72
     target_vr_fps = max(30, vr_hz // 2)
 
+    # Silent detection of hardware refresh rates
+    detected_vr = detect_vr_headset()
+    if detected_vr.get("detected") and detected_vr.get("refresh_rate_hz"):
+        vr_hz = int(detected_vr["refresh_rate_hz"])
+    else:
+        try:
+            vr_hz = int(vr_refresh_rate)
+        except Exception:
+            vr_hz = 72
+    target_vr_fps = max(30, vr_hz // 2)
+
+    disp_info = detect_display_info()
+    screen_hz = int(disp_info.get("refresh_rate_int", 60))
+    if screen_hz >= 240:
+        target_2d_fps = 120
+    elif screen_hz >= 165:
+        target_2d_fps = 82
+    elif screen_hz >= 144:
+        target_2d_fps = 72
+    elif screen_hz >= 120:
+        target_2d_fps = 60
+    elif screen_hz >= 75:
+        target_2d_fps = screen_hz // 2
+    else:
+        target_2d_fps = 60
+
     try:
         if mode == '2D':
             tex_val = 'Low' if is_liner else 'High'
@@ -1992,7 +2026,7 @@ def apply_recommended_msfs_settings(mode: str, flight_profile: str = 'LINER', vr
             update_msfs_user_cfg_setting('2D', 'anti_aliasing', 'DLSS (Quality)', path, create_backup=False)
             update_msfs_user_cfg_setting('2D', 'frame_generation', 'DLSSG (2X)', path, create_backup=False)
             update_msfs_user_cfg_setting('2D', 'vsync', 'ON', path, create_backup=False)
-            update_msfs_user_cfg_setting('2D', 'max_frame_rate', '90', path, create_backup=False)
+            update_msfs_user_cfg_setting('2D', 'max_frame_rate', str(target_2d_fps), path, create_backup=False)
             update_msfs_user_cfg_setting('2D', 'dynamic_settings', 'OFF', path, create_backup=False)
             update_msfs_user_cfg_setting('2D', 'reflex', 'ON', path, create_backup=False)
             update_msfs_user_cfg_setting('2D', 'texture_resolution', tex_val, path, create_backup=False)
@@ -2297,9 +2331,7 @@ def get_full_rig_diagnostics(flight_profile: str = 'LINER', vr_refresh_rate: int
     installed = detect_installed_aircraft()
     balance = analyze_system_balance(cpu, gpu, ram)
     vr_headset = detect_vr_headset()
-    effective_vr_hz = vr_refresh_rate
-    if vr_headset.get("detected") and vr_headset.get("refresh_rate_hz") and vr_refresh_rate == 72:
-        effective_vr_hz = vr_headset["refresh_rate_hz"]
+    effective_vr_hz = vr_headset["refresh_rate_hz"] if (vr_headset.get("detected") and vr_headset.get("refresh_rate_hz")) else 72
 
     matrix_data = build_msfs_settings_matrix(user_cfg_path=cfg.get("path"), gpu_info=gpu, cpu_info=cpu, flight_profile=flight_profile, vr_refresh_rate=effective_vr_hz)
     backups = get_available_user_cfg_backups(cfg.get("path"))

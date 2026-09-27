@@ -2141,7 +2141,6 @@
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
                         <span class="text-xs font-mono font-black text-white uppercase tracking-wider">MY RIG</span>
-                        <span id="opt-rig-balance-badge" class="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-800/80 uppercase">Optimal Balance</span>
                     </div>
                     <span id="opt-rig-summary-desc" class="text-xs text-slate-400 truncate max-w-[520px]">High-end CPU, GPU, and RAM perfectly balanced for complex flight sim operations.</span>
                 </div>
@@ -2214,15 +2213,6 @@
                         <button id="opt-flight-profile-btn-ga" onclick="switchFlightMissionProfile('GA')" class="px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer">
                             VFR GA
                         </button>
-                    </div>
-
-                    <!-- VR Refresh Rate Selector (Shown when in VR mode) -->
-                    <div id="opt-vr-hz-selector-wrapper" class="hidden flex items-center bg-slate-900 p-0.5 rounded-xl border border-slate-800 text-xs font-mono font-bold" title="Select your VR Headset native refresh rate to calculate the exact 1/2 sync frame rate divisor and eliminate motion judder.">
-                        <span class="text-[10px] text-slate-400 px-2 uppercase font-bold">VR HZ:</span>
-                        <button id="opt-vr-hz-btn-72" onclick="switchVrRefreshRate(72)" class="px-2.5 py-1 rounded-lg bg-cyan-600 text-white text-[11px] transition-all cursor-pointer font-bold" title="72 Hz (Pimax / Quest)">72 Hz</button>
-                        <button id="opt-vr-hz-btn-80" onclick="switchVrRefreshRate(80)" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white text-[11px] transition-all cursor-pointer font-bold" title="80 Hz (Rift S / Quest)">80 Hz</button>
-                        <button id="opt-vr-hz-btn-90" onclick="switchVrRefreshRate(90)" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white text-[11px] transition-all cursor-pointer font-bold" title="90 Hz (Index / HP Reverb G2 / Quest)">90 Hz</button>
-                        <button id="opt-vr-hz-btn-120" onclick="switchVrRefreshRate(120)" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white text-[11px] transition-all cursor-pointer font-bold" title="120 Hz (Quest / Index / Pimax)">120 Hz</button>
                     </div>
 
                     <!-- AutoFPS Status Pill (Solid Aplat) -->
@@ -2347,7 +2337,7 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                 <div class="p-3 rounded-2xl bg-slate-950 border border-slate-800 space-y-1.5">
                     <div class="flex items-center gap-2">
-                        <span class="text-xs font-mono font-bold text-slate-200 uppercase tracking-wider">1. HARDWARE ASSESSMENT</span>
+                        <span class="text-xs font-mono font-bold text-slate-200 uppercase tracking-wider">HARDWARE ASSESSMENT</span>
                         <span id="opt-debrief-hw-tier" class="text-[10px] font-mono font-bold text-emerald-400 uppercase">OPTIMAL</span>
                     </div>
                     <p id="opt-debrief-hw-text" class="text-xs text-slate-300 leading-relaxed font-medium">
@@ -2357,7 +2347,7 @@
                 <div class="p-3 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
                     <div class="flex items-center justify-between">
                         <div class="flex items-center gap-2">
-                            <span class="text-xs font-mono font-bold text-slate-200 uppercase tracking-wider">2. MSFS GRAPHICS ADVISORY</span>
+                            <span class="text-xs font-mono font-bold text-slate-200 uppercase tracking-wider">MSFS GRAPHICS ADVISORY</span>
                             <span id="opt-debrief-msfs-tier" class="text-[10px] font-mono font-bold text-cyan-400 uppercase">CALIBRATED</span>
                         </div>
                     </div>
@@ -2659,6 +2649,91 @@
                 </div>
             </div>
 
+        </div>
+    </div>
+
+    <!-- HARDWARE DISPLAY CADENCE CALIBRATION MODAL -->
+    <div id="opt-hz-cadence-modal" style="display: none;" class="fixed inset-0 z-[9999] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-slate-700/80 rounded-2xl w-full max-w-2xl shadow-2xl p-6 space-y-5 animate-in fade-in zoom-in-95 duration-200">
+            <!-- Header -->
+            <div class="flex items-start justify-between border-b border-slate-800 pb-4">
+                <div class="space-y-1">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse"></span>
+                        <span id="cadence-modal-pill" class="text-[10px] font-mono text-cyan-400 uppercase font-black tracking-wider">HARDWARE PACING ENGINE</span>
+                    </div>
+                    <h3 id="cadence-modal-title" class="text-base font-bold text-white tracking-wide">Hardware Display Cadence Calibration</h3>
+                </div>
+                <button onclick="closeHzCadenceModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <!-- Detected Hardware & Targets Grid -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 font-mono">
+                <!-- 2D Display Card -->
+                <div class="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1.5">
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-slate-400 uppercase font-bold">2D MONITOR</span>
+                        <span id="cadence-detected-2d-hz" class="text-emerald-400 font-bold">-- Hz</span>
+                    </div>
+                    <div id="cadence-detected-2d-desc" class="text-[11px] text-slate-300 font-medium truncate">Desktop Display</div>
+                    <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between">
+                        <span class="text-[10px] text-slate-400 uppercase">CALCULATED TARGET:</span>
+                        <span id="cadence-target-2d-fps" class="px-2 py-0.5 rounded bg-emerald-950/80 text-emerald-400 border border-emerald-800/80 text-xs font-black">-- FPS</span>
+                    </div>
+                </div>
+
+                <!-- VR Headset Card -->
+                <div class="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1.5">
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-slate-400 uppercase font-bold">VR HEADSET</span>
+                        <span id="cadence-detected-vr-hz" class="text-cyan-400 font-bold">-- Hz</span>
+                    </div>
+                    <div id="cadence-detected-vr-desc" class="text-[11px] text-slate-300 font-medium truncate">VR Headset</div>
+                    <div class="pt-2 border-t border-slate-800/80 flex items-center justify-between">
+                        <span class="text-[10px] text-slate-400 uppercase">CALCULATED TARGET:</span>
+                        <span id="cadence-target-vr-fps" class="px-2 py-0.5 rounded bg-cyan-950/80 text-cyan-400 border border-cyan-800/80 text-xs font-black">-- FPS</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Pedagogy / Calculation & Mode Explanation -->
+            <div class="p-4 rounded-xl bg-slate-950 border border-slate-800/90 text-xs text-slate-300 space-y-3 leading-relaxed">
+                <div>
+                    <span class="font-bold text-white font-mono uppercase tracking-wide block mb-1">🎯 Mode de Calcul : Diviseur Harmonique 1/2 Sync</span>
+                    <p class="text-slate-300">
+                        La formule de synchronisation optimale est <strong class="text-white font-mono">Target FPS = Cadence Matérielle (Hz) ÷ 2</strong>.
+                    </p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-slate-800/80">
+                    <div>
+                        <span class="font-bold text-cyan-300 font-mono text-[11px] uppercase block mb-0.5">En Réalité Virtuelle (VR)</span>
+                        <p class="text-[11px] text-slate-400">
+                            Les casques VR reposent sur la reprojection asynchrone (Smart Smoothing / Motion Reprojection). En verrouillant MSFS exactement à <strong>la moitié de la fréquence native</strong> (ex: 36 FPS pour 72 Hz), le casque interpole chaque trame avec une cadence rigoureusement stable, éliminant tout dédoublement visuel (judder).
+                        </p>
+                    </div>
+                    <div>
+                        <span class="font-bold text-emerald-300 font-mono text-[11px] uppercase block mb-0.5">En Affichage Écran (2D)</span>
+                        <p class="text-[11px] text-slate-400">
+                            Verrouiller le framerate à un diviseur naturel de votre écran stabilise le frame pacing, évite la saturation thermique du GPU et réserve une marge de calcul vitale pour le processeur (CPU MainThread) lors des scènes complexes.
+                        </p>
+                    </div>
+                </div>
+                <div class="pt-2 border-t border-slate-800/80 flex items-start gap-2">
+                    <span class="text-amber-400 font-mono font-bold text-xs shrink-0">💡 NOTE :</span>
+                    <p class="text-[11px] text-slate-400">
+                        Le réglage <strong class="text-slate-200">MAX FRAME RATE</strong> dispose également d'une position <strong class="text-slate-200">OFF</strong>. Si vous utilisez un limiteur tiers (ex: Panneau NVIDIA, RivaTuner) ou préférez laisser le moteur débridé avec G-Sync, vous pouvez choisir <strong>OFF</strong> à tout moment dans la liste déroulante.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Footer Action -->
+            <div class="flex items-center justify-end pt-2">
+                <button onclick="closeHzCadenceModal()" class="px-6 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs font-mono uppercase tracking-wider transition-all cursor-pointer shadow-lg shadow-cyan-900/30">
+                    COMPRIS & CONTINUER
+                </button>
+            </div>
         </div>
     </div>
 

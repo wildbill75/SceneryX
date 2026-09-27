@@ -16416,9 +16416,8 @@ async function loadRigDiagnostics() {
                     vrHzEl.textContent = `${vrHeadset.refresh_rate_hz || 72} Hz Active`;
                     vrHzEl.className = 'text-[11px] text-emerald-400 font-bold';
                 }
-                if (!window._userExplicitVrHzSet && vrHeadset.refresh_rate_hz) {
+                if (vrHeadset.refresh_rate_hz) {
                     currentVrRefreshRate = vrHeadset.refresh_rate_hz;
-                    updateVrHzButtonsUI();
                 }
             } else {
                 vrNameEl.textContent = 'None Detected';
@@ -16470,6 +16469,9 @@ async function loadRigDiagnostics() {
         msfsSettingsMatrixData = data.settings_matrix;
         switchMsfsGraphicsMode(currentMsfsGraphicsMode);
 
+        // Check hardware display cadence (2D screen Hz and VR headset Hz)
+        await checkAndPromptCadenceCalibration(det, data);
+
     } catch (e) {
         console.error("Error loading Rig diagnostics:", e);
     }
@@ -16479,17 +16481,14 @@ function switchMsfsGraphicsMode(mode) {
     currentMsfsGraphicsMode = mode;
     const btn2d = document.getElementById('opt-msfs-mode-btn-2d');
     const btnVr = document.getElementById('opt-msfs-mode-btn-vr');
-    const vrHzWrapper = document.getElementById('opt-vr-hz-selector-wrapper');
 
     if (btn2d && btnVr) {
         if (mode === '2D') {
             btn2d.className = 'px-3 py-1 rounded-lg bg-cyan-600 text-white transition-all cursor-pointer font-bold shadow-sm';
             btnVr.className = 'px-3 py-1 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold';
-            if (vrHzWrapper) vrHzWrapper.classList.add('hidden');
         } else {
             btn2d.className = 'px-3 py-1 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold';
             btnVr.className = 'px-3 py-1 rounded-lg bg-cyan-600 text-white transition-all cursor-pointer font-bold shadow-sm';
-            if (vrHzWrapper) vrHzWrapper.classList.remove('hidden');
         }
     }
 
@@ -16503,7 +16502,7 @@ async function onMsfsManualSettingSubmitted(settingKey, value, minVal, maxVal) {
     if (!rawStr) return;
 
     let cleanVal;
-    if (rawStr.toLowerCase() === 'unlocked' || rawStr === '0') {
+    if (rawStr.toLowerCase() === 'unlocked' || rawStr.toUpperCase() === 'OFF' || rawStr === '0') {
         cleanVal = '0';
     } else {
         const cleanStr = rawStr.replace('Dynamic', '').replace('(', '').replace(')', '').replace('FPS', '').replace('LOD', '').trim();
@@ -16527,10 +16526,20 @@ function toggleComboboxDropdown(key, event) {
         event.stopPropagation();
     }
     const menu = document.getElementById(`opt-combo-menu-${key}`);
+    const input = document.getElementById(`opt-combo-input-${key}`);
     if (!menu) return;
     const isHidden = menu.classList.contains('hidden');
     closeAllComboboxes();
     if (isHidden) {
+        // Position upwards for max_frame_rate or when near the bottom of viewport to avoid container clipping
+        const rect = input ? input.getBoundingClientRect() : null;
+        if (key === 'max_frame_rate' || (rect && (window.innerHeight - rect.bottom < 250 || rect.bottom > 500))) {
+            menu.classList.remove('top-full', 'mt-1');
+            menu.classList.add('bottom-full', 'mb-1');
+        } else {
+            menu.classList.remove('bottom-full', 'mb-1');
+            menu.classList.add('top-full', 'mt-1');
+        }
         menu.classList.remove('hidden');
     }
 }
@@ -16656,7 +16665,7 @@ function renderMsfsSettingsMatrix() {
         if (item.is_numeric) {
             let displayVal = item.raw_value;
             if (item.key === 'max_frame_rate') {
-                displayVal = (item.raw_value === '0' || item.value === '0' || String(item.value).toLowerCase().includes('unlocked')) ? 'Unlocked' : item.raw_value;
+                displayVal = (item.raw_value === '0' || item.value === '0' || String(item.value).toUpperCase() === 'OFF' || String(item.value).toLowerCase().includes('unlocked')) ? 'OFF' : item.raw_value;
             } else {
                 displayVal = item.raw_value || String(item.value).replace(/[^0-9]/g, '') || '100';
             }
@@ -16664,10 +16673,10 @@ function renderMsfsSettingsMatrix() {
             let presetListItems = '';
             if (Array.isArray(item.options)) {
                 presetListItems = item.options.map(opt => {
-                    const isCur = String(opt).toLowerCase() === String(displayVal).toLowerCase();
+                    const isCur = String(opt).toUpperCase() === String(displayVal).toUpperCase();
                     return `
                         <div class="px-3.5 py-2 hover:bg-cyan-600 hover:text-white ${isCur ? 'bg-cyan-950/80 text-cyan-300 font-bold' : 'text-slate-200'} cursor-pointer transition-colors flex items-center justify-between text-sm font-mono"
-                             onmousedown="selectComboboxPreset('${item.key}', '${opt}', ${item.min_val ?? 10}, ${item.max_val ?? 400})">
+                             onmousedown="selectComboboxPreset('${item.key}', '${opt}', ${item.min_val ?? 0}, ${item.max_val ?? 400})">
                             <span>${opt}</span>
                             ${isCur ? '<span class="text-[10px] font-bold bg-cyan-700 text-white px-2 py-0.5 rounded">CURRENT</span>' : ''}
                         </div>
@@ -16684,7 +16693,7 @@ function renderMsfsSettingsMatrix() {
                            onclick="toggleComboboxDropdown('${item.key}', event)"
                            onfocus="this.select();"
                            onkeydown="if(event.key==='Enter'){this.blur();}"
-                           onchange="onMsfsManualSettingSubmitted('${item.key}', this.value, ${item.min_val ?? 10}, ${item.max_val ?? 400})"
+                           onchange="onMsfsManualSettingSubmitted('${item.key}', this.value, ${item.min_val ?? 0}, ${item.max_val ?? 400})"
                            class="w-full bg-slate-950 border border-slate-700/80 focus:border-cyan-400 rounded-xl pl-3 pr-10 py-2 text-sm text-white font-mono font-bold focus:outline-none cursor-pointer"
                            placeholder="Select or enter value..."
                            title="Select a preset from dropdown or enter custom value">
@@ -16695,7 +16704,7 @@ function renderMsfsSettingsMatrix() {
                         </svg>
                     </div>
                     <div id="opt-combo-menu-${item.key}"
-                         class="hidden absolute z-50 left-0 right-0 mt-1 max-h-52 overflow-y-auto bg-slate-900 border border-slate-700 rounded-xl shadow-2xl py-1 divide-y divide-slate-800">
+                         class="hidden absolute z-50 left-0 right-0 max-h-56 overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-700 rounded-xl shadow-2xl py-1 divide-y divide-slate-800">
                         ${presetListItems}
                     </div>
                 </div>
@@ -16796,6 +16805,113 @@ async function applyOptimalMsfsSettingsCurrentMode() {
         }
     } catch (e) {
         console.error("Error applying optimal settings:", e);
+    }
+}
+
+async function checkAndPromptCadenceCalibration(det, data) {
+    if (!det) return;
+    const disp = det.display;
+    const vrHeadset = det.vr_headset;
+
+    const screenHz = disp ? Math.round(disp.refresh_rate_hz || disp.refresh_rate_int || 60) : 60;
+    const screenName = (disp && disp.formatted) ? disp.formatted : `${screenHz} Hz Monitor`;
+
+    const hasVr = Boolean(vrHeadset && vrHeadset.detected);
+    const vrHz = hasVr ? Math.round(vrHeadset.refresh_rate_hz || 72) : 72;
+    const vrName = hasVr ? (vrHeadset.name || 'VR Headset') : 'None Detected';
+
+    // Calculate ideal targets
+    // VR target: exactly 1/2 sync
+    const vrTargetFps = Math.max(30, Math.floor(vrHz / 2));
+
+    // 2D target: 1/2 sync for high-refresh screens or 60 FPS
+    let screenTargetFps = 60;
+    if (screenHz >= 240) screenTargetFps = 120;
+    else if (screenHz >= 165) screenTargetFps = 82;
+    else if (screenHz >= 144) screenTargetFps = 72;
+    else if (screenHz >= 120) screenTargetFps = 60;
+    else if (screenHz >= 75) screenTargetFps = Math.round(screenHz / 2);
+    else screenTargetFps = 60;
+
+    const savedScreenHz = localStorage.getItem('sceneryx_cadence_screen_hz');
+    const savedVrHz = localStorage.getItem('sceneryx_cadence_vr_hz');
+    const hasCalibratedOnce = localStorage.getItem('sceneryx_cadence_calibrated_v1');
+
+    const isFirstTime = !hasCalibratedOnce;
+    const isScreenHzChanged = Boolean(savedScreenHz && String(savedScreenHz) !== String(screenHz));
+    const isVrHzChanged = Boolean(hasVr && savedVrHz && String(savedVrHz) !== String(vrHz));
+
+    if (isFirstTime || isScreenHzChanged || isVrHzChanged) {
+        // Automatically stage/apply the optimal target frame rates
+        try {
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.update_msfs_setting) {
+                if (hasVr) {
+                    await window.pywebview.api.update_msfs_setting('VR', 'max_frame_rate', String(vrTargetFps));
+                }
+                await window.pywebview.api.update_msfs_setting('2D', 'max_frame_rate', String(screenTargetFps));
+            }
+        } catch (e) {
+            console.error("Error auto-calibrating target frame rate:", e);
+        }
+
+        // Save new state to localStorage so it doesn't pop up again unless hardware Hz changes
+        localStorage.setItem('sceneryx_cadence_screen_hz', String(screenHz));
+        localStorage.setItem('sceneryx_cadence_vr_hz', String(vrHz));
+        localStorage.setItem('sceneryx_cadence_calibrated_v1', 'true');
+
+        // Show the cadence calibration modal
+        showHzCadenceModal({
+            isFirstTime,
+            isScreenHzChanged,
+            isVrHzChanged,
+            screenHz,
+            screenName,
+            screenTargetFps,
+            hasVr,
+            vrHz,
+            vrName,
+            vrTargetFps
+        });
+    }
+}
+
+function showHzCadenceModal(info) {
+    const modal = document.getElementById('opt-hz-cadence-modal');
+    if (!modal) return;
+
+    const titleEl = document.getElementById('cadence-modal-title');
+    const pillEl = document.getElementById('cadence-modal-pill');
+    if (pillEl) {
+        pillEl.textContent = info.isFirstTime ? 'INITIAL HARDWARE CALIBRATION' : 'HARDWARE CADENCE SHIFT';
+    }
+    if (titleEl) {
+        titleEl.textContent = info.isFirstTime 
+            ? 'Hardware Display Cadence Calibration'
+            : (info.isVrHzChanged ? `VR Headset Refresh Rate Changed (${info.vrHz} Hz)` : `Display Refresh Rate Changed (${info.screenHz} Hz)`);
+    }
+
+    const scrHzEl = document.getElementById('cadence-detected-2d-hz');
+    const scrDescEl = document.getElementById('cadence-detected-2d-desc');
+    const scrTargetEl = document.getElementById('cadence-target-2d-fps');
+    if (scrHzEl) scrHzEl.textContent = `${info.screenHz} Hz`;
+    if (scrDescEl) scrDescEl.textContent = info.screenName;
+    if (scrTargetEl) scrTargetEl.textContent = `${info.screenTargetFps} FPS (1/2 Sync)`;
+
+    const vrHzEl = document.getElementById('cadence-detected-vr-hz');
+    const vrDescEl = document.getElementById('cadence-detected-vr-desc');
+    const vrTargetEl = document.getElementById('cadence-target-vr-fps');
+    if (vrHzEl) vrHzEl.textContent = info.hasVr ? `${info.vrHz} Hz Native` : 'Desktop Mode';
+    if (vrDescEl) vrDescEl.textContent = info.hasVr ? info.vrName : 'No VR Headset Connected';
+    if (vrTargetEl) vrTargetEl.textContent = info.hasVr ? `${info.vrTargetFps} FPS (1/2 Reprojection)` : 'OFF / N/A';
+
+    modal.style.display = 'flex';
+}
+
+function closeHzCadenceModal() {
+    const modal = document.getElementById('opt-hz-cadence-modal');
+    if (modal) modal.style.display = 'none';
+    if (typeof loadRigDiagnostics === 'function') {
+        loadRigDiagnostics();
     }
 }
 
