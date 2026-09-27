@@ -10,6 +10,7 @@ L'application ne se limite plus à la seule gestion des dossiers de scènes, ell
 L'expérience utilisateur couvre désormais les trois temps clés du vol :
 1. **Avant le vol (Pre-Flight Optimizer)** :
    * Détection instantanée du matériel (CPU, GPU, RAM, XMP, RBar, HAGS, Écran Hz, DLSS).
+   * Sélection assistée via listes déroulantes de composants filtrables (style e-commerce hardware) et saisie libre.
    * Sélection de l'avion / studio (ex: Flight Sim Labs A321, Fenix, PMDG) et profilage sur mesure.
    * Calcul du ratio de synchronisation parfait (Frame Pacing), calibration AutoFPS et isolation des scènes **Direct A ➔ B**.
 2. **Pendant le vol (In-Flight Blackbox & Live HUD)** :
@@ -23,7 +24,29 @@ L'expérience utilisateur couvre désormais les trois temps clés du vol :
 
 ---
 
-## 2. Architecture Logicielle & Découplage Modulaire
+## 2. Évolution Ergonomique du Menu Radial : "Flight Optimizer"
+
+Dans SceneryX, l'action sur un aéroport n'a jamais été un outil de dispatching complexe (rôle de SimBrief), mais un acte d'**optimisation du simulateur** pour le vol envisagé.
+
+Le quadrant Nord du menu radial évolue donc naturellement :
+* **Ancien intitulé** : `FLIGHT PLAN`
+* **Nouvel intitulé** : `FLIGHT OPTIMIZER`
+* **Légèreté & Esthétique** : Conservation exacte du design aérien, des secteurs SVG circulaires translucides en verre dépoli (Frosted Glassmorphism) et de l'animation de cascade à ressort (Spring Bounce).
+
+```
+                 ▲ NORD : [ FLIGHT OPTIMIZER ]
+                        (Vol + Rig + Blackbox)
+                          ┌─────────────┐
+                          │    LFPO     │
+       ◄ OUEST :          │ Paris Orly  │          ► EST :
+ [ OPERATING AIRLINES ]   │  Payware    │      [ SCENERIES ]
+                          └─────────────┘
+                 ▼ SUD : [ AIRPORT DETAILS ]
+```
+
+---
+
+## 3. Architecture Logicielle & Découplage Modulaire
 
 Pour garantir une maintenabilité absolue et faciliter la publication ultérieure d'outils autonomes gratuits pour la communauté, le design repose sur des modules indépendants :
 
@@ -57,6 +80,7 @@ graph TD
    * Détecteur matériel et sous-systèmes Windows.
    * Moteur mathématique de Frame Pacing ($Hz / N$).
    * Matrice d'empreinte des studios (FSLabs, Fenix, PMDG, iniBuilds, etc.).
+   * Base de données locale des composants du marché (familles CPU et GPU).
    * Générateur de recommandations pour `UserCfg.opt` et AutoFPS.
 2. `flight_perf_tracker.py` :
    * Capture de métriques toutes les 500 ms (VRAM physique, RAM Commit/WS, MainThread, FPS, Rolling Cache Mbps, TLOD/OLOD, altitude/VSI).
@@ -65,67 +89,53 @@ graph TD
 3. `main.py` :
    * Expose les méthodes PyWebView unifiées (`api.get_rig_diagnostics()`, `api.start_flight_tracker()`, `api.stop_flight_tracker()`, `api.get_live_telemetry()`, `api.list_flight_benchmarks()`).
 4. `web/` :
-   * Panneau modal unifié **"Performance & Flight Hub"** réunissant le configurateur de vol et le tableau de bord de télémétrie.
+   * Modal glassmorphism unifiée accessible depuis le quadrant Nord de la radiale et depuis la toolbar inférieure.
 
 ---
 
-## 3. Points d'Accès UI dans SceneryX
+## 4. Design des Composants de Saisie : Combobox Filtrable & Recherche Libre
 
-### A. Barre d'Outils Inférieure (`#bottom-map-toolbar`)
-Ajout d'un bouton de contrôle de performance avec icône tachymètre (`fa-solid fa-gauge-high`) :
-* **Label** : *Performance & Rig*
-* **Statut Visuel Dynamique** :
-  * *Gris* : Inactif / Prêt pour configuration.
-  * *Cyan clignotant / pulsé* : Vol en cours d'enregistrement (Tracker actif).
-  * *Pastille Verte* : Réglages parfaitement alignés avec l'écran et l'appareil.
-  * *Pastille Orange* : Alerte de goulot d'étranglement détecté (ex: VRAM limite).
+Pour offrir une expérience digne des meilleurs configurateurs hardware (style LDLC, PCPartPicker), les sélecteurs de matériel (CPU, GPU, RAM, Écran) fonctionnent en **Combobox Hybride Intelligente** :
 
-### B. Mini-Barre Live Télémétrie (In-Flight Floating HUD)
-Lorsque le simulateur tourne et que le tracker est activé :
-* SceneryX propose un mini bandeau compact et flottant (rétractable) affichant :
-  * **FPS** (affichés / base moteur).
-  * **MainThread** (ms) avec code couleur (vert si $< 20\text{ ms}$, orange si $> 22{,}2\text{ ms}$).
-  * **VRAM** (Go et % d'utilisation physique).
-  * **Rolling Cache** (lecture en temps réel en Mbps).
-  * **LOD** (TLOD / OLOD dynamiques appliqués par AutoFPS).
-
-### C. Bandeau de Plan de Vol Contextuel
-Lorsqu'un vol est sélectionné (départ A ➔ arrivée B ou import SimBrief) :
-* Bouton d'action directe : *"Préparer les performances pour ce vol"*
-* Applique en une seule étape l'isolation des scènes et le profil optimal de l'appareil choisi.
+### Fonctionnement UX :
+1. **Auto-remplissage initial** : Dès l'ouverture, le champ affiche la valeur réelle détectée sur la machine de l'utilisateur (ex: `Intel Core i9-13900K`, `NVIDIA GeForce RTX 4080 (16 Go)`).
+2. **Liste déroulante hiérarchisée** : Un clic sur la flèche ou le champ ouvre une liste groupée par catégories :
+   * **CPU** : 
+     * *Intel 14th / 13th Gen* (i9-14900K, i7-14700K, i9-13900K...)
+     * *Intel 12th Gen* (i9-12900K, i7-12700K...)
+     * *AMD Ryzen 9000 / 7000 X3D* (Ryzen 7 9800X3D, Ryzen 7 7800X3D, Ryzen 9 7950X3D...)
+     * *AMD Ryzen 5000 X3D* (Ryzen 7 5800X3D...)
+   * **GPU** :
+     * *NVIDIA RTX 50 Series* (RTX 5090 32GB, RTX 5080 16GB...)
+     * *NVIDIA RTX 40 Series* (RTX 4090 24GB, RTX 4080 16GB, RTX 4070 Ti Super 16GB, RTX 4070 12GB...)
+     * *NVIDIA RTX 30 Series* (RTX 3090 24GB, RTX 3080 Ti 12GB, RTX 3080 10GB...)
+     * *AMD Radeon RX 7000 Series* (RX 7900 XTX 24GB, RX 7900 XT 20GB...)
+3. **Recherche textuelle instantanée (Typeahead Filter)** : L'utilisateur peut taper directement dans le champ (ex: taper *"7800"* pour isoler le 7800X3D en 2 frappes).
+4. **Saisie personnalisée libre (Custom Entry)** : Si l'utilisateur possède un processeur ou une variante non répertoriée, il peut taper son modèle sans être bloqué par la liste.
 
 ---
 
-## 4. Parcours Utilisateur dans la Modal "Performance Hub"
+## 5. Parcours Utilisateur dans le Panneau "Flight Optimizer"
 
-La modal se compose de 3 onglets principaux :
+Le panneau s'ouvre avec l'aéroport de départ déjà sélectionné :
 
-### Onglet 1 : "Flight Rig Optimizer" (Avant le Vol)
-* **Cartouche Matériel & Écran** : CPU, GPU, RAM (XMP), HAGS, RBar, Fréquence Écran (ex: 180 Hz).
-* **Sélecteur d'Avion & Studio** : Menu déroulant intuitif incluant le profil ultra-lourd **Flight Sim Labs (FSLabs A321)**, Fenix, PMDG, etc.
-* **Résultat de Calibration** :
-  * Cible FPS recommandée (ex: 90 FPS sur 180 Hz avec Frame Gen).
-  * Recommandation `Terrain Detail = LOW` pour préserver 7 Go de VRAM.
-  * Réglages suggérés pour AutoFPS et NVIDIA App.
-* **Bouton 1-Clic** : *"Appliquer et Isoler les Scènes pour ce Vol"*.
+### Volet 1 : Mission & Route
+* **Aéroport de Départ & Arrivée** (avec bouton de permutation et import SimBrief 1-clic).
+* **Mode d'isolation des scènes** : Mode **Direct A ➔ B** activé par défaut (délester toutes les scènes intermédiaires).
+* **Indicateur de gain immédiat** : Affiche le gain de charge estimé (ex: `515 scènes délestées ~ -2.7 Go Commit RAM`).
 
-### Onglet 2 : "Live Blackbox & Tracker" (Pendant le Vol)
-* **Bouton Principal** : `[ Démarrer l'Enregistrement du Vol ]` / `[ Arrêter & Analyser ]`.
-* **Nom du vol** : Auto-rempli avec les OACI de départ et d'arrivée (ex: `LFPO_EGKK_FSLabs_A321`).
-* **Vue en direct** : Graphique miniature des FPS et de la charge MainThread en temps réel.
+### Volet 2 : Rig & Settings
+* **Champs de configuration hardware** (Combobox filtrables : CPU, GPU, RAM MHz, Écran Hz).
+* **Sélecteur d'Avion & Studio** :
+  * **Flight Sim Labs (A321-X / A320)** ➔ Profil calcul intensif MainThread, verrouillage FPS strict 45/90, TLOD sol 110.
+  * **Fenix Simulations (A320)** ➔ Profil VRAM & CoherentGT, Terrain Detail LOW, rendu écran CPU/Balanced.
+  * **PMDG (B737 / B777)** ➔ Profil WASM équilibré, TLOD High permis.
+  * **iniBuilds (A300 / A350)** ➔ Profil VRAM intense, textures cabine allégées.
+* **Prédiction de Fluidité** :
+  * Cible FPS calculée selon l'écran (ex: 90 FPS sur 180 Hz avec Frame Gen, 22.2 ms budget).
+  * Recommandations `UserCfg.opt` et AutoFPS prêtes à l'emploi.
 
-### Onglet 3 : "Historique & Débriefings" (Après le Vol)
-* **Liste des vols enregistrés** : Date, durée, appareil, mode (Baseline vs SceneryX Direct A ➔ B).
-* **Actions par vol** :
-  * *Ouvrir le rapport d'analyse HTML* (courbes, métriques max/moyennes, diagnostic textuel).
-  * *Superposer / Comparer deux vols* (génère le benchmark comparatif instantané).
-
----
-
-## 5. Perspectives & Stratégie Communautaire (Phase 2)
-
-Grâce à ce design complètement découplé :
-1. **SceneryX** conserve l'avantage d'une solution tout-en-un fluide et professionnelle.
-2. Un utilitaire allégé gratuit (**SceneryX Performance Blackbox Free**) pourra être extrait et proposé à la communauté sur Flightsim.to, offrant la détection matérielle et le tracker en version autonome.
-3. Chaque rapport HTML généré par l'outil gratuit comportera la signature discrète :  
-   *"Généré par SceneryX - Boostez vos FPS et libérez votre mémoire sur Flight Simulator"*.
+### Volet 3 : Live Blackbox & Télémétrie
+* **Bouton d'enregistrement** : `[ ⏺ Démarrer le vol ]` / `[ ⏹ Arrêter et voir le débriefing ]`.
+* **Mini HUD en temps réel** : Affichage discret des FPS, du MainThread (ms), de la VRAM totale consommée et de la vitesse de lecture disque / Rolling Cache.
+* **Historique des benchmarks** : Accès direct aux rapports HTML et comparatifs de vol.
