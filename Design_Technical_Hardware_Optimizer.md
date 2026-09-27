@@ -157,14 +157,19 @@ To maximize readability and prevent visual clutter, the graphics configuration i
   - Modifying dropdowns or typing custom values in the UI updates an in-memory staging dictionary (`_staged_user_cfg_settings[mode][key] = val`) without touching `UserCfg.opt` on disk.
   - The live diagnostics matrix recalculates dynamically in-memory, updating ratings, tags, and trade-off pills instantly without writing any backup file or touching disk storage.
   - Disk writes and backup generation are strictly deferred until explicit confirmation.
+- **Pristine Original Backup Preservation (`UserCfg.opt.original`)**:
+  - Automatically and silently created upon the first launch of SceneryX before any diagnostics or optimizations can touch `UserCfg.opt`.
+  - Permanently preserves the user's authentic personal configuration. If previous backups exist, it captures the earliest timestamped file (`UserCfg.opt.backup_20260927_172048`).
+  - Protected from deletion: `delete_user_cfg_backup` strictly prevents removing `UserCfg.opt.original`.
 - **Single-Pass Safety Backup on Validation**:
   - Clicking `OPTIMIZE PROFILE` triggers the commit phase: exactly one timestamped safety backup (`UserCfg.opt.backup_YYYYMMDD_HHMMSS`) is generated before applying the calibrated profile and any staged overrides to `UserCfg.opt`.
 - **Unified Two-Way Modal Navigation (Zero Modal Stacking)**:
   - Consolidates profile feedback and backup rollback into a single window with seamless view switching:
     - **View A (Feedback)**: Clean uppercase header `GRAPHICS PROFILE OPTIMIZED` without icon badge or subtitle clutter. Displays optimization results and applied profile details. Bottom actions feature a standard blue, icon-free `VIEW BACKUPS` button (`bg-blue-600 hover:bg-blue-500 text-white font-bold`) and an `OK` validation button.
-    - **View B (Backups Management)**: Features a dedicated `OPEN FOLDER` button (launches Windows Explorer directly targeting `UserCfg.opt`), 1-click `RESTORE`, and an instant `DELETE` button next to each backup. Clicking `BACK` returns directly to View A.
+    - **View B (Backups Management)**: Features a dedicated `OPEN FOLDER` button (launches Windows Explorer directly targeting `UserCfg.opt`), 1-click `RESTORE`, and an instant `DELETE` button next to each backup.
+    - **Backups Footer Ergonomics**: The footer features a prominent red `RESTORE ORIGINAL CFG` button on the bottom-left (`bg-rose-600 hover:bg-rose-500 text-white font-black`) allowing instant reversion to pristine pre-SceneryX settings, and the `CLOSE` button (along with `BACK` if navigated from feedback) positioned strictly on the bottom-right.
   - Backups list features uniform slate cards (`border-slate-800`), neutral gray `BAK` icons (`bg-slate-800 text-slate-400`), clean single-line timestamp titles, a solid amber `MOST RECENT` badge positioned immediately to the left of `RESTORE` with identical height, padding, and typography, and a minimalist gray trash can button (`text-slate-400 hover:text-white`) without borders or colored backgrounds.
-- **Safety Copy on Rollback**: Restoring a backup automatically creates a safety snapshot of the active file before overwriting, and clears in-memory staged overrides.
+- **Safety Copy on Rollback**: Restoring any backup or the original file automatically creates a safety snapshot of the active file before overwriting, and clears in-memory staged overrides.
 
 ---
 

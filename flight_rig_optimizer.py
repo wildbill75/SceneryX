@@ -711,6 +711,64 @@ def restore_user_cfg_backup(backup_target: str, user_cfg_path: Optional[str] = N
         return {"status": "error", "message": str(e)}
 
 
+def ensure_original_user_cfg_backup(user_cfg_path: Optional[str] = None) -> Optional[str]:
+    """Ensures a permanent pristine copy of the user's original UserCfg.opt exists prior to any SceneryX tampering."""
+    path = user_cfg_path or get_user_cfg_path()
+    if not path or not os.path.exists(path):
+        return None
+    dir_name = os.path.dirname(path)
+    original_path = os.path.join(dir_name, "UserCfg.opt.original")
+    if os.path.exists(original_path):
+        return original_path
+
+    # If UserCfg.opt.original doesn't exist yet, check for existing backups to find the very oldest one
+    base_name = os.path.basename(path)
+    pattern = os.path.join(dir_name, f"{base_name}.backup_*")
+    files = glob.glob(pattern)
+    if files:
+        # Sort by filename / timestamp suffix to get the earliest backup ever made by SceneryX
+        oldest_backup = sorted(files)[0]
+        try:
+            shutil.copy2(oldest_backup, original_path)
+            return original_path
+        except Exception:
+            pass
+
+    # If no prior backup existed, copy the active UserCfg.opt directly
+    try:
+        shutil.copy2(path, original_path)
+        return original_path
+    except Exception:
+        return None
+
+
+def restore_original_user_cfg(user_cfg_path: Optional[str] = None) -> Dict[str, Any]:
+    """Safely restores the user's original UserCfg.opt configuration from before SceneryX was first run."""
+    path = user_cfg_path or get_user_cfg_path()
+    if not path or not os.path.exists(path):
+        return {"status": "error", "message": "UserCfg.opt path not detected."}
+    dir_name = os.path.dirname(path)
+    original_path = os.path.join(dir_name, "UserCfg.opt.original")
+
+    if not os.path.exists(original_path):
+        ensured = ensure_original_user_cfg_backup(path)
+        if not ensured or not os.path.exists(ensured):
+            return {"status": "error", "message": "Original UserCfg.opt backup not found."}
+        original_path = ensured
+
+    safety_backup = backup_user_cfg(path)
+    try:
+        shutil.copy2(original_path, path)
+        clear_staged_settings()
+        return {
+            "status": "success",
+            "message": "Original UserCfg.opt configuration restored successfully.",
+            "safety_backup": os.path.basename(safety_backup)
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
 def delete_user_cfg_backup(backup_target: str, user_cfg_path: Optional[str] = None) -> Dict[str, Any]:
     """Safely deletes an obsolete UserCfg.opt backup file."""
     path = user_cfg_path or get_user_cfg_path()
@@ -718,9 +776,9 @@ def delete_user_cfg_backup(backup_target: str, user_cfg_path: Optional[str] = No
         return {"status": "error", "message": "UserCfg.opt path not detected."}
     dir_name = os.path.dirname(path)
     target_path = backup_target if os.path.isabs(backup_target) else os.path.join(dir_name, backup_target)
-    # Critical safety guard: never allow deleting the active UserCfg.opt file
-    if os.path.abspath(target_path) == os.path.abspath(path):
-        return {"status": "error", "message": "Cannot delete active UserCfg.opt configuration."}
+    # Critical safety guard: never allow deleting the active UserCfg.opt or the pristine UserCfg.opt.original
+    if os.path.abspath(target_path) == os.path.abspath(path) or os.path.basename(target_path) == "UserCfg.opt.original":
+        return {"status": "error", "message": "Cannot delete protected configuration files."}
     if not os.path.exists(target_path):
         return {"status": "error", "message": f"Backup file {backup_target} not found."}
     try:
@@ -2233,6 +2291,9 @@ def get_full_rig_diagnostics(flight_profile: str = 'LINER', vr_refresh_rate: int
     hags = detect_windows_hags()
     dlss = detect_dlss_version()
     cfg = detect_msfs_user_cfg()
+    # Silently ensure pristine copy of user's original UserCfg.opt is preserved
+    ensure_original_user_cfg_backup(cfg.get("path"))
+
     installed = detect_installed_aircraft()
     balance = analyze_system_balance(cpu, gpu, ram)
     vr_headset = detect_vr_headset()

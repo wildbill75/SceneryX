@@ -2643,13 +2643,19 @@
                 </div>
 
                 <div class="flex items-center justify-between pt-2 border-t border-slate-800">
-                    <button id="unified-backups-back-btn" onclick="switchUnifiedModalView('feedback')" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 font-bold text-xs transition-all cursor-pointer font-mono uppercase flex items-center gap-1.5">
-                        <i class="fa-solid fa-arrow-left"></i>
-                        <span>BACK</span>
+                    <button onclick="restoreOriginalUserCfgTarget()" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs transition-all cursor-pointer font-mono uppercase tracking-wider flex items-center gap-1.5 shadow-sm active:scale-95" title="Revert to your original UserCfg.opt saved before SceneryX was first run">
+                        <i class="fa-solid fa-rotate-left"></i>
+                        <span>RESTORE ORIGINAL CFG</span>
                     </button>
-                    <button onclick="closeUnifiedUserCfgModal()" class="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs transition-all cursor-pointer font-mono uppercase">
-                        CLOSE
-                    </button>
+                    <div class="flex items-center gap-2">
+                        <button id="unified-backups-back-btn" onclick="switchUnifiedModalView('feedback')" class="hidden px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 font-bold text-xs transition-all cursor-pointer font-mono uppercase flex items-center gap-1.5">
+                            <i class="fa-solid fa-arrow-left"></i>
+                            <span>BACK</span>
+                        </button>
+                        <button onclick="closeUnifiedUserCfgModal()" class="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs transition-all cursor-pointer font-mono uppercase">
+                            CLOSE
+                        </button>
+                    </div>
                 </div>
             </div>
 

@@ -16956,6 +16956,30 @@ async function restoreUserCfgBackupTarget(filename) {
     }
 }
 
+async function restoreOriginalUserCfgTarget() {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.restore_original_user_cfg) return;
+    try {
+        const resStr = await window.pywebview.api.restore_original_user_cfg();
+        const res = typeof resStr === 'string' ? JSON.parse(resStr) : resStr;
+        if (res && res.status === 'success') {
+            closeUnifiedUserCfgModal();
+            if (typeof showToast === 'function') {
+                showToast("Original UserCfg.opt restored successfully!", "success");
+            }
+            await loadRigDiagnostics();
+        } else {
+            if (typeof showToast === 'function') {
+                showToast(`Failed to restore original file: ${res ? res.message : 'Unknown error'}`, "error");
+            }
+        }
+    } catch (e) {
+        console.error("Error restoring original UserCfg.opt:", e);
+        if (typeof showToast === 'function') {
+            showToast(`Error: ${e}`, "error");
+        }
+    }
+}
+
 async function deleteUserCfgBackupTarget(filename) {
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.delete_user_cfg_backup) return;
     try {
