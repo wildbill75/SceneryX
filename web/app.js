@@ -15515,12 +15515,12 @@ function handleAirportRouteSelection(ap) {
             flightCorridorLayerGroup.clearLayers();
         }
         if (typeof showToast === 'function') {
-            showToast(`✈ Departure set: ${ap.icao}. Alt+Click or Click another airport for Destination.`, 'info');
+            showToast(`✈ Departure set: ${ap.icao}. Click another airport on the map to set Arrival.`, 'info');
         }
     } else if (optimizerOrigin.icao === ap.icao) {
         optimizerActiveAnchorAirport = ap;
         if (typeof showToast === 'function') {
-            showToast(`${ap.icao} is already set as Departure. Alt+Click another airport for Destination.`, 'warning');
+            showToast(`${ap.icao} is already set as Departure. Click another airport on the map for Arrival.`, 'warning');
         }
     } else {
         // Step 2: Set destination (Point B)
@@ -15734,7 +15734,7 @@ function triggerRadialFlightOptimizer() {
     }
     startOptimizerPanTracking(1400);
     if (typeof showToast === 'function') {
-        showToast(`✈ Departure set: ${targetAp.icao}. Alt+Click or Click an airport on the map to set Destination.`, 'info');
+        showToast(`✈ Departure set: ${targetAp.icao}. Click an airport on the map to set Arrival.`, 'info');
     }
 }
 
@@ -16005,13 +16005,22 @@ function updateOptimizerRouteUI() {
 
     if (origIcao) {
         origIcao.textContent = optimizerOrigin ? optimizerOrigin.icao : '----';
-        origIcao.className = `font-mono text-xl font-black ${getAirportPricingTextColor(optimizerOrigin)}`;
-        if (origName) origName.textContent = optimizerOrigin ? (optimizerOrigin.name || 'Airport') : 'Select on map';
+        origIcao.className = `font-mono text-2xl font-black ${getAirportPricingTextColor(optimizerOrigin)}`;
+        if (origName) origName.textContent = optimizerOrigin ? (optimizerOrigin.name || '') : '';
     }
     if (destIcao) {
         destIcao.textContent = optimizerDest ? optimizerDest.icao : '----';
-        destIcao.className = `font-mono text-xl font-black ${getAirportPricingTextColor(optimizerDest)}`;
-        if (destName) destName.textContent = optimizerDest ? (optimizerDest.name || 'Airport') : 'Alt+Click airport on map';
+        destIcao.className = `font-mono text-2xl font-black ${getAirportPricingTextColor(optimizerDest)}`;
+        if (destName) destName.textContent = optimizerDest ? (optimizerDest.name || '') : '';
+    }
+
+    const origBox = document.getElementById('opt-route-origin-box');
+    const destBox = document.getElementById('opt-route-dest-box');
+    if (origBox) {
+        origBox.title = optimizerOrigin ? `Departure: ${optimizerOrigin.icao} - ${optimizerOrigin.name || ''} (Click to focus on map)` : 'Click an airport on the map to set Departure';
+    }
+    if (destBox) {
+        destBox.title = optimizerDest ? `Arrival: ${optimizerDest.icao} - ${optimizerDest.name || ''} (Click to focus on map)` : 'Click an airport on the map to set Arrival';
     }
 
     if (flightBadge) {
@@ -16030,18 +16039,29 @@ function updateOptimizerRouteUI() {
         const card = document.getElementById(`opt-mode-card-${m}`);
         if (card) {
             const titleSpan = card.querySelector('span');
-            const subSpan = card.querySelector('span:last-of-type');
             if (m.toUpperCase() === optimizerMode) {
-                card.className = 'p-3 rounded-2xl bg-slate-800 border-2 border-blue-500 cursor-pointer transition-all';
+                card.className = 'p-3 rounded-2xl bg-slate-800 border-2 border-blue-500 flex flex-col items-center justify-center text-center cursor-pointer transition-all';
                 if (titleSpan) titleSpan.className = 'text-sm font-black text-white uppercase tracking-wider';
-                if (subSpan && subSpan !== titleSpan) subSpan.className = 'text-xs text-blue-300 font-medium';
             } else {
-                card.className = 'p-3 rounded-2xl bg-slate-950 border border-slate-800 hover:bg-slate-900 hover:border-slate-700 cursor-pointer transition-all';
+                card.className = 'p-3 rounded-2xl bg-slate-950 border border-slate-800 hover:bg-slate-900 hover:border-slate-700 flex flex-col items-center justify-center text-center cursor-pointer transition-all';
                 if (titleSpan) titleSpan.className = 'text-sm font-black text-slate-300 uppercase tracking-wider';
-                if (subSpan && subSpan !== titleSpan) subSpan.className = 'text-xs text-slate-400 font-medium';
             }
         }
     });
+
+    const clearRouteBtn = document.getElementById('opt-btn-clear-route');
+    if (clearRouteBtn) {
+        const hasRoute = !!(optimizerOrigin || optimizerDest);
+        if (hasRoute) {
+            clearRouteBtn.disabled = false;
+            clearRouteBtn.className = 'px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-blue-600 text-slate-200 hover:text-white border border-slate-700 hover:border-blue-500 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5';
+            clearRouteBtn.title = 'Clear current flight route';
+        } else {
+            clearRouteBtn.disabled = true;
+            clearRouteBtn.className = 'px-4 py-2.5 rounded-xl bg-slate-900 text-slate-600 border border-slate-800/80 font-bold text-xs uppercase tracking-wider cursor-not-allowed opacity-40 flex items-center gap-1.5 pointer-events-none';
+            clearRouteBtn.title = 'No active flight route to reset';
+        }
+    }
 
     const restoreBtn = document.getElementById('opt-btn-restore-sceneries');
     if (restoreBtn) {

@@ -2032,7 +2032,7 @@
          onpointerdown="event.stopPropagation();"
          class="hidden fixed z-[1200] w-[940px] max-w-[96vw] rounded-3xl p-4 shadow-2xl border border-slate-700 bg-slate-900 flex flex-col space-y-3 overflow-hidden text-slate-100 select-none pointer-events-auto">
         <!-- HEADER & DRAG HANDLE -->
-        <div id="opt-modal-header" class="flex items-center justify-between border-b border-slate-800 pb-2.5 shrink-0 cursor-grab active:cursor-grabbing">
+        <div id="opt-modal-header" class="flex items-center justify-between pb-1.5 shrink-0 cursor-grab active:cursor-grabbing">
             <div>
                 <h2 class="text-xl font-bold text-white tracking-tight">Flight Optimizer</h2>
             </div>
@@ -2056,52 +2056,45 @@
         <div id="opt-tab-content-route" class="flex-1 space-y-2.5">
             <!-- Flight Path Card -->
             <div class="p-3 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-3">
-                <div class="flex-1 cursor-pointer hover:bg-slate-900/60 p-1.5 rounded-xl transition-all" onclick="focusOptimizerAirport('origin')" title="Click to view Departure on map">
-                    <span class="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider block mb-0.5">Departure Airport</span>
+                <div id="opt-route-origin-box" class="flex-1 cursor-pointer hover:bg-slate-900/60 p-1.5 rounded-xl transition-all" onclick="focusOptimizerAirport('origin')" title="Click an airport on the map to set Departure">
+                    <span class="text-xs font-mono text-white uppercase font-bold tracking-wider block mb-1">Departure Airport</span>
                     <div class="flex items-center gap-2">
-                        <span id="opt-route-origin-icao" class="font-mono text-xl font-black text-slate-400">----</span>
-                        <span id="opt-route-origin-name" class="text-xs text-slate-300 truncate">Select on map</span>
+                        <span id="opt-route-origin-icao" class="font-mono text-2xl font-black text-slate-400">----</span>
+                        <span id="opt-route-origin-name" class="text-xs text-slate-300 truncate"></span>
                     </div>
                 </div>
-                <button onclick="swapOptimizerRouteAirports()" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition-all cursor-pointer shrink-0" title="Swap Departure and Destination">
+                <button onclick="swapOptimizerRouteAirports()" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition-all cursor-pointer shrink-0" title="Swap Departure and Arrival">
                     <i class="fa-solid fa-arrow-right-arrow-left text-xs"></i>
                 </button>
-                <div class="flex-1 text-right cursor-pointer hover:bg-slate-900/60 p-1.5 rounded-xl transition-all" onclick="focusOptimizerAirport('dest')" title="Click to view Destination on map">
-                    <span class="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider block mb-0.5">Destination Airport</span>
+                <div id="opt-route-dest-box" class="flex-1 text-right cursor-pointer hover:bg-slate-900/60 p-1.5 rounded-xl transition-all" onclick="focusOptimizerAirport('dest')" title="Click an airport on the map to set Arrival">
+                    <span class="text-xs font-mono text-white uppercase font-bold tracking-wider block mb-1">Arrival Airport</span>
                     <div class="flex items-center justify-end gap-2">
-                        <span id="opt-route-dest-name" class="text-xs text-slate-300 truncate">Alt+Click airport on map</span>
-                        <span id="opt-route-dest-icao" class="font-mono text-xl font-black text-slate-400">----</span>
+                        <span id="opt-route-dest-name" class="text-xs text-slate-300 truncate"></span>
+                        <span id="opt-route-dest-icao" class="font-mono text-2xl font-black text-slate-400">----</span>
                     </div>
                 </div>
             </div>
 
             <!-- Mode Selector -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-2.5">
-                <div onclick="setOptimizerMode('DIRECT')" id="opt-mode-card-direct" class="p-3 rounded-2xl bg-slate-800 border-2 border-blue-500 cursor-pointer transition-all">
-                    <div class="flex items-center justify-between mb-1">
-                        <span class="text-sm font-black text-white uppercase tracking-wider">Direct A ➔ B</span>
-                        <span class="text-[9px] font-mono bg-blue-500 text-white px-1.5 py-0.5 rounded font-bold">MAX FPS</span>
-                    </div>
-                    <span class="text-xs text-blue-300 font-medium">Dep & Arr Only</span>
+                <div onclick="setOptimizerMode('DIRECT')" id="opt-mode-card-direct" class="p-3 rounded-2xl bg-slate-800 border-2 border-blue-500 flex flex-col items-center justify-center text-center cursor-pointer transition-all" title="Keeps only Departure and Arrival airports. All en-route addon sceneries are disabled for maximum performance and RAM headroom.">
+                    <span class="text-sm font-black text-white uppercase tracking-wider">Direct A ➔ B</span>
                 </div>
-                <div onclick="setOptimizerMode('CORRIDOR')" id="opt-mode-card-corridor" class="p-3 rounded-2xl bg-slate-950 border border-slate-800 hover:bg-slate-900 hover:border-slate-700 cursor-pointer transition-all">
-                    <div class="flex items-center justify-between mb-1">
-                        <span class="text-sm font-black text-slate-300 uppercase tracking-wider">En-Route Corridor</span>
-                    </div>
-                    <span class="text-xs text-slate-400 font-medium">Flight Path Airfields</span>
+                <div onclick="setOptimizerMode('CORRIDOR')" id="opt-mode-card-corridor" class="p-3 rounded-2xl bg-slate-950 border border-slate-800 hover:bg-slate-900 hover:border-slate-700 flex flex-col items-center justify-center text-center cursor-pointer transition-all" title="Keeps Departure, Arrival, and all airports lying along the flight corridor.">
+                    <span class="text-sm font-black text-slate-300 uppercase tracking-wider">En-Route Corridor</span>
                 </div>
-                <div onclick="setOptimizerMode('SIMBRIEF')" id="opt-mode-card-simbrief" class="p-3 rounded-2xl bg-slate-950 border border-slate-800 hover:bg-slate-900 hover:border-slate-700 cursor-pointer transition-all">
-                    <div class="flex items-center justify-between mb-1">
+                <div onclick="setOptimizerMode('SIMBRIEF')" id="opt-mode-card-simbrief" class="p-3 rounded-2xl bg-slate-950 border border-slate-800 hover:bg-slate-900 hover:border-slate-700 flex flex-col items-center justify-center text-center cursor-pointer transition-all" title="1-Click synchronization with your latest SimBrief Operational Flight Plan (OFP). Keeps departure, arrival, alternates, and en-route corridor sceneries.">
+                    <div class="flex items-center justify-center gap-2">
                         <span class="text-sm font-black text-slate-300 uppercase tracking-wider">Import SimBrief</span>
                         <i class="fa-solid fa-cloud-arrow-down text-slate-400 text-xs"></i>
                     </div>
-                    <span class="text-xs text-slate-400 font-medium">Latest OFP Route</span>
                 </div>
             </div>
 
-            <!-- Unified Estimated Savings & Actions Bar -->
-            <div class="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-6">
-                <div class="flex items-center gap-6">
+            <!-- Stats & Actions Row (Dual-Pill Design) -->
+            <div class="flex items-stretch gap-2.5">
+                <!-- Dedicated Predictions Pill -->
+                <div class="flex-1 p-3 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-around gap-4">
                     <div>
                         <span class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Isolated Sceneries</span>
                         <span id="opt-saving-scenery-count" class="font-mono text-2xl font-black text-emerald-400 leading-none">--</span>
@@ -2118,9 +2111,14 @@
                     </div>
                 </div>
 
-                <div class="flex items-center gap-2">
-                    <button onclick="restoreFlightCorridorSceneries()" id="opt-btn-restore-sceneries" class="hidden px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer">
+                <!-- Actions Pill (New Route + Optimize) -->
+                <div class="p-3 rounded-2xl bg-slate-950 border border-slate-800 flex items-center gap-2 shrink-0">
+                    <button onclick="restoreFlightCorridorSceneries()" id="opt-btn-restore-sceneries" class="hidden px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer">
                         Restore All
+                    </button>
+                    <button onclick="clearOptimizerRoutePlanning()" id="opt-btn-clear-route" class="px-4 py-2.5 rounded-xl bg-slate-900 text-slate-600 border border-slate-800/80 font-bold text-xs uppercase tracking-wider cursor-not-allowed opacity-40 flex items-center gap-1.5" title="No active flight route to reset">
+                        <i class="fa-solid fa-arrows-rotate text-xs"></i>
+                        <span>New Route</span>
                     </button>
                     <button onclick="applyOptimizerRouteSceneries()" id="opt-btn-apply-sceneries" class="px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-sm uppercase tracking-wider transition-all cursor-pointer active:scale-95 shadow-lg shadow-emerald-500/20">
                         Optimize
@@ -2313,17 +2311,11 @@
         </div>
 
         <!-- FOOTER -->
-        <div class="flex items-center justify-end border-t border-slate-800 pt-2.5 shrink-0 text-xs">
-            <div class="flex items-center gap-2">
-                <button onclick="clearOptimizerRoutePlanning()" id="opt-btn-clear-route" class="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-blue-600 text-slate-300 hover:text-white border border-slate-700 hover:border-blue-500 font-bold transition-all cursor-pointer flex items-center gap-1.5" title="Clear current flight route without exiting">
-                    <i class="fa-solid fa-arrows-rotate text-xs"></i>
-                    <span>New Route</span>
-                </button>
-                <button onclick="exitFlightOptimizerMode()" class="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 hover:border-slate-500 font-bold transition-all cursor-pointer flex items-center gap-1.5">
-                    <i class="fa-solid fa-arrow-right-from-bracket text-xs"></i>
-                    <span>Exit</span>
-                </button>
-            </div>
+        <div class="flex items-center justify-end pt-1 shrink-0 text-xs">
+            <button onclick="exitFlightOptimizerMode()" class="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 hover:border-slate-500 font-bold transition-all cursor-pointer flex items-center gap-1.5">
+                <i class="fa-solid fa-arrow-right-from-bracket text-xs"></i>
+                <span>Exit</span>
+            </button>
         </div>
     </div>
 
