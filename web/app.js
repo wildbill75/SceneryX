@@ -16236,8 +16236,58 @@ function applyOptimizerRouteSceneries() {
 let currentMsfsGraphicsMode = '2D';
 let currentFlightMissionProfile = 'LINER';
 let currentVrRefreshRate = 72;
+let currentGraphicsSettingsPage = 0;
 let msfsSettingsMatrixData = null;
 let userCfgBackupsList = [];
+
+function switchGraphicsSettingsPage(pageIndex) {
+    if (pageIndex < 0 || pageIndex > 2) return;
+    currentGraphicsSettingsPage = pageIndex;
+    updateCarouselUI();
+}
+
+function prevGraphicsSettingsPage() {
+    if (currentGraphicsSettingsPage > 0) {
+        switchGraphicsSettingsPage(currentGraphicsSettingsPage - 1);
+    }
+}
+
+function nextGraphicsSettingsPage() {
+    if (currentGraphicsSettingsPage < 2) {
+        switchGraphicsSettingsPage(currentGraphicsSettingsPage + 1);
+    }
+}
+
+function updateCarouselUI() {
+    const track = document.getElementById('opt-msfs-carousel-track');
+    if (track) {
+        track.style.transform = `translateX(-${currentGraphicsSettingsPage * 100}%)`;
+    }
+
+    // Update Pills
+    for (let i = 0; i < 3; i++) {
+        const pill = document.getElementById(`opt-page-pill-${i}`);
+        if (pill) {
+            if (i === currentGraphicsSettingsPage) {
+                pill.className = 'px-3 py-1 rounded-lg bg-cyan-600 text-white transition-all cursor-pointer flex items-center gap-1.5 shadow-sm font-bold';
+            } else {
+                pill.className = 'px-3 py-1 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer flex items-center gap-1.5 font-bold';
+            }
+        }
+    }
+
+    // Update Prev / Next buttons
+    const btnPrev = document.getElementById('opt-btn-carousel-prev');
+    const btnNext = document.getElementById('opt-btn-carousel-next');
+    if (btnPrev) btnPrev.disabled = (currentGraphicsSettingsPage === 0);
+    if (btnNext) btnNext.disabled = (currentGraphicsSettingsPage === 2);
+
+    // Update Indicator text
+    const indicator = document.getElementById('opt-carousel-page-indicator');
+    if (indicator) {
+        indicator.textContent = `PAGE ${currentGraphicsSettingsPage + 1} / 3`;
+    }
+}
 
 function switchFlightMissionProfile(profile) {
     currentFlightMissionProfile = profile;
@@ -16245,11 +16295,11 @@ function switchFlightMissionProfile(profile) {
     const btnGa = document.getElementById('opt-flight-profile-btn-ga');
     if (btnLiner && btnGa) {
         if (profile === 'LINER') {
-            btnLiner.className = 'px-2.5 py-1 rounded-lg bg-indigo-600 text-white transition-all cursor-pointer font-bold shadow-sm';
-            btnGa.className = 'px-2.5 py-1 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold';
+            btnLiner.className = 'px-3 py-1 rounded-lg bg-indigo-600 text-white transition-all cursor-pointer font-bold shadow-sm';
+            btnGa.className = 'px-3 py-1 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold';
         } else {
-            btnLiner.className = 'px-2.5 py-1 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold';
-            btnGa.className = 'px-2.5 py-1 rounded-lg bg-indigo-600 text-white transition-all cursor-pointer font-bold shadow-sm';
+            btnLiner.className = 'px-3 py-1 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold';
+            btnGa.className = 'px-3 py-1 rounded-lg bg-indigo-600 text-white transition-all cursor-pointer font-bold shadow-sm';
         }
     }
     loadRigDiagnostics();
@@ -16261,9 +16311,9 @@ function switchVrRefreshRate(hz) {
         const btn = document.getElementById(`opt-vr-hz-btn-${rate}`);
         if (btn) {
             if (rate === currentVrRefreshRate) {
-                btn.className = 'px-2 py-0.5 rounded-lg bg-cyan-600 text-white text-[11px] transition-all cursor-pointer font-bold shadow-sm';
+                btn.className = 'px-2.5 py-1 rounded-lg bg-cyan-600 text-white text-[11px] transition-all cursor-pointer font-bold shadow-sm';
             } else {
-                btn.className = 'px-2 py-0.5 rounded-lg text-slate-400 hover:text-white text-[11px] transition-all cursor-pointer font-bold';
+                btn.className = 'px-2.5 py-1 rounded-lg text-slate-400 hover:text-white text-[11px] transition-all cursor-pointer font-bold';
             }
         }
     });
@@ -16424,9 +16474,31 @@ function switchMsfsGraphicsMode(mode) {
     renderMsfsSettingsMatrix();
 }
 
+let isManualSettingUpdating = false;
+async function onMsfsManualSettingSubmitted(settingKey, value, minVal, maxVal) {
+    if (isManualSettingUpdating) return;
+    const cleanStr = String(value || '').replace('Dynamic', '').replace('(', '').replace(')', '').replace('FPS', '').replace('LOD', '').trim();
+    if (!cleanStr) return;
+    let num = parseFloat(cleanStr);
+    if (isNaN(num)) return;
+    
+    if (typeof minVal === 'number' && num < minVal) num = minVal;
+    if (typeof maxVal === 'number' && num > maxVal) num = maxVal;
+    
+    const formattedVal = String(Math.round(num));
+    isManualSettingUpdating = true;
+    try {
+        await onMsfsSettingChanged(settingKey, formattedVal);
+    } finally {
+        setTimeout(() => { isManualSettingUpdating = false; }, 300);
+    }
+}
+
 function renderMsfsSettingsMatrix() {
-    const grid = document.getElementById('opt-msfs-settings-grid');
-    if (!grid || !msfsSettingsMatrixData) return;
+    const gridP1 = document.getElementById('opt-msfs-settings-grid-p1');
+    const gridP2 = document.getElementById('opt-msfs-settings-grid-p2');
+    const gridP3 = document.getElementById('opt-msfs-settings-grid-p3');
+    if (!msfsSettingsMatrixData) return;
 
     const list = currentMsfsGraphicsMode === '2D' ? (msfsSettingsMatrixData.matrix_2d || []) : (msfsSettingsMatrixData.matrix_vr || []);
     const pacing = currentMsfsGraphicsMode === '2D' ? msfsSettingsMatrixData.target_pacing_2d : msfsSettingsMatrixData.target_pacing_vr;
@@ -16492,9 +16564,8 @@ function renderMsfsSettingsMatrix() {
         }
     }
 
-    // Render 13 Settings
-    let html = '';
-    list.forEach(item => {
+    // Helper to render individual setting card
+    const renderCard = (item) => {
         let badgeColorClass = 'text-emerald-400 bg-emerald-950/80 border-emerald-800/80';
         if (item.rating_color === 'amber') badgeColorClass = 'text-amber-400 bg-amber-950/80 border-amber-800/80';
         else if (item.rating_color === 'orange') badgeColorClass = 'text-orange-400 bg-orange-950/80 border-orange-800/80';
@@ -16502,17 +16573,57 @@ function renderMsfsSettingsMatrix() {
 
         const sharedBadge = item.shared ? '<span class="px-1 py-0.2 rounded text-[8px] font-mono font-bold bg-slate-800 text-sky-400 border border-slate-700/80" title="This setting is globally shared in MSFS between 2D and VR modes.">SHARED</span>' : '';
 
-        // Options dropdown
-        let optionsHtml = '';
-        if (Array.isArray(item.options)) {
-            optionsHtml = item.options.map(opt => {
-                const isSelected = item.value === opt || item.raw_value === opt;
-                return `<option value="${opt}" ${isSelected ? 'selected' : ''}>${opt}</option>`;
-            }).join('');
+        let inputHtml = '';
+        if (item.is_numeric) {
+            const rawNum = item.raw_value || String(item.value).replace(/[^0-9]/g, '') || '100';
+            let optionsHtml = '<option value="" disabled selected>Presets</option>';
+            if (Array.isArray(item.options)) {
+                optionsHtml += item.options.map(opt => {
+                    const optNum = String(opt).replace(/[^0-9]/g, '');
+                    const isSelected = (opt === item.value || opt === item.raw_value || (optNum && optNum === rawNum));
+                    return `<option value="${opt}" ${isSelected ? 'selected' : ''}>${opt}</option>`;
+                }).join('');
+            }
+            const unitLabel = item.key === 'max_frame_rate' ? 'FPS' : 'LOD';
+            inputHtml = `
+                <div class="flex items-center gap-2 pt-0.5">
+                    <div class="relative flex-1">
+                        <input type="number" 
+                               min="${item.min_val ?? 10}" 
+                               max="${item.max_val ?? 400}" 
+                               step="${item.step ?? 5}" 
+                               value="${rawNum}" 
+                               id="opt-input-${item.key}"
+                               onkeydown="if(event.key==='Enter'){event.preventDefault(); onMsfsManualSettingSubmitted('${item.key}', this.value, ${item.min_val ?? 10}, ${item.max_val ?? 400});}"
+                               onblur="onMsfsManualSettingSubmitted('${item.key}', this.value, ${item.min_val ?? 10}, ${item.max_val ?? 400})"
+                               class="w-full bg-slate-950 border border-slate-700/80 focus:border-cyan-400 rounded-lg pl-2.5 pr-8 py-1 text-xs text-white font-mono font-bold focus:outline-none transition-colors" 
+                               title="Type any custom value (${item.min_val ?? 10}-${item.max_val ?? 400}) and press Enter or click outside">
+                        <span class="absolute right-2 top-1 text-[10px] font-mono text-slate-500 font-bold pointer-events-none">${unitLabel}</span>
+                    </div>
+                    <select onchange="onMsfsSettingChanged('${item.key}', this.value)" class="bg-slate-950 border border-slate-700/70 focus:border-cyan-400 rounded-lg px-2 py-1 text-xs text-slate-300 font-mono font-semibold focus:outline-none cursor-pointer max-w-[105px]" title="Quick Presets">
+                        ${optionsHtml}
+                    </select>
+                </div>
+            `;
+        } else {
+            let optionsHtml = '';
+            if (Array.isArray(item.options)) {
+                optionsHtml = item.options.map(opt => {
+                    const isSelected = item.value === opt || item.raw_value === opt;
+                    return `<option value="${opt}" ${isSelected ? 'selected' : ''}>${opt}</option>`;
+                }).join('');
+            }
+            inputHtml = `
+                <div class="flex items-center justify-between gap-2 pt-0.5">
+                    <select onchange="onMsfsSettingChanged('${item.key}', this.value)" class="w-full bg-slate-950 border border-slate-700/70 focus:border-cyan-400 rounded-lg px-2 py-1 text-xs text-white font-mono font-semibold focus:outline-none cursor-pointer">
+                        ${optionsHtml}
+                    </select>
+                </div>
+            `;
         }
 
-        html += `
-            <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700 transition-all flex flex-col justify-between space-y-1.5" title="${item.tooltip.replace(/"/g, '&quot;')}">
+        return `
+            <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700 transition-all flex flex-col justify-between space-y-1.5" title="${(item.tooltip || '').replace(/"/g, '&quot;')}">
                 <div class="flex items-start justify-between gap-1">
                     <div class="flex items-center gap-1.5 flex-wrap">
                         <span class="text-xs font-mono font-bold text-slate-200">${item.name}</span>
@@ -16520,16 +16631,21 @@ function renderMsfsSettingsMatrix() {
                     </div>
                     <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold border uppercase shrink-0 ${badgeColorClass}">${item.rating_label}</span>
                 </div>
-                <div class="flex items-center justify-between gap-2 pt-0.5">
-                    <select onchange="onMsfsSettingChanged('${item.key}', this.value)" class="w-full bg-slate-950 border border-slate-700/70 focus:border-cyan-400 rounded-lg px-2 py-1 text-xs text-white font-mono font-semibold focus:outline-none cursor-pointer">
-                        ${optionsHtml}
-                    </select>
-                </div>
+                ${inputHtml}
             </div>
         `;
-    });
+    };
 
-    grid.innerHTML = html;
+    // Partition into Page 1 (items 1-9), Page 2 (items 10-18), Page 3 (items 19-27)
+    const p1Items = list.filter(item => item.page === 1 || (!item.page && list.indexOf(item) < 9));
+    const p2Items = list.filter(item => item.page === 2 || (!item.page && list.indexOf(item) >= 9 && list.indexOf(item) < 18));
+    const p3Items = list.filter(item => item.page === 3 || (!item.page && list.indexOf(item) >= 18));
+
+    if (gridP1) gridP1.innerHTML = p1Items.map(renderCard).join('');
+    if (gridP2) gridP2.innerHTML = p2Items.map(renderCard).join('');
+    if (gridP3) gridP3.innerHTML = p3Items.map(renderCard).join('');
+
+    updateCarouselUI();
 }
 
 async function onMsfsSettingChanged(settingKey, newValue) {
@@ -16587,9 +16703,10 @@ function openOptFeedbackModal(res) {
         if (currentMsfsGraphicsMode === '2D') {
             detailsHtml += `
                 <div class="flex items-center gap-1.5 text-emerald-400 font-mono"><i class="fa-solid fa-check text-[10px]"></i><span>Texture Resolution: ${currentFlightMissionProfile === 'LINER' ? 'LOW (Axel LFBO - Frees 6-8 GB VRAM)' : 'HIGH (Full Detail)'}</span></div>
+                <div class="flex items-center gap-1.5 text-emerald-400 font-mono"><i class="fa-solid fa-check text-[10px]"></i><span>Glass Cockpit Refresh: ${currentFlightMissionProfile === 'LINER' ? 'MEDIUM (Saves 5-8 ms MainThread frame time)' : 'HIGH (Full Synthetic Vision)'}</span></div>
                 <div class="flex items-center gap-1.5 text-emerald-400 font-mono"><i class="fa-solid fa-check text-[10px]"></i><span>Terrain LOD (TLOD): ${currentFlightMissionProfile === 'LINER' ? '100 (Protects MainThread from WASM avionics)' : '150 (Smooth for VFR)'}</span></div>
-                <div class="flex items-center gap-1.5 text-emerald-400 font-mono"><i class="fa-solid fa-check text-[10px]"></i><span>Anti-Aliasing: DLSS (Quality) + Frame Generation DLSSG (2X)</span></div>
-                <div class="flex items-center gap-1.5 text-emerald-400 font-mono"><i class="fa-solid fa-check text-[10px]"></i><span>Pre-Caching: High (Prevents camera panning stutters)</span></div>
+                <div class="flex items-center gap-1.5 text-emerald-400 font-mono"><i class="fa-solid fa-check text-[10px]"></i><span>Anti-Aliasing & Pacing: DLSS (Quality) + Frame Generation DLSSG (2X)</span></div>
+                <div class="flex items-center gap-1.5 text-emerald-400 font-mono"><i class="fa-solid fa-check text-[10px]"></i><span>Environment & Shadows: 27 Settings Calibrated across 3 Pages</span></div>
             `;
         } else {
             const targetVrFps = Math.max(30, Math.floor(currentVrRefreshRate / 2));
@@ -16597,7 +16714,8 @@ function openOptFeedbackModal(res) {
                 <div class="flex items-center gap-1.5 text-emerald-400 font-mono"><i class="fa-solid fa-check text-[10px]"></i><span>Max Frame Rate: ${targetVrFps} FPS (Exact 1/2 sync divisor for ${currentVrRefreshRate} Hz headset)</span></div>
                 <div class="flex items-center gap-1.5 text-emerald-400 font-mono"><i class="fa-solid fa-check text-[10px]"></i><span>Frame Generation: OFF (Mandatory to prevent VR latency and artifacting)</span></div>
                 <div class="flex items-center gap-1.5 text-emerald-400 font-mono"><i class="fa-solid fa-check text-[10px]"></i><span>Texture Resolution: ${currentFlightMissionProfile === 'LINER' ? 'LOW (Frees 6-8 GB VRAM, avoids compositor crashes)' : 'MEDIUM (Balanced for VFR)'}</span></div>
-                <div class="flex items-center gap-1.5 text-emerald-400 font-mono"><i class="fa-solid fa-check text-[10px]"></i><span>TLOD: 100 (Safe stereo MainThread budget)</span></div>
+                <div class="flex items-center gap-1.5 text-emerald-400 font-mono"><i class="fa-solid fa-check text-[10px]"></i><span>Glass Cockpit Refresh: LOW (Quarter rate frees stereo MainThread budget)</span></div>
+                <div class="flex items-center gap-1.5 text-emerald-400 font-mono"><i class="fa-solid fa-check text-[10px]"></i><span>VR Environment & Terrain: 27 Settings Calibrated for Zero Judder</span></div>
             `;
         }
         detailsEl.innerHTML = detailsHtml;

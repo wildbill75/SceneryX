@@ -2166,28 +2166,32 @@
                 </div>
             </div>
 
-            <!-- SECTION 2: MSFS GRAPHICS SETTINGS (2D / VR SWITCHER & SETTINGS MATRIX) -->
-            <div class="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-3">
-                <div class="flex items-center justify-between flex-wrap gap-2.5">
-                    <div class="flex items-center gap-2.5 flex-wrap">
-                        <span class="text-xs font-mono font-black text-white uppercase tracking-wider">MSFS GRAPHICS SETTINGS</span>
+            <!-- SECTION 2: MSFS GRAPHICS SETTINGS (2D / VR SWITCHER & 3x3 SLIDING SETTINGS MATRIX) -->
+            <div class="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3.5">
+                <!-- ROW 1: HEADER & PRIMARY CONTROLS (AIRY & CLEAN) -->
+                <div class="flex items-center justify-between flex-wrap gap-3 pb-2 border-b border-slate-900">
+                    <div class="flex items-center gap-3.5 flex-wrap">
+                        <div class="flex flex-col">
+                            <span class="text-xs font-mono font-black text-white uppercase tracking-wider">MSFS GRAPHICS SETTINGS</span>
+                            <span class="text-[10px] font-mono text-slate-500">Direct UserCfg.opt Engine • Hardware Calibrated</span>
+                        </div>
 
                         <!-- 2D / VR Mode Switcher -->
                         <div class="flex items-center bg-slate-900 p-0.5 rounded-xl border border-slate-800 text-xs font-mono font-bold">
-                            <button id="opt-msfs-mode-btn-2d" onclick="switchMsfsGraphicsMode('2D')" class="px-3 py-1 rounded-lg bg-cyan-600 text-white transition-all cursor-pointer">
+                            <button id="opt-msfs-mode-btn-2d" onclick="switchMsfsGraphicsMode('2D')" class="px-3.5 py-1 rounded-lg bg-cyan-600 text-white transition-all cursor-pointer shadow-sm">
                                 2D DISPLAY
                             </button>
-                            <button id="opt-msfs-mode-btn-vr" onclick="switchMsfsGraphicsMode('VR')" class="px-3 py-1 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer">
+                            <button id="opt-msfs-mode-btn-vr" onclick="switchMsfsGraphicsMode('VR')" class="px-3.5 py-1 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer">
                                 VR HEADSET
                             </button>
                         </div>
 
                         <!-- Flight Mission Profile Switcher (Airliners vs GA) -->
                         <div class="flex items-center bg-slate-900 p-0.5 rounded-xl border border-slate-800 text-xs font-mono font-bold" title="Mission Profile: AIRLINER applies the Axel LFBO trick (Low/Med textures to save 6-8 GB VRAM on complex airliners). GA maximizes visual sharpness for low-altitude VFR flights.">
-                            <button id="opt-flight-profile-btn-liner" onclick="switchFlightMissionProfile('LINER')" class="px-2.5 py-1 rounded-lg bg-indigo-600 text-white transition-all cursor-pointer">
+                            <button id="opt-flight-profile-btn-liner" onclick="switchFlightMissionProfile('LINER')" class="px-3 py-1 rounded-lg bg-indigo-600 text-white transition-all cursor-pointer shadow-sm">
                                 IFR AIRLINER
                             </button>
-                            <button id="opt-flight-profile-btn-ga" onclick="switchFlightMissionProfile('GA')" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer">
+                            <button id="opt-flight-profile-btn-ga" onclick="switchFlightMissionProfile('GA')" class="px-3 py-1 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer">
                                 VFR GA
                             </button>
                         </div>
@@ -2195,33 +2199,94 @@
                         <!-- VR Refresh Rate Selector (Shown when in VR mode) -->
                         <div id="opt-vr-hz-selector-wrapper" class="hidden flex items-center bg-slate-900 p-0.5 rounded-xl border border-slate-800 text-xs font-mono font-bold" title="Select your VR Headset native refresh rate to calculate the exact 1/2 sync frame rate divisor and eliminate motion judder.">
                             <span class="text-[10px] text-slate-400 px-2 uppercase">VR HZ:</span>
-                            <button id="opt-vr-hz-btn-72" onclick="switchVrRefreshRate(72)" class="px-2 py-0.5 rounded-lg bg-cyan-600 text-white text-[11px] transition-all cursor-pointer" title="72 Hz (Pimax / Quest)">72 Hz</button>
-                            <button id="opt-vr-hz-btn-80" onclick="switchVrRefreshRate(80)" class="px-2 py-0.5 rounded-lg text-slate-400 hover:text-white text-[11px] transition-all cursor-pointer" title="80 Hz (Rift S / Quest)">80 Hz</button>
-                            <button id="opt-vr-hz-btn-90" onclick="switchVrRefreshRate(90)" class="px-2 py-0.5 rounded-lg text-slate-400 hover:text-white text-[11px] transition-all cursor-pointer" title="90 Hz (Index / HP Reverb G2 / Quest)">90 Hz</button>
-                            <button id="opt-vr-hz-btn-120" onclick="switchVrRefreshRate(120)" class="px-2 py-0.5 rounded-lg text-slate-400 hover:text-white text-[11px] transition-all cursor-pointer" title="120 Hz (Quest / Index / Pimax)">120 Hz</button>
+                            <button id="opt-vr-hz-btn-72" onclick="switchVrRefreshRate(72)" class="px-2.5 py-1 rounded-lg bg-cyan-600 text-white text-[11px] transition-all cursor-pointer font-bold" title="72 Hz (Pimax / Quest)">72 Hz</button>
+                            <button id="opt-vr-hz-btn-80" onclick="switchVrRefreshRate(80)" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white text-[11px] transition-all cursor-pointer font-bold" title="80 Hz (Rift S / Quest)">80 Hz</button>
+                            <button id="opt-vr-hz-btn-90" onclick="switchVrRefreshRate(90)" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white text-[11px] transition-all cursor-pointer font-bold" title="90 Hz (Index / HP Reverb G2 / Quest)">90 Hz</button>
+                            <button id="opt-vr-hz-btn-120" onclick="switchVrRefreshRate(120)" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white text-[11px] transition-all cursor-pointer font-bold" title="120 Hz (Quest / Index / Pimax)">120 Hz</button>
                         </div>
                     </div>
 
                     <!-- Right Action Bar: AutoFPS pill + Rollback + Optimize -->
-                    <div class="flex items-center gap-2">
-                        <div id="opt-autofps-status-pill" class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900 border border-slate-800 text-[10px] font-mono" title="AutoFPS status in background tasks. When active, TLOD and OLOD are dynamically calibrated in real-time.">
+                    <div class="flex items-center gap-2.5">
+                        <div id="opt-autofps-status-pill" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-[10px] font-mono" title="AutoFPS status in background tasks. When active, TLOD and OLOD are dynamically calibrated in real-time.">
                             <span id="opt-autofps-status-dot" class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
                             <span id="opt-autofps-status-text" class="text-slate-400 font-bold">AUTOFPS INACTIVE</span>
                         </div>
-                        <button onclick="openUserCfgBackupModal()" id="opt-btn-restore-backup" class="px-3 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5" title="Rollback UserCfg.opt to a previous timestamped backup">
+                        <button onclick="openUserCfgBackupModal()" id="opt-btn-restore-backup" class="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-sm" title="Rollback UserCfg.opt to a previous timestamped backup">
                             <i class="fa-solid fa-clock-rotate-left text-xs text-amber-400"></i>
                             <span>ROLLBACK</span>
                         </button>
-                        <button onclick="applyOptimalMsfsSettingsCurrentMode()" class="px-3 py-1 rounded-xl bg-slate-800 hover:bg-emerald-600 text-slate-300 hover:text-white border border-slate-700 hover:border-emerald-500 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5" title="Apply optimal graphics profile for current display mode and flight profile with automatic backup">
-                            <i class="fa-solid fa-wand-magic-sparkles text-xs"></i>
+                        <button onclick="applyOptimalMsfsSettingsCurrentMode()" class="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-emerald-600 text-slate-200 hover:text-white border border-slate-700 hover:border-emerald-500 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-sm" title="Apply optimal graphics profile across all 27 settings for current display mode and flight mission profile with automatic backup">
+                            <i class="fa-solid fa-wand-magic-sparkles text-xs text-emerald-400"></i>
                             <span>OPTIMIZE PROFILE</span>
                         </button>
                     </div>
                 </div>
 
-                <!-- 13 Settings Grid (Responsive 2 / 3 columns) -->
-                <div id="opt-msfs-settings-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                    <!-- Dynamic rendering by JS for all 13 settings with color-coded status and custom dropdowns -->
+                <!-- ROW 2: CAROUSEL PAGE NAVIGATION (PREV < , 3 PAGE PILLS, NEXT > , PAGE COUNTER) -->
+                <div class="flex items-center justify-between gap-2 px-1">
+                    <div class="flex items-center gap-2">
+                        <!-- Left Arrow (Prev Page) -->
+                        <button id="opt-btn-carousel-prev" onclick="prevGraphicsSettingsPage()" class="w-8 h-8 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 flex items-center justify-center transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed" title="Previous page (Page Left)">
+                            <i class="fa-solid fa-chevron-left text-xs"></i>
+                        </button>
+
+                        <!-- Page Indicator Tabs / Pills -->
+                        <div class="flex items-center bg-slate-900/90 p-0.5 rounded-xl border border-slate-800/90 text-xs font-mono font-bold">
+                            <button id="opt-page-pill-0" onclick="switchGraphicsSettingsPage(0)" class="px-3 py-1 rounded-lg bg-cyan-600 text-white transition-all cursor-pointer flex items-center gap-1.5 shadow-sm">
+                                <i class="fa-solid fa-gauge text-[10px]"></i>
+                                <span>1. CORE & DISPLAY</span>
+                                <span class="px-1 py-0.2 rounded text-[9px] bg-slate-950/60 text-cyan-200">9</span>
+                            </button>
+                            <button id="opt-page-pill-1" onclick="switchGraphicsSettingsPage(1)" class="px-3 py-1 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer flex items-center gap-1.5">
+                                <i class="fa-solid fa-mountain-sun text-[10px]"></i>
+                                <span>2. TERRAIN & WORLD</span>
+                                <span class="px-1 py-0.2 rounded text-[9px] bg-slate-950/60 text-slate-400">9</span>
+                            </button>
+                            <button id="opt-page-pill-2" onclick="switchGraphicsSettingsPage(2)" class="px-3 py-1 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer flex items-center gap-1.5">
+                                <i class="fa-solid fa-lightbulb text-[10px]"></i>
+                                <span>3. LIGHTING & AVIONICS</span>
+                                <span class="px-1 py-0.2 rounded text-[9px] bg-slate-950/60 text-slate-400">9</span>
+                            </button>
+                        </div>
+
+                        <!-- Right Arrow (Next Page) -->
+                        <button id="opt-btn-carousel-next" onclick="nextGraphicsSettingsPage()" class="w-8 h-8 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 flex items-center justify-center transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed" title="Next page (Page Right)">
+                            <i class="fa-solid fa-chevron-right text-xs"></i>
+                        </button>
+                    </div>
+
+                    <!-- Page Counter & Quick Hint -->
+                    <div class="flex items-center gap-2">
+                        <span class="text-[10px] font-mono text-slate-500 hidden sm:inline">Use arrows or tabs to slide</span>
+                        <span id="opt-carousel-page-indicator" class="px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-800 text-[10px] font-mono font-bold text-slate-300 uppercase">PAGE 1 / 3</span>
+                    </div>
+                </div>
+
+                <!-- CAROUSEL TRACK VIEWPORT (LATERAL SLIDE CONTAINER) -->
+                <div class="overflow-hidden relative w-full rounded-xl">
+                    <div id="opt-msfs-carousel-track" class="flex transition-transform duration-300 ease-out" style="transform: translateX(0%);">
+                        <!-- PAGE 1: CORE & DISPLAY PACING (9 CARDS IN 3x3 GRID) -->
+                        <div class="w-full shrink-0">
+                            <div id="opt-msfs-settings-grid-p1" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                                <!-- Rendered dynamically by JS -->
+                            </div>
+                        </div>
+
+                        <!-- PAGE 2: TERRAIN & ENVIRONMENT WORLD (9 CARDS IN 3x3 GRID) -->
+                        <div class="w-full shrink-0">
+                            <div id="opt-msfs-settings-grid-p2" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                                <!-- Rendered dynamically by JS -->
+                            </div>
+                        </div>
+
+                        <!-- PAGE 3: LIGHTING, AVIONICS & POST-PROCESSING (9 CARDS IN 3x3 GRID) -->
+                        <div class="w-full shrink-0">
+                            <div id="opt-msfs-settings-grid-p3" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                                <!-- Rendered dynamically by JS -->
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 

@@ -644,6 +644,35 @@ def get_block_val(pattern: str, block: str, default: str = '') -> str:
     return m.group(1).strip() if m else default
 
 
+def update_sub_block_setting(content: str, mode: str, block_name: str, pattern: str, replacement: str) -> str:
+    """Met à jour un paramètre dans un sous-bloc d'un bloc de mode ({Graphics ou {GraphicsVR)."""
+    mode_tag = '{Graphics\n' if mode == '2D' else '{GraphicsVR'
+    mode_idx = content.find(mode_tag)
+    if mode_idx == -1 and mode == '2D':
+        mode_tag = '{Graphics\r\n'
+        mode_idx = content.find(mode_tag)
+    if mode_idx == -1:
+        return content
+
+    mode_boundary = content.find('{GraphicsVR', mode_idx) if mode == '2D' else len(content)
+    if mode_boundary == -1:
+        mode_boundary = len(content)
+
+    mode_text = content[mode_idx:mode_boundary]
+    sub_start = mode_text.find(block_name)
+    if sub_start == -1:
+        return content
+
+    sub_end = mode_text.find('}', sub_start)
+    if sub_end == -1:
+        return content
+
+    sub_slice = mode_text[sub_start:sub_end]
+    new_sub_slice = re.sub(pattern, replacement, sub_slice)
+    new_mode_text = mode_text[:sub_start] + new_sub_slice + mode_text[sub_end:]
+    return content[:mode_idx] + new_mode_text + content[mode_boundary:]
+
+
 def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Optional[Dict[str, Any]] = None, cpu_info: Optional[Dict[str, Any]] = None, flight_profile: str = 'LINER', vr_refresh_rate: int = 72) -> Dict[str, Any]:
     path = user_cfg_path or get_user_cfg_path()
     if not path or not os.path.exists(path):
@@ -669,13 +698,18 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
     g2d = extract_block(content, '{Graphics\n') or extract_block(content, '{Graphics\r\n')
     gvr = extract_block(content, '{GraphicsVR')
 
-    def make_setting_item(key, name, val, raw_val, shared, rating, color, label, tooltip, options):
+    def make_setting_item(key, name, val, raw_val, shared, rating, color, label, tooltip, options, page=1, is_numeric=False, min_val=0, max_val=100, step=1):
         return {
             "key": key,
             "name": name,
             "value": str(val),
             "raw_value": str(raw_val),
             "shared": shared,
+            "page": page,
+            "is_numeric": is_numeric,
+            "min_val": min_val,
+            "max_val": max_val,
+            "step": step,
             "rating": rating,
             "rating_color": color,
             "rating_label": label,
@@ -683,11 +717,21 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
             "options": options
         }
 
-    # Resolution (Shared)
+    q_map = {'0': 'Low', '1': 'Medium', '2': 'High', '3': 'Ultra'}
+    fft_map = {'128': 'Low (128)', '256': 'Medium (256)', '512': 'High (512)', '1024': 'Ultra (1024)'}
+    glass_map = {'0': 'Low (Quarter)', '1': 'Medium (Half)', '2': 'High (Full)'}
+    shadow_map = {'512': 'Low (512)', '1024': 'Medium (1024)', '1536': 'High (1536)', '2048': 'Ultra (2048)'}
+    hf_map = {'128': 'Low (128)', '256': 'Medium (256)', '512': 'High (512)', '1024': 'Ultra (1024)'}
+
+    # ==========================================
+    # PAGE 1: CORE & DISPLAY PACING (9 SETTINGS)
+    # ==========================================
+
+    # 1. Full Screen Resolution (Shared)
     res_raw = get_block_val(r'FullScreenResolution\s+([\d\s]+)', video, '2560 1440')
     res_formatted = " x ".join(res_raw.split()) if res_raw else "2560 x 1440"
 
-    # Anti-Aliasing
+    # 2. Anti-Aliasing & Upscaling
     aa_2d = get_block_val(r'AntiAliasing\s+([^\r\n]+)', video, 'TAA')
     dlss_2d = get_block_val(r'DLSSMode\s+(\w+)', video, '')
     aa_vr = get_block_val(r'AntiAliasingVR\s+([^\r\n]+)', video, 'TAA')
@@ -696,54 +740,35 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
     val_aa_2d = f"DLSS ({dlss_2d.capitalize()})" if dlss_2d and dlss_2d.upper() != 'OFF' else aa_2d
     val_aa_vr = f"DLSS ({dlss_vr.capitalize()})" if dlss_vr and dlss_vr.upper() != 'OFF' else aa_vr
 
-    # Max Frame Rate
+    # 3. Max Frame Rate (Manual numeric + Presets)
     fps_2d = get_block_val(r'TargetFrameRate\s+(\d+)', video, '0')
     fps_vr = get_block_val(r'TargetFrameRateVR\s+(\d+)', video, '0')
 
-    # Frame Generation
+    # 4. Frame Generation
     fg_2d_raw = get_block_val(r'FrameGeneration\s+(\w+)', video, 'NONE')
     fg_2d = "DLSSG (2X)" if fg_2d_raw.upper() in ["DLSSG", "1", "ON"] else ("FSR3 (2X)" if fg_2d_raw.upper() == "FSR3" else "OFF")
     fg_vr_raw = get_block_val(r'FrameGenerationVR\s+(\w+)', video, 'NONE')
     fg_vr = "DLSSG (2X)" if fg_vr_raw.upper() in ["DLSSG", "1", "ON"] else "OFF"
 
-    # Framerate Multiplier
+    # 5. Framerate Multiplier
     mult_2d = get_block_val(r'NBFramesToGenerate\s+(\d+)', video, '1')
     mult_vr = get_block_val(r'NBFramesToGenerateVR\s+(\d+)', video, '1')
 
-    # V-Sync & Interval (Shared)
+    # 6. V-Sync (Shared)
     vsync_raw = get_block_val(r'VSync\s+(\d+)', video, '1')
     vsync_val = "ON" if vsync_raw == '1' else "OFF"
-    interval_raw = get_block_val(r'VSyncInterval\s+(\d+)', video, '1')
-    interval_val = "100% Monitor Hz" if interval_raw in ['1', ''] else "50% Monitor Hz"
 
-    # Dynamic Settings
+    # 7. Dynamic Settings
     dyn_2d = "ON" if get_block_val(r'DynamicSettings\s+(\d+)', video, '0') == '1' else "OFF"
     dyn_vr = "ON" if get_block_val(r'DynamicSettingsVR\s+(\d+)', video, '0') == '1' else "OFF"
 
-    # TLOD
-    tlod_2d_raw = get_block_val(r'LoDFactor\s+([\d\.]+)', extract_block(g2d, '{Terrain'), '1.0')
-    tlod_2d_val = round(float(tlod_2d_raw) * 100)
-    tlod_vr_raw = get_block_val(r'LoDFactor\s+([\d\.]+)', extract_block(gvr, '{Terrain'), '1.0')
-    tlod_vr_val = round(float(tlod_vr_raw) * 100)
+    # 8. NVIDIA Reflex Low Latency
+    reflex_2d_raw = get_block_val(r'Reflex\s+([^\r\n]+)', video, 'ON').upper().replace(' ', '')
+    reflex_2d = "ON+BOOST" if "BOOST" in reflex_2d_raw else ("ON" if reflex_2d_raw in ["ON", "1"] else "OFF")
+    reflex_vr_raw = get_block_val(r'ReflexVR\s+([^\r\n]+)', video, 'ON').upper().replace(' ', '')
+    reflex_vr = "ON+BOOST" if "BOOST" in reflex_vr_raw else ("ON" if reflex_vr_raw in ["ON", "1"] else "OFF")
 
-    # Offscreen Pre-Caching
-    q_map = {'0': 'Low', '1': 'Medium', '2': 'High', '3': 'Ultra'}
-    pre_2d_raw = get_block_val(r'Quality\s+(\d+)', extract_block(g2d, '{OffscreenTerrainPreCaching'), '2')
-    pre_2d_val = q_map.get(pre_2d_raw, 'High')
-    pre_vr_raw = get_block_val(r'Quality\s+(\d+)', extract_block(gvr, '{OffscreenTerrainPreCaching'), '2')
-    pre_vr_val = q_map.get(pre_vr_raw, 'High')
-
-    # OLOD
-    olod_2d_raw = get_block_val(r'LoDFactor\s+([\d\.]+)', extract_block(g2d, '{ObjectsLoD'), '1.0')
-    olod_2d_val = round(float(olod_2d_raw) * 100)
-    olod_vr_raw = get_block_val(r'LoDFactor\s+([\d\.]+)', extract_block(gvr, '{ObjectsLoD'), '1.0')
-    olod_vr_val = round(float(olod_vr_raw) * 100)
-
-    # Displacement Mapping
-    disp_2d = "ON" if get_block_val(r'Enabled\s+(\d+)', extract_block(g2d, '{DisplacementMapping'), '0') == '1' else "OFF"
-    disp_vr = "ON" if get_block_val(r'Enabled\s+(\d+)', extract_block(gvr, '{DisplacementMapping'), '0') == '1' else "OFF"
-
-    # Texture Quality
+    # 9. Texture Quality
     tex_2d_raw = get_block_val(r'Quality\s+(\d+)', extract_block(g2d, '{Texture'), '2')
     tex_2d_val = q_map.get(tex_2d_raw, 'High')
     tex_vr_raw = get_block_val(r'Quality\s+(\d+)', extract_block(gvr, '{Texture'), '1')
@@ -810,6 +835,23 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
             tex_vr_rating, tex_vr_color, tex_vr_label = "nogo", "rose", "VRAM Risk in VR"
             tex_vr_tip = "Ultra textures can saturate VR stereo buffers even in GA."
 
+    # VR Max Frame Rate Rating
+    is_vr_fps_opt = (fps_vr == str(target_vr_fps))
+    vr_fps_rating = "optimum" if is_vr_fps_opt else "suboptimal"
+    vr_fps_color = "emerald" if is_vr_fps_opt else "orange"
+    vr_fps_label = f"Optimum ({target_vr_fps} FPS Lock)" if is_vr_fps_opt else f"Mismatch ({target_vr_fps} FPS Target)"
+    vr_fps_tooltip = f"Matches exact 1/2 sync divisor of {vr_hz} Hz headset ({target_vr_fps} FPS), delivering smooth motion reprojection." if is_vr_fps_opt else f"Target frame rate ({fps_vr} FPS) does not match the 1/2 sync divisor ({target_vr_fps} FPS) of your {vr_hz} Hz headset, causing motion judder."
+
+    # ===============================================
+    # PAGE 2: TERRAIN & ENVIRONMENT WORLD (9 SETTINGS)
+    # ===============================================
+
+    # 10. TLOD (Manual input up to 400 + Presets)
+    tlod_2d_raw = get_block_val(r'LoDFactor\s+([\d\.]+)', extract_block(g2d, '{Terrain'), '1.0')
+    tlod_2d_val = round(float(tlod_2d_raw) * 100)
+    tlod_vr_raw = get_block_val(r'LoDFactor\s+([\d\.]+)', extract_block(gvr, '{Terrain'), '1.0')
+    tlod_vr_val = round(float(tlod_vr_raw) * 100)
+
     # TLOD 2D Rating
     if is_liner:
         tlod_2d_rating = "optimum" if autofps or tlod_2d_val <= 120 else ("acceptable" if tlod_2d_val <= 150 else "nogo")
@@ -820,45 +862,203 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
         tlod_2d_color = "emerald" if autofps or tlod_2d_val <= 160 else "amber"
         tlod_2d_label = "AutoFPS Linked" if autofps else ("Optimum" if tlod_2d_val <= 160 else "Acceptable")
 
-    # VR Max Frame Rate Rating
-    is_vr_fps_opt = (fps_vr == str(target_vr_fps))
-    vr_fps_rating = "optimum" if is_vr_fps_opt else "suboptimal"
-    vr_fps_color = "emerald" if is_vr_fps_opt else "orange"
-    vr_fps_label = f"Optimum ({target_vr_fps} FPS Lock)" if is_vr_fps_opt else f"Mismatch ({target_vr_fps} FPS Target)"
-    vr_fps_tooltip = f"Matches exact 1/2 sync divisor of {vr_hz} Hz headset ({target_vr_fps} FPS), delivering smooth motion reprojection." if is_vr_fps_opt else f"Target frame rate ({fps_vr} FPS) does not match the 1/2 sync divisor ({target_vr_fps} FPS) of your {vr_hz} Hz headset, causing motion judder."
+    # 11. OLOD (Manual input up to 400 + Presets)
+    olod_2d_raw = get_block_val(r'LoDFactor\s+([\d\.]+)', extract_block(g2d, '{ObjectsLoD'), '1.0')
+    olod_2d_val = round(float(olod_2d_raw) * 100)
+    olod_vr_raw = get_block_val(r'LoDFactor\s+([\d\.]+)', extract_block(gvr, '{ObjectsLoD'), '1.0')
+    olod_vr_val = round(float(olod_vr_raw) * 100)
 
-    # Build 2D Matrix
+    # 12. Offscreen Pre-Caching
+    pre_2d_raw = get_block_val(r'Quality\s+(\d+)', extract_block(g2d, '{OffscreenTerrainPreCaching'), '2')
+    pre_2d_val = q_map.get(pre_2d_raw, 'High')
+    pre_vr_raw = get_block_val(r'Quality\s+(\d+)', extract_block(gvr, '{OffscreenTerrainPreCaching'), '2')
+    pre_vr_val = q_map.get(pre_vr_raw, 'High')
+
+    # 13. Volumetric Clouds
+    cld_2d_raw = get_block_val(r'Quality\s+(\d+)', extract_block(g2d, '{VolumetricClouds'), '2')
+    cld_2d_val = q_map.get(cld_2d_raw, 'High')
+    cld_vr_raw = get_block_val(r'Quality\s+(\d+)', extract_block(gvr, '{VolumetricClouds'), '2')
+    cld_vr_val = q_map.get(cld_vr_raw, 'High')
+
+    # 14. Buildings Quality
+    bld_2d_raw = get_block_val(r'Quality\s+(\d+)', extract_block(g2d, '{Buildings'), '2')
+    bld_2d_val = q_map.get(bld_2d_raw, 'High')
+    bld_vr_raw = get_block_val(r'Quality\s+(\d+)', extract_block(gvr, '{Buildings'), '1')
+    bld_vr_val = q_map.get(bld_vr_raw, 'Medium')
+
+    # 15. Trees Quality
+    tree_2d_raw = get_block_val(r'TreesQuality\s+(\d+)', extract_block(g2d, '{Procedural'), '2')
+    tree_2d_val = q_map.get(tree_2d_raw, 'High')
+    tree_vr_raw = get_block_val(r'TreesQuality\s+(\d+)', extract_block(gvr, '{Procedural'), '1')
+    tree_vr_val = q_map.get(tree_vr_raw, 'Medium')
+
+    # 16. Grass & Bushes Quality
+    grass_2d_raw = get_block_val(r'GrassQuality\s+(\d+)', extract_block(g2d, '{Procedural'), '2')
+    grass_2d_val = q_map.get(grass_2d_raw, 'High')
+    grass_vr_raw = get_block_val(r'GrassQuality\s+(\d+)', extract_block(gvr, '{Procedural'), '0')
+    grass_vr_val = q_map.get(grass_vr_raw, 'Low')
+
+    # 17. Water Waves Simulation
+    water_2d_raw = get_block_val(r'FFTSize\s+(\d+)', extract_block(g2d, '{Water'), '512')
+    water_2d_val = fft_map.get(water_2d_raw, 'High (512)')
+    water_vr_raw = get_block_val(r'FFTSize\s+(\d+)', extract_block(gvr, '{Water'), '256')
+    water_vr_val = fft_map.get(water_vr_raw, 'Medium (256)')
+
+    # 18. Displacement Mapping
+    disp_2d = "ON" if get_block_val(r'Enabled\s+(\d+)', extract_block(g2d, '{DisplacementMapping'), '0') == '1' else "OFF"
+    disp_vr = "ON" if get_block_val(r'Enabled\s+(\d+)', extract_block(gvr, '{DisplacementMapping'), '0') == '1' else "OFF"
+
+    # ==========================================================
+    # PAGE 3: LIGHTING, AVIONICS & POST-PROCESSING (9 SETTINGS)
+    # ==========================================================
+
+    # 19. Glass Cockpit Refresh Rate (Critical for CPU MainThread!)
+    glass_2d_raw = get_block_val(r'Quality\s+(\d+)', extract_block(g2d, '{GlassCockpitsRefreshRate'), '2')
+    glass_2d_val = glass_map.get(glass_2d_raw, 'High (Full)')
+    glass_vr_raw = get_block_val(r'Quality\s+(\d+)', extract_block(gvr, '{GlassCockpitsRefreshRate'), '0')
+    glass_vr_val = glass_map.get(glass_vr_raw, 'Low (Quarter)')
+
+    # 20. Shadow Maps Resolution
+    shd_2d_raw = get_block_val(r'Size\s+(\d+)', extract_block(g2d, '{Shadows'), '1536')
+    shd_2d_val = shadow_map.get(shd_2d_raw, 'High (1536)')
+    shd_vr_raw = get_block_val(r'Size\s+(\d+)', extract_block(gvr, '{Shadows'), '1024')
+    shd_vr_val = shadow_map.get(shd_vr_raw, 'Medium (1024)')
+
+    # 21. Terrain Shadows
+    tshd_2d_raw = get_block_val(r'Size\s+(\d+)', extract_block(g2d, '{HeightFieldShadows'), '512')
+    tshd_2d_val = hf_map.get(tshd_2d_raw, 'High (512)')
+    tshd_vr_raw = get_block_val(r'Size\s+(\d+)', extract_block(gvr, '{HeightFieldShadows'), '256')
+    tshd_vr_val = hf_map.get(tshd_vr_raw, 'Medium (256)')
+
+    # 22. Contact Shadows
+    cshd_2d_raw = get_block_val(r'Quality\s+(\d+)', extract_block(g2d, '{ContactShadows'), '2')
+    cshd_2d_val = q_map.get(cshd_2d_raw, 'High')
+    cshd_vr_raw = get_block_val(r'Quality\s+(\d+)', extract_block(gvr, '{ContactShadows'), '1')
+    cshd_vr_val = q_map.get(cshd_vr_raw, 'Medium')
+
+    # 23. Ambient Occlusion (SSAO)
+    ssao_2d_raw = get_block_val(r'Quality\s+(\d+)', extract_block(g2d, '{SSAO'), '2')
+    ssao_2d_val = q_map.get(ssao_2d_raw, 'High')
+    ssao_vr_raw = get_block_val(r'Quality\s+(\d+)', extract_block(gvr, '{SSAO'), '0')
+    ssao_vr_val = q_map.get(ssao_vr_raw, 'Low')
+
+    # 24. Screen Space Reflections (SSR)
+    ssr_2d_raw = get_block_val(r'Quality\s+(\d+)', extract_block(g2d, '{SSR'), '2')
+    ssr_2d_val = q_map.get(ssr_2d_raw, 'High')
+    ssr_vr_raw = get_block_val(r'Quality\s+(\d+)', extract_block(gvr, '{SSR'), '0')
+    ssr_vr_val = q_map.get(ssr_vr_raw, 'Low')
+
+    # 25. Volumetric Lights
+    vl_2d_raw = get_block_val(r'Quality\s+(\d+)', extract_block(g2d, '{VolumetricLights'), '2')
+    vl_2d_val = q_map.get(vl_2d_raw, 'High')
+    vl_vr_raw = get_block_val(r'Quality\s+(\d+)', extract_block(gvr, '{VolumetricLights'), '0')
+    vl_vr_val = q_map.get(vl_vr_raw, 'Low')
+
+    # 26. Anisotropic Filtering
+    aniso_2d_raw = get_block_val(r'MaxAnisotropy\s+(\d+)', extract_block(g2d, '{Texture'), '16')
+    aniso_2d_val = f"{aniso_2d_raw}X" if aniso_2d_raw != '0' else "OFF"
+    aniso_vr_raw = get_block_val(r'MaxAnisotropy\s+(\d+)', extract_block(gvr, '{Texture'), '16')
+    aniso_vr_val = f"{aniso_vr_raw}X" if aniso_vr_raw != '0' else "OFF"
+
+    # 27. Windshield Effects
+    wind_2d_raw = get_block_val(r'Quality\s+(\d+)', extract_block(g2d, '{WindShield'), '2')
+    wind_2d_val = q_map.get(wind_2d_raw, 'High')
+    wind_vr_raw = get_block_val(r'Quality\s+(\d+)', extract_block(gvr, '{WindShield'), '2')
+    wind_vr_val = q_map.get(wind_vr_raw, 'High')
+
+    # Preset Options Lists
+    fps_options = ["Unlocked", "30", "36", "40", "45", "60", "72", "80", "82", "90", "120", "144", "165", "240"]
+    lod_options = ["50", "80", "100", "120", "150", "180", "200", "250", "300", "350", "400"]
+    q_options = ["Ultra", "High", "Medium", "Low"]
+    glass_options = ["High (Full)", "Medium (Half)", "Low (Quarter)"]
+    water_options = ["Ultra (1024)", "High (512)", "Medium (256)", "Low (128)"]
+    shadow_options = ["Ultra (2048)", "High (1536)", "Medium (1024)", "Low (512)"]
+    hf_options = ["Ultra (1024)", "High (512)", "Medium (256)", "Low (128)"]
+    aniso_options = ["16X", "8X", "4X", "2X", "OFF"]
+
+    # Glass Cockpit Ratings
+    glass_2d_opt = (glass_2d_val != 'High (Full)') if is_liner else True
+    glass_2d_rating = "optimum" if glass_2d_opt else "suboptimal"
+    glass_2d_color = "emerald" if glass_2d_opt else "orange"
+    glass_2d_label = "Optimum (Avionics Throttled)" if (is_liner and glass_2d_opt) else ("Optimum" if not is_liner else "MainThread Heavy")
+    glass_2d_tip = "Medium or Low glass refresh throttles avionics screen redraws, saving 5-8 ms CPU MainThread frame time on complex airliner displays." if is_liner else "Full glass refresh delivers silky smooth synthetic vision and instrumentation in GA aircraft."
+
+    glass_vr_opt = (glass_vr_val == 'Low (Quarter)')
+    glass_vr_rating = "optimum" if glass_vr_opt else "acceptable"
+    glass_vr_color = "emerald" if glass_vr_opt else "amber"
+    glass_vr_label = "Optimum" if glass_vr_opt else "Acceptable"
+    glass_vr_tip = "Quarter-rate avionics refresh in VR frees critical CPU MainThread cycles for stereo reprojection."
+
+    # Build 2D Matrix (27 Items across 3 Pages of 9)
     matrix_2d = [
-        make_setting_item("resolution", "Full Screen Resolution", res_formatted, res_raw, True, "optimum", "emerald", "Optimum", "Native monitor rendering resolution. Globally shared with windowing.", ["3840 x 2160", "2560 x 1440", "1920 x 1080"]),
-        make_setting_item("anti_aliasing", "Anti-Aliasing", val_aa_2d, aa_2d, False, "optimum" if "DLSS" in val_aa_2d else "acceptable", "emerald" if "DLSS" in val_aa_2d else "amber", "Optimum" if "DLSS" in val_aa_2d else "Acceptable", "DLSS Quality gives superior edge stability and sharpness with substantial GPU headroom.", ["DLSS (Quality)", "DLSS (Balanced)", "DLSS (Performance)", "TAA", "DLAA"]),
-        make_setting_item("max_frame_rate", "Max Frame Rate", f"{fps_2d} FPS" if fps_2d != '0' else "Unlocked", fps_2d, False, "optimum" if fps_2d in ['60', '72', '80', '82', '90'] else "suboptimal", "emerald" if fps_2d in ['60', '72', '80', '82', '90'] else "orange", "Optimum" if fps_2d in ['60', '72', '80', '82', '90'] else "Sub-Optimal", "Capping frame rate to your display sync divisor eliminates judder and micro-stutters.", ["30", "36", "40", "45", "60", "72", "80", "82", "90", "120", "Unlocked"]),
-        make_setting_item("frame_generation", "Frame Generation", fg_2d, fg_2d_raw, False, "optimum" if fg_2d.startswith("DLSSG") else "acceptable", "emerald" if fg_2d.startswith("DLSSG") else "amber", "Optimum" if fg_2d.startswith("DLSSG") else "Acceptable", "Doubles motion smoothness using optical flow without increasing CPU MainThread load.", ["DLSSG (2X)", "FSR3 (2X)", "OFF"]),
-        make_setting_item("framerate_multiplier", "Framerate Multiplier", f"{mult_2d}X", mult_2d, False, "optimum", "emerald", "Optimum", "Frame generation interpolation multiplier.", ["1 (2X Interpolation)"]),
-        make_setting_item("vsync", "V-Sync", vsync_val, vsync_raw, True, "optimum" if vsync_val == "ON" else "acceptable", "emerald" if vsync_val == "ON" else "amber", "Optimum" if vsync_val == "ON" else "Acceptable", "Eliminates horizontal screen tearing. Recommended ON with G-Sync/FreeSync.", ["ON", "OFF"]),
-        make_setting_item("vsync_interval", "V-Sync Interval", interval_val, interval_raw, True, "optimum", "emerald", "Optimum", "Display refresh rate divisor frequency.", ["100% Monitor Hz", "50% Monitor Hz"]),
-        make_setting_item("dynamic_settings", "Dynamic Settings", dyn_2d, "0" if dyn_2d == "OFF" else "1", False, "optimum" if dyn_2d == "OFF" else "suboptimal", "emerald" if dyn_2d == "OFF" else "orange", "Optimum" if dyn_2d == "OFF" else "Sub-Optimal", "Dynamic resolution scaling. Recommended OFF to prevent fluctuating blurriness.", ["OFF", "ON"]),
-        make_setting_item("tlod", "Terrain LOD (TLOD)", f"{tlod_2d_val}" if not autofps else f"Dynamic ({tlod_2d_val})", str(tlod_2d_val), False, tlod_2d_rating, tlod_2d_color, tlod_2d_label, "Controls terrain mesh & photogrammetry draw distance. Heavy CPU MainThread driver." + (" Currently managed by AutoFPS." if autofps else ""), ["50", "80", "100", "120", "150", "180", "200"]),
-        make_setting_item("offscreen_precaching", "Off Screen Terrain Pre-Caching", pre_2d_val, pre_2d_raw, False, "optimum" if pre_2d_val in ["High", "Ultra"] else "nogo", "emerald" if pre_2d_val in ["High", "Ultra"] else "rose", "Optimum" if pre_2d_val in ["High", "Ultra"] else "NO GO", "Pre-caches terrain around camera. HIGH or ULTRA is mandatory to eliminate camera panning stutters.", ["Ultra", "High", "Medium", "Low"]),
-        make_setting_item("olod", "Objects LOD (OLOD)", f"{olod_2d_val}" if not autofps else f"Dynamic ({olod_2d_val})", str(olod_2d_val), False, "optimum" if olod_2d_val <= 150 else "acceptable", "emerald" if olod_2d_val <= 150 else "amber", "Optimum" if olod_2d_val <= 150 else "Acceptable", "Controls distance at which 3D airport buildings and models are drawn.", ["50", "80", "100", "120", "150", "200"]),
-        make_setting_item("displacement_mapping", "Displacement Mapping", disp_2d, "1" if disp_2d == "ON" else "0", False, "optimum" if disp_2d == "OFF" else "suboptimal", "emerald" if disp_2d == "OFF" else "orange", "Optimum" if disp_2d == "OFF" else "Sub-Optimal", "Adds micro-surface height details to runways and terrain. Recommended OFF to save VRAM and GPU compute.", ["OFF", "ON"]),
-        make_setting_item("texture_resolution", "Texture Resolution", tex_2d_val, tex_2d_raw, False, tex_2d_rating, tex_2d_color, tex_2d_label, tex_2d_tip, ["Ultra", "High", "Medium", "Low"])
+        # PAGE 1: CORE & DISPLAY PACING (9)
+        make_setting_item("resolution", "Full Screen Resolution", res_formatted, res_raw, True, "optimum", "emerald", "Optimum", "Native monitor rendering resolution. Globally shared with windowing.", ["3840 x 2160", "2560 x 1440", "1920 x 1080"], page=1),
+        make_setting_item("anti_aliasing", "Anti-Aliasing & Upscaling", val_aa_2d, aa_2d, False, "optimum" if "DLSS" in val_aa_2d else "acceptable", "emerald" if "DLSS" in val_aa_2d else "amber", "Optimum" if "DLSS" in val_aa_2d else "Acceptable", "DLSS Quality gives superior edge stability and sharpness with substantial GPU headroom.", ["DLSS (Quality)", "DLSS (Balanced)", "DLSS (Performance)", "TAA", "DLAA"], page=1),
+        make_setting_item("max_frame_rate", "Max Frame Rate", f"{fps_2d} FPS" if fps_2d != '0' else "Unlocked", fps_2d, False, "optimum" if fps_2d in ['60', '72', '80', '82', '90'] else "suboptimal", "emerald" if fps_2d in ['60', '72', '80', '82', '90'] else "orange", "Optimum" if fps_2d in ['60', '72', '80', '82', '90'] else "Sub-Optimal", "Capping frame rate to your display sync divisor eliminates judder and micro-stutters. Direct numeric input supported.", fps_options, page=1, is_numeric=True, min_val=0, max_val=240, step=1),
+        make_setting_item("frame_generation", "Frame Generation", fg_2d, fg_2d_raw, False, "optimum" if fg_2d.startswith("DLSSG") else "acceptable", "emerald" if fg_2d.startswith("DLSSG") else "amber", "Optimum" if fg_2d.startswith("DLSSG") else "Acceptable", "Doubles motion smoothness using optical flow without increasing CPU MainThread load.", ["DLSSG (2X)", "FSR3 (2X)", "OFF"], page=1),
+        make_setting_item("framerate_multiplier", "Framerate Multiplier", f"{mult_2d}X", mult_2d, False, "optimum", "emerald", "Optimum", "Frame generation interpolation multiplier.", ["1 (2X Interpolation)"], page=1),
+        make_setting_item("vsync", "V-Sync", vsync_val, vsync_raw, True, "optimum" if vsync_val == "ON" else "acceptable", "emerald" if vsync_val == "ON" else "amber", "Optimum" if vsync_val == "ON" else "Acceptable", "Eliminates horizontal screen tearing. Mandatory ON with G-Sync/FreeSync.", ["ON", "OFF"], page=1),
+        make_setting_item("dynamic_settings", "Dynamic Settings", dyn_2d, "0" if dyn_2d == "OFF" else "1", False, "optimum" if dyn_2d == "OFF" else "suboptimal", "emerald" if dyn_2d == "OFF" else "orange", "Optimum" if dyn_2d == "OFF" else "Sub-Optimal", "Dynamic resolution scaling. Recommended OFF to prevent fluctuating blurriness.", ["OFF", "ON"], page=1),
+        make_setting_item("reflex", "NVIDIA Reflex", reflex_2d, reflex_2d, False, "optimum" if reflex_2d in ["ON", "ON+BOOST"] else "suboptimal", "emerald" if reflex_2d in ["ON", "ON+BOOST"] else "orange", "Optimum" if reflex_2d in ["ON", "ON+BOOST"] else "Sub-Optimal", "Minimizes input latency and reduces render queue delays for responsive flight controls.", ["ON", "ON+BOOST", "OFF"], page=1),
+        make_setting_item("texture_resolution", "Texture Resolution", tex_2d_val, tex_2d_raw, False, tex_2d_rating, tex_2d_color, tex_2d_label, tex_2d_tip, q_options, page=1),
+
+        # PAGE 2: TERRAIN & ENVIRONMENT WORLD (9)
+        make_setting_item("tlod", "Terrain LOD (TLOD)", f"{tlod_2d_val}" if not autofps else f"Dynamic ({tlod_2d_val})", str(tlod_2d_val), False, tlod_2d_rating, tlod_2d_color, tlod_2d_label, "Controls terrain mesh & photogrammetry draw distance up to 400. Heavy CPU MainThread driver." + (" Currently managed by AutoFPS." if autofps else ""), lod_options, page=2, is_numeric=True, min_val=10, max_val=400, step=5),
+        make_setting_item("olod", "Objects LOD (OLOD)", f"{olod_2d_val}" if not autofps else f"Dynamic ({olod_2d_val})", str(olod_2d_val), False, "optimum" if olod_2d_val <= 150 else "acceptable", "emerald" if olod_2d_val <= 150 else "amber", "Optimum" if olod_2d_val <= 150 else "Acceptable", "Controls distance at which 3D airport buildings and models are drawn up to 400.", lod_options, page=2, is_numeric=True, min_val=10, max_val=400, step=5),
+        make_setting_item("offscreen_precaching", "Off Screen Pre-Caching", pre_2d_val, pre_2d_raw, False, "optimum" if pre_2d_val in ["High", "Ultra"] else "nogo", "emerald" if pre_2d_val in ["High", "Ultra"] else "rose", "Optimum" if pre_2d_val in ["High", "Ultra"] else "NO GO", "Pre-caches terrain around camera. HIGH or ULTRA is mandatory to eliminate camera panning stutters.", q_options, page=2),
+        make_setting_item("volumetric_clouds", "Volumetric Clouds", cld_2d_val, cld_2d_raw, False, "optimum" if cld_2d_val == "High" else "acceptable", "emerald" if cld_2d_val == "High" else "amber", "Optimum" if cld_2d_val == "High" else "Acceptable", "Raymarched volumetric cloud rendering quality and edge density.", q_options, page=2),
+        make_setting_item("buildings", "Buildings Quality", bld_2d_val, bld_2d_raw, False, "optimum" if bld_2d_val in ["High", "Ultra"] else "acceptable", "emerald" if bld_2d_val in ["High", "Ultra"] else "amber", "Optimum", "Procedural 3D buildings mesh detail and roof textures.", q_options, page=2),
+        make_setting_item("trees", "Trees Quality", tree_2d_val, tree_2d_raw, False, "optimum" if tree_2d_val in ["High", "Ultra"] else "acceptable", "emerald" if tree_2d_val in ["High", "Ultra"] else "amber", "Optimum", "Vegetation and 3D canopy draw distance and shadow detail.", q_options, page=2),
+        make_setting_item("grass", "Grass & Bushes", grass_2d_val, grass_2d_raw, False, "optimum" if grass_2d_val in ["High", "Medium"] else "acceptable", "emerald" if grass_2d_val in ["High", "Medium"] else "amber", "Optimum", "Ground turf, flowers and 3D procedural grass density around runways.", q_options, page=2),
+        make_setting_item("water_waves", "Water Waves Simulation", water_2d_val, water_2d_raw, False, "optimum" if "512" in water_2d_val or "1024" in water_2d_val else "acceptable", "emerald" if "512" in water_2d_val or "1024" in water_2d_val else "amber", "Optimum", "FFT resolution grid for ocean and lake wave physics.", water_options, page=2),
+        make_setting_item("displacement_mapping", "Displacement Mapping", disp_2d, "1" if disp_2d == "ON" else "0", False, "optimum" if disp_2d == "OFF" else "suboptimal", "emerald" if disp_2d == "OFF" else "orange", "Optimum" if disp_2d == "OFF" else "Sub-Optimal", "Adds micro-surface height details to runways and terrain. Recommended OFF to save VRAM and GPU compute.", ["OFF", "ON"], page=2),
+
+        # PAGE 3: LIGHTING, AVIONICS & POST-PROCESSING (9)
+        make_setting_item("glass_cockpits", "Glass Cockpit Refresh", glass_2d_val, glass_2d_raw, False, glass_2d_rating, glass_2d_color, glass_2d_label, glass_2d_tip, glass_options, page=3),
+        make_setting_item("shadow_maps", "Shadow Maps Resolution", shd_2d_val, shd_2d_raw, False, "optimum" if "1536" in shd_2d_val or "2048" in shd_2d_val else "acceptable", "emerald" if "1536" in shd_2d_val or "2048" in shd_2d_val else "amber", "Optimum", "Direct sunlight shadow map resolution for aircraft and buildings.", shadow_options, page=3),
+        make_setting_item("terrain_shadows", "Terrain Shadows", tshd_2d_val, tshd_2d_raw, False, "optimum" if "512" in tshd_2d_val or "1024" in tshd_2d_val else "acceptable", "emerald" if "512" in tshd_2d_val or "1024" in tshd_2d_val else "amber", "Optimum", "Mountain and terrain heightfield self-shadowing fidelity.", hf_options, page=3),
+        make_setting_item("contact_shadows", "Contact Shadows", cshd_2d_val, cshd_2d_raw, False, "optimum" if cshd_2d_val in ["High", "Ultra"] else "acceptable", "emerald" if cshd_2d_val in ["High", "Ultra"] else "amber", "Optimum", "Screen-space micro-shadows beneath wheels, switches, and small fixtures.", q_options, page=3),
+        make_setting_item("ambient_occlusion", "Ambient Occlusion (SSAO)", ssao_2d_val, ssao_2d_raw, False, "optimum" if ssao_2d_val in ["High", "Ultra"] else "acceptable", "emerald" if ssao_2d_val in ["High", "Ultra"] else "amber", "Optimum", "Screen-space ambient occlusion providing realism and contact depth.", q_options, page=3),
+        make_setting_item("reflections_ssr", "Screen Reflections (SSR)", ssr_2d_val, ssr_2d_raw, False, "optimum" if ssr_2d_val in ["High", "Ultra"] else "acceptable", "emerald" if ssr_2d_val in ["High", "Ultra"] else "amber", "Optimum", "Real-time water puddles, wet apron, and cockpit glass reflections.", q_options, page=3),
+        make_setting_item("volumetric_lights", "Volumetric Lights", vl_2d_val, vl_2d_raw, False, "optimum" if vl_2d_val in ["High", "Ultra"] else "acceptable", "emerald" if vl_2d_val in ["High", "Ultra"] else "amber", "Optimum", "Light beam scattering in clouds, mist, and night landing lights.", q_options, page=3),
+        make_setting_item("anisotropic_filtering", "Anisotropic Filtering", aniso_2d_val, aniso_2d_raw, False, "optimum" if aniso_2d_val == "16X" else "acceptable", "emerald" if aniso_2d_val == "16X" else "amber", "Optimum", "Sharpens runway markings and ground textures viewed at acute glancing angles.", aniso_options, page=3),
+        make_setting_item("windshield_effects", "Windshield Effects", wind_2d_val, wind_2d_raw, False, "optimum" if wind_2d_val in ["High", "Ultra"] else "acceptable", "emerald" if wind_2d_val in ["High", "Ultra"] else "amber", "Optimum", "Raindrops, icing, wiper sweeps, and glass reflection effects on windshield.", q_options, page=3),
     ]
 
-    # Build VR Matrix
+    # Build VR Matrix (27 Items across 3 Pages of 9)
     matrix_vr = [
-        make_setting_item("resolution", "Full Screen Resolution", res_formatted, res_raw, True, "optimum", "emerald", "Optimum", "Desktop mirror resolution. Shared with 2D windowing.", ["3840 x 2160", "2560 x 1440", "1920 x 1080"]),
-        make_setting_item("anti_aliasing", "Anti-Aliasing", val_aa_vr, aa_vr, False, "optimum" if "DLSS" in val_aa_vr else "acceptable", "emerald" if "DLSS" in val_aa_vr else "amber", "Optimum" if "DLSS" in val_aa_vr else "Acceptable", "DLSS Balanced or Quality is essential in VR to reduce stereo rendering load.", ["DLSS (Quality)", "DLSS (Balanced)", "DLSS (Performance)", "TAA"]),
-        make_setting_item("max_frame_rate", "Max Frame Rate", f"{fps_vr} FPS" if fps_vr != '0' else "Unlocked", fps_vr, False, vr_fps_rating, vr_fps_color, vr_fps_label, vr_fps_tooltip, ["36", "40", "45", "60", "72", "80", "90", "120", "Unlocked"]),
-        make_setting_item("frame_generation", "Frame Generation", fg_vr, fg_vr_raw, False, "optimum" if fg_vr == "OFF" else "nogo", "emerald" if fg_vr == "OFF" else "rose", "Optimum (OFF)" if fg_vr == "OFF" else "NO GO", "Frame Generation must be kept OFF in VR to prevent head-tracking latency and stereo distortion.", ["OFF", "DLSSG (2X)"]),
-        make_setting_item("framerate_multiplier", "Framerate Multiplier", f"{mult_vr}X", mult_vr, False, "optimum", "emerald", "Optimum", "Multiplier in VR.", ["1"]),
-        make_setting_item("vsync", "V-Sync", vsync_val, vsync_raw, True, "optimum", "emerald", "Optimum", "Global V-Sync state.", ["ON", "OFF"]),
-        make_setting_item("vsync_interval", "V-Sync Interval", interval_val, interval_raw, True, "optimum", "emerald", "Optimum", "V-Sync Interval.", ["100% Monitor Hz"]),
-        make_setting_item("dynamic_settings", "Dynamic Settings", dyn_vr, "0" if dyn_vr == "OFF" else "1", False, "optimum" if dyn_vr == "OFF" else "suboptimal", "emerald" if dyn_vr == "OFF" else "orange", "Optimum", "Keep OFF in VR to avoid sudden stereo blurriness.", ["OFF", "ON"]),
-        make_setting_item("tlod", "Terrain LOD (TLOD)", f"{tlod_vr_val}" if not autofps else f"Dynamic ({tlod_vr_val})", str(tlod_vr_val), False, "optimum" if tlod_vr_val <= 100 else ("acceptable" if tlod_vr_val <= 120 else "nogo"), "emerald" if tlod_vr_val <= 100 else ("amber" if tlod_vr_val <= 120 else "rose"), "Optimum" if tlod_vr_val <= 100 else "High Stutter Hazard", "In VR stereo, keep TLOD <= 100 to avoid CPU MainThread frame drops.", ["50", "80", "100", "120", "150"]),
-        make_setting_item("offscreen_precaching", "Off Screen Terrain Pre-Caching", pre_vr_val, pre_vr_raw, False, "optimum" if pre_vr_val in ["High", "Ultra"] else "nogo", "emerald" if pre_vr_val in ["High", "Ultra"] else "rose", "Optimum", "Essential for smooth head rotation in VR.", ["Ultra", "High", "Medium", "Low"]),
-        make_setting_item("olod", "Objects LOD (OLOD)", f"{olod_vr_val}" if not autofps else f"Dynamic ({olod_vr_val})", str(olod_vr_val), False, "optimum" if olod_vr_val <= 100 else "acceptable", "emerald" if olod_vr_val <= 100 else "amber", "Optimum", "Objects distance in VR.", ["50", "80", "100", "120"]),
-        make_setting_item("displacement_mapping", "Displacement Mapping", disp_vr, "1" if disp_vr == "ON" else "0", False, "optimum" if disp_vr == "OFF" else "suboptimal", "emerald" if disp_vr == "OFF" else "orange", "Optimum", "Keep OFF in VR.", ["OFF", "ON"]),
-        make_setting_item("texture_resolution", "Texture Resolution", tex_vr_val, tex_vr_raw, False, tex_vr_rating, tex_vr_color, tex_vr_label, tex_vr_tip, ["Ultra", "High", "Medium", "Low"])
+        # PAGE 1: CORE & DISPLAY PACING (9)
+        make_setting_item("resolution", "Full Screen Resolution", res_formatted, res_raw, True, "optimum", "emerald", "Optimum", "Desktop mirror resolution. Shared with 2D windowing.", ["3840 x 2160", "2560 x 1440", "1920 x 1080"], page=1),
+        make_setting_item("anti_aliasing", "Anti-Aliasing & Upscaling", val_aa_vr, aa_vr, False, "optimum" if "DLSS" in val_aa_vr else "acceptable", "emerald" if "DLSS" in val_aa_vr else "amber", "Optimum" if "DLSS" in val_aa_vr else "Acceptable", "DLSS Balanced or Quality is essential in VR to reduce stereo rendering load.", ["DLSS (Quality)", "DLSS (Balanced)", "DLSS (Performance)", "TAA"], page=1),
+        make_setting_item("max_frame_rate", "Max Frame Rate", f"{fps_vr} FPS" if fps_vr != '0' else "Unlocked", fps_vr, False, vr_fps_rating, vr_fps_color, vr_fps_label, vr_fps_tooltip, fps_options, page=1, is_numeric=True, min_val=0, max_val=240, step=1),
+        make_setting_item("frame_generation", "Frame Generation", fg_vr, fg_vr_raw, False, "optimum" if fg_vr == "OFF" else "nogo", "emerald" if fg_vr == "OFF" else "rose", "Optimum (OFF)" if fg_vr == "OFF" else "NO GO", "Frame Generation must be kept OFF in VR to prevent head-tracking latency and stereo distortion.", ["OFF", "DLSSG (2X)"], page=1),
+        make_setting_item("framerate_multiplier", "Framerate Multiplier", f"{mult_vr}X", mult_vr, False, "optimum", "emerald", "Optimum", "Multiplier in VR.", ["1"], page=1),
+        make_setting_item("vsync", "V-Sync", vsync_val, vsync_raw, True, "optimum", "emerald", "Optimum", "Global V-Sync state.", ["ON", "OFF"], page=1),
+        make_setting_item("dynamic_settings", "Dynamic Settings", dyn_vr, "0" if dyn_vr == "OFF" else "1", False, "optimum" if dyn_vr == "OFF" else "suboptimal", "emerald" if dyn_vr == "OFF" else "orange", "Optimum", "Keep OFF in VR to avoid sudden stereo blurriness.", ["OFF", "ON"], page=1),
+        make_setting_item("reflex", "NVIDIA Reflex", reflex_vr, reflex_vr, False, "optimum" if reflex_vr in ["ON", "ON+BOOST"] else "suboptimal", "emerald" if reflex_vr in ["ON", "ON+BOOST"] else "orange", "Optimum", "Reduces VR motion-to-photon latency.", ["ON", "ON+BOOST", "OFF"], page=1),
+        make_setting_item("texture_resolution", "Texture Resolution", tex_vr_val, tex_vr_raw, False, tex_vr_rating, tex_vr_color, tex_vr_label, tex_vr_tip, q_options, page=1),
+
+        # PAGE 2: TERRAIN & ENVIRONMENT WORLD (9)
+        make_setting_item("tlod", "Terrain LOD (TLOD)", f"{tlod_vr_val}" if not autofps else f"Dynamic ({tlod_vr_val})", str(tlod_vr_val), False, "optimum" if tlod_vr_val <= 100 else ("acceptable" if tlod_vr_val <= 120 else "nogo"), "emerald" if tlod_vr_val <= 100 else ("amber" if tlod_vr_val <= 120 else "rose"), "Optimum" if tlod_vr_val <= 100 else "High Stutter Hazard", "In VR stereo, keep TLOD <= 100 to avoid CPU MainThread frame drops. Manual input supported up to 400.", lod_options, page=2, is_numeric=True, min_val=10, max_val=400, step=5),
+        make_setting_item("olod", "Objects LOD (OLOD)", f"{olod_vr_val}" if not autofps else f"Dynamic ({olod_vr_val})", str(olod_vr_val), False, "optimum" if olod_vr_val <= 100 else "acceptable", "emerald" if olod_vr_val <= 100 else "amber", "Optimum", "Objects distance in VR up to 400.", lod_options, page=2, is_numeric=True, min_val=10, max_val=400, step=5),
+        make_setting_item("offscreen_precaching", "Off Screen Pre-Caching", pre_vr_val, pre_vr_raw, False, "optimum" if pre_vr_val in ["High", "Ultra"] else "nogo", "emerald" if pre_vr_val in ["High", "Ultra"] else "rose", "Optimum", "Essential for smooth head rotation in VR.", q_options, page=2),
+        make_setting_item("volumetric_clouds", "Volumetric Clouds", cld_vr_val, cld_vr_raw, False, "optimum" if cld_vr_val in ["High", "Medium"] else "acceptable", "emerald" if cld_vr_val in ["High", "Medium"] else "amber", "Optimum", "Volumetric clouds in VR stereo. High or Medium provides smooth frame pacing.", q_options, page=2),
+        make_setting_item("buildings", "Buildings Quality", bld_vr_val, bld_vr_raw, False, "optimum" if bld_vr_val in ["High", "Medium"] else "acceptable", "emerald" if bld_vr_val in ["High", "Medium"] else "amber", "Optimum", "3D building fidelity in VR.", q_options, page=2),
+        make_setting_item("trees", "Trees Quality", tree_vr_val, tree_vr_raw, False, "optimum" if tree_vr_val in ["High", "Medium"] else "acceptable", "emerald" if tree_vr_val in ["High", "Medium"] else "amber", "Optimum", "Trees geometry in VR.", q_options, page=2),
+        make_setting_item("grass", "Grass & Bushes", grass_vr_val, grass_vr_raw, False, "optimum" if grass_vr_val in ["Low", "Medium"] else "acceptable", "emerald" if grass_vr_val in ["Low", "Medium"] else "amber", "Optimum", "Ground procedural vegetation.", q_options, page=2),
+        make_setting_item("water_waves", "Water Waves Simulation", water_vr_val, water_vr_raw, False, "optimum" if "256" in water_vr_val or "512" in water_vr_val else "acceptable", "emerald" if "256" in water_vr_val or "512" in water_vr_val else "amber", "Optimum", "Water FFT physics in VR.", water_options, page=2),
+        make_setting_item("displacement_mapping", "Displacement Mapping", disp_vr, "1" if disp_vr == "ON" else "0", False, "optimum" if disp_vr == "OFF" else "suboptimal", "emerald" if disp_vr == "OFF" else "orange", "Optimum", "Keep OFF in VR.", ["OFF", "ON"], page=2),
+
+        # PAGE 3: LIGHTING, AVIONICS & POST-PROCESSING (9)
+        make_setting_item("glass_cockpits", "Glass Cockpit Refresh", glass_vr_val, glass_vr_raw, False, glass_vr_rating, glass_vr_color, glass_vr_label, glass_vr_tip, glass_options, page=3),
+        make_setting_item("shadow_maps", "Shadow Maps Resolution", shd_vr_val, shd_vr_raw, False, "optimum" if "1024" in shd_vr_val or "1536" in shd_vr_val else "acceptable", "emerald" if "1024" in shd_vr_val or "1536" in shd_vr_val else "amber", "Optimum", "Shadows size in VR.", shadow_options, page=3),
+        make_setting_item("terrain_shadows", "Terrain Shadows", tshd_vr_val, tshd_vr_raw, False, "optimum" if "256" in tshd_vr_val or "512" in tshd_vr_val else "acceptable", "emerald" if "256" in tshd_vr_val or "512" in tshd_vr_val else "amber", "Optimum", "Heightfield mountain shadows.", hf_options, page=3),
+        make_setting_item("contact_shadows", "Contact Shadows", cshd_vr_val, cshd_vr_raw, False, "optimum" if cshd_vr_val in ["Medium", "High"] else "acceptable", "emerald" if cshd_vr_val in ["Medium", "High"] else "amber", "Optimum", "Small contact shadows in cockpit.", q_options, page=3),
+        make_setting_item("ambient_occlusion", "Ambient Occlusion (SSAO)", ssao_vr_val, ssao_vr_raw, False, "optimum" if ssao_vr_val in ["Low", "Medium"] else "acceptable", "emerald" if ssao_vr_val in ["Low", "Medium"] else "amber", "Optimum", "Ambient shading in VR.", q_options, page=3),
+        make_setting_item("reflections_ssr", "Screen Reflections (SSR)", ssr_vr_val, ssr_vr_raw, False, "optimum" if ssr_vr_val in ["Low", "Medium"] else "acceptable", "emerald" if ssr_vr_val in ["Low", "Medium"] else "amber", "Optimum", "Cockpit and puddle reflections in VR.", q_options, page=3),
+        make_setting_item("volumetric_lights", "Volumetric Lights", vl_vr_val, vl_vr_raw, False, "optimum" if vl_vr_val in ["Low", "Medium"] else "acceptable", "emerald" if vl_vr_val in ["Low", "Medium"] else "amber", "Optimum", "Fog light scattering in VR.", q_options, page=3),
+        make_setting_item("anisotropic_filtering", "Anisotropic Filtering", aniso_vr_val, aniso_vr_raw, False, "optimum" if aniso_vr_val == "16X" else "acceptable", "emerald" if aniso_vr_val == "16X" else "amber", "Optimum", "Ground texture sharpness in VR headset.", aniso_options, page=3),
+        make_setting_item("windshield_effects", "Windshield Effects", wind_vr_val, wind_vr_raw, False, "optimum" if wind_vr_val in ["High", "Ultra"] else "acceptable", "emerald" if wind_vr_val in ["High", "Ultra"] else "amber", "Optimum", "Canopy rain and wipers in VR.", q_options, page=3),
     ]
 
     # Cross-Settings Interdependences Analysis
@@ -885,11 +1085,16 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
     elif "DLSS" in val_aa_2d and tex_2d_val in ["Low", "Medium"]:
         synergies_2d.append("DLSS Upscaling + Low/Med Textures: Synergistic VRAM reduction (-8 GB) for zero-stutter flights.")
 
-    # 3. Airliner vs GA TLOD
+    # 3. Airliner vs GA TLOD & Avionics Refresh
     if is_liner and tlod_2d_val > 130 and not autofps:
         conflicts_2d.append(f"Airliner Profile + TLOD {tlod_2d_val}: High CPU MainThread load from avionics + high terrain draw.")
     elif is_liner and (tlod_2d_val <= 120 or autofps):
         synergies_2d.append("Airliner Profile + Controlled TLOD: Keeps MainThread latency under 25ms during landing flare.")
+
+    if is_liner and glass_2d_val == 'High (Full)':
+        conflicts_2d.append("Airliner Profile + High Glass Cockpits: Vector avionics (MFD/PFD/ND) severely stress CPU MainThread. Throttling to Medium/Low frees 5-8 ms.")
+    elif is_liner and glass_2d_val in ['Medium (Half)', 'Low (Quarter)']:
+        synergies_2d.append("Airliner Profile + Throttled Glass Cockpits: Balanced avionics refresh preserves MainThread budget.")
 
     # 4. AutoFPS Synergy
     if autofps:
@@ -938,7 +1143,8 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
             "summary": f"Configured for {'complex airliners (Axel LFBO VRAM optimizations)' if is_liner else 'VFR general aviation flights'}.",
             "recommendations": [
                 "Low/Medium textures eliminate D3D12 paging freezes with complex airliners." if is_liner else "High/Ultra textures maximize terrain & cockpit visual fidelity in GA.",
-                "Offscreen Pre-Caching HIGH eliminates camera panning judder."
+                "Offscreen Pre-Caching HIGH eliminates camera panning judder.",
+                "Throttle Glass Cockpits to Medium/Low on airliners to protect CPU MainThread." if is_liner else "Full Glass Cockpit refresh provides peak synthetic vision fidelity."
             ],
             "synergies": synergies_2d,
             "conflicts": conflicts_2d
@@ -970,79 +1176,50 @@ def update_msfs_user_cfg_setting(mode: str, setting_key: str, new_value: Any, us
             content = f.read()
 
         mode = mode.upper()
+        q_map_rev = {'ultra': '3', 'high': '2', 'medium': '1', 'low': '0'}
+        fft_map_rev = {'ultra (1024)': '1024', 'high (512)': '512', 'medium (256)': '256', 'low (128)': '128', '1024': '1024', '512': '512', '256': '256', '128': '128'}
+        glass_map_rev = {'high (full)': '2', 'medium (half)': '1', 'low (quarter)': '0', 'full': '2', 'half': '1', 'quarter': '0', 'high': '2', 'medium': '1', 'low': '0'}
+        shadow_map_rev = {'ultra (2048)': '2048', 'high (1536)': '1536', 'medium (1024)': '1024', 'low (512)': '512', '2048': '2048', '1536': '1536', '1024': '1024', '512': '512'}
+        hf_map_rev = {'ultra (1024)': '1024', 'high (512)': '512', 'medium (256)': '256', 'low (128)': '128', '1024': '1024', '512': '512', '256': '256', '128': '128'}
+
+        # 1. Full Screen Resolution (Shared)
         if setting_key in ['resolution', 'FullScreenResolution']:
             clean_val = str(new_value).replace('x', ' ').replace('X', ' ')
             clean_val = " ".join(clean_val.split())
             content = re.sub(r'(FullScreenResolution\s+)[^\r\n]+', rf'\g<1>{clean_val}', content)
+
+        # 2. Max Frame Rate (2D / VR + FrameLimiter)
         elif setting_key in ['max_frame_rate', 'TargetFrameRate']:
             k = 'TargetFrameRate' if mode == '2D' else 'TargetFrameRateVR'
             clean_val = str(new_value).replace('FPS', '').replace('Unlocked', '0').strip()
             content = re.sub(rf'({k}\s+)[^\r\n]+', rf'\g<1>{clean_val}', content)
             if mode == '2D':
                 content = re.sub(r'(FrameLimiter\s+)[^\r\n]+', rf'\g<1>{clean_val}', content)
+
+        # 3. Frame Generation
         elif setting_key in ['frame_generation', 'FrameGeneration']:
             k = 'FrameGeneration' if mode == '2D' else 'FrameGenerationVR'
             clean_val = 'DLSSG' if 'DLSSG' in str(new_value).upper() else ('FSR3' if 'FSR3' in str(new_value).upper() else 'NONE')
             content = re.sub(rf'({k}\s+)[^\r\n]+', rf'\g<1>{clean_val}', content)
+
+        # 4. V-Sync (Shared)
         elif setting_key in ['vsync', 'VSync']:
             clean_val = '1' if str(new_value).upper() in ['1', 'ON', 'TRUE'] else '0'
             content = re.sub(r'(VSync\s+)[^\r\n]+', rf'\g<1>{clean_val}', content)
+
+        # 5. Dynamic Settings
         elif setting_key in ['dynamic_settings', 'DynamicSettings']:
             k = 'DynamicSettings' if mode == '2D' else 'DynamicSettingsVR'
             clean_val = '1' if str(new_value).upper() in ['1', 'ON', 'TRUE'] else '0'
             content = re.sub(rf'({k}\s+)[^\r\n]+', rf'\g<1>{clean_val}', content)
-        elif setting_key in ['tlod', 'TerrainLoD']:
-            val_f = f"{float(str(new_value).replace('Dynamic', '').replace('(', '').replace(')', '').strip()) / 100.0:.6f}"
-            target_block = '{Graphics\n' if mode == '2D' else '{GraphicsVR'
-            b_idx = content.find(target_block)
-            if b_idx != -1:
-                t_idx = content.find('{Terrain', b_idx)
-                t_end = content.find('}', t_idx)
-                t_block = content[t_idx:t_end]
-                new_t_block = re.sub(r'(LoDFactor\s+)[^\r\n]+', rf'\g<1>{val_f}', t_block)
-                content = content[:t_idx] + new_t_block + content[t_end:]
-        elif setting_key in ['olod', 'ObjectsLoD']:
-            val_f = f"{float(str(new_value).replace('Dynamic', '').replace('(', '').replace(')', '').strip()) / 100.0:.6f}"
-            target_block = '{Graphics\n' if mode == '2D' else '{GraphicsVR'
-            b_idx = content.find(target_block)
-            if b_idx != -1:
-                o_idx = content.find('{ObjectsLoD', b_idx)
-                o_end = content.find('}', o_idx)
-                o_block = content[o_idx:o_end]
-                new_o_block = re.sub(r'(LoDFactor\s+)[^\r\n]+', rf'\g<1>{val_f}', o_block)
-                content = content[:o_idx] + new_o_block + content[o_end:]
-        elif setting_key in ['offscreen_precaching', 'OffscreenTerrainPreCaching']:
-            q_map = {'ultra': '3', 'high': '2', 'medium': '1', 'low': '0'}
-            clean_q = q_map.get(str(new_value).lower().strip(), '2')
-            target_block = '{Graphics\n' if mode == '2D' else '{GraphicsVR'
-            b_idx = content.find(target_block)
-            if b_idx != -1:
-                p_idx = content.find('{OffscreenTerrainPreCaching', b_idx)
-                p_end = content.find('}', p_idx)
-                p_block = content[p_idx:p_end]
-                new_p_block = re.sub(r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}', p_block)
-                content = content[:p_idx] + new_p_block + content[p_end:]
-        elif setting_key in ['texture_resolution', 'Texture']:
-            q_map = {'ultra': '3', 'high': '2', 'medium': '1', 'low': '0'}
-            clean_q = q_map.get(str(new_value).lower().strip(), '2')
-            target_block = '{Graphics\n' if mode == '2D' else '{GraphicsVR'
-            b_idx = content.find(target_block)
-            if b_idx != -1:
-                tex_idx = content.find('{Texture', b_idx)
-                tex_end = content.find('}', tex_idx)
-                tex_block = content[tex_idx:tex_end]
-                new_tex_block = re.sub(r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}', tex_block)
-                content = content[:tex_idx] + new_tex_block + content[tex_end:]
-        elif setting_key in ['displacement_mapping', 'DisplacementMapping']:
-            clean_val = '1' if str(new_value).upper() in ['1', 'ON', 'TRUE'] else '0'
-            target_block = '{Graphics\n' if mode == '2D' else '{GraphicsVR'
-            b_idx = content.find(target_block)
-            if b_idx != -1:
-                d_idx = content.find('{DisplacementMapping', b_idx)
-                d_end = content.find('}', d_idx)
-                d_block = content[d_idx:d_end]
-                new_d_block = re.sub(r'(Enabled\s+)[^\r\n]+', rf'\g<1>{clean_val}', d_block)
-                content = content[:d_idx] + new_d_block + content[d_end:]
+
+        # 6. NVIDIA Reflex
+        elif setting_key in ['reflex', 'Reflex']:
+            k = 'Reflex' if mode == '2D' else 'ReflexVR'
+            clean_val = 'ON_BOOST' if 'BOOST' in str(new_value).upper() else ('ON' if str(new_value).upper() in ['ON', '1', 'TRUE'] else 'OFF')
+            content = re.sub(rf'({k}\s+)[^\r\n]+', rf'\g<1>{clean_val}', content)
+
+        # 7. Anti-Aliasing & Upscaling
         elif setting_key in ['anti_aliasing', 'AntiAliasing']:
             aa_mode = 'DLSS' if 'DLSS' in str(new_value).upper() else ('TAA' if 'TAA' in str(new_value).upper() else 'DLAA')
             dlss_mode = 'QUALITY' if 'QUALITY' in str(new_value).upper() else ('BALANCED' if 'BALANCED' in str(new_value).upper() else ('PERFORMANCE' if 'PERFORMANCE' in str(new_value).upper() else 'OFF'))
@@ -1051,6 +1228,105 @@ def update_msfs_user_cfg_setting(mode: str, setting_key: str, new_value: Any, us
             content = re.sub(rf'({k_aa}\s+)[^\r\n]+', rf'\g<1>{aa_mode}', content)
             if dlss_mode != 'OFF':
                 content = re.sub(rf'({k_dlss}\s+)[^\r\n]+', rf'\g<1>{dlss_mode}', content)
+
+        # 8. TLOD (Supports up to 400 manual input)
+        elif setting_key in ['tlod', 'TerrainLoD', 'LoDFactor']:
+            clean_str = str(new_value).replace('Dynamic', '').replace('(', '').replace(')', '').replace('LOD', '').strip()
+            num_val = max(10, min(400, float(clean_str)))
+            val_f = f"{num_val / 100.0:.6f}"
+            content = update_sub_block_setting(content, mode, '{Terrain', r'(LoDFactor\s+)[^\r\n]+', rf'\g<1>{val_f}')
+
+        # 9. OLOD (Supports up to 400 manual input)
+        elif setting_key in ['olod', 'ObjectsLoD']:
+            clean_str = str(new_value).replace('Dynamic', '').replace('(', '').replace(')', '').replace('LOD', '').strip()
+            num_val = max(10, min(400, float(clean_str)))
+            val_f = f"{num_val / 100.0:.6f}"
+            content = update_sub_block_setting(content, mode, '{ObjectsLoD', r'(LoDFactor\s+)[^\r\n]+', rf'\g<1>{val_f}')
+
+        # 10. Offscreen Terrain Pre-Caching
+        elif setting_key in ['offscreen_precaching', 'OffscreenTerrainPreCaching']:
+            clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
+            content = update_sub_block_setting(content, mode, '{OffscreenTerrainPreCaching', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}')
+
+        # 11. Texture Resolution
+        elif setting_key in ['texture_resolution', 'Texture']:
+            clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
+            content = update_sub_block_setting(content, mode, '{Texture', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}')
+
+        # 12. Volumetric Clouds
+        elif setting_key in ['volumetric_clouds', 'VolumetricClouds']:
+            clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
+            content = update_sub_block_setting(content, mode, '{VolumetricClouds', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}')
+
+        # 13. Buildings Quality
+        elif setting_key in ['buildings', 'Buildings']:
+            clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
+            content = update_sub_block_setting(content, mode, '{Buildings', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}')
+
+        # 14. Trees Quality
+        elif setting_key in ['trees', 'TreesQuality']:
+            clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
+            content = update_sub_block_setting(content, mode, '{Procedural', r'(TreesQuality\s+)[^\r\n]+', rf'\g<1>{clean_q}')
+
+        # 15. Grass Quality
+        elif setting_key in ['grass', 'GrassQuality']:
+            clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
+            content = update_sub_block_setting(content, mode, '{Procedural', r'(GrassQuality\s+)[^\r\n]+', rf'\g<1>{clean_q}')
+
+        # 16. Water Waves Simulation
+        elif setting_key in ['water_waves', 'Water']:
+            clean_val = fft_map_rev.get(str(new_value).lower().strip(), '512')
+            content = update_sub_block_setting(content, mode, '{Water', r'(FFTSize\s+)[^\r\n]+', rf'\g<1>{clean_val}')
+
+        # 17. Displacement Mapping
+        elif setting_key in ['displacement_mapping', 'DisplacementMapping']:
+            clean_val = '1' if str(new_value).upper() in ['1', 'ON', 'TRUE'] else '0'
+            content = update_sub_block_setting(content, mode, '{DisplacementMapping', r'(Enabled\s+)[^\r\n]+', rf'\g<1>{clean_val}')
+
+        # 18. Glass Cockpits Refresh Rate
+        elif setting_key in ['glass_cockpits', 'GlassCockpitsRefreshRate']:
+            clean_val = glass_map_rev.get(str(new_value).lower().strip(), '1')
+            content = update_sub_block_setting(content, mode, '{GlassCockpitsRefreshRate', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_val}')
+
+        # 19. Shadow Maps Resolution
+        elif setting_key in ['shadow_maps', 'Shadows']:
+            clean_val = shadow_map_rev.get(str(new_value).lower().strip(), '1536')
+            content = update_sub_block_setting(content, mode, '{Shadows', r'(Size\s+)[^\r\n]+', rf'\g<1>{clean_val}')
+
+        # 20. Terrain Shadows
+        elif setting_key in ['terrain_shadows', 'HeightFieldShadows']:
+            clean_val = hf_map_rev.get(str(new_value).lower().strip(), '512')
+            content = update_sub_block_setting(content, mode, '{HeightFieldShadows', r'(Size\s+)[^\r\n]+', rf'\g<1>{clean_val}')
+
+        # 21. Contact Shadows
+        elif setting_key in ['contact_shadows', 'ContactShadows']:
+            clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
+            content = update_sub_block_setting(content, mode, '{ContactShadows', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}')
+
+        # 22. Ambient Occlusion (SSAO)
+        elif setting_key in ['ambient_occlusion', 'SSAO']:
+            clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
+            content = update_sub_block_setting(content, mode, '{SSAO', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}')
+
+        # 23. Screen Space Reflections (SSR)
+        elif setting_key in ['reflections_ssr', 'SSR']:
+            clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
+            content = update_sub_block_setting(content, mode, '{SSR', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}')
+
+        # 24. Volumetric Lights
+        elif setting_key in ['volumetric_lights', 'VolumetricLights']:
+            clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
+            content = update_sub_block_setting(content, mode, '{VolumetricLights', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}')
+
+        # 25. Anisotropic Filtering
+        elif setting_key in ['anisotropic_filtering', 'MaxAnisotropy']:
+            clean_val = str(new_value).upper().replace('X', '').replace('OFF', '0').strip()
+            content = update_sub_block_setting(content, mode, '{Texture', r'(MaxAnisotropy\s+)[^\r\n]+', rf'\g<1>{clean_val}')
+
+        # 26. Windshield Effects
+        elif setting_key in ['windshield_effects', 'WindShield']:
+            clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
+            content = update_sub_block_setting(content, mode, '{WindShield', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}')
 
         with open(path, 'w', encoding='utf-8') as f:
             f.write(content)
@@ -1082,33 +1358,77 @@ def apply_recommended_msfs_settings(mode: str, flight_profile: str = 'LINER', vr
         if mode == '2D':
             tex_val = 'Low' if is_liner else 'High'
             tlod_val = '100' if is_liner else '150'
+            glass_val = 'Medium (Half)' if is_liner else 'High (Full)'
+            
+            # Page 1
             update_msfs_user_cfg_setting('2D', 'anti_aliasing', 'DLSS (Quality)', path, create_backup=False)
             update_msfs_user_cfg_setting('2D', 'frame_generation', 'DLSSG (2X)', path, create_backup=False)
             update_msfs_user_cfg_setting('2D', 'vsync', 'ON', path, create_backup=False)
             update_msfs_user_cfg_setting('2D', 'max_frame_rate', '90', path, create_backup=False)
+            update_msfs_user_cfg_setting('2D', 'dynamic_settings', 'OFF', path, create_backup=False)
+            update_msfs_user_cfg_setting('2D', 'reflex', 'ON', path, create_backup=False)
+            update_msfs_user_cfg_setting('2D', 'texture_resolution', tex_val, path, create_backup=False)
+            
+            # Page 2
             update_msfs_user_cfg_setting('2D', 'tlod', tlod_val, path, create_backup=False)
             update_msfs_user_cfg_setting('2D', 'olod', '100', path, create_backup=False)
             update_msfs_user_cfg_setting('2D', 'offscreen_precaching', 'High', path, create_backup=False)
-            update_msfs_user_cfg_setting('2D', 'texture_resolution', tex_val, path, create_backup=False)
+            update_msfs_user_cfg_setting('2D', 'volumetric_clouds', 'High', path, create_backup=False)
+            update_msfs_user_cfg_setting('2D', 'buildings', 'High', path, create_backup=False)
+            update_msfs_user_cfg_setting('2D', 'trees', 'High', path, create_backup=False)
+            update_msfs_user_cfg_setting('2D', 'grass', 'High', path, create_backup=False)
+            update_msfs_user_cfg_setting('2D', 'water_waves', 'High (512)', path, create_backup=False)
             update_msfs_user_cfg_setting('2D', 'displacement_mapping', 'OFF', path, create_backup=False)
-            update_msfs_user_cfg_setting('2D', 'dynamic_settings', 'OFF', path, create_backup=False)
+            
+            # Page 3
+            update_msfs_user_cfg_setting('2D', 'glass_cockpits', glass_val, path, create_backup=False)
+            update_msfs_user_cfg_setting('2D', 'shadow_maps', 'High (1536)', path, create_backup=False)
+            update_msfs_user_cfg_setting('2D', 'terrain_shadows', 'High (512)', path, create_backup=False)
+            update_msfs_user_cfg_setting('2D', 'contact_shadows', 'High', path, create_backup=False)
+            update_msfs_user_cfg_setting('2D', 'ambient_occlusion', 'High', path, create_backup=False)
+            update_msfs_user_cfg_setting('2D', 'reflections_ssr', 'High', path, create_backup=False)
+            update_msfs_user_cfg_setting('2D', 'volumetric_lights', 'High', path, create_backup=False)
+            update_msfs_user_cfg_setting('2D', 'anisotropic_filtering', '16X', path, create_backup=False)
+            update_msfs_user_cfg_setting('2D', 'windshield_effects', 'High', path, create_backup=False)
         else:
             tex_val = 'Low' if is_liner else 'Medium'
+            glass_val = 'Low (Quarter)' if is_liner else 'Medium (Half)'
+            
+            # Page 1
             update_msfs_user_cfg_setting('VR', 'anti_aliasing', 'DLSS (Balanced)', path, create_backup=False)
             update_msfs_user_cfg_setting('VR', 'frame_generation', 'OFF', path, create_backup=False)
             update_msfs_user_cfg_setting('VR', 'vsync', 'ON', path, create_backup=False)
             update_msfs_user_cfg_setting('VR', 'max_frame_rate', str(target_vr_fps), path, create_backup=False)
+            update_msfs_user_cfg_setting('VR', 'dynamic_settings', 'OFF', path, create_backup=False)
+            update_msfs_user_cfg_setting('VR', 'reflex', 'ON', path, create_backup=False)
+            update_msfs_user_cfg_setting('VR', 'texture_resolution', tex_val, path, create_backup=False)
+            
+            # Page 2
             update_msfs_user_cfg_setting('VR', 'tlod', '100', path, create_backup=False)
             update_msfs_user_cfg_setting('VR', 'olod', '100', path, create_backup=False)
             update_msfs_user_cfg_setting('VR', 'offscreen_precaching', 'High', path, create_backup=False)
-            update_msfs_user_cfg_setting('VR', 'texture_resolution', tex_val, path, create_backup=False)
+            update_msfs_user_cfg_setting('VR', 'volumetric_clouds', 'High', path, create_backup=False)
+            update_msfs_user_cfg_setting('VR', 'buildings', 'Medium', path, create_backup=False)
+            update_msfs_user_cfg_setting('VR', 'trees', 'Medium', path, create_backup=False)
+            update_msfs_user_cfg_setting('VR', 'grass', 'Low', path, create_backup=False)
+            update_msfs_user_cfg_setting('VR', 'water_waves', 'Medium (256)', path, create_backup=False)
             update_msfs_user_cfg_setting('VR', 'displacement_mapping', 'OFF', path, create_backup=False)
-            update_msfs_user_cfg_setting('VR', 'dynamic_settings', 'OFF', path, create_backup=False)
+            
+            # Page 3
+            update_msfs_user_cfg_setting('VR', 'glass_cockpits', glass_val, path, create_backup=False)
+            update_msfs_user_cfg_setting('VR', 'shadow_maps', 'Medium (1024)', path, create_backup=False)
+            update_msfs_user_cfg_setting('VR', 'terrain_shadows', 'Medium (256)', path, create_backup=False)
+            update_msfs_user_cfg_setting('VR', 'contact_shadows', 'Medium', path, create_backup=False)
+            update_msfs_user_cfg_setting('VR', 'ambient_occlusion', 'Low', path, create_backup=False)
+            update_msfs_user_cfg_setting('VR', 'reflections_ssr', 'Low', path, create_backup=False)
+            update_msfs_user_cfg_setting('VR', 'volumetric_lights', 'Low', path, create_backup=False)
+            update_msfs_user_cfg_setting('VR', 'anisotropic_filtering', '16X', path, create_backup=False)
+            update_msfs_user_cfg_setting('VR', 'windshield_effects', 'High', path, create_backup=False)
 
         profile_desc = "IFR Airliners (Axel LFBO VRAM Saver)" if is_liner else "VFR General Aviation (High Detail)"
         return {
             "status": "success",
-            "message": f"Optimal {mode} profile applied for {profile_desc}!",
+            "message": f"Optimal {mode} profile applied for {profile_desc} across 27 settings!",
             "backup_created": os.path.basename(backup_path),
             "profile": "LINER" if is_liner else "GA",
             "mode": mode,
