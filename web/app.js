@@ -15660,10 +15660,8 @@ function positionFlightOptimizerModal(targetAp = null) {
 
     const mapSize = (typeof map.getSize === 'function') ? map.getSize() : null;
     const containerW = mapSize ? mapSize.x : (modal.offsetParent ? modal.offsetParent.offsetWidth : window.innerWidth);
-    const containerH = mapSize ? mapSize.y : (modal.offsetParent ? modal.offsetParent.offsetHeight : window.innerHeight);
 
     const modalWidth = modal.offsetWidth || 940;
-    const modalHeight = modal.offsetHeight || 360;
     const halfWidth = modalWidth / 2;
 
     const minLeft = halfWidth + 12;
@@ -15675,20 +15673,9 @@ function positionFlightOptimizerModal(targetAp = null) {
     modal.style.bottom = 'auto';
 
     if (!hasUserDraggedOptimizerModal) {
-        // Place directly beneath the airport marker
-        let desiredTop = Math.round(point.y) + 32;
-
-        // Ensure it doesn't fall below the bottom toolbar (~65px reserve)
-        const maxTop = Math.max(70, containerH - modalHeight - 65);
-        if (desiredTop > maxTop) {
-            if (Math.round(point.y) - modalHeight - 32 >= 70) {
-                desiredTop = Math.round(point.y) - modalHeight - 32;
-            } else {
-                desiredTop = maxTop;
-            }
-        }
-        desiredTop = Math.max(70, desiredTop);
-        modal.style.top = `${desiredTop}px`;
+        // Systematically position directly beneath the airport marker and its label (matching Screen 2)
+        const targetTop = Math.round(point.y) + 26;
+        modal.style.top = `${targetTop}px`;
         modal.style.transform = 'translateX(-50%)';
     }
 }
