@@ -3494,7 +3494,7 @@ class Api:
 
     def update_msfs_setting(self, mode, setting_key, new_value):
         try:
-            res = flight_rig_optimizer.update_msfs_user_cfg_setting(mode, setting_key, new_value)
+            res = flight_rig_optimizer.stage_msfs_setting(mode, setting_key, new_value)
             return json.dumps(res, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)

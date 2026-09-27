@@ -111,47 +111,56 @@ To maximize readability and prevent visual clutter, the graphics configuration i
 ---
 
 ## 5. Ergonomics, Tag Nomenclature & Action Placement Design
-1. **Airy Header & Clean Minimalist 7-Tab Rubriques**:
+1. **Wider Window Architecture (1180px)**:
+   - Floating window width expanded from `940px` to `1180px` (`w-[1180px] max-w-[96vw]`), providing generous breathing room for cards and preventing any horizontal cramping.
+2. **Airy Header & Clean Minimalist 7-Tab Rubriques (Single Line Guarantee)**:
    - **Row 1**: Displays section title, 2D/VR display switcher, Airliner/GA mission profile switcher, VR refresh rate selector (72, 80, 90, 120 Hz), and AutoFPS live indicator.
-   - **Row 2**: Displays a streamlined segmented tab bar with exactly seven clean rubrique pills: `DISPLAY & SYNC`, `FRAME GEN & LATENCY`, `TERRAIN & LOD`, `ENVIRONMENT & FLORA`, `SHADOWS & LIGHTS`, `COCKPIT & AVIONICS`, and `WEATHER & REFLECTIONS`. All icons, numbers, helper text, and page counters are eliminated for minimalism.
-2. **Carousel Viewport (2x2 Grid per Rubrique)**:
+   - **Row 2**: Displays a streamlined segmented tab bar with exactly seven clean rubrique pills: `DISPLAY & SYNC`, `FRAME GEN & LATENCY`, `TERRAIN & LOD`, `ENVIRONMENT & FLORA`, `SHADOWS & LIGHTS`, `COCKPIT & AVIONICS`, and `WEATHER & REFLECTIONS`. Structured with `flex-nowrap justify-between gap-1.5` so all 7 tabs sit strictly on a single horizontal row without wrapping.
+3. **Carousel Viewport (2x2 Grid per Rubrique with Enhanced Readability)**:
    - Houses seven full-width $2 \times 2$ grid panels (4 cards each, 3 on final page) sliding along the X-axis via CSS transform transitions (`translateX(-0%)` to `translateX(-600%)`).
-3. **Custom Dark Combobox with Full Preset Visibility**:
+   - Cards feature expanded internal padding (`p-3.5`), high-contrast uppercase titles (`text-sm font-bold text-slate-100`), and generous vertical spacing.
+4. **Custom Dark Combobox with Full Preset Visibility**:
    - Replaces the native `<datalist>` dropdown with a custom dark-themed combobox popover menu.
    - On click or chevron toggle, the dropdown renders **all** preset options without filtering out non-matching values.
    - Presets highlight the `CURRENT` active value with a dedicated cyan badge.
    - Users can either click a preset for instant application or freely type custom numeric values (e.g. `82` or `125`), validated with min/max thresholds.
-4. **Strict Single-Word Uppercase Tag System**:
+5. **Strict Single-Word Uppercase Tag System (Enlarged)**:
    - Every graphics setting badge displays strictly one single uppercase word: `OPTIMUM`, `ACCEPTABLE`, `SUBOPTIMAL`, or `HAZARD`.
+   - Prominently sized (`text-xs font-black px-3 py-1`) for effortless legibility.
    - Explanations in parentheses are banned entirely from the tag label.
    - Solid, full-opacity background colors only: `bg-emerald-600`, `bg-amber-600`, `bg-orange-600`, `bg-rose-600`. All stroke, border, and glass opacity effects are removed.
    - Hovering over any tag reveals a dedicated tooltip explaining the specific rationale for the assigned rating (e.g. Axel LFBO VRAM savings or MainThread throttling).
-5. **Structured 3-Part Setting Tooltips**:
+6. **Structured 3-Part Setting Tooltips**:
    - Each card provides a structured 3-part tooltip:
      - `Description`: Exact functional description of what the graphics parameter controls.
      - `Current`: Analysis of the currently selected value and its system impact.
      - `Recommendation`: Concrete, actionable advice tailored to hardware capabilities and flight mission profile.
-6. **Uniform Combobox & Select Dropdown Chevrons**:
-   - Both standard `<select>` dropdowns and editable text/numeric fields (`tlod`, `olod`, `max_frame_rate`) share an identical SVG down-arrow chevron (`w-3.5 h-3.5 text-slate-400`).
+7. **Uniform Combobox & Select Dropdown Chevrons**:
+   - Both standard `<select>` dropdowns and editable text/numeric fields (`tlod`, `olod`, `max_frame_rate`) share an identical SVG down-arrow chevron (`w-4 h-4 text-slate-400`).
    - The chevron remains visible 100% of the time, in both free text typing mode and dropdown selection mode. Native browser indicators are hidden via CSS for visual consistency.
-7. **Bottom-Right Action Placement**:
+8. **Bottom-Right Action Placement**:
    - `ROLLBACK` and `OPTIMIZE PROFILE` action buttons are positioned at the bottom-right of the graphics settings block (beneath the carousel viewport).
-   - Icons are stripped from both buttons, adopting a clean, solid, uppercase typography.
+   - Icons are stripped from both buttons, adopting a clean, solid, uppercase typography (`text-sm font-black` for Optimize Profile).
 
 ---
 
-## 6. Rollback & Backup System Design
-- **Single-Pass Safety Backup**: A timestamped backup (`UserCfg.opt.backup_YYYYMMDD_HHMMSS`) is generated once prior to batch optimization.
+## 6. Staging, Rollback & Backup System Design
+- **In-Memory Staging Architecture (Zero Premature Disk Writes)**:
+  - Modifying dropdowns or typing custom values in the UI updates an in-memory staging dictionary (`_staged_user_cfg_settings[mode][key] = val`) without touching `UserCfg.opt` on disk.
+  - The live diagnostics matrix recalculates dynamically in-memory, updating ratings, tags, and trade-off pills instantly without writing any backup file or touching disk storage.
+  - Disk writes and backup generation are strictly deferred until explicit confirmation.
+- **Single-Pass Safety Backup on Validation**:
+  - Clicking `OPTIMIZE PROFILE` triggers the commit phase: exactly one timestamped safety backup (`UserCfg.opt.backup_YYYYMMDD_HHMMSS`) is generated before applying the calibrated profile and any staged overrides to `UserCfg.opt`.
 - **Rollback Interface**: A dedicated rollback modal lists all historical backups with timestamp and file size, enabling 1-click restore.
-- **Safety Copy on Rollback**: Restoring a backup automatically creates a safety snapshot of the active file before overwriting.
+- **Safety Copy on Rollback**: Restoring a backup automatically creates a safety snapshot of the active file before overwriting, and clears in-memory staged overrides.
 
 ---
 
 ## 7. Trade-Off (Pour & Contre) System & Confirmation Modal Design
-1. **Dynamic Trade-Off Pills (Pour & Contre)**:
+1. **Dynamic Trade-Off Pills (Pour & Contre - High Contrast & Enlarged)**:
    - Each setting card conveys the exact visual vs. frame pacing trade-off via two solid, compact pills positioned immediately below the input field:
-     - **Pro Pill (`+ PRO`)**: Solid emerald (`bg-emerald-700 text-white font-bold text-[8px]`), highlighting the immediate performance or visual advantage (e.g. `+ MAX RUNWAY FPS`, `+ FREES 6-8GB VRAM`, `+ 2X SMOOTHNESS`). Hovering displays a detailed explanation.
-     - **Con Pill (`- CON`)**: Solid slate (`bg-slate-700 text-slate-200 font-bold text-[8px]`), detailing what is sacrificed (e.g. `- FLAT RUNWAY EDGE`, `- SOFTER LIVERY`, `- 10MS INPUT LAG`). Hovering displays a detailed explanation.
+     - **Pro Pill (`+ PRO`)**: Solid emerald (`bg-emerald-600 text-white font-bold text-[11px] px-2.5 py-1 rounded-md`), highlighting the immediate performance or visual advantage (e.g. `+ MAX RUNWAY FPS`, `+ FREES 6-8GB VRAM`, `+ 2X SMOOTHNESS`). Hovering displays a detailed explanation.
+     - **Con Pill (`- CON`)**: Solid slate (`bg-slate-700 text-slate-100 font-bold text-[11px] px-2.5 py-1 rounded-md`), detailing what is sacrificed (e.g. `- FLAT RUNWAY EDGE`, `- SOFTER LIVERY`, `- 10MS INPUT LAG`). Hovering displays a detailed explanation.
    - **Mission-Aware Calibration**:
      - *Airliners (IFR)*: Parameters prioritize CPU MainThread and VRAM preservation. Grass at `Low` or `Medium` is rated `OPTIMUM` because 3D grass geometry is wasted on concrete runways while consuming critical draw calls.
      - *General Aviation (VFR)*: Parameters prioritize low-altitude visual richness. Grass at `High` or `Ultra` is rated `OPTIMUM` for bush and grass runway realism.

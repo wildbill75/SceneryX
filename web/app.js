@@ -16269,9 +16269,9 @@ function updateCarouselUI() {
         const pill = document.getElementById(`opt-page-pill-${i}`);
         if (pill) {
             if (i === currentGraphicsSettingsPage) {
-                pill.className = 'px-3 py-1.5 rounded-lg bg-cyan-600 text-white transition-all cursor-pointer font-bold shadow-sm whitespace-nowrap';
+                pill.className = 'px-3.5 py-2 rounded-lg bg-cyan-600 text-white transition-all cursor-pointer font-bold shadow-sm whitespace-nowrap text-xs';
             } else {
-                pill.className = 'px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold whitespace-nowrap';
+                pill.className = 'px-3.5 py-2 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold whitespace-nowrap text-xs';
             }
         }
     }
@@ -16619,12 +16619,12 @@ function renderMsfsSettingsMatrix() {
         else if (item.rating_color === 'rose' || cleanTag === 'HAZARD') badgeColorClass = 'bg-rose-600 text-white font-bold';
 
         const tagTooltip = (item.tag_reason || item.rating_reason || item.tooltip || cleanTag).replace(/"/g, '&quot;');
-        const sharedBadge = item.shared ? '<span class="px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-slate-700 text-slate-200 uppercase tracking-wider shrink-0" title="This setting is globally shared in MSFS between 2D and VR modes.">SHARED</span>' : '';
+        const sharedBadge = item.shared ? '<span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-slate-800 text-slate-300 border border-slate-700 uppercase tracking-wider shrink-0" title="This setting is globally shared in MSFS between 2D and VR modes.">SHARED</span>' : '';
 
         // Unified SVG down arrow chevron identical on both text/numeric inputs and select dropdowns
         const chevronSvg = `
-            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400">
-                <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400">
+                <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
                     <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
                 </svg>
             </div>
@@ -16644,10 +16644,10 @@ function renderMsfsSettingsMatrix() {
                 presetListItems = item.options.map(opt => {
                     const isCur = String(opt).toLowerCase() === String(displayVal).toLowerCase();
                     return `
-                        <div class="px-3 py-1.5 hover:bg-cyan-600 hover:text-white ${isCur ? 'bg-cyan-950/80 text-cyan-300 font-bold' : 'text-slate-200'} cursor-pointer transition-colors flex items-center justify-between text-xs font-mono"
+                        <div class="px-3.5 py-2 hover:bg-cyan-600 hover:text-white ${isCur ? 'bg-cyan-950/80 text-cyan-300 font-bold' : 'text-slate-200'} cursor-pointer transition-colors flex items-center justify-between text-sm font-mono"
                              onmousedown="selectComboboxPreset('${item.key}', '${opt}', ${item.min_val ?? 10}, ${item.max_val ?? 400})">
                             <span>${opt}</span>
-                            ${isCur ? '<span class="text-[9px] font-bold bg-cyan-700 text-white px-1.5 py-0.5 rounded">CURRENT</span>' : ''}
+                            ${isCur ? '<span class="text-[10px] font-bold bg-cyan-700 text-white px-2 py-0.5 rounded">CURRENT</span>' : ''}
                         </div>
                     `;
                 }).join('');
@@ -16663,17 +16663,17 @@ function renderMsfsSettingsMatrix() {
                            onfocus="this.select();"
                            onkeydown="if(event.key==='Enter'){this.blur();}"
                            onchange="onMsfsManualSettingSubmitted('${item.key}', this.value, ${item.min_val ?? 10}, ${item.max_val ?? 400})"
-                           class="w-full bg-slate-950 border border-slate-700/70 focus:border-cyan-400 rounded-lg pl-2.5 pr-8 py-1.5 text-xs text-white font-mono font-semibold focus:outline-none cursor-pointer"
+                           class="w-full bg-slate-950 border border-slate-700/80 focus:border-cyan-400 rounded-xl pl-3 pr-10 py-2 text-sm text-white font-mono font-bold focus:outline-none cursor-pointer"
                            placeholder="Select or enter value..."
                            title="Select a preset from dropdown or enter custom value">
-                    <div class="cursor-pointer absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400 hover:text-white"
+                    <div class="cursor-pointer absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-white"
                          onclick="toggleComboboxDropdown('${item.key}', event)">
-                        <svg class="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
+                        <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
                             <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
                         </svg>
                     </div>
                     <div id="opt-combo-menu-${item.key}"
-                         class="hidden absolute z-50 left-0 right-0 mt-1 max-h-48 overflow-y-auto bg-slate-900 border border-slate-700 rounded-lg shadow-2xl py-1 divide-y divide-slate-800">
+                         class="hidden absolute z-50 left-0 right-0 mt-1 max-h-52 overflow-y-auto bg-slate-900 border border-slate-700 rounded-xl shadow-2xl py-1 divide-y divide-slate-800">
                         ${presetListItems}
                     </div>
                 </div>
@@ -16688,7 +16688,7 @@ function renderMsfsSettingsMatrix() {
             }
             inputHtml = `
                 <div class="relative w-full pt-0.5">
-                    <select onchange="onMsfsSettingChanged('${item.key}', this.value)" class="w-full appearance-none bg-slate-950 border border-slate-700/70 focus:border-cyan-400 rounded-lg pl-2.5 pr-8 py-1.5 text-xs text-white font-mono font-semibold focus:outline-none cursor-pointer">
+                    <select onchange="onMsfsSettingChanged('${item.key}', this.value)" class="w-full appearance-none bg-slate-950 border border-slate-700/80 focus:border-cyan-400 rounded-xl pl-3 pr-10 py-2 text-sm text-white font-mono font-bold focus:outline-none cursor-pointer">
                         ${optionsHtml}
                     </select>
                     ${chevronSvg}
@@ -16697,32 +16697,32 @@ function renderMsfsSettingsMatrix() {
         }
 
         const proPill = item.pro_label ? `
-            <span class="px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-emerald-700 text-white shrink-0 cursor-help uppercase tracking-wider truncate max-w-[48%]" title="${(item.pro_desc || '').replace(/"/g, '&quot;')}">
+            <span class="px-2.5 py-1 rounded-md text-[11px] font-mono font-bold bg-emerald-600 text-white shrink-0 cursor-help uppercase tracking-wider truncate max-w-[48%] shadow-sm" title="${(item.pro_desc || '').replace(/"/g, '&quot;')}">
                 ${item.pro_label}
             </span>
         ` : '';
 
         const conPill = item.con_label ? `
-            <span class="px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-slate-700 text-slate-200 shrink-0 cursor-help uppercase tracking-wider truncate max-w-[48%]" title="${(item.con_desc || '').replace(/"/g, '&quot;')}">
+            <span class="px-2.5 py-1 rounded-md text-[11px] font-mono font-bold bg-slate-700 text-slate-100 shrink-0 cursor-help uppercase tracking-wider truncate max-w-[48%] shadow-sm" title="${(item.con_desc || '').replace(/"/g, '&quot;')}">
                 ${item.con_label}
             </span>
         ` : '';
 
         const tradeOffHtml = (proPill || conPill) ? `
-            <div class="flex items-center justify-between gap-1 pt-1 border-t border-slate-800/60 overflow-hidden">
+            <div class="flex items-center justify-between gap-2 pt-2 border-t border-slate-800/80 overflow-hidden">
                 ${proPill}
                 ${conPill}
             </div>
         ` : '';
 
         return `
-            <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700 transition-all flex flex-col justify-between space-y-1.5" title="${(item.tooltip || '').replace(/"/g, '&quot;')}">
-                <div class="flex items-start justify-between gap-1">
-                    <div class="flex items-center gap-1.5 flex-wrap">
-                        <span class="text-xs font-mono font-bold text-slate-200">${(item.name || '').toUpperCase()}</span>
+            <div class="p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-slate-700 transition-all flex flex-col justify-between space-y-2.5" title="${(item.tooltip || '').replace(/"/g, '&quot;')}">
+                <div class="flex items-start justify-between gap-1.5">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="text-sm font-mono font-bold text-slate-100 uppercase tracking-wide">${(item.name || '').toUpperCase()}</span>
                         ${sharedBadge}
                     </div>
-                    <span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider shrink-0 shadow-sm cursor-help ${badgeColorClass}" title="${tagTooltip}">${cleanTag}</span>
+                    <span class="px-3 py-1 rounded-md text-xs font-mono font-black uppercase tracking-wider shrink-0 shadow-sm cursor-help ${badgeColorClass}" title="${tagTooltip}">${cleanTag}</span>
                 </div>
                 ${inputHtml}
                 ${tradeOffHtml}
@@ -16748,17 +16748,14 @@ async function onMsfsSettingChanged(settingKey, newValue) {
         const resStr = await window.pywebview.api.update_msfs_setting(currentMsfsGraphicsMode, settingKey, newValue);
         const res = JSON.parse(resStr);
         if (res.status === 'success') {
-            if (typeof showToast === 'function') {
-                showToast(`MSFS ${currentMsfsGraphicsMode}: ${settingKey} updated to ${newValue}. Backup created.`, 'success');
-            }
             await loadRigDiagnostics();
         } else {
             if (typeof showToast === 'function') {
-                showToast(`Failed to update setting: ${res.message}`, 'error');
+                showToast(`Failed to stage setting: ${res.message}`, 'error');
             }
         }
     } catch (e) {
-        console.error("Error updating setting:", e);
+        console.error("Error staging setting:", e);
     }
 }
 

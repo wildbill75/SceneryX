@@ -673,6 +673,183 @@ def update_sub_block_setting(content: str, mode: str, block_name: str, pattern: 
     return content[:mode_idx] + new_mode_text + content[mode_boundary:]
 
 
+_staged_user_cfg_settings: Dict[str, Dict[str, Any]] = {"2D": {}, "VR": {}}
+
+
+def stage_msfs_setting(mode: str, setting_key: str, new_value: Any) -> Dict[str, Any]:
+    global _staged_user_cfg_settings
+    mode = (mode or '2D').upper()
+    if mode not in _staged_user_cfg_settings:
+        _staged_user_cfg_settings[mode] = {}
+    _staged_user_cfg_settings[mode][setting_key] = new_value
+    return {"status": "success", "staged": True, "setting_key": setting_key, "new_value": new_value}
+
+
+def clear_staged_settings(mode: Optional[str] = None):
+    global _staged_user_cfg_settings
+    if mode:
+        _staged_user_cfg_settings[mode.upper()] = {}
+    else:
+        _staged_user_cfg_settings = {"2D": {}, "VR": {}}
+
+
+def apply_setting_to_content(content: str, mode: str, setting_key: str, new_value: Any) -> str:
+    mode = (mode or '2D').upper()
+    q_map_rev = {'ultra': '3', 'high': '2', 'medium': '1', 'low': '0'}
+    fft_map_rev = {'ultra (1024)': '1024', 'high (512)': '512', 'medium (256)': '256', 'low (128)': '128', '1024': '1024', '512': '512', '256': '256', '128': '128'}
+    glass_map_rev = {'high (full)': '2', 'medium (half)': '1', 'low (quarter)': '0', 'full': '2', 'half': '1', 'quarter': '0', 'high': '2', 'medium': '1', 'low': '0'}
+    shadow_map_rev = {'ultra (2048)': '2048', 'high (1536)': '1536', 'medium (1024)': '1024', 'low (512)': '512', '2048': '2048', '1536': '1536', '1024': '1024', '512': '512'}
+    hf_map_rev = {'ultra (1024)': '1024', 'high (512)': '512', 'medium (256)': '256', 'low (128)': '128', '1024': '1024', '512': '512', '256': '256', '128': '128'}
+
+    # 1. Full Screen Resolution (Shared)
+    if setting_key in ['resolution', 'FullScreenResolution']:
+        clean_val = str(new_value).replace('x', ' ').replace('X', ' ')
+        clean_val = " ".join(clean_val.split())
+        content = re.sub(r'(FullScreenResolution\s+)[^\r\n]+', rf'\g<1>{clean_val}', content)
+
+    # 2. Max Frame Rate (2D / VR + FrameLimiter)
+    elif setting_key in ['max_frame_rate', 'TargetFrameRate']:
+        k = 'TargetFrameRate' if mode == '2D' else 'TargetFrameRateVR'
+        clean_val = str(new_value).replace('FPS', '').replace('Unlocked', '0').strip()
+        content = re.sub(rf'({k}\s+)[^\r\n]+', rf'\g<1>{clean_val}', content)
+        if mode == '2D':
+            content = re.sub(r'(FrameLimiter\s+)[^\r\n]+', rf'\g<1>{clean_val}', content)
+
+    # 3. Frame Generation
+    elif setting_key in ['frame_generation', 'FrameGeneration']:
+        k = 'FrameGeneration' if mode == '2D' else 'FrameGenerationVR'
+        clean_val = 'DLSSG' if 'DLSSG' in str(new_value).upper() else ('FSR3' if 'FSR3' in str(new_value).upper() else 'NONE')
+        content = re.sub(rf'({k}\s+)[^\r\n]+', rf'\g<1>{clean_val}', content)
+
+    # 4. V-Sync (Shared)
+    elif setting_key in ['vsync', 'VSync']:
+        clean_val = '1' if str(new_value).upper() in ['1', 'ON', 'TRUE'] else '0'
+        content = re.sub(r'(VSync\s+)[^\r\n]+', rf'\g<1>{clean_val}', content)
+
+    # 5. Dynamic Settings
+    elif setting_key in ['dynamic_settings', 'DynamicSettings']:
+        k = 'DynamicSettings' if mode == '2D' else 'DynamicSettingsVR'
+        clean_val = '1' if str(new_value).upper() in ['1', 'ON', 'TRUE'] else '0'
+        content = re.sub(rf'({k}\s+)[^\r\n]+', rf'\g<1>{clean_val}', content)
+
+    # 6. NVIDIA Reflex
+    elif setting_key in ['reflex', 'Reflex']:
+        k = 'Reflex' if mode == '2D' else 'ReflexVR'
+        clean_val = 'ON_BOOST' if 'BOOST' in str(new_value).upper() else ('ON' if str(new_value).upper() in ['ON', '1', 'TRUE'] else 'OFF')
+        content = re.sub(rf'({k}\s+)[^\r\n]+', rf'\g<1>{clean_val}', content)
+
+    # 7. Anti-Aliasing & Upscaling
+    elif setting_key in ['anti_aliasing', 'AntiAliasing']:
+        aa_mode = 'DLSS' if 'DLSS' in str(new_value).upper() else ('TAA' if 'TAA' in str(new_value).upper() else 'DLAA')
+        dlss_mode = 'QUALITY' if 'QUALITY' in str(new_value).upper() else ('BALANCED' if 'BALANCED' in str(new_value).upper() else ('PERFORMANCE' if 'PERFORMANCE' in str(new_value).upper() else 'OFF'))
+        k_aa = 'AntiAliasing' if mode == '2D' else 'AntiAliasingVR'
+        k_dlss = 'DLSSMode' if mode == '2D' else 'DLSSModeVR'
+        content = re.sub(rf'({k_aa}\s+)[^\r\n]+', rf'\g<1>{aa_mode}', content)
+        if dlss_mode != 'OFF':
+            content = re.sub(rf'({k_dlss}\s+)[^\r\n]+', rf'\g<1>{dlss_mode}', content)
+
+    # 8. TLOD (Supports up to 400 manual input)
+    elif setting_key in ['tlod', 'TerrainLoD', 'LoDFactor']:
+        clean_str = str(new_value).replace('Dynamic', '').replace('(', '').replace(')', '').replace('LOD', '').strip()
+        num_val = max(10, min(400, float(clean_str)))
+        val_f = f"{num_val / 100.0:.6f}"
+        content = update_sub_block_setting(content, mode, '{Terrain', r'(LoDFactor\s+)[^\r\n]+', rf'\g<1>{val_f}')
+
+    # 9. OLOD (Supports up to 400 manual input)
+    elif setting_key in ['olod', 'ObjectsLoD']:
+        clean_str = str(new_value).replace('Dynamic', '').replace('(', '').replace(')', '').replace('LOD', '').strip()
+        num_val = max(10, min(400, float(clean_str)))
+        val_f = f"{num_val / 100.0:.6f}"
+        content = update_sub_block_setting(content, mode, '{ObjectsLoD', r'(LoDFactor\s+)[^\r\n]+', rf'\g<1>{val_f}')
+
+    # 10. Offscreen Terrain Pre-Caching
+    elif setting_key in ['offscreen_precaching', 'OffscreenTerrainPreCaching']:
+        clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
+        content = update_sub_block_setting(content, mode, '{OffscreenTerrainPreCaching', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}')
+
+    # 11. Texture Resolution
+    elif setting_key in ['texture_resolution', 'Texture']:
+        clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
+        content = update_sub_block_setting(content, mode, '{Texture', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}')
+
+    # 12. Volumetric Clouds
+    elif setting_key in ['volumetric_clouds', 'VolumetricClouds']:
+        clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
+        content = update_sub_block_setting(content, mode, '{VolumetricClouds', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}')
+
+    # 13. Buildings Quality
+    elif setting_key in ['buildings', 'Buildings']:
+        clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
+        content = update_sub_block_setting(content, mode, '{Buildings', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}')
+
+    # 14. Trees Quality
+    elif setting_key in ['trees', 'TreesQuality']:
+        clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
+        content = update_sub_block_setting(content, mode, '{Procedural', r'(TreesQuality\s+)[^\r\n]+', rf'\g<1>{clean_q}')
+
+    # 15. Grass Quality
+    elif setting_key in ['grass', 'GrassQuality']:
+        clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
+        content = update_sub_block_setting(content, mode, '{Procedural', r'(GrassQuality\s+)[^\r\n]+', rf'\g<1>{clean_q}')
+
+    # 16. Water Waves Simulation
+    elif setting_key in ['water_waves', 'Water']:
+        clean_val = fft_map_rev.get(str(new_value).lower().strip(), '512')
+        content = update_sub_block_setting(content, mode, '{Water', r'(FFTSize\s+)[^\r\n]+', rf'\g<1>{clean_val}')
+
+    # 17. Displacement Mapping
+    elif setting_key in ['displacement_mapping', 'DisplacementMapping']:
+        clean_val = '1' if str(new_value).upper() in ['1', 'ON', 'TRUE'] else '0'
+        content = update_sub_block_setting(content, mode, '{DisplacementMapping', r'(Enabled\s+)[^\r\n]+', rf'\g<1>{clean_val}')
+
+    # 18. Glass Cockpits Refresh Rate
+    elif setting_key in ['glass_cockpits', 'GlassCockpitsRefreshRate']:
+        clean_val = glass_map_rev.get(str(new_value).lower().strip(), '1')
+        content = update_sub_block_setting(content, mode, '{GlassCockpitsRefreshRate', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_val}')
+
+    # 19. Shadow Maps Resolution
+    elif setting_key in ['shadow_maps', 'Shadows']:
+        clean_val = shadow_map_rev.get(str(new_value).lower().strip(), '1536')
+        content = update_sub_block_setting(content, mode, '{Shadows', r'(Size\s+)[^\r\n]+', rf'\g<1>{clean_val}')
+
+    # 20. Terrain Shadows
+    elif setting_key in ['terrain_shadows', 'HeightFieldShadows']:
+        clean_val = hf_map_rev.get(str(new_value).lower().strip(), '512')
+        content = update_sub_block_setting(content, mode, '{HeightFieldShadows', r'(Size\s+)[^\r\n]+', rf'\g<1>{clean_val}')
+
+    # 21. Contact Shadows
+    elif setting_key in ['contact_shadows', 'ContactShadows']:
+        clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
+        content = update_sub_block_setting(content, mode, '{ContactShadows', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}')
+
+    # 22. Ambient Occlusion (SSAO)
+    elif setting_key in ['ambient_occlusion', 'SSAO']:
+        clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
+        content = update_sub_block_setting(content, mode, '{SSAO', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}')
+
+    # 23. Screen Space Reflections (SSR)
+    elif setting_key in ['reflections_ssr', 'SSR']:
+        clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
+        content = update_sub_block_setting(content, mode, '{SSR', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}')
+
+    # 24. Volumetric Lights
+    elif setting_key in ['volumetric_lights', 'VolumetricLights']:
+        clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
+        content = update_sub_block_setting(content, mode, '{VolumetricLights', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}')
+
+    # 25. Anisotropic Filtering
+    elif setting_key in ['anisotropic_filtering', 'MaxAnisotropy']:
+        clean_val = str(new_value).upper().replace('X', '').replace('OFF', '0').strip()
+        content = update_sub_block_setting(content, mode, '{Texture', r'(MaxAnisotropy\s+)[^\r\n]+', rf'\g<1>{clean_val}')
+
+    # 26. Windshield Effects
+    elif setting_key in ['windshield_effects', 'WindShield']:
+        clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
+        content = update_sub_block_setting(content, mode, '{WindShield', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}')
+
+    return content
+
+
 def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Optional[Dict[str, Any]] = None, cpu_info: Optional[Dict[str, Any]] = None, flight_profile: str = 'LINER', vr_refresh_rate: int = 72) -> Dict[str, Any]:
     path = user_cfg_path or get_user_cfg_path()
     if not path or not os.path.exists(path):
@@ -681,6 +858,11 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
     try:
         with open(path, 'r', encoding='utf-8', errors='ignore') as f:
             content = f.read()
+
+        # Overlay any in-memory staged settings on content without touching UserCfg.opt on disk
+        for m, staged in _staged_user_cfg_settings.items():
+            for k, v in staged.items():
+                content = apply_setting_to_content(content, m, k, v)
     except Exception:
         return {"found": False, "path": path, "matrix_2d": [], "matrix_vr": []}
 
@@ -1506,6 +1688,8 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
     }
 
 
+
+
 def update_msfs_user_cfg_setting(mode: str, setting_key: str, new_value: Any, user_cfg_path: Optional[str] = None, create_backup: bool = True) -> Dict[str, Any]:
     path = user_cfg_path or get_user_cfg_path()
     if not path or not os.path.exists(path):
@@ -1517,158 +1701,7 @@ def update_msfs_user_cfg_setting(mode: str, setting_key: str, new_value: Any, us
         with open(path, 'r', encoding='utf-8', errors='ignore') as f:
             content = f.read()
 
-        mode = mode.upper()
-        q_map_rev = {'ultra': '3', 'high': '2', 'medium': '1', 'low': '0'}
-        fft_map_rev = {'ultra (1024)': '1024', 'high (512)': '512', 'medium (256)': '256', 'low (128)': '128', '1024': '1024', '512': '512', '256': '256', '128': '128'}
-        glass_map_rev = {'high (full)': '2', 'medium (half)': '1', 'low (quarter)': '0', 'full': '2', 'half': '1', 'quarter': '0', 'high': '2', 'medium': '1', 'low': '0'}
-        shadow_map_rev = {'ultra (2048)': '2048', 'high (1536)': '1536', 'medium (1024)': '1024', 'low (512)': '512', '2048': '2048', '1536': '1536', '1024': '1024', '512': '512'}
-        hf_map_rev = {'ultra (1024)': '1024', 'high (512)': '512', 'medium (256)': '256', 'low (128)': '128', '1024': '1024', '512': '512', '256': '256', '128': '128'}
-
-        # 1. Full Screen Resolution (Shared)
-        if setting_key in ['resolution', 'FullScreenResolution']:
-            clean_val = str(new_value).replace('x', ' ').replace('X', ' ')
-            clean_val = " ".join(clean_val.split())
-            content = re.sub(r'(FullScreenResolution\s+)[^\r\n]+', rf'\g<1>{clean_val}', content)
-
-        # 2. Max Frame Rate (2D / VR + FrameLimiter)
-        elif setting_key in ['max_frame_rate', 'TargetFrameRate']:
-            k = 'TargetFrameRate' if mode == '2D' else 'TargetFrameRateVR'
-            clean_val = str(new_value).replace('FPS', '').replace('Unlocked', '0').strip()
-            content = re.sub(rf'({k}\s+)[^\r\n]+', rf'\g<1>{clean_val}', content)
-            if mode == '2D':
-                content = re.sub(r'(FrameLimiter\s+)[^\r\n]+', rf'\g<1>{clean_val}', content)
-
-        # 3. Frame Generation
-        elif setting_key in ['frame_generation', 'FrameGeneration']:
-            k = 'FrameGeneration' if mode == '2D' else 'FrameGenerationVR'
-            clean_val = 'DLSSG' if 'DLSSG' in str(new_value).upper() else ('FSR3' if 'FSR3' in str(new_value).upper() else 'NONE')
-            content = re.sub(rf'({k}\s+)[^\r\n]+', rf'\g<1>{clean_val}', content)
-
-        # 4. V-Sync (Shared)
-        elif setting_key in ['vsync', 'VSync']:
-            clean_val = '1' if str(new_value).upper() in ['1', 'ON', 'TRUE'] else '0'
-            content = re.sub(r'(VSync\s+)[^\r\n]+', rf'\g<1>{clean_val}', content)
-
-        # 5. Dynamic Settings
-        elif setting_key in ['dynamic_settings', 'DynamicSettings']:
-            k = 'DynamicSettings' if mode == '2D' else 'DynamicSettingsVR'
-            clean_val = '1' if str(new_value).upper() in ['1', 'ON', 'TRUE'] else '0'
-            content = re.sub(rf'({k}\s+)[^\r\n]+', rf'\g<1>{clean_val}', content)
-
-        # 6. NVIDIA Reflex
-        elif setting_key in ['reflex', 'Reflex']:
-            k = 'Reflex' if mode == '2D' else 'ReflexVR'
-            clean_val = 'ON_BOOST' if 'BOOST' in str(new_value).upper() else ('ON' if str(new_value).upper() in ['ON', '1', 'TRUE'] else 'OFF')
-            content = re.sub(rf'({k}\s+)[^\r\n]+', rf'\g<1>{clean_val}', content)
-
-        # 7. Anti-Aliasing & Upscaling
-        elif setting_key in ['anti_aliasing', 'AntiAliasing']:
-            aa_mode = 'DLSS' if 'DLSS' in str(new_value).upper() else ('TAA' if 'TAA' in str(new_value).upper() else 'DLAA')
-            dlss_mode = 'QUALITY' if 'QUALITY' in str(new_value).upper() else ('BALANCED' if 'BALANCED' in str(new_value).upper() else ('PERFORMANCE' if 'PERFORMANCE' in str(new_value).upper() else 'OFF'))
-            k_aa = 'AntiAliasing' if mode == '2D' else 'AntiAliasingVR'
-            k_dlss = 'DLSSMode' if mode == '2D' else 'DLSSModeVR'
-            content = re.sub(rf'({k_aa}\s+)[^\r\n]+', rf'\g<1>{aa_mode}', content)
-            if dlss_mode != 'OFF':
-                content = re.sub(rf'({k_dlss}\s+)[^\r\n]+', rf'\g<1>{dlss_mode}', content)
-
-        # 8. TLOD (Supports up to 400 manual input)
-        elif setting_key in ['tlod', 'TerrainLoD', 'LoDFactor']:
-            clean_str = str(new_value).replace('Dynamic', '').replace('(', '').replace(')', '').replace('LOD', '').strip()
-            num_val = max(10, min(400, float(clean_str)))
-            val_f = f"{num_val / 100.0:.6f}"
-            content = update_sub_block_setting(content, mode, '{Terrain', r'(LoDFactor\s+)[^\r\n]+', rf'\g<1>{val_f}')
-
-        # 9. OLOD (Supports up to 400 manual input)
-        elif setting_key in ['olod', 'ObjectsLoD']:
-            clean_str = str(new_value).replace('Dynamic', '').replace('(', '').replace(')', '').replace('LOD', '').strip()
-            num_val = max(10, min(400, float(clean_str)))
-            val_f = f"{num_val / 100.0:.6f}"
-            content = update_sub_block_setting(content, mode, '{ObjectsLoD', r'(LoDFactor\s+)[^\r\n]+', rf'\g<1>{val_f}')
-
-        # 10. Offscreen Terrain Pre-Caching
-        elif setting_key in ['offscreen_precaching', 'OffscreenTerrainPreCaching']:
-            clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
-            content = update_sub_block_setting(content, mode, '{OffscreenTerrainPreCaching', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}')
-
-        # 11. Texture Resolution
-        elif setting_key in ['texture_resolution', 'Texture']:
-            clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
-            content = update_sub_block_setting(content, mode, '{Texture', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}')
-
-        # 12. Volumetric Clouds
-        elif setting_key in ['volumetric_clouds', 'VolumetricClouds']:
-            clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
-            content = update_sub_block_setting(content, mode, '{VolumetricClouds', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}')
-
-        # 13. Buildings Quality
-        elif setting_key in ['buildings', 'Buildings']:
-            clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
-            content = update_sub_block_setting(content, mode, '{Buildings', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}')
-
-        # 14. Trees Quality
-        elif setting_key in ['trees', 'TreesQuality']:
-            clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
-            content = update_sub_block_setting(content, mode, '{Procedural', r'(TreesQuality\s+)[^\r\n]+', rf'\g<1>{clean_q}')
-
-        # 15. Grass Quality
-        elif setting_key in ['grass', 'GrassQuality']:
-            clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
-            content = update_sub_block_setting(content, mode, '{Procedural', r'(GrassQuality\s+)[^\r\n]+', rf'\g<1>{clean_q}')
-
-        # 16. Water Waves Simulation
-        elif setting_key in ['water_waves', 'Water']:
-            clean_val = fft_map_rev.get(str(new_value).lower().strip(), '512')
-            content = update_sub_block_setting(content, mode, '{Water', r'(FFTSize\s+)[^\r\n]+', rf'\g<1>{clean_val}')
-
-        # 17. Displacement Mapping
-        elif setting_key in ['displacement_mapping', 'DisplacementMapping']:
-            clean_val = '1' if str(new_value).upper() in ['1', 'ON', 'TRUE'] else '0'
-            content = update_sub_block_setting(content, mode, '{DisplacementMapping', r'(Enabled\s+)[^\r\n]+', rf'\g<1>{clean_val}')
-
-        # 18. Glass Cockpits Refresh Rate
-        elif setting_key in ['glass_cockpits', 'GlassCockpitsRefreshRate']:
-            clean_val = glass_map_rev.get(str(new_value).lower().strip(), '1')
-            content = update_sub_block_setting(content, mode, '{GlassCockpitsRefreshRate', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_val}')
-
-        # 19. Shadow Maps Resolution
-        elif setting_key in ['shadow_maps', 'Shadows']:
-            clean_val = shadow_map_rev.get(str(new_value).lower().strip(), '1536')
-            content = update_sub_block_setting(content, mode, '{Shadows', r'(Size\s+)[^\r\n]+', rf'\g<1>{clean_val}')
-
-        # 20. Terrain Shadows
-        elif setting_key in ['terrain_shadows', 'HeightFieldShadows']:
-            clean_val = hf_map_rev.get(str(new_value).lower().strip(), '512')
-            content = update_sub_block_setting(content, mode, '{HeightFieldShadows', r'(Size\s+)[^\r\n]+', rf'\g<1>{clean_val}')
-
-        # 21. Contact Shadows
-        elif setting_key in ['contact_shadows', 'ContactShadows']:
-            clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
-            content = update_sub_block_setting(content, mode, '{ContactShadows', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}')
-
-        # 22. Ambient Occlusion (SSAO)
-        elif setting_key in ['ambient_occlusion', 'SSAO']:
-            clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
-            content = update_sub_block_setting(content, mode, '{SSAO', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}')
-
-        # 23. Screen Space Reflections (SSR)
-        elif setting_key in ['reflections_ssr', 'SSR']:
-            clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
-            content = update_sub_block_setting(content, mode, '{SSR', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}')
-
-        # 24. Volumetric Lights
-        elif setting_key in ['volumetric_lights', 'VolumetricLights']:
-            clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
-            content = update_sub_block_setting(content, mode, '{VolumetricLights', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}')
-
-        # 25. Anisotropic Filtering
-        elif setting_key in ['anisotropic_filtering', 'MaxAnisotropy']:
-            clean_val = str(new_value).upper().replace('X', '').replace('OFF', '0').strip()
-            content = update_sub_block_setting(content, mode, '{Texture', r'(MaxAnisotropy\s+)[^\r\n]+', rf'\g<1>{clean_val}')
-
-        # 26. Windshield Effects
-        elif setting_key in ['windshield_effects', 'WindShield']:
-            clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
-            content = update_sub_block_setting(content, mode, '{WindShield', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}')
+        content = apply_setting_to_content(content, mode, setting_key, new_value)
 
         with open(path, 'w', encoding='utf-8') as f:
             f.write(content)
@@ -1768,6 +1801,14 @@ def apply_recommended_msfs_settings(mode: str, flight_profile: str = 'LINER', vr
             update_msfs_user_cfg_setting('VR', 'volumetric_lights', 'Low', path, create_backup=False)
             update_msfs_user_cfg_setting('VR', 'anisotropic_filtering', '16X', path, create_backup=False)
             update_msfs_user_cfg_setting('VR', 'windshield_effects', 'High', path, create_backup=False)
+
+        # Apply any staged custom setting overrides the user modified in the UI
+        staged = _staged_user_cfg_settings.get(mode, {})
+        for staged_key, staged_val in staged.items():
+            update_msfs_user_cfg_setting(mode, staged_key, staged_val, path, create_backup=False)
+
+        # Clear staged overrides now that they have been committed to disk
+        clear_staged_settings(mode)
 
         profile_desc = "IFR Airliners (Axel LFBO VRAM Saver)" if is_liner else "VFR General Aviation (High Detail)"
         return {

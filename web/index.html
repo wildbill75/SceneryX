@@ -2041,7 +2041,7 @@
          onclick="event.stopPropagation();"
          onmousedown="event.stopPropagation();"
          onpointerdown="event.stopPropagation();"
-         class="hidden fixed z-[1200] w-[940px] max-w-[96vw] rounded-3xl p-5 shadow-2xl border border-slate-700 bg-slate-900 flex flex-col space-y-3.5 overflow-hidden text-slate-100 select-none pointer-events-auto">
+         class="hidden fixed z-[1200] w-[1180px] max-w-[96vw] rounded-3xl p-6 shadow-2xl border border-slate-700 bg-slate-900 flex flex-col space-y-3.5 overflow-hidden text-slate-100 select-none pointer-events-auto">
         <!-- HEADER & DRAG HANDLE -->
         <div id="opt-modal-header" class="flex items-center justify-between pb-3.5 border-b border-slate-800 shrink-0 cursor-grab active:cursor-grabbing">
             <div>
@@ -2232,26 +2232,26 @@
                 </div>
 
                 <!-- ROW 2: CLEAN MINIMALIST TABS (7 RUBRIQUES IN 2x2 SECTIONS) -->
-                <div class="flex items-center flex-wrap gap-1.5 bg-slate-900/90 p-1 rounded-xl border border-slate-800 text-[11px] font-mono font-bold w-full overflow-x-auto">
-                    <button id="opt-page-pill-0" onclick="switchGraphicsSettingsPage(0)" class="px-3 py-1.5 rounded-lg bg-cyan-600 text-white transition-all cursor-pointer font-bold shadow-sm whitespace-nowrap">
+                <div class="flex items-center flex-nowrap justify-between gap-1.5 bg-slate-900/90 p-1.5 rounded-xl border border-slate-800 text-xs font-mono font-bold w-full overflow-x-auto custom-scrollbar">
+                    <button id="opt-page-pill-0" onclick="switchGraphicsSettingsPage(0)" class="px-3.5 py-2 rounded-lg bg-cyan-600 text-white transition-all cursor-pointer font-bold shadow-sm whitespace-nowrap">
                         DISPLAY & SYNC
                     </button>
-                    <button id="opt-page-pill-1" onclick="switchGraphicsSettingsPage(1)" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold whitespace-nowrap">
+                    <button id="opt-page-pill-1" onclick="switchGraphicsSettingsPage(1)" class="px-3.5 py-2 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold whitespace-nowrap">
                         FRAME GEN & LATENCY
                     </button>
-                    <button id="opt-page-pill-2" onclick="switchGraphicsSettingsPage(2)" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold whitespace-nowrap">
+                    <button id="opt-page-pill-2" onclick="switchGraphicsSettingsPage(2)" class="px-3.5 py-2 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold whitespace-nowrap">
                         TERRAIN & LOD
                     </button>
-                    <button id="opt-page-pill-3" onclick="switchGraphicsSettingsPage(3)" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold whitespace-nowrap">
+                    <button id="opt-page-pill-3" onclick="switchGraphicsSettingsPage(3)" class="px-3.5 py-2 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold whitespace-nowrap">
                         ENVIRONMENT & FLORA
                     </button>
-                    <button id="opt-page-pill-4" onclick="switchGraphicsSettingsPage(4)" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold whitespace-nowrap">
+                    <button id="opt-page-pill-4" onclick="switchGraphicsSettingsPage(4)" class="px-3.5 py-2 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold whitespace-nowrap">
                         SHADOWS & LIGHTS
                     </button>
-                    <button id="opt-page-pill-5" onclick="switchGraphicsSettingsPage(5)" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold whitespace-nowrap">
+                    <button id="opt-page-pill-5" onclick="switchGraphicsSettingsPage(5)" class="px-3.5 py-2 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold whitespace-nowrap">
                         COCKPIT & AVIONICS
                     </button>
-                    <button id="opt-page-pill-6" onclick="switchGraphicsSettingsPage(6)" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold whitespace-nowrap">
+                    <button id="opt-page-pill-6" onclick="switchGraphicsSettingsPage(6)" class="px-3.5 py-2 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold whitespace-nowrap">
                         WEATHER & REFLECTIONS
                     </button>
                 </div>
@@ -2311,11 +2311,11 @@
                 </div>
 
                 <!-- BOTTOM ACTION BAR: ROLLBACK & OPTIMIZE PROFILE (BOTTOM RIGHT) -->
-                <div class="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-900">
-                    <button onclick="openUserCfgBackupModal()" id="opt-btn-restore-backup" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-mono font-bold transition-all cursor-pointer shadow-sm uppercase tracking-wider" title="Rollback UserCfg.opt to a previous timestamped backup">
+                <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-900">
+                    <button onclick="openUserCfgBackupModal()" id="opt-btn-restore-backup" class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-mono font-bold transition-all cursor-pointer shadow-sm uppercase tracking-wider" title="Rollback UserCfg.opt to a previous timestamped backup">
                         ROLLBACK
                     </button>
-                    <button onclick="applyOptimalMsfsSettingsCurrentMode()" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-mono font-bold transition-all cursor-pointer shadow-sm uppercase tracking-wider" title="Apply optimal graphics profile across all 27 settings for current display mode and flight mission profile with automatic backup">
+                    <button onclick="applyOptimalMsfsSettingsCurrentMode()" id="opt-btn-apply-settings" class="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-mono font-black transition-all cursor-pointer shadow-sm uppercase tracking-wider" title="Apply optimal calibrated graphics profile to UserCfg.opt with automatic safety backup">
                         OPTIMIZE PROFILE
                     </button>
                 </div>
@@ -2659,10 +2659,10 @@
     </div>
 
     <!-- LOCALES DICTIONARY SCRIPT -->
-    <script src="locales.js?v=1.0.2"></script>
+    <script src="locales.js?v=1.0.3"></script>
     <!-- WORLD CAPITALS DATABASE SCRIPT -->
-    <script src="capitals_data.js?v=1.0.2"></script>
+    <script src="capitals_data.js?v=1.0.3"></script>
     <!-- MAIN APP JS SCRIPT -->
-    <script src="app.js?v=1.0.2"></script>
+    <script src="app.js?v=1.0.3"></script>
 </body>
 </html>
