@@ -32,6 +32,13 @@ The purpose of this module is to serve as an intelligent advisory, calibration, 
 - **CPU**: Model, physical cores, logical threads.
 - **GPU**: Model, dedicated VRAM capacity, driver version, Re-Size BAR state.
 - **Primary Display (Monitor)**: Native resolution (e.g. `2560 x 1440 Native`) and native refresh rate frequency in Hz (e.g. `165 HZ REFRESH RATE`), acquired via Windows `EnumDisplaySettingsW` system API.
+- **VR Headset Scanner Engine**:
+  - Automatically scans the system at startup for active or configured Virtual Reality headsets across major PCVR ecosystems:
+    - **Pimax**: Detects Pimax Crystal / Crystal Light / 8KX from Pimax runtime (`P3CONFIG.json`, `profile.json`, and live service logs), extracting active refresh rates (e.g. `72 Hz`, `80 Hz`, `90 Hz`, `120 Hz`).
+    - **SteamVR**: Inspects `steamvr.vrsettings` for `LastKnown` HMD model and manufacturer (Valve Index, HTC Vive, Bigscreen Beyond).
+    - **Meta / Oculus**: Inspects Oculus Runtime and Virtual Desktop configurations (Meta Quest 2/3/Pro, Rift S).
+    - **Windows Mixed Reality**: Inspects Holographic system configurations (HP Reverb G2).
+  - Reports detected headset model and native cadence directly in the dedicated 6th card of **MY RIG** (e.g. `Pimax Crystal Light - 72 Hz Active`), and auto-initializes the VR refresh rate sync target.
 - **System Memory (RAM)**: Capacity, clock speed (MHz), XMP activation.
 - **Accelerators & Drivers**: Hardware-Accelerated GPU Scheduling (HAGS), Re-Size BAR, and DLSS runtime version.
 - **System Balance Matrix**:
@@ -113,8 +120,9 @@ To maximize readability and prevent visual clutter, the graphics configuration i
 ## 5. Ergonomics, Tag Nomenclature & Action Placement Design
 1. **Wider Window Architecture (1180px)**:
    - Floating window width expanded from `940px` to `1180px` (`w-[1180px] max-w-[96vw]`), providing generous breathing room for cards and preventing any horizontal cramping.
-2. **Airy Header & Clean Minimalist 7-Tab Rubriques (Single Line Guarantee)**:
-   - **Row 1**: Displays section title, 2D/VR display switcher, Airliner/GA mission profile switcher, VR refresh rate selector (72, 80, 90, 120 Hz), and AutoFPS live indicator.
+2. **Airy Header & Centered Control Pills (Row 1B)**:
+   - **Row 1**: Displays clean uppercase section title `MSFS GRAPHICS SETTINGS` without subtitle clutter.
+   - **Row 1B**: Houses a centered, unified controls line with `[ 2D DISPLAY / VR HEADSET ]`, `[ IFR AIRLINER / VFR GA ]`, `VR HZ: [ 72 Hz / 80 Hz / 90 Hz / 120 Hz ]`, and a solid `AUTOFPS` pill (solid green `bg-emerald-600` when dynamic sync is active, solid dark gray `bg-slate-800` when inactive, without blinking artifacts).
    - **Row 2**: Displays a streamlined segmented tab bar with exactly seven clean rubrique pills: `DISPLAY & SYNC`, `FRAME GEN & LATENCY`, `TERRAIN & LOD`, `ENVIRONMENT & FLORA`, `SHADOWS & LIGHTS`, `COCKPIT & AVIONICS`, and `WEATHER & REFLECTIONS`. Structured with `flex-nowrap justify-between gap-1.5` so all 7 tabs sit strictly on a single horizontal row without wrapping.
 3. **Carousel Viewport (2x2 Grid per Rubrique with Enhanced Readability)**:
    - Houses seven full-width $2 \times 2$ grid panels (4 cards each, 3 on final page) sliding along the X-axis via CSS transform transitions (`translateX(-0%)` to `translateX(-600%)`).
@@ -151,7 +159,11 @@ To maximize readability and prevent visual clutter, the graphics configuration i
   - Disk writes and backup generation are strictly deferred until explicit confirmation.
 - **Single-Pass Safety Backup on Validation**:
   - Clicking `OPTIMIZE PROFILE` triggers the commit phase: exactly one timestamped safety backup (`UserCfg.opt.backup_YYYYMMDD_HHMMSS`) is generated before applying the calibrated profile and any staged overrides to `UserCfg.opt`.
-- **Rollback Interface**: A dedicated rollback modal lists all historical backups with timestamp and file size, enabling 1-click restore.
+- **Unified Two-Way Modal Navigation (Zero Modal Stacking)**:
+  - Consolidates profile feedback and backup rollback into a single window with seamless view switching:
+    - **View A (Feedback)**: Displays optimization results and applied profile details. Clicking `VIEW BACKUPS` smoothly switches to View B inside the same modal container.
+    - **View B (Backups Management)**: Features a dedicated `OPEN FOLDER` button (opens the UserCfg.opt directory in Windows Explorer), 1-click `RESTORE`, and an instant `DELETE` button next to each backup. Clicking `BACK` returns directly to View A.
+  - Backups list features clean single-line timestamp titles (extraneous filename/size subtitles stripped), solid `MOST RECENT` badges, and full English localization (`CLOSE`, `BACK`, `RESTORE`, `DELETE`).
 - **Safety Copy on Rollback**: Restoring a backup automatically creates a safety snapshot of the active file before overwriting, and clears in-memory staged overrides.
 
 ---
@@ -170,4 +182,5 @@ To maximize readability and prevent visual clutter, the graphics configuration i
 3. **Instant Optimization Confirmation Modal**:
    - Triggered upon clicking `OPTIMIZE PROFILE`.
    - Renders a focused dialog displaying the target display mode, active flight mission profile, generated safety backup path, and an icon-free summary list with solid `[OK]` badges.
+
 

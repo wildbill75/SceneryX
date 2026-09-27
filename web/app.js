@@ -16293,8 +16293,7 @@ function switchFlightMissionProfile(profile) {
     loadRigDiagnostics();
 }
 
-function switchVrRefreshRate(hz) {
-    currentVrRefreshRate = parseInt(hz) || 72;
+function updateVrHzButtonsUI() {
     [72, 80, 90, 120].forEach(rate => {
         const btn = document.getElementById(`opt-vr-hz-btn-${rate}`);
         if (btn) {
@@ -16305,6 +16304,12 @@ function switchVrRefreshRate(hz) {
             }
         }
     });
+}
+
+function switchVrRefreshRate(hz) {
+    window._userExplicitVrHzSet = true;
+    currentVrRefreshRate = parseInt(hz) || 72;
+    updateVrHzButtonsUI();
     loadRigDiagnostics();
 }
 
@@ -16399,6 +16404,32 @@ async function loadRigDiagnostics() {
             dlssEl.textContent = `DLSS ${det.dlss.version || 'v3.10'}`;
         }
 
+        // VR Headset Card in MY RIG
+        const vrNameEl = document.getElementById('opt-detected-vr-name');
+        const vrHzEl = document.getElementById('opt-detected-vr-hz');
+        if (vrNameEl) {
+            const vrHeadset = det.vr_headset;
+            if (vrHeadset && vrHeadset.detected) {
+                vrNameEl.textContent = vrHeadset.name || 'VR Headset';
+                vrNameEl.className = 'font-bold text-cyan-400 truncate';
+                if (vrHzEl) {
+                    vrHzEl.textContent = `${vrHeadset.refresh_rate_hz || 72} Hz Active`;
+                    vrHzEl.className = 'text-[11px] text-emerald-400 font-bold';
+                }
+                if (!window._userExplicitVrHzSet && vrHeadset.refresh_rate_hz) {
+                    currentVrRefreshRate = vrHeadset.refresh_rate_hz;
+                    updateVrHzButtonsUI();
+                }
+            } else {
+                vrNameEl.textContent = 'None Detected';
+                vrNameEl.className = 'font-bold text-slate-400 truncate';
+                if (vrHzEl) {
+                    vrHzEl.textContent = 'Desktop Mode';
+                    vrHzEl.className = 'text-[11px] text-slate-500 font-bold';
+                }
+            }
+        }
+
         // System Balance Badge & Description
         const balanceBadge = document.getElementById('opt-rig-balance-badge');
         const balanceDesc = document.getElementById('opt-rig-summary-desc');
@@ -16425,24 +16456,15 @@ async function loadRigDiagnostics() {
             if (debriefHwText) debriefHwText.textContent = `${b.summary} ${b.advice || ''}`;
         }
 
-        // AutoFPS Status Pill
-        const autofpsDot = document.getElementById('opt-autofps-status-dot');
-        const autofpsText = document.getElementById('opt-autofps-status-text');
+        // AutoFPS Status Pill (Solid Aplat)
         const autofpsPill = document.getElementById('opt-autofps-status-pill');
-        if (data.settings_matrix && data.settings_matrix.autofps_active) {
-            if (autofpsDot) autofpsDot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse';
-            if (autofpsText) {
-                autofpsText.textContent = 'AUTOFPS LINKED (DYNAMIC)';
-                autofpsText.className = 'text-emerald-400 font-bold';
+        if (autofpsPill) {
+            if (data.settings_matrix && data.settings_matrix.autofps_active) {
+                autofpsPill.className = 'px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-mono font-bold transition-all shadow-sm';
+            } else {
+                autofpsPill.className = 'px-3 py-1.5 rounded-xl bg-slate-800 text-slate-400 text-xs font-mono font-bold transition-all shadow-sm';
             }
-            if (autofpsPill) autofpsPill.className = 'flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-950/50 border border-emerald-800/60 text-[10px] font-mono';
-        } else {
-            if (autofpsDot) autofpsDot.className = 'w-1.5 h-1.5 rounded-full bg-slate-500';
-            if (autofpsText) {
-                autofpsText.textContent = 'AUTOFPS INACTIVE (STATIC PROFILE)';
-                autofpsText.className = 'text-slate-400 font-bold';
-            }
-            if (autofpsPill) autofpsPill.className = 'flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900 border border-slate-800 text-[10px] font-mono';
+            autofpsPill.textContent = 'AUTOFPS';
         }
 
         msfsSettingsMatrixData = data.settings_matrix;
@@ -16777,9 +16799,42 @@ async function applyOptimalMsfsSettingsCurrentMode() {
     }
 }
 
-function openOptFeedbackModal(res) {
-    const modal = document.getElementById('opt-feedback-modal');
+let currentUnifiedModalView = 'feedback';
+let unifiedModalOpenedFromFeedback = false;
+
+function switchUnifiedModalView(view, fromFeedback = false) {
+    const modal = document.getElementById('unified-user-cfg-modal');
     if (!modal) return;
+    const viewFeedback = document.getElementById('unified-view-feedback');
+    const viewBackups = document.getElementById('unified-view-backups');
+    const backBtn = document.getElementById('unified-backups-back-btn');
+
+    currentUnifiedModalView = view;
+    if (fromFeedback) {
+        unifiedModalOpenedFromFeedback = true;
+    }
+
+    if (view === 'feedback') {
+        if (viewFeedback) viewFeedback.classList.remove('hidden');
+        if (viewBackups) viewBackups.classList.add('hidden');
+    } else {
+        if (viewFeedback) viewFeedback.classList.add('hidden');
+        if (viewBackups) viewBackups.classList.remove('hidden');
+        if (backBtn) {
+            if (unifiedModalOpenedFromFeedback) {
+                backBtn.classList.remove('hidden');
+            } else {
+                backBtn.classList.add('hidden');
+            }
+        }
+        fetchAndRenderUserCfgBackups();
+    }
+
+    modal.style.display = 'flex';
+    modal.classList.remove('hidden');
+}
+
+function openOptFeedbackModal(res) {
     const modeEl = document.getElementById('opt-feedback-mode');
     const profileEl = document.getElementById('opt-feedback-profile');
     const backupEl = document.getElementById('opt-feedback-backup');
@@ -16787,7 +16842,7 @@ function openOptFeedbackModal(res) {
 
     if (modeEl) modeEl.textContent = `${currentMsfsGraphicsMode} DISPLAY${currentMsfsGraphicsMode === 'VR' ? ` (${currentVrRefreshRate} Hz)` : ''}`;
     if (profileEl) profileEl.textContent = currentFlightMissionProfile === 'LINER' ? 'IFR AIRLINER (Axel LFBO Trick)' : 'VFR GENERAL AVIATION (High Detail)';
-    if (backupEl) backupEl.textContent = res.backup_created || 'UserCfg.opt.backup_...';
+    if (backupEl) backupEl.textContent = (res && res.backup_created) || 'UserCfg.opt.backup_...';
 
     if (detailsEl) {
         let detailsHtml = '';
@@ -16812,22 +16867,34 @@ function openOptFeedbackModal(res) {
         detailsEl.innerHTML = detailsHtml;
     }
 
-    modal.style.display = 'flex';
-    modal.classList.remove('hidden');
+    unifiedModalOpenedFromFeedback = false;
+    switchUnifiedModalView('feedback');
 }
 
-function closeOptFeedbackModal() {
-    const modal = document.getElementById('opt-feedback-modal');
+function openUserCfgBackupModal() {
+    unifiedModalOpenedFromFeedback = false;
+    switchUnifiedModalView('backups');
+}
+
+function closeUnifiedUserCfgModal() {
+    const modal = document.getElementById('unified-user-cfg-modal');
     if (modal) {
         modal.style.display = 'none';
         modal.classList.add('hidden');
     }
 }
 
-async function openUserCfgBackupModal() {
-    const modal = document.getElementById('user-cfg-backup-modal');
-    if (!modal) return;
+function closeOptFeedbackModal() {
+    closeUnifiedUserCfgModal();
+}
+
+function closeUserCfgBackupModal() {
+    closeUnifiedUserCfgModal();
+}
+
+async function fetchAndRenderUserCfgBackups() {
     const listEl = document.getElementById('user-cfg-backup-list');
+    if (!listEl) return;
 
     if (window.pywebview && window.pywebview.api && window.pywebview.api.get_user_cfg_backups) {
         try {
@@ -16838,46 +16905,35 @@ async function openUserCfgBackupModal() {
         }
     }
 
-    if (listEl) {
-        if (!userCfgBackupsList || userCfgBackupsList.length === 0) {
-            listEl.innerHTML = '<div class="p-4 text-center text-slate-500 font-mono text-xs">No backups found yet. Backups are created automatically before any setting change.</div>';
-        } else {
-            let html = '';
-            userCfgBackupsList.slice(0, 15).forEach((b, index) => {
-                const isLatest = (index === 0);
-                html += `
-                    <div class="p-3 rounded-2xl bg-slate-950 border ${isLatest ? 'border-amber-500/50' : 'border-slate-800'} flex items-center justify-between gap-3">
-                        <div class="flex items-center gap-2.5">
-                            <div class="w-8 h-8 rounded-xl ${isLatest ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-800 text-slate-400'} flex items-center justify-center shrink-0">
-                                <span class="font-mono text-[9px] font-black">BAK</span>
-                            </div>
-                            <div class="flex flex-col">
-                                <div class="flex items-center gap-2">
-                                    <span class="font-mono text-xs font-bold text-white">${b.timestamp}</span>
-                                    ${isLatest ? '<span class="px-1.5 py-0.2 rounded text-[8px] font-mono font-bold bg-amber-950 text-amber-400 border border-amber-800">MOST RECENT</span>' : ''}
-                                </div>
-                                <span class="text-[10px] font-mono text-slate-500 truncate max-w-[280px]">${b.filename} (${b.size_kb} KB)</span>
-                            </div>
+    if (!userCfgBackupsList || userCfgBackupsList.length === 0) {
+        listEl.innerHTML = '<div class="p-6 text-center text-slate-500 font-mono text-xs">No backups found yet. Backups are created automatically when applying profile changes.</div>';
+    } else {
+        let html = '';
+        userCfgBackupsList.slice(0, 20).forEach((b, index) => {
+            const isLatest = (index === 0);
+            html += `
+                <div class="p-3 rounded-2xl bg-slate-950 border ${isLatest ? 'border-amber-500/60' : 'border-slate-800'} flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-8 h-8 rounded-xl ${isLatest ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-800 text-slate-400'} flex items-center justify-center shrink-0">
+                            <span class="font-mono text-[9px] font-black">BAK</span>
                         </div>
-                        <button onclick="restoreUserCfgBackupTarget('${b.filename}')" class="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all cursor-pointer active:scale-95 shrink-0 uppercase tracking-wider">
+                        <div class="flex items-center gap-2">
+                            <span class="font-mono text-xs font-bold text-white tracking-wide">${b.timestamp}</span>
+                            ${isLatest ? '<span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-500 text-slate-950 uppercase shadow-sm">MOST RECENT</span>' : ''}
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <button onclick="restoreUserCfgBackupTarget('${b.filename}')" class="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all cursor-pointer active:scale-95 uppercase tracking-wider">
                             Restore
                         </button>
+                        <button onclick="deleteUserCfgBackupTarget('${b.filename}')" class="px-2.5 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 hover:border-transparent font-mono font-bold text-xs transition-all cursor-pointer active:scale-95" title="Delete backup">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
                     </div>
-                `;
-            });
-            listEl.innerHTML = html;
-        }
-    }
-
-    modal.style.display = 'flex';
-    modal.classList.remove('hidden');
-}
-
-function closeUserCfgBackupModal() {
-    const modal = document.getElementById('user-cfg-backup-modal');
-    if (modal) {
-        modal.style.display = 'none';
-        modal.classList.add('hidden');
+                </div>
+            `;
+        });
+        listEl.innerHTML = html;
     }
 }
 
@@ -16887,8 +16943,7 @@ async function restoreUserCfgBackupTarget(filename) {
         const resStr = await window.pywebview.api.restore_user_cfg_backup(filename);
         const res = JSON.parse(resStr);
         if (res.status === 'success') {
-            closeUserCfgBackupModal();
-            closeOptFeedbackModal();
+            closeUnifiedUserCfgModal();
             if (typeof showToast === 'function') {
                 showToast(`UserCfg.opt restored from ${filename}!`, 'success');
             }
@@ -16900,6 +16955,35 @@ async function restoreUserCfgBackupTarget(filename) {
         }
     } catch (e) {
         console.error("Error restoring backup:", e);
+    }
+}
+
+async function deleteUserCfgBackupTarget(filename) {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.delete_user_cfg_backup) return;
+    try {
+        const resStr = await window.pywebview.api.delete_user_cfg_backup(filename);
+        const res = JSON.parse(resStr);
+        if (res.status === 'success') {
+            if (typeof showToast === 'function') {
+                showToast(`Backup ${filename} deleted`, 'info');
+            }
+            await fetchAndRenderUserCfgBackups();
+        } else {
+            if (typeof showToast === 'function') {
+                showToast(`Delete failed: ${res.message}`, 'error');
+            }
+        }
+    } catch (e) {
+        console.error("Error deleting backup:", e);
+    }
+}
+
+async function openUserCfgFolderLocation() {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.open_user_cfg_folder) return;
+    try {
+        await window.pywebview.api.open_user_cfg_folder();
+    } catch (e) {
+        console.error("Error opening backups folder:", e);
     }
 }
 

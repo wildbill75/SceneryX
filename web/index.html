@@ -2146,7 +2146,7 @@
                     <span id="opt-rig-summary-desc" class="text-xs text-slate-400 truncate max-w-[520px]">High-end CPU, GPU, and RAM perfectly balanced for complex flight sim operations.</span>
                 </div>
                 <!-- Pure Informative Detected Hardware Cards (No Comboboxes) -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2 text-xs font-mono">
+                <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-xs font-mono">
                     <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-1" title="Detected CPU model, core architecture, and single-thread capabilities.">
                         <span class="text-[10px] text-slate-400 uppercase font-bold block">Processor (CPU)</span>
                         <div id="opt-detected-cpu-name" class="font-bold text-emerald-400 truncate">Detecting...</div>
@@ -2161,6 +2161,11 @@
                         <span class="text-[10px] text-slate-400 uppercase font-bold block">Primary Display (Monitor)</span>
                         <div id="opt-detected-display-hz" class="font-bold text-emerald-400 truncate">Detecting...</div>
                         <div id="opt-detected-display-res" class="text-[11px] text-slate-400">--</div>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-1" title="Detected Virtual Reality (VR) headset hardware and native refresh rate cadence.">
+                        <span class="text-[10px] text-slate-400 uppercase font-bold block">VR Headset</span>
+                        <div id="opt-detected-vr-name" class="font-bold text-cyan-400 truncate">Detecting...</div>
+                        <div id="opt-detected-vr-hz" class="text-[11px] text-slate-400 font-bold">--</div>
                     </div>
                     <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-1" title="Detected System RAM capacity, frequency, and XMP state.">
                         <span class="text-[10px] text-slate-400 uppercase font-bold block">System Memory (RAM)</span>
@@ -2184,50 +2189,45 @@
 
             <!-- SECTION 2: MSFS GRAPHICS SETTINGS (2D / VR SWITCHER & 2x2 SLIDING SETTINGS MATRIX) -->
             <div class="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3.5">
-                <!-- ROW 1: HEADER & PRIMARY CONTROLS (AIRY & CLEAN) -->
-                <div class="flex items-center justify-between flex-wrap gap-3 pb-2 border-b border-slate-900">
-                    <div class="flex items-center gap-3.5 flex-wrap">
-                        <div class="flex flex-col">
-                            <span class="text-xs font-mono font-black text-white uppercase tracking-wider">MSFS GRAPHICS SETTINGS</span>
-                            <span class="text-[10px] font-mono text-slate-500">Direct UserCfg.opt Engine • Hardware Calibrated</span>
-                        </div>
+                <!-- ROW 1: HEADER (CLEAN & MINIMALIST) -->
+                <div class="flex items-center justify-between pb-2 border-b border-slate-900">
+                    <span class="text-xs font-mono font-black text-white uppercase tracking-wider">MSFS GRAPHICS SETTINGS</span>
+                </div>
 
-                        <!-- 2D / VR Mode Switcher -->
-                        <div class="flex items-center bg-slate-900 p-0.5 rounded-xl border border-slate-800 text-xs font-mono font-bold">
-                            <button id="opt-msfs-mode-btn-2d" onclick="switchMsfsGraphicsMode('2D')" class="px-3.5 py-1 rounded-lg bg-cyan-600 text-white transition-all cursor-pointer shadow-sm">
-                                2D DISPLAY
-                            </button>
-                            <button id="opt-msfs-mode-btn-vr" onclick="switchMsfsGraphicsMode('VR')" class="px-3.5 py-1 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer">
-                                VR HEADSET
-                            </button>
-                        </div>
-
-                        <!-- Flight Mission Profile Switcher (Airliners vs GA) -->
-                        <div class="flex items-center bg-slate-900 p-0.5 rounded-xl border border-slate-800 text-xs font-mono font-bold" title="Mission Profile: AIRLINER applies the Axel LFBO trick (Low/Med textures to save 6-8 GB VRAM on complex airliners). GA maximizes visual sharpness for low-altitude VFR flights.">
-                            <button id="opt-flight-profile-btn-liner" onclick="switchFlightMissionProfile('LINER')" class="px-3 py-1 rounded-lg bg-indigo-600 text-white transition-all cursor-pointer shadow-sm">
-                                IFR AIRLINER
-                            </button>
-                            <button id="opt-flight-profile-btn-ga" onclick="switchFlightMissionProfile('GA')" class="px-3 py-1 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer">
-                                VFR GA
-                            </button>
-                        </div>
-
-                        <!-- VR Refresh Rate Selector (Shown when in VR mode) -->
-                        <div id="opt-vr-hz-selector-wrapper" class="hidden flex items-center bg-slate-900 p-0.5 rounded-xl border border-slate-800 text-xs font-mono font-bold" title="Select your VR Headset native refresh rate to calculate the exact 1/2 sync frame rate divisor and eliminate motion judder.">
-                            <span class="text-[10px] text-slate-400 px-2 uppercase">VR HZ:</span>
-                            <button id="opt-vr-hz-btn-72" onclick="switchVrRefreshRate(72)" class="px-2.5 py-1 rounded-lg bg-cyan-600 text-white text-[11px] transition-all cursor-pointer font-bold" title="72 Hz (Pimax / Quest)">72 Hz</button>
-                            <button id="opt-vr-hz-btn-80" onclick="switchVrRefreshRate(80)" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white text-[11px] transition-all cursor-pointer font-bold" title="80 Hz (Rift S / Quest)">80 Hz</button>
-                            <button id="opt-vr-hz-btn-90" onclick="switchVrRefreshRate(90)" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white text-[11px] transition-all cursor-pointer font-bold" title="90 Hz (Index / HP Reverb G2 / Quest)">90 Hz</button>
-                            <button id="opt-vr-hz-btn-120" onclick="switchVrRefreshRate(120)" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white text-[11px] transition-all cursor-pointer font-bold" title="120 Hz (Quest / Index / Pimax)">120 Hz</button>
-                        </div>
+                <!-- ROW 1B: CENTERED CONTROL PILLS (MODE, PROFILE, VR HZ, AUTOFPS) -->
+                <div class="flex items-center justify-center gap-3 flex-wrap py-0.5">
+                    <!-- 2D / VR Mode Switcher -->
+                    <div class="flex items-center bg-slate-900 p-0.5 rounded-xl border border-slate-800 text-xs font-mono font-bold">
+                        <button id="opt-msfs-mode-btn-2d" onclick="switchMsfsGraphicsMode('2D')" class="px-3.5 py-1.5 rounded-lg bg-cyan-600 text-white transition-all cursor-pointer shadow-sm">
+                            2D DISPLAY
+                        </button>
+                        <button id="opt-msfs-mode-btn-vr" onclick="switchMsfsGraphicsMode('VR')" class="px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer">
+                            VR HEADSET
+                        </button>
                     </div>
 
-                    <!-- Right Action Bar: AutoFPS status pill -->
-                    <div class="flex items-center gap-2.5">
-                        <div id="opt-autofps-status-pill" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-[10px] font-mono" title="AutoFPS status in background tasks. When active, TLOD and OLOD are dynamically calibrated in real-time.">
-                            <span id="opt-autofps-status-dot" class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>
-                            <span id="opt-autofps-status-text" class="text-slate-400 font-bold">AUTOFPS INACTIVE</span>
-                        </div>
+                    <!-- Flight Mission Profile Switcher (Airliners vs GA) -->
+                    <div class="flex items-center bg-slate-900 p-0.5 rounded-xl border border-slate-800 text-xs font-mono font-bold" title="Mission Profile: AIRLINER applies the Axel LFBO trick (Low/Med textures to save 6-8 GB VRAM on complex airliners). GA maximizes visual sharpness for low-altitude VFR flights.">
+                        <button id="opt-flight-profile-btn-liner" onclick="switchFlightMissionProfile('LINER')" class="px-3.5 py-1.5 rounded-lg bg-indigo-600 text-white transition-all cursor-pointer shadow-sm">
+                            IFR AIRLINER
+                        </button>
+                        <button id="opt-flight-profile-btn-ga" onclick="switchFlightMissionProfile('GA')" class="px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer">
+                            VFR GA
+                        </button>
+                    </div>
+
+                    <!-- VR Refresh Rate Selector (Shown when in VR mode) -->
+                    <div id="opt-vr-hz-selector-wrapper" class="hidden flex items-center bg-slate-900 p-0.5 rounded-xl border border-slate-800 text-xs font-mono font-bold" title="Select your VR Headset native refresh rate to calculate the exact 1/2 sync frame rate divisor and eliminate motion judder.">
+                        <span class="text-[10px] text-slate-400 px-2 uppercase font-bold">VR HZ:</span>
+                        <button id="opt-vr-hz-btn-72" onclick="switchVrRefreshRate(72)" class="px-2.5 py-1 rounded-lg bg-cyan-600 text-white text-[11px] transition-all cursor-pointer font-bold" title="72 Hz (Pimax / Quest)">72 Hz</button>
+                        <button id="opt-vr-hz-btn-80" onclick="switchVrRefreshRate(80)" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white text-[11px] transition-all cursor-pointer font-bold" title="80 Hz (Rift S / Quest)">80 Hz</button>
+                        <button id="opt-vr-hz-btn-90" onclick="switchVrRefreshRate(90)" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white text-[11px] transition-all cursor-pointer font-bold" title="90 Hz (Index / HP Reverb G2 / Quest)">90 Hz</button>
+                        <button id="opt-vr-hz-btn-120" onclick="switchVrRefreshRate(120)" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white text-[11px] transition-all cursor-pointer font-bold" title="120 Hz (Quest / Index / Pimax)">120 Hz</button>
+                    </div>
+
+                    <!-- AutoFPS Status Pill (Solid Aplat) -->
+                    <div id="opt-autofps-status-pill" class="px-3 py-1.5 rounded-xl bg-slate-800 text-slate-400 text-xs font-mono font-bold transition-all shadow-sm" title="AutoFPS status in background tasks. When active, TLOD and OLOD are dynamically calibrated in real-time.">
+                        AUTOFPS
                     </div>
                 </div>
 
@@ -2581,75 +2581,85 @@
         </div>
     </div>
 
-    <!-- USERCFG.OPT BACKUP ROLLBACK MODAL -->
-    <div id="user-cfg-backup-modal" style="display: none;" class="fixed inset-0 z-[9999] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
-        <div class="w-[560px] max-w-[95vw] rounded-3xl p-5 shadow-2xl border border-slate-700 bg-slate-900 flex flex-col space-y-3.5 text-slate-100 select-none">
-            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
-                <div class="flex items-center gap-2.5">
-                    <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-600 text-white uppercase">BACKUP</span>
+    <!-- UNIFIED USERCFG.OPT & FEEDBACK MODAL (SEAMLESS 2-WAY NAVIGATION) -->
+    <div id="unified-user-cfg-modal" style="display: none;" class="fixed inset-0 z-[9999] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="w-[580px] max-w-[95vw] rounded-3xl p-5 shadow-2xl border border-slate-700 bg-slate-900 flex flex-col space-y-3.5 text-slate-100 select-none">
+            
+            <!-- VIEW A: OPTIMIZATION CALIBRATION FEEDBACK -->
+            <div id="unified-view-feedback" class="space-y-3.5">
+                <div class="flex items-center justify-between pb-3 border-b border-slate-800">
+                    <div class="flex items-center gap-2.5">
+                        <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-600 text-white uppercase">OK</span>
+                        <div>
+                            <h3 class="text-base font-bold text-white tracking-tight uppercase">Graphics Profile Optimized</h3>
+                            <span id="opt-feedback-subtitle" class="text-xs text-emerald-400 font-bold">Settings successfully written to UserCfg.opt</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="p-3 rounded-2xl bg-slate-950 border border-slate-800 space-y-2 text-xs font-mono">
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-400">Target Mode:</span>
+                        <span id="opt-feedback-mode" class="font-bold text-white uppercase">2D DISPLAY</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-400">Flight Mission:</span>
+                        <span id="opt-feedback-profile" class="font-bold text-indigo-400 uppercase">IFR AIRLINER</span>
+                    </div>
+                    <div class="flex items-center justify-between">
+                        <span class="text-slate-400">Safety Backup:</span>
+                        <span id="opt-feedback-backup" class="text-[11px] text-cyan-400 font-bold truncate max-w-[280px]">UserCfg.opt.backup_...</span>
+                    </div>
+                </div>
+
+                <div id="opt-feedback-details" class="p-3 rounded-2xl bg-slate-950/70 border border-slate-800/80 text-xs text-slate-300 space-y-1.5 font-mono">
+                    <!-- Key applied settings bullets -->
+                </div>
+
+                <div class="flex items-center justify-between pt-2 border-t border-slate-800">
+                    <button onclick="switchUnifiedModalView('backups')" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 font-bold text-xs transition-all cursor-pointer font-mono uppercase flex items-center gap-1.5">
+                        <i class="fa-solid fa-clock-rotate-left"></i>
+                        <span>View Backups</span>
+                    </button>
+                    <button onclick="closeUnifiedUserCfgModal()" class="px-6 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition-all cursor-pointer font-mono uppercase tracking-wider">
+                        OK
+                    </button>
+                </div>
+            </div>
+
+            <!-- VIEW B: RESTORE USERCFG.OPT BACKUP -->
+            <div id="unified-view-backups" class="hidden space-y-3.5">
+                <!-- HEADER (NO "BACKUP" PILL, NO "FERMER" DUPLICATE, WITH OPEN FOLDER BUTTON) -->
+                <div class="flex items-center justify-between pb-3 border-b border-slate-800">
                     <div>
                         <h3 class="text-base font-bold text-white tracking-tight uppercase">Restore UserCfg.opt Backup</h3>
                         <span class="text-xs text-slate-400 font-mono">Revert your MSFS graphics configuration safely</span>
                     </div>
+                    <button onclick="openUserCfgFolderLocation()" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-mono text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-sm border border-slate-700/60" title="Open UserCfg.opt backups folder in Windows Explorer">
+                        <i class="fa-solid fa-folder-open text-amber-400"></i>
+                        <span>OPEN FOLDER</span>
+                    </button>
                 </div>
-                <button onclick="closeUserCfgBackupModal()" class="px-3 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-mono text-xs font-bold transition-all cursor-pointer">
-                    FERMER
-                </button>
-            </div>
-            <div class="text-xs text-slate-300 font-mono">
-                Choose a previous timestamped configuration to restore. A safety copy of your current file will be preserved automatically.
-            </div>
-            <div id="user-cfg-backup-list" class="space-y-2 max-h-[320px] overflow-y-auto custom-scrollbar pr-1">
-                <!-- Dynamically rendered backup cards -->
-            </div>
-            <div class="flex items-center justify-end pt-2 border-t border-slate-800">
-                <button onclick="closeUserCfgBackupModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold text-xs transition-all cursor-pointer font-mono uppercase">
-                    FERMER
-                </button>
-            </div>
-        </div>
-    </div>
 
-    <!-- OPTIMIZATION CALIBRATION FEEDBACK MODAL -->
-    <div id="opt-feedback-modal" style="display: none;" class="fixed inset-0 z-[9999] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
-        <div class="w-[520px] max-w-[95vw] rounded-3xl p-5 shadow-2xl border border-slate-700 bg-slate-900 flex flex-col space-y-3.5 text-slate-100 select-none">
-            <div class="flex items-center justify-between pb-3 border-b border-slate-800">
-                <div class="flex items-center gap-2.5">
-                    <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-600 text-white uppercase">OK</span>
-                    <div>
-                        <h3 class="text-base font-bold text-white tracking-tight uppercase">Graphics Profile Optimized</h3>
-                        <span id="opt-feedback-subtitle" class="text-xs text-emerald-400 font-bold">Settings successfully written to UserCfg.opt</span>
-                    </div>
+                <div class="text-xs text-slate-300 font-mono">
+                    Choose a previous timestamped configuration to restore. A safety copy of your current file will be preserved automatically.
                 </div>
-                <button onclick="closeOptFeedbackModal()" class="px-3 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-mono text-xs font-bold transition-all cursor-pointer">
-                    FERMER
-                </button>
-            </div>
-            <div class="p-3 rounded-2xl bg-slate-950 border border-slate-800 space-y-2 text-xs font-mono">
-                <div class="flex items-center justify-between">
-                    <span class="text-slate-400">Target Mode:</span>
-                    <span id="opt-feedback-mode" class="font-bold text-white uppercase">2D DISPLAY</span>
+
+                <div id="user-cfg-backup-list" class="space-y-2 max-h-[320px] overflow-y-auto custom-scrollbar pr-1">
+                    <!-- Dynamically rendered backup cards -->
                 </div>
-                <div class="flex items-center justify-between">
-                    <span class="text-slate-400">Flight Mission:</span>
-                    <span id="opt-feedback-profile" class="font-bold text-indigo-400 uppercase">IFR AIRLINER</span>
-                </div>
-                <div class="flex items-center justify-between">
-                    <span class="text-slate-400">Safety Backup:</span>
-                    <span id="opt-feedback-backup" class="text-[11px] text-cyan-400 font-bold truncate max-w-[280px]">UserCfg.opt.backup_...</span>
+
+                <div class="flex items-center justify-between pt-2 border-t border-slate-800">
+                    <button id="unified-backups-back-btn" onclick="switchUnifiedModalView('feedback')" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-400 font-bold text-xs transition-all cursor-pointer font-mono uppercase flex items-center gap-1.5">
+                        <i class="fa-solid fa-arrow-left"></i>
+                        <span>BACK</span>
+                    </button>
+                    <button onclick="closeUnifiedUserCfgModal()" class="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs transition-all cursor-pointer font-mono uppercase">
+                        CLOSE
+                    </button>
                 </div>
             </div>
-            <div id="opt-feedback-details" class="p-3 rounded-2xl bg-slate-950/70 border border-slate-800/80 text-xs text-slate-300 space-y-1.5 font-mono">
-                <!-- Key applied settings bullets -->
-            </div>
-            <div class="flex items-center justify-between pt-2 border-t border-slate-800">
-                <button onclick="openUserCfgBackupModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 font-bold text-xs transition-all cursor-pointer font-mono uppercase">
-                    View Backups
-                </button>
-                <button onclick="closeOptFeedbackModal()" class="px-6 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition-all cursor-pointer font-mono uppercase tracking-wider">
-                    OK
-                </button>
-            </div>
+
         </div>
     </div>
 
@@ -2659,10 +2669,10 @@
     </div>
 
     <!-- LOCALES DICTIONARY SCRIPT -->
-    <script src="locales.js?v=1.0.3"></script>
+    <script src="locales.js?v=1.0.4"></script>
     <!-- WORLD CAPITALS DATABASE SCRIPT -->
-    <script src="capitals_data.js?v=1.0.3"></script>
+    <script src="capitals_data.js?v=1.0.4"></script>
     <!-- MAIN APP JS SCRIPT -->
-    <script src="app.js?v=1.0.3"></script>
+    <script src="app.js?v=1.0.4"></script>
 </body>
 </html>

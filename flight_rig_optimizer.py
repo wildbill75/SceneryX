@@ -434,6 +434,140 @@ def detect_display_info() -> Dict[str, Any]:
     return result
 
 
+def detect_vr_headset() -> Dict[str, Any]:
+    """
+    Scanne le système au démarrage et détecte le casque VR connecté/configuré
+    (Pimax Crystal / Crystal Light, Meta Quest, Valve Index, HTC Vive, HP Reverb G2 / WMR, etc.)
+    ainsi que sa cadence de rafraîchissement native / configurée en Hz.
+    """
+    result = {
+        "detected": False,
+        "name": "None",
+        "manufacturer": "None",
+        "refresh_rate_hz": 72,
+        "status": "Not Connected",
+        "source": "None"
+    }
+
+    # 1. Écosystème Pimax (Pimax Crystal, Crystal Light, 8KX, etc.)
+    try:
+        pimax_profile_path = os.path.expandvars(r"%LOCALAPPDATA%\Pimax\runtime\profile.json")
+        pimax_p3config = r"C:\Program Files\Pimax\Runtime\P3CONFIG.json"
+        pimax_openxr = r"C:\Program Files\Pimax\Runtime\PiOpenXR_64.json"
+        pimax_base = r"C:\Program Files\Pimax"
+
+        if os.path.exists(pimax_profile_path) or os.path.exists(pimax_p3config) or os.path.exists(pimax_openxr) or os.path.exists(pimax_base):
+            result["detected"] = True
+            result["manufacturer"] = "Pimax"
+            result["name"] = "Pimax Crystal Light"
+            result["source"] = "Pimax Runtime"
+            result["status"] = "Configured"
+
+            if os.path.exists(pimax_p3config):
+                try:
+                    with open(pimax_p3config, 'r', encoding='utf-8', errors='ignore') as f:
+                        p3_data = json.load(f)
+                        hmd_list = p3_data.get('hmd', [])
+                        if hmd_list and 'name' in hmd_list[0]:
+                            result["name"] = hmd_list[0]['name']
+                except Exception:
+                    pass
+
+            hz_found = None
+            if os.path.exists(pimax_profile_path):
+                try:
+                    with open(pimax_profile_path, 'r', encoding='utf-8', errors='ignore') as f:
+                        prof_data = json.load(f)
+                        for k, v in prof_data.items():
+                            if isinstance(v, dict) and 'display_timing_selection' in v:
+                                timing = v['display_timing_selection']
+                                timing_map = {0: 120, 1: 90, 2: 72, 3: 80}
+                                hz_found = timing_map.get(timing, 72)
+                                break
+                except Exception:
+                    pass
+
+            try:
+                runtime_dir = os.path.expandvars(r"%LOCALAPPDATA%\Pimax\runtime")
+                srv_logs = sorted(glob.glob(os.path.join(runtime_dir, 'pvr_srv_log_*.txt')), reverse=True)
+                if srv_logs:
+                    with open(srv_logs[0], 'r', encoding='utf-8', errors='ignore') as f:
+                        content = f.read()
+                        matches = re.findall(r'fps:\(a:[\d\.]+,c:([\d\.]+)\)', content)
+                        if matches:
+                            latest_fps = float(matches[-1])
+                            if 65 <= latest_fps <= 76:
+                                hz_found = 72
+                            elif 76 < latest_fps <= 85:
+                                hz_found = 80
+                            elif 85 < latest_fps <= 95:
+                                hz_found = 90
+                            elif 110 <= latest_fps <= 125:
+                                hz_found = 120
+            except Exception:
+                pass
+
+            if hz_found:
+                result["refresh_rate_hz"] = hz_found
+            return result
+    except Exception:
+        pass
+
+    # 2. Écosystème SteamVR (Valve Index, HTC Vive, Bigscreen Beyond, etc.)
+    try:
+        steamvr_settings = os.path.expandvars(r"%LOCALAPPDATA%\openvr\steamvr.vrsettings")
+        if os.path.exists(steamvr_settings):
+            with open(steamvr_settings, 'r', encoding='utf-8', errors='ignore') as f:
+                svr_data = json.load(f)
+                last_known = svr_data.get('LastKnown', {})
+                hmd_model = last_known.get('HMDModel')
+                if hmd_model:
+                    result["detected"] = True
+                    result["name"] = hmd_model
+                    result["manufacturer"] = last_known.get('HMDManufacturer', 'SteamVR')
+                    result["source"] = "SteamVR"
+                    result["status"] = "Configured"
+                    if 'index' in hmd_model.lower():
+                        result["refresh_rate_hz"] = 90
+                    elif 'crystal' in hmd_model.lower():
+                        result["refresh_rate_hz"] = 72
+                    elif 'beyond' in hmd_model.lower():
+                        result["refresh_rate_hz"] = 90
+                    return result
+    except Exception:
+        pass
+
+    # 3. Écosystème Meta / Oculus (Quest 2/3/Pro, Rift S)
+    try:
+        oculus_runtime = r"C:\Program Files\Oculus\Support\oculus-runtime"
+        if os.path.exists(oculus_runtime):
+            result["detected"] = True
+            result["manufacturer"] = "Meta"
+            result["name"] = "Meta Quest (Link)"
+            result["source"] = "Oculus Runtime"
+            result["refresh_rate_hz"] = 72
+            result["status"] = "Configured"
+            return result
+    except Exception:
+        pass
+
+    # 4. Windows Mixed Reality (HP Reverb G2)
+    try:
+        key_path = r"Software\Microsoft\Windows\CurrentVersion\Holographic"
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path) as key:
+            result["detected"] = True
+            result["manufacturer"] = "HP / Microsoft"
+            result["name"] = "HP Reverb G2 (WMR)"
+            result["source"] = "WMR"
+            result["refresh_rate_hz"] = 90
+            result["status"] = "Configured"
+            return result
+    except Exception:
+        pass
+
+    return result
+
+
 def detect_windows_hags() -> bool:
     """Vérifie si la planification GPU accélérée (HAGS) est active dans le registre Windows."""
     try:
@@ -575,6 +709,44 @@ def restore_user_cfg_backup(backup_target: str, user_cfg_path: Optional[str] = N
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
+def delete_user_cfg_backup(backup_target: str, user_cfg_path: Optional[str] = None) -> Dict[str, Any]:
+    """Safely deletes an obsolete UserCfg.opt backup file."""
+    path = user_cfg_path or get_user_cfg_path()
+    if not path:
+        return {"status": "error", "message": "UserCfg.opt path not detected."}
+    dir_name = os.path.dirname(path)
+    target_path = backup_target if os.path.isabs(backup_target) else os.path.join(dir_name, backup_target)
+    # Critical safety guard: never allow deleting the active UserCfg.opt file
+    if os.path.abspath(target_path) == os.path.abspath(path):
+        return {"status": "error", "message": "Cannot delete active UserCfg.opt configuration."}
+    if not os.path.exists(target_path):
+        return {"status": "error", "message": f"Backup file {backup_target} not found."}
+    try:
+        os.remove(target_path)
+        return {
+            "status": "success",
+            "message": f"Successfully deleted {os.path.basename(target_path)}",
+            "deleted_file": os.path.basename(target_path)
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+def open_user_cfg_folder(user_cfg_path: Optional[str] = None) -> Dict[str, Any]:
+    """Opens the directory containing UserCfg.opt backups in Windows Explorer."""
+    path = user_cfg_path or get_user_cfg_path()
+    if not path:
+        return {"status": "error", "message": "UserCfg.opt path not detected."}
+    dir_name = os.path.dirname(path)
+    if os.path.exists(dir_name):
+        try:
+            os.startfile(dir_name)
+            return {"status": "success", "folder": dir_name}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+    return {"status": "error", "message": f"Folder {dir_name} not found."}
 
 
 def analyze_system_balance(cpu_info: Dict[str, Any], gpu_info: Dict[str, Any], ram_info: Dict[str, Any]) -> Dict[str, Any]:
@@ -2040,7 +2212,12 @@ def get_full_rig_diagnostics(flight_profile: str = 'LINER', vr_refresh_rate: int
     cfg = detect_msfs_user_cfg()
     installed = detect_installed_aircraft()
     balance = analyze_system_balance(cpu, gpu, ram)
-    matrix_data = build_msfs_settings_matrix(user_cfg_path=cfg.get("path"), gpu_info=gpu, cpu_info=cpu, flight_profile=flight_profile, vr_refresh_rate=vr_refresh_rate)
+    vr_headset = detect_vr_headset()
+    effective_vr_hz = vr_refresh_rate
+    if vr_headset.get("detected") and vr_headset.get("refresh_rate_hz") and vr_refresh_rate == 72:
+        effective_vr_hz = vr_headset["refresh_rate_hz"]
+
+    matrix_data = build_msfs_settings_matrix(user_cfg_path=cfg.get("path"), gpu_info=gpu, cpu_info=cpu, flight_profile=flight_profile, vr_refresh_rate=effective_vr_hz)
     backups = get_available_user_cfg_backups(cfg.get("path"))
 
     initial_specs = {
@@ -2057,6 +2234,7 @@ def get_full_rig_diagnostics(flight_profile: str = 'LINER', vr_refresh_rate: int
             "gpu": gpu,
             "ram": ram,
             "display": disp,
+            "vr_headset": vr_headset,
             "hags_active": hags,
             "rbar_active": gpu.get("is_rbar_active", False),
             "dlss": dlss,

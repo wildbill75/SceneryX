@@ -3520,6 +3520,20 @@ class Api:
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
 
+    def delete_user_cfg_backup(self, backup_name):
+        try:
+            res = flight_rig_optimizer.delete_user_cfg_backup(backup_name)
+            return json.dumps(res, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    def open_user_cfg_folder(self):
+        try:
+            res = flight_rig_optimizer.open_user_cfg_folder()
+            return json.dumps(res, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
     def start_flight_blackbox(self, flight_name, dep_icao, arr_icao, aircraft):
         try:
             res = flight_perf_tracker.BLACKBOX.start(flight_name=flight_name, dep=dep_icao, arr=arr_icao, aircraft=aircraft)
