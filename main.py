@@ -3477,9 +3477,9 @@ class Api:
     # SUITE PERFORMANCE : FLIGHT RIG OPTIMIZER & LIVE BLACKBOX TELEMETRY
     # =========================================================================
 
-    def get_rig_diagnostics(self, flight_profile='LINER', vr_refresh_rate=72):
+    def get_rig_diagnostics(self, flight_profile='LINER', vr_refresh_rate=72, preferred_display_id=None):
         try:
-            data = flight_rig_optimizer.get_full_rig_diagnostics(flight_profile=flight_profile, vr_refresh_rate=vr_refresh_rate)
+            data = flight_rig_optimizer.get_full_rig_diagnostics(flight_profile=flight_profile, vr_refresh_rate=vr_refresh_rate, preferred_display_id=preferred_display_id)
             return json.dumps(data, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"error": str(e)}, ensure_ascii=False)
@@ -3499,9 +3499,9 @@ class Api:
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
 
-    def apply_recommended_msfs_settings(self, mode, flight_profile='LINER', vr_refresh_rate=72):
+    def apply_recommended_msfs_settings(self, mode, flight_profile='LINER', vr_refresh_rate=72, preferred_display_id=None):
         try:
-            res = flight_rig_optimizer.apply_recommended_msfs_settings(mode, flight_profile=flight_profile, vr_refresh_rate=vr_refresh_rate)
+            res = flight_rig_optimizer.apply_recommended_msfs_settings(mode, flight_profile=flight_profile, vr_refresh_rate=vr_refresh_rate, preferred_display_id=preferred_display_id)
             return json.dumps(res, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)

@@ -16316,7 +16316,8 @@ function switchVrRefreshRate(hz) {
 async function loadRigDiagnostics() {
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.get_rig_diagnostics) return;
     try {
-        const resStr = await window.pywebview.api.get_rig_diagnostics(currentFlightMissionProfile, currentVrRefreshRate);
+        const selectedDisplayId = localStorage.getItem('sceneryx_selected_display_id') || null;
+        const resStr = await window.pywebview.api.get_rig_diagnostics(currentFlightMissionProfile, currentVrRefreshRate, selectedDisplayId);
         const data = JSON.parse(resStr);
         rigDiagnosticsData = data;
 
@@ -16352,13 +16353,29 @@ async function loadRigDiagnostics() {
 
         const displayHzEl = document.getElementById('opt-detected-display-hz');
         const displayResEl = document.getElementById('opt-detected-display-res');
+        const displaySwitcherEl = document.getElementById('opt-detected-display-switcher');
+        const displayCountBadge = document.getElementById('opt-display-count-badge');
         if (det.display) {
             if (displayHzEl) {
                 const hz = det.display.refresh_rate_int || 60;
-                displayHzEl.textContent = `${hz} HZ REFRESH RATE`;
+                displayHzEl.textContent = `${hz} HZ REFRESH RATE (${det.display.id || 'DISPLAY1'})`;
             }
             if (displayResEl) {
-                displayResEl.textContent = `${det.display.width || 2560} x ${det.display.height || 1440} Native`;
+                displayResEl.textContent = `${det.display.width || 2560} x ${det.display.height || 1440} • ${det.display.friendly_name || 'Monitor'}`;
+            }
+            if (det.all_displays && det.all_displays.length > 1) {
+                if (displayCountBadge) displayCountBadge.classList.remove('hidden');
+                if (displaySwitcherEl) {
+                    displaySwitcherEl.classList.remove('hidden');
+                    const activeId = det.display.id;
+                    displaySwitcherEl.innerHTML = det.all_displays.map(d => {
+                        const isSel = (d.id === activeId || String(d.index) === String(activeId));
+                        return `<button type="button" onclick="selectCadenceDisplay('${d.id}')" class="px-2 py-0.5 rounded text-[10px] font-bold ${isSel ? 'bg-cyan-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'} transition-colors cursor-pointer" title="${d.formatted}">${d.id} (${d.refresh_rate_int} Hz)</button>`;
+                    }).join('');
+                }
+            } else {
+                if (displayCountBadge) displayCountBadge.classList.add('hidden');
+                if (displaySwitcherEl) displaySwitcherEl.classList.add('hidden');
             }
         }
 
@@ -16650,7 +16667,11 @@ function renderMsfsSettingsMatrix() {
         else if (item.rating_color === 'rose' || cleanTag === 'HAZARD') badgeColorClass = 'bg-rose-600 text-white font-bold';
 
         const tagTooltip = (item.tag_reason || item.rating_reason || item.tooltip || cleanTag).replace(/"/g, '&quot;');
-        const sharedBadge = item.shared ? '<span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-slate-800 text-slate-300 border border-slate-700 uppercase tracking-wider shrink-0" title="This setting is globally shared in MSFS between 2D and VR modes.">SHARED</span>' : '';
+        
+        // Exact identical height, font and typography for SHARED tag, placed immediately to the left of OPTIMUM tag
+        const sharedBadge = item.shared ? '<span class="px-2 py-0.5 rounded text-xs font-mono font-bold bg-slate-800 text-slate-300 uppercase tracking-wider shrink-0" title="This setting is globally shared in MSFS between 2D and VR modes.">SHARED</span>' : '';
+        const ratingBadge = `<span class="px-2.5 py-0.5 rounded text-xs font-mono font-bold uppercase tracking-wider shrink-0 shadow-sm cursor-help ${badgeColorClass}" title="${tagTooltip}">${cleanTag}</span>`;
+        const infoButton = `<button type="button" onclick="openSettingInfoModal('${item.key}')" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-mono text-xs font-bold transition-colors cursor-pointer shrink-0 select-none" title="Detailed Technical Information">i</button>`;
 
         // Unified SVG down arrow chevron identical on both text/numeric inputs and select dropdowns
         const chevronSvg = `
@@ -16674,11 +16695,24 @@ function renderMsfsSettingsMatrix() {
             if (Array.isArray(item.options)) {
                 presetListItems = item.options.map(opt => {
                     const isCur = String(opt).toUpperCase() === String(displayVal).toUpperCase();
+                    const optRating = (item.option_ratings && item.option_ratings[opt]) ? item.option_ratings[opt].rating : 'acceptable';
+                    let dotClass = 'bg-amber-400';
+                    let textClass = 'text-amber-200';
+                    if (optRating === 'optimum') {
+                        dotClass = 'bg-emerald-400';
+                        textClass = 'text-emerald-300 font-bold';
+                    } else if (optRating === 'hazard') {
+                        dotClass = 'bg-rose-400';
+                        textClass = 'text-rose-400 font-bold';
+                    }
                     return `
-                        <div class="px-3.5 py-2 hover:bg-cyan-600 hover:text-white ${isCur ? 'bg-cyan-950/80 text-cyan-300 font-bold' : 'text-slate-200'} cursor-pointer transition-colors flex items-center justify-between text-sm font-mono"
+                        <div class="px-3 py-1.5 hover:bg-slate-800 ${isCur ? 'bg-slate-800/90 text-white font-bold' : textClass} cursor-pointer transition-colors flex items-center justify-between text-xs font-mono"
                              onmousedown="selectComboboxPreset('${item.key}', '${opt}', ${item.min_val ?? 0}, ${item.max_val ?? 400})">
-                            <span>${opt}</span>
-                            ${isCur ? '<span class="text-[10px] font-bold bg-cyan-700 text-white px-2 py-0.5 rounded">CURRENT</span>' : ''}
+                            <div class="flex items-center gap-2">
+                                <span class="w-2 h-2 rounded-full shrink-0 ${dotClass}"></span>
+                                <span>${opt}</span>
+                            </div>
+                            ${isCur ? '<span class="text-[9px] font-bold bg-slate-700 text-slate-200 px-1.5 py-0.2 rounded">CURRENT</span>' : ''}
                         </div>
                     `;
                 }).join('');
@@ -16714,7 +16748,11 @@ function renderMsfsSettingsMatrix() {
             if (Array.isArray(item.options)) {
                 optionsHtml = item.options.map(opt => {
                     const isSelected = String(item.value).toUpperCase() === String(opt).toUpperCase() || String(item.raw_value).toUpperCase() === String(opt).toUpperCase();
-                    return `<option value="${opt}" ${isSelected ? 'selected' : ''}>${opt}</option>`;
+                    const optRating = (item.option_ratings && item.option_ratings[opt]) ? item.option_ratings[opt].rating : 'acceptable';
+                    let optClass = 'text-amber-300 font-bold bg-slate-900';
+                    if (optRating === 'optimum') optClass = 'text-emerald-400 font-bold bg-slate-900';
+                    else if (optRating === 'hazard') optClass = 'text-rose-400 font-bold bg-slate-900';
+                    return `<option value="${opt}" class="${optClass}" ${isSelected ? 'selected' : ''}>${opt}</option>`;
                 }).join('');
             }
             inputHtml = `
@@ -16727,36 +16765,17 @@ function renderMsfsSettingsMatrix() {
             `;
         }
 
-        const proPill = item.pro_label ? `
-            <span class="px-2.5 py-1 rounded-md text-[11px] font-mono font-bold bg-emerald-600 text-white shrink-0 cursor-help uppercase tracking-wider truncate max-w-[48%] shadow-sm" title="${(item.pro_desc || '').replace(/"/g, '&quot;')}">
-                ${item.pro_label}
-            </span>
-        ` : '';
-
-        const conPill = item.con_label ? `
-            <span class="px-2.5 py-1 rounded-md text-[11px] font-mono font-bold bg-slate-700 text-slate-100 shrink-0 cursor-help uppercase tracking-wider truncate max-w-[48%] shadow-sm" title="${(item.con_desc || '').replace(/"/g, '&quot;')}">
-                ${item.con_label}
-            </span>
-        ` : '';
-
-        const tradeOffHtml = (proPill || conPill) ? `
-            <div class="flex items-center justify-between gap-2 pt-2 border-t border-slate-800/80 overflow-hidden">
-                ${proPill}
-                ${conPill}
-            </div>
-        ` : '';
-
         return `
             <div class="p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-slate-700 transition-all flex flex-col justify-between space-y-2.5" title="${(item.tooltip || '').replace(/"/g, '&quot;')}">
-                <div class="flex items-start justify-between gap-1.5">
-                    <div class="flex items-center gap-2 flex-wrap">
-                        <span class="text-sm font-mono font-bold text-slate-100 uppercase tracking-wide">${(item.name || '').toUpperCase()}</span>
+                <div class="flex items-center justify-between gap-2">
+                    <span class="text-sm font-mono font-bold text-slate-100 uppercase tracking-wide truncate" title="${item.name}">${(item.name || '').toUpperCase()}</span>
+                    <div class="flex items-center gap-1.5 shrink-0">
                         ${sharedBadge}
+                        ${ratingBadge}
+                        ${infoButton}
                     </div>
-                    <span class="px-3 py-1 rounded-md text-xs font-mono font-black uppercase tracking-wider shrink-0 shadow-sm cursor-help ${badgeColorClass}" title="${tagTooltip}">${cleanTag}</span>
                 </div>
                 ${inputHtml}
-                ${tradeOffHtml}
             </div>
         `;
     };
@@ -16793,7 +16812,8 @@ async function onMsfsSettingChanged(settingKey, newValue) {
 async function applyOptimalMsfsSettingsCurrentMode() {
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.apply_recommended_msfs_settings) return;
     try {
-        const resStr = await window.pywebview.api.apply_recommended_msfs_settings(currentMsfsGraphicsMode, currentFlightMissionProfile, currentVrRefreshRate);
+        const selectedDisplayId = localStorage.getItem('sceneryx_selected_display_id') || null;
+        const resStr = await window.pywebview.api.apply_recommended_msfs_settings(currentMsfsGraphicsMode, currentFlightMissionProfile, currentVrRefreshRate, selectedDisplayId);
         const res = JSON.parse(resStr);
         if (res.status === 'success') {
             openOptFeedbackModal(res);
@@ -16824,9 +16844,10 @@ async function checkAndPromptCadenceCalibration(det, data) {
     // VR target: exactly 1/2 sync
     const vrTargetFps = Math.max(30, Math.floor(vrHz / 2));
 
-    // 2D target: 1/2 sync for high-refresh screens or 60 FPS
+    // 2D target: 1/2 sync for high-refresh screens (180 -> 90, 165 -> 82, 144 -> 72, 120 -> 60)
     let screenTargetFps = 60;
     if (screenHz >= 240) screenTargetFps = 120;
+    else if (screenHz >= 180) screenTargetFps = 90;
     else if (screenHz >= 165) screenTargetFps = 82;
     else if (screenHz >= 144) screenTargetFps = 72;
     else if (screenHz >= 120) screenTargetFps = 60;
@@ -16870,7 +16891,9 @@ async function checkAndPromptCadenceCalibration(det, data) {
             hasVr,
             vrHz,
             vrName,
-            vrTargetFps
+            vrTargetFps,
+            allDisplays: det.all_displays || [],
+            activeDisplayId: disp ? disp.id : 'DISPLAY1'
         });
     }
 }
@@ -16880,14 +16903,33 @@ function showHzCadenceModal(info) {
     if (!modal) return;
 
     const titleEl = document.getElementById('cadence-modal-title');
-    const pillEl = document.getElementById('cadence-modal-pill');
-    if (pillEl) {
-        pillEl.textContent = info.isFirstTime ? 'INITIAL HARDWARE CALIBRATION' : 'HARDWARE CADENCE SHIFT';
-    }
     if (titleEl) {
         titleEl.textContent = info.isFirstTime 
-            ? 'Hardware Display Cadence Calibration'
+            ? 'Display Cadence Calibration'
             : (info.isVrHzChanged ? `VR Headset Refresh Rate Changed (${info.vrHz} Hz)` : `Display Refresh Rate Changed (${info.screenHz} Hz)`);
+    }
+
+    // Multi-monitor list
+    const multiContainer = document.getElementById('cadence-multimonitor-container');
+    const displaysList = document.getElementById('cadence-displays-list');
+    if (info.allDisplays && info.allDisplays.length > 1) {
+        if (multiContainer) multiContainer.classList.remove('hidden');
+        if (displaysList) {
+            displaysList.innerHTML = info.allDisplays.map(d => {
+                const isSel = (d.id === info.activeDisplayId || String(d.index) === String(info.activeDisplayId));
+                return `
+                    <div onclick="selectCadenceDisplay('${d.id}')" class="p-2.5 rounded-xl border ${isSel ? 'bg-cyan-950/70 border-cyan-500 text-white font-bold' : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'} cursor-pointer transition-all flex items-center justify-between text-xs">
+                        <div class="truncate">
+                            <div class="font-bold text-slate-100">${d.name || d.id}</div>
+                            <div class="text-[11px] text-slate-400 font-mono">${d.formatted}</div>
+                        </div>
+                        ${isSel ? '<span class="px-2 py-0.5 rounded bg-cyan-600 text-white text-[10px] font-bold shrink-0 ml-2">ACTIVE</span>' : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+    } else {
+        if (multiContainer) multiContainer.classList.add('hidden');
     }
 
     const scrHzEl = document.getElementById('cadence-detected-2d-hz');
@@ -16895,14 +16937,14 @@ function showHzCadenceModal(info) {
     const scrTargetEl = document.getElementById('cadence-target-2d-fps');
     if (scrHzEl) scrHzEl.textContent = `${info.screenHz} Hz`;
     if (scrDescEl) scrDescEl.textContent = info.screenName;
-    if (scrTargetEl) scrTargetEl.textContent = `${info.screenTargetFps} FPS (1/2 Sync)`;
+    if (scrTargetEl) scrTargetEl.textContent = `${info.screenTargetFps} FPS (1/2 SYNC)`;
 
     const vrHzEl = document.getElementById('cadence-detected-vr-hz');
     const vrDescEl = document.getElementById('cadence-detected-vr-desc');
     const vrTargetEl = document.getElementById('cadence-target-vr-fps');
-    if (vrHzEl) vrHzEl.textContent = info.hasVr ? `${info.vrHz} Hz Native` : 'Desktop Mode';
+    if (vrHzEl) vrHzEl.textContent = info.hasVr ? `${info.vrHz} Hz` : 'Desktop Mode';
     if (vrDescEl) vrDescEl.textContent = info.hasVr ? info.vrName : 'No VR Headset Connected';
-    if (vrTargetEl) vrTargetEl.textContent = info.hasVr ? `${info.vrTargetFps} FPS (1/2 Reprojection)` : 'OFF / N/A';
+    if (vrTargetEl) vrTargetEl.textContent = info.hasVr ? `${info.vrTargetFps} FPS (1/2 SYNC)` : 'OFF / N/A';
 
     modal.style.display = 'flex';
 }
@@ -16913,6 +16955,148 @@ function closeHzCadenceModal() {
     if (typeof loadRigDiagnostics === 'function') {
         loadRigDiagnostics();
     }
+}
+
+async function selectCadenceDisplay(displayId) {
+    localStorage.setItem('sceneryx_selected_display_id', displayId);
+    await loadRigDiagnostics();
+
+    // Dynamically refresh cadence modal targets if open
+    const modal = document.getElementById('opt-hz-cadence-modal');
+    if (modal && modal.style.display !== 'none' && rigDiagnosticsData && rigDiagnosticsData.detected) {
+        const det = rigDiagnosticsData.detected;
+        const disp = det.display;
+        const screenHz = disp ? Math.round(disp.refresh_rate_hz || disp.refresh_rate_int || 60) : 60;
+        const screenName = (disp && disp.formatted) ? disp.formatted : `${screenHz} Hz Monitor`;
+        let screenTargetFps = 60;
+        if (screenHz >= 240) screenTargetFps = 120;
+        else if (screenHz >= 180) screenTargetFps = 90;
+        else if (screenHz >= 165) screenTargetFps = 82;
+        else if (screenHz >= 144) screenTargetFps = 72;
+        else if (screenHz >= 120) screenTargetFps = 60;
+        else if (screenHz >= 75) screenTargetFps = Math.round(screenHz / 2);
+        else screenTargetFps = 60;
+
+        const scrHzEl = document.getElementById('cadence-detected-2d-hz');
+        const scrDescEl = document.getElementById('cadence-detected-2d-desc');
+        const scrTargetEl = document.getElementById('cadence-target-2d-fps');
+        if (scrHzEl) scrHzEl.textContent = `${screenHz} Hz`;
+        if (scrDescEl) scrDescEl.textContent = screenName;
+        if (scrTargetEl) scrTargetEl.textContent = `${screenTargetFps} FPS (1/2 SYNC)`;
+
+        // Automatically update TargetFrameRate in UserCfg.opt for this display
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.update_msfs_setting) {
+            await window.pywebview.api.update_msfs_setting('2D', 'max_frame_rate', String(screenTargetFps));
+        }
+
+        // Re-render display selector cards
+        if (det.all_displays && det.all_displays.length > 1) {
+            const displaysList = document.getElementById('cadence-displays-list');
+            if (displaysList) {
+                displaysList.innerHTML = det.all_displays.map(d => {
+                    const isSel = (d.id === disp.id || String(d.index) === String(disp.id));
+                    return `
+                        <div onclick="selectCadenceDisplay('${d.id}')" class="p-2.5 rounded-xl border ${isSel ? 'bg-cyan-950/70 border-cyan-500 text-white font-bold' : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'} cursor-pointer transition-all flex items-center justify-between text-xs">
+                            <div class="truncate">
+                                <div class="font-bold text-slate-100">${d.name || d.id}</div>
+                                <div class="text-[11px] text-slate-400 font-mono">${d.formatted}</div>
+                            </div>
+                            ${isSel ? '<span class="px-2 py-0.5 rounded bg-cyan-600 text-white text-[10px] font-bold shrink-0 ml-2">ACTIVE</span>' : ''}
+                        </div>
+                    `;
+                }).join('');
+            }
+        }
+    }
+}
+
+function openSettingInfoModal(settingKey) {
+    const modal = document.getElementById('opt-setting-info-modal');
+    if (!modal || !msfsSettingsMatrixData) return;
+
+    const matrix = currentMsfsGraphicsMode === 'VR' 
+        ? (msfsSettingsMatrixData.matrix_vr || []) 
+        : (msfsSettingsMatrixData.matrix_2d || []);
+
+    const item = matrix.find(x => x.key === settingKey);
+    if (!item) return;
+
+    const titleEl = document.getElementById('opt-info-title');
+    const sharedEl = document.getElementById('opt-info-shared');
+    const ratingEl = document.getElementById('opt-info-rating');
+    const descEl = document.getElementById('opt-info-desc');
+    const cpuEl = document.getElementById('opt-info-cpu');
+    const gpuEl = document.getElementById('opt-info-gpu');
+    const linerEl = document.getElementById('opt-info-liner');
+    const gaEl = document.getElementById('opt-info-ga');
+    const optionsListEl = document.getElementById('opt-info-options-list');
+
+    if (titleEl) titleEl.textContent = item.name || settingKey.toUpperCase();
+    
+    if (sharedEl) {
+        if (item.shared) sharedEl.classList.remove('hidden');
+        else sharedEl.classList.add('hidden');
+    }
+
+    let cleanTag = (item.rating_label || 'OPTIMUM').toUpperCase().replace(/\(.*?\)/g, '').replace(/[^A-Z]/g, '').trim();
+    if (cleanTag.includes('HAZARD') || cleanTag.includes('NOGO') || cleanTag.includes('RISK') || cleanTag.includes('ALERT')) cleanTag = 'HAZARD';
+    else if (cleanTag.includes('SUB') || cleanTag.includes('MISMATCH')) cleanTag = 'SUBOPTIMAL';
+    else if (cleanTag.includes('ACCEPT') || cleanTag.includes('WATCH') || cleanTag.includes('PRESSURE')) cleanTag = 'ACCEPTABLE';
+    else cleanTag = 'OPTIMUM';
+
+    let badgeClass = 'bg-emerald-600 text-white font-bold';
+    if (cleanTag === 'ACCEPTABLE') badgeClass = 'bg-amber-600 text-white font-bold';
+    else if (cleanTag === 'SUBOPTIMAL') badgeClass = 'bg-orange-600 text-white font-bold';
+    else if (cleanTag === 'HAZARD') badgeClass = 'bg-rose-600 text-white font-bold';
+
+    if (ratingEl) {
+        ratingEl.textContent = cleanTag;
+        ratingEl.className = `px-2.5 py-0.5 rounded text-xs font-mono font-bold uppercase ${badgeClass}`;
+    }
+
+    if (descEl) descEl.textContent = item.info_desc || item.tooltip || 'Paramètre de configuration du moteur graphique MSFS.';
+    if (cpuEl) cpuEl.textContent = item.info_cpu || 'Impact modéré sur le CPU MainThread.';
+    if (gpuEl) gpuEl.textContent = item.info_gpu || 'Impact standard sur le GPU et la mémoire VRAM.';
+    if (linerEl) linerEl.textContent = item.info_liner || 'Recommandé pour préserver le MainThread et la VRAM lors des opérations IFR.';
+    if (gaEl) gaEl.textContent = item.info_ga || 'Idéal pour le vol VFR et la netteté visuelle des paysages.';
+
+    if (optionsListEl && Array.isArray(item.options)) {
+        optionsListEl.innerHTML = item.options.map(opt => {
+            const isCur = String(item.value).toUpperCase() === String(opt).toUpperCase() || String(item.raw_value).toUpperCase() === String(opt).toUpperCase();
+            const optRating = (item.option_ratings && item.option_ratings[opt]) ? item.option_ratings[opt].rating : 'acceptable';
+            
+            let tagText = 'ACCEPTABLE';
+            let tagBg = 'bg-amber-900 text-amber-300';
+            let dotBg = 'bg-amber-400';
+            if (optRating === 'optimum') {
+                tagText = 'OPTIMUM';
+                tagBg = 'bg-emerald-900 text-emerald-300';
+                dotBg = 'bg-emerald-400';
+            } else if (optRating === 'hazard') {
+                tagText = 'HAZARD';
+                tagBg = 'bg-rose-900 text-rose-300';
+                dotBg = 'bg-rose-400';
+            }
+
+            return `
+                <div class="p-2.5 rounded-xl bg-slate-950 border ${isCur ? 'border-cyan-500 bg-cyan-950/20' : 'border-slate-800'} flex items-center justify-between text-xs">
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full shrink-0 ${dotBg}"></span>
+                        <span class="font-mono font-bold text-slate-200">${opt}</span>
+                        ${isCur ? '<span class="text-[9px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 font-bold ml-1">CURRENT</span>' : ''}
+                    </div>
+                    <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${tagBg}">${tagText}</span>
+                </div>
+            `;
+        }).join('');
+    }
+
+    modal.style.display = 'flex';
+}
+
+function closeSettingInfoModal() {
+    const modal = document.getElementById('opt-setting-info-modal');
+    if (modal) modal.style.display = 'none';
 }
 
 let currentUnifiedModalView = 'feedback';

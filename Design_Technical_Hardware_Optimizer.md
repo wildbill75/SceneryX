@@ -17,13 +17,16 @@ The purpose of this module is to serve as an intelligent advisory, calibration, 
    - Maintain distinct inspection and tuning for 2D (`{Graphics}` and 2D Video keys) and VR (`{GraphicsVR}` and VR Video keys).
    - Support selectable VR headset refresh rates (`72 Hz`, `80 Hz`, `90 Hz`, `120 Hz`) to accurately calculate the 1/2 sync reprojection target (36, 40, 45, 60 FPS).
    - Clearly flag settings shared between both modes (`VSync`, `FrameLimiter`, `FullScreenResolution`).
-4. **AutoFPS Hierarchy & Integration**:
+4. **Multi-Monitor Awareness & Dynamic Routing**:
+   - Detect all active desktop monitors connected to the system with their individual resolutions and refresh rates (e.g. Display 1: LG UltraGear @ 180 Hz, Display 2: LG UltraGear @ 165 Hz).
+   - Allow simmers to designate which display runs MSFS, dynamically adjusting the 1/2 sync pacing divisor (90 FPS for 180 Hz, 82 FPS for 165 Hz).
+5. **AutoFPS Hierarchy & Integration**:
    - Detect whether `AutoFPS` is active in the background.
    - If active: reflect dynamic control over TLOD/OLOD and adapt recommendations accordingly.
    - If inactive: allow direct manual tuning of TLOD/OLOD.
-5. **Target Pacing Clarification**:
+6. **Target Pacing Clarification**:
    - Clean metrics without misleading engine divisor jargon: `TARGET FPS` and `TARGET MAIN THREAD` (ms).
-6. **Cross-Settings Interdependence & Conflict Engine**:
+7. **Cross-Settings Interdependence & Conflict Engine**:
    - Continuously evaluate cross-parameter synergies (e.g. DLSS + Low/Med textures = -8 GB VRAM) and conflicts (e.g. 4K TAA + Ultra textures on airliners = D3D12 paging stutters; VR + Frame Generation = head-tracking distortion).
 
 ---
@@ -31,14 +34,17 @@ The purpose of this module is to serve as an intelligent advisory, calibration, 
 ## 2. Hardware Detection & System Balance Engine ("MY RIG")
 - **CPU**: Model, physical cores, logical threads.
 - **GPU**: Model, dedicated VRAM capacity, driver version, Re-Size BAR state.
-- **Primary Display (Monitor)**: Native resolution (e.g. `2560 x 1440 Native`) and native refresh rate frequency in Hz (e.g. `165 HZ REFRESH RATE`), acquired via Windows `EnumDisplaySettingsW` system API.
+- **Active Display (Monitor)**:
+  - Enumerates all attached desktop displays using `EnumDisplayDevicesW`, `EnumDisplaySettingsW`, and `WmiMonitorID`.
+  - Displays resolution and native refresh rate (e.g. `2560 x 1440 • LG ULTRAGEAR`).
+  - When multi-monitor setups are detected, renders quick-switch pills (`DISPLAY 1 (180 Hz)` | `DISPLAY 2 (165 Hz)`) for on-the-fly display designation.
 - **VR Headset Scanner Engine**:
   - Automatically scans the system at startup for active or configured Virtual Reality headsets across major PCVR ecosystems:
     - **Pimax**: Detects Pimax Crystal / Crystal Light / 8KX from Pimax runtime (`P3CONFIG.json`, `profile.json`, and live service logs), extracting active refresh rates (e.g. `72 Hz`, `80 Hz`, `90 Hz`, `120 Hz`).
     - **SteamVR**: Inspects `steamvr.vrsettings` for `LastKnown` HMD model and manufacturer (Valve Index, HTC Vive, Bigscreen Beyond).
     - **Meta / Oculus**: Inspects Oculus Runtime and Virtual Desktop configurations (Meta Quest 2/3/Pro, Rift S).
     - **Windows Mixed Reality**: Inspects Holographic system configurations (HP Reverb G2).
-  - Reports detected headset model and native cadence directly in the dedicated 6th card of **MY RIG** (e.g. `Pimax Crystal Light - 72 Hz Active`), and auto-initializes the VR refresh rate sync target.
+  - Reports detected headset model and native cadence directly in the dedicated card of **MY RIG** (e.g. `Pimax Crystal Light - 72 Hz Active`), and auto-initializes the VR refresh rate sync target.
 - **System Memory (RAM)**: Capacity, clock speed (MHz), XMP activation.
 - **Accelerators & Drivers**: Hardware-Accelerated GPU Scheduling (HAGS), Re-Size BAR, and DLSS runtime version.
 - **System Balance Matrix**:
@@ -89,7 +95,7 @@ To maximize readability and prevent visual clutter, the graphics configuration i
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Buildings Quality** | `{Buildings Quality}` | `{Buildings Quality}` | No | Select | High / Ultra |
 | **Trees Quality** | `{Procedural TreesQuality}` | `{Procedural TreesQuality}` | No | Select | High |
-| **Grass & Bushes** | `{Procedural GrassQuality}` | `{Procedural GrassQuality}` | No | Select | High / Medium |
+| **Grass & Bushes** | `{Procedural GrassQuality}` | `{Procedural GrassQuality}` | No | Select | Low / Medium (Airliners) / High (GA) |
 | **Water Waves Simulation** | `{Water FFTSize}` | `{Water FFTSize}` | No | Select | High (512) (2D) / Medium (256) (VR) |
 
 ### Page 5: SHADOWS & LIGHTS (4 Parameters)
@@ -117,94 +123,77 @@ To maximize readability and prevent visual clutter, the graphics configuration i
 
 ---
 
-## 5. Ergonomics, Tag Nomenclature & Action Placement Design
-1. **Wider Window Architecture (1180px)**:
-   - Floating window width expanded from `940px` to `1180px` (`w-[1180px] max-w-[96vw]`), providing generous breathing room for cards and preventing any horizontal cramping.
-2. **Airy Header & Centered Control Pills (Row 1B)**:
-   - **Row 1**: Displays clean uppercase section title `MSFS GRAPHICS SETTINGS` without subtitle clutter.
-   - **Row 1B**: Houses a centered, unified controls line with `[ 2D DISPLAY / VR HEADSET ]`, `[ IFR AIRLINER / VFR GA ]`, `VR HZ: [ 72 Hz / 80 Hz / 90 Hz / 120 Hz ]`, and a solid `AUTOFPS` pill (solid green `bg-emerald-600` when dynamic sync is active, solid dark gray `bg-slate-800` when inactive, without blinking artifacts).
-   - **Row 2**: Displays a streamlined segmented tab bar with exactly seven clean rubrique pills: `DISPLAY & SYNC`, `FRAME GEN & LATENCY`, `TERRAIN & LOD`, `ENVIRONMENT & FLORA`, `SHADOWS & LIGHTS`, `COCKPIT & AVIONICS`, and `WEATHER & REFLECTIONS`. Structured with `flex-nowrap justify-between gap-1.5` so all 7 tabs sit strictly on a single horizontal row without wrapping.
-3. **Carousel Viewport (2x2 Grid per Rubrique with Enhanced Readability)**:
-   - Houses seven full-width $2 \times 2$ grid panels (4 cards each, 3 on final page) sliding along the X-axis via CSS transform transitions (`translateX(-0%)` to `translateX(-600%)`).
-   - Cards feature expanded internal padding (`p-3.5`), high-contrast uppercase titles (`text-sm font-bold text-slate-100`), and generous vertical spacing.
-4. **Custom Dark Combobox with Full Preset Visibility**:
-   - Replaces the native `<datalist>` dropdown with a custom dark-themed combobox popover menu.
-   - On click or chevron toggle, the dropdown renders **all** preset options without filtering out non-matching values.
-   - Presets highlight the `CURRENT` active value with a dedicated cyan badge.
-   - Users can either click a preset for instant application or freely type custom numeric values (e.g. `82` or `125`), validated with min/max thresholds.
-5. **Strict Single-Word Uppercase Tag System (Enlarged)**:
-   - Every graphics setting badge displays strictly one single uppercase word: `OPTIMUM`, `ACCEPTABLE`, `SUBOPTIMAL`, or `HAZARD`.
-   - Prominently sized (`text-xs font-black px-3 py-1`) for effortless legibility.
-   - Explanations in parentheses are banned entirely from the tag label.
-   - Solid, full-opacity background colors only: `bg-emerald-600`, `bg-amber-600`, `bg-orange-600`, `bg-rose-600`. All stroke, border, and glass opacity effects are removed.
-   - Hovering over any tag reveals a dedicated tooltip explaining the specific rationale for the assigned rating (e.g. VRAM savings or MainThread throttling).
-6. **Structured 3-Part Setting Tooltips**:
-   - Each card provides a structured 3-part tooltip:
-     - `Description`: Exact functional description of what the graphics parameter controls.
-     - `Current`: Analysis of the currently selected value and its system impact.
-     - `Recommendation`: Concrete, actionable advice tailored to hardware capabilities and flight mission profile.
-7. **Uniform Combobox & Select Dropdown Chevrons**:
-   - Both standard `<select>` dropdowns and editable text/numeric fields (`tlod`, `olod`, `max_frame_rate`) share an identical SVG down-arrow chevron (`w-4 h-4 text-slate-400`).
-   - The chevron remains visible 100% of the time, in both free text typing mode and dropdown selection mode. Native browser indicators are hidden via CSS for visual consistency.
-8. **Bottom-Right Action Placement**:
-   - `ROLLBACK` and `OPTIMIZE PROFILE` action buttons are positioned at the bottom-right of the graphics settings block (beneath the carousel viewport).
-   - Icons are stripped from both buttons, adopting a clean, solid, uppercase typography (`text-sm font-black` for Optimize Profile).
+## 5. Ergonomics, Card Layout & Option Color-Coding Design
+1. **Streamlined Card Header Layout**:
+   - Setting title on the left (`text-sm font-mono font-bold text-slate-100 uppercase`).
+   - Right-side cluster:
+     - `[ SHARED ]` badge (when parameter is shared between 2D and VR), positioned immediately to the left of the rating tag with matching height and typography (`px-2 py-0.5 rounded text-xs font-mono font-bold bg-slate-800 text-slate-300`).
+     - `[ OPTIMUM / ACCEPTABLE / HAZARD ]` tag (`px-2.5 py-0.5 rounded text-xs font-mono font-bold uppercase`).
+     - `[ i ]` information button (`w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-mono text-xs font-bold`) triggering the in-depth technical modal.
+2. **De-Cluttered Card Footers**:
+   - Redundant bottom trade-off pills (`+ PRO` / `- CON`) have been eliminated from the card surface, preventing card height distortion and dropdown clipping.
+   - All trade-off analysis and technical explanations are centralized inside the dedicated `[ i ]` modal.
+3. **Color-Coded Dropdown & Combobox Options**:
+   - Options are classified and styled according to their impact:
+     - **Optimum**: Emerald green (`text-emerald-400 font-bold`).
+     - **Acceptable**: Amber (`text-amber-300 font-bold`).
+     - **Hazard / Suboptimal**: Rose / Red (`text-rose-400 font-bold`).
+   - In combobox popover menus, each option is accompanied by a color-coded indicator dot (`bg-emerald-400`, `bg-amber-400`, `bg-rose-400`) for immediate visual identification.
 
 ---
 
-## 6. Staging, Rollback & Backup System Design
+## 6. Dedicated Setting Information Modal Design (`[ i ]`)
+Clicking the `[ i ]` button opens a clean, solid, flat modal (`#opt-setting-info-modal`) presenting structured technical intelligence:
+1. **MSFS Technical Purpose**: Explains what the setting calculates in the engine.
+2. **Hardware Impact Breakdown**:
+   - *CPU MainThread*: Latency, thread synchronization, draw call overhead.
+   - *GPU & VRAM*: Shading workload, texture memory footprint, compute shader passes.
+3. **Flight Profile Guidance**:
+   - *IFR Airliners*: Concrete guidance for complex payware airliners (Fenix, PMDG, FlyByWire, iniBuilds).
+   - *VFR General Aviation*: Advice for light aircraft and visual navigation.
+4. **Comparative Option Evaluation**:
+   - Structured list of all options with their assigned rating badges and color-coded status dots.
+   - Specific pros and cons associated with each choice.
+
+---
+
+## 7. Multi-Monitor & Cadence Calibration Architecture
+1. **Multi-Monitor Discovery**:
+   - Automatically enumerates all connected physical displays via Win32 APIs.
+   - Detects resolution and exact refresh rates (e.g. 180 Hz, 165 Hz, 144 Hz, 120 Hz, 60 Hz).
+2. **Dynamic Active Monitor Selection**:
+   - In the Cadence Calibration modal, if two or more monitors are detected, a clean card grid allows the user to select which display runs MSFS.
+   - The user's selection is persisted in `localStorage` (`sceneryx_selected_display_id`).
+   - The active display is also switchable on-the-fly in the **MY RIG** hardware card.
+3. **Harmonic 1/2 Sync Pacing Calculation**:
+   - Automatically computes the optimal 1/2 sync target frame rate for the chosen display:
+     - 240 Hz $\rightarrow$ 120 FPS
+     - 180 Hz $\rightarrow$ 90 FPS
+     - 165 Hz $\rightarrow$ 82 FPS
+     - 144 Hz $\rightarrow$ 72 FPS
+     - 120 Hz $\rightarrow$ 60 FPS
+   - Updates `TargetFrameRate` in `UserCfg.opt` upon selection.
+4. **De-Cluttered Cadence Calibration Modal**:
+   - Removed bulky text blocks and redundant descriptions.
+   - Removed "Native" and confusing liserets.
+   - Clean single-line target badges: `90 FPS (1/2 SYNC)` and `36 FPS (1/2 SYNC)`.
+
+---
+
+## 8. Staging, Rollback & Backup System Design
 - **In-Memory Staging Architecture (Zero Premature Disk Writes)**:
   - Modifying dropdowns or typing custom values in the UI updates an in-memory staging dictionary (`_staged_user_cfg_settings[mode][key] = val`) without touching `UserCfg.opt` on disk.
-  - The live diagnostics matrix recalculates dynamically in-memory, updating ratings, tags, and trade-off pills instantly without writing any backup file or touching disk storage.
+  - The live diagnostics matrix recalculates dynamically in-memory, updating ratings and tags instantly without writing any backup file or touching disk storage.
   - Disk writes and backup generation are strictly deferred until explicit confirmation.
 - **Pristine Original Backup Preservation (`UserCfg.opt.original`)**:
   - Automatically and silently created upon the first launch of SceneryX before any diagnostics or optimizations can touch `UserCfg.opt`.
-  - Permanently preserves the user's authentic personal configuration. If previous backups exist, it captures the earliest timestamped file (`UserCfg.opt.backup_20260927_172048`).
+  - Permanently preserves the user's authentic personal configuration. If previous backups exist, it captures the earliest timestamped file.
   - Protected from deletion: `delete_user_cfg_backup` strictly prevents removing `UserCfg.opt.original`.
 - **Single-Pass Safety Backup on Validation**:
   - Clicking `OPTIMIZE PROFILE` triggers the commit phase: exactly one timestamped safety backup (`UserCfg.opt.backup_YYYYMMDD_HHMMSS`) is generated before applying the calibrated profile and any staged overrides to `UserCfg.opt`.
-- **Unified Two-Way Modal Navigation (Zero Modal Stacking)**:
+- **Unified Two-Way Modal Navigation**:
   - Consolidates profile feedback and backup rollback into a single window with seamless view switching:
-    - **View A (Feedback)**: Clean uppercase header `GRAPHICS PROFILE OPTIMIZED` without icon badge or subtitle clutter. Displays optimization results and applied profile details. Bottom actions feature a standard blue, icon-free `VIEW BACKUPS` button (`bg-blue-600 hover:bg-blue-500 text-white font-bold`) and an `OK` validation button.
+    - **View A (Feedback)**: Clean uppercase header `GRAPHICS PROFILE OPTIMIZED` without icon badge or subtitle clutter. Displays optimization results and applied profile details. Bottom actions feature a standard blue, icon-free `VIEW BACKUPS` button and an `OK` validation button.
     - **View B (Backups Management)**: Features a dedicated `OPEN FOLDER` button (launches Windows Explorer directly targeting `UserCfg.opt`), 1-click `RESTORE`, and an instant `DELETE` button next to each backup.
-    - **Backups Footer Ergonomics**: The footer features a prominent red `RESTORE ORIGINAL CFG` button on the bottom-left (`bg-rose-600 hover:bg-rose-500 text-white font-black`) allowing instant reversion to pristine pre-SceneryX settings, and the `CLOSE` button (along with `BACK` if navigated from feedback) positioned strictly on the bottom-right.
-  - Backups list features uniform slate cards (`border-slate-800`), neutral gray `BAK` icons (`bg-slate-800 text-slate-400`), clean single-line timestamp titles, a solid amber `MOST RECENT` badge positioned immediately to the left of `RESTORE` with identical height, padding, and typography, and a minimalist gray trash can button (`text-slate-400 hover:text-white`) without borders or colored backgrounds.
+    - **Backups Footer Ergonomics**: Features a prominent red `RESTORE ORIGINAL CFG` button on the bottom-left allowing instant reversion to pristine pre-SceneryX settings, and the `CLOSE` button (along with `BACK` if navigated from feedback) positioned strictly on the bottom-right.
 - **Safety Copy on Rollback**: Restoring any backup or the original file automatically creates a safety snapshot of the active file before overwriting, and clears in-memory staged overrides.
-
----
-
-## 7. Trade-Off (Pour & Contre) System & Confirmation Modal Design
-1. **Dynamic Trade-Off Pills (Pour & Contre - High Contrast & Enlarged)**:
-   - Each setting card conveys the exact visual vs. frame pacing trade-off via two solid, compact pills positioned immediately below the input field:
-     - **Pro Pill (`+ PRO`)**: Solid emerald (`bg-emerald-600 text-white font-bold text-[11px] px-2.5 py-1 rounded-md`), highlighting the immediate performance or visual advantage (e.g. `+ MAX RUNWAY FPS`, `+ FREES 6-8GB VRAM`, `+ 2X SMOOTHNESS`). Hovering displays a detailed explanation.
-     - **Con Pill (`- CON`)**: Solid slate (`bg-slate-700 text-slate-100 font-bold text-[11px] px-2.5 py-1 rounded-md`), detailing what is sacrificed (e.g. `- FLAT RUNWAY EDGE`, `- SOFTER LIVERY`, `- 10MS INPUT LAG`). Hovering displays a detailed explanation.
-   - **Mission-Aware Calibration**:
-     - *Airliners (IFR)*: Parameters prioritize CPU MainThread and VRAM preservation. Grass at `Low` or `Medium` is rated `OPTIMUM` because 3D grass geometry is wasted on concrete runways while consuming critical draw calls.
-     - *General Aviation (VFR)*: Parameters prioritize low-altitude visual richness. Grass at `High` or `Ultra` is rated `OPTIMUM` for bush and grass runway realism.
-2. **All-Caps Card Typography**:
-   - Setting card headers are rendered strictly in uppercase (e.g. `GRASS & BUSHES`, `TEXTURE RESOLUTION`, `TERRAIN LOD (TLOD)`).
-   - Card rating tags are single uppercase words (`OPTIMUM`, `ACCEPTABLE`, `SUBOPTIMAL`, `HAZARD`) with solid background colors and zero parenthetical text.
-3. **Instant Optimization Confirmation Modal**:
-   - Triggered upon clicking `OPTIMIZE PROFILE`.
-   - Renders a focused dialog displaying the target display mode, active flight mission profile, generated safety backup path, and an icon-free summary list with solid `[OK]` badges.
-
----
-
-## 8. Automatic Cadence Calibration & Pacing Dialog Design
-1. **Silent Refresh Rate Detection**:
-   - **2D Display**: Silently inspects active desktop resolution and native refresh rate (e.g. `2560x1440 @ 165 Hz`) via Windows display APIs.
-   - **VR Headset**: Silently queries runtime configurations (Pimax runtime, SteamVR, OpenXR) to detect connected headset model and native cadence (e.g. `Pimax Crystal Light @ 72 Hz`). Manual selector buttons have been deprecated and eliminated from the UI.
-2. **Harmonic 1/2 Sync Divisor Calculation**:
-   - **VR Mode**: Targets exactly half native refresh rate ($f_{\text{target}} = \frac{f_{\text{native}}}{2}$, e.g. 36 FPS for 72 Hz, 40 FPS for 80 Hz, 45 FPS for 90 Hz, 60 FPS for 120 Hz) to deliver flawless 1:1 motion reprojection without judder.
-   - **2D Mode**: Calculates synchronized divisors for high-refresh panels (82 FPS for 165 Hz, 72 FPS for 144 Hz, 60 FPS for 120 Hz / 60 Hz) to maintain constant frame pacing and protect CPU MainThread headroom.
-3. **Proactive Cadence Explanation Dialog**:
-   - Pops up on first launch of the Flight Optimizer or whenever an active refresh rate change is detected on either the 2D display or VR headset.
-   - Clarifies the mathematical rationale: why locking to an exact half-rate sync divisor prevents reprojection drops, stabilizes CPU frame times, and avoids micro-stuttering.
-   - Clearly documents the **OFF** position (raw value `0`), allowing users with G-Sync/FreeSync or third-party frame limiters (RTSS / NVIDIA Control Panel) to run uncapped.
-4. **Max Frame Rate Dropdown Design**:
-   - Populated with universal display and VR frequencies and half-divisors: `["OFF", "30", "36", "40", "45", "60", "72", "80", "90", "120", "144", "165", "240"]`.
-   - Replaced ambiguous "Unlocked" label with standardized flight simulator terminology `OFF`.
-   - Combobox dropdown dynamically adapts positioning (opening upward for bottom-row cards) to prevent clipping against carousel viewport overflow boundaries.
-
-
-
