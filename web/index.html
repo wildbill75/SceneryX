@@ -843,6 +843,13 @@
                     <span data-i18n="footer.rescan_button">Rescan</span>
                 </button>
 
+                <!-- FLIGHT OPTIMIZER BUTTON -->
+                <button onclick="openFlightOptimizerModal()" id="btn-open-optimizer" data-i18n-title="footer.optimizer_button" title="Flight Rig Optimizer & Blackbox" class="h-9 px-3.5 rounded-xl bg-slate-900/50 hover:bg-slate-800/70 text-slate-200 hover:text-white border border-slate-700/60 hover:border-cyan-400/80 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 group">
+                    <i class="fa-solid fa-gauge-high text-cyan-400 group-hover:text-cyan-300 text-xs transition-colors"></i>
+                    <span data-i18n="footer.optimizer_button">Optimizer</span>
+                    <span id="optimizer-status-dot" class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                </button>
+
                 <!-- SETTINGS GEAR BUTTON -->
                 <button onclick="openSettingsModal()" data-i18n-title="footer.settings_tooltip" title="Settings & Scenery Paths" class="w-9 h-9 rounded-xl bg-slate-900/50 hover:bg-slate-800/70 text-slate-300 hover:text-white border border-slate-700/60 hover:border-slate-400/80 flex items-center justify-center transition-all shrink-0 cursor-pointer active:scale-95 group">
                     <i class="fa-solid fa-gear text-slate-400 group-hover:text-white text-sm transition-transform duration-300 group-hover:rotate-45"></i>
@@ -873,12 +880,12 @@
 
                     <!-- SVG Ring with 4 Annular Quadrants -->
                     <svg id="radial-sectors-svg" class="absolute inset-0 w-full h-full filter drop-shadow-2xl overflow-visible pointer-events-none transition-all duration-300" viewBox="0 0 540 540" style="transform-origin: 270px 270px;">
-                        <!-- NORTH SECTOR: FLIGHT PLAN -->
-                        <g id="radial-sector-flight" onclick="triggerRadialFlightPlan()" class="radial-sector radial-sector-flight group cursor-pointer pointer-events-auto" role="button" aria-label="Flight Plan">
+                        <!-- NORTH SECTOR: FLIGHT OPTIMIZER -->
+                        <g id="radial-sector-flight" onclick="triggerRadialFlightOptimizer()" class="radial-sector radial-sector-flight group cursor-pointer pointer-events-auto" role="button" aria-label="Flight Optimizer">
                             <path class="radial-sector-path" d="M 87.59 77.78 A 265.00 265.00 0 0 1 452.41 77.78 L 359.49 175.70 A 130.00 130.00 0 0 0 180.51 175.70 Z" />
                             <foreignObject x="170" y="32" width="200" height="85" class="pointer-events-none">
                                 <div class="w-full h-full flex items-center justify-center text-center filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
-                                    <span data-i18n="radial.flight_plan" class="text-xs font-black tracking-widest text-slate-200 group-hover:text-white uppercase leading-none">Flight Plan</span>
+                                    <span data-i18n="radial.flight_optimizer" class="text-xs font-black tracking-widest text-slate-200 group-hover:text-white uppercase leading-none">Flight Optimizer</span>
                                 </div>
                             </foreignObject>
                         </g>
@@ -2018,6 +2025,332 @@
                 </span>
                 <button id="btn-gsx-open-map" onclick="openMapFromGsxAudit()" data-i18n="gsx.open_map" class="hidden px-6 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition-all cursor-pointer border-0 active:scale-98">
                     Open Map
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- FLIGHT OPTIMIZER & BLACKBOX MODAL -->
+    <div id="flight-optimizer-modal" class="hidden fixed inset-0 z-[2200] flex items-center justify-center bg-slate-950/85 backdrop-blur-md select-none">
+        <div class="glass-modal w-full max-w-4xl max-h-[92vh] rounded-3xl p-6 shadow-2xl border border-slate-800 flex flex-col space-y-4 overflow-hidden text-slate-100">
+            <!-- HEADER -->
+            <div class="flex items-center justify-between border-b border-slate-800/80 pb-3.5 shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+                        <i class="fa-solid fa-gauge-high text-lg"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] font-mono text-cyan-400/90 uppercase font-black tracking-wider">Flight Optimization & Blackbox Suite</span>
+                            <span class="text-[9px] font-mono bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-2 py-0.5 rounded-full font-bold">MSFS 2024 / 2020</span>
+                        </div>
+                        <h2 class="text-xl font-extrabold text-white tracking-tight flex items-center gap-2">
+                            <span>Flight Optimizer</span>
+                            <span id="opt-modal-flight-badge" class="hidden font-mono text-xs font-bold text-cyan-300 bg-cyan-950/60 px-2.5 py-0.5 rounded-lg border border-cyan-700/50">LFPO ➔ EGKK</span>
+                        </h2>
+                    </div>
+                </div>
+
+                <!-- TABS SWITCHER -->
+                <div class="flex items-center bg-slate-950/80 p-1 rounded-2xl border border-slate-800 shrink-0">
+                    <button id="opt-tab-btn-route" onclick="switchOptimizerTab('route')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer bg-cyan-600 text-white shadow-sm shadow-cyan-600/30 flex items-center gap-2">
+                        <i class="fa-solid fa-route text-xs"></i>
+                        <span>Route & Scènes</span>
+                    </button>
+                    <button id="opt-tab-btn-rig" onclick="switchOptimizerTab('rig')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition-all cursor-pointer flex items-center gap-2">
+                        <i class="fa-solid fa-microchip text-xs"></i>
+                        <span>Rig & Réglages</span>
+                    </button>
+                    <button id="opt-tab-btn-blackbox" onclick="switchOptimizerTab('blackbox')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition-all cursor-pointer flex items-center gap-2">
+                        <i class="fa-solid fa-stopwatch-20 text-xs"></i>
+                        <span>Live Blackbox</span>
+                        <span id="opt-tab-rec-dot" class="hidden w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+                    </button>
+                </div>
+
+                <button onclick="closeFlightOptimizerModal()" class="w-8 h-8 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-xs transition-all cursor-pointer">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <!-- TAB 1: ROUTE & SCÈNES -->
+            <div id="opt-tab-content-route" class="flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-1">
+                <!-- Flight Path Card -->
+                <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex items-center justify-between gap-4">
+                    <div class="flex-1">
+                        <span class="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider block mb-1">Aéroport de Départ</span>
+                        <div class="flex items-center gap-2">
+                            <span id="opt-route-origin-icao" class="font-mono text-2xl font-black text-white">LFPO</span>
+                            <span id="opt-route-origin-name" class="text-xs text-slate-300 truncate">Paris Orly</span>
+                        </div>
+                    </div>
+                    <button onclick="swapOptimizerRouteAirports()" class="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition-all cursor-pointer shrink-0" title="Intervertir départ et arrivée">
+                        <i class="fa-solid fa-arrow-right-arrow-left text-xs"></i>
+                    </button>
+                    <div class="flex-1 text-right">
+                        <span class="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider block mb-1">Aéroport d'Arrivée</span>
+                        <div class="flex items-center justify-end gap-2">
+                            <span id="opt-route-dest-name" class="text-xs text-slate-300 truncate">London Gatwick</span>
+                            <span id="opt-route-dest-icao" class="font-mono text-2xl font-black text-cyan-400">EGKK</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mode Selector -->
+                <div class="space-y-2">
+                    <span class="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider block">Stratégie d'Isolation des Scènes</span>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <div onclick="setOptimizerMode('DIRECT')" id="opt-mode-card-direct" class="p-3.5 rounded-2xl bg-cyan-950/40 border-2 border-cyan-500/80 cursor-pointer transition-all">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <span class="text-xs font-black text-white uppercase tracking-wider">Direct A ➔ B</span>
+                                <span class="text-[9px] font-mono bg-cyan-500/20 text-cyan-300 px-2 py-0.5 rounded-full font-bold">RECOMMANDÉ</span>
+                            </div>
+                            <p class="text-[11px] text-slate-300 leading-snug">Conserve uniquement le départ et l'arrivée. Désactive toutes les scènes tierces intermédiaires. Gain de FPS et de mémoire maximal.</p>
+                        </div>
+                        <div onclick="setOptimizerMode('CORRIDOR')" id="opt-mode-card-corridor" class="p-3.5 rounded-2xl bg-slate-900/40 border border-slate-800 cursor-pointer hover:border-slate-700 transition-all">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <span class="text-xs font-black text-slate-200 uppercase tracking-wider">En-Route Corridor</span>
+                            </div>
+                            <p class="text-[11px] text-slate-400 leading-snug">Garde le départ, l'arrivée et les aérodromes situés sous le corridor de vol.</p>
+                        </div>
+                        <div onclick="setOptimizerMode('SIMBRIEF')" id="opt-mode-card-simbrief" class="p-3.5 rounded-2xl bg-slate-900/40 border border-slate-800 cursor-pointer hover:border-slate-700 transition-all">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <span class="text-xs font-black text-slate-200 uppercase tracking-wider">Import SimBrief</span>
+                                <i class="fa-solid fa-cloud-arrow-down text-slate-400"></i>
+                            </div>
+                            <p class="text-[11px] text-slate-400 leading-snug">Synchronisation 1-clic avec votre dernier plan de vol SimBrief (OFP).</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Estimated Savings Banner -->
+                <div class="p-4 rounded-2xl bg-gradient-to-r from-emerald-950/40 to-slate-900/40 border border-emerald-500/30 flex items-center justify-between">
+                    <div class="space-y-0.5">
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-bolt text-emerald-400 text-sm"></i>
+                            <span class="text-xs font-bold text-white uppercase tracking-wider">Gain de Mémoire Estimé</span>
+                        </div>
+                        <p class="text-[11px] text-slate-300">Déleste le simulateur de <strong id="opt-saving-scenery-count" class="text-emerald-400">515 scènes</strong> inutiles pour ce vol.</p>
+                    </div>
+                    <div class="flex items-center gap-3 font-mono text-right">
+                        <div>
+                            <span class="text-[10px] text-slate-400 block">Commit RAM</span>
+                            <span class="text-sm font-extrabold text-emerald-400">- 2.70 Go</span>
+                        </div>
+                        <div class="w-px h-6 bg-slate-800"></div>
+                        <div>
+                            <span class="text-[10px] text-slate-400 block">VRAM Phys.</span>
+                            <span class="text-sm font-extrabold text-cyan-400">- 650 Mo</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Actions -->
+                <div class="flex items-center justify-between pt-2">
+                    <span id="opt-route-status-text" class="text-xs text-slate-400 font-medium">Prêt pour l'isolation des scènes.</span>
+                    <div class="flex items-center gap-2">
+                        <button onclick="restoreFlightCorridorSceneries()" id="opt-btn-restore-sceneries" class="hidden px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition-all cursor-pointer">
+                            Rétablir toutes les scènes
+                        </button>
+                        <button onclick="applyOptimizerRouteSceneries()" id="opt-btn-apply-sceneries" class="px-5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition-all cursor-pointer active:scale-95 shadow-lg shadow-emerald-500/20">
+                            Isoler les Scènes pour ce Vol
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: RIG & SETTINGS (COMBOBOX HARDWARE + AIRCRAFT STUDIO + FRAME PACING) -->
+            <div id="opt-tab-content-rig" class="hidden flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-1">
+                <!-- System Badges Bar -->
+                <div class="flex items-center gap-2 flex-wrap pb-1">
+                    <div class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-[11px] font-mono">
+                        <i class="fa-solid fa-memory text-cyan-400 text-[10px]"></i>
+                        <span id="opt-badge-ram" class="text-slate-200 font-bold">64 Go @ 3600 MHz</span>
+                        <span class="text-emerald-400 font-black text-[9px] bg-emerald-500/10 px-1.5 py-0.2 rounded">XMP ACTIF</span>
+                    </div>
+                    <div class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-[11px] font-mono">
+                        <i class="fa-solid fa-microchip text-purple-400 text-[10px]"></i>
+                        <span id="opt-badge-rbar" class="text-slate-200 font-bold">Re-Size BAR</span>
+                        <span class="text-emerald-400 font-black text-[9px] bg-emerald-500/10 px-1.5 py-0.2 rounded">ACTIF</span>
+                    </div>
+                    <div class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-[11px] font-mono">
+                        <i class="fa-brands fa-windows text-sky-400 text-[10px]"></i>
+                        <span id="opt-badge-hags" class="text-slate-200 font-bold">HAGS</span>
+                        <span class="text-emerald-400 font-black text-[9px] bg-emerald-500/10 px-1.5 py-0.2 rounded">ACTIF</span>
+                    </div>
+                    <div class="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-900 border border-slate-800 text-[11px] font-mono">
+                        <i class="fa-solid fa-layer-group text-amber-400 text-[10px]"></i>
+                        <span id="opt-badge-dlss" class="text-slate-200 font-bold">DLSS v3.10.9.1</span>
+                    </div>
+                </div>
+
+                <!-- Hardware Inputs with Searchable Comboboxes -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
+                    <!-- CPU Combobox -->
+                    <div class="relative space-y-1">
+                        <label class="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider block">Processeur (CPU)</label>
+                        <div class="relative">
+                            <input type="text" id="opt-cpu-input" oninput="filterCombobox('cpu', this.value)" onfocus="openCombobox('cpu')"
+                                   class="w-full bg-slate-900/80 border border-slate-700/60 focus:border-cyan-400 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-400 focus:outline-none font-semibold">
+                            <button onclick="toggleCombobox('cpu')" class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1 text-xs">
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </button>
+                        </div>
+                        <div id="opt-cpu-dropdown" class="hidden absolute left-0 right-0 top-full mt-1 max-h-56 overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 p-1.5 space-y-1">
+                            <!-- Populated via JS -->
+                        </div>
+                    </div>
+
+                    <!-- GPU Combobox -->
+                    <div class="relative space-y-1">
+                        <label class="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider block">Carte Graphique (GPU & VRAM)</label>
+                        <div class="relative">
+                            <input type="text" id="opt-gpu-input" oninput="filterCombobox('gpu', this.value)" onfocus="openCombobox('gpu')"
+                                   class="w-full bg-slate-900/80 border border-slate-700/60 focus:border-cyan-400 rounded-xl px-3 py-2 text-xs text-white placeholder-slate-400 focus:outline-none font-semibold">
+                            <button onclick="toggleCombobox('gpu')" class="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1 text-xs">
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </button>
+                        </div>
+                        <div id="opt-gpu-dropdown" class="hidden absolute left-0 right-0 top-full mt-1 max-h-56 overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 p-1.5 space-y-1">
+                            <!-- Populated via JS -->
+                        </div>
+                    </div>
+
+                    <!-- Display Refresh Rate Hz -->
+                    <div class="space-y-1">
+                        <label class="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider block">Fréquence Écran (Hz)</label>
+                        <select id="opt-hz-select" onchange="triggerRigRecalculation()" class="w-full bg-slate-900/80 border border-slate-700/60 focus:border-cyan-400 rounded-xl px-3 py-2 text-xs text-white focus:outline-none font-semibold">
+                            <option value="180">180 Hz (Recommandé - Synchronisation 90 FPS)</option>
+                            <option value="165">165 Hz (Synchronisation 82 FPS)</option>
+                            <option value="144">144 Hz (Synchronisation 72 FPS)</option>
+                            <option value="120">120 Hz (Synchronisation 60 FPS)</option>
+                            <option value="240">240 Hz (Synchronisation 80 FPS)</option>
+                            <option value="60">60 Hz (Synchronisation 60 ou 30 FPS)</option>
+                        </select>
+                    </div>
+
+                    <!-- Aircraft Studio Selector -->
+                    <div class="space-y-1">
+                        <label class="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider block">Avion & Studio Éditeur</label>
+                        <select id="opt-studio-select" onchange="triggerRigRecalculation()" class="w-full bg-slate-900/80 border border-slate-700/60 focus:border-cyan-400 rounded-xl px-3 py-2 text-xs text-white focus:outline-none font-semibold">
+                            <option value="fslabs">Flight Sim Labs (FSLabs) - A321 / A320 (Calculs CPU extrêmes)</option>
+                            <option value="fenix">Fenix Simulations - A320 Family (Gouffre VRAM)</option>
+                            <option value="pmdg">PMDG - B737 / B777 (WASM économe)</option>
+                            <option value="inibuilds">iniBuilds - A300 / A350 (Cockpit 8K lourd)</option>
+                            <option value="flybywire">FlyByWire - A32NX / A380X (React CoherentGT)</option>
+                            <option value="justflight">Just Flight - BAe 146 / PA-28 (Manipulators)</option>
+                            <option value="asobo">Asobo / Working Title (Natif optimisé)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Calibration Results Grid -->
+                <div class="space-y-2 pt-1">
+                    <span class="text-xs font-mono font-bold text-cyan-400 uppercase tracking-wider block">Cible de Fluidité & Réglages Recommandés</span>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <!-- Card 1: Frame Pacing -->
+                        <div class="p-3.5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-1">
+                            <span class="text-[10px] font-mono text-slate-400 uppercase font-bold block">Synchronisation Écran</span>
+                            <div class="flex items-baseline gap-2">
+                                <span id="opt-target-fps-display" class="font-mono text-2xl font-black text-emerald-400">90 FPS</span>
+                                <span id="opt-engine-fps-display" class="text-xs font-mono text-slate-400">(45 moteur)</span>
+                            </div>
+                            <p id="opt-frame-budget-display" class="text-[11px] text-slate-300">Budget MainThread : <strong>22.2 ms</strong></p>
+                        </div>
+
+                        <!-- Card 2: Terrain Detail -->
+                        <div class="p-3.5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-1">
+                            <span class="text-[10px] font-mono text-slate-400 uppercase font-bold block">Terrain Detail (MSFS)</span>
+                            <div class="flex items-baseline gap-2">
+                                <span id="opt-terrain-detail-display" class="font-mono text-2xl font-black text-cyan-400">LOW</span>
+                                <span class="text-[10px] font-bold text-emerald-400">+ 7 Go VRAM</span>
+                            </div>
+                            <p class="text-[11px] text-slate-300">Bannit tout paging D3D12 en liner.</p>
+                        </div>
+
+                        <!-- Card 3: AutoFPS -->
+                        <div class="p-3.5 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-1">
+                            <span class="text-[10px] font-mono text-slate-400 uppercase font-bold block">AutoFPS Calibration</span>
+                            <div class="flex items-baseline gap-2">
+                                <span id="opt-autofps-tlod-display" class="font-mono text-lg font-black text-amber-400">TLOD 110 ➔ 220</span>
+                            </div>
+                            <p class="text-[11px] text-slate-300">Target 90 FPS | VRAM+ 96%</p>
+                        </div>
+                    </div>
+
+                    <!-- Studio Advice Callout -->
+                    <div id="opt-studio-advice-box" class="p-3.5 rounded-2xl bg-cyan-950/30 border border-cyan-800/40 text-xs text-cyan-200 font-medium">
+                        Verrouillage strict 45 FPS moteur (90 FPS affichés) impératif. SceneryX Direct A ➔ B requis pour libérer le bus mémoire.
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: LIVE BLACKBOX & TELEMETRY -->
+            <div id="opt-tab-content-blackbox" class="hidden flex-1 overflow-y-auto custom-scrollbar space-y-4 pr-1">
+                <!-- Master Record Action Bar -->
+                <div class="p-4 rounded-2xl bg-slate-900/60 border border-slate-800 flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <button onclick="toggleBlackboxRecording()" id="opt-btn-record" class="px-5 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-extrabold text-xs transition-all cursor-pointer active:scale-95 flex items-center gap-2 shadow-lg shadow-red-600/30">
+                            <span id="opt-rec-icon" class="w-2.5 h-2.5 rounded-full bg-white animate-pulse"></span>
+                            <span id="opt-rec-btn-text">Démarrer le Vol (Blackbox)</span>
+                        </button>
+                        <div class="font-mono">
+                            <span id="opt-blackbox-timer" class="text-lg font-black text-white">00:00:00</span>
+                            <span id="opt-blackbox-status-label" class="text-xs text-slate-400 block">En attente de démarrage</span>
+                        </div>
+                    </div>
+                    <button onclick="openLatestBenchmarkReport()" id="opt-btn-view-last-report" class="hidden px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition-all cursor-pointer flex items-center gap-2">
+                        <i class="fa-solid fa-chart-line text-cyan-400"></i>
+                        <span>Voir le Débriefing HTML</span>
+                    </button>
+                </div>
+
+                <!-- Live HUD Telemetry Cards Grid -->
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div class="p-3 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-1">
+                        <span class="text-[10px] font-mono text-slate-400 uppercase font-bold block">FPS Affichés</span>
+                        <div class="flex items-baseline gap-1.5 font-mono">
+                            <span id="live-fps-val" class="text-2xl font-black text-emerald-400">--</span>
+                            <span id="live-fps-base" class="text-xs text-slate-400">(-- base)</span>
+                        </div>
+                    </div>
+                    <div class="p-3 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-1">
+                        <span class="text-[10px] font-mono text-slate-400 uppercase font-bold block">MainThread CPU</span>
+                        <div class="flex items-baseline gap-1.5 font-mono">
+                            <span id="live-mt-val" class="text-2xl font-black text-emerald-400">--</span>
+                            <span class="text-xs text-slate-400">ms</span>
+                        </div>
+                    </div>
+                    <div class="p-3 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-1">
+                        <span class="text-[10px] font-mono text-slate-400 uppercase font-bold block">VRAM Physique</span>
+                        <div class="flex items-baseline gap-1.5 font-mono">
+                            <span id="live-vram-val" class="text-xl font-black text-cyan-400">--</span>
+                            <span id="live-vram-pct" class="text-xs text-slate-400">(--%)</span>
+                        </div>
+                    </div>
+                    <div class="p-3 rounded-2xl bg-slate-900/60 border border-slate-800 space-y-1">
+                        <span class="text-[10px] font-mono text-slate-400 uppercase font-bold block">Rolling Cache</span>
+                        <div class="flex items-baseline gap-1.5 font-mono">
+                            <span id="live-cache-val" class="text-xl font-black text-amber-400">--</span>
+                            <span class="text-xs text-slate-400">Mbps</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Benchmarks List -->
+                <div class="space-y-2 pt-1">
+                    <span class="text-xs font-mono font-bold text-slate-300 uppercase tracking-wider block">Rapports de Vol & Benchmarks Disponibles</span>
+                    <div id="opt-benchmarks-list" class="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
+                        <!-- Populated via JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- FOOTER -->
+            <div class="flex items-center justify-between border-t border-slate-800/80 pt-3 shrink-0 text-xs">
+                <span class="text-slate-400 font-medium">SceneryX Suite v1.0.1 - Performance & Memory Controller</span>
+                <button onclick="closeFlightOptimizerModal()" class="px-5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold transition-all cursor-pointer">
+                    Fermer
                 </button>
             </div>
         </div>

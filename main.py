@@ -5,6 +5,9 @@ import re
 import urllib.request
 import webbrowser
 import webview
+from datetime import datetime
+import flight_rig_optimizer
+import flight_perf_tracker
 from scanner import run_scan, get_settings, save_settings, load_ratings, save_rating, save_custom_price, save_custom_category, load_custom_prices, get_estimated_price, get_default_gsx_path, load_airport_database, SPECIAL_BUNDLE_MAP, OUTPUT_JSON_PATH, compute_scan_delta, build_library_snapshot, SNAPSHOT_JSON_PATH, get_resource_file_path, audit_all_gsx_profiles, audit_single_airport_gsx, extract_icao_from_gsx_filename, find_bundled_gsx, USER_DATA_DIR
 
 try:
@@ -3467,6 +3470,80 @@ class Api:
                 json.dump(airports, f, indent=2, ensure_ascii=False)
                 
             return json.dumps({"status": "ok", "path": file_path, "count": len(airports)}, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
+    # =========================================================================
+    # SUITE PERFORMANCE : FLIGHT RIG OPTIMIZER & LIVE BLACKBOX TELEMETRY
+    # =========================================================================
+
+    def get_rig_diagnostics(self):
+        try:
+            data = flight_rig_optimizer.get_full_rig_diagnostics()
+            return json.dumps(data, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"error": str(e)}, ensure_ascii=False)
+
+    def calculate_rig_profile(self, user_specs_json):
+        try:
+            specs = json.loads(user_specs_json) if isinstance(user_specs_json, str) else user_specs_json
+            profile = flight_rig_optimizer.generate_optimized_rig_profile(specs)
+            return json.dumps(profile, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"error": str(e)}, ensure_ascii=False)
+
+    def start_flight_blackbox(self, flight_name, dep_icao, arr_icao, aircraft):
+        try:
+            res = flight_perf_tracker.BLACKBOX.start(flight_name=flight_name, dep=dep_icao, arr=arr_icao, aircraft=aircraft)
+            return json.dumps(res, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    def stop_flight_blackbox(self):
+        try:
+            res = flight_perf_tracker.BLACKBOX.stop()
+            return json.dumps(res, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    def get_live_blackbox_telemetry(self):
+        try:
+            telemetry = flight_perf_tracker.BLACKBOX.get_telemetry()
+            return json.dumps(telemetry, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"error": str(e)}, ensure_ascii=False)
+
+    def list_flight_benchmarks(self):
+        try:
+            bench_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'benchmarks')
+            if not os.path.exists(bench_dir):
+                return json.dumps([], ensure_ascii=False)
+            files = []
+            for f in sorted(os.listdir(bench_dir), reverse=True):
+                if f.endswith('.html'):
+                    full_p = os.path.join(bench_dir, f)
+                    stat = os.stat(full_p)
+                    files.append({
+                        "filename": f,
+                        "path": full_p,
+                        "size_kb": round(stat.st_size / 1024, 1),
+                        "mtime": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M")
+                    })
+            return json.dumps(files, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps([], ensure_ascii=False)
+
+    def open_benchmark_report(self, filename_or_path):
+        try:
+            bench_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'benchmarks')
+            if not os.path.isabs(filename_or_path):
+                p = os.path.join(bench_dir, filename_or_path)
+            else:
+                p = filename_or_path
+            if os.path.exists(p):
+                webbrowser.open(f"file:///{os.path.abspath(p)}")
+                return json.dumps({"status": "ok"})
+            return json.dumps({"status": "error", "message": "File not found"})
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
 

@@ -18,6 +18,7 @@ import ctypes
 import ctypes.wintypes
 import subprocess
 import webbrowser
+import threading
 from datetime import datetime
 
 # Windows Memory API Structures
@@ -910,6 +911,227 @@ def main():
         print(f"📄 Journal CSV complet : {csv_path}\n")
     else:
         print("\nAucune donnée n'a été enregistrée (MSFS n'était pas actif).")
+
+
+class BlackboxSession:
+    def __init__(self):
+        self.is_running = False
+        self.thread = None
+        self._stop_event = threading.Event()
+        self.current_flight_name = ""
+        self.current_csv_path = None
+        self.last_report_path = None
+        self.latest_telemetry = {
+            "is_tracking": False,
+            "flight_name": "",
+            "displayed_fps": None,
+            "base_fps": None,
+            "main_thread_ms": None,
+            "tlod": None,
+            "olod": None,
+            "vram_used_mb": 0,
+            "vram_total_mb": 16376,
+            "vram_pct": 0,
+            "cache_read_mbps": 0.0,
+            "msfs_ram_mb": 0,
+            "gpu_power_w": 0,
+            "elapsed_sec": 0,
+            "elapsed_str": "00:00",
+            "msfs_active": False
+        }
+
+    def start(self, flight_name="flight", dep="LFPO", arr="EGKK", aircraft="Airliner"):
+        if self.is_running:
+            return {"status": "already_running", "flight_name": self.current_flight_name}
+        self._stop_event.clear()
+        self.is_running = True
+        self.current_flight_name = flight_name or f"{dep}_{arr}_{aircraft}"
+        self.thread = threading.Thread(target=self._worker, args=(flight_name, dep, arr, aircraft), daemon=True)
+        self.thread.start()
+        return {"status": "started", "flight_name": self.current_flight_name}
+
+    def stop(self):
+        if not self.is_running:
+            return {"status": "not_running", "report_path": self.last_report_path}
+        self._stop_event.set()
+        if self.thread and self.thread.is_alive():
+            self.thread.join(timeout=3.0)
+        self.is_running = False
+        self.latest_telemetry["is_tracking"] = False
+        return {
+            "status": "stopped",
+            "report_path": self.last_report_path,
+            "csv_path": self.current_csv_path
+        }
+
+    def get_telemetry(self):
+        msfs = get_msfs_process()
+        gpu = get_nvidia_gpu_telemetry()
+        sys_ram_used, sys_ram_total = get_system_ram()
+        autofps = get_latest_autofps_data()
+        
+        telemetry = dict(self.latest_telemetry)
+        telemetry["is_tracking"] = self.is_running
+        telemetry["msfs_active"] = msfs is not None
+        if gpu:
+            telemetry["vram_used_mb"] = gpu.get("vram_used_mb", 0)
+            telemetry["vram_total_mb"] = gpu.get("vram_total_mb", 16376)
+            telemetry["vram_pct"] = gpu.get("vram_pct", 0)
+            telemetry["gpu_power_w"] = gpu.get("power_w", 0)
+        if autofps:
+            telemetry["displayed_fps"] = autofps.get("disp_fps")
+            telemetry["base_fps"] = autofps.get("base_fps")
+            telemetry["main_thread_ms"] = autofps.get("main_thread_ms")
+            telemetry["tlod"] = autofps.get("tlod")
+            telemetry["olod"] = autofps.get("olod")
+        if msfs:
+            telemetry["msfs_ram_mb"] = msfs.get("ws_mb", 0)
+        return telemetry
+
+    def _worker(self, flight_name, dep, arr, aircraft):
+        benchmarks_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'benchmarks')
+        os.makedirs(benchmarks_dir, exist_ok=True)
+        timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        mode_str, is_corridor, cur_dep, cur_arr, dis_count, prof_slug = get_sceneryx_flight_mode()
+
+        prefix = f"{dep or cur_dep}_{arr or cur_arr}_{aircraft or 'Flight'}"
+        csv_filename = f"benchmark_{prefix}_{timestamp_str}.csv"
+        csv_path = os.path.join(benchmarks_dir, csv_filename)
+        self.current_csv_path = csv_path
+
+        with open(csv_path, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerow([
+                'timestamp', 'elapsed_sec', 'time_str', 'mode',
+                'displayed_fps', 'base_fps', 'main_thread_ms',
+                'tlod', 'olod', 'agl_ft', 'fpm', 'fg_mode',
+                'cache_read_mbps', 'cache_read_mbs',
+                'vram_used_mb', 'vram_total_mb', 'vram_pct',
+                'gpu_util_pct', 'gpu_temp_c', 'gpu_power_w', 'gpu_clock_mhz', 'gpu_mem_bus_pct',
+                'msfs_ram_mb', 'msfs_commit_mb', 'msfs_cpu_pct',
+                'sys_ram_used_mb', 'sys_ram_total_mb'
+            ])
+
+        samples = []
+        start_time = time.time()
+        last_read_bytes = None
+        last_tick_time = None
+
+        while not self._stop_event.is_set():
+            msfs = get_msfs_process()
+            gpu = get_nvidia_gpu_telemetry()
+            sys_ram_used, sys_ram_total = get_system_ram()
+            autofps = get_latest_autofps_data()
+
+            now_tick = time.time()
+            elapsed = round(now_tick - start_time, 1)
+            time_formatted = format_time_delta(elapsed)
+
+            disp_fps = autofps.get('disp_fps') if autofps else None
+            base_fps = autofps.get('base_fps') if autofps else None
+            mt_ms = autofps.get('main_thread_ms') if autofps else None
+            tlod = autofps.get('tlod') if autofps else None
+            olod = autofps.get('olod') if autofps else None
+            agl = autofps.get('agl_ft') if autofps else None
+            fpm = autofps.get('fpm') if autofps else None
+            fg_mode = autofps.get('fg_mode') if autofps else None
+
+            # Rolling Cache I/O
+            cur_read_bytes = msfs.get('read_bytes', 0) if msfs else 0
+            cache_read_mbps = 0.0
+            cache_read_mbs = 0.0
+            if last_read_bytes is not None and last_tick_time is not None:
+                delta_t = now_tick - last_tick_time
+                if delta_t > 0.05 and cur_read_bytes >= last_read_bytes:
+                    delta_bytes = cur_read_bytes - last_read_bytes
+                    cache_read_mbps = round((delta_bytes * 8.0) / (delta_t * 1_000_000.0), 2)
+                    cache_read_mbs = round(delta_bytes / (delta_t * 1024.0 * 1024.0), 2)
+            last_read_bytes = cur_read_bytes
+            last_tick_time = now_tick
+
+            v_used = gpu.get('vram_used_mb', 0)
+            v_total = gpu.get('vram_total_mb', 16376)
+            v_pct = gpu.get('vram_pct', 0)
+
+            self.latest_telemetry = {
+                "is_tracking": True,
+                "flight_name": self.current_flight_name,
+                "displayed_fps": disp_fps,
+                "base_fps": base_fps,
+                "main_thread_ms": mt_ms,
+                "tlod": tlod,
+                "olod": olod,
+                "vram_used_mb": v_used,
+                "vram_total_mb": v_total,
+                "vram_pct": v_pct,
+                "cache_read_mbps": cache_read_mbps,
+                "msfs_ram_mb": msfs.get('ws_mb', 0) if msfs else 0,
+                "gpu_power_w": gpu.get('power_w', 0),
+                "elapsed_sec": elapsed,
+                "elapsed_str": time_formatted,
+                "msfs_active": msfs is not None
+            }
+
+            row = [
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"), elapsed, time_formatted, mode_str,
+                disp_fps if disp_fps is not None else '',
+                base_fps if base_fps is not None else '',
+                mt_ms if mt_ms is not None else '',
+                tlod if tlod is not None else '',
+                olod if olod is not None else '',
+                agl if agl is not None else '',
+                fpm if fpm is not None else '',
+                fg_mode or '',
+                cache_read_mbps, cache_read_mbs,
+                v_used, v_total, v_pct,
+                gpu.get('util_pct', 0), gpu.get('temp_c', 0), gpu.get('power_w', 0), gpu.get('clock_mhz', 0), gpu.get('mem_bus_pct', 0),
+                msfs.get('ws_mb', 0) if msfs else 0, msfs.get('commit_mb', 0) if msfs else 0, 0,
+                sys_ram_used, sys_ram_total
+            ]
+            try:
+                with open(csv_path, 'a', newline='', encoding='utf-8') as f:
+                    csv.writer(f).writerow(row)
+            except Exception:
+                pass
+
+            samples.append({
+                'elapsed': elapsed,
+                'time_str': time_formatted,
+                'disp_fps': disp_fps,
+                'base_fps': base_fps,
+                'main_thread_ms': mt_ms,
+                'tlod': tlod,
+                'olod': olod,
+                'agl': agl,
+                'fpm': fpm,
+                'cache_mbps': cache_read_mbps,
+                'vram_used': v_used,
+                'vram_pct': v_pct,
+                'gpu_util': gpu.get('util_pct', 0),
+                'gpu_temp': gpu.get('temp_c', 0),
+                'gpu_power': gpu.get('power_w', 0),
+                'gpu_clock': gpu.get('clock_mhz', 0),
+                'gpu_bus': gpu.get('mem_bus_pct', 0),
+                'msfs_ram': msfs.get('ws_mb', 0) if msfs else 0,
+                'msfs_commit': msfs.get('commit_mb', 0) if msfs else 0,
+                'sys_ram_used': sys_ram_used,
+                'sys_ram_total': sys_ram_total
+            })
+
+            self._stop_event.wait(0.5)
+
+        if samples:
+            session_info = {
+                'mode_str': mode_str,
+                'is_corridor': is_corridor,
+                'start_time': timestamp_str,
+                'duration': format_time_delta(round(time.time() - start_time, 1))
+            }
+            html_file = generate_html_report(csv_path, session_info, samples)
+            self.last_report_path = html_file
+
+
+BLACKBOX = BlackboxSession()
 
 if __name__ == '__main__':
     main()
