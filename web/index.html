@@ -2057,21 +2057,21 @@
         <div id="opt-tab-content-route" class="flex-1 space-y-2.5">
             <!-- Flight Path Card -->
             <div class="p-3 rounded-2xl bg-slate-950/60 border border-slate-800 flex items-center justify-between gap-3">
-                <div class="flex-1">
+                <div class="flex-1 cursor-pointer hover:bg-slate-900/60 p-1.5 rounded-xl transition-all" onclick="focusOptimizerAirport('origin')" title="Click to view Departure on map">
                     <span class="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider block mb-0.5">Departure Airport</span>
                     <div class="flex items-center gap-2">
-                        <span id="opt-route-origin-icao" class="font-mono text-xl font-black text-white">LFPO</span>
-                        <span id="opt-route-origin-name" class="text-xs text-slate-300 truncate">Paris Orly</span>
+                        <span id="opt-route-origin-icao" class="font-mono text-xl font-black text-slate-400">----</span>
+                        <span id="opt-route-origin-name" class="text-xs text-slate-300 truncate">Select on map</span>
                     </div>
                 </div>
                 <button onclick="swapOptimizerRouteAirports()" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition-all cursor-pointer shrink-0" title="Swap Departure and Destination">
                     <i class="fa-solid fa-arrow-right-arrow-left text-xs"></i>
                 </button>
-                <div class="flex-1 text-right">
+                <div class="flex-1 text-right cursor-pointer hover:bg-slate-900/60 p-1.5 rounded-xl transition-all" onclick="focusOptimizerAirport('dest')" title="Click to view Destination on map">
                     <span class="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider block mb-0.5">Destination Airport</span>
                     <div class="flex items-center justify-end gap-2">
-                        <span id="opt-route-dest-name" class="text-xs text-slate-300 truncate">London Gatwick</span>
-                        <span id="opt-route-dest-icao" class="font-mono text-xl font-black text-cyan-400">EGKK</span>
+                        <span id="opt-route-dest-name" class="text-xs text-slate-300 truncate">Alt+Click airport on map</span>
+                        <span id="opt-route-dest-icao" class="font-mono text-xl font-black text-slate-400">----</span>
                     </div>
                 </div>
             </div>
@@ -2317,10 +2317,16 @@
         <!-- FOOTER -->
         <div class="flex items-center justify-between border-t border-slate-800/80 pt-2.5 shrink-0 text-xs">
             <span class="text-slate-400 font-medium">SceneryX Suite v1.0.1 - Performance & Memory Controller</span>
-            <button onclick="exitFlightOptimizerMode()" class="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-950/60 text-slate-300 hover:text-rose-300 border border-slate-700/60 hover:border-rose-500/50 font-bold transition-all cursor-pointer flex items-center gap-1.5">
-                <i class="fa-solid fa-arrow-right-from-bracket text-xs"></i>
-                <span>Exit</span>
-            </button>
+            <div class="flex items-center gap-2">
+                <button onclick="clearOptimizerRoutePlanning()" id="opt-btn-clear-route" class="px-3.5 py-1.5 rounded-xl bg-slate-800/90 hover:bg-blue-600 text-slate-300 hover:text-white border border-slate-700/60 hover:border-blue-500 font-bold transition-all cursor-pointer flex items-center gap-1.5" title="Clear current flight route without exiting">
+                    <i class="fa-solid fa-arrows-rotate text-xs"></i>
+                    <span>New Route</span>
+                </button>
+                <button onclick="exitFlightOptimizerMode()" class="px-4 py-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/60 hover:border-slate-500 font-bold transition-all cursor-pointer flex items-center gap-1.5">
+                    <i class="fa-solid fa-arrow-right-from-bracket text-xs"></i>
+                    <span>Exit</span>
+                </button>
+            </div>
         </div>
     </div>
 

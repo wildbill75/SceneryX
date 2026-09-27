@@ -15461,10 +15461,29 @@ let isBlackboxRunning = false;
 let currentOptimizerTab = 'route';
 let optimizerOrigin = null;
 let optimizerDest = null;
+let optimizerActiveAnchorAirport = null;
 let optimizerMode = 'DIRECT';
 let isOptimizerModalDragging = false;
 let optimizerModalDragStart = { offsetX: 0, offsetY: 0 };
 let hasUserDraggedOptimizerModal = false;
+
+function getAirportPricingTextColor(ap) {
+    if (!ap) return 'text-slate-400';
+    let cat = 'DEFAULT';
+    if (typeof getAirportCategory === 'function') {
+        cat = getAirportCategory(ap);
+    } else {
+        const pt = (ap.pricing_type || '').toLowerCase();
+        if (pt.includes('payware')) cat = 'PAYWARE';
+        else if (pt.includes('asobo')) cat = 'ASOBO';
+        else if (pt.includes('free')) cat = 'FREEWARE';
+    }
+    if (cat === 'PAYWARE') return 'text-purple-400';
+    if (cat === 'ASOBO') return 'text-amber-400';
+    if (cat === 'FREEWARE') return 'text-cyan-400';
+    if (cat === 'DEFAULT') return 'text-blue-400';
+    return 'text-blue-400';
+}
 
 function isFlightOptimizerModalOpen() {
     const modal = document.getElementById('flight-optimizer-modal');
@@ -15474,10 +15493,12 @@ function isFlightOptimizerModalOpen() {
 function handleAirportRouteSelection(ap) {
     if (!ap) return;
     const wasOpen = isFlightOptimizerModalOpen();
+    hasUserDraggedOptimizerModal = false;
 
     if (!optimizerOrigin) {
         // Step 1: Set departure (Point A)
         optimizerOrigin = ap;
+        optimizerActiveAnchorAirport = ap;
         optimizerDest = null;
         flightPlanningDeparture = ap;
         flightPlanningDestination = null;
@@ -15497,12 +15518,14 @@ function handleAirportRouteSelection(ap) {
             showToast(`✈ Departure set: ${ap.icao}. Alt+Click or Click another airport for Destination.`, 'info');
         }
     } else if (optimizerOrigin.icao === ap.icao) {
+        optimizerActiveAnchorAirport = ap;
         if (typeof showToast === 'function') {
             showToast(`${ap.icao} is already set as Departure. Alt+Click another airport for Destination.`, 'warning');
         }
     } else {
         // Step 2: Set destination (Point B)
         optimizerDest = ap;
+        optimizerActiveAnchorAirport = ap;
         flightPlanningDestination = ap;
         flightDestinationAirport = ap;
         flightDestAirport = ap;
@@ -15524,6 +15547,13 @@ function handleAirportRouteSelection(ap) {
         }
     } else {
         updateOptimizerRouteUI();
+        if (typeof panMapToAirport === 'function') {
+            panMapToAirport(ap);
+        }
+        positionFlightOptimizerModal(ap);
+        if (typeof startOptimizerPanTracking === 'function') {
+            startOptimizerPanTracking(1400);
+        }
     }
 }
 
@@ -15555,7 +15585,10 @@ function startOptimizerPanTracking(durationMs = 1200) {
 function positionFlightOptimizerModal(targetAp = null) {
     const modal = document.getElementById('flight-optimizer-modal');
     if (!modal || modal.classList.contains('hidden')) return;
-    const ap = targetAp || optimizerOrigin || currentRadialAirport || selectedAirport;
+    if (targetAp) {
+        optimizerActiveAnchorAirport = targetAp;
+    }
+    const ap = targetAp || optimizerActiveAnchorAirport || optimizerDest || optimizerOrigin || currentRadialAirport || selectedAirport;
     if (!ap || !map || ap.lat === undefined || ap.lon === undefined) return;
 
     let latLng = [parseFloat(ap.lat), parseFloat(ap.lon)];
@@ -15668,9 +15701,11 @@ function triggerRadialFlightOptimizer() {
     if (!currentRadialAirport) return;
     const targetAp = currentRadialAirport;
     closeAirportRadialMenu();
+    hasUserDraggedOptimizerModal = false;
     
     // Always start FRESH for this departure airport:
     optimizerOrigin = targetAp;
+    optimizerActiveAnchorAirport = targetAp;
     optimizerDest = null;
     flightPlanningDeparture = targetAp;
     flightPlanningDestination = null;
@@ -15697,7 +15732,7 @@ function triggerRadialFlightOptimizer() {
     if (typeof panMapToAirport === 'function') {
         panMapToAirport(targetAp);
     }
-    startOptimizerPanTracking(1200);
+    startOptimizerPanTracking(1400);
     if (typeof showToast === 'function') {
         showToast(`✈ Departure set: ${targetAp.icao}. Alt+Click or Click an airport on the map to set Destination.`, 'info');
     }
@@ -15710,20 +15745,24 @@ function openFlightOptimizerModal(initialTab = 'route', targetAp = null) {
 
     if (targetAp) {
         optimizerOrigin = targetAp;
+        optimizerActiveAnchorAirport = targetAp;
         flightPlanningDeparture = targetAp;
         selectedAirport = targetAp;
     } else if (!optimizerOrigin) {
         if (typeof flightOriginAirport !== 'undefined' && flightOriginAirport) optimizerOrigin = flightOriginAirport;
         else if (typeof currentRadialAirport !== 'undefined' && currentRadialAirport) optimizerOrigin = currentRadialAirport;
         else if (typeof selectedAirport !== 'undefined' && selectedAirport) optimizerOrigin = selectedAirport;
+        optimizerActiveAnchorAirport = optimizerOrigin;
+    } else if (!optimizerActiveAnchorAirport) {
+        optimizerActiveAnchorAirport = optimizerOrigin;
     }
 
     modal.classList.remove('hidden');
     modal.classList.add('flex');
 
     if (!hasUserDraggedOptimizerModal) {
-        positionFlightOptimizerModal(targetAp || optimizerOrigin);
-        startOptimizerPanTracking(1200);
+        positionFlightOptimizerModal(targetAp || optimizerActiveAnchorAirport || optimizerOrigin);
+        startOptimizerPanTracking(1400);
     }
 
     updateOptimizerRouteUI();
@@ -15796,6 +15835,7 @@ function forceExitOptimizerClean() {
     // COMPLETE FLUSH OF ALL FLIGHT ROUTE & OPTIMIZER STATE
     optimizerOrigin = null;
     optimizerDest = null;
+    optimizerActiveAnchorAirport = null;
     flightPlanningDeparture = null;
     flightPlanningDestination = null;
     flightOriginAirport = null;
@@ -15855,6 +15895,89 @@ function forceExitOptimizerClean() {
 
 const closeFlightOptimizerModal = exitFlightOptimizerMode;
 
+function focusOptimizerAirport(which) {
+    const ap = which === 'dest' ? optimizerDest : optimizerOrigin;
+    if (ap) {
+        optimizerActiveAnchorAirport = ap;
+        hasUserDraggedOptimizerModal = false;
+        if (typeof panMapToAirport === 'function') {
+            panMapToAirport(ap);
+        }
+        positionFlightOptimizerModal(ap);
+        if (typeof startOptimizerPanTracking === 'function') {
+            startOptimizerPanTracking(1400);
+        }
+    }
+}
+
+function clearOptimizerRoutePlanning() {
+    if (isFlightCorridorOptimized) {
+        if (typeof restoreFlightCorridorSceneries === 'function') {
+            restoreFlightCorridorSceneries();
+        }
+    }
+
+    // Reset all flight route planning data while keeping optimizer mode open
+    optimizerOrigin = null;
+    optimizerDest = null;
+    optimizerActiveAnchorAirport = null;
+    flightPlanningDeparture = null;
+    flightPlanningDestination = null;
+    flightOriginAirport = null;
+    flightDestAirport = null;
+    flightDestinationAirport = null;
+    flightCorridorArrivalAirport = null;
+    selectedAirport = null;
+    currentRadialAirport = null;
+    operatingAirlinesOriginAirport = null;
+    currentSimBriefFlight = null;
+    currentSimBriefAlternates = [];
+    isFlightPlanningMode = true;
+    isFlightCorridorOptimized = false;
+    flightCorridorDisabledCount = 0;
+    optimizerMode = 'DIRECT';
+    flightCorridorProfile = 'DIRECT';
+    isDirectRouteMode = true;
+    hasUserDraggedOptimizerModal = false;
+
+    try {
+        localStorage.removeItem('sceneryx_saved_flight_plan');
+    } catch (e) {}
+
+    // Clear flight route vector lines and corridor graphics on Leaflet map
+    if (flightCorridorLayerGroup && map) {
+        flightCorridorLayerGroup.clearLayers();
+    }
+    if (typeof activeRouteLinesGroup !== 'undefined' && activeRouteLinesGroup) {
+        activeRouteLinesGroup.clearLayers();
+    }
+    if (typeof flightRouteLineGroup !== 'undefined' && flightRouteLineGroup) {
+        flightRouteLineGroup.clearLayers();
+    }
+    if (typeof clearFlightCorridor === 'function') {
+        clearFlightCorridor();
+    }
+
+    // Hide old flight planning banner if displayed
+    const banner = document.getElementById('flight-planning-banner');
+    if (banner) {
+        banner.classList.add('hidden');
+        banner.classList.remove('flex');
+        banner.style.display = 'none';
+    }
+
+    updateOptimizerRouteUI();
+
+    // Re-filter airports so normal map state is restored
+    if (typeof filterAirports === 'function') {
+        filterAirports();
+    }
+
+    if (typeof showToast === 'function') {
+        showToast("Flight route reset. Click any airport on the map to set Departure.", "info");
+    }
+}
+
 function switchOptimizerTab(tabName) {
     currentOptimizerTab = tabName;
     const tabs = ['route', 'rig', 'blackbox'];
@@ -15882,10 +16005,12 @@ function updateOptimizerRouteUI() {
 
     if (origIcao) {
         origIcao.textContent = optimizerOrigin ? optimizerOrigin.icao : '----';
+        origIcao.className = `font-mono text-xl font-black ${getAirportPricingTextColor(optimizerOrigin)}`;
         if (origName) origName.textContent = optimizerOrigin ? (optimizerOrigin.name || 'Airport') : 'Select on map';
     }
     if (destIcao) {
         destIcao.textContent = optimizerDest ? optimizerDest.icao : '----';
+        destIcao.className = `font-mono text-xl font-black ${getAirportPricingTextColor(optimizerDest)}`;
         if (destName) destName.textContent = optimizerDest ? (optimizerDest.name || 'Airport') : 'Alt+Click airport on map';
     }
 
@@ -15992,11 +16117,13 @@ function swapOptimizerRouteAirports() {
     }
     updateOptimizerRouteUI();
     if (optimizerOrigin) {
+        optimizerActiveAnchorAirport = optimizerOrigin;
+        hasUserDraggedOptimizerModal = false;
         if (typeof panMapToAirport === 'function') {
             panMapToAirport(optimizerOrigin);
         }
         positionFlightOptimizerModal(optimizerOrigin);
-        startOptimizerPanTracking(1200);
+        startOptimizerPanTracking(1400);
     }
 }
 
