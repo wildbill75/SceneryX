@@ -15481,8 +15481,14 @@ function handleAirportRouteSelection(ap) {
         optimizerDest = null;
         flightPlanningDeparture = ap;
         flightPlanningDestination = null;
+        flightOriginAirport = ap;
+        flightDestAirport = null;
+        flightDestinationAirport = null;
+        flightCorridorArrivalAirport = null;
         selectedAirport = ap;
         isFlightPlanningMode = true;
+        currentSimBriefFlight = null;
+        currentSimBriefAlternates = [];
 
         if (flightCorridorLayerGroup && map) {
             flightCorridorLayerGroup.clearLayers();
@@ -15498,6 +15504,8 @@ function handleAirportRouteSelection(ap) {
         // Step 2: Set destination (Point B)
         optimizerDest = ap;
         flightPlanningDestination = ap;
+        flightDestinationAirport = ap;
+        flightDestAirport = ap;
         flightCorridorArrivalAirport = ap;
         isFlightPlanningMode = true;
 
@@ -15661,19 +15669,30 @@ function triggerRadialFlightOptimizer() {
     const targetAp = currentRadialAirport;
     closeAirportRadialMenu();
     
+    // Always start FRESH for this departure airport:
     optimizerOrigin = targetAp;
+    optimizerDest = null;
     flightPlanningDeparture = targetAp;
+    flightPlanningDestination = null;
+    flightOriginAirport = targetAp;
+    flightDestAirport = null;
+    flightDestinationAirport = null;
+    flightCorridorArrivalAirport = null;
     selectedAirport = targetAp;
     isFlightPlanningMode = true;
+    currentSimBriefFlight = null;
+    currentSimBriefAlternates = [];
 
-    if (typeof flightDestinationAirport !== 'undefined' && flightDestinationAirport) {
-        optimizerDest = flightDestinationAirport;
-        flightPlanningDestination = flightDestinationAirport;
-        flightCorridorArrivalAirport = flightDestinationAirport;
-        if (typeof renderFlightCorridor === 'function') {
-            renderFlightCorridor();
-        }
+    if (flightCorridorLayerGroup && map) {
+        flightCorridorLayerGroup.clearLayers();
     }
+    if (typeof activeRouteLinesGroup !== 'undefined' && activeRouteLinesGroup) {
+        activeRouteLinesGroup.clearLayers();
+    }
+    if (typeof flightRouteLineGroup !== 'undefined' && flightRouteLineGroup) {
+        flightRouteLineGroup.clearLayers();
+    }
+
     openFlightOptimizerModal('route', targetAp);
     if (typeof panMapToAirport === 'function') {
         panMapToAirport(targetAp);
@@ -15689,11 +15708,15 @@ function openFlightOptimizerModal(initialTab = 'route', targetAp = null) {
     if (!modal) return;
     initDraggableFlightOptimizerModal();
 
-    if (!optimizerOrigin && targetAp) optimizerOrigin = targetAp;
-    if (!optimizerOrigin && typeof flightOriginAirport !== 'undefined' && flightOriginAirport) optimizerOrigin = flightOriginAirport;
-    if (!optimizerDest && typeof flightDestinationAirport !== 'undefined' && flightDestinationAirport) optimizerDest = flightDestinationAirport;
-    if (!optimizerOrigin && typeof currentRadialAirport !== 'undefined' && currentRadialAirport) optimizerOrigin = currentRadialAirport;
-    if (!optimizerOrigin && typeof selectedAirport !== 'undefined' && selectedAirport) optimizerOrigin = selectedAirport;
+    if (targetAp) {
+        optimizerOrigin = targetAp;
+        flightPlanningDeparture = targetAp;
+        selectedAirport = targetAp;
+    } else if (!optimizerOrigin) {
+        if (typeof flightOriginAirport !== 'undefined' && flightOriginAirport) optimizerOrigin = flightOriginAirport;
+        else if (typeof currentRadialAirport !== 'undefined' && currentRadialAirport) optimizerOrigin = currentRadialAirport;
+        else if (typeof selectedAirport !== 'undefined' && selectedAirport) optimizerOrigin = selectedAirport;
+    }
 
     modal.classList.remove('hidden');
     modal.classList.add('flex');
@@ -15770,16 +15793,31 @@ function forceExitOptimizerClean() {
         blackboxTelemetryInterval = null;
     }
 
-    // Reset optimizer route & flight planning state
+    // COMPLETE FLUSH OF ALL FLIGHT ROUTE & OPTIMIZER STATE
     optimizerOrigin = null;
     optimizerDest = null;
     flightPlanningDeparture = null;
     flightPlanningDestination = null;
     flightOriginAirport = null;
     flightDestAirport = null;
+    flightDestinationAirport = null;
     flightCorridorArrivalAirport = null;
-    isFlightPlanningMode = false;
+    selectedAirport = null;
+    currentRadialAirport = null;
+    operatingAirlinesOriginAirport = null;
+    currentSimBriefFlight = null;
     currentSimBriefAlternates = [];
+    isFlightPlanningMode = false;
+    isFlightOptimizerActive = false;
+    isFlightCorridorOptimized = false;
+    flightCorridorDisabledCount = 0;
+    optimizerMode = 'DIRECT';
+    flightCorridorProfile = 'DIRECT';
+    isDirectRouteMode = true;
+
+    try {
+        localStorage.removeItem('sceneryx_saved_flight_plan');
+    } catch (e) {}
 
     // Clear flight route vector lines and corridor graphics on Leaflet map
     if (flightCorridorLayerGroup && map) {
@@ -15787,6 +15825,9 @@ function forceExitOptimizerClean() {
     }
     if (typeof activeRouteLinesGroup !== 'undefined' && activeRouteLinesGroup) {
         activeRouteLinesGroup.clearLayers();
+    }
+    if (typeof flightRouteLineGroup !== 'undefined' && flightRouteLineGroup) {
+        flightRouteLineGroup.clearLayers();
     }
     if (typeof clearFlightCorridor === 'function') {
         clearFlightCorridor();
