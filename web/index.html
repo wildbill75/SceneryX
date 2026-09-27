@@ -2030,16 +2030,15 @@
          onclick="event.stopPropagation();"
          onmousedown="event.stopPropagation();"
          onpointerdown="event.stopPropagation();"
-         class="hidden fixed z-[1200] w-[940px] max-w-[96vw] rounded-3xl p-4 shadow-2xl border border-slate-700/60 bg-slate-900/95 backdrop-blur-xl flex flex-col space-y-3 overflow-hidden text-slate-100 select-none pointer-events-auto">
+         class="hidden fixed z-[1200] w-[940px] max-w-[96vw] rounded-3xl p-4 shadow-2xl border border-slate-700 bg-slate-900 flex flex-col space-y-3 overflow-hidden text-slate-100 select-none pointer-events-auto">
         <!-- HEADER & DRAG HANDLE -->
-        <div id="opt-modal-header" class="flex items-center justify-between border-b border-slate-800/80 pb-2.5 shrink-0 cursor-grab active:cursor-grabbing">
+        <div id="opt-modal-header" class="flex items-center justify-between border-b border-slate-800 pb-2.5 shrink-0 cursor-grab active:cursor-grabbing">
             <div>
-                <span class="text-[10px] font-mono text-slate-400 uppercase font-black tracking-wider block">Flight Optimization & Blackbox</span>
-                <h2 class="text-lg font-extrabold text-white tracking-tight leading-tight">Flight Optimizer</h2>
+                <h2 class="text-xl font-bold text-white tracking-tight">Flight Optimizer</h2>
             </div>
 
             <!-- TABS SWITCHER -->
-            <div class="flex items-center bg-slate-950/80 p-1 rounded-2xl border border-slate-800 shrink-0">
+            <div class="flex items-center bg-slate-950 p-1 rounded-2xl border border-slate-800 shrink-0">
                 <button id="opt-tab-btn-route" onclick="switchOptimizerTab('route')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer bg-cyan-600 text-white shadow-sm shadow-cyan-600/30 flex items-center gap-1.5">
                     <span>Route & Sceneries</span>
                 </button>
@@ -2056,7 +2055,7 @@
         <!-- TAB 1: ROUTE & SCENERIES -->
         <div id="opt-tab-content-route" class="flex-1 space-y-2.5">
             <!-- Flight Path Card -->
-            <div class="p-3 rounded-2xl bg-slate-950/60 border border-slate-800 flex items-center justify-between gap-3">
+            <div class="p-3 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-3">
                 <div class="flex-1 cursor-pointer hover:bg-slate-900/60 p-1.5 rounded-xl transition-all" onclick="focusOptimizerAirport('origin')" title="Click to view Departure on map">
                     <span class="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider block mb-0.5">Departure Airport</span>
                     <div class="flex items-center gap-2">
@@ -2078,54 +2077,53 @@
 
             <!-- Mode Selector -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-2.5">
-                <div onclick="setOptimizerMode('DIRECT')" id="opt-mode-card-direct" class="p-2.5 rounded-2xl bg-cyan-950/40 border-2 border-cyan-500/80 cursor-pointer transition-all">
+                <div onclick="setOptimizerMode('DIRECT')" id="opt-mode-card-direct" class="p-3 rounded-2xl bg-slate-800 border-2 border-blue-500 cursor-pointer transition-all">
                     <div class="flex items-center justify-between mb-1">
-                        <span class="text-xs font-black text-white uppercase tracking-wider">Direct A ➔ B</span>
-                        <span class="text-[9px] font-mono bg-cyan-500/20 text-cyan-300 px-1.5 py-0.5 rounded font-bold">RECOMMENDED</span>
+                        <span class="text-sm font-black text-white uppercase tracking-wider">Direct A ➔ B</span>
+                        <span class="text-[9px] font-mono bg-blue-500 text-white px-1.5 py-0.5 rounded font-bold">MAX FPS</span>
                     </div>
-                    <p class="text-[11px] text-slate-300 leading-snug">Keeps only Departure and Arrival. Disables en-route sceneries for maximum FPS & RAM headroom.</p>
+                    <span class="text-xs text-blue-300 font-medium">Dep & Arr Only</span>
                 </div>
-                <div onclick="setOptimizerMode('CORRIDOR')" id="opt-mode-card-corridor" class="p-2.5 rounded-2xl bg-slate-950/40 border border-slate-800 cursor-pointer hover:border-slate-700 transition-all">
+                <div onclick="setOptimizerMode('CORRIDOR')" id="opt-mode-card-corridor" class="p-3 rounded-2xl bg-slate-950 border border-slate-800 hover:bg-slate-900 hover:border-slate-700 cursor-pointer transition-all">
                     <div class="flex items-center justify-between mb-1">
-                        <span class="text-xs font-black text-slate-200 uppercase tracking-wider">En-Route Corridor</span>
+                        <span class="text-sm font-black text-slate-300 uppercase tracking-wider">En-Route Corridor</span>
                     </div>
-                    <p class="text-[11px] text-slate-400 leading-snug">Keeps Departure, Destination, and all airports lying along the flight corridor.</p>
+                    <span class="text-xs text-slate-400 font-medium">Flight Path Airfields</span>
                 </div>
-                <div onclick="setOptimizerMode('SIMBRIEF')" id="opt-mode-card-simbrief" class="p-2.5 rounded-2xl bg-slate-950/40 border border-slate-800 cursor-pointer hover:border-slate-700 transition-all">
+                <div onclick="setOptimizerMode('SIMBRIEF')" id="opt-mode-card-simbrief" class="p-3 rounded-2xl bg-slate-950 border border-slate-800 hover:bg-slate-900 hover:border-slate-700 cursor-pointer transition-all">
                     <div class="flex items-center justify-between mb-1">
-                        <span class="text-xs font-black text-slate-200 uppercase tracking-wider">Import SimBrief</span>
+                        <span class="text-sm font-black text-slate-300 uppercase tracking-wider">Import SimBrief</span>
                         <i class="fa-solid fa-cloud-arrow-down text-slate-400 text-xs"></i>
                     </div>
-                    <p class="text-[11px] text-slate-400 leading-snug">1-Click synchronization with your latest SimBrief Operational Flight Plan (OFP).</p>
+                    <span class="text-xs text-slate-400 font-medium">Latest OFP Route</span>
                 </div>
             </div>
 
             <!-- Unified Estimated Savings & Actions Bar -->
-            <div class="p-3 rounded-2xl bg-slate-950/60 border border-slate-800 flex items-center justify-between gap-4">
-                <div class="flex items-center gap-4">
-                    <div class="space-y-0.5">
-                        <span class="text-[10px] font-mono text-slate-400 uppercase font-bold tracking-wider block">Estimated Memory Savings</span>
-                        <p class="text-[11px] text-slate-300">Relieves simulator of <strong id="opt-saving-scenery-count" class="text-emerald-400">-- sceneries</strong> for this flight.</p>
+            <div class="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-6">
+                <div class="flex items-center gap-6">
+                    <div>
+                        <span class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Isolated Sceneries</span>
+                        <span id="opt-saving-scenery-count" class="font-mono text-2xl font-black text-emerald-400 leading-none">--</span>
                     </div>
                     <div class="h-8 w-px bg-slate-800"></div>
-                    <div class="flex items-center gap-3 font-mono">
-                        <div>
-                            <span class="text-[9px] text-slate-400 block uppercase">Commit RAM</span>
-                            <span id="opt-saving-ram-val" class="text-xs font-extrabold text-emerald-400">- 2.70 GB</span>
-                        </div>
-                        <div>
-                            <span class="text-[9px] text-slate-400 block uppercase">VRAM Headroom</span>
-                            <span id="opt-saving-vram-val" class="text-xs font-extrabold text-cyan-400">- 650 MB</span>
-                        </div>
+                    <div>
+                        <span class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-0.5">RAM Freed</span>
+                        <span id="opt-saving-ram-val" class="font-mono text-2xl font-black text-cyan-400 leading-none">- 0.00 GB</span>
+                    </div>
+                    <div class="h-8 w-px bg-slate-800"></div>
+                    <div>
+                        <span class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-0.5">VRAM Headroom</span>
+                        <span id="opt-saving-vram-val" class="font-mono text-2xl font-black text-sky-400 leading-none">- 0 MB</span>
                     </div>
                 </div>
 
                 <div class="flex items-center gap-2">
-                    <button onclick="restoreFlightCorridorSceneries()" id="opt-btn-restore-sceneries" class="hidden px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs transition-all cursor-pointer">
-                        Restore All Sceneries
+                    <button onclick="restoreFlightCorridorSceneries()" id="opt-btn-restore-sceneries" class="hidden px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer">
+                        Restore All
                     </button>
-                    <button onclick="applyOptimizerRouteSceneries()" id="opt-btn-apply-sceneries" class="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition-all cursor-pointer active:scale-95 shadow-lg shadow-emerald-500/20">
-                        Isolate Sceneries for this Flight
+                    <button onclick="applyOptimizerRouteSceneries()" id="opt-btn-apply-sceneries" class="px-6 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-sm uppercase tracking-wider transition-all cursor-pointer active:scale-95 shadow-lg shadow-emerald-500/20">
+                        Optimize
                     </button>
                 </div>
             </div>
@@ -2315,14 +2313,13 @@
         </div>
 
         <!-- FOOTER -->
-        <div class="flex items-center justify-between border-t border-slate-800/80 pt-2.5 shrink-0 text-xs">
-            <span class="text-slate-400 font-medium">SceneryX Suite v1.0.1 - Performance & Memory Controller</span>
+        <div class="flex items-center justify-end border-t border-slate-800 pt-2.5 shrink-0 text-xs">
             <div class="flex items-center gap-2">
-                <button onclick="clearOptimizerRoutePlanning()" id="opt-btn-clear-route" class="px-3.5 py-1.5 rounded-xl bg-slate-800/90 hover:bg-blue-600 text-slate-300 hover:text-white border border-slate-700/60 hover:border-blue-500 font-bold transition-all cursor-pointer flex items-center gap-1.5" title="Clear current flight route without exiting">
+                <button onclick="clearOptimizerRoutePlanning()" id="opt-btn-clear-route" class="px-3.5 py-1.5 rounded-xl bg-slate-800 hover:bg-blue-600 text-slate-300 hover:text-white border border-slate-700 hover:border-blue-500 font-bold transition-all cursor-pointer flex items-center gap-1.5" title="Clear current flight route without exiting">
                     <i class="fa-solid fa-arrows-rotate text-xs"></i>
                     <span>New Route</span>
                 </button>
-                <button onclick="exitFlightOptimizerMode()" class="px-4 py-1.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/60 hover:border-slate-500 font-bold transition-all cursor-pointer flex items-center gap-1.5">
+                <button onclick="exitFlightOptimizerMode()" class="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 hover:border-slate-500 font-bold transition-all cursor-pointer flex items-center gap-1.5">
                     <i class="fa-solid fa-arrow-right-from-bracket text-xs"></i>
                     <span>Exit</span>
                 </button>

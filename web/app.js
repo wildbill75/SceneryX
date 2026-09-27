@@ -16029,14 +16029,16 @@ function updateOptimizerRouteUI() {
     ['direct', 'corridor', 'simbrief'].forEach(m => {
         const card = document.getElementById(`opt-mode-card-${m}`);
         if (card) {
+            const titleSpan = card.querySelector('span');
+            const subSpan = card.querySelector('span:last-of-type');
             if (m.toUpperCase() === optimizerMode) {
-                card.className = 'p-2.5 rounded-2xl bg-cyan-950/40 border-2 border-cyan-500/80 cursor-pointer transition-all';
-                const titleSpan = card.querySelector('span');
-                if (titleSpan) titleSpan.className = 'text-xs font-black text-white uppercase tracking-wider';
+                card.className = 'p-3 rounded-2xl bg-slate-800 border-2 border-blue-500 cursor-pointer transition-all';
+                if (titleSpan) titleSpan.className = 'text-sm font-black text-white uppercase tracking-wider';
+                if (subSpan && subSpan !== titleSpan) subSpan.className = 'text-xs text-blue-300 font-medium';
             } else {
-                card.className = 'p-2.5 rounded-2xl bg-slate-950/40 border border-slate-800 cursor-pointer hover:border-slate-700 transition-all';
-                const titleSpan = card.querySelector('span');
-                if (titleSpan) titleSpan.className = 'text-xs font-black text-slate-200 uppercase tracking-wider';
+                card.className = 'p-3 rounded-2xl bg-slate-950 border border-slate-800 hover:bg-slate-900 hover:border-slate-700 cursor-pointer transition-all';
+                if (titleSpan) titleSpan.className = 'text-sm font-black text-slate-300 uppercase tracking-wider';
+                if (subSpan && subSpan !== titleSpan) subSpan.className = 'text-xs text-slate-400 font-medium';
             }
         }
     });
@@ -16060,14 +16062,14 @@ function updateOptimizerSavings() {
     if (!savingCountEl) return;
 
     if (!optimizerOrigin || !optimizerDest) {
-        savingCountEl.textContent = '-- sceneries';
+        savingCountEl.textContent = '--';
         if (savingRamEl) savingRamEl.textContent = '- 0.00 GB';
         if (savingVramEl) savingVramEl.textContent = '- 0 MB';
         return;
     }
 
     if (isFlightCorridorOptimized && flightCorridorDisabledCount > 0) {
-        savingCountEl.textContent = `${flightCorridorDisabledCount} sceneries`;
+        savingCountEl.textContent = `${flightCorridorDisabledCount}`;
         const ramSavedGb = (flightCorridorDisabledCount * 0.0053).toFixed(2);
         const vramSavedMb = Math.round(flightCorridorDisabledCount * 1.25);
         if (savingRamEl) savingRamEl.textContent = `- ${ramSavedGb} GB`;
@@ -16095,7 +16097,7 @@ function updateOptimizerSavings() {
     }
 
     const disabledCount = Math.max(0, allThirdParty.length - keptCount);
-    savingCountEl.textContent = `${disabledCount} sceneries`;
+    savingCountEl.textContent = `${disabledCount}`;
 
     const ramSavedGb = (disabledCount * 0.0053).toFixed(2);
     const vramSavedMb = Math.round(disabledCount * 1.25);
