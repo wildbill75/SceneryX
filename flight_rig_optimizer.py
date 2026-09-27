@@ -11,6 +11,7 @@ import sys
 import json
 import re
 import shutil
+import glob
 from datetime import datetime
 import ctypes
 import ctypes.wintypes
@@ -521,6 +522,61 @@ def backup_user_cfg(path: str) -> str:
     return backup_path
 
 
+def get_available_user_cfg_backups(user_cfg_path: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Returns sorted list of available UserCfg.opt timestamped backups."""
+    path = user_cfg_path or get_user_cfg_path()
+    if not path or not os.path.exists(path):
+        return []
+    dir_name = os.path.dirname(path)
+    base_name = os.path.basename(path)
+    pattern = os.path.join(dir_name, f"{base_name}.backup_*")
+    files = glob.glob(pattern)
+    backups = []
+    for f in files:
+        fn = os.path.basename(f)
+        ts_part = fn.replace(f"{base_name}.backup_", "")
+        try:
+            dt = datetime.strptime(ts_part, "%Y%m%d_%H%M%S")
+            formatted_date = dt.strftime("%Y-%m-%d %H:%M:%S")
+        except Exception:
+            formatted_date = ts_part
+        size_kb = round(os.path.getsize(f) / 1024, 1)
+        mtime = os.path.getmtime(f)
+        backups.append({
+            "filename": fn,
+            "path": f,
+            "timestamp": formatted_date,
+            "raw_timestamp": ts_part,
+            "mtime": mtime,
+            "size_kb": size_kb
+        })
+    backups.sort(key=lambda x: x["mtime"], reverse=True)
+    return backups
+
+
+def restore_user_cfg_backup(backup_target: str, user_cfg_path: Optional[str] = None) -> Dict[str, Any]:
+    """Safely restores a previously saved UserCfg.opt backup file."""
+    path = user_cfg_path or get_user_cfg_path()
+    if not path:
+        return {"status": "error", "message": "UserCfg.opt path not detected."}
+    dir_name = os.path.dirname(path)
+    target_path = backup_target if os.path.isabs(backup_target) else os.path.join(dir_name, backup_target)
+    if not os.path.exists(target_path):
+        return {"status": "error", "message": f"Backup file {backup_target} not found."}
+
+    safety_backup = backup_user_cfg(path)
+    try:
+        shutil.copy2(target_path, path)
+        return {
+            "status": "success",
+            "message": f"Successfully restored UserCfg.opt from {os.path.basename(target_path)}",
+            "restored_file": os.path.basename(target_path),
+            "safety_backup": os.path.basename(safety_backup)
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
 def analyze_system_balance(cpu_info: Dict[str, Any], gpu_info: Dict[str, Any], ram_info: Dict[str, Any]) -> Dict[str, Any]:
     """Evaluates system component harmony, bottleneck hazards, and memory stability."""
     cpu_name = (cpu_info.get("name") or "").lower()
@@ -588,7 +644,7 @@ def get_block_val(pattern: str, block: str, default: str = '') -> str:
     return m.group(1).strip() if m else default
 
 
-def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Optional[Dict[str, Any]] = None, cpu_info: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Optional[Dict[str, Any]] = None, cpu_info: Optional[Dict[str, Any]] = None, flight_profile: str = 'LINER', vr_refresh_rate: int = 72) -> Dict[str, Any]:
     path = user_cfg_path or get_user_cfg_path()
     if not path or not os.path.exists(path):
         return {"found": False, "path": "", "matrix_2d": [], "matrix_vr": []}
@@ -601,6 +657,13 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
 
     autofps = detect_autofps_running()
     vram_gb = float((gpu_info or {}).get("vram_total_gb") or 16.0)
+    is_liner = (str(flight_profile).upper() == 'LINER')
+    try:
+        vr_hz = int(vr_refresh_rate)
+    except Exception:
+        vr_hz = 72
+    target_vr_fps = max(30, vr_hz // 2)
+    target_vr_ms = round(1000.0 / target_vr_fps, 1)
 
     video = extract_block(content, '{Video')
     g2d = extract_block(content, '{Graphics\n') or extract_block(content, '{Graphics\r\n')
@@ -686,28 +749,106 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
     tex_vr_raw = get_block_val(r'Quality\s+(\d+)', extract_block(gvr, '{Texture'), '1')
     tex_vr_val = q_map.get(tex_vr_raw, 'Medium')
 
+    # Texture 2D Rating
+    if is_liner:
+        if tex_2d_val == "Low":
+            tex_2d_rating, tex_2d_color, tex_2d_label = "optimum", "emerald", "Optimum (Axel LFBO)"
+            tex_2d_tip = "Axel LFBO airliner rule: cuts VRAM by 6-8 GB, eliminating D3D12 paging stutters at busy hubs while cockpit vector screens remain sharp."
+        elif tex_2d_val == "Medium":
+            tex_2d_rating, tex_2d_color, tex_2d_label = "optimum", "emerald", "Optimum (Balanced)"
+            tex_2d_tip = "Balanced texture resolution with safe VRAM headroom for airliners."
+        elif tex_2d_val == "High":
+            tex_2d_rating = "acceptable" if vram_gb >= 16.0 else "suboptimal"
+            tex_2d_color = "amber" if vram_gb >= 16.0 else "orange"
+            tex_2d_label = "Acceptable (Watch VRAM)" if vram_gb >= 16.0 else "VRAM Alert"
+            tex_2d_tip = "High textures are usable with 16+ GB VRAM, but can approach limit at complex payware hubs."
+        else:
+            tex_2d_rating, tex_2d_color, tex_2d_label = "nogo", "rose", "VRAM Overflow Risk"
+            tex_2d_tip = "ULTRA textures consume 6-8 GB extra VRAM, triggering heavy D3D12 paging freezes on airliners."
+    else:
+        if tex_2d_val == "Ultra":
+            tex_2d_rating = "optimum" if vram_gb >= 16.0 else "acceptable"
+            tex_2d_color = "emerald" if vram_gb >= 16.0 else "amber"
+            tex_2d_label = "Optimum (Ultra Detail)" if vram_gb >= 16.0 else "Acceptable"
+            tex_2d_tip = "Maximum visual fidelity for low-altitude VFR. GA aircraft consume minimal VRAM."
+        elif tex_2d_val == "High":
+            tex_2d_rating, tex_2d_color, tex_2d_label = "optimum", "emerald", "Optimum"
+            tex_2d_tip = "Crisp ground and cockpit textures with ample headroom for GA flights."
+        elif tex_2d_val == "Medium":
+            tex_2d_rating, tex_2d_color, tex_2d_label = "acceptable", "amber", "Acceptable"
+            tex_2d_tip = "Good performance, slight texture blur at low altitude."
+        else:
+            tex_2d_rating, tex_2d_color, tex_2d_label = "suboptimal", "orange", "Sub-Optimal"
+            tex_2d_tip = "Unnecessarily blurry for VFR sightseeing flights when VRAM is plentiful."
+
+    # Texture VR Rating
+    if is_liner:
+        if tex_vr_val == "Low":
+            tex_vr_rating, tex_vr_color, tex_vr_label = "optimum", "emerald", "Optimum (Axel LFBO)"
+            tex_vr_tip = "Essential Axel LFBO trick in VR: frees 6-8 GB VRAM, preventing VR compositor crashes and paging stutters while cockpit vector instruments stay crisp."
+        elif tex_vr_val == "Medium":
+            tex_vr_rating = "optimum" if vram_gb >= 16.0 else "acceptable"
+            tex_vr_color = "emerald" if vram_gb >= 16.0 else "amber"
+            tex_vr_label = "Optimum (Medium)" if vram_gb >= 16.0 else "Acceptable"
+            tex_vr_tip = "Medium textures provide good balance in VR stereo rendering."
+        elif tex_vr_val == "High":
+            tex_vr_rating = "suboptimal" if vram_gb >= 16.0 else "nogo"
+            tex_vr_color = "orange" if vram_gb >= 16.0 else "rose"
+            tex_vr_label = "VRAM Alert" if vram_gb >= 16.0 else "VRAM Overflow Risk"
+            tex_vr_tip = "High textures in VR stereo demand extreme VRAM, risking frame drops on airliners."
+        else:
+            tex_vr_rating, tex_vr_color, tex_vr_label = "nogo", "rose", "NO GO (Compositor Crash)"
+            tex_vr_tip = "Ultra textures in VR cause severe VRAM overflow and headset tracking freezes."
+    else:
+        if tex_vr_val in ["Medium", "High"]:
+            tex_vr_rating, tex_vr_color, tex_vr_label = "optimum", "emerald", "Optimum"
+            tex_vr_tip = "Sharp scenery textures for VFR immersion without overloading VR buffers."
+        elif tex_vr_val == "Low":
+            tex_vr_rating, tex_vr_color, tex_vr_label = "acceptable", "amber", "Acceptable (Low)"
+            tex_vr_tip = "Smooth performance but softer terrain textures in VR."
+        else:
+            tex_vr_rating, tex_vr_color, tex_vr_label = "nogo", "rose", "VRAM Risk in VR"
+            tex_vr_tip = "Ultra textures can saturate VR stereo buffers even in GA."
+
+    # TLOD 2D Rating
+    if is_liner:
+        tlod_2d_rating = "optimum" if autofps or tlod_2d_val <= 120 else ("acceptable" if tlod_2d_val <= 150 else "nogo")
+        tlod_2d_color = "emerald" if autofps or tlod_2d_val <= 120 else ("amber" if tlod_2d_val <= 150 else "rose")
+        tlod_2d_label = "AutoFPS Linked" if autofps else ("Optimum" if tlod_2d_val <= 120 else ("MainThread Pressure" if tlod_2d_val <= 150 else "High Stutter Risk"))
+    else:
+        tlod_2d_rating = "optimum" if autofps or tlod_2d_val <= 160 else "acceptable"
+        tlod_2d_color = "emerald" if autofps or tlod_2d_val <= 160 else "amber"
+        tlod_2d_label = "AutoFPS Linked" if autofps else ("Optimum" if tlod_2d_val <= 160 else "Acceptable")
+
+    # VR Max Frame Rate Rating
+    is_vr_fps_opt = (fps_vr == str(target_vr_fps))
+    vr_fps_rating = "optimum" if is_vr_fps_opt else "suboptimal"
+    vr_fps_color = "emerald" if is_vr_fps_opt else "orange"
+    vr_fps_label = f"Optimum ({target_vr_fps} FPS Lock)" if is_vr_fps_opt else f"Mismatch ({target_vr_fps} FPS Target)"
+    vr_fps_tooltip = f"Matches exact 1/2 sync divisor of {vr_hz} Hz headset ({target_vr_fps} FPS), delivering smooth motion reprojection." if is_vr_fps_opt else f"Target frame rate ({fps_vr} FPS) does not match the 1/2 sync divisor ({target_vr_fps} FPS) of your {vr_hz} Hz headset, causing motion judder."
+
     # Build 2D Matrix
     matrix_2d = [
         make_setting_item("resolution", "Full Screen Resolution", res_formatted, res_raw, True, "optimum", "emerald", "Optimum", "Native monitor rendering resolution. Globally shared with windowing.", ["3840 x 2160", "2560 x 1440", "1920 x 1080"]),
         make_setting_item("anti_aliasing", "Anti-Aliasing", val_aa_2d, aa_2d, False, "optimum" if "DLSS" in val_aa_2d else "acceptable", "emerald" if "DLSS" in val_aa_2d else "amber", "Optimum" if "DLSS" in val_aa_2d else "Acceptable", "DLSS Quality gives superior edge stability and sharpness with substantial GPU headroom.", ["DLSS (Quality)", "DLSS (Balanced)", "DLSS (Performance)", "TAA", "DLAA"]),
-        make_setting_item("max_frame_rate", "Max Frame Rate", f"{fps_2d} FPS" if fps_2d != '0' else "Unlocked", fps_2d, False, "optimum" if fps_2d in ['60', '72', '80', '82', '90'] else "suboptimal", "emerald" if fps_2d in ['60', '72', '80', '82', '90'] else "orange", "Optimum" if fps_2d in ['60', '72', '80', '82', '90'] else "Sub-Optimal", "Capping frame rate to your display sync divisor eliminates judder and micro-stutters.", ["30", "36", "45", "60", "72", "80", "82", "90", "120", "Unlocked"]),
+        make_setting_item("max_frame_rate", "Max Frame Rate", f"{fps_2d} FPS" if fps_2d != '0' else "Unlocked", fps_2d, False, "optimum" if fps_2d in ['60', '72', '80', '82', '90'] else "suboptimal", "emerald" if fps_2d in ['60', '72', '80', '82', '90'] else "orange", "Optimum" if fps_2d in ['60', '72', '80', '82', '90'] else "Sub-Optimal", "Capping frame rate to your display sync divisor eliminates judder and micro-stutters.", ["30", "36", "40", "45", "60", "72", "80", "82", "90", "120", "Unlocked"]),
         make_setting_item("frame_generation", "Frame Generation", fg_2d, fg_2d_raw, False, "optimum" if fg_2d.startswith("DLSSG") else "acceptable", "emerald" if fg_2d.startswith("DLSSG") else "amber", "Optimum" if fg_2d.startswith("DLSSG") else "Acceptable", "Doubles motion smoothness using optical flow without increasing CPU MainThread load.", ["DLSSG (2X)", "FSR3 (2X)", "OFF"]),
         make_setting_item("framerate_multiplier", "Framerate Multiplier", f"{mult_2d}X", mult_2d, False, "optimum", "emerald", "Optimum", "Frame generation interpolation multiplier.", ["1 (2X Interpolation)"]),
         make_setting_item("vsync", "V-Sync", vsync_val, vsync_raw, True, "optimum" if vsync_val == "ON" else "acceptable", "emerald" if vsync_val == "ON" else "amber", "Optimum" if vsync_val == "ON" else "Acceptable", "Eliminates horizontal screen tearing. Recommended ON with G-Sync/FreeSync.", ["ON", "OFF"]),
         make_setting_item("vsync_interval", "V-Sync Interval", interval_val, interval_raw, True, "optimum", "emerald", "Optimum", "Display refresh rate divisor frequency.", ["100% Monitor Hz", "50% Monitor Hz"]),
         make_setting_item("dynamic_settings", "Dynamic Settings", dyn_2d, "0" if dyn_2d == "OFF" else "1", False, "optimum" if dyn_2d == "OFF" else "suboptimal", "emerald" if dyn_2d == "OFF" else "orange", "Optimum" if dyn_2d == "OFF" else "Sub-Optimal", "Dynamic resolution scaling. Recommended OFF to prevent fluctuating blurriness.", ["OFF", "ON"]),
-        make_setting_item("tlod", "Terrain LOD (TLOD)", f"{tlod_2d_val}" if not autofps else f"Dynamic ({tlod_2d_val})", str(tlod_2d_val), False, "optimum" if autofps or tlod_2d_val <= 150 else ("acceptable" if tlod_2d_val <= 200 else "nogo"), "emerald" if autofps or tlod_2d_val <= 150 else ("amber" if tlod_2d_val <= 200 else "rose"), "AutoFPS Linked" if autofps else ("Optimum" if tlod_2d_val <= 150 else "High Stutter Risk"), "Controls terrain mesh & photogrammetry draw distance. Heavy CPU MainThread driver." + (" Currently managed by AutoFPS." if autofps else ""), ["50", "80", "100", "120", "150", "200"]),
+        make_setting_item("tlod", "Terrain LOD (TLOD)", f"{tlod_2d_val}" if not autofps else f"Dynamic ({tlod_2d_val})", str(tlod_2d_val), False, tlod_2d_rating, tlod_2d_color, tlod_2d_label, "Controls terrain mesh & photogrammetry draw distance. Heavy CPU MainThread driver." + (" Currently managed by AutoFPS." if autofps else ""), ["50", "80", "100", "120", "150", "180", "200"]),
         make_setting_item("offscreen_precaching", "Off Screen Terrain Pre-Caching", pre_2d_val, pre_2d_raw, False, "optimum" if pre_2d_val in ["High", "Ultra"] else "nogo", "emerald" if pre_2d_val in ["High", "Ultra"] else "rose", "Optimum" if pre_2d_val in ["High", "Ultra"] else "NO GO", "Pre-caches terrain around camera. HIGH or ULTRA is mandatory to eliminate camera panning stutters.", ["Ultra", "High", "Medium", "Low"]),
         make_setting_item("olod", "Objects LOD (OLOD)", f"{olod_2d_val}" if not autofps else f"Dynamic ({olod_2d_val})", str(olod_2d_val), False, "optimum" if olod_2d_val <= 150 else "acceptable", "emerald" if olod_2d_val <= 150 else "amber", "Optimum" if olod_2d_val <= 150 else "Acceptable", "Controls distance at which 3D airport buildings and models are drawn.", ["50", "80", "100", "120", "150", "200"]),
         make_setting_item("displacement_mapping", "Displacement Mapping", disp_2d, "1" if disp_2d == "ON" else "0", False, "optimum" if disp_2d == "OFF" else "suboptimal", "emerald" if disp_2d == "OFF" else "orange", "Optimum" if disp_2d == "OFF" else "Sub-Optimal", "Adds micro-surface height details to runways and terrain. Recommended OFF to save VRAM and GPU compute.", ["OFF", "ON"]),
-        make_setting_item("texture_resolution", "Texture Resolution", tex_2d_val, tex_2d_raw, False, "optimum" if (tex_2d_val == "High" or (tex_2d_val == "Ultra" and vram_gb >= 16.0)) else "suboptimal", "emerald" if (tex_2d_val == "High" or (tex_2d_val == "Ultra" and vram_gb >= 16.0)) else "orange", "Optimum" if tex_2d_val == "High" else ("Acceptable" if vram_gb >= 16.0 else "VRAM Warning"), "Controls texture clarity. ULTRA consumes 6-8 GB more VRAM, triggering D3D12 paging stutters on busy airliners.", ["Ultra", "High", "Medium", "Low"])
+        make_setting_item("texture_resolution", "Texture Resolution", tex_2d_val, tex_2d_raw, False, tex_2d_rating, tex_2d_color, tex_2d_label, tex_2d_tip, ["Ultra", "High", "Medium", "Low"])
     ]
 
     # Build VR Matrix
     matrix_vr = [
         make_setting_item("resolution", "Full Screen Resolution", res_formatted, res_raw, True, "optimum", "emerald", "Optimum", "Desktop mirror resolution. Shared with 2D windowing.", ["3840 x 2160", "2560 x 1440", "1920 x 1080"]),
         make_setting_item("anti_aliasing", "Anti-Aliasing", val_aa_vr, aa_vr, False, "optimum" if "DLSS" in val_aa_vr else "acceptable", "emerald" if "DLSS" in val_aa_vr else "amber", "Optimum" if "DLSS" in val_aa_vr else "Acceptable", "DLSS Balanced or Quality is essential in VR to reduce stereo rendering load.", ["DLSS (Quality)", "DLSS (Balanced)", "DLSS (Performance)", "TAA"]),
-        make_setting_item("max_frame_rate", "Max Frame Rate", f"{fps_vr} FPS" if fps_vr != '0' else "Unlocked", fps_vr, False, "optimum" if fps_vr in ['36', '40', '45', '72', '80', '90'] else "suboptimal", "emerald" if fps_vr in ['36', '40', '45', '72', '80', '90'] else "orange", "Optimum" if fps_vr in ['36', '40', '45', '72', '80', '90'] else "Judder Hazard", "In VR, cap at half (or 1:1) headset refresh rate (e.g. 36 FPS for 72 Hz Pimax) to avoid motion judder.", ["36", "40", "45", "60", "72", "80", "90", "Unlocked"]),
+        make_setting_item("max_frame_rate", "Max Frame Rate", f"{fps_vr} FPS" if fps_vr != '0' else "Unlocked", fps_vr, False, vr_fps_rating, vr_fps_color, vr_fps_label, vr_fps_tooltip, ["36", "40", "45", "60", "72", "80", "90", "120", "Unlocked"]),
         make_setting_item("frame_generation", "Frame Generation", fg_vr, fg_vr_raw, False, "optimum" if fg_vr == "OFF" else "nogo", "emerald" if fg_vr == "OFF" else "rose", "Optimum (OFF)" if fg_vr == "OFF" else "NO GO", "Frame Generation must be kept OFF in VR to prevent head-tracking latency and stereo distortion.", ["OFF", "DLSSG (2X)"]),
         make_setting_item("framerate_multiplier", "Framerate Multiplier", f"{mult_vr}X", mult_vr, False, "optimum", "emerald", "Optimum", "Multiplier in VR.", ["1"]),
         make_setting_item("vsync", "V-Sync", vsync_val, vsync_raw, True, "optimum", "emerald", "Optimum", "Global V-Sync state.", ["ON", "OFF"]),
@@ -717,12 +858,59 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
         make_setting_item("offscreen_precaching", "Off Screen Terrain Pre-Caching", pre_vr_val, pre_vr_raw, False, "optimum" if pre_vr_val in ["High", "Ultra"] else "nogo", "emerald" if pre_vr_val in ["High", "Ultra"] else "rose", "Optimum", "Essential for smooth head rotation in VR.", ["Ultra", "High", "Medium", "Low"]),
         make_setting_item("olod", "Objects LOD (OLOD)", f"{olod_vr_val}" if not autofps else f"Dynamic ({olod_vr_val})", str(olod_vr_val), False, "optimum" if olod_vr_val <= 100 else "acceptable", "emerald" if olod_vr_val <= 100 else "amber", "Optimum", "Objects distance in VR.", ["50", "80", "100", "120"]),
         make_setting_item("displacement_mapping", "Displacement Mapping", disp_vr, "1" if disp_vr == "ON" else "0", False, "optimum" if disp_vr == "OFF" else "suboptimal", "emerald" if disp_vr == "OFF" else "orange", "Optimum", "Keep OFF in VR.", ["OFF", "ON"]),
-        make_setting_item("texture_resolution", "Texture Resolution", tex_vr_val, tex_vr_raw, False, "optimum" if tex_vr_val in ["Medium", "High"] else "nogo", "emerald" if tex_vr_val in ["Medium", "High"] else "rose", "Optimum" if tex_vr_val in ["Medium", "High"] else "VRAM Overflow Risk", "Medium or High is ideal for VR to stay safely within VRAM limits.", ["High", "Medium", "Low"])
+        make_setting_item("texture_resolution", "Texture Resolution", tex_vr_val, tex_vr_raw, False, tex_vr_rating, tex_vr_color, tex_vr_label, tex_vr_tip, ["Ultra", "High", "Medium", "Low"])
     ]
+
+    # Cross-Settings Interdependences Analysis
+    synergies_2d = []
+    conflicts_2d = []
+    synergies_vr = []
+    conflicts_vr = []
+
+    # 1. Frame Gen & V-Sync
+    if fg_2d.startswith("DLSSG") and vsync_val == "ON":
+        synergies_2d.append("DLSS Frame Gen + VSync: Smooth frame pacing without CPU MainThread load.")
+    elif fg_2d.startswith("DLSSG") and vsync_val == "OFF":
+        conflicts_2d.append("Frame Gen Active with VSync OFF: May cause micro-tearing and pacing jitter.")
+
+    if fg_vr != "OFF":
+        conflicts_vr.append("VR + Frame Generation: Severe motion distortion and tracking latency in headset. Keep OFF.")
+    else:
+        synergies_vr.append("Frame Gen OFF in VR: Native low-latency stereo head-tracking preserved.")
+
+    # 2. Resolution & DLSS & Textures
+    is_4k = "3840" in res_formatted
+    if is_4k and "TAA" in val_aa_2d and tex_2d_val == "Ultra":
+        conflicts_2d.append("4K Native TAA + Ultra Textures: Exceeds 15.8 GB VRAM. High risk of D3D12 paging freezes.")
+    elif "DLSS" in val_aa_2d and tex_2d_val in ["Low", "Medium"]:
+        synergies_2d.append("DLSS Upscaling + Low/Med Textures: Synergistic VRAM reduction (-8 GB) for zero-stutter flights.")
+
+    # 3. Airliner vs GA TLOD
+    if is_liner and tlod_2d_val > 130 and not autofps:
+        conflicts_2d.append(f"Airliner Profile + TLOD {tlod_2d_val}: High CPU MainThread load from avionics + high terrain draw.")
+    elif is_liner and (tlod_2d_val <= 120 or autofps):
+        synergies_2d.append("Airliner Profile + Controlled TLOD: Keeps MainThread latency under 25ms during landing flare.")
+
+    # 4. AutoFPS Synergy
+    if autofps:
+        synergies_2d.append("AutoFPS Linked: Dynamic LOD management active, relaxing MainThread at busy airports.")
+        synergies_vr.append("AutoFPS Linked: Dynamic VR LODs prevent stereo stutter on final approach.")
+
+    # 5. VR Headset Sync Divisor
+    if fps_vr == str(target_vr_fps):
+        synergies_vr.append(f"VR {vr_hz} Hz Headset locked to exact 1/2 sync ({target_vr_fps} FPS): Maximum reprojection fluidity.")
+    else:
+        conflicts_vr.append(f"VR {vr_hz} Hz frame cap ({fps_vr} FPS) differs from 1/2 target ({target_vr_fps} FPS): Reprojection judder hazard.")
+
+    # VRAM calculation
+    vram_headroom_2d = "+ 6.4 GB FREE" if tex_2d_val == "Low" else ("+ 4.2 GB FREE" if tex_2d_val == "Medium" else "+ 2.1 GB FREE")
+    vram_headroom_vr = "+ 5.6 GB FREE" if tex_vr_val == "Low" else ("+ 3.6 GB FREE" if tex_vr_val == "Medium" else "+ 1.2 GB FREE")
 
     return {
         "found": True,
         "path": path,
+        "flight_profile": flight_profile,
+        "vr_refresh_rate": vr_hz,
         "autofps_active": autofps,
         "matrix_2d": matrix_2d,
         "matrix_vr": matrix_vr,
@@ -732,45 +920,50 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
             "frame_gen_color": "emerald" if fg_2d.startswith("DLSSG") else "slate",
             "target_mainthread": "24.4 ms" if fg_2d.startswith("DLSSG") else "12.2 ms",
             "mainthread_color": "emerald",
-            "vram_headroom": "+ 4.2 GB FREE",
+            "vram_headroom": vram_headroom_2d,
             "vram_color": "emerald"
         },
         "target_pacing_vr": {
-            "target_fps": f"{fps_vr} FPS" if fps_vr != '0' else "36 FPS",
-            "frame_gen_label": "NATIVE STEREO SYNC",
+            "target_fps": f"{fps_vr} FPS" if fps_vr != '0' else f"{target_vr_fps} FPS",
+            "frame_gen_label": f"1/2 REPROJECTION ({target_vr_fps} FPS)",
             "frame_gen_color": "cyan",
-            "target_mainthread": "27.8 ms",
+            "target_mainthread": f"{target_vr_ms} ms",
             "mainthread_color": "emerald",
-            "vram_headroom": "+ 2.8 GB FREE",
+            "vram_headroom": vram_headroom_vr,
             "vram_color": "emerald"
         },
         "graphics_advisory_2d": {
-            "status": "optimal",
-            "title": "2D Graphics Profile Advisory",
-            "summary": "Your 2D settings are well-aligned with your RTX 4080 and i9-13900KF.",
+            "status": "optimal" if not conflicts_2d else "suboptimal",
+            "title": f"2D Graphics Profile Advisory ({'IFR Airliners' if is_liner else 'VFR General Aviation'})",
+            "summary": f"Configured for {'complex airliners (Axel LFBO VRAM optimizations)' if is_liner else 'VFR general aviation flights'}.",
             "recommendations": [
-                "Texture Resolution ULTRA is viable, but setting to HIGH eliminates D3D12 paging spikes at large hub airports.",
+                "Low/Medium textures eliminate D3D12 paging freezes with complex airliners." if is_liner else "High/Ultra textures maximize terrain & cockpit visual fidelity in GA.",
                 "Offscreen Pre-Caching HIGH eliminates camera panning judder."
-            ]
+            ],
+            "synergies": synergies_2d,
+            "conflicts": conflicts_2d
         },
         "graphics_advisory_vr": {
-            "status": "optimal",
-            "title": "VR Headset Profile Advisory",
-            "summary": "Calibrated for 72 Hz VR Headset (Pimax / Quest). 36 FPS lock ensures rock-solid motion fluidity.",
+            "status": "optimal" if not conflicts_vr else "suboptimal",
+            "title": f"VR Headset Profile Advisory ({vr_hz} Hz - {'IFR Airliners' if is_liner else 'VFR GA'})",
+            "summary": f"Calibrated for {vr_hz} Hz VR Headset. {target_vr_fps} FPS lock provides 1/2 sync motion reprojection.",
             "recommendations": [
-                "Frame Generation MUST stay OFF in VR to prevent head-tracking latency and artifacting.",
-                "TLOD capped at 100 preserves MainThread headroom for smooth cockpit interaction."
-            ]
+                f"Lock MSFS to {target_vr_fps} FPS for your {vr_hz} Hz headset to eliminate motion judder.",
+                "Keep Frame Generation OFF in VR to avoid head-tracking latency and artifacting.",
+                "Low textures in VR save 6-8 GB VRAM, preventing compositor crashes on heavy airliners." if is_liner else "Medium or High textures offer crisp immersion for VFR flights in VR."
+            ],
+            "synergies": synergies_vr,
+            "conflicts": conflicts_vr
         }
     }
 
 
-def update_msfs_user_cfg_setting(mode: str, setting_key: str, new_value: Any, user_cfg_path: Optional[str] = None) -> Dict[str, Any]:
+def update_msfs_user_cfg_setting(mode: str, setting_key: str, new_value: Any, user_cfg_path: Optional[str] = None, create_backup: bool = True) -> Dict[str, Any]:
     path = user_cfg_path or get_user_cfg_path()
     if not path or not os.path.exists(path):
         return {"status": "error", "message": "UserCfg.opt file not found."}
 
-    backup_path = backup_user_cfg(path)
+    backup_path = backup_user_cfg(path) if create_backup else None
 
     try:
         with open(path, 'r', encoding='utf-8', errors='ignore') as f:
@@ -871,45 +1064,58 @@ def update_msfs_user_cfg_setting(mode: str, setting_key: str, new_value: Any, us
         return {"status": "error", "message": str(e), "backup_created": backup_path}
 
 
-def apply_recommended_msfs_settings(mode: str, user_cfg_path: Optional[str] = None) -> Dict[str, Any]:
+def apply_recommended_msfs_settings(mode: str, flight_profile: str = 'LINER', vr_refresh_rate: int = 72, user_cfg_path: Optional[str] = None) -> Dict[str, Any]:
     path = user_cfg_path or get_user_cfg_path()
     if not path or not os.path.exists(path):
         return {"status": "error", "message": "UserCfg.opt file not found."}
 
     backup_path = backup_user_cfg(path)
     mode = mode.upper()
+    is_liner = (str(flight_profile).upper() == 'LINER')
+    try:
+        vr_hz = int(vr_refresh_rate)
+    except Exception:
+        vr_hz = 72
+    target_vr_fps = max(30, vr_hz // 2)
 
     try:
         if mode == '2D':
-            update_msfs_user_cfg_setting('2D', 'anti_aliasing', 'DLSS (Quality)', path)
-            update_msfs_user_cfg_setting('2D', 'frame_generation', 'DLSSG (2X)', path)
-            update_msfs_user_cfg_setting('2D', 'vsync', 'ON', path)
-            update_msfs_user_cfg_setting('2D', 'max_frame_rate', '90', path)
-            update_msfs_user_cfg_setting('2D', 'tlod', '120', path)
-            update_msfs_user_cfg_setting('2D', 'olod', '100', path)
-            update_msfs_user_cfg_setting('2D', 'offscreen_precaching', 'High', path)
-            update_msfs_user_cfg_setting('2D', 'texture_resolution', 'High', path)
-            update_msfs_user_cfg_setting('2D', 'displacement_mapping', 'OFF', path)
-            update_msfs_user_cfg_setting('2D', 'dynamic_settings', 'OFF', path)
+            tex_val = 'Low' if is_liner else 'High'
+            tlod_val = '100' if is_liner else '150'
+            update_msfs_user_cfg_setting('2D', 'anti_aliasing', 'DLSS (Quality)', path, create_backup=False)
+            update_msfs_user_cfg_setting('2D', 'frame_generation', 'DLSSG (2X)', path, create_backup=False)
+            update_msfs_user_cfg_setting('2D', 'vsync', 'ON', path, create_backup=False)
+            update_msfs_user_cfg_setting('2D', 'max_frame_rate', '90', path, create_backup=False)
+            update_msfs_user_cfg_setting('2D', 'tlod', tlod_val, path, create_backup=False)
+            update_msfs_user_cfg_setting('2D', 'olod', '100', path, create_backup=False)
+            update_msfs_user_cfg_setting('2D', 'offscreen_precaching', 'High', path, create_backup=False)
+            update_msfs_user_cfg_setting('2D', 'texture_resolution', tex_val, path, create_backup=False)
+            update_msfs_user_cfg_setting('2D', 'displacement_mapping', 'OFF', path, create_backup=False)
+            update_msfs_user_cfg_setting('2D', 'dynamic_settings', 'OFF', path, create_backup=False)
         else:
-            update_msfs_user_cfg_setting('VR', 'anti_aliasing', 'DLSS (Balanced)', path)
-            update_msfs_user_cfg_setting('VR', 'frame_generation', 'OFF', path)
-            update_msfs_user_cfg_setting('VR', 'vsync', 'ON', path)
-            update_msfs_user_cfg_setting('VR', 'max_frame_rate', '36', path)
-            update_msfs_user_cfg_setting('VR', 'tlod', '100', path)
-            update_msfs_user_cfg_setting('VR', 'olod', '100', path)
-            update_msfs_user_cfg_setting('VR', 'offscreen_precaching', 'High', path)
-            update_msfs_user_cfg_setting('VR', 'texture_resolution', 'Medium', path)
-            update_msfs_user_cfg_setting('VR', 'displacement_mapping', 'OFF', path)
-            update_msfs_user_cfg_setting('VR', 'dynamic_settings', 'OFF', path)
+            tex_val = 'Low' if is_liner else 'Medium'
+            update_msfs_user_cfg_setting('VR', 'anti_aliasing', 'DLSS (Balanced)', path, create_backup=False)
+            update_msfs_user_cfg_setting('VR', 'frame_generation', 'OFF', path, create_backup=False)
+            update_msfs_user_cfg_setting('VR', 'vsync', 'ON', path, create_backup=False)
+            update_msfs_user_cfg_setting('VR', 'max_frame_rate', str(target_vr_fps), path, create_backup=False)
+            update_msfs_user_cfg_setting('VR', 'tlod', '100', path, create_backup=False)
+            update_msfs_user_cfg_setting('VR', 'olod', '100', path, create_backup=False)
+            update_msfs_user_cfg_setting('VR', 'offscreen_precaching', 'High', path, create_backup=False)
+            update_msfs_user_cfg_setting('VR', 'texture_resolution', tex_val, path, create_backup=False)
+            update_msfs_user_cfg_setting('VR', 'displacement_mapping', 'OFF', path, create_backup=False)
+            update_msfs_user_cfg_setting('VR', 'dynamic_settings', 'OFF', path, create_backup=False)
 
+        profile_desc = "IFR Airliners (Axel LFBO VRAM Saver)" if is_liner else "VFR General Aviation (High Detail)"
         return {
             "status": "success",
-            "message": f"Applied optimal {mode} settings successfully.",
-            "backup_created": backup_path
+            "message": f"Optimal {mode} profile applied for {profile_desc}!",
+            "backup_created": os.path.basename(backup_path),
+            "profile": "LINER" if is_liner else "GA",
+            "mode": mode,
+            "target_vr_fps": target_vr_fps if mode == 'VR' else 90
         }
     except Exception as e:
-        return {"status": "error", "message": str(e), "backup_created": backup_path}
+        return {"status": "error", "message": str(e), "backup_created": os.path.basename(backup_path) if backup_path else ""}
 
 
 def detect_msfs_user_cfg() -> Dict[str, Any]:
@@ -1118,7 +1324,7 @@ def generate_optimized_rig_profile(user_specs: Dict[str, Any]) -> Dict[str, Any]
     }
 
 
-def get_full_rig_diagnostics() -> Dict[str, Any]:
+def get_full_rig_diagnostics(flight_profile: str = 'LINER', vr_refresh_rate: int = 72) -> Dict[str, Any]:
     """Point d'entrée complet : retourne le diagnostic matériel complet et les listes pour l'UI."""
     cpu = detect_cpu_info()
     gpu = detect_gpu_info()
@@ -1129,7 +1335,8 @@ def get_full_rig_diagnostics() -> Dict[str, Any]:
     cfg = detect_msfs_user_cfg()
     installed = detect_installed_aircraft()
     balance = analyze_system_balance(cpu, gpu, ram)
-    matrix_data = build_msfs_settings_matrix(user_cfg_path=cfg.get("path"), gpu_info=gpu, cpu_info=cpu)
+    matrix_data = build_msfs_settings_matrix(user_cfg_path=cfg.get("path"), gpu_info=gpu, cpu_info=cpu, flight_profile=flight_profile, vr_refresh_rate=vr_refresh_rate)
+    backups = get_available_user_cfg_backups(cfg.get("path"))
 
     initial_specs = {
         "screen_hz": disp["refresh_rate_hz"],
@@ -1160,7 +1367,8 @@ def get_full_rig_diagnostics() -> Dict[str, Any]:
             "studios": AIRCRAFT_STUDIO_PROFILES
         },
         "recommended_profile": initial_profile,
-        "settings_matrix": matrix_data
+        "settings_matrix": matrix_data,
+        "backups": backups
     }
 
 

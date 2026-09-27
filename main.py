@@ -3477,9 +3477,9 @@ class Api:
     # SUITE PERFORMANCE : FLIGHT RIG OPTIMIZER & LIVE BLACKBOX TELEMETRY
     # =========================================================================
 
-    def get_rig_diagnostics(self):
+    def get_rig_diagnostics(self, flight_profile='LINER', vr_refresh_rate=72):
         try:
-            data = flight_rig_optimizer.get_full_rig_diagnostics()
+            data = flight_rig_optimizer.get_full_rig_diagnostics(flight_profile=flight_profile, vr_refresh_rate=vr_refresh_rate)
             return json.dumps(data, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"error": str(e)}, ensure_ascii=False)
@@ -3499,9 +3499,23 @@ class Api:
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
 
-    def apply_recommended_msfs_settings(self, mode):
+    def apply_recommended_msfs_settings(self, mode, flight_profile='LINER', vr_refresh_rate=72):
         try:
-            res = flight_rig_optimizer.apply_recommended_msfs_settings(mode)
+            res = flight_rig_optimizer.apply_recommended_msfs_settings(mode, flight_profile=flight_profile, vr_refresh_rate=vr_refresh_rate)
+            return json.dumps(res, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    def get_user_cfg_backups(self):
+        try:
+            backups = flight_rig_optimizer.get_available_user_cfg_backups()
+            return json.dumps(backups, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps([], ensure_ascii=False)
+
+    def restore_user_cfg_backup(self, backup_name):
+        try:
+            res = flight_rig_optimizer.restore_user_cfg_backup(backup_name)
             return json.dumps(res, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)

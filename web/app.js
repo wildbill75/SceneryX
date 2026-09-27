@@ -16234,14 +16234,60 @@ function applyOptimizerRouteSceneries() {
 // -------------------------------------------------------------------------
 
 let currentMsfsGraphicsMode = '2D';
+let currentFlightMissionProfile = 'LINER';
+let currentVrRefreshRate = 72;
 let msfsSettingsMatrixData = null;
+let userCfgBackupsList = [];
+
+function switchFlightMissionProfile(profile) {
+    currentFlightMissionProfile = profile;
+    const btnLiner = document.getElementById('opt-flight-profile-btn-liner');
+    const btnGa = document.getElementById('opt-flight-profile-btn-ga');
+    if (btnLiner && btnGa) {
+        if (profile === 'LINER') {
+            btnLiner.className = 'px-2.5 py-1 rounded-lg bg-indigo-600 text-white transition-all cursor-pointer font-bold shadow-sm';
+            btnGa.className = 'px-2.5 py-1 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold';
+        } else {
+            btnLiner.className = 'px-2.5 py-1 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold';
+            btnGa.className = 'px-2.5 py-1 rounded-lg bg-indigo-600 text-white transition-all cursor-pointer font-bold shadow-sm';
+        }
+    }
+    loadRigDiagnostics();
+}
+
+function switchVrRefreshRate(hz) {
+    currentVrRefreshRate = parseInt(hz) || 72;
+    [72, 80, 90, 120].forEach(rate => {
+        const btn = document.getElementById(`opt-vr-hz-btn-${rate}`);
+        if (btn) {
+            if (rate === currentVrRefreshRate) {
+                btn.className = 'px-2 py-0.5 rounded-lg bg-cyan-600 text-white text-[11px] transition-all cursor-pointer font-bold shadow-sm';
+            } else {
+                btn.className = 'px-2 py-0.5 rounded-lg text-slate-400 hover:text-white text-[11px] transition-all cursor-pointer font-bold';
+            }
+        }
+    });
+    loadRigDiagnostics();
+}
 
 async function loadRigDiagnostics() {
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.get_rig_diagnostics) return;
     try {
-        const resStr = await window.pywebview.api.get_rig_diagnostics();
+        const resStr = await window.pywebview.api.get_rig_diagnostics(currentFlightMissionProfile, currentVrRefreshRate);
         const data = JSON.parse(resStr);
         rigDiagnosticsData = data;
+
+        if (Array.isArray(data.backups)) {
+            userCfgBackupsList = data.backups;
+            const rbBtn = document.getElementById('opt-btn-restore-backup');
+            if (rbBtn) {
+                if (userCfgBackupsList.length > 0) {
+                    rbBtn.title = `Rollback available (${userCfgBackupsList.length} backups found. Latest: ${userCfgBackupsList[0].timestamp})`;
+                } else {
+                    rbBtn.title = "No backups found yet";
+                }
+            }
+        }
 
         const det = data.detected;
         if (!det) return;
@@ -16361,14 +16407,17 @@ function switchMsfsGraphicsMode(mode) {
     currentMsfsGraphicsMode = mode;
     const btn2d = document.getElementById('opt-msfs-mode-btn-2d');
     const btnVr = document.getElementById('opt-msfs-mode-btn-vr');
+    const vrHzWrapper = document.getElementById('opt-vr-hz-selector-wrapper');
 
     if (btn2d && btnVr) {
         if (mode === '2D') {
             btn2d.className = 'px-3 py-1 rounded-lg bg-cyan-600 text-white transition-all cursor-pointer font-bold shadow-sm';
             btnVr.className = 'px-3 py-1 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold';
+            if (vrHzWrapper) vrHzWrapper.classList.add('hidden');
         } else {
             btn2d.className = 'px-3 py-1 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold';
             btnVr.className = 'px-3 py-1 rounded-lg bg-cyan-600 text-white transition-all cursor-pointer font-bold shadow-sm';
+            if (vrHzWrapper) vrHzWrapper.classList.remove('hidden');
         }
     }
 
@@ -16411,6 +16460,35 @@ function renderMsfsSettingsMatrix() {
         if (msfsTextEl) {
             const recs = Array.isArray(advisory.recommendations) ? advisory.recommendations.join(' • ') : '';
             msfsTextEl.textContent = `${advisory.summary} ${recs}`;
+        }
+
+        // Render Cross-Settings Interdependences
+        const interList = document.getElementById('opt-interdependence-list');
+        if (interList) {
+            const synergies = advisory.synergies || [];
+            const conflicts = advisory.conflicts || [];
+            if (synergies.length === 0 && conflicts.length === 0) {
+                interList.innerHTML = '<span class="text-slate-500 italic">No cross-setting conflicts detected.</span>';
+            } else {
+                let interHtml = '';
+                conflicts.forEach(c => {
+                    interHtml += `
+                        <div class="flex items-start gap-1.5 text-rose-400">
+                            <i class="fa-solid fa-triangle-exclamation text-[10px] mt-0.5 shrink-0"></i>
+                            <span>${c}</span>
+                        </div>
+                    `;
+                });
+                synergies.forEach(s => {
+                    interHtml += `
+                        <div class="flex items-start gap-1.5 text-emerald-400">
+                            <i class="fa-solid fa-circle-check text-[10px] mt-0.5 shrink-0"></i>
+                            <span>${s}</span>
+                        </div>
+                    `;
+                });
+                interList.innerHTML = interHtml;
+            }
         }
     }
 
@@ -16477,20 +16555,134 @@ async function onMsfsSettingChanged(settingKey, newValue) {
 async function applyOptimalMsfsSettingsCurrentMode() {
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.apply_recommended_msfs_settings) return;
     try {
-        const resStr = await window.pywebview.api.apply_recommended_msfs_settings(currentMsfsGraphicsMode);
+        const resStr = await window.pywebview.api.apply_recommended_msfs_settings(currentMsfsGraphicsMode, currentFlightMissionProfile, currentVrRefreshRate);
         const res = JSON.parse(resStr);
         if (res.status === 'success') {
-            if (typeof showToast === 'function') {
-                showToast(`Optimal ${currentMsfsGraphicsMode} profile applied! (UserCfg.opt backup created)`, 'success');
-            }
+            openOptFeedbackModal(res);
             await loadRigDiagnostics();
         } else {
             if (typeof showToast === 'function') {
-                showToast(`Failed: ${res.message}`, 'error');
+                showToast(`Optimization failed: ${res.message}`, 'error');
             }
         }
     } catch (e) {
         console.error("Error applying optimal settings:", e);
+    }
+}
+
+function openOptFeedbackModal(res) {
+    const modal = document.getElementById('opt-feedback-modal');
+    if (!modal) return;
+    const modeEl = document.getElementById('opt-feedback-mode');
+    const profileEl = document.getElementById('opt-feedback-profile');
+    const backupEl = document.getElementById('opt-feedback-backup');
+    const detailsEl = document.getElementById('opt-feedback-details');
+
+    if (modeEl) modeEl.textContent = `${currentMsfsGraphicsMode} DISPLAY${currentMsfsGraphicsMode === 'VR' ? ` (${currentVrRefreshRate} Hz)` : ''}`;
+    if (profileEl) profileEl.textContent = currentFlightMissionProfile === 'LINER' ? 'IFR AIRLINER (Axel LFBO Trick)' : 'VFR GENERAL AVIATION (High Detail)';
+    if (backupEl) backupEl.textContent = res.backup_created || 'UserCfg.opt.backup_...';
+
+    if (detailsEl) {
+        let detailsHtml = '';
+        if (currentMsfsGraphicsMode === '2D') {
+            detailsHtml += `
+                <div class="flex items-center gap-1.5 text-emerald-400 font-mono"><i class="fa-solid fa-check text-[10px]"></i><span>Texture Resolution: ${currentFlightMissionProfile === 'LINER' ? 'LOW (Axel LFBO - Frees 6-8 GB VRAM)' : 'HIGH (Full Detail)'}</span></div>
+                <div class="flex items-center gap-1.5 text-emerald-400 font-mono"><i class="fa-solid fa-check text-[10px]"></i><span>Terrain LOD (TLOD): ${currentFlightMissionProfile === 'LINER' ? '100 (Protects MainThread from WASM avionics)' : '150 (Smooth for VFR)'}</span></div>
+                <div class="flex items-center gap-1.5 text-emerald-400 font-mono"><i class="fa-solid fa-check text-[10px]"></i><span>Anti-Aliasing: DLSS (Quality) + Frame Generation DLSSG (2X)</span></div>
+                <div class="flex items-center gap-1.5 text-emerald-400 font-mono"><i class="fa-solid fa-check text-[10px]"></i><span>Pre-Caching: High (Prevents camera panning stutters)</span></div>
+            `;
+        } else {
+            const targetVrFps = Math.max(30, Math.floor(currentVrRefreshRate / 2));
+            detailsHtml += `
+                <div class="flex items-center gap-1.5 text-emerald-400 font-mono"><i class="fa-solid fa-check text-[10px]"></i><span>Max Frame Rate: ${targetVrFps} FPS (Exact 1/2 sync divisor for ${currentVrRefreshRate} Hz headset)</span></div>
+                <div class="flex items-center gap-1.5 text-emerald-400 font-mono"><i class="fa-solid fa-check text-[10px]"></i><span>Frame Generation: OFF (Mandatory to prevent VR latency and artifacting)</span></div>
+                <div class="flex items-center gap-1.5 text-emerald-400 font-mono"><i class="fa-solid fa-check text-[10px]"></i><span>Texture Resolution: ${currentFlightMissionProfile === 'LINER' ? 'LOW (Frees 6-8 GB VRAM, avoids compositor crashes)' : 'MEDIUM (Balanced for VFR)'}</span></div>
+                <div class="flex items-center gap-1.5 text-emerald-400 font-mono"><i class="fa-solid fa-check text-[10px]"></i><span>TLOD: 100 (Safe stereo MainThread budget)</span></div>
+            `;
+        }
+        detailsEl.innerHTML = detailsHtml;
+    }
+
+    modal.classList.remove('hidden');
+}
+
+function closeOptFeedbackModal() {
+    const modal = document.getElementById('opt-feedback-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+async function openUserCfgBackupModal() {
+    const modal = document.getElementById('user-cfg-backup-modal');
+    if (!modal) return;
+    const listEl = document.getElementById('user-cfg-backup-list');
+
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.get_user_cfg_backups) {
+        try {
+            const resStr = await window.pywebview.api.get_user_cfg_backups();
+            userCfgBackupsList = JSON.parse(resStr);
+        } catch (e) {
+            console.error("Error fetching backups:", e);
+        }
+    }
+
+    if (listEl) {
+        if (!userCfgBackupsList || userCfgBackupsList.length === 0) {
+            listEl.innerHTML = '<div class="p-4 text-center text-slate-500 font-mono text-xs">No backups found yet. Backups are created automatically before any setting change.</div>';
+        } else {
+            let html = '';
+            userCfgBackupsList.slice(0, 15).forEach((b, index) => {
+                const isLatest = (index === 0);
+                html += `
+                    <div class="p-3 rounded-2xl bg-slate-950 border ${isLatest ? 'border-amber-500/50' : 'border-slate-800'} flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-7 h-7 rounded-xl ${isLatest ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-800 text-slate-400'} flex items-center justify-center shrink-0">
+                                <i class="fa-solid fa-file-shield text-xs"></i>
+                            </div>
+                            <div class="flex flex-col">
+                                <div class="flex items-center gap-2">
+                                    <span class="font-mono text-xs font-bold text-white">${b.timestamp}</span>
+                                    ${isLatest ? '<span class="px-1.5 py-0.2 rounded text-[8px] font-mono font-bold bg-amber-950 text-amber-400 border border-amber-800">MOST RECENT</span>' : ''}
+                                </div>
+                                <span class="text-[10px] font-mono text-slate-500 truncate max-w-[280px]">${b.filename} (${b.size_kb} KB)</span>
+                            </div>
+                        </div>
+                        <button onclick="restoreUserCfgBackupTarget('${b.filename}')" class="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all cursor-pointer active:scale-95 shrink-0">
+                            Restore
+                        </button>
+                    </div>
+                `;
+            });
+            listEl.innerHTML = html;
+        }
+    }
+
+    modal.classList.remove('hidden');
+}
+
+function closeUserCfgBackupModal() {
+    const modal = document.getElementById('user-cfg-backup-modal');
+    if (modal) modal.classList.add('hidden');
+}
+
+async function restoreUserCfgBackupTarget(filename) {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.restore_user_cfg_backup) return;
+    try {
+        const resStr = await window.pywebview.api.restore_user_cfg_backup(filename);
+        const res = JSON.parse(resStr);
+        if (res.status === 'success') {
+            closeUserCfgBackupModal();
+            closeOptFeedbackModal();
+            if (typeof showToast === 'function') {
+                showToast(`UserCfg.opt restored from ${filename}!`, 'success');
+            }
+            await loadRigDiagnostics();
+        } else {
+            if (typeof showToast === 'function') {
+                showToast(`Rollback failed: ${res.message}`, 'error');
+            }
+        }
+    } catch (e) {
+        console.error("Error restoring backup:", e);
     }
 }
 
