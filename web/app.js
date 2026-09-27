@@ -16005,12 +16005,12 @@ function updateOptimizerRouteUI() {
 
     if (origIcao) {
         origIcao.textContent = optimizerOrigin ? optimizerOrigin.icao : '----';
-        origIcao.className = `font-mono text-2xl font-black ${getAirportPricingTextColor(optimizerOrigin)}`;
+        origIcao.className = `font-mono text-3xl font-black ${getAirportPricingTextColor(optimizerOrigin)} leading-none`;
         if (origName) origName.textContent = optimizerOrigin ? (optimizerOrigin.name || '') : '';
     }
     if (destIcao) {
         destIcao.textContent = optimizerDest ? optimizerDest.icao : '----';
-        destIcao.className = `font-mono text-2xl font-black ${getAirportPricingTextColor(optimizerDest)}`;
+        destIcao.className = `font-mono text-3xl font-black ${getAirportPricingTextColor(optimizerDest)} leading-none`;
         if (destName) destName.textContent = optimizerDest ? (optimizerDest.name || '') : '';
     }
 
@@ -16054,11 +16054,11 @@ function updateOptimizerRouteUI() {
         const hasRoute = !!(optimizerOrigin || optimizerDest);
         if (hasRoute) {
             clearRouteBtn.disabled = false;
-            clearRouteBtn.className = 'px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-blue-600 text-slate-200 hover:text-white border border-slate-700 hover:border-blue-500 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5';
+            clearRouteBtn.className = 'px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-blue-600 text-white border border-slate-600 hover:border-blue-500 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center gap-1.5 shadow-sm';
             clearRouteBtn.title = 'Clear current flight route';
         } else {
             clearRouteBtn.disabled = true;
-            clearRouteBtn.className = 'px-4 py-2.5 rounded-xl bg-slate-900 text-slate-600 border border-slate-800/80 font-bold text-xs uppercase tracking-wider cursor-not-allowed opacity-40 flex items-center gap-1.5 pointer-events-none';
+            clearRouteBtn.className = 'px-4 py-2.5 rounded-xl bg-slate-800/60 text-slate-400 border border-slate-700/60 font-bold text-xs uppercase tracking-wider cursor-not-allowed opacity-60 flex items-center gap-1.5 pointer-events-none';
             clearRouteBtn.title = 'No active flight route to reset';
         }
     }
@@ -16083,8 +16083,8 @@ function updateOptimizerSavings() {
 
     if (!optimizerOrigin || !optimizerDest) {
         savingCountEl.textContent = '--';
-        if (savingRamEl) savingRamEl.textContent = '- 0.00 GB';
-        if (savingVramEl) savingVramEl.textContent = '- 0 MB';
+        if (savingRamEl) savingRamEl.textContent = '0.00 GB';
+        if (savingVramEl) savingVramEl.textContent = '0 MB';
         return;
     }
 
@@ -16092,8 +16092,8 @@ function updateOptimizerSavings() {
         savingCountEl.textContent = `${flightCorridorDisabledCount}`;
         const ramSavedGb = (flightCorridorDisabledCount * 0.0053).toFixed(2);
         const vramSavedMb = Math.round(flightCorridorDisabledCount * 1.25);
-        if (savingRamEl) savingRamEl.textContent = `- ${ramSavedGb} GB`;
-        if (savingVramEl) savingVramEl.textContent = `- ${vramSavedMb} MB`;
+        if (savingRamEl) savingRamEl.textContent = `${ramSavedGb} GB`;
+        if (savingVramEl) savingVramEl.textContent = `${vramSavedMb} MB`;
         return;
     }
 
@@ -16121,8 +16121,8 @@ function updateOptimizerSavings() {
 
     const ramSavedGb = (disabledCount * 0.0053).toFixed(2);
     const vramSavedMb = Math.round(disabledCount * 1.25);
-    if (savingRamEl) savingRamEl.textContent = `- ${ramSavedGb} GB`;
-    if (savingVramEl) savingVramEl.textContent = `- ${vramSavedMb} MB`;
+    if (savingRamEl) savingRamEl.textContent = `${ramSavedGb} GB`;
+    if (savingVramEl) savingVramEl.textContent = `${vramSavedMb} MB`;
 }
 
 function swapOptimizerRouteAirports() {

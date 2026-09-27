@@ -2055,22 +2055,22 @@
         <!-- TAB 1: ROUTE & SCENERIES -->
         <div id="opt-tab-content-route" class="flex-1 space-y-2.5">
             <!-- Flight Path Card -->
-            <div class="p-3 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-3">
-                <div id="opt-route-origin-box" class="flex-1 cursor-pointer hover:bg-slate-900/60 p-1.5 rounded-xl transition-all" onclick="focusOptimizerAirport('origin')" title="Click an airport on the map to set Departure">
-                    <span class="text-xs font-mono text-white uppercase font-bold tracking-wider block mb-1">Departure Airport</span>
-                    <div class="flex items-center gap-2">
-                        <span id="opt-route-origin-icao" class="font-mono text-2xl font-black text-slate-400">----</span>
-                        <span id="opt-route-origin-name" class="text-xs text-slate-300 truncate"></span>
+            <div class="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-4">
+                <div id="opt-route-origin-box" class="flex-1 cursor-pointer hover:bg-slate-900/60 p-2 rounded-xl transition-all" onclick="focusOptimizerAirport('origin')" title="Click an airport on the map to set Departure">
+                    <span class="text-sm font-mono text-white uppercase font-black tracking-wider block mb-1">Departure Airport</span>
+                    <div class="flex flex-col">
+                        <span id="opt-route-origin-icao" class="font-mono text-3xl font-black text-slate-400 leading-none">----</span>
+                        <span id="opt-route-origin-name" class="text-xs text-slate-300 truncate mt-1"></span>
                     </div>
                 </div>
-                <button onclick="swapOptimizerRouteAirports()" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition-all cursor-pointer shrink-0" title="Swap Departure and Arrival">
-                    <i class="fa-solid fa-arrow-right-arrow-left text-xs"></i>
+                <button onclick="swapOptimizerRouteAirports()" class="w-9 h-9 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition-all cursor-pointer shrink-0" title="Swap Departure and Arrival">
+                    <i class="fa-solid fa-arrow-right-arrow-left text-sm"></i>
                 </button>
-                <div id="opt-route-dest-box" class="flex-1 text-right cursor-pointer hover:bg-slate-900/60 p-1.5 rounded-xl transition-all" onclick="focusOptimizerAirport('dest')" title="Click an airport on the map to set Arrival">
-                    <span class="text-xs font-mono text-white uppercase font-bold tracking-wider block mb-1">Arrival Airport</span>
-                    <div class="flex items-center justify-end gap-2">
-                        <span id="opt-route-dest-name" class="text-xs text-slate-300 truncate"></span>
-                        <span id="opt-route-dest-icao" class="font-mono text-2xl font-black text-slate-400">----</span>
+                <div id="opt-route-dest-box" class="flex-1 text-right cursor-pointer hover:bg-slate-900/60 p-2 rounded-xl transition-all" onclick="focusOptimizerAirport('dest')" title="Click an airport on the map to set Arrival">
+                    <span class="text-sm font-mono text-white uppercase font-black tracking-wider block mb-1">Arrival Airport</span>
+                    <div class="flex flex-col items-end">
+                        <span id="opt-route-dest-icao" class="font-mono text-3xl font-black text-slate-400 leading-none">----</span>
+                        <span id="opt-route-dest-name" class="text-xs text-slate-300 truncate mt-1"></span>
                     </div>
                 </div>
             </div>
@@ -2084,30 +2084,27 @@
                     <span class="text-sm font-black text-slate-300 uppercase tracking-wider">En-Route Corridor</span>
                 </div>
                 <div onclick="setOptimizerMode('SIMBRIEF')" id="opt-mode-card-simbrief" class="p-3 rounded-2xl bg-slate-950 border border-slate-800 hover:bg-slate-900 hover:border-slate-700 flex flex-col items-center justify-center text-center cursor-pointer transition-all" title="1-Click synchronization with your latest SimBrief Operational Flight Plan (OFP). Keeps departure, arrival, alternates, and en-route corridor sceneries.">
-                    <div class="flex items-center justify-center gap-2">
-                        <span class="text-sm font-black text-slate-300 uppercase tracking-wider">Import SimBrief</span>
-                        <i class="fa-solid fa-cloud-arrow-down text-slate-400 text-xs"></i>
-                    </div>
+                    <span class="text-sm font-black text-slate-300 uppercase tracking-wider">Import SimBrief</span>
                 </div>
             </div>
 
             <!-- Stats & Actions Row (Dual-Pill Design) -->
             <div class="flex items-stretch gap-2.5">
                 <!-- Dedicated Predictions Pill -->
-                <div class="flex-1 p-3 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-around gap-4">
-                    <div>
-                        <span class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-0.5">Isolated Sceneries</span>
+                <div class="flex-1 p-3 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-around gap-4 text-center">
+                    <div class="flex flex-col items-center justify-center text-center">
+                        <span class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-1">Isolated Sceneries</span>
                         <span id="opt-saving-scenery-count" class="font-mono text-2xl font-black text-emerald-400 leading-none">--</span>
                     </div>
                     <div class="h-8 w-px bg-slate-800"></div>
-                    <div>
-                        <span class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-0.5">RAM Freed</span>
-                        <span id="opt-saving-ram-val" class="font-mono text-2xl font-black text-cyan-400 leading-none">- 0.00 GB</span>
+                    <div class="flex flex-col items-center justify-center text-center">
+                        <span class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-1">RAM Freed</span>
+                        <span id="opt-saving-ram-val" class="font-mono text-2xl font-black text-cyan-400 leading-none">0.00 GB</span>
                     </div>
                     <div class="h-8 w-px bg-slate-800"></div>
-                    <div>
-                        <span class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-0.5">VRAM Headroom</span>
-                        <span id="opt-saving-vram-val" class="font-mono text-2xl font-black text-sky-400 leading-none">- 0 MB</span>
+                    <div class="flex flex-col items-center justify-center text-center">
+                        <span class="text-[10px] font-mono font-bold text-slate-400 uppercase tracking-wider block mb-1">VRAM Headroom Freed</span>
+                        <span id="opt-saving-vram-val" class="font-mono text-2xl font-black text-sky-400 leading-none">0 MB</span>
                     </div>
                 </div>
 
@@ -2116,7 +2113,7 @@
                     <button onclick="restoreFlightCorridorSceneries()" id="opt-btn-restore-sceneries" class="hidden px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer">
                         Restore All
                     </button>
-                    <button onclick="clearOptimizerRoutePlanning()" id="opt-btn-clear-route" class="px-4 py-2.5 rounded-xl bg-slate-900 text-slate-600 border border-slate-800/80 font-bold text-xs uppercase tracking-wider cursor-not-allowed opacity-40 flex items-center gap-1.5" title="No active flight route to reset">
+                    <button onclick="clearOptimizerRoutePlanning()" id="opt-btn-clear-route" class="px-4 py-2.5 rounded-xl bg-slate-800/60 text-slate-400 border border-slate-700/60 font-bold text-xs uppercase tracking-wider cursor-not-allowed opacity-60 flex items-center gap-1.5 pointer-events-none" title="No active flight route to reset">
                         <i class="fa-solid fa-arrows-rotate text-xs"></i>
                         <span>New Route</span>
                     </button>
