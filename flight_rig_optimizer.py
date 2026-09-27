@@ -739,13 +739,21 @@ def open_user_cfg_folder(user_cfg_path: Optional[str] = None) -> Dict[str, Any]:
     path = user_cfg_path or get_user_cfg_path()
     if not path:
         return {"status": "error", "message": "UserCfg.opt path not detected."}
-    dir_name = os.path.dirname(path)
+    norm_path = os.path.normpath(path)
+    dir_name = os.path.normpath(os.path.dirname(norm_path))
     if os.path.exists(dir_name):
         try:
-            os.startfile(dir_name)
+            if os.path.exists(norm_path):
+                subprocess.Popen(f'explorer.exe /select,"{norm_path}"', shell=True)
+            else:
+                subprocess.Popen(f'explorer.exe "{dir_name}"', shell=True)
             return {"status": "success", "folder": dir_name}
         except Exception as e:
-            return {"status": "error", "message": str(e)}
+            try:
+                os.startfile(dir_name)
+                return {"status": "success", "folder": dir_name}
+            except Exception as e2:
+                return {"status": "error", "message": f"{e}; {e2}"}
     return {"status": "error", "message": f"Folder {dir_name} not found."}
 
 
@@ -854,6 +862,14 @@ def stage_msfs_setting(mode: str, setting_key: str, new_value: Any) -> Dict[str,
     if mode not in _staged_user_cfg_settings:
         _staged_user_cfg_settings[mode] = {}
     _staged_user_cfg_settings[mode][setting_key] = new_value
+
+    # Synchronize globally shared settings across both 2D and VR modes (e.g. V-Sync, Full Screen Resolution)
+    if str(setting_key).lower() in ['vsync', 'resolution', 'fullscreenresolution']:
+        for m in ['2D', 'VR']:
+            if m not in _staged_user_cfg_settings:
+                _staged_user_cfg_settings[m] = {}
+            _staged_user_cfg_settings[m][setting_key] = new_value
+
     return {"status": "success", "staged": True, "setting_key": setting_key, "new_value": new_value}
 
 
@@ -877,26 +893,33 @@ def apply_setting_to_content(content: str, mode: str, setting_key: str, new_valu
     if setting_key in ['resolution', 'FullScreenResolution']:
         clean_val = str(new_value).replace('x', ' ').replace('X', ' ')
         clean_val = " ".join(clean_val.split())
-        content = re.sub(r'(FullScreenResolution\s+)[^\r\n]+', rf'\g<1>{clean_val}', content)
+        content = re.sub(r'(FullScreenResolution\s+)[^\r\n]+', rf'\g<1>{clean_val}', content, flags=re.IGNORECASE)
 
     # 2. Max Frame Rate (2D / VR + FrameLimiter)
     elif setting_key in ['max_frame_rate', 'TargetFrameRate']:
         k = 'TargetFrameRate' if mode == '2D' else 'TargetFrameRateVR'
         clean_val = str(new_value).replace('FPS', '').replace('Unlocked', '0').strip()
-        content = re.sub(rf'({k}\s+)[^\r\n]+', rf'\g<1>{clean_val}', content)
+        content = re.sub(rf'({k}\s+)[^\r\n]+', rf'\g<1>{clean_val}', content, flags=re.IGNORECASE)
         if mode == '2D':
-            content = re.sub(r'(FrameLimiter\s+)[^\r\n]+', rf'\g<1>{clean_val}', content)
+            content = re.sub(r'(FrameLimiter\s+)[^\r\n]+', rf'\g<1>{clean_val}', content, flags=re.IGNORECASE)
 
     # 3. Frame Generation
     elif setting_key in ['frame_generation', 'FrameGeneration']:
         k = 'FrameGeneration' if mode == '2D' else 'FrameGenerationVR'
         clean_val = 'DLSSG' if 'DLSSG' in str(new_value).upper() else ('FSR3' if 'FSR3' in str(new_value).upper() else 'NONE')
-        content = re.sub(rf'({k}\s+)[^\r\n]+', rf'\g<1>{clean_val}', content)
+        content = re.sub(rf'({k}\s+)[^\r\n]+', rf'\g<1>{clean_val}', content, flags=re.IGNORECASE)
 
     # 4. V-Sync (Shared)
-    elif setting_key in ['vsync', 'VSync']:
-        clean_val = '1' if str(new_value).upper() in ['1', 'ON', 'TRUE'] else '0'
-        content = re.sub(r'(VSync\s+)[^\r\n]+', rf'\g<1>{clean_val}', content)
+    elif str(setting_key).lower() in ['vsync']:
+        clean_val = '1' if str(new_value).strip().upper() in ['1', 'ON', 'TRUE'] else '0'
+        if re.search(r'(VSync\s+)[^\r\n]+', content, flags=re.IGNORECASE):
+            content = re.sub(r'(VSync\s+)[^\r\n]+', rf'\g<1>{clean_val}', content, flags=re.IGNORECASE)
+        else:
+            v_start = content.find('{Video')
+            if v_start != -1:
+                v_end = content.find('}', v_start)
+                if v_end != -1:
+                    content = content[:v_end] + f"\tVSync {clean_val}\n" + content[v_end:]
 
     # 5. Dynamic Settings
     elif setting_key in ['dynamic_settings', 'DynamicSettings']:
@@ -1126,7 +1149,7 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
         if key == "texture_resolution":
             if is_liner:
                 if "LOW" in v_upper:
-                    return ("+ FREES 6-8GB VRAM", "Axel LFBO rule: prevents D3D12 paging freezes at heavy hubs while vector instruments stay sharp.",
+                    return ("+ FREES 6-8GB VRAM", "VRAM optimization: prevents D3D12 paging freezes at heavy hubs while vector instruments stay sharp.",
                             "- SOFTER LIVERY", "Slightly softer exterior airframe and apron asphalt decals up close.")
                 elif "MEDIUM" in v_upper:
                     return ("+ BALANCED VRAM", "Sharper exterior liveries and ramp textures with moderate VRAM margin.",
@@ -1437,8 +1460,8 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
     if is_liner:
         if tex_2d_val == "Low":
             tex_2d_rating, tex_2d_color, tex_2d_label = "optimum", "emerald", "OPTIMUM"
-            tex_2d_tip = "Description: Base texture map resolution for scenery, airports, and cockpits.\nCurrent: LOW saves 6-8 GB VRAM, preventing D3D12 paging freezes at busy hubs while cockpit vector screens remain sharp.\nRecommendation: Maintain LOW for all airliner flights (Axel LFBO rule)."
-            tex_2d_reason = "Axel LFBO rule: saves 6-8 GB VRAM, preventing D3D12 paging freezes at dense hubs while vector instruments stay sharp."
+            tex_2d_tip = "Description: Base texture map resolution for scenery, airports, and cockpits.\nCurrent: LOW saves 6-8 GB VRAM, preventing D3D12 paging freezes at busy hubs while cockpit vector screens remain sharp.\nRecommendation: Maintain LOW for all airliner flights (VRAM Optimization)."
+            tex_2d_reason = "VRAM Optimization: saves 6-8 GB VRAM, preventing D3D12 paging freezes at dense hubs while vector instruments stay sharp."
         elif tex_2d_val == "Medium":
             tex_2d_rating, tex_2d_color, tex_2d_label = "optimum", "emerald", "OPTIMUM"
             tex_2d_tip = "Description: Base texture map resolution for scenery, airports, and cockpits.\nCurrent: MEDIUM provides balanced textures with safe VRAM headroom for airliners.\nRecommendation: LOW is preferred for maximum stability at heavy airports; MEDIUM is safe with 16+ GB VRAM."
@@ -1477,8 +1500,8 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
     if is_liner:
         if tex_vr_val == "Low":
             tex_vr_rating, tex_vr_color, tex_vr_label = "optimum", "emerald", "OPTIMUM"
-            tex_vr_tip = "Description: Base texture map resolution in VR stereo rendering.\nCurrent: LOW frees 6-8 GB VRAM, preventing VR compositor crashes and paging stutters while cockpit vector instruments stay crisp.\nRecommendation: Maintain LOW for all airliner flights in VR (Axel LFBO rule)."
-            tex_vr_reason = "Essential Axel LFBO trick in VR: frees 6-8 GB VRAM, preventing VR compositor crashes and paging stutters."
+            tex_vr_tip = "Description: Base texture map resolution in VR stereo rendering.\nCurrent: LOW frees 6-8 GB VRAM, preventing VR compositor crashes and paging stutters while cockpit vector instruments stay crisp.\nRecommendation: Maintain LOW for all airliner flights in VR (VRAM Optimization)."
+            tex_vr_reason = "VRAM Optimization in VR: frees 6-8 GB VRAM, preventing VR compositor crashes and paging stutters."
         elif tex_vr_val == "Medium":
             tex_vr_rating = "optimum" if vram_gb >= 16.0 else "acceptable"
             tex_vr_color = "emerald" if vram_gb >= 16.0 else "amber"
@@ -1836,7 +1859,7 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
         "graphics_advisory_2d": {
             "status": "optimal" if not conflicts_2d else "suboptimal",
             "title": f"2D Graphics Profile Advisory ({'IFR Airliners' if is_liner else 'VFR General Aviation'})",
-            "summary": f"Configured for {'complex airliners (Axel LFBO VRAM optimizations)' if is_liner else 'VFR general aviation flights'}.",
+            "summary": f"Configured for {'complex airliners (VRAM optimizations)' if is_liner else 'VFR general aviation flights'}.",
             "recommendations": [
                 "Low/Medium textures eliminate D3D12 paging freezes with complex airliners." if is_liner else "High/Ultra textures maximize terrain & cockpit visual fidelity in GA.",
                 "Offscreen Pre-Caching HIGH eliminates camera panning judder.",
@@ -1982,7 +2005,7 @@ def apply_recommended_msfs_settings(mode: str, flight_profile: str = 'LINER', vr
         # Clear staged overrides now that they have been committed to disk
         clear_staged_settings(mode)
 
-        profile_desc = "IFR Airliners (Axel LFBO VRAM Saver)" if is_liner else "VFR General Aviation (High Detail)"
+        profile_desc = "IFR Airliners (VRAM Saver)" if is_liner else "VFR General Aviation (High Detail)"
         return {
             "status": "success",
             "message": f"Optimal {mode} profile applied for {profile_desc} across 27 settings!",

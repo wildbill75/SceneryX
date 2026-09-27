@@ -2207,7 +2207,7 @@
                     </div>
 
                     <!-- Flight Mission Profile Switcher (Airliners vs GA) -->
-                    <div class="flex items-center bg-slate-900 p-0.5 rounded-xl border border-slate-800 text-xs font-mono font-bold" title="Mission Profile: AIRLINER applies the Axel LFBO trick (Low/Med textures to save 6-8 GB VRAM on complex airliners). GA maximizes visual sharpness for low-altitude VFR flights.">
+                    <div class="flex items-center bg-slate-900 p-0.5 rounded-xl border border-slate-800 text-xs font-mono font-bold" title="Mission Profile: AIRLINER applies VRAM optimization (Low/Med textures to save 6-8 GB VRAM on complex airliners). GA maximizes visual sharpness for low-altitude VFR flights.">
                         <button id="opt-flight-profile-btn-liner" onclick="switchFlightMissionProfile('LINER')" class="px-3.5 py-1.5 rounded-lg bg-indigo-600 text-white transition-all cursor-pointer shadow-sm">
                             IFR AIRLINER
                         </button>
@@ -2588,13 +2588,7 @@
             <!-- VIEW A: OPTIMIZATION CALIBRATION FEEDBACK -->
             <div id="unified-view-feedback" class="space-y-3.5">
                 <div class="flex items-center justify-between pb-3 border-b border-slate-800">
-                    <div class="flex items-center gap-2.5">
-                        <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-600 text-white uppercase">OK</span>
-                        <div>
-                            <h3 class="text-base font-bold text-white tracking-tight uppercase">Graphics Profile Optimized</h3>
-                            <span id="opt-feedback-subtitle" class="text-xs text-emerald-400 font-bold">Settings successfully written to UserCfg.opt</span>
-                        </div>
-                    </div>
+                    <h3 class="text-base font-bold text-white tracking-tight uppercase">Graphics Profile Optimized</h3>
                 </div>
 
                 <div class="p-3 rounded-2xl bg-slate-950 border border-slate-800 space-y-2 text-xs font-mono">
@@ -2617,9 +2611,8 @@
                 </div>
 
                 <div class="flex items-center justify-between pt-2 border-t border-slate-800">
-                    <button onclick="switchUnifiedModalView('backups')" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 font-bold text-xs transition-all cursor-pointer font-mono uppercase flex items-center gap-1.5">
-                        <i class="fa-solid fa-clock-rotate-left"></i>
-                        <span>View Backups</span>
+                    <button onclick="switchUnifiedModalView('backups')" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition-all cursor-pointer font-mono uppercase tracking-wider">
+                        VIEW BACKUPS
                     </button>
                     <button onclick="closeUnifiedUserCfgModal()" class="px-6 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition-all cursor-pointer font-mono uppercase tracking-wider">
                         OK

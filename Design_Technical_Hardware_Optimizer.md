@@ -48,7 +48,7 @@ The purpose of this module is to serve as an intelligent advisory, calibration, 
 
 ---
 
-## 3. The Axel LFBO Airliner VRAM Architecture
+## 3. The Airliner VRAM Optimization Architecture
 - **Technical Problem**: At major payware hub airports, complex airliners (Fenix A320, PMDG 777, FlyByWire A380, Inibuilds A300) combined with Ultra/High textures frequently exceed 15-16 GB of VRAM. DirectX 12 WDDM paging over PCIe then causes 0.5s to 2s stutter freezes.
 - **The Solution**: Setting `Texture Resolution` to **LOW** slashes VRAM footprint by **6 to 8 GB**.
 - **Avionics Rendering Mechanics**: In modern MSFS aircraft, cockpit screens (PFD, ND, MCDU, ECAM, EICAS) are vector and canvas render targets (CoherentGT/HTML/WASM), completely unaffected by world texture compression. Avionics remain sharp while completely freeing VRAM.
@@ -103,7 +103,7 @@ To maximize readability and prevent visual clutter, the graphics configuration i
 ### Page 6: COCKPIT & AVIONICS (4 Parameters)
 | Parameter | 2D Key | VR Key | Shared? | Input Mode | Optimum Criteria |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Texture Resolution** | `{Texture Quality}` | `{Texture Quality}` | No | Select | Low (Airliners - Axel LFBO) / High-Ultra (GA) |
+| **Texture Resolution** | `{Texture Quality}` | `{Texture Quality}` | No | Select | Low (Airliners - VRAM Optimization) / High-Ultra (GA) |
 | **Glass Cockpit Refresh** | `{GlassCockpitsRefreshRate Quality}` | `{GlassCockpitsRefreshRate Quality}` | No | Select | Medium / Low (Airliners) / High (GA) |
 | **Ambient Occlusion (SSAO)** | `{SSAO Quality}` | `{SSAO Quality}` | No | Select | High (2D) / Low-Medium (VR) |
 | **Windshield Effects** | `{WindShield Quality}` | `{WindShield Quality}` | No | Select | High / Ultra |
@@ -137,7 +137,7 @@ To maximize readability and prevent visual clutter, the graphics configuration i
    - Prominently sized (`text-xs font-black px-3 py-1`) for effortless legibility.
    - Explanations in parentheses are banned entirely from the tag label.
    - Solid, full-opacity background colors only: `bg-emerald-600`, `bg-amber-600`, `bg-orange-600`, `bg-rose-600`. All stroke, border, and glass opacity effects are removed.
-   - Hovering over any tag reveals a dedicated tooltip explaining the specific rationale for the assigned rating (e.g. Axel LFBO VRAM savings or MainThread throttling).
+   - Hovering over any tag reveals a dedicated tooltip explaining the specific rationale for the assigned rating (e.g. VRAM savings or MainThread throttling).
 6. **Structured 3-Part Setting Tooltips**:
    - Each card provides a structured 3-part tooltip:
      - `Description`: Exact functional description of what the graphics parameter controls.
@@ -161,9 +161,9 @@ To maximize readability and prevent visual clutter, the graphics configuration i
   - Clicking `OPTIMIZE PROFILE` triggers the commit phase: exactly one timestamped safety backup (`UserCfg.opt.backup_YYYYMMDD_HHMMSS`) is generated before applying the calibrated profile and any staged overrides to `UserCfg.opt`.
 - **Unified Two-Way Modal Navigation (Zero Modal Stacking)**:
   - Consolidates profile feedback and backup rollback into a single window with seamless view switching:
-    - **View A (Feedback)**: Displays optimization results and applied profile details. Clicking `VIEW BACKUPS` smoothly switches to View B inside the same modal container.
-    - **View B (Backups Management)**: Features a dedicated `OPEN FOLDER` button (opens the UserCfg.opt directory in Windows Explorer), 1-click `RESTORE`, and an instant `DELETE` button next to each backup. Clicking `BACK` returns directly to View A.
-  - Backups list features clean single-line timestamp titles (extraneous filename/size subtitles stripped), solid `MOST RECENT` badges, and full English localization (`CLOSE`, `BACK`, `RESTORE`, `DELETE`).
+    - **View A (Feedback)**: Clean uppercase header `GRAPHICS PROFILE OPTIMIZED` without icon badge or subtitle clutter. Displays optimization results and applied profile details. Bottom actions feature a standard blue, icon-free `VIEW BACKUPS` button (`bg-blue-600 hover:bg-blue-500 text-white font-bold`) and an `OK` validation button.
+    - **View B (Backups Management)**: Features a dedicated `OPEN FOLDER` button (launches Windows Explorer directly targeting `UserCfg.opt`), 1-click `RESTORE`, and an instant `DELETE` button next to each backup. Clicking `BACK` returns directly to View A.
+  - Backups list features uniform slate cards (`border-slate-800`), neutral gray `BAK` icons (`bg-slate-800 text-slate-400`), clean single-line timestamp titles, a solid amber `MOST RECENT` badge positioned immediately to the left of `RESTORE` with identical height, padding, and typography, and a minimalist gray trash can button (`text-slate-400 hover:text-white`) without borders or colored backgrounds.
 - **Safety Copy on Rollback**: Restoring a backup automatically creates a safety snapshot of the active file before overwriting, and clears in-memory staged overrides.
 
 ---

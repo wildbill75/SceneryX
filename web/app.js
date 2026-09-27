@@ -16704,7 +16704,7 @@ function renderMsfsSettingsMatrix() {
             let optionsHtml = '';
             if (Array.isArray(item.options)) {
                 optionsHtml = item.options.map(opt => {
-                    const isSelected = item.value === opt || item.raw_value === opt;
+                    const isSelected = String(item.value).toUpperCase() === String(opt).toUpperCase() || String(item.raw_value).toUpperCase() === String(opt).toUpperCase();
                     return `<option value="${opt}" ${isSelected ? 'selected' : ''}>${opt}</option>`;
                 }).join('');
             }
@@ -16841,14 +16841,14 @@ function openOptFeedbackModal(res) {
     const detailsEl = document.getElementById('opt-feedback-details');
 
     if (modeEl) modeEl.textContent = `${currentMsfsGraphicsMode} DISPLAY${currentMsfsGraphicsMode === 'VR' ? ` (${currentVrRefreshRate} Hz)` : ''}`;
-    if (profileEl) profileEl.textContent = currentFlightMissionProfile === 'LINER' ? 'IFR AIRLINER (Axel LFBO Trick)' : 'VFR GENERAL AVIATION (High Detail)';
+    if (profileEl) profileEl.textContent = currentFlightMissionProfile === 'LINER' ? 'IFR AIRLINER (VRAM OPTIMIZATION)' : 'VFR GENERAL AVIATION (High Detail)';
     if (backupEl) backupEl.textContent = (res && res.backup_created) || 'UserCfg.opt.backup_...';
 
     if (detailsEl) {
         let detailsHtml = '';
         if (currentMsfsGraphicsMode === '2D') {
             detailsHtml += `
-                <div class="flex items-center gap-2 text-emerald-400 font-mono"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded">OK</span><span>Texture Resolution: ${currentFlightMissionProfile === 'LINER' ? 'LOW (Axel LFBO - Frees 6-8 GB VRAM)' : 'HIGH (Full Detail)'}</span></div>
+                <div class="flex items-center gap-2 text-emerald-400 font-mono"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded">OK</span><span>Texture Resolution: ${currentFlightMissionProfile === 'LINER' ? 'LOW (VRAM Optimization - Frees 6-8 GB VRAM)' : 'HIGH (Full Detail)'}</span></div>
                 <div class="flex items-center gap-2 text-emerald-400 font-mono"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded">OK</span><span>Glass Cockpit Refresh: ${currentFlightMissionProfile === 'LINER' ? 'MEDIUM (Saves 5-8 ms MainThread frame time)' : 'HIGH (Full Synthetic Vision)'}</span></div>
                 <div class="flex items-center gap-2 text-emerald-400 font-mono"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded">OK</span><span>Terrain LOD (TLOD): ${currentFlightMissionProfile === 'LINER' ? '100 (Protects MainThread from WASM avionics)' : '150 (Smooth for VFR)'}</span></div>
                 <div class="flex items-center gap-2 text-emerald-400 font-mono"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded">OK</span><span>Anti-Aliasing & Pacing: DLSS (Quality) + Frame Generation DLSSG (2X)</span></div>
@@ -16912,22 +16912,20 @@ async function fetchAndRenderUserCfgBackups() {
         userCfgBackupsList.slice(0, 20).forEach((b, index) => {
             const isLatest = (index === 0);
             html += `
-                <div class="p-3 rounded-2xl bg-slate-950 border ${isLatest ? 'border-amber-500/60' : 'border-slate-800'} flex items-center justify-between gap-3">
+                <div class="p-3 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-3">
                     <div class="flex items-center gap-2.5">
-                        <div class="w-8 h-8 rounded-xl ${isLatest ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-800 text-slate-400'} flex items-center justify-center shrink-0">
+                        <div class="w-8 h-8 rounded-xl bg-slate-800 text-slate-400 flex items-center justify-center shrink-0">
                             <span class="font-mono text-[9px] font-black">BAK</span>
                         </div>
-                        <div class="flex items-center gap-2">
-                            <span class="font-mono text-xs font-bold text-white tracking-wide">${b.timestamp}</span>
-                            ${isLatest ? '<span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold bg-amber-500 text-slate-950 uppercase shadow-sm">MOST RECENT</span>' : ''}
-                        </div>
+                        <span class="font-mono text-xs font-bold text-white tracking-wide">${b.timestamp}</span>
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
+                        ${isLatest ? `<span class="px-3.5 py-1.5 rounded-xl bg-amber-500 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center">MOST RECENT</span>` : ''}
                         <button onclick="restoreUserCfgBackupTarget('${b.filename}')" class="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all cursor-pointer active:scale-95 uppercase tracking-wider">
-                            Restore
+                            RESTORE
                         </button>
-                        <button onclick="deleteUserCfgBackupTarget('${b.filename}')" class="px-2.5 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 hover:border-transparent font-mono font-bold text-xs transition-all cursor-pointer active:scale-95" title="Delete backup">
-                            <i class="fa-solid fa-trash-can"></i>
+                        <button onclick="deleteUserCfgBackupTarget('${b.filename}')" class="p-2 text-slate-400 hover:text-white transition-all cursor-pointer active:scale-95 flex items-center justify-center" title="Delete backup">
+                            <i class="fa-solid fa-trash-can text-sm"></i>
                         </button>
                     </div>
                 </div>
@@ -16979,11 +16977,21 @@ async function deleteUserCfgBackupTarget(filename) {
 }
 
 async function openUserCfgFolderLocation() {
-    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.open_user_cfg_folder) return;
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.open_user_cfg_folder) {
+        if (typeof showToast === 'function') showToast("Native bridge not available", "warning");
+        return;
+    }
     try {
-        await window.pywebview.api.open_user_cfg_folder();
+        const resStr = await window.pywebview.api.open_user_cfg_folder();
+        const res = typeof resStr === 'string' ? JSON.parse(resStr) : resStr;
+        if (res && res.status === 'success') {
+            if (typeof showToast === 'function') showToast("UserCfg.opt folder opened in Explorer", "success");
+        } else if (res && res.message) {
+            if (typeof showToast === 'function') showToast(`Could not open folder: ${res.message}`, "error");
+        }
     } catch (e) {
         console.error("Error opening backups folder:", e);
+        if (typeof showToast === 'function') showToast(`Error opening folder: ${e}`, "error");
     }
 }
 
