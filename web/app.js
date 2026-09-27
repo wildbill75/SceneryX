@@ -14891,14 +14891,10 @@ async function syncSimBriefFlightPlan() {
         flightDestinationAirport = arrAp;
 
         // 4. Update Modal UI
+        hasUserDraggedOptimizerModal = false;
         openFlightOptimizerModal('route', depAp);
         updateOptimizerRouteUI();
-
-        if (typeof panMapToAirport === 'function') {
-            panMapToAirport(depAp);
-        }
-        positionFlightOptimizerModal(depAp);
-        startOptimizerPanTracking(1200);
+        positionFlightOptimizerModal();
 
         // 5. Render corridor, alternates, and fit map bounds
         renderFlightCorridor();
@@ -15585,6 +15581,21 @@ function startOptimizerPanTracking(durationMs = 1200) {
 function positionFlightOptimizerModal(targetAp = null) {
     const modal = document.getElementById('flight-optimizer-modal');
     if (!modal || modal.classList.contains('hidden')) return;
+
+    if (hasUserDraggedOptimizerModal) return;
+
+    // In SimBrief profile / mode, keep the modal cleanly docked on the left
+    if (optimizerMode === 'SIMBRIEF') {
+        const pad = 24;
+        const top = 136;
+        modal.style.left = `${pad}px`;
+        modal.style.top = `${top}px`;
+        modal.style.right = 'auto';
+        modal.style.bottom = 'auto';
+        modal.style.transform = 'none';
+        return;
+    }
+
     if (targetAp) {
         optimizerActiveAnchorAirport = targetAp;
     }
@@ -15608,35 +15619,36 @@ function positionFlightOptimizerModal(targetAp = null) {
     const modalWidth = modal.offsetWidth || 940;
     const halfWidth = modalWidth / 2;
 
-    const pad = 12;
-    const minLeft = halfWidth + pad;
-    const maxLeft = Math.max(minLeft, window.innerWidth - halfWidth - pad);
-    const clampedX = Math.max(minLeft, Math.min(maxLeft, Math.round(screenX)));
+    const pad = 16;
+    let left = Math.round(screenX - halfWidth);
+    const maxLeft = Math.max(pad, window.innerWidth - modalWidth - pad);
+    left = Math.max(pad, Math.min(maxLeft, left));
 
-    modal.style.left = `${clampedX}px`;
-    modal.style.right = 'auto';
-    modal.style.bottom = 'auto';
-
-    if (!hasUserDraggedOptimizerModal) {
-        // Systematically position directly beneath the airport marker and its label (matching Screen 2)
-        let markerBottomY = screenY + 16;
-        if (typeof airportMarkerCache !== 'undefined' && ap.icao && airportMarkerCache.has(ap.icao)) {
-            const m = airportMarkerCache.get(ap.icao);
-            if (m && typeof m.getElement === 'function') {
-                const el = m.getElement();
-                if (el) {
-                    const elRect = el.getBoundingClientRect();
-                    if (elRect && elRect.bottom > 0) {
-                        markerBottomY = elRect.bottom;
-                    }
+    let markerBottomY = screenY + 16;
+    if (typeof airportMarkerCache !== 'undefined' && ap.icao && airportMarkerCache.has(ap.icao)) {
+        const m = airportMarkerCache.get(ap.icao);
+        if (m && typeof m.getElement === 'function') {
+            const el = m.getElement();
+            if (el) {
+                const elRect = el.getBoundingClientRect();
+                if (elRect && elRect.bottom > 0) {
+                    markerBottomY = elRect.bottom;
                 }
             }
         }
-
-        const targetTop = Math.round(markerBottomY) + 12;
-        modal.style.top = `${targetTop}px`;
-        modal.style.transform = 'translateX(-50%)';
     }
+
+    let top = Math.round(markerBottomY) + 12;
+    const modalHeight = modal.offsetHeight || 280;
+    if (top + modalHeight > window.innerHeight - pad) {
+        top = Math.max(124, window.innerHeight - modalHeight - pad);
+    }
+
+    modal.style.left = `${left}px`;
+    modal.style.top = `${top}px`;
+    modal.style.right = 'auto';
+    modal.style.bottom = 'auto';
+    modal.style.transform = 'none';
 }
 
 function initDraggableFlightOptimizerModal() {
@@ -16191,6 +16203,7 @@ async function setOptimizerMode(mode) {
             showToast("Flight Mode: En-Route Corridor (Flight path & intermediate addons)", "info");
         }
     } else if (mode === 'SIMBRIEF') {
+        hasUserDraggedOptimizerModal = false;
         updateOptimizerRouteUI();
         await syncSimBriefFlightPlan();
     }
