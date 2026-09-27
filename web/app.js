@@ -1060,18 +1060,31 @@ function initMap() {
     // High-performance RAF-throttled radial menu updates during pan/zoom
     let radialMenuMoveRaf = null;
     function onMapMoveUpdateRadial() {
-        if (!currentRadialAirport && !isAirlinesModalOpen() && !isDetailsModalOpen()) return;
+        if (!currentRadialAirport && !isAirlinesModalOpen() && !isDetailsModalOpen() && !isFlightOptimizerModalOpen()) return;
         if (!radialMenuMoveRaf) {
             radialMenuMoveRaf = requestAnimationFrame(() => {
                 radialMenuMoveRaf = null;
                 updateRadialMenuPosition(false);
+                if (typeof isFlightOptimizerModalOpen === 'function' && isFlightOptimizerModalOpen() && !hasUserDraggedOptimizerModal) {
+                    positionFlightOptimizerModal();
+                }
             });
         }
     }
     map.on('move', onMapMoveUpdateRadial);
-    map.on('zoom viewreset moveend', () => updateRadialMenuPosition(false));
+    map.on('zoom viewreset moveend', () => {
+        updateRadialMenuPosition(false);
+        if (typeof isFlightOptimizerModalOpen === 'function' && isFlightOptimizerModalOpen() && !hasUserDraggedOptimizerModal) {
+            positionFlightOptimizerModal();
+        }
+    });
     map.on('zoomend', updateCountryInteractivityState);
-    window.addEventListener('resize', () => updateRadialMenuPosition(false));
+    window.addEventListener('resize', () => {
+        updateRadialMenuPosition(false);
+        if (typeof isFlightOptimizerModalOpen === 'function' && isFlightOptimizerModalOpen() && !hasUserDraggedOptimizerModal) {
+            positionFlightOptimizerModal();
+        }
+    });
 
     // Double-click on neutral map area: PANIC RESET (aborts all actions & returns to default startup state)
     map.on('dblclick', (e) => {
@@ -5994,8 +6007,8 @@ function panMapToAirport(ap, forcedZoom = null) {
         : 6.0;
 
     let xOffset = 0;
-    // In airlines/details mode: strictly enforce xOffset = 0 so the airport is centered horizontally
-    if (!isAirlinesModalOpen() && !isDetailsModalOpen()) {
+    // In airlines/details/optimizer mode: strictly enforce xOffset = 0 so the airport is centered horizontally
+    if (!isAirlinesModalOpen() && !isDetailsModalOpen() && !(typeof isFlightOptimizerModalOpen === 'function' && isFlightOptimizerModalOpen())) {
         const detailDrawer = document.getElementById('detail-drawer');
         if (detailDrawer && !detailDrawer.classList.contains('translate-x-full') && !detailDrawer.classList.contains('hidden')) {
             const drawerWidth = detailDrawer.offsetWidth || 460;
@@ -6012,11 +6025,11 @@ function panMapToAirport(ap, forcedZoom = null) {
         const cy = mapH / 2;
         const desiredApY = Math.round(mapH * 0.45);
         yOffset = Math.round(cy - desiredApY);
-    } else if (isDetailsModalOpen()) {
-        // En mode Details : positionner l'aéroport dans la partie supérieure (~22%) pour laisser la place à la modale en dessous
+    } else if (isDetailsModalOpen() || (typeof isFlightOptimizerModalOpen === 'function' && isFlightOptimizerModalOpen())) {
+        // En mode Details ou Flight Optimizer : positionner l'aéroport dans la partie supérieure (~22%) pour laisser la place à la modale en dessous
         const mapH = (map && typeof map.getSize === 'function') ? map.getSize().y : window.innerHeight;
         const cy = mapH / 2;
-        const desiredApY = Math.max(120, Math.min(220, Math.round(mapH * 0.22)));
+        const desiredApY = Math.max(120, Math.min(240, Math.round(mapH * 0.22)));
         yOffset = Math.round(cy - desiredApY);
     }
 
@@ -6026,6 +6039,8 @@ function panMapToAirport(ap, forcedZoom = null) {
         targetZoom = forcedZoom;
     } else if (isAirlinesModalOpen()) {
         targetZoom = (currentZoom < 4.0) ? 4.0 : Math.min(currentZoom, 7.0);
+    } else if (typeof isFlightOptimizerModalOpen === 'function' && isFlightOptimizerModalOpen()) {
+        targetZoom = (currentZoom < 4.0) ? 5.5 : currentZoom;
     } else {
         targetZoom = TARGET_AIRPORT_ZOOM;
     }
@@ -6035,6 +6050,9 @@ function panMapToAirport(ap, forcedZoom = null) {
     const onPanFinish = () => {
         isCameraPanningToRadial = false;
         updateRadialMenuPosition(true);
+        if (typeof isFlightOptimizerModalOpen === 'function' && isFlightOptimizerModalOpen() && !hasUserDraggedOptimizerModal) {
+            positionFlightOptimizerModal();
+        }
     };
     map.once('moveend', onPanFinish);
 
@@ -15618,9 +15636,60 @@ function handleAirportRouteSelection(ap) {
     }
 
     if (!wasOpen) {
-        openFlightOptimizerModal('route');
+        openFlightOptimizerModal('route', ap);
+        if (typeof panMapToAirport === 'function') {
+            panMapToAirport(ap);
+        }
     } else {
         updateOptimizerRouteUI();
+    }
+}
+
+function positionFlightOptimizerModal(targetAp = null) {
+    const modal = document.getElementById('flight-optimizer-modal');
+    if (!modal || modal.classList.contains('hidden')) return;
+    const ap = targetAp || optimizerOrigin || currentRadialAirport || selectedAirport;
+    if (!ap || !map || ap.lat === undefined || ap.lon === undefined) return;
+
+    let latLng = [parseFloat(ap.lat), parseFloat(ap.lon)];
+    if (typeof getWrappedAirportLatLng === 'function') {
+        latLng = getWrappedAirportLatLng(ap);
+    }
+    const point = (typeof map.latLngToContainerPoint === 'function') ? map.latLngToContainerPoint(latLng) : null;
+    if (!point) return;
+
+    const mapSize = (typeof map.getSize === 'function') ? map.getSize() : null;
+    const containerW = mapSize ? mapSize.x : (modal.offsetParent ? modal.offsetParent.offsetWidth : window.innerWidth);
+    const containerH = mapSize ? mapSize.y : (modal.offsetParent ? modal.offsetParent.offsetHeight : window.innerHeight);
+
+    const modalWidth = modal.offsetWidth || 940;
+    const modalHeight = modal.offsetHeight || 360;
+    const halfWidth = modalWidth / 2;
+
+    const minLeft = halfWidth + 12;
+    const maxLeft = Math.max(minLeft, containerW - halfWidth - 12);
+    const clampedX = Math.max(minLeft, Math.min(maxLeft, Math.round(point.x)));
+
+    modal.style.left = `${clampedX}px`;
+    modal.style.right = 'auto';
+    modal.style.bottom = 'auto';
+
+    if (!hasUserDraggedOptimizerModal) {
+        // Place directly beneath the airport marker
+        let desiredTop = Math.round(point.y) + 32;
+
+        // Ensure it doesn't fall below the bottom toolbar (~65px reserve)
+        const maxTop = Math.max(70, containerH - modalHeight - 65);
+        if (desiredTop > maxTop) {
+            if (Math.round(point.y) - modalHeight - 32 >= 70) {
+                desiredTop = Math.round(point.y) - modalHeight - 32;
+            } else {
+                desiredTop = maxTop;
+            }
+        }
+        desiredTop = Math.max(70, desiredTop);
+        modal.style.top = `${desiredTop}px`;
+        modal.style.transform = 'translateX(-50%)';
     }
 }
 
@@ -15642,6 +15711,9 @@ function initDraggableFlightOptimizerModal() {
             offsetX: e.clientX - rect.left,
             offsetY: e.clientY - rect.top
         };
+        modal.style.transform = 'none';
+        modal.style.left = `${rect.left}px`;
+        modal.style.top = `${rect.top}px`;
         modal.style.transition = 'none';
 
         const onMouseMove = (moveEvent) => {
@@ -15662,6 +15734,7 @@ function initDraggableFlightOptimizerModal() {
             modal.style.top = `${newTop}px`;
             modal.style.right = 'auto';
             modal.style.bottom = 'auto';
+            modal.style.transform = 'none';
         };
 
         const onMouseUp = () => {
@@ -15696,30 +15769,35 @@ function triggerRadialFlightOptimizer() {
             renderFlightCorridor();
         }
     }
-    openFlightOptimizerModal('route');
+    openFlightOptimizerModal('route', targetAp);
+    if (typeof panMapToAirport === 'function') {
+        panMapToAirport(targetAp);
+    }
     if (typeof showToast === 'function') {
         showToast(`✈ Departure set: ${targetAp.icao}. Alt+Click or Click an airport on the map to set Destination.`, 'info');
     }
 }
 
-function openFlightOptimizerModal(initialTab = 'route') {
+function openFlightOptimizerModal(initialTab = 'route', targetAp = null) {
     const modal = document.getElementById('flight-optimizer-modal');
     if (!modal) return;
     initDraggableFlightOptimizerModal();
+
+    if (!optimizerOrigin && targetAp) optimizerOrigin = targetAp;
+    if (!optimizerOrigin && typeof flightOriginAirport !== 'undefined' && flightOriginAirport) optimizerOrigin = flightOriginAirport;
+    if (!optimizerDest && typeof flightDestinationAirport !== 'undefined' && flightDestinationAirport) optimizerDest = flightDestinationAirport;
+    if (!optimizerOrigin && typeof currentRadialAirport !== 'undefined' && currentRadialAirport) optimizerOrigin = currentRadialAirport;
+    if (!optimizerOrigin && typeof selectedAirport !== 'undefined' && selectedAirport) optimizerOrigin = selectedAirport;
 
     modal.classList.remove('hidden');
     modal.classList.add('flex');
 
     if (!hasUserDraggedOptimizerModal) {
-        modal.style.top = '80px';
-        modal.style.right = '32px';
-        modal.style.left = 'auto';
-        modal.style.bottom = 'auto';
+        positionFlightOptimizerModal(targetAp || optimizerOrigin);
+        requestAnimationFrame(() => {
+            positionFlightOptimizerModal(targetAp || optimizerOrigin);
+        });
     }
-
-    if (!optimizerOrigin && typeof flightOriginAirport !== 'undefined' && flightOriginAirport) optimizerOrigin = flightOriginAirport;
-    if (!optimizerDest && typeof flightDestinationAirport !== 'undefined' && flightDestinationAirport) optimizerDest = flightDestinationAirport;
-    if (!optimizerOrigin && typeof currentRadialAirport !== 'undefined' && currentRadialAirport) optimizerOrigin = currentRadialAirport;
 
     updateOptimizerRouteUI();
     switchOptimizerTab(initialTab);
@@ -15735,6 +15813,7 @@ function exitFlightOptimizerMode() {
         modal.classList.remove('flex');
     }
     closeAllComboboxes();
+    hasUserDraggedOptimizerModal = false;
 
     if (blackboxTelemetryInterval && !isBlackboxRunning) {
         clearInterval(blackboxTelemetryInterval);
