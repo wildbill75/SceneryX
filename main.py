@@ -3492,6 +3492,20 @@ class Api:
         except Exception as e:
             return json.dumps({"error": str(e)}, ensure_ascii=False)
 
+    def update_msfs_setting(self, mode, setting_key, new_value):
+        try:
+            res = flight_rig_optimizer.update_msfs_user_cfg_setting(mode, setting_key, new_value)
+            return json.dumps(res, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    def apply_recommended_msfs_settings(self, mode):
+        try:
+            res = flight_rig_optimizer.apply_recommended_msfs_settings(mode)
+            return json.dumps(res, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
     def start_flight_blackbox(self, flight_name, dep_icao, arr_icao, aircraft):
         try:
             res = flight_perf_tracker.BLACKBOX.start(flight_name=flight_name, dep=dep_icao, arr=arr_icao, aircraft=aircraft)

@@ -16233,6 +16233,9 @@ function applyOptimizerRouteSceneries() {
 // RIG & SETTINGS (COMBOBOX HARDWARE & AUTO-CALIBRATION)
 // -------------------------------------------------------------------------
 
+let currentMsfsGraphicsMode = '2D';
+let msfsSettingsMatrixData = null;
+
 async function loadRigDiagnostics() {
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.get_rig_diagnostics) return;
     try {
@@ -16243,182 +16246,251 @@ async function loadRigDiagnostics() {
         const det = data.detected;
         if (!det) return;
 
-        const badgeRam = document.getElementById('opt-badge-ram');
-        if (badgeRam && det.ram) {
-            badgeRam.textContent = `${det.ram.total_gb} GB @ ${det.ram.speed_mhz} MHz`;
-        }
-        const badgeDlss = document.getElementById('opt-badge-dlss');
-        if (badgeDlss && det.dlss) {
-            badgeDlss.textContent = `DLSS ${det.dlss.version || 'v3.10'}`;
-        }
-
-        const cpuInput = document.getElementById('opt-cpu-input');
-        if (cpuInput && det.cpu) {
-            cpuInput.value = det.cpu.name || '';
-        }
-        const gpuInput = document.getElementById('opt-gpu-input');
-        if (gpuInput && det.gpu) {
-            gpuInput.value = `${det.gpu.name} (${det.gpu.vram_total_gb} GB)` || '';
+        // MY RIG - Detected Hardware Fields
+        const cpuNameEl = document.getElementById('opt-detected-cpu-name');
+        const cpuCoresEl = document.getElementById('opt-detected-cpu-cores');
+        if (cpuNameEl && det.cpu) {
+            cpuNameEl.textContent = det.cpu.name || 'Unknown CPU';
+            if (cpuCoresEl) cpuCoresEl.textContent = `${det.cpu.cores || 8} Cores / ${det.cpu.threads || 16} Threads`;
         }
 
-        const hzSelect = document.getElementById('opt-hz-select');
-        if (hzSelect && det.display) {
-            const currentHz = Math.round(det.display.refresh_rate_hz);
-            const foundOpt = Array.from(hzSelect.options).find(o => parseInt(o.value) === currentHz);
-            if (foundOpt) {
-                hzSelect.value = String(currentHz);
+        const gpuNameEl = document.getElementById('opt-detected-gpu-name');
+        const gpuVramEl = document.getElementById('opt-detected-gpu-vram');
+        if (gpuNameEl && det.gpu) {
+            gpuNameEl.textContent = det.gpu.name || 'Unknown GPU';
+            if (gpuVramEl) gpuVramEl.textContent = `${det.gpu.vram_total_gb || 16} GB VRAM • Driver ${det.gpu.driver_version || 'Latest'}`;
+        }
+
+        const ramValEl = document.getElementById('opt-detected-ram-val');
+        const ramXmpEl = document.getElementById('opt-detected-ram-xmp');
+        if (ramValEl && det.ram) {
+            ramValEl.textContent = `${det.ram.total_gb} GB @ ${det.ram.speed_mhz} MHz`;
+            if (ramXmpEl) {
+                if (det.ram.is_xmp_active) {
+                    ramXmpEl.textContent = 'XMP Active';
+                    ramXmpEl.className = 'font-bold text-emerald-400';
+                } else {
+                    ramXmpEl.textContent = 'XMP Inactive';
+                    ramXmpEl.className = 'font-bold text-slate-500';
+                }
             }
         }
 
-        if (data.combobox_data) {
-            buildComboboxDropdown('cpu', data.combobox_data.popular_cpus, det.cpu ? det.cpu.name : '');
-            buildComboboxDropdown('gpu', data.combobox_data.popular_gpus, det.gpu ? det.gpu.name : '');
+        const rbarEl = document.getElementById('opt-detected-rbar');
+        if (rbarEl) {
+            if (det.rbar_active) {
+                rbarEl.textContent = 'Re-Size BAR Active';
+                rbarEl.className = 'font-bold text-emerald-400';
+            } else {
+                rbarEl.textContent = 'Re-Size BAR Inactive';
+                rbarEl.className = 'font-bold text-slate-500';
+            }
         }
 
-        if (data.recommended_profile) {
-            renderRigProfile(data.recommended_profile);
+        const hagsEl = document.getElementById('opt-detected-hags');
+        if (hagsEl) {
+            if (det.hags_active) {
+                hagsEl.textContent = 'HAGS Active';
+                hagsEl.className = 'font-bold text-emerald-400';
+            } else {
+                hagsEl.textContent = 'HAGS Inactive';
+                hagsEl.className = 'font-bold text-slate-500';
+            }
         }
+
+        const dlssEl = document.getElementById('opt-detected-dlss-ver');
+        if (dlssEl && det.dlss) {
+            dlssEl.textContent = `DLSS ${det.dlss.version || 'v3.10'}`;
+        }
+
+        // System Balance Badge & Description
+        const balanceBadge = document.getElementById('opt-rig-balance-badge');
+        const balanceDesc = document.getElementById('opt-rig-summary-desc');
+        if (det.system_balance) {
+            const b = det.system_balance;
+            if (balanceBadge) {
+                balanceBadge.textContent = b.tier;
+                if (b.color === 'emerald') {
+                    balanceBadge.className = 'px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-800/80 uppercase';
+                } else if (b.color === 'amber') {
+                    balanceBadge.className = 'px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-950/80 text-amber-400 border border-amber-800/80 uppercase';
+                } else {
+                    balanceBadge.className = 'px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-rose-950/80 text-rose-400 border border-rose-800/80 uppercase';
+                }
+            }
+            if (balanceDesc) {
+                balanceDesc.textContent = b.summary;
+                balanceDesc.title = b.advice || b.summary;
+            }
+
+            const debriefHwTier = document.getElementById('opt-debrief-hw-tier');
+            const debriefHwText = document.getElementById('opt-debrief-hw-text');
+            if (debriefHwTier) debriefHwTier.textContent = b.tier;
+            if (debriefHwText) debriefHwText.textContent = `${b.summary} ${b.advice || ''}`;
+        }
+
+        // AutoFPS Status Pill
+        const autofpsDot = document.getElementById('opt-autofps-status-dot');
+        const autofpsText = document.getElementById('opt-autofps-status-text');
+        const autofpsPill = document.getElementById('opt-autofps-status-pill');
+        if (data.settings_matrix && data.settings_matrix.autofps_active) {
+            if (autofpsDot) autofpsDot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse';
+            if (autofpsText) {
+                autofpsText.textContent = 'AUTOFPS LINKED (DYNAMIC)';
+                autofpsText.className = 'text-emerald-400 font-bold';
+            }
+            if (autofpsPill) autofpsPill.className = 'flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-950/50 border border-emerald-800/60 text-[10px] font-mono';
+        } else {
+            if (autofpsDot) autofpsDot.className = 'w-1.5 h-1.5 rounded-full bg-slate-500';
+            if (autofpsText) {
+                autofpsText.textContent = 'AUTOFPS INACTIVE (STATIC PROFILE)';
+                autofpsText.className = 'text-slate-400 font-bold';
+            }
+            if (autofpsPill) autofpsPill.className = 'flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900 border border-slate-800 text-[10px] font-mono';
+        }
+
+        msfsSettingsMatrixData = data.settings_matrix;
+        switchMsfsGraphicsMode(currentMsfsGraphicsMode);
+
     } catch (e) {
         console.error("Error loading Rig diagnostics:", e);
     }
 }
 
-function isHardwareOwnedMatch(type, item, detectedName) {
-    if (!detectedName || !item) return false;
-    const cleanDet = detectedName.toLowerCase().replace(/[^a-z0-9]/g, ' ');
-    const cleanItem = item.toLowerCase().replace(/[^a-z0-9]/g, ' ');
-    const detTokens = cleanDet.split(/\s+/).filter(Boolean);
-    const itemTokens = cleanItem.split(/\s+/).filter(Boolean);
+function switchMsfsGraphicsMode(mode) {
+    currentMsfsGraphicsMode = mode;
+    const btn2d = document.getElementById('opt-msfs-mode-btn-2d');
+    const btnVr = document.getElementById('opt-msfs-mode-btn-vr');
 
-    if (type === 'cpu') {
-        const chip = detTokens.find(t => /\d{4,5}[a-z]{0,3}/.test(t));
-        if (chip) {
-            return itemTokens.includes(chip);
-        }
-    } else if (type === 'gpu') {
-        const num = detTokens.find(t => /^\d{3,4}$/.test(t));
-        if (num) {
-            if (!itemTokens.includes(num)) return false;
-            const hasSuper = detTokens.includes('super');
-            const hasTi = detTokens.includes('ti');
-            const hasXtx = detTokens.includes('xtx');
-            const hasXt = detTokens.includes('xt') && !hasXtx;
-            const itemHasSuper = itemTokens.includes('super');
-            const itemHasTi = itemTokens.includes('ti');
-            const itemHasXtx = itemTokens.includes('xtx');
-            const itemHasXt = itemTokens.includes('xt') && !itemHasXtx;
-            return hasSuper === itemHasSuper && hasTi === itemHasTi && hasXtx === itemHasXtx && hasXt === itemHasXt;
+    if (btn2d && btnVr) {
+        if (mode === '2D') {
+            btn2d.className = 'px-3 py-1 rounded-lg bg-cyan-600 text-white transition-all cursor-pointer font-bold shadow-sm';
+            btnVr.className = 'px-3 py-1 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold';
+        } else {
+            btn2d.className = 'px-3 py-1 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold';
+            btnVr.className = 'px-3 py-1 rounded-lg bg-cyan-600 text-white transition-all cursor-pointer font-bold shadow-sm';
         }
     }
-    return false;
+
+    renderMsfsSettingsMatrix();
 }
 
-function buildComboboxDropdown(type, categorizedData, detectedName) {
-    const dropdown = document.getElementById(`opt-${type}-dropdown`);
-    if (!dropdown || !categorizedData) return;
+function renderMsfsSettingsMatrix() {
+    const grid = document.getElementById('opt-msfs-settings-grid');
+    if (!grid || !msfsSettingsMatrixData) return;
 
+    const list = currentMsfsGraphicsMode === '2D' ? (msfsSettingsMatrixData.matrix_2d || []) : (msfsSettingsMatrixData.matrix_vr || []);
+    const pacing = currentMsfsGraphicsMode === '2D' ? msfsSettingsMatrixData.target_pacing_2d : msfsSettingsMatrixData.target_pacing_vr;
+    const advisory = currentMsfsGraphicsMode === '2D' ? msfsSettingsMatrixData.graphics_advisory_2d : msfsSettingsMatrixData.graphics_advisory_vr;
+
+    // Render Metrics
+    if (pacing) {
+        const targetFpsEl = document.getElementById('opt-metric-target-fps');
+        const frameGenBadge = document.getElementById('opt-metric-framegen-badge');
+        const mainThreadEl = document.getElementById('opt-metric-mainthread');
+        const mainThreadStatus = document.getElementById('opt-metric-mainthread-status');
+        const vramHeadroomEl = document.getElementById('opt-metric-vram-headroom');
+        const vramStatus = document.getElementById('opt-metric-vram-status');
+
+        if (targetFpsEl) targetFpsEl.textContent = pacing.target_fps;
+        if (frameGenBadge) {
+            frameGenBadge.textContent = pacing.frame_gen_label;
+            frameGenBadge.className = `text-[10px] font-mono font-bold text-${pacing.frame_gen_color}-400 pt-0.5`;
+        }
+        if (mainThreadEl) mainThreadEl.textContent = pacing.target_mainthread;
+        if (mainThreadStatus) mainThreadStatus.className = `text-[10px] font-mono font-bold text-${pacing.mainthread_color}-400 pt-0.5`;
+        if (vramHeadroomEl) vramHeadroomEl.textContent = pacing.vram_headroom;
+        if (vramStatus) vramStatus.className = `text-[10px] font-mono font-bold text-${pacing.vram_color}-400 pt-0.5`;
+    }
+
+    // Render Advisory
+    if (advisory) {
+        const msfsTierEl = document.getElementById('opt-debrief-msfs-tier');
+        const msfsTextEl = document.getElementById('opt-debrief-msfs-text');
+        if (msfsTierEl) msfsTierEl.textContent = advisory.status.toUpperCase();
+        if (msfsTextEl) {
+            const recs = Array.isArray(advisory.recommendations) ? advisory.recommendations.join(' • ') : '';
+            msfsTextEl.textContent = `${advisory.summary} ${recs}`;
+        }
+    }
+
+    // Render 13 Settings
     let html = '';
-    for (const [category, items] of Object.entries(categorizedData)) {
-        html += `<div class="px-2.5 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 bg-slate-800/60 rounded-lg mt-1 select-none">${category}</div>`;
-        items.forEach(item => {
-            const isMatch = isHardwareOwnedMatch(type, item, detectedName);
-            html += `
-                <div onclick="selectComboboxOption('${type}', '${item.replace(/'/g, "\\'")}')" 
-                     class="px-2.5 py-1.5 rounded-lg text-xs text-slate-200 hover:bg-slate-800 hover:text-white cursor-pointer transition-all flex items-center justify-between">
-                    <span class="truncate">${item}</span>
-                    ${isMatch ? '<span class="flex items-center gap-1 text-emerald-400 font-mono text-[10px] font-bold shrink-0 ml-2"><i class="fa-solid fa-check text-[10px]"></i> Detected</span>' : ''}
+    list.forEach(item => {
+        let badgeColorClass = 'text-emerald-400 bg-emerald-950/80 border-emerald-800/80';
+        if (item.rating_color === 'amber') badgeColorClass = 'text-amber-400 bg-amber-950/80 border-amber-800/80';
+        else if (item.rating_color === 'orange') badgeColorClass = 'text-orange-400 bg-orange-950/80 border-orange-800/80';
+        else if (item.rating_color === 'rose') badgeColorClass = 'text-rose-400 bg-rose-950/80 border-rose-800/80';
+
+        const sharedBadge = item.shared ? '<span class="px-1 py-0.2 rounded text-[8px] font-mono font-bold bg-slate-800 text-sky-400 border border-slate-700/80" title="This setting is globally shared in MSFS between 2D and VR modes.">SHARED</span>' : '';
+
+        // Options dropdown
+        let optionsHtml = '';
+        if (Array.isArray(item.options)) {
+            optionsHtml = item.options.map(opt => {
+                const isSelected = item.value === opt || item.raw_value === opt;
+                return `<option value="${opt}" ${isSelected ? 'selected' : ''}>${opt}</option>`;
+            }).join('');
+        }
+
+        html += `
+            <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700 transition-all flex flex-col justify-between space-y-1.5" title="${item.tooltip.replace(/"/g, '&quot;')}">
+                <div class="flex items-start justify-between gap-1">
+                    <div class="flex items-center gap-1.5 flex-wrap">
+                        <span class="text-xs font-mono font-bold text-slate-200">${item.name}</span>
+                        ${sharedBadge}
+                    </div>
+                    <span class="px-1.5 py-0.5 rounded text-[9px] font-mono font-bold border uppercase shrink-0 ${badgeColorClass}">${item.rating_label}</span>
                 </div>
-            `;
-        });
-    }
-    dropdown.innerHTML = html;
-}
-
-function openCombobox(type) {
-    closeAllComboboxes();
-    const dropdown = document.getElementById(`opt-${type}-dropdown`);
-    if (dropdown) dropdown.classList.remove('hidden');
-}
-
-function toggleCombobox(type) {
-    const dropdown = document.getElementById(`opt-${type}-dropdown`);
-    if (dropdown) dropdown.classList.toggle('hidden');
-}
-
-function closeAllComboboxes() {
-    ['cpu', 'gpu'].forEach(t => {
-        const dd = document.getElementById(`opt-${t}-dropdown`);
-        if (dd) dd.classList.add('hidden');
+                <div class="flex items-center justify-between gap-2 pt-0.5">
+                    <select onchange="onMsfsSettingChanged('${item.key}', this.value)" class="w-full bg-slate-950 border border-slate-700/70 focus:border-cyan-400 rounded-lg px-2 py-1 text-xs text-white font-mono font-semibold focus:outline-none cursor-pointer">
+                        ${optionsHtml}
+                    </select>
+                </div>
+            </div>
+        `;
     });
+
+    grid.innerHTML = html;
 }
 
-function selectComboboxOption(type, value) {
-    const input = document.getElementById(`opt-${type}-input`);
-    if (input) input.value = value;
-    closeAllComboboxes();
-    triggerRigRecalculation();
-}
-
-function filterCombobox(type, query) {
-    openCombobox(type);
-    const dropdown = document.getElementById(`opt-${type}-dropdown`);
-    if (!dropdown) return;
-    const q = (query || '').toLowerCase();
-    const items = dropdown.querySelectorAll('div[onclick]');
-    items.forEach(item => {
-        const txt = item.textContent.toLowerCase();
-        item.style.display = txt.includes(q) ? 'flex' : 'none';
-    });
-    triggerRigRecalculation();
-}
-
-async function triggerRigRecalculation() {
-    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.calculate_rig_profile) return;
+async function onMsfsSettingChanged(settingKey, newValue) {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.update_msfs_setting) return;
     try {
-        const hz = parseFloat(document.getElementById('opt-hz-select')?.value || 180);
-        const studio = document.getElementById('opt-studio-select')?.value || 'fslabs';
-        const gpuTxt = document.getElementById('opt-gpu-input')?.value || '';
-        
-        let vram = 16.0;
-        const vramMatch = gpuTxt.match(/(\d+)\s*(?:Go|GB)/i);
-        if (vramMatch) vram = parseFloat(vramMatch[1]);
-
-        const specs = {
-            screen_hz: hz,
-            vram_gb: vram,
-            studio_id: studio,
-            frame_gen: true
-        };
-        const resStr = await window.pywebview.api.calculate_rig_profile(JSON.stringify(specs));
-        const profile = JSON.parse(resStr);
-        renderRigProfile(profile);
+        const resStr = await window.pywebview.api.update_msfs_setting(currentMsfsGraphicsMode, settingKey, newValue);
+        const res = JSON.parse(resStr);
+        if (res.status === 'success') {
+            if (typeof showToast === 'function') {
+                showToast(`MSFS ${currentMsfsGraphicsMode}: ${settingKey} updated to ${newValue}. Backup created.`, 'success');
+            }
+            await loadRigDiagnostics();
+        } else {
+            if (typeof showToast === 'function') {
+                showToast(`Failed to update setting: ${res.message}`, 'error');
+            }
+        }
     } catch (e) {
-        console.error("Error recalculating Rig profile:", e);
+        console.error("Error updating setting:", e);
     }
 }
 
-function renderRigProfile(profile) {
-    if (!profile) return;
-    const targetFps = document.getElementById('opt-target-fps-display');
-    const engineFps = document.getElementById('opt-engine-fps-display');
-    const budgetDisplay = document.getElementById('opt-frame-budget-display');
-    const terrainDisplay = document.getElementById('opt-terrain-detail-display');
-    const autofpsDisplay = document.getElementById('opt-autofps-tlod-display');
-    const adviceBox = document.getElementById('opt-studio-advice-box');
-
-    if (profile.pacing) {
-        if (targetFps) targetFps.textContent = `${profile.pacing.displayed_fps_target} FPS`;
-        if (engineFps) engineFps.textContent = `(${profile.pacing.base_engine_fps_target} engine)`;
-        if (budgetDisplay) budgetDisplay.innerHTML = `MainThread Budget : <strong class="text-white font-mono">${profile.pacing.frame_budget_ms} ms</strong>`;
-    }
-    if (terrainDisplay) {
-        terrainDisplay.textContent = profile.terrain_detail || 'LOW';
-    }
-    if (profile.autofps && autofpsDisplay) {
-        autofpsDisplay.textContent = `TLOD ${profile.autofps.tlod_base_min} ➔ ${profile.autofps.tlod_top_max}`;
-    }
-    if (adviceBox && profile.summary_advice) {
-        adviceBox.textContent = profile.summary_advice;
+async function applyOptimalMsfsSettingsCurrentMode() {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.apply_recommended_msfs_settings) return;
+    try {
+        const resStr = await window.pywebview.api.apply_recommended_msfs_settings(currentMsfsGraphicsMode);
+        const res = JSON.parse(resStr);
+        if (res.status === 'success') {
+            if (typeof showToast === 'function') {
+                showToast(`Optimal ${currentMsfsGraphicsMode} profile applied! (UserCfg.opt backup created)`, 'success');
+            }
+            await loadRigDiagnostics();
+        } else {
+            if (typeof showToast === 'function') {
+                showToast(`Failed: ${res.message}`, 'error');
+            }
+        }
+    } catch (e) {
+        console.error("Error applying optimal settings:", e);
     }
 }
 

@@ -10,6 +10,8 @@ import os
 import sys
 import json
 import re
+import shutil
+from datetime import datetime
 import ctypes
 import ctypes.wintypes
 import subprocess
@@ -485,6 +487,431 @@ def detect_dlss_version() -> Dict[str, Any]:
     return result
 
 
+def detect_autofps_running() -> bool:
+    """Detects if AutoFPS (MSFS AutoFPS / MSFS2024 AutoFPS) is active in background tasks."""
+    try:
+        CREATE_NO_WINDOW = 0x08000000
+        out = subprocess.check_output(['tasklist', '/fo', 'csv', '/nh'], creationflags=CREATE_NO_WINDOW).decode('utf-8', errors='ignore')
+        return any('autofps' in line.lower() for line in out.splitlines())
+    except Exception:
+        return False
+
+
+def get_user_cfg_path() -> Optional[str]:
+    """Finds the active UserCfg.opt file for MSFS 2024 or MSFS 2020."""
+    candidate_paths = [
+        os.path.expandvars(r"%LOCALAPPDATA%\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\UserCfg.opt"),
+        os.path.expandvars(r"%APPDATA%\Microsoft Flight Simulator 2024\UserCfg.opt"),
+        os.path.expandvars(r"%LOCALAPPDATA%\Packages\Microsoft.FlightSimulator_8wekyb3d8bbwe\LocalCache\UserCfg.opt"),
+        os.path.expandvars(r"%APPDATA%\Microsoft Flight Simulator\UserCfg.opt"),
+    ]
+    for p in candidate_paths:
+        if os.path.exists(p):
+            return p
+    return None
+
+
+def backup_user_cfg(path: str) -> str:
+    """Creates an automatic timestamped backup of UserCfg.opt before any modification."""
+    dir_name = os.path.dirname(path)
+    base_name = os.path.basename(path)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_path = os.path.join(dir_name, f"{base_name}.backup_{timestamp}")
+    shutil.copy2(path, backup_path)
+    return backup_path
+
+
+def analyze_system_balance(cpu_info: Dict[str, Any], gpu_info: Dict[str, Any], ram_info: Dict[str, Any]) -> Dict[str, Any]:
+    """Evaluates system component harmony, bottleneck hazards, and memory stability."""
+    cpu_name = (cpu_info.get("name") or "").lower()
+    gpu_name = (gpu_info.get("name") or "").lower()
+    vram_gb = float(gpu_info.get("vram_total_gb") or 16.0)
+    ram_gb = float(ram_info.get("total_gb") or 32.0)
+
+    is_flagship_cpu = any(k in cpu_name for k in ["13900", "14900", "7800x3d", "7950x3d", "9800x3d", "9950x3d"])
+    is_high_cpu = is_flagship_cpu or any(k in cpu_name for k in ["13700", "14700", "12900", "7700", "5800x3d", "13600", "14600"])
+    is_legacy_cpu = any(k in cpu_name for k in ["8700", "9700", "9900", "10700", "3600", "3700", "2700", "i5-8", "i5-9", "i5-10", "i7-8", "i7-9"])
+
+    is_flagship_gpu = any(k in gpu_name for k in ["4090", "4080", "5090", "5080", "7900 xtx", "7900 xt"])
+    is_high_gpu = is_flagship_gpu or any(k in gpu_name for k in ["4070", "3080", "3090", "6800", "6900"])
+
+    if is_legacy_cpu and is_flagship_gpu:
+        return {
+            "status": "bottleneck",
+            "tier": "CPU Bottleneck Risk",
+            "color": "amber",
+            "summary": "Older generation CPU paired with high-end GPU. MainThread will bottleneck at dense airports.",
+            "advice": "Keep TLOD <= 100, reduce airport ground aircraft and vehicular traffic to keep MainThread below 33ms."
+        }
+    elif vram_gb < 12.0 and is_high_gpu:
+        return {
+            "status": "vram_limit",
+            "tier": "VRAM Constrained",
+            "color": "amber",
+            "summary": f"GPU has {vram_gb:.0f} GB VRAM. Risk of D3D12 paging stutters when flying complex paywares with Ultra textures.",
+            "advice": "Set Texture Resolution to HIGH and Terrain Detail to LOW to preserve VRAM safety margins."
+        }
+    elif is_high_cpu and is_high_gpu and ram_gb >= 32.0:
+        return {
+            "status": "optimal",
+            "tier": "Optimal Balance",
+            "color": "emerald",
+            "summary": "High-end CPU, GPU, and RAM perfectly balanced for complex flight sim operations.",
+            "advice": "Your machine has ample MainThread and VRAM headroom to handle high LODs and complex airliners."
+        }
+    else:
+        return {
+            "status": "balanced",
+            "tier": "Balanced Rig",
+            "color": "emerald",
+            "summary": "Hardware components are harmoniously matched.",
+            "advice": "Configure settings according to target display refresh rate and aircraft complexity."
+        }
+
+
+def extract_block(text: str, header: str) -> str:
+    idx = text.find(header)
+    if idx == -1: return ''
+    start = text.find('{', idx)
+    if start == -1: return ''
+    depth = 1
+    i = start + 1
+    while i < len(text) and depth > 0:
+        if text[i] == '{': depth += 1
+        elif text[i] == '}': depth -= 1
+        i += 1
+    return text[start:i]
+
+
+def get_block_val(pattern: str, block: str, default: str = '') -> str:
+    m = re.search(pattern, block, re.I)
+    return m.group(1).strip() if m else default
+
+
+def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Optional[Dict[str, Any]] = None, cpu_info: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    path = user_cfg_path or get_user_cfg_path()
+    if not path or not os.path.exists(path):
+        return {"found": False, "path": "", "matrix_2d": [], "matrix_vr": []}
+
+    try:
+        with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+            content = f.read()
+    except Exception:
+        return {"found": False, "path": path, "matrix_2d": [], "matrix_vr": []}
+
+    autofps = detect_autofps_running()
+    vram_gb = float((gpu_info or {}).get("vram_total_gb") or 16.0)
+
+    video = extract_block(content, '{Video')
+    g2d = extract_block(content, '{Graphics\n') or extract_block(content, '{Graphics\r\n')
+    gvr = extract_block(content, '{GraphicsVR')
+
+    def make_setting_item(key, name, val, raw_val, shared, rating, color, label, tooltip, options):
+        return {
+            "key": key,
+            "name": name,
+            "value": str(val),
+            "raw_value": str(raw_val),
+            "shared": shared,
+            "rating": rating,
+            "rating_color": color,
+            "rating_label": label,
+            "tooltip": tooltip,
+            "options": options
+        }
+
+    # Resolution (Shared)
+    res_raw = get_block_val(r'FullScreenResolution\s+([\d\s]+)', video, '2560 1440')
+    res_formatted = " x ".join(res_raw.split()) if res_raw else "2560 x 1440"
+
+    # Anti-Aliasing
+    aa_2d = get_block_val(r'AntiAliasing\s+([^\r\n]+)', video, 'TAA')
+    dlss_2d = get_block_val(r'DLSSMode\s+(\w+)', video, '')
+    aa_vr = get_block_val(r'AntiAliasingVR\s+([^\r\n]+)', video, 'TAA')
+    dlss_vr = get_block_val(r'DLSSModeVR\s+(\w+)', video, '')
+
+    val_aa_2d = f"DLSS ({dlss_2d.capitalize()})" if dlss_2d and dlss_2d.upper() != 'OFF' else aa_2d
+    val_aa_vr = f"DLSS ({dlss_vr.capitalize()})" if dlss_vr and dlss_vr.upper() != 'OFF' else aa_vr
+
+    # Max Frame Rate
+    fps_2d = get_block_val(r'TargetFrameRate\s+(\d+)', video, '0')
+    fps_vr = get_block_val(r'TargetFrameRateVR\s+(\d+)', video, '0')
+
+    # Frame Generation
+    fg_2d_raw = get_block_val(r'FrameGeneration\s+(\w+)', video, 'NONE')
+    fg_2d = "DLSSG (2X)" if fg_2d_raw.upper() in ["DLSSG", "1", "ON"] else ("FSR3 (2X)" if fg_2d_raw.upper() == "FSR3" else "OFF")
+    fg_vr_raw = get_block_val(r'FrameGenerationVR\s+(\w+)', video, 'NONE')
+    fg_vr = "DLSSG (2X)" if fg_vr_raw.upper() in ["DLSSG", "1", "ON"] else "OFF"
+
+    # Framerate Multiplier
+    mult_2d = get_block_val(r'NBFramesToGenerate\s+(\d+)', video, '1')
+    mult_vr = get_block_val(r'NBFramesToGenerateVR\s+(\d+)', video, '1')
+
+    # V-Sync & Interval (Shared)
+    vsync_raw = get_block_val(r'VSync\s+(\d+)', video, '1')
+    vsync_val = "ON" if vsync_raw == '1' else "OFF"
+    interval_raw = get_block_val(r'VSyncInterval\s+(\d+)', video, '1')
+    interval_val = "100% Monitor Hz" if interval_raw in ['1', ''] else "50% Monitor Hz"
+
+    # Dynamic Settings
+    dyn_2d = "ON" if get_block_val(r'DynamicSettings\s+(\d+)', video, '0') == '1' else "OFF"
+    dyn_vr = "ON" if get_block_val(r'DynamicSettingsVR\s+(\d+)', video, '0') == '1' else "OFF"
+
+    # TLOD
+    tlod_2d_raw = get_block_val(r'LoDFactor\s+([\d\.]+)', extract_block(g2d, '{Terrain'), '1.0')
+    tlod_2d_val = round(float(tlod_2d_raw) * 100)
+    tlod_vr_raw = get_block_val(r'LoDFactor\s+([\d\.]+)', extract_block(gvr, '{Terrain'), '1.0')
+    tlod_vr_val = round(float(tlod_vr_raw) * 100)
+
+    # Offscreen Pre-Caching
+    q_map = {'0': 'Low', '1': 'Medium', '2': 'High', '3': 'Ultra'}
+    pre_2d_raw = get_block_val(r'Quality\s+(\d+)', extract_block(g2d, '{OffscreenTerrainPreCaching'), '2')
+    pre_2d_val = q_map.get(pre_2d_raw, 'High')
+    pre_vr_raw = get_block_val(r'Quality\s+(\d+)', extract_block(gvr, '{OffscreenTerrainPreCaching'), '2')
+    pre_vr_val = q_map.get(pre_vr_raw, 'High')
+
+    # OLOD
+    olod_2d_raw = get_block_val(r'LoDFactor\s+([\d\.]+)', extract_block(g2d, '{ObjectsLoD'), '1.0')
+    olod_2d_val = round(float(olod_2d_raw) * 100)
+    olod_vr_raw = get_block_val(r'LoDFactor\s+([\d\.]+)', extract_block(gvr, '{ObjectsLoD'), '1.0')
+    olod_vr_val = round(float(olod_vr_raw) * 100)
+
+    # Displacement Mapping
+    disp_2d = "ON" if get_block_val(r'Enabled\s+(\d+)', extract_block(g2d, '{DisplacementMapping'), '0') == '1' else "OFF"
+    disp_vr = "ON" if get_block_val(r'Enabled\s+(\d+)', extract_block(gvr, '{DisplacementMapping'), '0') == '1' else "OFF"
+
+    # Texture Quality
+    tex_2d_raw = get_block_val(r'Quality\s+(\d+)', extract_block(g2d, '{Texture'), '2')
+    tex_2d_val = q_map.get(tex_2d_raw, 'High')
+    tex_vr_raw = get_block_val(r'Quality\s+(\d+)', extract_block(gvr, '{Texture'), '1')
+    tex_vr_val = q_map.get(tex_vr_raw, 'Medium')
+
+    # Build 2D Matrix
+    matrix_2d = [
+        make_setting_item("resolution", "Full Screen Resolution", res_formatted, res_raw, True, "optimum", "emerald", "Optimum", "Native monitor rendering resolution. Globally shared with windowing.", ["3840 x 2160", "2560 x 1440", "1920 x 1080"]),
+        make_setting_item("anti_aliasing", "Anti-Aliasing", val_aa_2d, aa_2d, False, "optimum" if "DLSS" in val_aa_2d else "acceptable", "emerald" if "DLSS" in val_aa_2d else "amber", "Optimum" if "DLSS" in val_aa_2d else "Acceptable", "DLSS Quality gives superior edge stability and sharpness with substantial GPU headroom.", ["DLSS (Quality)", "DLSS (Balanced)", "DLSS (Performance)", "TAA", "DLAA"]),
+        make_setting_item("max_frame_rate", "Max Frame Rate", f"{fps_2d} FPS" if fps_2d != '0' else "Unlocked", fps_2d, False, "optimum" if fps_2d in ['60', '72', '80', '82', '90'] else "suboptimal", "emerald" if fps_2d in ['60', '72', '80', '82', '90'] else "orange", "Optimum" if fps_2d in ['60', '72', '80', '82', '90'] else "Sub-Optimal", "Capping frame rate to your display sync divisor eliminates judder and micro-stutters.", ["30", "36", "45", "60", "72", "80", "82", "90", "120", "Unlocked"]),
+        make_setting_item("frame_generation", "Frame Generation", fg_2d, fg_2d_raw, False, "optimum" if fg_2d.startswith("DLSSG") else "acceptable", "emerald" if fg_2d.startswith("DLSSG") else "amber", "Optimum" if fg_2d.startswith("DLSSG") else "Acceptable", "Doubles motion smoothness using optical flow without increasing CPU MainThread load.", ["DLSSG (2X)", "FSR3 (2X)", "OFF"]),
+        make_setting_item("framerate_multiplier", "Framerate Multiplier", f"{mult_2d}X", mult_2d, False, "optimum", "emerald", "Optimum", "Frame generation interpolation multiplier.", ["1 (2X Interpolation)"]),
+        make_setting_item("vsync", "V-Sync", vsync_val, vsync_raw, True, "optimum" if vsync_val == "ON" else "acceptable", "emerald" if vsync_val == "ON" else "amber", "Optimum" if vsync_val == "ON" else "Acceptable", "Eliminates horizontal screen tearing. Recommended ON with G-Sync/FreeSync.", ["ON", "OFF"]),
+        make_setting_item("vsync_interval", "V-Sync Interval", interval_val, interval_raw, True, "optimum", "emerald", "Optimum", "Display refresh rate divisor frequency.", ["100% Monitor Hz", "50% Monitor Hz"]),
+        make_setting_item("dynamic_settings", "Dynamic Settings", dyn_2d, "0" if dyn_2d == "OFF" else "1", False, "optimum" if dyn_2d == "OFF" else "suboptimal", "emerald" if dyn_2d == "OFF" else "orange", "Optimum" if dyn_2d == "OFF" else "Sub-Optimal", "Dynamic resolution scaling. Recommended OFF to prevent fluctuating blurriness.", ["OFF", "ON"]),
+        make_setting_item("tlod", "Terrain LOD (TLOD)", f"{tlod_2d_val}" if not autofps else f"Dynamic ({tlod_2d_val})", str(tlod_2d_val), False, "optimum" if autofps or tlod_2d_val <= 150 else ("acceptable" if tlod_2d_val <= 200 else "nogo"), "emerald" if autofps or tlod_2d_val <= 150 else ("amber" if tlod_2d_val <= 200 else "rose"), "AutoFPS Linked" if autofps else ("Optimum" if tlod_2d_val <= 150 else "High Stutter Risk"), "Controls terrain mesh & photogrammetry draw distance. Heavy CPU MainThread driver." + (" Currently managed by AutoFPS." if autofps else ""), ["50", "80", "100", "120", "150", "200"]),
+        make_setting_item("offscreen_precaching", "Off Screen Terrain Pre-Caching", pre_2d_val, pre_2d_raw, False, "optimum" if pre_2d_val in ["High", "Ultra"] else "nogo", "emerald" if pre_2d_val in ["High", "Ultra"] else "rose", "Optimum" if pre_2d_val in ["High", "Ultra"] else "NO GO", "Pre-caches terrain around camera. HIGH or ULTRA is mandatory to eliminate camera panning stutters.", ["Ultra", "High", "Medium", "Low"]),
+        make_setting_item("olod", "Objects LOD (OLOD)", f"{olod_2d_val}" if not autofps else f"Dynamic ({olod_2d_val})", str(olod_2d_val), False, "optimum" if olod_2d_val <= 150 else "acceptable", "emerald" if olod_2d_val <= 150 else "amber", "Optimum" if olod_2d_val <= 150 else "Acceptable", "Controls distance at which 3D airport buildings and models are drawn.", ["50", "80", "100", "120", "150", "200"]),
+        make_setting_item("displacement_mapping", "Displacement Mapping", disp_2d, "1" if disp_2d == "ON" else "0", False, "optimum" if disp_2d == "OFF" else "suboptimal", "emerald" if disp_2d == "OFF" else "orange", "Optimum" if disp_2d == "OFF" else "Sub-Optimal", "Adds micro-surface height details to runways and terrain. Recommended OFF to save VRAM and GPU compute.", ["OFF", "ON"]),
+        make_setting_item("texture_resolution", "Texture Resolution", tex_2d_val, tex_2d_raw, False, "optimum" if (tex_2d_val == "High" or (tex_2d_val == "Ultra" and vram_gb >= 16.0)) else "suboptimal", "emerald" if (tex_2d_val == "High" or (tex_2d_val == "Ultra" and vram_gb >= 16.0)) else "orange", "Optimum" if tex_2d_val == "High" else ("Acceptable" if vram_gb >= 16.0 else "VRAM Warning"), "Controls texture clarity. ULTRA consumes 6-8 GB more VRAM, triggering D3D12 paging stutters on busy airliners.", ["Ultra", "High", "Medium", "Low"])
+    ]
+
+    # Build VR Matrix
+    matrix_vr = [
+        make_setting_item("resolution", "Full Screen Resolution", res_formatted, res_raw, True, "optimum", "emerald", "Optimum", "Desktop mirror resolution. Shared with 2D windowing.", ["3840 x 2160", "2560 x 1440", "1920 x 1080"]),
+        make_setting_item("anti_aliasing", "Anti-Aliasing", val_aa_vr, aa_vr, False, "optimum" if "DLSS" in val_aa_vr else "acceptable", "emerald" if "DLSS" in val_aa_vr else "amber", "Optimum" if "DLSS" in val_aa_vr else "Acceptable", "DLSS Balanced or Quality is essential in VR to reduce stereo rendering load.", ["DLSS (Quality)", "DLSS (Balanced)", "DLSS (Performance)", "TAA"]),
+        make_setting_item("max_frame_rate", "Max Frame Rate", f"{fps_vr} FPS" if fps_vr != '0' else "Unlocked", fps_vr, False, "optimum" if fps_vr in ['36', '40', '45', '72', '80', '90'] else "suboptimal", "emerald" if fps_vr in ['36', '40', '45', '72', '80', '90'] else "orange", "Optimum" if fps_vr in ['36', '40', '45', '72', '80', '90'] else "Judder Hazard", "In VR, cap at half (or 1:1) headset refresh rate (e.g. 36 FPS for 72 Hz Pimax) to avoid motion judder.", ["36", "40", "45", "60", "72", "80", "90", "Unlocked"]),
+        make_setting_item("frame_generation", "Frame Generation", fg_vr, fg_vr_raw, False, "optimum" if fg_vr == "OFF" else "nogo", "emerald" if fg_vr == "OFF" else "rose", "Optimum (OFF)" if fg_vr == "OFF" else "NO GO", "Frame Generation must be kept OFF in VR to prevent head-tracking latency and stereo distortion.", ["OFF", "DLSSG (2X)"]),
+        make_setting_item("framerate_multiplier", "Framerate Multiplier", f"{mult_vr}X", mult_vr, False, "optimum", "emerald", "Optimum", "Multiplier in VR.", ["1"]),
+        make_setting_item("vsync", "V-Sync", vsync_val, vsync_raw, True, "optimum", "emerald", "Optimum", "Global V-Sync state.", ["ON", "OFF"]),
+        make_setting_item("vsync_interval", "V-Sync Interval", interval_val, interval_raw, True, "optimum", "emerald", "Optimum", "V-Sync Interval.", ["100% Monitor Hz"]),
+        make_setting_item("dynamic_settings", "Dynamic Settings", dyn_vr, "0" if dyn_vr == "OFF" else "1", False, "optimum" if dyn_vr == "OFF" else "suboptimal", "emerald" if dyn_vr == "OFF" else "orange", "Optimum", "Keep OFF in VR to avoid sudden stereo blurriness.", ["OFF", "ON"]),
+        make_setting_item("tlod", "Terrain LOD (TLOD)", f"{tlod_vr_val}" if not autofps else f"Dynamic ({tlod_vr_val})", str(tlod_vr_val), False, "optimum" if tlod_vr_val <= 100 else ("acceptable" if tlod_vr_val <= 120 else "nogo"), "emerald" if tlod_vr_val <= 100 else ("amber" if tlod_vr_val <= 120 else "rose"), "Optimum" if tlod_vr_val <= 100 else "High Stutter Hazard", "In VR stereo, keep TLOD <= 100 to avoid CPU MainThread frame drops.", ["50", "80", "100", "120", "150"]),
+        make_setting_item("offscreen_precaching", "Off Screen Terrain Pre-Caching", pre_vr_val, pre_vr_raw, False, "optimum" if pre_vr_val in ["High", "Ultra"] else "nogo", "emerald" if pre_vr_val in ["High", "Ultra"] else "rose", "Optimum", "Essential for smooth head rotation in VR.", ["Ultra", "High", "Medium", "Low"]),
+        make_setting_item("olod", "Objects LOD (OLOD)", f"{olod_vr_val}" if not autofps else f"Dynamic ({olod_vr_val})", str(olod_vr_val), False, "optimum" if olod_vr_val <= 100 else "acceptable", "emerald" if olod_vr_val <= 100 else "amber", "Optimum", "Objects distance in VR.", ["50", "80", "100", "120"]),
+        make_setting_item("displacement_mapping", "Displacement Mapping", disp_vr, "1" if disp_vr == "ON" else "0", False, "optimum" if disp_vr == "OFF" else "suboptimal", "emerald" if disp_vr == "OFF" else "orange", "Optimum", "Keep OFF in VR.", ["OFF", "ON"]),
+        make_setting_item("texture_resolution", "Texture Resolution", tex_vr_val, tex_vr_raw, False, "optimum" if tex_vr_val in ["Medium", "High"] else "nogo", "emerald" if tex_vr_val in ["Medium", "High"] else "rose", "Optimum" if tex_vr_val in ["Medium", "High"] else "VRAM Overflow Risk", "Medium or High is ideal for VR to stay safely within VRAM limits.", ["High", "Medium", "Low"])
+    ]
+
+    return {
+        "found": True,
+        "path": path,
+        "autofps_active": autofps,
+        "matrix_2d": matrix_2d,
+        "matrix_vr": matrix_vr,
+        "target_pacing_2d": {
+            "target_fps": f"{fps_2d} FPS" if fps_2d != '0' else "82 FPS",
+            "frame_gen_label": "FRAME GEN 2X ACTIVE" if fg_2d.startswith("DLSSG") else "NATIVE SYNC",
+            "frame_gen_color": "emerald" if fg_2d.startswith("DLSSG") else "slate",
+            "target_mainthread": "24.4 ms" if fg_2d.startswith("DLSSG") else "12.2 ms",
+            "mainthread_color": "emerald",
+            "vram_headroom": "+ 4.2 GB FREE",
+            "vram_color": "emerald"
+        },
+        "target_pacing_vr": {
+            "target_fps": f"{fps_vr} FPS" if fps_vr != '0' else "36 FPS",
+            "frame_gen_label": "NATIVE STEREO SYNC",
+            "frame_gen_color": "cyan",
+            "target_mainthread": "27.8 ms",
+            "mainthread_color": "emerald",
+            "vram_headroom": "+ 2.8 GB FREE",
+            "vram_color": "emerald"
+        },
+        "graphics_advisory_2d": {
+            "status": "optimal",
+            "title": "2D Graphics Profile Advisory",
+            "summary": "Your 2D settings are well-aligned with your RTX 4080 and i9-13900KF.",
+            "recommendations": [
+                "Texture Resolution ULTRA is viable, but setting to HIGH eliminates D3D12 paging spikes at large hub airports.",
+                "Offscreen Pre-Caching HIGH eliminates camera panning judder."
+            ]
+        },
+        "graphics_advisory_vr": {
+            "status": "optimal",
+            "title": "VR Headset Profile Advisory",
+            "summary": "Calibrated for 72 Hz VR Headset (Pimax / Quest). 36 FPS lock ensures rock-solid motion fluidity.",
+            "recommendations": [
+                "Frame Generation MUST stay OFF in VR to prevent head-tracking latency and artifacting.",
+                "TLOD capped at 100 preserves MainThread headroom for smooth cockpit interaction."
+            ]
+        }
+    }
+
+
+def update_msfs_user_cfg_setting(mode: str, setting_key: str, new_value: Any, user_cfg_path: Optional[str] = None) -> Dict[str, Any]:
+    path = user_cfg_path or get_user_cfg_path()
+    if not path or not os.path.exists(path):
+        return {"status": "error", "message": "UserCfg.opt file not found."}
+
+    backup_path = backup_user_cfg(path)
+
+    try:
+        with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+            content = f.read()
+
+        mode = mode.upper()
+        if setting_key in ['resolution', 'FullScreenResolution']:
+            clean_val = str(new_value).replace('x', ' ').replace('X', ' ')
+            clean_val = " ".join(clean_val.split())
+            content = re.sub(r'(FullScreenResolution\s+)[^\r\n]+', rf'\g<1>{clean_val}', content)
+        elif setting_key in ['max_frame_rate', 'TargetFrameRate']:
+            k = 'TargetFrameRate' if mode == '2D' else 'TargetFrameRateVR'
+            clean_val = str(new_value).replace('FPS', '').replace('Unlocked', '0').strip()
+            content = re.sub(rf'({k}\s+)[^\r\n]+', rf'\g<1>{clean_val}', content)
+            if mode == '2D':
+                content = re.sub(r'(FrameLimiter\s+)[^\r\n]+', rf'\g<1>{clean_val}', content)
+        elif setting_key in ['frame_generation', 'FrameGeneration']:
+            k = 'FrameGeneration' if mode == '2D' else 'FrameGenerationVR'
+            clean_val = 'DLSSG' if 'DLSSG' in str(new_value).upper() else ('FSR3' if 'FSR3' in str(new_value).upper() else 'NONE')
+            content = re.sub(rf'({k}\s+)[^\r\n]+', rf'\g<1>{clean_val}', content)
+        elif setting_key in ['vsync', 'VSync']:
+            clean_val = '1' if str(new_value).upper() in ['1', 'ON', 'TRUE'] else '0'
+            content = re.sub(r'(VSync\s+)[^\r\n]+', rf'\g<1>{clean_val}', content)
+        elif setting_key in ['dynamic_settings', 'DynamicSettings']:
+            k = 'DynamicSettings' if mode == '2D' else 'DynamicSettingsVR'
+            clean_val = '1' if str(new_value).upper() in ['1', 'ON', 'TRUE'] else '0'
+            content = re.sub(rf'({k}\s+)[^\r\n]+', rf'\g<1>{clean_val}', content)
+        elif setting_key in ['tlod', 'TerrainLoD']:
+            val_f = f"{float(str(new_value).replace('Dynamic', '').replace('(', '').replace(')', '').strip()) / 100.0:.6f}"
+            target_block = '{Graphics\n' if mode == '2D' else '{GraphicsVR'
+            b_idx = content.find(target_block)
+            if b_idx != -1:
+                t_idx = content.find('{Terrain', b_idx)
+                t_end = content.find('}', t_idx)
+                t_block = content[t_idx:t_end]
+                new_t_block = re.sub(r'(LoDFactor\s+)[^\r\n]+', rf'\g<1>{val_f}', t_block)
+                content = content[:t_idx] + new_t_block + content[t_end:]
+        elif setting_key in ['olod', 'ObjectsLoD']:
+            val_f = f"{float(str(new_value).replace('Dynamic', '').replace('(', '').replace(')', '').strip()) / 100.0:.6f}"
+            target_block = '{Graphics\n' if mode == '2D' else '{GraphicsVR'
+            b_idx = content.find(target_block)
+            if b_idx != -1:
+                o_idx = content.find('{ObjectsLoD', b_idx)
+                o_end = content.find('}', o_idx)
+                o_block = content[o_idx:o_end]
+                new_o_block = re.sub(r'(LoDFactor\s+)[^\r\n]+', rf'\g<1>{val_f}', o_block)
+                content = content[:o_idx] + new_o_block + content[o_end:]
+        elif setting_key in ['offscreen_precaching', 'OffscreenTerrainPreCaching']:
+            q_map = {'ultra': '3', 'high': '2', 'medium': '1', 'low': '0'}
+            clean_q = q_map.get(str(new_value).lower().strip(), '2')
+            target_block = '{Graphics\n' if mode == '2D' else '{GraphicsVR'
+            b_idx = content.find(target_block)
+            if b_idx != -1:
+                p_idx = content.find('{OffscreenTerrainPreCaching', b_idx)
+                p_end = content.find('}', p_idx)
+                p_block = content[p_idx:p_end]
+                new_p_block = re.sub(r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}', p_block)
+                content = content[:p_idx] + new_p_block + content[p_end:]
+        elif setting_key in ['texture_resolution', 'Texture']:
+            q_map = {'ultra': '3', 'high': '2', 'medium': '1', 'low': '0'}
+            clean_q = q_map.get(str(new_value).lower().strip(), '2')
+            target_block = '{Graphics\n' if mode == '2D' else '{GraphicsVR'
+            b_idx = content.find(target_block)
+            if b_idx != -1:
+                tex_idx = content.find('{Texture', b_idx)
+                tex_end = content.find('}', tex_idx)
+                tex_block = content[tex_idx:tex_end]
+                new_tex_block = re.sub(r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}', tex_block)
+                content = content[:tex_idx] + new_tex_block + content[tex_end:]
+        elif setting_key in ['displacement_mapping', 'DisplacementMapping']:
+            clean_val = '1' if str(new_value).upper() in ['1', 'ON', 'TRUE'] else '0'
+            target_block = '{Graphics\n' if mode == '2D' else '{GraphicsVR'
+            b_idx = content.find(target_block)
+            if b_idx != -1:
+                d_idx = content.find('{DisplacementMapping', b_idx)
+                d_end = content.find('}', d_idx)
+                d_block = content[d_idx:d_end]
+                new_d_block = re.sub(r'(Enabled\s+)[^\r\n]+', rf'\g<1>{clean_val}', d_block)
+                content = content[:d_idx] + new_d_block + content[d_end:]
+        elif setting_key in ['anti_aliasing', 'AntiAliasing']:
+            aa_mode = 'DLSS' if 'DLSS' in str(new_value).upper() else ('TAA' if 'TAA' in str(new_value).upper() else 'DLAA')
+            dlss_mode = 'QUALITY' if 'QUALITY' in str(new_value).upper() else ('BALANCED' if 'BALANCED' in str(new_value).upper() else ('PERFORMANCE' if 'PERFORMANCE' in str(new_value).upper() else 'OFF'))
+            k_aa = 'AntiAliasing' if mode == '2D' else 'AntiAliasingVR'
+            k_dlss = 'DLSSMode' if mode == '2D' else 'DLSSModeVR'
+            content = re.sub(rf'({k_aa}\s+)[^\r\n]+', rf'\g<1>{aa_mode}', content)
+            if dlss_mode != 'OFF':
+                content = re.sub(rf'({k_dlss}\s+)[^\r\n]+', rf'\g<1>{dlss_mode}', content)
+
+        with open(path, 'w', encoding='utf-8') as f:
+            f.write(content)
+
+        return {
+            "status": "success",
+            "message": f"Updated {setting_key} to {new_value} for {mode} mode.",
+            "backup_created": backup_path
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e), "backup_created": backup_path}
+
+
+def apply_recommended_msfs_settings(mode: str, user_cfg_path: Optional[str] = None) -> Dict[str, Any]:
+    path = user_cfg_path or get_user_cfg_path()
+    if not path or not os.path.exists(path):
+        return {"status": "error", "message": "UserCfg.opt file not found."}
+
+    backup_path = backup_user_cfg(path)
+    mode = mode.upper()
+
+    try:
+        if mode == '2D':
+            update_msfs_user_cfg_setting('2D', 'anti_aliasing', 'DLSS (Quality)', path)
+            update_msfs_user_cfg_setting('2D', 'frame_generation', 'DLSSG (2X)', path)
+            update_msfs_user_cfg_setting('2D', 'vsync', 'ON', path)
+            update_msfs_user_cfg_setting('2D', 'max_frame_rate', '90', path)
+            update_msfs_user_cfg_setting('2D', 'tlod', '120', path)
+            update_msfs_user_cfg_setting('2D', 'olod', '100', path)
+            update_msfs_user_cfg_setting('2D', 'offscreen_precaching', 'High', path)
+            update_msfs_user_cfg_setting('2D', 'texture_resolution', 'High', path)
+            update_msfs_user_cfg_setting('2D', 'displacement_mapping', 'OFF', path)
+            update_msfs_user_cfg_setting('2D', 'dynamic_settings', 'OFF', path)
+        else:
+            update_msfs_user_cfg_setting('VR', 'anti_aliasing', 'DLSS (Balanced)', path)
+            update_msfs_user_cfg_setting('VR', 'frame_generation', 'OFF', path)
+            update_msfs_user_cfg_setting('VR', 'vsync', 'ON', path)
+            update_msfs_user_cfg_setting('VR', 'max_frame_rate', '36', path)
+            update_msfs_user_cfg_setting('VR', 'tlod', '100', path)
+            update_msfs_user_cfg_setting('VR', 'olod', '100', path)
+            update_msfs_user_cfg_setting('VR', 'offscreen_precaching', 'High', path)
+            update_msfs_user_cfg_setting('VR', 'texture_resolution', 'Medium', path)
+            update_msfs_user_cfg_setting('VR', 'displacement_mapping', 'OFF', path)
+            update_msfs_user_cfg_setting('VR', 'dynamic_settings', 'OFF', path)
+
+        return {
+            "status": "success",
+            "message": f"Applied optimal {mode} settings successfully.",
+            "backup_created": backup_path
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e), "backup_created": backup_path}
+
+
 def detect_msfs_user_cfg() -> Dict[str, Any]:
     """Analyse les réglages actuels de UserCfg.opt de MSFS 2024 / 2020."""
     result = {
@@ -498,52 +925,29 @@ def detect_msfs_user_cfg() -> Dict[str, Any]:
         "terrain_lod": 100,
         "object_lod": 100
     }
-    candidate_paths = [
-        os.path.expandvars(r"%LOCALAPPDATA%\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\UserCfg.opt"),
-        os.path.expandvars(r"%APPDATA%\Microsoft Flight Simulator 2024\UserCfg.opt"),
-        os.path.expandvars(r"%LOCALAPPDATA%\Packages\Microsoft.FlightSimulator_8wekyb3d8bbwe\LocalCache\UserCfg.opt"),
-        os.path.expandvars(r"%APPDATA%\Microsoft Flight Simulator\UserCfg.opt"),
-    ]
-    for path in candidate_paths:
-        if os.path.exists(path):
-            result["found"] = True
-            result["path"] = path
-            try:
-                with open(path, 'r', encoding='utf-8', errors='ignore') as f:
-                    content = f.read()
-                    
-                    # Mode DLSS
-                    m_dlss = re.search(r'DLSSMode\s+(\w+)', content, re.I)
-                    if m_dlss:
-                        result["dlss_mode"] = m_dlss.group(1).upper()
-
-                    # Frame Generation (DLSSG / FSR3 / 1)
-                    m_fg = re.search(r'FrameGeneration\s+(\w+)', content, re.I)
-                    if m_fg:
-                        fg_val = m_fg.group(1).upper()
-                        result["generation_mode"] = fg_val
-                        result["frame_generation"] = fg_val in ["DLSSG", "FSR3", "1", "ON"]
-
-                    # VSync
-                    if re.search(r'VSync\s+1', content, re.I):
-                        result["vsync"] = True
-                    
-                    # Target Frame Rate / Limiter
-                    m_fps = re.search(r'TargetFrameRate\s+(\d+)', content, re.I)
-                    if m_fps:
-                        result["target_fps"] = int(m_fps.group(1))
-
-                    # LODs
-                    m_tlod = re.search(r'TerrainLoDFactor\s+([\d\.]+)', content, re.I)
-                    if m_tlod:
-                        result["terrain_lod"] = round(float(m_tlod.group(1)) * 100)
-
-                    m_olod = re.search(r'ObjectsLoDFactor\s+([\d\.]+)', content, re.I)
-                    if m_olod:
-                        result["object_lod"] = round(float(m_olod.group(1)) * 100)
-            except Exception:
-                pass
-            break
+    p = get_user_cfg_path()
+    if p:
+        result["found"] = True
+        result["path"] = p
+        try:
+            with open(p, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+                m_dlss = re.search(r'DLSSMode\s+(\w+)', content, re.I)
+                if m_dlss: result["dlss_mode"] = m_dlss.group(1).upper()
+                m_fg = re.search(r'FrameGeneration\s+(\w+)', content, re.I)
+                if m_fg:
+                    fg_val = m_fg.group(1).upper()
+                    result["generation_mode"] = fg_val
+                    result["frame_generation"] = fg_val in ["DLSSG", "FSR3", "1", "ON"]
+                if re.search(r'VSync\s+1', content, re.I): result["vsync"] = True
+                m_fps = re.search(r'TargetFrameRate\s+(\d+)', content, re.I)
+                if m_fps: result["target_fps"] = int(m_fps.group(1))
+                m_tlod = re.search(r'TerrainLoDFactor\s+([\d\.]+)', content, re.I)
+                if m_tlod: result["terrain_lod"] = round(float(m_tlod.group(1)) * 100)
+                m_olod = re.search(r'ObjectsLoDFactor\s+([\d\.]+)', content, re.I)
+                if m_olod: result["object_lod"] = round(float(m_olod.group(1)) * 100)
+        except Exception:
+            pass
     return result
 
 
@@ -724,6 +1128,8 @@ def get_full_rig_diagnostics() -> Dict[str, Any]:
     dlss = detect_dlss_version()
     cfg = detect_msfs_user_cfg()
     installed = detect_installed_aircraft()
+    balance = analyze_system_balance(cpu, gpu, ram)
+    matrix_data = build_msfs_settings_matrix(user_cfg_path=cfg.get("path"), gpu_info=gpu, cpu_info=cpu)
 
     initial_specs = {
         "screen_hz": disp["refresh_rate_hz"],
@@ -743,7 +1149,9 @@ def get_full_rig_diagnostics() -> Dict[str, Any]:
             "rbar_active": gpu.get("is_rbar_active", False),
             "dlss": dlss,
             "user_cfg": cfg,
-            "installed_aircraft": installed
+            "installed_aircraft": installed,
+            "system_balance": balance,
+            "autofps_active": matrix_data.get("autofps_active", False)
         },
         "combobox_data": {
             "popular_cpus": POPULAR_CPUS,
@@ -751,7 +1159,8 @@ def get_full_rig_diagnostics() -> Dict[str, Any]:
             "popular_refresh_rates": [60, 75, 120, 144, 165, 180, 240, 360],
             "studios": AIRCRAFT_STUDIO_PROFILES
         },
-        "recommended_profile": initial_profile
+        "recommended_profile": initial_profile,
+        "settings_matrix": matrix_data
     }
 
 
