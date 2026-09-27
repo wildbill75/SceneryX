@@ -63,6 +63,23 @@ class IO_COUNTERS(ctypes.Structure):
         ('OtherTransferCount', ctypes.c_ulonglong),
     ]
 
+TH32CS_SNAPPROCESS = 0x00000002
+CREATE_NO_WINDOW = 0x08000000
+
+class PROCESSENTRY32(ctypes.Structure):
+    _fields_ = [
+        ('dwSize', ctypes.wintypes.DWORD),
+        ('cntUsage', ctypes.wintypes.DWORD),
+        ('th32ProcessID', ctypes.wintypes.DWORD),
+        ('th32DefaultHeapID', ctypes.c_size_t),
+        ('th32ModuleID', ctypes.wintypes.DWORD),
+        ('cntThreads', ctypes.wintypes.DWORD),
+        ('th32ParentProcessID', ctypes.wintypes.DWORD),
+        ('pcPriClassBase', ctypes.c_long),
+        ('dwFlags', ctypes.wintypes.DWORD),
+        ('szExeFile', ctypes.c_char * 260)
+    ]
+
 def get_system_ram():
     stat = MEMORYSTATUSEX()
     stat.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
@@ -71,43 +88,59 @@ def get_system_ram():
     used_mb = round((stat.ullTotalPhys - stat.ullAvailPhys) / (1024 * 1024))
     return used_mb, total_mb
 
+def find_msfs_pid():
+    hSnapshot = ctypes.windll.kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+    if not hSnapshot or hSnapshot == -1:
+        return None, None
+    pe = PROCESSENTRY32()
+    pe.dwSize = ctypes.sizeof(PROCESSENTRY32)
+    found_pid = None
+    found_name = None
+    if ctypes.windll.kernel32.Process32First(hSnapshot, ctypes.byref(pe)):
+        while True:
+            exe_name = pe.szExeFile.decode('utf-8', errors='ignore').lower()
+            if 'flightsimulator' in exe_name:
+                found_pid = pe.th32ProcessID
+                found_name = pe.szExeFile.decode('utf-8', errors='ignore')
+                break
+            if not ctypes.windll.kernel32.Process32Next(hSnapshot, ctypes.byref(pe)):
+                break
+    ctypes.windll.kernel32.CloseHandle(hSnapshot)
+    return found_pid, found_name
+
 def get_msfs_process():
     try:
-        cmd = ['tasklist', '/FI', 'IMAGENAME eq FlightSimulator*', '/FO', 'CSV', '/NH']
-        out = subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL)
-        for line in out.strip().splitlines():
-            if 'FlightSimulator' in line:
-                parts = [p.strip('"') for p in line.split('","')]
-                name = parts[0]
-                pid = int(parts[1])
-                PROCESS_QUERY_INFORMATION = 0x0400
-                PROCESS_VM_READ = 0x0010
-                hProcess = ctypes.windll.kernel32.OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, False, pid)
-                if hProcess:
-                    pmc = PROCESS_MEMORY_COUNTERS_EX()
-                    pmc.cb = ctypes.sizeof(PROCESS_MEMORY_COUNTERS_EX)
-                    ctypes.windll.psapi.GetProcessMemoryInfo(hProcess, ctypes.byref(pmc), pmc.cb)
-                    
-                    # Read CPU times
-                    c, e, k, u = FILETIME(), FILETIME(), FILETIME(), FILETIME()
-                    ctypes.windll.kernel32.GetProcessTimes(hProcess, ctypes.byref(c), ctypes.byref(e), ctypes.byref(k), ctypes.byref(u))
-                    cpu_sec = ((k.dwHighDateTime << 32 | k.dwLowDateTime) + (u.dwHighDateTime << 32 | u.dwLowDateTime)) / 10000000.0
+        pid, name = find_msfs_pid()
+        if not pid:
+            return None
+        PROCESS_QUERY_INFORMATION = 0x0400
+        PROCESS_VM_READ = 0x0010
+        hProcess = ctypes.windll.kernel32.OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, False, pid)
+        if hProcess:
+            pmc = PROCESS_MEMORY_COUNTERS_EX()
+            pmc.cb = ctypes.sizeof(PROCESS_MEMORY_COUNTERS_EX)
+            ctypes.windll.psapi.GetProcessMemoryInfo(hProcess, ctypes.byref(pmc), pmc.cb)
+            
+            # Read CPU times
+            c, e, k, u = FILETIME(), FILETIME(), FILETIME(), FILETIME()
+            ctypes.windll.kernel32.GetProcessTimes(hProcess, ctypes.byref(c), ctypes.byref(e), ctypes.byref(k), ctypes.byref(u))
+            cpu_sec = ((k.dwHighDateTime << 32 | k.dwLowDateTime) + (u.dwHighDateTime << 32 | u.dwLowDateTime)) / 10000000.0
 
-                    # Read Disk & Rolling Cache IO
-                    ioc = IO_COUNTERS()
-                    ctypes.windll.kernel32.GetProcessIoCounters(hProcess, ctypes.byref(ioc))
-                    read_bytes = ioc.ReadTransferCount
-                    
-                    ctypes.windll.kernel32.CloseHandle(hProcess)
-                    return {
-                        'name': name,
-                        'pid': pid,
-                        'ram_mb': round(pmc.WorkingSetSize / (1024 * 1024), 1),
-                        'commit_mb': round(pmc.PrivateUsage / (1024 * 1024), 1),
-                        'peak_ram_mb': round(pmc.PeakWorkingSetSize / (1024 * 1024), 1),
-                        'cpu_sec': cpu_sec,
-                        'read_bytes': read_bytes
-                    }
+            # Read Disk & Rolling Cache IO
+            ioc = IO_COUNTERS()
+            ctypes.windll.kernel32.GetProcessIoCounters(hProcess, ctypes.byref(ioc))
+            read_bytes = ioc.ReadTransferCount
+            
+            ctypes.windll.kernel32.CloseHandle(hProcess)
+            return {
+                'name': name,
+                'pid': pid,
+                'ram_mb': round(pmc.WorkingSetSize / (1024 * 1024), 1),
+                'commit_mb': round(pmc.PrivateUsage / (1024 * 1024), 1),
+                'peak_ram_mb': round(pmc.PeakWorkingSetSize / (1024 * 1024), 1),
+                'cpu_sec': cpu_sec,
+                'read_bytes': read_bytes
+            }
     except Exception:
         pass
     return None
@@ -119,7 +152,7 @@ def get_nvidia_gpu_telemetry():
             '--query-gpu=memory.used,memory.total,utilization.gpu,temperature.gpu,power.draw,clocks.gr,utilization.memory',
             '--format=csv,noheader,nounits'
         ]
-        out = subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL)
+        out = subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL, creationflags=CREATE_NO_WINDOW)
         line = out.strip().splitlines()[0]
         parts = [v.strip() for v in line.split(',')]
         used = int(float(parts[0]))

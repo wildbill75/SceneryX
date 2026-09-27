@@ -24,6 +24,8 @@ if sys.platform == "win32":
     except Exception:
         pass
 
+CREATE_NO_WINDOW = 0x08000000
+
 # ==============================================================================
 # BASE DE DONNÉES MATÉRIELLE (CATÉGORIES POUR COMBOBOX FILTRABLE)
 # ==============================================================================
@@ -247,7 +249,7 @@ def detect_cpu_info() -> Dict[str, Any]:
     }
     try:
         ps_cmd = 'Get-CimInstance Win32_Processor | Select-Object -Property Name, NumberOfCores, NumberOfLogicalProcessors, MaxClockSpeed | ConvertTo-Json'
-        out = subprocess.check_output(['powershell', '-NoProfile', '-Command', ps_cmd], text=True, stderr=subprocess.DEVNULL)
+        out = subprocess.check_output(['powershell', '-NoProfile', '-Command', ps_cmd], text=True, stderr=subprocess.DEVNULL, creationflags=CREATE_NO_WINDOW)
         data = json.loads(out)
         if isinstance(data, list):
             data = data[0]
@@ -282,7 +284,7 @@ def detect_gpu_info() -> Dict[str, Any]:
             '--query-gpu=name,driver_version,memory.total',
             '--format=csv,noheader,nounits'
         ]
-        out = subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL).strip()
+        out = subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL, creationflags=CREATE_NO_WINDOW).strip()
         parts = [p.strip() for p in out.split(',')]
         if len(parts) >= 3:
             result["name"] = parts[0]
@@ -297,7 +299,7 @@ def detect_gpu_info() -> Dict[str, Any]:
     if result["vendor"] == "NVIDIA":
         try:
             cmd_bar = ['nvidia-smi', '-q', '-d', 'MEMORY']
-            out_bar = subprocess.check_output(cmd_bar, text=True, stderr=subprocess.DEVNULL)
+            out_bar = subprocess.check_output(cmd_bar, text=True, stderr=subprocess.DEVNULL, creationflags=CREATE_NO_WINDOW)
             m_bar = re.search(r'BAR1 Memory Usage\s+Total\s+:\s+(\d+)\s+MiB', out_bar)
             if m_bar:
                 result["bar1_memory_mb"] = int(m_bar.group(1))
@@ -310,7 +312,7 @@ def detect_gpu_info() -> Dict[str, Any]:
     # 3. Fallback via PowerShell / WMI pour AMD / Intel / générique
     try:
         ps_cmd = 'Get-CimInstance Win32_VideoController | Select-Object -Property Name, DriverVersion, AdapterRAM | ConvertTo-Json'
-        out = subprocess.check_output(['powershell', '-NoProfile', '-Command', ps_cmd], text=True, stderr=subprocess.DEVNULL)
+        out = subprocess.check_output(['powershell', '-NoProfile', '-Command', ps_cmd], text=True, stderr=subprocess.DEVNULL, creationflags=CREATE_NO_WINDOW)
         data = json.loads(out)
         if isinstance(data, list):
             data = data[0]
@@ -340,7 +342,7 @@ def detect_ram_and_xmp() -> Dict[str, Any]:
     }
     try:
         ps_cmd = 'Get-CimInstance Win32_PhysicalMemory | Select-Object -Property Capacity, Speed, ConfiguredClockSpeed | ConvertTo-Json'
-        out = subprocess.check_output(['powershell', '-NoProfile', '-Command', ps_cmd], text=True, stderr=subprocess.DEVNULL)
+        out = subprocess.check_output(['powershell', '-NoProfile', '-Command', ps_cmd], text=True, stderr=subprocess.DEVNULL, creationflags=CREATE_NO_WINDOW)
         data = json.loads(out)
         if not isinstance(data, list):
             data = [data]

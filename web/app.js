@@ -15586,6 +15586,10 @@ function closeFlightOptimizerModal() {
         modal.classList.remove('flex');
     }
     closeAllComboboxes();
+    if (blackboxTelemetryInterval && !isBlackboxRunning) {
+        clearInterval(blackboxTelemetryInterval);
+        blackboxTelemetryInterval = null;
+    }
 }
 
 function switchOptimizerTab(tabName) {
@@ -15896,6 +15900,7 @@ function startBlackboxTelemetryPolling() {
     blackboxTelemetryInterval = setInterval(async () => {
         const modal = document.getElementById('flight-optimizer-modal');
         if (!modal || modal.classList.contains('hidden')) return;
+        if (currentOptimizerTab !== 'blackbox' && !isBlackboxRunning) return;
         if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.get_live_blackbox_telemetry) return;
 
         try {
