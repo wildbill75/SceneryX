@@ -677,11 +677,17 @@
         #map.countries-inactive .leaflet-overlay-pane path {
             cursor: inherit !important;
             pointer-events: none !important;
-        /* Uniform styling for combobox inputs and select dropdowns */
+        }
+
+        /* Uniform styling for combobox inputs and select dropdowns: hide inner browser arrow */
+        input::-webkit-calendar-picker-indicator,
         input[list]::-webkit-calendar-picker-indicator {
             display: none !important;
             -webkit-appearance: none !important;
             opacity: 0 !important;
+            width: 0 !important;
+            height: 0 !important;
+            pointer-events: none !important;
         }
     </style>
 </head>
@@ -2561,46 +2567,43 @@
     </div>
 
     <!-- OPTIMIZATION CALIBRATION FEEDBACK MODAL -->
-    <div id="opt-feedback-modal" class="hidden fixed inset-0 z-[3200] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div id="opt-feedback-modal" style="display: none;" class="fixed inset-0 z-[9999] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
         <div class="w-[520px] max-w-[95vw] rounded-3xl p-5 shadow-2xl border border-slate-700 bg-slate-900 flex flex-col space-y-3.5 text-slate-100 select-none">
             <div class="flex items-center justify-between pb-3 border-b border-slate-800">
                 <div class="flex items-center gap-2.5">
-                    <div class="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-                        <i class="fa-solid fa-circle-check text-sm"></i>
-                    </div>
+                    <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-600 text-white uppercase">OK</span>
                     <div>
-                        <h3 class="text-base font-bold text-white tracking-tight">Graphics Calibration Applied</h3>
-                        <span id="opt-feedback-subtitle" class="text-xs text-emerald-400 font-bold">Profile successfully saved to UserCfg.opt</span>
+                        <h3 class="text-base font-bold text-white tracking-tight uppercase">Graphics Profile Optimized</h3>
+                        <span id="opt-feedback-subtitle" class="text-xs text-emerald-400 font-bold">Settings successfully written to UserCfg.opt</span>
                     </div>
                 </div>
-                <button onclick="closeOptFeedbackModal()" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center transition-all cursor-pointer">
-                    <i class="fa-solid fa-xmark text-sm"></i>
+                <button onclick="closeOptFeedbackModal()" class="px-3 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-mono text-xs font-bold transition-all cursor-pointer">
+                    FERMER
                 </button>
             </div>
             <div class="p-3 rounded-2xl bg-slate-950 border border-slate-800 space-y-2 text-xs font-mono">
                 <div class="flex items-center justify-between">
                     <span class="text-slate-400">Target Mode:</span>
-                    <span id="opt-feedback-mode" class="font-bold text-white">2D DISPLAY</span>
+                    <span id="opt-feedback-mode" class="font-bold text-white uppercase">2D DISPLAY</span>
                 </div>
                 <div class="flex items-center justify-between">
                     <span class="text-slate-400">Flight Mission:</span>
-                    <span id="opt-feedback-profile" class="font-bold text-indigo-400">IFR AIRLINER</span>
+                    <span id="opt-feedback-profile" class="font-bold text-indigo-400 uppercase">IFR AIRLINER</span>
                 </div>
                 <div class="flex items-center justify-between">
                     <span class="text-slate-400">Safety Backup:</span>
                     <span id="opt-feedback-backup" class="text-[11px] text-cyan-400 font-bold truncate max-w-[280px]">UserCfg.opt.backup_...</span>
                 </div>
             </div>
-            <div id="opt-feedback-details" class="p-3 rounded-2xl bg-slate-950/70 border border-slate-800/80 text-xs text-slate-300 space-y-1">
+            <div id="opt-feedback-details" class="p-3 rounded-2xl bg-slate-950/70 border border-slate-800/80 text-xs text-slate-300 space-y-1.5 font-mono">
                 <!-- Key applied settings bullets -->
             </div>
             <div class="flex items-center justify-between pt-2 border-t border-slate-800">
-                <button onclick="openUserCfgBackupModal()" class="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 font-bold text-xs transition-all cursor-pointer flex items-center gap-1.5">
-                    <i class="fa-solid fa-clock-rotate-left text-xs"></i>
-                    <span>View Backups</span>
+                <button onclick="openUserCfgBackupModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 font-bold text-xs transition-all cursor-pointer font-mono uppercase">
+                    View Backups
                 </button>
-                <button onclick="closeOptFeedbackModal()" class="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition-all cursor-pointer">
-                    Done
+                <button onclick="closeOptFeedbackModal()" class="px-6 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition-all cursor-pointer font-mono uppercase tracking-wider">
+                    OK
                 </button>
             </div>
         </div>

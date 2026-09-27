@@ -698,7 +698,286 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
     g2d = extract_block(content, '{Graphics\n') or extract_block(content, '{Graphics\r\n')
     gvr = extract_block(content, '{GraphicsVR')
 
-    def make_setting_item(key, name, val, raw_val, shared, rating, color, label, tooltip, options, page=1, is_numeric=False, min_val=0, max_val=100, step=1, tag_reason=None):
+    def resolve_setting_tradeoff(key, val, is_liner, is_vr):
+        val_str = str(val).strip()
+        v_upper = val_str.upper()
+
+        if key == "resolution":
+            return ("+ NATIVE 1:1", "Matches physical display pixels with zero scaling blur.",
+                    "- PIXEL SHADING", "Full raster fill-rate workload on GPU.")
+
+        if key == "anti_aliasing":
+            if "DLSS" in v_upper:
+                return ("+ 25% GPU HEADROOM", "DLSS Tensor upscaling saves massive GPU frame time and stabilizes edges.",
+                        "- MILD HUD GHOSTING", "Subtle temporal ghosting on fast digital cockpit displays.")
+            elif "DLAA" in v_upper:
+                return ("+ ULTRA SHARP EDGES", "AI edge smoothing at native resolution with zero upscaling blur.",
+                        "- FULL GPU WORKLOAD", "Runs at native resolution without upscaling performance boost.")
+            else:
+                return ("+ NATIVE CLARITY", "Native raster clarity without AI reconstruction artifacts.",
+                        "- HIGH GPU LOAD", "Full native shading workload reduces headroom in heavy clouds.")
+
+        if key == "max_frame_rate":
+            if any(num in val_str for num in ['30', '36', '40', '45', '60', '72', '80', '82', '90', '120']):
+                return ("+ ZERO JUDDER", "Eliminates frame pacing spikes and stutter by locking to refresh divisor.",
+                        "- CAPPED FPS", "Framerate cannot exceed locked refresh divisor.")
+            else:
+                return ("+ MAX PEAK FPS", "GPU runs uncapped for maximum instantaneous framerate.",
+                        "- PACING JITTER", "Fluctuating frame delivery times cause micro-stutters.")
+
+        if key == "frame_generation":
+            if not is_vr:
+                if any(k in v_upper for k in ["DLSSG", "FSR3", "ON", "2X"]):
+                    return ("+ 2X SMOOTHNESS", "Optical Flow doubles visual framerate without CPU MainThread penalty.",
+                            "- 10MS INPUT LAG", "Adds slight frame latency; requires NVIDIA Reflex to mitigate.")
+                else:
+                    return ("+ LOWEST LATENCY", "Pure direct yoke and flight control responsiveness.",
+                            "- 1X MOTION FPS", "Half the perceived visual motion smoothness.")
+            else:
+                if v_upper in ["OFF", "0"]:
+                    return ("+ STEREO STABILITY", "Zero motion-to-photon lag; headset reprojection works cleanly without distortion.",
+                            "- REQUIRES RAW FPS", "Demands pure native rendering performance from hardware.")
+                else:
+                    return ("+ HIGH RAW FPS", "Interpolated frames generated.",
+                            "- HEAD WARPING", "Severe stereo disorientation and tracking artifacting in VR headsets.")
+
+        if key == "framerate_multiplier":
+            return ("+ STABLE CADENCE", "Even 1:1 interpolated frame cadence.",
+                    "- FIXED RATIO", "Single interpolation pass per rendered frame.")
+
+        if key == "vsync":
+            if "ON" in v_upper:
+                return ("+ ZERO TEARING", "Eliminates horizontal screen tears during rapid camera pans.",
+                        "- BUFFER CADENCE", "Locks buffer presentation strictly to display scan cycles.")
+            else:
+                return ("+ DIRECT BUFFER", "Immediate buffer presentation without waiting for refresh cycle.",
+                        "- SCREEN TEARING", "Noticeable horizontal visual tears across runway lines during camera movement.")
+
+        if key == "dynamic_settings":
+            if "OFF" in v_upper or v_upper == "0":
+                return ("+ CRISP COCKPIT", "Guaranteed 100% render scale; instruments and labels remain razor-sharp.",
+                        "- NO AUTO THROTTLE", "GPU will not downscale resolution automatically during heavy scenes.")
+            else:
+                return ("+ DYNAMIC RELIEF", "Downscales internal render resolution when GPU is saturated.",
+                        "- BLURRY DISPLAYS", "Cockpit avionics blur unpredictably during low approaches.")
+
+        if key == "reflex":
+            if "ON" in v_upper:
+                return ("+ MIN INPUT LAG", "Drains GPU render queue for instantaneous flight control response.",
+                        "- PEAK GPU CLOCK", "Keeps GPU memory and core clocks at performance state.")
+            else:
+                return ("+ STANDARD POWER", "Standard power and clock management.",
+                        "- SLUGGISH CONTROLS", "Higher control latency during critical landing flares.")
+
+        if key == "texture_resolution":
+            if is_liner:
+                if "LOW" in v_upper:
+                    return ("+ FREES 6-8GB VRAM", "Axel LFBO rule: prevents D3D12 paging freezes at heavy hubs while vector instruments stay sharp.",
+                            "- SOFTER LIVERY", "Slightly softer exterior airframe and apron asphalt decals up close.")
+                elif "MEDIUM" in v_upper:
+                    return ("+ BALANCED VRAM", "Sharper exterior liveries and ramp textures with moderate VRAM margin.",
+                            "- 3-4GB VRAM LOAD", "Moderate VRAM consumption; safe on 16+ GB GPUs.")
+                else:
+                    return ("+ MAXIMUM DETAIL", "Ultra-sharp ground markings and exterior paint rivets.",
+                            "- D3D12 STUTTERS", "High risk of VRAM paging stutters and CTD at payware hubs.")
+            else:
+                if any(k in v_upper for k in ["HIGH", "ULTRA"]):
+                    return ("+ ULTRA REALISM", "Photorealistic cockpit placards, upholstery, and runway surface.",
+                            "- MODERATE VRAM", "Higher VRAM footprint, easily sustained by GA aircraft.")
+                else:
+                    return ("+ LOW MEMORY", "Very light memory footprint.",
+                            "- BLURRY CABIN", "Visible texture blurring on cockpit labels and close ground.")
+
+        if key == "tlod":
+            try:
+                num = int(''.join(filter(str.isdigit, val_str)) or 100)
+            except Exception:
+                num = 100
+            if is_liner:
+                if autofps or num <= 120:
+                    return ("+ FLUID FLARE", "Protects CPU MainThread; prevents landing micro-stutters at dense airports.",
+                            "- DRAW DISTANCE", "Distant mountain meshes and urban autogen simplified.")
+                else:
+                    return ("+ DISTANT DETAIL", "Crisp mountain peaks and urban skylines visible from 50 NM.",
+                            "- MAINTHREAD LAG", "Heavy CPU MainThread saturation causes stutters on short final.")
+            else:
+                if autofps or num >= 150:
+                    return ("+ VFR TOPOGRAPHY", "Sharp ridgelines, valleys, and roads for visual navigation.",
+                            "- CPU DRAW CALLS", "Higher CPU overhead, easily handled by GA aircraft.")
+                else:
+                    return ("+ HIGH FPS", "Maximum framerate for low-end CPUs.",
+                            "- SIMPLIFIED RELIEF", "Terrain geometry pops in closer during low-altitude flights.")
+
+        if key == "olod":
+            try:
+                num = int(''.join(filter(str.isdigit, val_str)) or 100)
+            except Exception:
+                num = 100
+            if num <= 120:
+                return ("+ LIGHT DRAWCALLS", "Frees CPU from rendering distant airport clutter and vehicles.",
+                        "- PROXIMITY POP-IN", "Terminal buildings and jetways pop in closer to the field.")
+            else:
+                return ("+ DENSE AIRPORTS", "Terminal buildings, hangars, and light poles visible from afar.",
+                        "- HEAVY DRAW CALLS", "Significantly increases CPU draw call overhead at major airports.")
+
+        if key == "offscreen_precaching":
+            if any(k in v_upper for k in ["HIGH", "ULTRA"]):
+                return ("+ SMOOTH PANNING", "Zero stutter when panning camera left/right around cockpit.",
+                        "- 1-2GB RAM USAGE", "Retains more scenery geometry in system RAM and VRAM.")
+            else:
+                return ("+ LOW RAM FOOTPRINT", "Unloads offscreen objects immediately.",
+                        "- PANNING FREEZES", "Noticeable micro-freezes every time camera rotates.")
+
+        if key == "volumetric_clouds":
+            if "HIGH" in v_upper:
+                return ("+ 15% CLOUD FPS", "Near-identical raymarched fidelity with strong GPU headroom in storm fronts.",
+                        "- SUBTLE NOISE", "Minor raymarching edge softness in dense overcast layers.")
+            elif "ULTRA" in v_upper:
+                return ("+ DENSE VOXELS", "Maximum cloud volume density and sharpest boundary scattering.",
+                        "- HEAVY GPU FILL", "Significant GPU framerate drop during heavy overcast approaches.")
+            else:
+                return ("+ MAX CLOUD FPS", "Lightweight raymarching passes.",
+                        "- GRAINY EDGES", "Pixelated cloud boundaries and flatter atmospheric lighting.")
+
+        if key == "buildings":
+            if any(k in v_upper for k in ["HIGH", "ULTRA"]):
+                return ("+ SHARP TERMINALS", "Crisp building facades, realistic glass windows, and roof details.",
+                        "- MINOR GPU LOAD", "Slightly higher polygon count for autogen cities.")
+            else:
+                return ("+ FAST RENDER", "Simplified building geometry.",
+                        "- FLAT GEOMETRY", "Boxy autogen buildings and low-detail terminal structures.")
+
+        if key == "trees":
+            if any(k in v_upper for k in ["HIGH", "ULTRA"]):
+                return ("+ LUSH FORESTS", "Full 3D tree canopies, deep foliage shadows, and natural woodlots.",
+                        "- GPU RASTER COST", "Modest fill-rate cost over heavily forested approaches.")
+            else:
+                return ("+ LIGHT FILL-RATE", "Sparse procedural foliage.",
+                        "- THIN CANOPY", "Sparse tree clusters and visible LOD popping on approach.")
+
+        if key == "grass":
+            if is_liner:
+                if any(k in v_upper for k in ["LOW", "MEDIUM"]):
+                    return ("+ MAX RUNWAY FPS", "Eliminates millions of unnecessary 3D grass blade triangles on concrete runways.",
+                            "- FLAT RUNWAY EDGE", "Flat turf texture along asphalt runway shoulders instead of 3D blades.")
+                else:
+                    return ("+ 3D WILDFLOWERS", "Dense 3D grass blades and flowers visible on runway shoulders.",
+                            "- USELESS DRAWCALLS", "Wastes CPU draw calls and GPU fill rate on paved airliner operations.")
+            else:
+                if any(k in v_upper for k in ["HIGH", "ULTRA"]):
+                    return ("+ BUSH REALISM", "Immersive 3D grass, flowers, and turf for grass runway landings.",
+                            "- MODERATE GPU LOAD", "GPU fill rate impact when taxiing through dense grass fields.")
+                else:
+                    return ("+ MAX VEGETATION FPS", "Lightweight procedural vegetation pass.",
+                            "- FLAT BUSH STRIPS", "Grass runways appear flat and painted without 3D depth.")
+
+        if key == "water_waves":
+            if any(k in v_upper for k in ["512", "1024", "HIGH", "ULTRA"]):
+                return ("+ REALISTIC SWELLS", "High-resolution FFT ocean swells, whitecaps, and realistic reflections.",
+                        "- COMPUTE SHADER", "Modest compute shader workload during coastal approaches.")
+            else:
+                return ("+ LIGHT COMPUTE", "Low FFT simulation overhead.",
+                        "- REPETITIVE WAVES", "Flatter water surface with repetitive ripple patterns.")
+
+        if key == "displacement_mapping":
+            if "OFF" in v_upper or v_upper == "0":
+                return ("+ SAVES VRAM", "Zero tessellation geometry overhead; saves memory bandwidth.",
+                        "- FLAT RUNWAY CRACKS", "Runway pavement seams and cracks appear flat at wheel level.")
+            else:
+                return ("+ 3D TARMAC RELIEF", "Micro-relief on runway concrete and asphalt joints.",
+                        "- EXTRA TESSELLATION", "Consumes VRAM and GPU tessellation cycles with zero airborne visibility.")
+
+        if key == "glass_cockpits":
+            if is_liner:
+                if "HIGH" not in v_upper:
+                    return ("+ SAVES 5-8MS CPU", "Throttles vector glass redraws, dramatically lowering CPU MainThread frame time.",
+                            "- LOWER DISPLAY HZ", "PFD attitude indicator updates at half or quarter refresh rate.")
+                else:
+                    return ("+ SILKY 60HZ PFD", "Vector instruments redraw every single frame with zero stepped motion.",
+                            "- SEVERE CPU STUTTERS", "Heavily overloads CPU MainThread on complex airliners like Fenix/PMDG.")
+            else:
+                if "HIGH" in v_upper:
+                    return ("+ FLUID SYNTH VISION", "Smooth synthetic vision and Garmin G1000 flight director animation.",
+                            "- MINOR CPU LOAD", "Easily sustained by GA aircraft with simple systems.")
+                else:
+                    return ("+ SAVES CPU CYCLES", "Throttles Garmin screen redraws.",
+                            "- STEPPED GAUGES", "Stepped needle movement on digital engine and airspeed gauges.")
+
+        if key == "shadow_maps":
+            if any(k in v_upper for k in ["1536", "2048", "HIGH", "ULTRA"]):
+                return ("+ RAZOR SHADOWS", "Sharp canopy, frame, and wing shadows without shimmering jagged edges.",
+                        "- VRAM SHADOW MAP", "Allocates larger shadow depth textures in VRAM.")
+            else:
+                return ("+ LOW VRAM USAGE", "Small shadow texture footprint.",
+                        "- JAGGED SHADOWS", "Pixelated, shimmering shadow borders across cockpit dashboard.")
+
+        if key == "terrain_shadows":
+            if any(k in v_upper for k in ["512", "1024", "HIGH", "ULTRA"]):
+                return ("+ ALPINE RELIEF", "Dramatic mountain ridge self-shadowing during sunrise and sunset.",
+                        "- HEIGHTFIELD LOAD", "GPU heightfield raymarching overhead in mountainous terrain.")
+            else:
+                return ("+ FAST MOUNTAINS", "Simplified terrain shadowing.",
+                        "- WASHED MOUNTAINS", "Flatter mountain ridges with reduced depth during low sun angles.")
+
+        if key == "contact_shadows":
+            if any(k in v_upper for k in ["HIGH", "ULTRA"]):
+                return ("+ TACTILE SWITCHES", "Crisp contact ambient shadows under cockpit switches, levers, and tires.",
+                        "- SCREEN SHADER", "Subtle screen-space pass overhead (< 0.2 ms).")
+            else:
+                return ("+ MAX FILL RATE", "Minimal screen-space shading.",
+                        "- FLOATING SWITCHES", "Cockpit dials and floor pedals look slightly disconnected or floating.")
+
+        if key == "ambient_occlusion":
+            if any(k in v_upper for k in ["HIGH", "ULTRA"]):
+                return ("+ NATURAL COCKPIT", "Deep crevice and corner shading; authentic enclosed cockpit feel.",
+                        "- POST-PROCESS GPU", "Requires full screen-space ambient occlusion compute pass.")
+            else:
+                return ("+ SAVES GPU FILL", "Light ambient shading pass.",
+                        "- WASHED COCKPIT", "Cockpit interior corners look flat and overly bright.")
+
+        if key == "reflections_ssr":
+            if not is_vr:
+                if any(k in v_upper for k in ["HIGH", "ULTRA"]):
+                    return ("+ WET TARMAC GLOW", "Realistic wet apron puddle reflections and canopy rain sheen.",
+                            "- 1-2 MS GPU TIME", "Screen space raymarching overhead on wet runways.")
+                else:
+                    return ("+ HIGH WET FPS", "Prevents frame drops during heavy rainy landings.",
+                            "- MATTE WATER", "Water puddles and windshield appear matte with minimal reflections.")
+            else:
+                if any(k in v_upper for k in ["LOW", "OFF"]):
+                    return ("+ STEREO FILL RATE", "Crucial for maintaining locked 45/60 FPS in VR headsets.",
+                            "- LIMITED REFLECTIONS", "Simplified cockpit glass reflections.")
+                else:
+                    return ("+ VIVID WET APRON", "Glossy wet reflections.",
+                            "- REPROJECTION DROPS", "Heavy stereo reflection overhead drops headset into reprojection.")
+
+        if key == "volumetric_lights":
+            if any(k in v_upper for k in ["HIGH", "ULTRA"]):
+                return ("+ DRAMATIC BEAMS", "Atmospheric light scattering through fog, mist, and night clouds for CAT III.",
+                        "- LIGHT VOLUME GPU", "Compute cost when intersecting multiple dense light shafts.")
+            else:
+                return ("+ FAST NIGHT FPS", "Smooth frame delivery at busy illuminated night airports.",
+                        "- FAINT SHAFTS", "Landing light beams look faint and less atmospheric in thick fog.")
+
+        if key == "anisotropic_filtering":
+            if "16X" in v_upper:
+                return ("+ SHARP RUNWAY LINES", "Razor-sharp runway threshold, centerline, and touchdown markings at acute angles.",
+                        "- TRIVIAL MEMORY BW", "Negligible < 0.1 ms impact on any modern GPU.")
+            else:
+                return ("+ MINIMAL BW", "Minimal memory bandwidth.",
+                        "- BLURRY RUNWAY", "Runway centerlines and touchdown markers blur into mud ahead of aircraft.")
+
+        if key == "windshield_effects":
+            if any(k in v_upper for k in ["HIGH", "ULTRA"]):
+                return ("+ VIVID RAIN & ICE", "Dynamic rain rivulets, wiper blade clearance, and icing accretion.",
+                        "- SHADER OVERHEAD", "Glass distortion shader pass during heavy precipitation.")
+            else:
+                return ("+ HIGH STORM FPS", "Lower shader overhead during thunderstorm flights.",
+                        "- COARSE WATER DROPS", "Simpler, less realistic raindrop physics on the glass.")
+
+        return ("+ BALANCED", "Maintains optimal frame delivery.", "- BASELINE LOAD", "Standard hardware utilization.")
+
+    def make_setting_item(key, name, val, raw_val, shared, rating, color, label, tooltip, options, page=1, is_numeric=False, min_val=0, max_val=100, step=1, tag_reason=None, is_vr=False, pro_label=None, pro_desc=None, con_label=None, con_desc=None):
         clean_lbl = str(label).upper().replace('(', ' ').replace(')', ' ').replace('-', '').strip().split()[0] if str(label).strip() else "OPTIMUM"
         if clean_lbl in ["NO", "NOGO", "RISK", "HAZARD", "ALERT"]:
             clean_lbl = "HAZARD"
@@ -713,9 +992,16 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
             clean_lbl = "OPTIMUM"
             color = "emerald"
 
+        if not pro_label or not con_label:
+            calc_pro, calc_pro_desc, calc_con, calc_con_desc = resolve_setting_tradeoff(key, val, is_liner, is_vr)
+            pro_label = pro_label or calc_pro
+            pro_desc = pro_desc or calc_pro_desc
+            con_label = con_label or calc_con
+            con_desc = con_desc or calc_con_desc
+
         return {
             "key": key,
-            "name": name,
+            "name": str(name).upper(),
             "value": str(val),
             "raw_value": str(raw_val),
             "shared": shared,
@@ -729,7 +1015,11 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
             "rating_label": clean_lbl,
             "tag_reason": tag_reason or f"Rated {clean_lbl} based on hardware pacing budget.",
             "tooltip": tooltip,
-            "options": options
+            "options": options,
+            "pro_label": pro_label,
+            "pro_desc": pro_desc,
+            "con_label": con_label,
+            "con_desc": con_desc
         }
 
     q_map = {'0': 'Low', '1': 'Medium', '2': 'High', '3': 'Ultra'}
@@ -1044,7 +1334,7 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
         make_setting_item("volumetric_clouds", "Volumetric Clouds", cld_2d_val, cld_2d_raw, False, "optimum" if cld_2d_val == "High" else "acceptable", "emerald" if cld_2d_val == "High" else "amber", "OPTIMUM" if cld_2d_val == "High" else "ACCEPTABLE", f"Description: Raymarched volumetric cloud rendering quality and boundary scattering.\nCurrent: {cld_2d_val}.\nRecommendation: HIGH delivers near-identical visual fidelity to Ultra with 15% better GPU performance in overcast weather.", q_options, page=2, tag_reason="Optimal volumetric raymarching quality without GPU fill-rate drop." if cld_2d_val == "High" else "Cloud quality may impact GPU frame rate during heavy overcast."),
         make_setting_item("buildings", "Buildings Quality", bld_2d_val, bld_2d_raw, False, "optimum" if bld_2d_val in ["High", "Ultra"] else "acceptable", "emerald" if bld_2d_val in ["High", "Ultra"] else "amber", "OPTIMUM" if bld_2d_val in ["High", "Ultra"] else "ACCEPTABLE", f"Description: Procedural 3D buildings mesh detail, window reflections, and roof textures.\nCurrent: {bld_2d_val}.\nRecommendation: HIGH or ULTRA for crisp terminal and city structures with minimal performance impact.", q_options, page=2, tag_reason="Sharp 3D building geometry and roof textures."),
         make_setting_item("trees", "Trees Quality", tree_2d_val, tree_2d_raw, False, "optimum" if tree_2d_val in ["High", "Ultra"] else "acceptable", "emerald" if tree_2d_val in ["High", "Ultra"] else "amber", "OPTIMUM" if tree_2d_val in ["High", "Ultra"] else "ACCEPTABLE", f"Description: 3D tree canopy geometry density, draw distance, and foliage shadowing.\nCurrent: {tree_2d_val}.\nRecommendation: HIGH offers rich forests and realistic canopy cover with negligible performance cost.", q_options, page=2, tag_reason="High density 3D foliage with smooth LOD transitions."),
-        make_setting_item("grass", "Grass & Bushes", grass_2d_val, grass_2d_raw, False, "optimum" if grass_2d_val in ["High", "Medium"] else "acceptable", "emerald" if grass_2d_val in ["High", "Medium"] else "amber", "OPTIMUM" if grass_2d_val in ["High", "Medium"] else "ACCEPTABLE", f"Description: Ground procedural turf, 3D grass, and wild flowers around airfields.\nCurrent: {grass_2d_val}.\nRecommendation: HIGH for GA grass airfields; MEDIUM is sufficient for paved airliner runways.", q_options, page=2, tag_reason="Natural airfield ground vegetation without excessive triangle density."),
+        make_setting_item("grass", "Grass & Bushes", grass_2d_val, grass_2d_raw, False, "optimum" if (grass_2d_val in ["Low", "Medium"] if is_liner else grass_2d_val in ["High", "Ultra"]) else ("acceptable" if is_liner or grass_2d_val == "Medium" else "suboptimal"), "emerald" if (grass_2d_val in ["Low", "Medium"] if is_liner else grass_2d_val in ["High", "Ultra"]) else ("amber" if is_liner or grass_2d_val == "Medium" else "orange"), "OPTIMUM" if (grass_2d_val in ["Low", "Medium"] if is_liner else grass_2d_val in ["High", "Ultra"]) else ("ACCEPTABLE" if is_liner or grass_2d_val == "Medium" else "SUBOPTIMAL"), f"Description: Ground procedural turf, 3D grass, and wild flowers around airfields.\nCurrent: {grass_2d_val}.\nRecommendation: {'Airliners: LOW or MEDIUM eliminates useless 3D grass triangles on concrete runways, saving CPU draw calls.' if is_liner else 'GA: HIGH or ULTRA for realistic grass airfields and bush strips.'}", q_options, page=2, tag_reason="Airliner concrete operations: Low/Medium grass eliminates millions of useless 3D turf draw calls, maximizing approach framerate." if is_liner and grass_2d_val in ["Low", "Medium"] else ("High grass generates millions of 3D vegetation triangles invisible from airliner cockpit on concrete runways." if is_liner else ("Immersive 3D grass and wildflowers for grass strips and bush runway landings." if grass_2d_val in ["High", "Ultra"] else "Low grass flattens bush runways and grass strips during VFR sightseeing.")), is_vr=False),
         make_setting_item("water_waves", "Water Waves Simulation", water_2d_val, water_2d_raw, False, "optimum" if "512" in water_2d_val or "1024" in water_2d_val else "acceptable", "emerald" if "512" in water_2d_val or "1024" in water_2d_val else "amber", "OPTIMUM" if "512" in water_2d_val or "1024" in water_2d_val else "ACCEPTABLE", f"Description: Fast Fourier Transform (FFT) ocean and lake wave simulation resolution grid.\nCurrent: {water_2d_val}.\nRecommendation: HIGH (512) for realistic open water swells without GPU compute penalty.", water_options, page=2, tag_reason="High FFT wave resolution provides realistic ocean swells and reflections."),
         make_setting_item("displacement_mapping", "Displacement Mapping", disp_2d, "1" if disp_2d == "ON" else "0", False, "optimum" if disp_2d == "OFF" else "suboptimal", "emerald" if disp_2d == "OFF" else "orange", "OPTIMUM" if disp_2d == "OFF" else "SUBOPTIMAL", f"Description: Tessellated micro-surface height displacements on runway pavement and terrain.\nCurrent: {disp_2d}.\nRecommendation: Keep OFF to save VRAM and GPU compute. Visual difference from flight altitude is imperceptible.", ["OFF", "ON"], page=2, tag_reason="Displacement mapping disabled to conserve VRAM and GPU compute." if disp_2d == "OFF" else "Enables surface tessellation at the expense of extra VRAM and draw calls."),
 
@@ -1080,7 +1370,7 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
         make_setting_item("volumetric_clouds", "Volumetric Clouds", cld_vr_val, cld_vr_raw, False, "optimum" if cld_vr_val in ["High", "Medium"] else "acceptable", "emerald" if cld_vr_val in ["High", "Medium"] else "amber", "OPTIMUM" if cld_vr_val in ["High", "Medium"] else "ACCEPTABLE", f"Description: Volumetric clouds in VR stereo.\nCurrent: {cld_vr_val}.\nRecommendation: HIGH or MEDIUM provides smooth frame pacing in VR.", q_options, page=2, tag_reason="Smooth frame pacing during cloudy flights in VR."),
         make_setting_item("buildings", "Buildings Quality", bld_vr_val, bld_vr_raw, False, "optimum" if bld_vr_val in ["High", "Medium"] else "acceptable", "emerald" if bld_vr_val in ["High", "Medium"] else "amber", "OPTIMUM" if bld_vr_val in ["High", "Medium"] else "ACCEPTABLE", f"Description: 3D building fidelity in VR.\nCurrent: {bld_vr_val}.\nRecommendation: HIGH or MEDIUM for optimal stereo performance.", q_options, page=2, tag_reason="Sharp building geometry in VR."),
         make_setting_item("trees", "Trees Quality", tree_vr_val, tree_vr_raw, False, "optimum" if tree_vr_val in ["High", "Medium"] else "acceptable", "emerald" if tree_vr_val in ["High", "Medium"] else "amber", "OPTIMUM" if tree_vr_val in ["High", "Medium"] else "ACCEPTABLE", f"Description: Trees geometry in VR.\nCurrent: {tree_vr_val}.\nRecommendation: HIGH or MEDIUM.", q_options, page=2, tag_reason="Optimized 3D trees geometry in VR."),
-        make_setting_item("grass", "Grass & Bushes", grass_vr_val, grass_vr_raw, False, "optimum" if grass_vr_val in ["Low", "Medium"] else "acceptable", "emerald" if grass_vr_val in ["Low", "Medium"] else "amber", "OPTIMUM" if grass_vr_val in ["Low", "Medium"] else "ACCEPTABLE", f"Description: Ground procedural vegetation in VR.\nCurrent: {grass_vr_val}.\nRecommendation: LOW or MEDIUM saves GPU fill rate in VR stereo.", q_options, page=2, tag_reason="Balanced vegetation density for VR stereo."),
+        make_setting_item("grass", "Grass & Bushes", grass_vr_val, grass_vr_raw, False, "optimum" if (grass_vr_val in ["Low", "Medium"] if is_liner else grass_vr_val in ["Medium", "High"]) else "acceptable", "emerald" if (grass_vr_val in ["Low", "Medium"] if is_liner else grass_vr_val in ["Medium", "High"]) else "amber", "OPTIMUM" if (grass_vr_val in ["Low", "Medium"] if is_liner else grass_vr_val in ["Medium", "High"]) else "ACCEPTABLE", f"Description: Ground procedural vegetation in VR.\nCurrent: {grass_vr_val}.\nRecommendation: LOW or MEDIUM saves GPU fill rate in VR stereo.", q_options, page=2, tag_reason="Low grass saves critical VR stereo fill rate and draw calls on airliner approaches." if is_liner and grass_vr_val in ["Low", "Medium"] else ("High grass incurs heavy stereo fill-rate penalty in VR." if is_liner else "Balanced vegetation density for VR stereo."), is_vr=True),
         make_setting_item("water_waves", "Water Waves Simulation", water_vr_val, water_vr_raw, False, "optimum" if "256" in water_vr_val or "512" in water_vr_val else "acceptable", "emerald" if "256" in water_vr_val or "512" in water_vr_val else "amber", "OPTIMUM" if "256" in water_vr_val or "512" in water_vr_val else "ACCEPTABLE", f"Description: Water FFT physics in VR.\nCurrent: {water_vr_val}.\nRecommendation: MEDIUM (256) or HIGH (512).", water_options, page=2, tag_reason="Realistic water wave physics in VR."),
         make_setting_item("displacement_mapping", "Displacement Mapping", disp_vr, "1" if disp_vr == "ON" else "0", False, "optimum" if disp_vr == "OFF" else "suboptimal", "emerald" if disp_vr == "OFF" else "orange", "OPTIMUM" if disp_vr == "OFF" else "SUBOPTIMAL", f"Description: Displacement mapping in VR.\nCurrent: {disp_vr}.\nRecommendation: Keep OFF in VR to save VRAM and GPU compute.", ["OFF", "ON"], page=2, tag_reason="Disabled displacement mapping saves GPU compute in VR."),
 
@@ -1411,7 +1701,8 @@ def apply_recommended_msfs_settings(mode: str, flight_profile: str = 'LINER', vr
             update_msfs_user_cfg_setting('2D', 'volumetric_clouds', 'High', path, create_backup=False)
             update_msfs_user_cfg_setting('2D', 'buildings', 'High', path, create_backup=False)
             update_msfs_user_cfg_setting('2D', 'trees', 'High', path, create_backup=False)
-            update_msfs_user_cfg_setting('2D', 'grass', 'High', path, create_backup=False)
+            grass_val_2d = 'Low' if is_liner else 'High'
+            update_msfs_user_cfg_setting('2D', 'grass', grass_val_2d, path, create_backup=False)
             update_msfs_user_cfg_setting('2D', 'water_waves', 'High (512)', path, create_backup=False)
             update_msfs_user_cfg_setting('2D', 'displacement_mapping', 'OFF', path, create_backup=False)
             
@@ -1428,6 +1719,7 @@ def apply_recommended_msfs_settings(mode: str, flight_profile: str = 'LINER', vr
         else:
             tex_val = 'Low' if is_liner else 'Medium'
             glass_val = 'Low (Quarter)' if is_liner else 'Medium (Half)'
+            grass_val_vr = 'Low' if is_liner else 'Medium'
             
             # Page 1
             update_msfs_user_cfg_setting('VR', 'anti_aliasing', 'DLSS (Balanced)', path, create_backup=False)
@@ -1445,7 +1737,7 @@ def apply_recommended_msfs_settings(mode: str, flight_profile: str = 'LINER', vr
             update_msfs_user_cfg_setting('VR', 'volumetric_clouds', 'High', path, create_backup=False)
             update_msfs_user_cfg_setting('VR', 'buildings', 'Medium', path, create_backup=False)
             update_msfs_user_cfg_setting('VR', 'trees', 'Medium', path, create_backup=False)
-            update_msfs_user_cfg_setting('VR', 'grass', 'Low', path, create_backup=False)
+            update_msfs_user_cfg_setting('VR', 'grass', grass_val_vr, path, create_backup=False)
             update_msfs_user_cfg_setting('VR', 'water_waves', 'Medium (256)', path, create_backup=False)
             update_msfs_user_cfg_setting('VR', 'displacement_mapping', 'OFF', path, create_backup=False)
             

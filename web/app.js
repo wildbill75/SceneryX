@@ -16610,7 +16610,7 @@ function renderMsfsSettingsMatrix() {
                            type="text"
                            id="opt-combo-${item.key}"
                            value="${displayVal}"
-                           style="color-scheme: dark;"
+                           style="color-scheme: dark; -webkit-appearance: none; appearance: none;"
                            onclick="this.select(); try{this.showPicker();}catch(e){}"
                            onfocus="this.select();"
                            onkeydown="if(event.key==='Enter'){this.blur();}"
@@ -16642,16 +16642,36 @@ function renderMsfsSettingsMatrix() {
             `;
         }
 
+        const proPill = item.pro_label ? `
+            <span class="px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-emerald-700 text-white shrink-0 cursor-help uppercase tracking-wider truncate max-w-[48%]" title="${(item.pro_desc || '').replace(/"/g, '&quot;')}">
+                ${item.pro_label}
+            </span>
+        ` : '';
+
+        const conPill = item.con_label ? `
+            <span class="px-1.5 py-0.5 rounded text-[8px] font-mono font-bold bg-slate-700 text-slate-200 shrink-0 cursor-help uppercase tracking-wider truncate max-w-[48%]" title="${(item.con_desc || '').replace(/"/g, '&quot;')}">
+                ${item.con_label}
+            </span>
+        ` : '';
+
+        const tradeOffHtml = (proPill || conPill) ? `
+            <div class="flex items-center justify-between gap-1 pt-1 border-t border-slate-800/60 overflow-hidden">
+                ${proPill}
+                ${conPill}
+            </div>
+        ` : '';
+
         return `
             <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 hover:border-slate-700 transition-all flex flex-col justify-between space-y-1.5" title="${(item.tooltip || '').replace(/"/g, '&quot;')}">
                 <div class="flex items-start justify-between gap-1">
                     <div class="flex items-center gap-1.5 flex-wrap">
-                        <span class="text-xs font-mono font-bold text-slate-200">${item.name}</span>
+                        <span class="text-xs font-mono font-bold text-slate-200">${(item.name || '').toUpperCase()}</span>
                         ${sharedBadge}
                     </div>
                     <span class="px-2 py-0.5 rounded text-[9px] font-mono font-bold uppercase tracking-wider shrink-0 shadow-sm cursor-help ${badgeColorClass}" title="${tagTooltip}">${cleanTag}</span>
                 </div>
                 ${inputHtml}
+                ${tradeOffHtml}
             </div>
         `;
     };
@@ -16722,31 +16742,35 @@ function openOptFeedbackModal(res) {
         let detailsHtml = '';
         if (currentMsfsGraphicsMode === '2D') {
             detailsHtml += `
-                <div class="flex items-center gap-1.5 text-emerald-400 font-mono"><i class="fa-solid fa-check text-[10px]"></i><span>Texture Resolution: ${currentFlightMissionProfile === 'LINER' ? 'LOW (Axel LFBO - Frees 6-8 GB VRAM)' : 'HIGH (Full Detail)'}</span></div>
-                <div class="flex items-center gap-1.5 text-emerald-400 font-mono"><i class="fa-solid fa-check text-[10px]"></i><span>Glass Cockpit Refresh: ${currentFlightMissionProfile === 'LINER' ? 'MEDIUM (Saves 5-8 ms MainThread frame time)' : 'HIGH (Full Synthetic Vision)'}</span></div>
-                <div class="flex items-center gap-1.5 text-emerald-400 font-mono"><i class="fa-solid fa-check text-[10px]"></i><span>Terrain LOD (TLOD): ${currentFlightMissionProfile === 'LINER' ? '100 (Protects MainThread from WASM avionics)' : '150 (Smooth for VFR)'}</span></div>
-                <div class="flex items-center gap-1.5 text-emerald-400 font-mono"><i class="fa-solid fa-check text-[10px]"></i><span>Anti-Aliasing & Pacing: DLSS (Quality) + Frame Generation DLSSG (2X)</span></div>
-                <div class="flex items-center gap-1.5 text-emerald-400 font-mono"><i class="fa-solid fa-check text-[10px]"></i><span>Environment & Shadows: 27 Settings Calibrated across 3 Pages</span></div>
+                <div class="flex items-center gap-2 text-emerald-400 font-mono"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded">OK</span><span>Texture Resolution: ${currentFlightMissionProfile === 'LINER' ? 'LOW (Axel LFBO - Frees 6-8 GB VRAM)' : 'HIGH (Full Detail)'}</span></div>
+                <div class="flex items-center gap-2 text-emerald-400 font-mono"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded">OK</span><span>Glass Cockpit Refresh: ${currentFlightMissionProfile === 'LINER' ? 'MEDIUM (Saves 5-8 ms MainThread frame time)' : 'HIGH (Full Synthetic Vision)'}</span></div>
+                <div class="flex items-center gap-2 text-emerald-400 font-mono"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded">OK</span><span>Terrain LOD (TLOD): ${currentFlightMissionProfile === 'LINER' ? '100 (Protects MainThread from WASM avionics)' : '150 (Smooth for VFR)'}</span></div>
+                <div class="flex items-center gap-2 text-emerald-400 font-mono"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded">OK</span><span>Anti-Aliasing & Pacing: DLSS (Quality) + Frame Generation DLSSG (2X)</span></div>
+                <div class="flex items-center gap-2 text-emerald-400 font-mono"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded">OK</span><span>Environment & Shadows: 27 Settings Calibrated across 3 Pages</span></div>
             `;
         } else {
             const targetVrFps = Math.max(30, Math.floor(currentVrRefreshRate / 2));
             detailsHtml += `
-                <div class="flex items-center gap-1.5 text-emerald-400 font-mono"><i class="fa-solid fa-check text-[10px]"></i><span>Max Frame Rate: ${targetVrFps} FPS (Exact 1/2 sync divisor for ${currentVrRefreshRate} Hz headset)</span></div>
-                <div class="flex items-center gap-1.5 text-emerald-400 font-mono"><i class="fa-solid fa-check text-[10px]"></i><span>Frame Generation: OFF (Mandatory to prevent VR latency and artifacting)</span></div>
-                <div class="flex items-center gap-1.5 text-emerald-400 font-mono"><i class="fa-solid fa-check text-[10px]"></i><span>Texture Resolution: ${currentFlightMissionProfile === 'LINER' ? 'LOW (Frees 6-8 GB VRAM, avoids compositor crashes)' : 'MEDIUM (Balanced for VFR)'}</span></div>
-                <div class="flex items-center gap-1.5 text-emerald-400 font-mono"><i class="fa-solid fa-check text-[10px]"></i><span>Glass Cockpit Refresh: LOW (Quarter rate frees stereo MainThread budget)</span></div>
-                <div class="flex items-center gap-1.5 text-emerald-400 font-mono"><i class="fa-solid fa-check text-[10px]"></i><span>VR Environment & Terrain: 27 Settings Calibrated for Zero Judder</span></div>
+                <div class="flex items-center gap-2 text-emerald-400 font-mono"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded">OK</span><span>Max Frame Rate: ${targetVrFps} FPS (Exact 1/2 sync divisor for ${currentVrRefreshRate} Hz headset)</span></div>
+                <div class="flex items-center gap-2 text-emerald-400 font-mono"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded">OK</span><span>Frame Generation: OFF (Mandatory to prevent VR latency and artifacting)</span></div>
+                <div class="flex items-center gap-2 text-emerald-400 font-mono"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded">OK</span><span>Texture Resolution: ${currentFlightMissionProfile === 'LINER' ? 'LOW (Frees 6-8 GB VRAM, avoids compositor crashes)' : 'MEDIUM (Balanced for VFR)'}</span></div>
+                <div class="flex items-center gap-2 text-emerald-400 font-mono"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded">OK</span><span>Glass Cockpit Refresh: LOW (Quarter rate frees stereo MainThread budget)</span></div>
+                <div class="flex items-center gap-2 text-emerald-400 font-mono"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded">OK</span><span>VR Environment & Terrain: 27 Settings Calibrated for Zero Judder</span></div>
             `;
         }
         detailsEl.innerHTML = detailsHtml;
     }
 
+    modal.style.display = 'flex';
     modal.classList.remove('hidden');
 }
 
 function closeOptFeedbackModal() {
     const modal = document.getElementById('opt-feedback-modal');
-    if (modal) modal.classList.add('hidden');
+    if (modal) {
+        modal.style.display = 'none';
+        modal.classList.add('hidden');
+    }
 }
 
 async function openUserCfgBackupModal() {

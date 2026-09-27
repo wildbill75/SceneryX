@@ -121,3 +121,21 @@ The graphics configuration interface features a 3-page lateral carousel with a c
 - **Single-Pass Safety Backup**: A timestamped backup (`UserCfg.opt.backup_YYYYMMDD_HHMMSS`) is generated once prior to batch optimization.
 - **Rollback Interface**: A dedicated rollback modal lists all historical backups with timestamp and file size, enabling 1-click restore.
 - **Safety Copy on Rollback**: Restoring a backup automatically creates a safety snapshot of the active file before overwriting.
+
+---
+
+## 7. Trade-Off (Pour & Contre) System & Confirmation Modal Design
+1. **Dynamic Trade-Off Pills (Pour & Contre)**:
+   - Each setting card conveys the exact visual vs. frame pacing trade-off via two solid, compact pills positioned immediately below the input field:
+     - **Pro Pill (`+ PRO`)**: Solid emerald (`bg-emerald-700 text-white font-bold text-[8px]`), highlighting the immediate performance or visual advantage (e.g. `+ MAX RUNWAY FPS`, `+ FREES 6-8GB VRAM`, `+ 2X SMOOTHNESS`). Hovering displays a detailed explanation.
+     - **Con Pill (`- CON`)**: Solid slate (`bg-slate-700 text-slate-200 font-bold text-[8px]`), detailing what is sacrificed (e.g. `- FLAT RUNWAY EDGE`, `- SOFTER LIVERY`, `- 10MS INPUT LAG`). Hovering displays a detailed explanation.
+   - **Mission-Aware Calibration**:
+     - *Airliners (IFR)*: Parameters prioritize CPU MainThread and VRAM preservation. Grass at `Low` or `Medium` is rated `OPTIMUM` because 3D grass geometry is wasted on concrete runways while consuming critical draw calls.
+     - *General Aviation (VFR)*: Parameters prioritize low-altitude visual richness. Grass at `High` or `Ultra` is rated `OPTIMUM` for bush and grass runway realism.
+2. **All-Caps Card Typography**:
+   - Setting card headers are rendered strictly in uppercase (e.g. `GRASS & BUSHES`, `TEXTURE RESOLUTION`, `TERRAIN LOD (TLOD)`).
+   - Card rating tags are single uppercase words (`OPTIMUM`, `ACCEPTABLE`, `SUBOPTIMAL`, `HAZARD`) with solid background colors and zero parenthetical text.
+3. **Instant Optimization Confirmation Modal**:
+   - Triggered upon clicking `OPTIMIZE PROFILE`.
+   - Renders a focused dialog displaying the target display mode, active flight mission profile, generated safety backup path, and an icon-free summary list with solid `[OK]` badges.
+
