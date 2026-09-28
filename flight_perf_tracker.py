@@ -1054,29 +1054,62 @@ def generate_html_report(csv_path, session_info, samples):
     io_reads_mbps = [s.get('cache_read_mbps', 0) for s in samples]
 
     fps_vals = [s['disp_fps'] for s in samples if s.get('disp_fps') is not None]
+    base_fps_vals = [s['base_fps'] for s in samples if s.get('base_fps') is not None]
     mainthread_vals = [s['main_thread_ms'] for s in samples if s.get('main_thread_ms') is not None]
 
-    peak_vram = max(vram_vals) if vram_vals else 0
-    avg_vram = round(sum(vram_vals) / len(vram_vals), 1) if vram_vals else 0
-    total_vram = samples[0].get('vram_total', 16376) if samples else 16376
-    peak_vram_pct = round((peak_vram / total_vram) * 100, 1) if total_vram else 0
-
-    peak_ram = max(msfs_ram_vals) if msfs_ram_vals else 0
-    avg_ram = round(sum(msfs_ram_vals) / len(msfs_ram_vals), 1) if msfs_ram_vals else 0
-
-    peak_commit = max(msfs_commit_vals) if msfs_commit_vals else 0
-    avg_commit = round(sum(msfs_commit_vals) / len(msfs_commit_vals), 1) if msfs_commit_vals else 0
-
-    avg_power = round(sum(gpu_power_vals) / len(gpu_power_vals), 1) if gpu_power_vals else 0
-    peak_power = max(gpu_power_vals) if gpu_power_vals else 0
+    # Détection Frame Generation
+    is_fg_used = any(
+        (s.get('disp_fps') and s.get('base_fps') and s['disp_fps'] >= s['base_fps'] * 1.4)
+        or ('2X' in str(s.get('fg_mode', '')).upper())
+        for s in samples
+    )
 
     avg_fps = round(sum(fps_vals) / len(fps_vals), 1) if fps_vals else "N/A"
     max_fps = max(fps_vals) if fps_vals else "N/A"
     min_fps = min(fps_vals) if fps_vals else "N/A"
 
+    avg_base_fps = round(sum(base_fps_vals) / len(base_fps_vals), 1) if base_fps_vals else "N/A"
+    max_base_fps = max(base_fps_vals) if base_fps_vals else "N/A"
+    min_base_fps = min(base_fps_vals) if base_fps_vals else "N/A"
+
     avg_mt = round(sum(mainthread_vals) / len(mainthread_vals), 1) if mainthread_vals else "N/A"
     min_mt = min(mainthread_vals) if mainthread_vals else "N/A"
     max_mt = max(mainthread_vals) if mainthread_vals else "N/A"
+
+    # VRAM (exprimée en Go)
+    peak_vram_mb = max(vram_vals) if vram_vals else 0
+    avg_vram_mb = round(sum(vram_vals) / len(vram_vals), 1) if vram_vals else 0
+    min_vram_mb = min(vram_vals) if vram_vals else 0
+    total_vram_mb = samples[0].get('vram_total', 16376) if samples else 16376
+    peak_vram_pct = round((peak_vram_mb / total_vram_mb) * 100, 1) if total_vram_mb else 0
+
+    avg_vram_gb = round(avg_vram_mb / 1024.0, 1)
+    min_vram_gb = round(min_vram_mb / 1024.0, 1)
+    peak_vram_gb = round(peak_vram_mb / 1024.0, 1)
+    total_vram_gb = round(total_vram_mb / 1024.0, 1)
+
+    # RAM Working Set (exprimée en Go)
+    peak_ram_mb = max(msfs_ram_vals) if msfs_ram_vals else 0
+    avg_ram_mb = round(sum(msfs_ram_vals) / len(msfs_ram_vals), 1) if msfs_ram_vals else 0
+    min_ram_mb = min(msfs_ram_vals) if msfs_ram_vals else 0
+
+    avg_ram_gb = round(avg_ram_mb / 1024.0, 1)
+    min_ram_gb = round(min_ram_mb / 1024.0, 1)
+    peak_ram_gb = round(peak_ram_mb / 1024.0, 1)
+
+    # RAM Commit (exprimée en Go)
+    peak_commit_mb = max(msfs_commit_vals) if msfs_commit_vals else 0
+    avg_commit_mb = round(sum(msfs_commit_vals) / len(msfs_commit_vals), 1) if msfs_commit_vals else 0
+    min_commit_mb = min(msfs_commit_vals) if msfs_commit_vals else 0
+
+    avg_commit_gb = round(avg_commit_mb / 1024.0, 1)
+    min_commit_gb = round(min_commit_mb / 1024.0, 1)
+    peak_commit_gb = round(peak_commit_mb / 1024.0, 1)
+
+    # Puissance GPU
+    avg_power = round(sum(gpu_power_vals) / len(gpu_power_vals), 1) if gpu_power_vals else 0
+    peak_power = round(max(gpu_power_vals), 1) if gpu_power_vals else 0
+    min_power = round(min(gpu_power_vals), 1) if gpu_power_vals else 0
 
     mode_title = session_info['mode_str']
     is_corridor = session_info['is_corridor']
@@ -1145,6 +1178,36 @@ def generate_html_report(csv_path, session_info, samples):
         milestones_section = ""
 
     narrative_section = generate_automated_flight_narrative(samples, session_info)
+
+    # Formatage des Cartes KPI (Moyenne en gros, Min/Pic en petit, Go pour mémoire)
+    if is_fg_used and avg_base_fps != "N/A":
+        card_fps_title = "FPS Moyens (Frame Gen)"
+        card_fps_val = f'{avg_fps} <span style="font-size:16px;">FPS</span> <span style="font-size:15px; color:#38bdf8; font-weight:normal;">({avg_base_fps} base)</span>'
+        card_fps_sub = f"Pic : {max_fps} FPS ({max_base_fps} base) • Min : {min_fps} FPS ({min_base_fps} base)"
+    else:
+        card_fps_title = "FPS Moyens (Natif)"
+        card_fps_val = f'{avg_fps} <span style="font-size:16px;">FPS</span>'
+        card_fps_sub = f"Pic : {max_fps} FPS • Min : {min_fps} FPS"
+
+    card_mt_title = "MainThread CPU Moyen"
+    card_mt_val = f'{avg_mt} <span style="font-size:16px;">ms</span>'
+    card_mt_sub = f"Meilleur : {min_mt} ms • Pic : {max_mt} ms"
+
+    card_vram_title = "VRAM GPU Moyenne"
+    card_vram_val = f'{avg_vram_gb} <span style="font-size:16px;">Go</span>'
+    card_vram_sub = f"Pic : {peak_vram_gb} Go ({peak_vram_pct}% de {total_vram_gb} Go) • Min : {min_vram_gb} Go"
+
+    card_ram_title = "RAM MSFS Moyenne (Physique)"
+    card_ram_val = f'{avg_ram_gb} <span style="font-size:16px;">Go</span>'
+    card_ram_sub = f"Pic : {peak_ram_gb} Go • Min : {min_ram_gb} Go"
+
+    card_commit_title = "RAM Allouée Moyenne (Commit)"
+    card_commit_val = f'{avg_commit_gb} <span style="font-size:16px;">Go</span>'
+    card_commit_sub = f"Pic : {peak_commit_gb} Go • Min : {min_commit_gb} Go"
+
+    card_power_title = "Puissance GPU Moyenne"
+    card_power_val = f'{avg_power} <span style="font-size:16px;">W</span>'
+    card_power_sub = f"Pic : {peak_power} W • Min : {min_power} W"
 
     html = f"""<!DOCTYPE html>
 <html lang="fr">
@@ -1270,39 +1333,39 @@ def generate_html_report(csv_path, session_info, samples):
 
         <div class="grid">
             <div class="card">
-                <div class="card-title">FPS Affichés (Frame Gen)</div>
-                <div class="card-val" style="color: #10b981;">{avg_fps} <span style="font-size:16px;">FPS</span></div>
-                <div class="card-sub">Crête : {max_fps} FPS • Min : {min_fps} FPS</div>
+                <div class="card-title">{card_fps_title}</div>
+                <div class="card-val" style="color: #10b981;">{card_fps_val}</div>
+                <div class="card-sub">{card_fps_sub}</div>
             </div>
 
             <div class="card">
-                <div class="card-title">MainThread CPU</div>
-                <div class="card-val" style="color: #f59e0b;">{avg_mt} <span style="font-size:16px;">ms</span></div>
-                <div class="card-sub">Meilleur : {min_mt} ms • Max : {max_mt} ms</div>
+                <div class="card-title">{card_mt_title}</div>
+                <div class="card-val" style="color: #f59e0b;">{card_mt_val}</div>
+                <div class="card-sub">{card_mt_sub}</div>
             </div>
 
             <div class="card">
-                <div class="card-title">VRAM GPU Maximale</div>
-                <div class="card-val" style="color: #38bdf8;">{peak_vram:,.0f} Mo</div>
-                <div class="card-sub">{peak_vram_pct}% de {total_vram:,.0f} Mo • Moyenne : {avg_vram:,.0f} Mo</div>
+                <div class="card-title">{card_vram_title}</div>
+                <div class="card-val" style="color: #38bdf8;">{card_vram_val}</div>
+                <div class="card-sub">{card_vram_sub}</div>
             </div>
 
             <div class="card">
-                <div class="card-title">RAM MSFS (Working Set)</div>
-                <div class="card-val">{peak_ram:,.0f} Mo</div>
-                <div class="card-sub">{round(peak_ram/1024, 1)} Go Crête • Moyenne : {round(avg_ram/1024, 1)} Go</div>
+                <div class="card-title">{card_ram_title}</div>
+                <div class="card-val">{card_ram_val}</div>
+                <div class="card-sub">{card_ram_sub}</div>
             </div>
 
             <div class="card">
-                <div class="card-title">RAM Allouée (Commit)</div>
-                <div class="card-val">{peak_commit:,.0f} Mo</div>
-                <div class="card-sub">{round(peak_commit/1024, 1)} Go Crête • Moyenne : {round(avg_commit/1024, 1)} Go</div>
+                <div class="card-title">{card_commit_title}</div>
+                <div class="card-val">{card_commit_val}</div>
+                <div class="card-sub">{card_commit_sub}</div>
             </div>
 
             <div class="card">
-                <div class="card-title">Puissance GPU (Watts)</div>
-                <div class="card-val" style="color: #eab308;">{avg_power} W</div>
-                <div class="card-sub">Moyenne vol • Crête : {peak_power} W</div>
+                <div class="card-title">{card_power_title}</div>
+                <div class="card-val" style="color: #eab308;">{card_power_val}</div>
+                <div class="card-sub">{card_power_sub}</div>
             </div>
         </div>
 
