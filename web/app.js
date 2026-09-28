@@ -17422,6 +17422,30 @@ function startBlackboxTelemetryPolling() {
                     scBadge.classList.add('hidden');
                 }
             }
+
+            const autofpsBadge = document.getElementById('opt-autofps-badge');
+            if (autofpsBadge) {
+                if (telem.autofps_active) {
+                    autofpsBadge.classList.remove('hidden');
+                } else {
+                    autofpsBadge.classList.add('hidden');
+                }
+            }
+
+            const aircraftEl = document.getElementById('opt-live-aircraft');
+            if (aircraftEl && telem.aircraft) {
+                aircraftEl.textContent = telem.aircraft;
+            }
+
+            const routeEl = document.getElementById('opt-live-route');
+            if (routeEl && telem.route_display) {
+                routeEl.textContent = telem.route_display;
+            }
+
+            const modeEl = document.getElementById('opt-live-mode');
+            if (modeEl && telem.mode_display) {
+                modeEl.textContent = telem.mode_display;
+            }
         } catch (e) {
             // silent polling catch
         }

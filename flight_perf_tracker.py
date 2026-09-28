@@ -311,6 +311,232 @@ def get_latest_autofps_data():
         pass
     return _last_autofps_cache
 
+def get_autofps_config():
+    """Lit et extrait les réglages cibles d'AutoFPS depuis le fichier de configuration actif."""
+    appdata = os.getenv('APPDATA', '')
+    cfg_path = os.path.join(appdata, 'MSFS_AutoFPS', 'MSFS2024_AutoFPS.config')
+    if not os.path.exists(cfg_path):
+        cfg_path = os.path.join(appdata, 'MSFS_AutoFPS', 'MSFS2020_AutoFPS.config')
+    if not os.path.exists(cfg_path):
+        return None
+    try:
+        import xml.etree.ElementTree as ET
+        tree = ET.parse(cfg_path)
+        root = tree.getroot()
+        settings = {}
+        for add in root.findall('.//add'):
+            k = add.get('key')
+            v = add.get('value')
+            if k and v:
+                settings[k] = v
+        return {
+            'target_fps_fg': int(settings.get('targetFpsFG', 90)),
+            'target_fps_pc': int(settings.get('targetFpsPC', 45)),
+            'target_fps_vr': int(settings.get('targetFpsVR', 36)),
+            'min_tlod': int(settings.get('minTLod', 100)),
+            'max_tlod': int(settings.get('maxTLod', 200)),
+            'alt_tlod_top': int(settings.get('AltTLODTop_SensTol', 5000)),
+            'auto_reduce_settings': settings.get('AutoReduceSettings', 'false').lower() == 'true',
+            'inc_cloud_quality': settings.get('IncCloudQNonExpert', 'false').lower() == 'true',
+            'olod_base': int(settings.get('OLODAtBase', 100)),
+            'olod_top': int(settings.get('OLODAtTop', 20))
+        }
+    except Exception:
+        return None
+
+def is_autofps_active():
+    """Détecte si AutoFPS est actif et génère des mises à jour récentes."""
+    try:
+        log_dir = os.path.expandvars(r'%APPDATA%\MSFS_AutoFPS\log')
+        if os.path.exists(log_dir):
+            logs = glob.glob(os.path.join(log_dir, 'MSFS_AutoFPS*.log'))
+            if logs:
+                latest = max(logs, key=os.path.getmtime)
+                if time.time() - os.path.getmtime(latest) < 60:
+                    return True
+    except Exception:
+        pass
+    return False
+
+def check_autofps_cloud_events():
+    """Vérifie dans les logs récents d'AutoFPS si une réduction de qualité des nuages a eu lieu."""
+    try:
+        log_dir = os.path.expandvars(r'%APPDATA%\MSFS_AutoFPS\log')
+        if not os.path.exists(log_dir):
+            return "Nominale"
+        logs = glob.glob(os.path.join(log_dir, 'MSFS_AutoFPS*.log'))
+        if not logs:
+            return "Nominale"
+        latest_log = max(logs, key=os.path.getmtime)
+        with open(latest_log, 'r', encoding='utf-8', errors='ignore') as f:
+            lines = f.readlines()
+        recent = lines[-200:]
+        reduced = False
+        initial_q = "High"
+        for l in recent:
+            if "Initial Cloud Quality" in l:
+                initial_q = l.split("Initial Cloud Quality")[-1].strip()
+            if "Reducing Cloud Quality" in l:
+                reduced = True
+        if reduced:
+            return f"Réductions automatiques déclenchées en vol (Initial : {initial_q})"
+        return f"Qualité nominale maintenue ({initial_q}) - Aucun décrochage nuages"
+    except Exception:
+        return "Qualité nominale maintenue"
+
+_AIRPORT_GEO_CACHE = None
+
+def get_airport_geo_cache():
+    global _AIRPORT_GEO_CACHE
+    if _AIRPORT_GEO_CACHE is not None:
+        return _AIRPORT_GEO_CACHE
+    
+    path = "airports.json"
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        p_frozen = os.path.join(sys._MEIPASS, "airports.json")
+        if os.path.exists(p_frozen):
+            path = p_frozen
+    if not os.path.exists(path):
+        base_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+        path = os.path.join(base_dir, "airports.json")
+
+    cache = []
+    if os.path.exists(path):
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                for icao, ap in data.items():
+                    if len(icao) == 4 and ap.get('lat') is not None and ap.get('lon') is not None:
+                        cache.append((icao, ap.get('name', ''), float(ap['lat']), float(ap['lon'])))
+        except Exception:
+            pass
+    _AIRPORT_GEO_CACHE = cache
+    return _AIRPORT_GEO_CACHE
+
+def find_nearest_airport(lat, lon):
+    if lat is None or lon is None:
+        return None, "", 999999.0
+    cache = get_airport_geo_cache()
+    if not cache:
+        return None, "", 999999.0
+
+    best_icao = None
+    best_name = ""
+    min_d_sq = 999999.0
+    for icao, name, alat, alon in cache:
+        d_sq = (lat - alat)**2 + (lon - alon)**2
+        if d_sq < min_d_sq:
+            min_d_sq = d_sq
+            best_icao = icao
+            best_name = name
+
+    nm_dist = (min_d_sq ** 0.5) * 60.0
+    return best_icao, best_name, nm_dist
+
+def resolve_flight_context(lat=None, lon=None, on_ground=False):
+    """
+    Détermine automatiquement l'appareil, la route, le point de départ
+    ou la position la plus proche selon que le joueur utilise un profil SceneryX
+    ou vole librement (au sol ou spawn en vol).
+    """
+    mode_str, is_corridor, dep, arr, dis_count, prof_slug = get_sceneryx_flight_mode()
+
+    route_display = ""
+    mode_display = "BASELINE STANDARD"
+
+    if is_corridor and dep and arr:
+        if prof_slug == 'direct':
+            mode_display = f"A ➔ B DIRECT ({dis_count} scènes isolées)"
+            route_display = f"{dep} ➔ {arr}"
+        elif prof_slug == 'simbrief':
+            mode_display = f"SIMBRIEF ({dis_count} scènes isolées)"
+            route_display = f"{dep} ➔ {arr}"
+        else:
+            mode_display = f"COULOIR ({dis_count} scènes isolées)"
+            route_display = f"{dep} ➔ {arr}"
+    else:
+        if lat is not None and lon is not None:
+            near_icao, near_name, dist_nm = find_nearest_airport(lat, lon)
+            if near_icao:
+                if on_ground or dist_nm <= 4.0:
+                    route_display = f"Départ : {near_icao} ({near_name})"
+                else:
+                    route_display = f"En vol à ~{int(round(dist_nm))} NM de {near_icao}"
+            else:
+                route_display = "Vol libre"
+        else:
+            route_display = "Vol libre (GPS en attente)"
+
+    return {
+        "route_display": route_display,
+        "mode_display": mode_display,
+        "is_corridor": is_corridor,
+        "dep": dep,
+        "arr": arr,
+        "disabled_count": dis_count,
+        "prof_slug": prof_slug
+    }
+
+def analyze_flight_milestones(samples):
+    """Analyse les paliers d'altitudes, variations de LOD et impacts de performance."""
+    if not samples:
+        return []
+    ground_samples = [s for s in samples if s.get('agl_ft') is not None and s.get('agl_ft') < 200]
+    climb_samples = [s for s in samples if s.get('agl_ft') is not None and 200 <= s.get('agl_ft') < 3000]
+    mid_samples = [s for s in samples if s.get('agl_ft') is not None and 3000 <= s.get('agl_ft') < 10000]
+    cruise_samples = [s for s in samples if s.get('agl_ft') is not None and s.get('agl_ft') >= 10000]
+
+    milestones = []
+    def avg(lst, key):
+        vals = [s[key] for s in lst if s.get(key) is not None]
+        return round(sum(vals)/len(vals), 1) if vals else 'N/A'
+    def mode_val(lst, key):
+        vals = [s[key] for s in lst if s.get(key) is not None]
+        return round(sum(vals)/len(vals)) if vals else 'N/A'
+
+    if ground_samples:
+        milestones.append({
+            'phase': 'Sol / Décollage',
+            'alt': str(mode_val(ground_samples, 'agl_ft')) + ' ft',
+            'tlod': str(mode_val(ground_samples, 'tlod')),
+            'olod': str(mode_val(ground_samples, 'olod')),
+            'fps': str(avg(ground_samples, 'disp_fps')) + ' FPS',
+            'mt': str(avg(ground_samples, 'main_thread_ms')) + ' ms',
+            'notes': 'Protection MainThread au sol (scène & avionique)'
+        })
+    if climb_samples:
+        milestones.append({
+            'phase': 'Montée Initiale',
+            'alt': '200 - 3 000 ft',
+            'tlod': str(mode_val(climb_samples, 'tlod')),
+            'olod': str(mode_val(climb_samples, 'olod')),
+            'fps': str(avg(climb_samples, 'disp_fps')) + ' FPS',
+            'mt': str(avg(climb_samples, 'main_thread_ms')) + ' ms',
+            'notes': 'Escalade progressive du TLOD'
+        })
+    if mid_samples:
+        milestones.append({
+            'phase': 'Plafond TLOD',
+            'alt': '3 000 - 10 000 ft',
+            'tlod': str(mode_val(mid_samples, 'tlod')),
+            'olod': str(mode_val(mid_samples, 'olod')),
+            'fps': str(avg(mid_samples, 'disp_fps')) + ' FPS',
+            'mt': str(avg(mid_samples, 'main_thread_ms')) + ' ms',
+            'notes': 'LOD max atteint en montée'
+        })
+    if cruise_samples:
+        milestones.append({
+            'phase': 'Croisière Haute Altitude',
+            'alt': '> 10 000 ft',
+            'tlod': str(mode_val(cruise_samples, 'tlod')),
+            'olod': str(mode_val(cruise_samples, 'olod')),
+            'fps': str(avg(cruise_samples, 'disp_fps')) + ' FPS',
+            'mt': str(avg(cruise_samples, 'main_thread_ms')) + ' ms',
+            'notes': 'Rendu horizon étendu et stabilité FPS'
+        })
+    return milestones
+
 class SimConnectTelemetryClient:
     """
     Client de télémétrie natif haute précision SimConnect.
@@ -330,6 +556,9 @@ class SimConnectTelemetryClient:
         self.vertical_speed_fpm = None
         self.airspeed_kts = None
         self.on_ground = None
+        self.aircraft_title = None
+        self.lat = None
+        self.lon = None
         self._stop_event = threading.Event()
         self._thread = None
         self._accum_fps = 0.0
@@ -360,6 +589,9 @@ class SimConnectTelemetryClient:
             self.vertical_speed_fpm = None
             self.airspeed_kts = None
             self.on_ground = None
+            self.aircraft_title = None
+            self.lat = None
+            self.lon = None
             self._accum_fps = 0.0
             self._frame_count = 0
             self._latest_instant_fps = None
@@ -406,16 +638,29 @@ class SimConnectTelemetryClient:
                             {"name": "PLANE ALT ABOVE GROUND", "units": "feet"},
                             {"name": "VERTICAL SPEED", "units": "feet/minute"},
                             {"name": "AIRSPEED INDICATED", "units": "knots"},
-                            {"name": "SIM ON GROUND", "units": "bool"}
+                            {"name": "SIM ON GROUND", "units": "bool"},
+                            {"name": "PLANE LATITUDE", "units": "degrees"},
+                            {"name": "PLANE LONGITUDE", "units": "degrees"}
                         ]
                         simdata_dd = sc.subscribe_simdata(simvars, period=PERIOD_SECOND)
                     except Exception:
                         simdata_dd = None
 
+                    # Tenter de lire le modèle d'avion (TITLE)
+                    aircraft_title = None
+                    try:
+                        title_val = sc.get_simdatum('TITLE', timeout_seconds=0.5)
+                        if title_val:
+                            aircraft_title = str(title_val).strip()
+                    except Exception:
+                        pass
+
                     self.sc = sc
                     self.simdata_dd = simdata_dd
                     with self._lock:
                         self.connected = True
+                        if aircraft_title:
+                            self.aircraft_title = aircraft_title
                         self._accum_fps = 0.0
                         self._frame_count = 0
                 except Exception:
@@ -480,6 +725,17 @@ class SimConnectTelemetryClient:
                                     self.airspeed_kts = round(float(sdata['AIRSPEED INDICATED']))
                                 if 'SIM ON GROUND' in sdata:
                                     self.on_ground = bool(sdata['SIM ON GROUND'])
+                                if 'PLANE LATITUDE' in sdata:
+                                    self.lat = float(sdata['PLANE LATITUDE'])
+                                if 'PLANE LONGITUDE' in sdata:
+                                    self.lon = float(sdata['PLANE LONGITUDE'])
+                                if not self.aircraft_title:
+                                    try:
+                                        title_val = self.sc.get_simdatum('TITLE', timeout_seconds=0.2)
+                                        if title_val:
+                                            self.aircraft_title = str(title_val).strip()
+                                    except Exception:
+                                        pass
 
                         last_calc_time = now
 
@@ -497,7 +753,10 @@ class SimConnectTelemetryClient:
                 "agl_ft": self.agl_ft,
                 "fpm": self.vertical_speed_fpm,
                 "airspeed_kts": self.airspeed_kts,
-                "on_ground": self.on_ground
+                "on_ground": self.on_ground,
+                "aircraft": self.aircraft_title,
+                "lat": self.lat,
+                "lon": self.lon
             }
 
 SIMCONNECT_CLIENT = SimConnectTelemetryClient()
@@ -571,11 +830,27 @@ def generate_automated_flight_narrative(samples, session_info):
     avg_tlod = round(sum(tlods) / len(tlods), 0) if tlods else "Fixe"
     peak_io = round(max(io_reads), 1) if io_reads else 0.0
 
+    # AutoFPS Info
+    autofps_active = session_info.get('autofps_active', False)
+    autofps_cfg = session_info.get('autofps_config', {})
+    cloud_status = session_info.get('cloud_events', 'Nominale')
+
+    autofps_diag = ""
+    if autofps_active and autofps_cfg:
+        tfps = autofps_cfg.get('target_fps_fg') or autofps_cfg.get('targetFps', '--')
+        min_t = autofps_cfg.get('min_tlod') or autofps_cfg.get('minTLod', '--')
+        max_t = autofps_cfg.get('max_tlod') or autofps_cfg.get('maxTLod', '--')
+        autofps_diag = f"<li><strong>Intégration AutoFPS Active :</strong> Cible de {tfps} FPS, plage TLOD configurée de {min_t} à {max_t}. TLOD moyen effectif mesuré à <strong>{avg_tlod}</strong>. État nuages : <em>{cloud_status}</em>.</li>"
+    elif autofps_active:
+        autofps_diag = f"<li><strong>Intégration AutoFPS Active :</strong> Ajustements dynamiques du TLOD détectés (TLOD moyen en vol : <strong>{avg_tlod}</strong>). État nuages : <em>{cloud_status}</em>.</li>"
+    else:
+        autofps_diag = f"<li><strong>Gestion LOD :</strong> AutoFPS non actif (valeurs statiques ou fixes, TLOD moyen : <strong>{avg_tlod}</strong>).</li>"
+
     # Diagnostic du goulot d'étranglement principal
     if avg_gpu >= 96 and (avg_mt != "N/A" and avg_mt <= 25.0):
         bottleneck_diag = "<strong>Profil GPU-Bound équilibré :</strong> La carte graphique RTX a tourné à plein régime avec une fluidité optimale, sans blocage sévère du MainThread."
     elif avg_mt != "N/A" and avg_mt > 30.0:
-        bottleneck_diag = f"<strong>Profil MainThread Limité ({avg_mt} ms en moyenne) :</strong> Le fil processeur principal a été le facteur limitant, typique des phases au sol avec avionique complexe (Fenix) et décors denses."
+        bottleneck_diag = f"<strong>Profil MainThread Limité ({avg_mt} ms en moyenne) :</strong> Le fil processeur principal a été le facteur limitant, typique des phases au sol avec avionique complexe et décors denses."
     else:
         bottleneck_diag = "<strong>Profil Mixte Équilibré :</strong> Répartition harmonieuse entre la charge de calcul CPU et le rendu graphique."
 
@@ -594,7 +869,7 @@ def generate_automated_flight_narrative(samples, session_info):
             <li><strong>Comportement Système & Goulot d'Étranglement :</strong> {bottleneck_diag}</li>
             <li><strong>Empreinte Mémoire Vidéo (VRAM) :</strong> {vram_diag}</li>
             <li><strong>Fluidité & Affichage :</strong> Moyenne de <strong>{avg_fps} FPS</strong> avec un MainThread de <strong>{avg_mt} ms</strong>.</li>
-            <li><strong>Gestion Dynamique LOD (AutoFPS) :</strong> TLOD moyen maintenu à <strong>{avg_tlod}</strong>. Les ajustements automatiques ont permis de soulager le RdrThread et le processeur lors des variations de charge.</li>
+            {autofps_diag}
             <li><strong>Activité Rolling Cache / Débit Disque :</strong> Pics d'accès aux textures et modèles de <strong>{peak_io} Mbps</strong> enregistrés lors des changements de zone géographique.</li>
         </ul>
         <div style="background:rgba(56, 189, 248, 0.08); border-left:3px solid #38bdf8; padding:8px 14px; border-radius:4px; font-size:12px;">
@@ -645,6 +920,67 @@ def generate_html_report(csv_path, session_info, samples):
     is_corridor = session_info['is_corridor']
     badge_color = "#10b981" if is_corridor else "#f59e0b"
     badge_text = "OPTIMISÉ SCENERYX" if is_corridor else "BASELINE STANDARD"
+
+    aircraft_display = session_info.get('aircraft') or "Non détecté / Générique"
+    route_display = session_info.get('route_display') or "Non spécifiée"
+    mode_display = session_info.get('mode_display') or session_info.get('mode_str', 'BASELINE STANDARD')
+    autofps_active = session_info.get('autofps_active', False)
+    autofps_cfg = session_info.get('autofps_config', {})
+    cloud_status = session_info.get('cloud_events', 'Nominale')
+
+    if autofps_active:
+        tfps = autofps_cfg.get('target_fps_fg') or autofps_cfg.get('targetFps', '--') if autofps_cfg else '--'
+        min_t = autofps_cfg.get('min_tlod') or autofps_cfg.get('minTLod', '--') if autofps_cfg else '--'
+        max_t = autofps_cfg.get('max_tlod') or autofps_cfg.get('maxTLod', '--') if autofps_cfg else '--'
+        cfg_sub = f" (Cible {tfps} FPS | TLOD {min_t}-{max_t})" if autofps_cfg else ""
+        autofps_badge_html = f'<span style="color:#38bdf8; font-weight:bold; font-family:monospace; background:rgba(56,189,248,0.15); border:1px solid #38bdf8; padding:3px 8px; border-radius:6px; font-size:11px;">AUTOFPS LIVE{cfg_sub}</span>'
+    else:
+        autofps_badge_html = '<span style="color:#94a3b8; font-size:11px; background:rgba(148,163,184,0.1); border:1px solid #334155; padding:3px 8px; border-radius:6px;">Inactif / Non Détecté</span>'
+
+    # Build Milestones section
+    milestones = analyze_flight_milestones(samples)
+    if milestones:
+        rows_html = ""
+        for m in milestones:
+            rows_html += f"""
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                <td style="padding:10px 12px; font-weight:bold; color:#f8fafc;">{m['phase']}</td>
+                <td style="padding:10px 12px; color:#38bdf8; font-family:monospace;">{m['alt']}</td>
+                <td style="padding:10px 12px; color:#a855f7; font-family:monospace; font-weight:bold;">{m['tlod']}</td>
+                <td style="padding:10px 12px; color:#a855f7; font-family:monospace;">{m['olod']}</td>
+                <td style="padding:10px 12px; color:#10b981; font-family:monospace; font-weight:bold;">{m['fps']}</td>
+                <td style="padding:10px 12px; color:#f59e0b; font-family:monospace; font-weight:bold;">{m['mt']}</td>
+                <td style="padding:10px 12px; color:#cbd5e1; font-size:12px;">{m['notes']}</td>
+            </tr>
+            """
+        milestones_section = f"""
+        <div class="chart-box" style="padding: 20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
+                <div class="chart-title" style="margin-bottom:0;">🏔️ Analyse des Paliers d'Altitude & Impacts LOD (AutoFPS)</div>
+                <div style="font-size:12px; color:#94a3b8;">Qualité Nuages AutoFPS : <span style="color:#38bdf8; font-weight:bold;">{cloud_status}</span></div>
+            </div>
+            <div style="overflow-x:auto;">
+                <table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">
+                    <thead>
+                        <tr style="border-bottom:1px solid #334155; color:#94a3b8; font-size:11px; text-transform:uppercase;">
+                            <th style="padding:8px 12px;">Phase de Vol</th>
+                            <th style="padding:8px 12px;">Altitude (AGL)</th>
+                            <th style="padding:8px 12px;">TLOD Moyen</th>
+                            <th style="padding:8px 12px;">OLOD Moyen</th>
+                            <th style="padding:8px 12px;">FPS Moyen</th>
+                            <th style="padding:8px 12px;">MainThread CPU</th>
+                            <th style="padding:8px 12px;">Comportement & Impact</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {rows_html}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        """
+    else:
+        milestones_section = ""
 
     narrative_section = generate_automated_flight_narrative(samples, session_info)
 
@@ -744,12 +1080,31 @@ def generate_html_report(csv_path, session_info, samples):
             </div>
         </div>
 
-        <div style="background:#1e293b; padding:12px 18px; border-radius:12px; margin-bottom:20px; font-size:13px; font-weight:600;">
-            Configuration du vol : <span style="color:#38bdf8;">{mode_title}</span>
+        <!-- EN-TETE CONTEXTUELLE DE VOL (Appareil, Route, Mode, AutoFPS) -->
+        <div style="background:#0f172a; border:1px solid #1e293b; border-radius:16px; padding:16px 20px; margin-bottom:20px; display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:16px; font-size:13px;">
+            <div>
+                <div style="color:#64748b; font-size:11px; font-weight:bold; text-transform:uppercase;">Appareil</div>
+                <div style="color:#f8fafc; font-weight:bold; font-size:15px; margin-top:2px;">{aircraft_display}</div>
+            </div>
+            <div>
+                <div style="color:#64748b; font-size:11px; font-weight:bold; text-transform:uppercase;">Route / Origine</div>
+                <div style="color:#38bdf8; font-weight:bold; font-size:15px; margin-top:2px;">{route_display}</div>
+            </div>
+            <div>
+                <div style="color:#64748b; font-size:11px; font-weight:bold; text-transform:uppercase;">Mode SceneryX</div>
+                <div style="color:#10b981; font-weight:bold; font-size:14px; margin-top:2px;">{mode_display}</div>
+            </div>
+            <div>
+                <div style="color:#64748b; font-size:11px; font-weight:bold; text-transform:uppercase;">AutoFPS</div>
+                <div style="margin-top:2px;">{autofps_badge_html}</div>
+            </div>
         </div>
 
         <!-- DIAGNOSTIC TEXTUEL EXPERT -->
         {narrative_section}
+
+        <!-- PALIERS D'ALTITUDE & IMPACTS LOD -->
+        {milestones_section}
 
         <div class="grid">
             <div class="card">
@@ -1220,11 +1575,27 @@ def main():
         print(f" RAM Allouée Max  : {peak_msfs_commit:,.0f} Mo")
         print("=" * 80)
 
+        last_sc = SIMCONNECT_CLIENT.get_data() if SIMCONNECT_CLIENT else {}
+        final_lat = last_sc.get('lat')
+        final_lon = last_sc.get('lon')
+        final_ground = last_sc.get('on_ground', False)
+        ctx = resolve_flight_context(final_lat, final_lon, final_ground)
+        final_aircraft = last_sc.get('aircraft') or "Avion générique"
+        cloud_status = check_autofps_cloud_events()
+        autofps_cfg = get_autofps_config()
+        autofps_active = is_autofps_active()
+
         session_info = {
             'mode_str': mode_str,
             'is_corridor': is_corridor,
             'start_time': timestamp_str,
-            'duration': total_duration
+            'duration': total_duration,
+            'aircraft': final_aircraft,
+            'route_display': ctx['route_display'],
+            'mode_display': ctx['mode_display'],
+            'autofps_config': autofps_cfg,
+            'autofps_active': autofps_active,
+            'cloud_events': cloud_status
         }
         html_file = generate_html_report(csv_path, session_info, samples)
         if html_file and os.path.exists(html_file):
@@ -1261,7 +1632,11 @@ class BlackboxSession:
             "gpu_power_w": 0,
             "elapsed_sec": 0,
             "elapsed_str": "00:00",
-            "msfs_active": False
+            "msfs_active": False,
+            "aircraft": "--",
+            "route_display": "--",
+            "mode_display": "BASELINE STANDARD",
+            "autofps_active": False
         }
 
     def start(self, flight_name="flight", dep="LFPO", arr="EGKK", aircraft="Airliner"):
@@ -1300,6 +1675,17 @@ class BlackboxSession:
         telemetry["is_tracking"] = self.is_running
         telemetry["msfs_active"] = msfs is not None
         telemetry["simconnect_connected"] = sc_connected
+        telemetry["autofps_active"] = is_autofps_active()
+
+        # Context (Appareil, Route, Mode)
+        lat = sc_data.get("lat")
+        lon = sc_data.get("lon")
+        on_ground = sc_data.get("on_ground", False)
+        ctx = resolve_flight_context(lat, lon, on_ground)
+        telemetry["aircraft"] = sc_data.get("aircraft") or "Non détecté"
+        telemetry["route_display"] = ctx["route_display"]
+        telemetry["mode_display"] = ctx["mode_display"]
+
         if gpu:
             telemetry["vram_used_mb"] = gpu.get("vram_used_mb", 0)
             telemetry["vram_total_mb"] = gpu.get("vram_total_mb", 16376)
@@ -1329,6 +1715,9 @@ class BlackboxSession:
         benchmarks_dir = get_benchmarks_directory()
         timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         mode_str, is_corridor, cur_dep, cur_arr, dis_count, prof_slug = get_sceneryx_flight_mode()
+
+        autofps_cfg = get_autofps_config()
+        autofps_is_active = is_autofps_active()
 
         prefix = f"{dep or cur_dep}_{arr or cur_arr}_{aircraft or 'Flight'}"
         csv_filename = f"benchmark_{prefix}_{timestamp_str}.csv"
@@ -1404,6 +1793,13 @@ class BlackboxSession:
 
             msfs_vram = msfs.get('vram_mb', 0.0) if msfs else 0.0
 
+            # Realtime Context
+            lat = sc_data.get("lat")
+            lon = sc_data.get("lon")
+            on_ground = sc_data.get("on_ground", False)
+            ctx = resolve_flight_context(lat, lon, on_ground)
+            detected_aircraft = sc_data.get("aircraft") or aircraft or "Non détecté"
+
             self.latest_telemetry = {
                 "is_tracking": True,
                 "flight_name": self.current_flight_name,
@@ -1422,7 +1818,11 @@ class BlackboxSession:
                 "elapsed_sec": elapsed,
                 "elapsed_str": time_formatted,
                 "msfs_active": msfs is not None,
-                "simconnect_connected": sc_connected
+                "simconnect_connected": sc_connected,
+                "aircraft": detected_aircraft,
+                "route_display": ctx["route_display"],
+                "mode_display": ctx["mode_display"],
+                "autofps_active": is_autofps_active()
             }
 
             row = [
@@ -1456,8 +1856,9 @@ class BlackboxSession:
                 'tlod': tlod,
                 'olod': olod,
                 'agl': agl,
+                'agl_ft': agl,
                 'fpm': fpm,
-                'cache_mbps': cache_read_mbps,
+                'cache_read_mbps': cache_read_mbps,
                 'vram_used': v_used,
                 'vram_total': v_total,
                 'vram_pct': v_pct,
@@ -1476,11 +1877,25 @@ class BlackboxSession:
             self._stop_event.wait(0.5)
 
         if samples:
+            last_sc = SIMCONNECT_CLIENT.get_data() if SIMCONNECT_CLIENT else {}
+            final_lat = last_sc.get('lat')
+            final_lon = last_sc.get('lon')
+            final_ground = last_sc.get('on_ground', False)
+            ctx = resolve_flight_context(final_lat, final_lon, final_ground)
+            final_aircraft = last_sc.get('aircraft') or aircraft or "Avion non détecté"
+            cloud_status = check_autofps_cloud_events()
+
             session_info = {
                 'mode_str': mode_str,
                 'is_corridor': is_corridor,
                 'start_time': timestamp_str,
-                'duration': format_time_delta(round(time.time() - start_time, 1))
+                'duration': format_time_delta(round(time.time() - start_time, 1)),
+                'aircraft': final_aircraft,
+                'route_display': ctx['route_display'],
+                'mode_display': ctx['mode_display'],
+                'autofps_config': autofps_cfg,
+                'autofps_active': autofps_is_active or is_autofps_active(),
+                'cloud_events': cloud_status
             }
             html_file = generate_html_report(csv_path, session_info, samples)
             self.last_report_path = html_file
