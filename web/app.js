@@ -2540,7 +2540,7 @@ function renderConflictModalStep(index) {
                             ${src.folder_name}
                         </div>
                         <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 pt-0.5">
-                            <span><i class="fa-regular fa-folder text-slate-500 mr-1"></i>${src.source_folder || 'Community'}</span>
+                            <span>${getIcon('folder', 'w-3 h-3 text-slate-500 mr-1 inline-block')}${src.source_folder || 'Community'}</span>
                             <span>${src.size_str || ''}</span>
                         </div>
                     </div>
@@ -7189,7 +7189,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
                         <button onclick="event.stopPropagation(); openSpecificPackageFolderByIndex('${ap.icao}', ${idx})"
                                 title="${t('drawer.open_folder', 'Open Folder')}"
                                 class="w-5 h-5 rounded-md bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-amber-400 flex items-center justify-center text-[10px] transition-colors border border-slate-700/50 shadow-sm">
-                            <i class="fa-solid fa-folder-open"></i>
+                            ${getIcon('folder', 'w-3 h-3')}
                         </button>
                     </div>
                 </div>
@@ -7299,7 +7299,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
                             <button onclick="event.stopPropagation(); openSpecificPackageFolderByIndex('${ap.icao}', ${idx})"
                                     title="${t('drawer.open_folder', 'Open Folder')}"
                                     class="w-5 h-5 rounded-md bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-amber-400 flex items-center justify-center text-[10px] transition-colors border border-slate-700/50 shadow-sm">
-                                <i class="fa-solid fa-folder-open"></i>
+                                ${getIcon('folder', 'w-3 h-3')}
                             </button>
                         </div>
                     </div>
@@ -8195,7 +8195,7 @@ function renderRadialGsx(ap) {
                             Disable
                         </button>
                         <button onclick="revealGsxFile('${safePath}')" title="Reveal in Windows Explorer" class="w-7 h-7 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs border border-slate-700/60 cursor-pointer shrink-0 transition-colors flex items-center justify-center">
-                            <i class="fa-solid fa-folder-open text-xs"></i>
+                            ${getIcon('folder', 'w-3.5 h-3.5')}
                         </button>
                     </div>
                 </div>
@@ -8265,7 +8265,7 @@ function renderRadialGsx(ap) {
                                         <i class="fa-solid fa-trash text-[10px]"></i>
                                     </button>
                                     <button onclick="revealGsxFile('${safePath}')" title="Reveal in Windows Explorer" class="w-6 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs border border-slate-700/60 cursor-pointer flex items-center justify-center">
-                                        <i class="fa-solid fa-folder-open text-[10px]"></i>
+                                        ${getIcon('folder', 'w-3 h-3')}
                                     </button>
                                 </div>
                             </div>
@@ -8297,7 +8297,7 @@ function renderRadialGsx(ap) {
                                 Disable
                             </button>
                             <button onclick="revealGsxFile('${safePath}')" title="Reveal in Windows Explorer" class="w-7 h-7 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs border border-slate-700/60 cursor-pointer shrink-0 transition-colors flex items-center justify-center">
-                                <i class="fa-solid fa-folder-open text-xs"></i>
+                                ${getIcon('folder', 'w-3.5 h-3.5')}
                             </button>
                         </div>
                     </div>
@@ -8331,7 +8331,7 @@ function renderRadialGsx(ap) {
                                     <i class="fa-solid fa-trash text-[10px]"></i>
                                 </button>
                                 <button onclick="revealGsxFile('${safePath}')" title="Reveal in Windows Explorer" class="w-6 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs border border-slate-700/60 cursor-pointer flex items-center justify-center transition-colors">
-                                    <i class="fa-solid fa-folder-open text-[10px]"></i>
+                                    ${getIcon('folder', 'w-3 h-3')}
                                 </button>
                             </div>
                         </div>
@@ -10282,7 +10282,7 @@ function renderUnifiedScenerySelector(ap) {
                     <div class="flex items-center justify-between text-xs pt-0.5">
                         <span class="text-[10px] font-mono opacity-85 font-semibold">${src.source_folder} ${src.size_str ? `• ${src.size_str}` : ''}</span>
                         <button onclick="event.stopPropagation(); openSpecificPackageFolderByIndex('${ap.icao}', ${idx})" class="px-2.5 py-1 rounded-lg bg-black/30 hover:bg-black/50 text-white text-xs font-bold transition-colors flex items-center gap-1.5 cursor-pointer border-0 shadow-sm" title="${t('drawer.open_folder', 'Open Folder')}">
-                            <i class="fa-solid fa-folder"></i>
+                            ${getIcon('folder', 'w-3.5 h-3.5')}
                             <span>${t('drawer.open_folder', 'Folder')}</span>
                         </button>
                     </div>
@@ -10387,7 +10387,7 @@ function renderUnifiedScenerySelector(ap) {
                     <div class="flex items-center justify-between text-[10px] font-mono text-slate-400 pl-[48px]">
                         <span>${src.source_folder} ${src.size_str ? `• ${src.size_str}` : ''}</span>
                         <button onclick="event.stopPropagation(); openSpecificPackageFolderByIndex('${ap.icao}', ${idx})" class="text-slate-400 hover:text-white transition-colors cursor-pointer border-0 bg-transparent p-0" title="${t('drawer.open_folder', 'Open Folder')}">
-                            <i class="fa-solid fa-folder"></i>
+                            ${getIcon('folder', 'w-3.5 h-3.5')}
                         </button>
                     </div>
                 </div>
@@ -10688,7 +10688,7 @@ function showAirportDetails(ap, calledFromCountryMode = false) {
                          class="p-3 rounded-xl bg-slate-950/80 hover:bg-slate-800/80 border border-slate-800/80 hover:border-cyan-500/50 cursor-pointer flex items-center justify-between gap-2 text-xs lg:text-sm font-mono font-bold text-slate-100 hover:text-cyan-300 transition-all group shadow-sm"
                          title="${t('drawer.gsx_reveal_tooltip', 'Click to reveal GSX INI file in Explorer')}">
                         <span class="truncate">${ap.gsx_profile_filename}</span>
-                        <i class="fa-solid fa-folder text-slate-400 text-sm group-hover:text-white transition-colors"></i>
+                        ${getIcon('folder', 'w-4 h-4 text-slate-400 group-hover:text-white transition-colors')}
                     </div>
                     <div ondragover="handleGsxDragOver(event)" ondragleave="handleGsxDragLeave(event)" ondrop="handleGsxDrop(event)"
                          onclick="triggerInstallGsxProfile()"
@@ -10909,7 +10909,7 @@ function showAirportDetails(ap, calledFromCountryMode = false) {
                     <div class="flex items-center justify-between text-xs pt-0.5">
                         <span class="text-[11px] font-mono text-slate-400">${src.source_folder} ${src.size_str ? `• ${src.size_str}` : ''}</span>
                         <button onclick="openSpecificPackageFolderByIndex('${ap.icao}', ${idx})" class="${openBtnClass}" title="${t('drawer.open_folder', 'Open Folder')}">
-                            <i class="fa-solid fa-folder text-slate-400 group-hover:text-white transition-colors"></i> ${t('drawer.open_folder', 'Open Folder')}
+                            ${getIcon('folder', 'w-3.5 h-3.5 text-slate-400 group-hover:text-white transition-colors')} ${t('drawer.open_folder', 'Open Folder')}
                         </button>
                     </div>
                 </div>
@@ -10978,7 +10978,7 @@ function showAirportDetails(ap, calledFromCountryMode = false) {
                         <div class="flex items-center justify-between text-xs pt-0.5">
                             <span class="text-[11px] font-mono text-slate-400">${src.source_folder} ${src.size_str ? `• ${src.size_str}` : ''}</span>
                             <button onclick="event.stopPropagation(); openSpecificPackageFolderByIndex('${ap.icao}', ${idx})" class="${openBtnClass}" title="Open Folder">
-                                <i class="fa-solid fa-folder text-slate-400 group-hover:text-white transition-colors"></i> Open Folder
+                                ${getIcon('folder', 'w-3.5 h-3.5 text-slate-400 group-hover:text-white transition-colors')} Open Folder
                             </button>
                         </div>
                     </div>
@@ -14158,7 +14158,7 @@ function renderSettingsPathsList() {
                            oninput="updatePathValue(${index}, this.value)"
                            class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs font-mono text-slate-300 focus:outline-none focus:border-cyan-500">
                     <button onclick="browsePathFolder(${index})" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs transition-colors flex items-center gap-1.5 border-0 cursor-pointer" title="Browse / Change Folder">
-                        <i class="fa-solid fa-folder text-slate-400 group-hover:text-white transition-colors"></i>
+                        ${getIcon('folder', 'w-3.5 h-3.5 text-slate-400 group-hover:text-white transition-colors')}
                     </button>
                     <button onclick="openPathInExplorer(${index})" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs transition-colors flex items-center justify-center border-0 cursor-pointer" title="Open in Windows Explorer">
                         <i class="fa-solid fa-arrow-up-right-from-square text-slate-400 group-hover:text-white transition-colors"></i>
