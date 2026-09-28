@@ -737,35 +737,30 @@
             <div class="flex items-center gap-2.5 justify-center flex-nowrap py-1">
                 <!-- TOTAL AIRPORTS BADGE (ELECTRIC SKY BLUE) -->
                 <div id="stat-pill-total" onclick="filterByPricingPill('All')" data-i18n-title="stat.tooltip_total" title="Click to show ALL airports" class="flex items-center gap-1.5 bg-slate-800 px-3.5 py-1.5 rounded-full shrink-0 cursor-pointer transition-all">
-                    <i class="fa-solid fa-star text-[10px] text-sky-400"></i>
                     <span id="stat-total" class="font-extrabold font-mono text-sky-400 text-base lg:text-lg leading-none">0</span>
                     <span data-i18n="stat.airports" class="text-[11px] font-black uppercase tracking-wider text-slate-200">AIRPORTS</span>
                 </div>
 
                 <!-- PAYWARE STAT BADGE (PURPLE) -->
                 <div id="stat-pill-payware" onclick="filterByPricingPill('Payware')" data-i18n-title="stat.tooltip_payware" title="Click to filter Payware sceneries" class="flex items-center gap-1.5 bg-slate-800 px-3.5 py-1.5 rounded-full shrink-0 cursor-pointer transition-all">
-                    <i class="fa-solid fa-star text-[10px] text-purple-400"></i>
                     <span id="stat-payware" class="font-extrabold font-mono text-purple-400 text-base lg:text-lg leading-none">0</span>
                     <span data-i18n="stat.payware" class="text-[11px] font-black uppercase tracking-wider text-slate-200">PAYWARE</span>
                 </div>
 
                 <!-- FREEWARE STAT BADGE (CYAN) -->
                 <div id="stat-pill-freeware" onclick="filterByPricingPill('Freeware')" data-i18n-title="stat.tooltip_freeware" title="Click to filter Freeware sceneries" class="flex items-center gap-1.5 bg-slate-800 px-3.5 py-1.5 rounded-full shrink-0 cursor-pointer transition-all">
-                    <i class="fa-solid fa-star text-[10px] text-cyan-400"></i>
                     <span id="stat-freeware" class="font-extrabold font-mono text-cyan-400 text-base lg:text-lg leading-none">0</span>
                     <span data-i18n="stat.freeware" class="text-[11px] font-black uppercase tracking-wider text-slate-200">FREEWARE</span>
                 </div>
 
                 <!-- ASOBO STAT BADGE (AMBER) -->
                 <div id="stat-pill-asobo" onclick="filterByPricingPill('Asobo')" data-i18n-title="stat.tooltip_asobo" title="Click to filter Asobo sceneries" class="flex items-center gap-1.5 bg-slate-800 px-3.5 py-1.5 rounded-full shrink-0 cursor-pointer transition-all">
-                    <i class="fa-solid fa-star text-[10px] text-amber-400"></i>
                     <span id="stat-asobo" class="font-extrabold font-mono text-amber-400 text-base lg:text-lg leading-none">0</span>
                     <span data-i18n="stat.asobo" class="text-[11px] font-black uppercase tracking-wider text-slate-200">ASOBO</span>
                 </div>
 
-                <!-- DEFAULT MSFS STAT BADGE (BLUE / CIRCLE ICON) -->
+                <!-- DEFAULT MSFS STAT BADGE (BLUE) -->
                 <div id="stat-pill-default" onclick="filterByPricingPill('Default')" data-i18n-title="stat.tooltip_default" title="Click to filter Default MSFS procedural airports" class="flex items-center gap-1.5 bg-slate-800 px-3.5 py-1.5 rounded-full shrink-0 cursor-pointer transition-all">
-                    <i class="fa-solid fa-circle text-[10px] text-blue-400"></i>
                     <span id="stat-default" class="font-extrabold font-mono text-blue-400 text-base lg:text-lg leading-none">0</span>
                     <span data-i18n="stat.default" class="text-[11px] font-black uppercase tracking-wider text-slate-200">DEFAULT MSFS</span>
                 </div>
@@ -778,9 +773,9 @@
                 
                 <!-- Left Nav Arrow (Discrete, appears on hover) -->
                 <button id="fun-stats-prev-btn" onclick="event.stopPropagation(); prevFunStatsSlide()"
-                        class="opacity-0 group-hover/ticker:opacity-80 hover:opacity-100 transition-opacity p-1 text-slate-400 hover:text-cyan-400 cursor-pointer border-0 bg-transparent shrink-0 text-sm active:scale-90"
+                        class="opacity-0 group-hover/ticker:opacity-80 hover:opacity-100 transition-opacity p-1 text-slate-400 hover:text-cyan-400 cursor-pointer border-0 bg-transparent shrink-0 active:scale-90"
                         title="Previous fact">
-                    <i class="fa-solid fa-chevron-left"></i>
+                    <span data-icon="chevron-left" class="w-4 h-4 block"></span>
                 </button>
 
                 <!-- Center Interactive Fact Card -->
@@ -794,9 +789,9 @@
 
                 <!-- Right Nav Arrow (Discrete, appears on hover) -->
                 <button id="fun-stats-next-btn" onclick="event.stopPropagation(); nextFunStatsSlide()"
-                        class="opacity-0 group-hover/ticker:opacity-80 hover:opacity-100 transition-opacity p-1 text-slate-400 hover:text-cyan-400 cursor-pointer border-0 bg-transparent shrink-0 text-sm active:scale-90"
+                        class="opacity-0 group-hover/ticker:opacity-80 hover:opacity-100 transition-opacity p-1 text-slate-400 hover:text-cyan-400 cursor-pointer border-0 bg-transparent shrink-0 active:scale-90"
                         title="Next fact">
-                    <i class="fa-solid fa-chevron-right"></i>
+                    <span data-icon="chevron-right" class="w-4 h-4 block"></span>
                 </button>
 
                 <!-- Indicator Pill (Slide index, e.g. 1/8) -->
@@ -808,7 +803,7 @@
         <div class="flex items-center gap-2.5 shrink-0 z-10">
             <!-- SUPPORT PROJECT ICON BUTTON (BORDERLESS & ENLARGED) -->
             <button onclick="openSupportLink()" title="Support Project" class="p-1.5 text-slate-400 hover:text-white transition-all shrink-0 cursor-pointer hover:scale-110 active:scale-95 group">
-                <i class="fa-solid fa-mug-hot text-xl lg:text-2xl text-slate-400 group-hover:text-white transition-colors"></i>
+                <span data-icon="support" class="w-5 h-5 block text-slate-400 group-hover:text-white transition-colors"></span>
             </button>
 
             <!-- SCENERY CONFLICT ALERT BUTTON (OPENS CONFLICT RESOLUTION MODAL) -->
@@ -845,7 +840,7 @@
 
                 <!-- EXPORT BUTTON -->
                 <button onclick="openExportModal()" data-i18n-title="footer.export_button" title="Export Scenery Collection (CSV / JSON)" class="h-9 px-3.5 rounded-xl bg-slate-900/50 hover:bg-slate-800/70 text-slate-200 hover:text-white border border-slate-700/60 hover:border-slate-400/80 text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 group">
-                    <i class="fa-solid fa-arrow-up-from-bracket text-slate-400 group-hover:text-white text-xs transition-colors"></i>
+                    <span data-icon="upload" class="w-4 h-4 block text-slate-400 group-hover:text-white transition-colors"></span>
                     <span data-i18n="footer.export_button">Export</span>
                 </button>
 
@@ -1656,7 +1651,7 @@
                     </div>
                 </div>
                 <button onclick="closeSettingsModal()" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-xs transition-all cursor-pointer border-0">
-                    <i class="fa-solid fa-xmark"></i>
+                    <span data-icon="x-square" class="w-4 h-4 block"></span>
                 </button>
             </div>
 
@@ -1916,15 +1911,15 @@
                 <div class="flex items-center gap-2">
                     <div id="conflict-modal-step-nav" class="hidden items-center gap-1 bg-slate-950 px-2 py-1 rounded-xl border border-slate-800">
                         <button onclick="navigateConflictStep(-1)" title="Previous Conflict" class="w-6 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-xs transition-colors cursor-pointer border-0">
-                            <i class="fa-solid fa-chevron-left"></i>
+                            <span data-icon="chevron-left" class="w-3.5 h-3.5 block"></span>
                         </button>
                         <span id="conflict-modal-step-index" class="text-[11px] font-mono font-bold text-slate-300 px-1">1/1</span>
                         <button onclick="navigateConflictStep(1)" title="Next Conflict" class="w-6 h-6 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-xs transition-colors cursor-pointer border-0">
-                            <i class="fa-solid fa-chevron-right"></i>
+                            <span data-icon="chevron-right" class="w-3.5 h-3.5 block"></span>
                         </button>
                     </div>
                     <button onclick="closeConflictModal()" title="Close" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition-all cursor-pointer border-0">
-                        <i class="fa-solid fa-xmark"></i>
+                        <span data-icon="x-square" class="w-4 h-4 block"></span>
                     </button>
                 </div>
             </div>
@@ -1973,7 +1968,7 @@
                     </h2>
                 </div>
                 <button onclick="closeGsxAuditModal()" title="Close" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition-all cursor-pointer border-0">
-                    ✕
+                    <span data-icon="x-square" class="w-4 h-4 block"></span>
                 </button>
             </div>
 
@@ -2460,7 +2455,7 @@
                     <h2 data-i18n="export.title" class="text-lg font-bold text-white">Export Scenery Collection</h2>
                 </div>
                 <button onclick="closeExportModal()" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-xs transition-all">
-                    <i class="fa-solid fa-xmark"></i>
+                    <span data-icon="x-square" class="w-4 h-4 block"></span>
                 </button>
             </div>
 
@@ -2520,7 +2515,7 @@
                     </div>
                 </div>
                 <button onclick="closePaywareStoresModal()" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition-colors border-0 cursor-pointer shrink-0">
-                    <i class="fa-solid fa-xmark"></i>
+                    <span data-icon="x-square" class="w-4 h-4 block"></span>
                 </button>
             </div>
 
@@ -2675,8 +2670,8 @@
             <!-- Header -->
             <div class="flex items-center justify-between border-b border-slate-800 pb-3">
                 <h3 id="cadence-modal-title" class="text-base font-bold text-white tracking-wide">Display Cadence Calibration</h3>
-                <button onclick="closeHzCadenceModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                <button onclick="closeHzCadenceModal()" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition-colors cursor-pointer border-0">
+                    <span data-icon="x-square" class="w-4 h-4 block"></span>
                 </button>
             </div>
 
@@ -2736,8 +2731,8 @@
                     <span id="opt-info-shared" class="hidden px-2 py-0.5 rounded text-xs font-mono font-bold bg-slate-700 text-slate-300 uppercase">SHARED</span>
                     <span id="opt-info-rating" class="px-2.5 py-0.5 rounded text-xs font-mono font-bold uppercase">OPTIMUM</span>
                 </div>
-                <button onclick="closeSettingInfoModal()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-700 transition-colors cursor-pointer shrink-0">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                <button onclick="closeSettingInfoModal()" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition-colors cursor-pointer border-0 shrink-0">
+                    <span data-icon="x-square" class="w-4 h-4 block"></span>
                 </button>
             </div>
 
@@ -2797,6 +2792,8 @@
         <div id="sceneryx-toast" class="opacity-0 pointer-events-none transition-all duration-300 transform scale-95 px-5 py-3 rounded-xl flex items-center gap-3 text-xs font-semibold shadow-2xl border backdrop-blur-md max-w-full text-center"></div>
     </div>
 
+    <!-- UNIFIED ICON LIBRARY -->
+    <script src="icons.js?v=1.0.4"></script>
     <!-- LOCALES DICTIONARY SCRIPT -->
     <script src="locales.js?v=1.0.4"></script>
     <!-- WORLD CAPITALS DATABASE SCRIPT -->

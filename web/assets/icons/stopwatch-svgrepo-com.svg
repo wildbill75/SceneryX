@@ -1,0 +1,11 @@
+<svg width="100%" height="100%" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Complete">
+<g id="stopwatch">
+<g>
+<line fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" x1="12" x2="12" y1="10.8" y2="14"/>
+<circle cx="12" cy="14.5" data-name="Circle" fill="none" id="Circle-2" r="7.9" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/>
+<polyline fill="none" points="12 5.5 12 1.5 9 1.5 15 1.5" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"/>
+</g>
+</g>
+</g>
+</svg>
