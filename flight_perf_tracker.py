@@ -120,6 +120,70 @@ def find_msfs_pid():
     ctypes.windll.kernel32.CloseHandle(hSnapshot)
     return found_pid, found_name
 
+class PDH_FMT_COUNTERVALUE_ITEM_DOUBLE(ctypes.Structure):
+    _fields_ = [
+        ('szName', ctypes.wintypes.LPWSTR),
+        ('CStatus', ctypes.wintypes.DWORD),
+        ('dummy', ctypes.wintypes.DWORD),
+        ('doubleValue', ctypes.c_double)
+    ]
+
+_cached_vram_pid = None
+_cached_vram_query = None
+_cached_vram_counter = None
+
+def get_msfs_dedicated_vram_mb(pid):
+    global _cached_vram_pid, _cached_vram_query, _cached_vram_counter
+    if not pid:
+        if _cached_vram_query:
+            try:
+                ctypes.windll.pdh.PdhCloseQuery(_cached_vram_query)
+            except Exception:
+                pass
+            _cached_vram_query = None
+            _cached_vram_counter = None
+            _cached_vram_pid = None
+        return 0.0
+
+    if pid != _cached_vram_pid or _cached_vram_query is None:
+        if _cached_vram_query:
+            try:
+                ctypes.windll.pdh.PdhCloseQuery(_cached_vram_query)
+            except Exception:
+                pass
+            _cached_vram_query = None
+            _cached_vram_counter = None
+
+        hQuery = ctypes.wintypes.HANDLE()
+        if ctypes.windll.pdh.PdhOpenQueryW(None, 0, ctypes.byref(hQuery)) != 0:
+            return 0.0
+        hCounter = ctypes.wintypes.HANDLE()
+        counter_path = fr'\GPU Process Memory(pid_{pid}*)\Dedicated Usage'
+        if ctypes.windll.pdh.PdhAddEnglishCounterW(hQuery, counter_path, 0, ctypes.byref(hCounter)) != 0:
+            ctypes.windll.pdh.PdhCloseQuery(hQuery)
+            return 0.0
+
+        _cached_vram_query = hQuery
+        _cached_vram_counter = hCounter
+        _cached_vram_pid = pid
+
+    try:
+        if ctypes.windll.pdh.PdhCollectQueryData(_cached_vram_query) != 0:
+            return 0.0
+        bufferSize = ctypes.wintypes.DWORD(0)
+        itemCount = ctypes.wintypes.DWORD(0)
+        PDH_FMT_DOUBLE = 0x00000200
+        ctypes.windll.pdh.PdhGetFormattedCounterArrayW(_cached_vram_counter, PDH_FMT_DOUBLE, ctypes.byref(bufferSize), ctypes.byref(itemCount), None)
+        if bufferSize.value > 0:
+            buf = (ctypes.c_char * bufferSize.value)()
+            if ctypes.windll.pdh.PdhGetFormattedCounterArrayW(_cached_vram_counter, PDH_FMT_DOUBLE, ctypes.byref(bufferSize), ctypes.byref(itemCount), buf) == 0:
+                items = ctypes.cast(buf, ctypes.POINTER(PDH_FMT_COUNTERVALUE_ITEM_DOUBLE))
+                total_bytes = sum(items[i].doubleValue for i in range(itemCount.value))
+                return round(total_bytes / (1024.0 * 1024.0), 1)
+    except Exception:
+        pass
+    return 0.0
+
 def get_msfs_process():
     try:
         pid, name = find_msfs_pid()
@@ -151,7 +215,8 @@ def get_msfs_process():
                 'commit_mb': round(pmc.PrivateUsage / (1024 * 1024), 1),
                 'peak_ram_mb': round(pmc.PeakWorkingSetSize / (1024 * 1024), 1),
                 'cpu_sec': cpu_sec,
-                'read_bytes': read_bytes
+                'read_bytes': read_bytes,
+                'vram_mb': get_msfs_dedicated_vram_mb(pid)
             }
     except Exception:
         pass
@@ -1192,6 +1257,7 @@ class BlackboxSession:
             "vram_pct": 0,
             "cache_read_mbps": 0.0,
             "msfs_ram_mb": 0,
+            "msfs_vram_mb": 0.0,
             "gpu_power_w": 0,
             "elapsed_sec": 0,
             "elapsed_str": "00:00",
@@ -1255,6 +1321,7 @@ class BlackboxSession:
             telemetry["olod"] = autofps.get("olod")
         if msfs:
             telemetry["msfs_ram_mb"] = msfs.get("ram_mb", 0)
+            telemetry["msfs_vram_mb"] = msfs.get("vram_mb", 0.0)
         return telemetry
 
 
@@ -1335,6 +1402,8 @@ class BlackboxSession:
             v_total = gpu.get('vram_total_mb', 16376)
             v_pct = gpu.get('vram_pct', 0)
 
+            msfs_vram = msfs.get('vram_mb', 0.0) if msfs else 0.0
+
             self.latest_telemetry = {
                 "is_tracking": True,
                 "flight_name": self.current_flight_name,
@@ -1346,6 +1415,7 @@ class BlackboxSession:
                 "vram_used_mb": v_used,
                 "vram_total_mb": v_total,
                 "vram_pct": v_pct,
+                "msfs_vram_mb": msfs_vram,
                 "cache_read_mbps": cache_read_mbps,
                 "msfs_ram_mb": msfs.get('ram_mb', 0) if msfs else 0,
                 "gpu_power_w": gpu.get('gpu_power_w', 0),
@@ -1391,6 +1461,7 @@ class BlackboxSession:
                 'vram_used': v_used,
                 'vram_total': v_total,
                 'vram_pct': v_pct,
+                'msfs_vram': msfs_vram,
                 'gpu_util': gpu.get('gpu_util_pct', 0),
                 'gpu_temp': gpu.get('gpu_temp_c', 0),
                 'gpu_power': gpu.get('gpu_power_w', 0),

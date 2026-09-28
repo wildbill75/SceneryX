@@ -17389,13 +17389,24 @@ function startBlackboxTelemetryPolling() {
                 }
             }
 
-            const vramVal = document.getElementById('live-vram-val');
-            const vramPct = document.getElementById('live-vram-pct');
-            if (vramVal && telem.vram_used_mb) {
-                vramVal.textContent = `${(telem.vram_used_mb / 1024).toFixed(1)} GB`;
+            const msfsVramVal = document.getElementById('live-msfs-vram-val');
+            if (msfsVramVal) {
+                if (telem.msfs_vram_mb && telem.msfs_vram_mb > 0) {
+                    msfsVramVal.textContent = `${(telem.msfs_vram_mb / 1024).toFixed(1)} GB`;
+                } else if (telem.vram_used_mb) {
+                    msfsVramVal.textContent = `${(telem.vram_used_mb / 1024).toFixed(1)} GB`;
+                } else {
+                    msfsVramVal.textContent = '--';
+                }
             }
-            if (vramPct && telem.vram_pct) {
-                vramPct.textContent = `(${telem.vram_pct}%)`;
+
+            const vramVal = document.getElementById('live-vram-val');
+            if (vramVal) {
+                if (telem.vram_used_mb) {
+                    vramVal.textContent = `(${(telem.vram_used_mb / 1024).toFixed(1)} GB total)`;
+                } else {
+                    vramVal.textContent = '(-- total)';
+                }
             }
 
             const cacheVal = document.getElementById('live-cache-val');
