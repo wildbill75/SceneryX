@@ -497,63 +497,203 @@ def resolve_flight_context(lat=None, lon=None, on_ground=False):
         "prof_slug": prof_slug
     }
 
-def analyze_flight_milestones(samples):
-    """Analyse les paliers d'altitudes, variations de LOD et impacts de performance."""
+def analyze_flight_milestones(samples, session_info=None):
+    """
+    Analyse chronologique complète des phases de vol :
+    Taxi-Out (Départ), Montée Initiale, Montée/Plafond TLOD, Croisière,
+    Descente, Approche Finale & Toucher, Taxi-In (Arrivée).
+    Mesure les impacts de scène d'aéroports et du trafic sol.
+    """
     if not samples:
         return []
-    ground_samples = [s for s in samples if s.get('agl_ft') is not None and s.get('agl_ft') < 200]
-    climb_samples = [s for s in samples if s.get('agl_ft') is not None and 200 <= s.get('agl_ft') < 3000]
-    mid_samples = [s for s in samples if s.get('agl_ft') is not None and 3000 <= s.get('agl_ft') < 10000]
-    cruise_samples = [s for s in samples if s.get('agl_ft') is not None and s.get('agl_ft') >= 10000]
 
-    milestones = []
     def avg(lst, key):
         vals = [s[key] for s in lst if s.get(key) is not None]
         return round(sum(vals)/len(vals), 1) if vals else 'N/A'
+
     def mode_val(lst, key):
         vals = [s[key] for s in lst if s.get(key) is not None]
         return round(sum(vals)/len(vals)) if vals else 'N/A'
 
-    if ground_samples:
-        milestones.append({
-            'phase': 'Sol / Décollage',
-            'alt': str(mode_val(ground_samples, 'agl_ft')) + ' ft',
-            'tlod': str(mode_val(ground_samples, 'tlod')),
-            'olod': str(mode_val(ground_samples, 'olod')),
-            'fps': str(avg(ground_samples, 'disp_fps')) + ' FPS',
-            'mt': str(avg(ground_samples, 'main_thread_ms')) + ' ms',
-            'notes': 'Protection MainThread au sol (scène & avionique)'
-        })
-    if climb_samples:
+    dep = ""
+    arr = ""
+    if session_info:
+        dep = session_info.get('dep') or session_info.get('cur_dep') or ""
+        arr = session_info.get('arr') or session_info.get('cur_arr') or ""
+
+    # Détection des échantillons en vol (airborne)
+    # Un point est considéré en l'air si on_ground == False et agl > 40, ou si agl >= 80 ft
+    airborne_indices = [
+        i for i, s in enumerate(samples)
+        if (s.get('on_ground') is False and (s.get('agl_ft') is None or s.get('agl_ft') > 40))
+        or (s.get('agl_ft') is not None and s.get('agl_ft') >= 80)
+    ]
+
+    milestones = []
+
+    # CAS 1 : Aucun échantillon en l'air (Vol entièrement au sol / Test Taxi sur aéroport)
+    if not airborne_indices:
+        taxi_samples = [s for s in samples if s.get('agl_ft') is None or s.get('agl_ft') < 200]
+        if taxi_samples:
+            milestones.append({
+                'phase': f"Roulage au Sol ({dep})" if dep else "Roulage au Sol (Taxi)",
+                'alt': 'Sol (0 - 50 ft)',
+                'tlod': str(mode_val(taxi_samples, 'tlod')),
+                'olod': str(mode_val(taxi_samples, 'olod')),
+                'fps': str(avg(taxi_samples, 'disp_fps')) + ' FPS',
+                'mt': str(avg(taxi_samples, 'main_thread_ms')) + ' ms',
+                'notes': 'Test de scène aéroportuaire & trafic au sol (Stationnaire / Roulage)'
+            })
+        return milestones
+
+    # CAS 2 : Le vol comporte des phases en l'air
+    idx_takeoff = airborne_indices[0]
+    idx_touchdown = airborne_indices[-1]
+
+    # --- 1. TAXI-OUT (Roulage au sol avant décollage) ---
+    if idx_takeoff > 0:
+        taxi_out_samples = [
+            samples[i] for i in range(idx_takeoff)
+            if samples[i].get('on_ground', True) and (samples[i].get('agl_ft') is None or samples[i].get('agl_ft') < 80)
+        ]
+        if len(taxi_out_samples) >= 3:
+            taxi_out_title = f"Taxi Out ({dep})" if dep else "Taxi Out (Roulage Départ)"
+            milestones.append({
+                'phase': taxi_out_title,
+                'alt': 'Sol (0 ft)',
+                'tlod': str(mode_val(taxi_out_samples, 'tlod')),
+                'olod': str(mode_val(taxi_out_samples, 'olod')),
+                'fps': str(avg(taxi_out_samples, 'disp_fps')) + ' FPS',
+                'mt': str(avg(taxi_out_samples, 'main_thread_ms')) + ' ms',
+                'notes': 'Impact scène aéroport de départ, bâtiments & trafic sol'
+            })
+
+    # Analyse des données en vol (entre décollage et atterrissage)
+    flight_samples = samples[idx_takeoff : idx_touchdown + 1]
+    
+    # Trouver le pic d'altitude et son index
+    max_agl = 0
+    idx_peak = idx_takeoff
+    for i in range(idx_takeoff, idx_touchdown + 1):
+        cur_agl = samples[i].get('agl_ft') or 0
+        if cur_agl > max_agl:
+            max_agl = cur_agl
+            idx_peak = i
+
+    # --- 2. MONTÉE INITIALE (0 - 3 000 ft) ---
+    climb_init_samples = [
+        samples[i] for i in range(idx_takeoff, idx_peak + 1)
+        if (samples[i].get('agl_ft') is not None and samples[i].get('agl_ft') < 3000)
+    ]
+    if climb_init_samples:
         milestones.append({
             'phase': 'Montée Initiale',
-            'alt': '200 - 3 000 ft',
-            'tlod': str(mode_val(climb_samples, 'tlod')),
-            'olod': str(mode_val(climb_samples, 'olod')),
-            'fps': str(avg(climb_samples, 'disp_fps')) + ' FPS',
-            'mt': str(avg(climb_samples, 'main_thread_ms')) + ' ms',
-            'notes': 'Escalade progressive du TLOD'
+            'alt': '0 - 3 000 ft',
+            'tlod': str(mode_val(climb_init_samples, 'tlod')),
+            'olod': str(mode_val(climb_init_samples, 'olod')),
+            'fps': str(avg(climb_init_samples, 'disp_fps')) + ' FPS',
+            'mt': str(avg(climb_init_samples, 'main_thread_ms')) + ' ms',
+            'notes': 'Dégagement sol et escalade progressive du TLOD'
         })
-    if mid_samples:
+
+    # --- 3. MONTÉE & PLAFOND TLOD (3 000 - 10 000 ft) ---
+    climb_mid_samples = [
+        samples[i] for i in range(idx_takeoff, idx_peak + 1)
+        if (samples[i].get('agl_ft') is not None and 3000 <= samples[i].get('agl_ft') < 10000)
+    ]
+    if climb_mid_samples:
         milestones.append({
             'phase': 'Plafond TLOD',
             'alt': '3 000 - 10 000 ft',
-            'tlod': str(mode_val(mid_samples, 'tlod')),
-            'olod': str(mode_val(mid_samples, 'olod')),
-            'fps': str(avg(mid_samples, 'disp_fps')) + ' FPS',
-            'mt': str(avg(mid_samples, 'main_thread_ms')) + ' ms',
+            'tlod': str(mode_val(climb_mid_samples, 'tlod')),
+            'olod': str(mode_val(climb_mid_samples, 'olod')),
+            'fps': str(avg(climb_mid_samples, 'disp_fps')) + ' FPS',
+            'mt': str(avg(climb_mid_samples, 'main_thread_ms')) + ' ms',
             'notes': 'LOD max atteint en montée'
         })
+
+    # --- 4. CROISIÈRE HAUTE ALTITUDE (Altitude croisière ou > 10 000 ft) ---
+    if max_agl >= 10000:
+        cruise_samples = [
+            s for s in flight_samples
+            if s.get('agl_ft') is not None and s.get('agl_ft') >= 10000
+        ]
+        cruise_label = 'Croisière Haute Altitude'
+        cruise_alt_str = '> 10 000 ft'
+    elif max_agl >= 2000:
+        threshold = max_agl * 0.85
+        cruise_samples = [
+            s for s in flight_samples
+            if (s.get('agl_ft') or 0) >= threshold and abs(s.get('fpm') or 0) < 500
+        ]
+        cruise_label = 'Palier de Croisière'
+        cruise_alt_str = f'~{mode_val(cruise_samples, "agl_ft")} ft' if cruise_samples else f'{max_agl} ft'
+    else:
+        cruise_samples = []
+        cruise_label = 'Croisière'
+        cruise_alt_str = ''
+
     if cruise_samples:
         milestones.append({
-            'phase': 'Croisière Haute Altitude',
-            'alt': '> 10 000 ft',
+            'phase': cruise_label,
+            'alt': cruise_alt_str,
             'tlod': str(mode_val(cruise_samples, 'tlod')),
             'olod': str(mode_val(cruise_samples, 'olod')),
             'fps': str(avg(cruise_samples, 'disp_fps')) + ' FPS',
             'mt': str(avg(cruise_samples, 'main_thread_ms')) + ' ms',
             'notes': 'Rendu horizon étendu et stabilité FPS'
         })
+
+    # --- 5. DESCENTE (après le pic, altitude >= 3 000 ft) ---
+    descent_samples = [
+        samples[i] for i in range(idx_peak + 1, idx_touchdown + 1)
+        if (samples[i].get('agl_ft') is not None and samples[i].get('agl_ft') >= 3000 and (samples[i].get('fpm') or 0) <= 200)
+    ]
+    if descent_samples:
+        milestones.append({
+            'phase': 'Descente',
+            'alt': '> 3 000 ft',
+            'tlod': str(mode_val(descent_samples, 'tlod')),
+            'olod': str(mode_val(descent_samples, 'olod')),
+            'fps': str(avg(descent_samples, 'disp_fps')) + ' FPS',
+            'mt': str(avg(descent_samples, 'main_thread_ms')) + ' ms',
+            'notes': 'Descente d\'altitude & chargement scènes d\'arrivée'
+        })
+
+    # --- 6. APPROCHE FINALE & TOUCHER (après le pic, altitude < 3 000 ft) ---
+    approach_samples = [
+        samples[i] for i in range(idx_peak + 1, idx_touchdown + 1)
+        if (samples[i].get('agl_ft') is not None and samples[i].get('agl_ft') < 3000)
+    ]
+    if approach_samples:
+        milestones.append({
+            'phase': 'Approche Finale & Toucher',
+            'alt': '3 000 - 0 ft',
+            'tlod': str(mode_val(approach_samples, 'tlod')),
+            'olod': str(mode_val(approach_samples, 'olod')),
+            'fps': str(avg(approach_samples, 'disp_fps')) + ' FPS',
+            'mt': str(avg(approach_samples, 'main_thread_ms')) + ' ms',
+            'notes': 'Alignement, capture piste & décors d\'approche'
+        })
+
+    # --- 7. TAXI-IN (Roulage au sol après atterrissage) ---
+    if idx_touchdown < len(samples) - 1:
+        taxi_in_samples = [
+            samples[i] for i in range(idx_touchdown + 1, len(samples))
+            if samples[i].get('on_ground', True) and (samples[i].get('agl_ft') is None or samples[i].get('agl_ft') < 80)
+        ]
+        if len(taxi_in_samples) >= 3:
+            taxi_in_title = f"Taxi In ({arr})" if arr else "Taxi In (Roulage Arrivée)"
+            milestones.append({
+                'phase': taxi_in_title,
+                'alt': 'Sol (0 ft)',
+                'tlod': str(mode_val(taxi_in_samples, 'tlod')),
+                'olod': str(mode_val(taxi_in_samples, 'olod')),
+                'fps': str(avg(taxi_in_samples, 'disp_fps')) + ' FPS',
+                'mt': str(avg(taxi_in_samples, 'main_thread_ms')) + ' ms',
+                'notes': 'Impact scène aéroport d\'arrivée, taxiways & parking gate'
+            })
+
     return milestones
 
 class SimConnectTelemetryClient:
@@ -574,6 +714,7 @@ class SimConnectTelemetryClient:
         self.agl_ft = None
         self.vertical_speed_fpm = None
         self.airspeed_kts = None
+        self.ground_speed_kts = None
         self.on_ground = None
         self.aircraft_title = None
         self.lat = None
@@ -607,6 +748,7 @@ class SimConnectTelemetryClient:
             self.agl_ft = None
             self.vertical_speed_fpm = None
             self.airspeed_kts = None
+            self.ground_speed_kts = None
             self.on_ground = None
             self.aircraft_title = None
             self.lat = None
@@ -654,6 +796,7 @@ class SimConnectTelemetryClient:
                             {"name": "PLANE ALT ABOVE GROUND", "units": "feet"},
                             {"name": "VERTICAL SPEED", "units": "feet/minute"},
                             {"name": "AIRSPEED INDICATED", "units": "knots"},
+                            {"name": "GROUND VELOCITY", "units": "knots"},
                             {"name": "SIM ON GROUND", "units": "bool"},
                             {"name": "PLANE LATITUDE", "units": "degrees"},
                             {"name": "PLANE LONGITUDE", "units": "degrees"},
@@ -722,6 +865,8 @@ class SimConnectTelemetryClient:
                                     self.vertical_speed_fpm = round(float(sdata['VERTICAL SPEED']))
                                 if 'AIRSPEED INDICATED' in sdata and sdata['AIRSPEED INDICATED'] is not None:
                                     self.airspeed_kts = round(float(sdata['AIRSPEED INDICATED']))
+                                if 'GROUND VELOCITY' in sdata and sdata['GROUND VELOCITY'] is not None:
+                                    self.ground_speed_kts = round(float(sdata['GROUND VELOCITY']))
                                 if 'SIM ON GROUND' in sdata and sdata['SIM ON GROUND'] is not None:
                                     self.on_ground = bool(sdata['SIM ON GROUND'])
                                 if 'PLANE LATITUDE' in sdata and sdata['PLANE LATITUDE'] is not None:
@@ -755,6 +900,7 @@ class SimConnectTelemetryClient:
                 "agl_ft": self.agl_ft,
                 "fpm": self.vertical_speed_fpm,
                 "airspeed_kts": self.airspeed_kts,
+                "ground_speed_kts": self.ground_speed_kts,
                 "on_ground": self.on_ground,
                 "aircraft": self.aircraft_title,
                 "lat": self.lat,
@@ -864,13 +1010,27 @@ def generate_automated_flight_narrative(samples, session_info):
     else:
         vram_diag = f"<span style='color:#10b981;'><strong>Excellente Marge Vidéo :</strong> VRAM crête contenue à {peak_vram:,.0f} Mo ({vram_peak_pct}%). L'isolation SceneryX a éliminé les textures en surplus.</span>"
 
+    # Diagnostic spécifique des impacts au sol & aéroports
+    milestones = analyze_flight_milestones(samples, session_info)
+    ground_notes = []
+    for m in milestones:
+        if 'Taxi Out' in m['phase'] or 'Taxi In' in m['phase']:
+            ground_notes.append(f"{m['phase']} : <strong>{m['fps']}</strong> (MainThread <strong>{m['mt']}</strong>)")
+        elif 'Approche' in m['phase']:
+            ground_notes.append(f"Approche Finale : <strong>{m['fps']}</strong> (MainThread <strong>{m['mt']}</strong>)")
+
+    ground_diag = ""
+    if ground_notes:
+        ground_diag = f"<li><strong>Comportement Sol & Aéroports :</strong> {' • '.join(ground_notes)}.</li>"
+
     narrative = f"""
     <div style="background:#0f172a; border:1px solid #1e293b; border-radius:16px; padding:20px; margin-bottom:24px; line-height:1.6; font-size:13px; color:#cbd5e1;">
         <h3 style="margin-top:0; color:#38bdf8; font-size:16px;">📝 Compte-Rendu d'Analyse du Vol</h3>
         <ul style="padding-left:20px; margin-bottom:12px;">
             <li><strong>Comportement Système & Goulot d'Étranglement :</strong> {bottleneck_diag}</li>
             <li><strong>Empreinte Mémoire Vidéo (VRAM) :</strong> {vram_diag}</li>
-            <li><strong>Fluidité & Affichage :</strong> Moyenne de <strong>{avg_fps} FPS</strong> avec un MainThread de <strong>{avg_mt} ms</strong>.</li>
+            <li><strong>Fluidité & Affichage :</strong> Moyenne globale de <strong>{avg_fps} FPS</strong> avec un MainThread moyen de <strong>{avg_mt} ms</strong>.</li>
+            {ground_diag}
             {autofps_diag}
             <li><strong>Activité Rolling Cache / Débit Disque :</strong> Pics d'accès aux textures et modèles de <strong>{peak_io} Mbps</strong> enregistrés lors des changements de zone géographique.</li>
         </ul>
@@ -940,7 +1100,7 @@ def generate_html_report(csv_path, session_info, samples):
         autofps_badge_html = '<span style="color:#94a3b8; font-size:11px; background:rgba(148,163,184,0.1); border:1px solid #334155; padding:3px 8px; border-radius:6px;">Inactif / Non Détecté</span>'
 
     # Build Milestones section
-    milestones = analyze_flight_milestones(samples)
+    milestones = analyze_flight_milestones(samples, session_info)
     if milestones:
         rows_html = ""
         for m in milestones:
@@ -958,7 +1118,7 @@ def generate_html_report(csv_path, session_info, samples):
         milestones_section = f"""
         <div class="chart-box" style="padding: 20px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
-                <div class="chart-title" style="margin-bottom:0;">🏔️ Analyse des Paliers d'Altitude & Impacts LOD (AutoFPS)</div>
+                <div class="chart-title" style="margin-bottom:0;">🛫 Analyse des Phases de Vol, Paliers d'Altitude & Impacts Sol/LOD</div>
                 <div style="font-size:12px; color:#94a3b8;">Qualité Nuages AutoFPS : <span style="color:#38bdf8; font-weight:bold;">{cloud_status}</span></div>
             </div>
             <div style="overflow-x:auto;">
@@ -1860,6 +2020,8 @@ class BlackboxSession:
                 'agl': agl,
                 'agl_ft': agl,
                 'fpm': fpm,
+                'on_ground': sc_data.get('on_ground', False if (agl is not None and agl > 80) else True),
+                'ground_speed_kts': sc_data.get('ground_speed_kts') or sc_data.get('airspeed_kts') or 0,
                 'cache_read_mbps': cache_read_mbps,
                 'vram_used': v_used,
                 'vram_total': v_total,
@@ -1895,6 +2057,8 @@ class BlackboxSession:
                 'aircraft': final_aircraft,
                 'route_display': ctx['route_display'],
                 'mode_display': ctx['mode_display'],
+                'dep': dep or cur_dep or ctx.get('dep'),
+                'arr': arr or cur_arr or ctx.get('arr'),
                 'autofps_config': autofps_cfg,
                 'autofps_active': autofps_is_active or is_autofps_active(),
                 'cloud_events': cloud_status
