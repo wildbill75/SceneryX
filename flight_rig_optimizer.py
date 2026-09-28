@@ -241,10 +241,35 @@ AIRCRAFT_STUDIO_PROFILES = {
 # SONDAGE MATÉRIEL & SYSTÈME WINDOWS
 # ==============================================================================
 
+def simplify_cpu_name(raw_name: str) -> str:
+    """Nettoie et raccourcit le nom du CPU pour l'affichage en capitales épurées."""
+    if not raw_name:
+        return "UNKNOWN CPU"
+    s = raw_name
+    for token in ['(R)', '(TM)', 'Processor', 'CPU', '12-Core', '16-Core', '24-Core', '8-Core', '6-Core', '4-Core', '32-Core']:
+        s = s.replace(token, '')
+    s = re.sub(r'@\s*[\d\.]+\s*[GgMm][Hh][Zz]', '', s)
+    s = re.sub(r'\b\d+(?:st|nd|rd|th)\s+Gen\b', '', s, flags=re.IGNORECASE)
+    s = ' '.join(s.split()).upper()
+    return s
+
+
+def simplify_gpu_name(raw_name: str) -> str:
+    """Nettoie et raccourcit le nom du GPU pour l'affichage en capitales épurées."""
+    if not raw_name:
+        return "UNKNOWN GPU"
+    s = raw_name
+    for token in ['(R)', '(TM)', 'Graphics', 'Video Controller']:
+        s = s.replace(token, '')
+    s = ' '.join(s.split()).upper()
+    return s
+
+
 def detect_cpu_info() -> Dict[str, Any]:
     """Détecte le processeur, le nombre de cœurs/threads et la vitesse via WMI/PowerShell."""
     result = {
         "name": "Unknown CPU",
+        "name_simplified": "UNKNOWN CPU",
         "cores": 0,
         "threads": 0,
         "max_clock_mhz": 0,
@@ -257,12 +282,14 @@ def detect_cpu_info() -> Dict[str, Any]:
         if isinstance(data, list):
             data = data[0]
         result["name"] = data.get("Name", "").strip()
+        result["name_simplified"] = simplify_cpu_name(result["name"])
         result["cores"] = data.get("NumberOfCores", 0)
         result["threads"] = data.get("NumberOfLogicalProcessors", 0)
         result["max_clock_mhz"] = data.get("MaxClockSpeed", 0)
         result["raw_string"] = f"{result['name']} ({result['cores']}C/{result['threads']}T)"
     except Exception:
         result["name"] = os.environ.get("PROCESSOR_IDENTIFIER", "Intel/AMD Processor")
+        result["name_simplified"] = simplify_cpu_name(result["name"])
         result["threads"] = os.cpu_count() or 8
         result["raw_string"] = result["name"]
     return result
@@ -272,6 +299,7 @@ def detect_gpu_info() -> Dict[str, Any]:
     """Détecte la carte graphique NVIDIA/AMD, VRAM totale et Re-Size BAR."""
     result = {
         "name": "Unknown GPU",
+        "name_simplified": "UNKNOWN GPU",
         "vram_total_mb": 0,
         "vram_total_gb": 0.0,
         "driver_version": "Unknown",
@@ -291,6 +319,7 @@ def detect_gpu_info() -> Dict[str, Any]:
         parts = [p.strip() for p in out.split(',')]
         if len(parts) >= 3:
             result["name"] = parts[0]
+            result["name_simplified"] = simplify_gpu_name(result["name"])
             result["driver_version"] = parts[1]
             result["vram_total_mb"] = int(float(parts[2]))
             result["vram_total_gb"] = round(result["vram_total_mb"] / 1024.0, 1)
@@ -320,6 +349,7 @@ def detect_gpu_info() -> Dict[str, Any]:
         if isinstance(data, list):
             data = data[0]
         result["name"] = data.get("Name", "Unknown GPU").strip()
+        result["name_simplified"] = simplify_gpu_name(result["name"])
         result["driver_version"] = data.get("DriverVersion", "Unknown")
         raw_ram = data.get("AdapterRAM", 0)
         if raw_ram and raw_ram > 0:
@@ -422,7 +452,7 @@ def detect_all_displays() -> List[Dict[str, Any]]:
     wmi_names = []
     try:
         ps = r'Get-CimInstance -Namespace root\wmi -ClassName WmiMonitorID | ForEach-Object { [System.Text.Encoding]::ASCII.GetString($_.UserFriendlyName -ne 0) }'
-        r = subprocess.run(['powershell', '-NoProfile', '-Command', ps], capture_output=True, text=True, timeout=2)
+        r = subprocess.run(['powershell', '-NoProfile', '-Command', ps], capture_output=True, text=True, timeout=2, creationflags=CREATE_NO_WINDOW)
         if r.returncode == 0:
             wmi_names = [line.strip() for line in r.stdout.splitlines() if line.strip()]
     except Exception:
@@ -482,16 +512,28 @@ def detect_all_displays() -> List[Dict[str, Any]]:
     return displays
 
 
-def detect_display_info(preferred_id: Optional[str] = None) -> Dict[str, Any]:
+def detect_display_info(preferred_id: Optional[str] = None, displays_list: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
     """Retourne les informations de l'écran actif (ou sélectionné si multi-écran)."""
-    all_displays = detect_all_displays()
+    all_displays = displays_list if displays_list is not None else detect_all_displays()
     if preferred_id:
         p_str = str(preferred_id).strip().upper()
         for d in all_displays:
             if d["id"].upper() == p_str or str(d["index"]) == p_str or p_str in d["device_name"].upper():
                 return d
     primary = next((d for d in all_displays if d.get("is_primary")), None)
-    return primary or all_displays[0]
+    return primary or (all_displays[0] if all_displays else {
+        "id": "DISPLAY1",
+        "index": 1,
+        "name": "Display 1: Monitor",
+        "friendly_name": "Monitor",
+        "device_name": r"\\.\DISPLAY1",
+        "width": 2560,
+        "height": 1440,
+        "refresh_rate_hz": 60.0,
+        "refresh_rate_int": 60,
+        "formatted": "2560x1440 @ 60 Hz",
+        "is_primary": True
+    })
 
 
 def detect_vr_headset() -> Dict[str, Any]:
@@ -1171,335 +1213,335 @@ def apply_setting_to_content(content: str, mode: str, setting_key: str, new_valu
 SETTING_INFO_DATABASE = {
     "resolution": {
         "title": "Full Screen Resolution",
-        "desc": "Résolution interne du tampon de trame de MSFS. Détermine le nombre brut de pixels calculés avant affichage. En mode 2D, elle correspond à l'affichage écran. En VR, elle définit la résolution miroir sur le bureau.",
-        "cpu_impact": "Impact MainThread négligeable. Sollicite quasi-exclusivement les unités de calcul matriciel du GPU.",
-        "gpu_impact": "Impact très lourd sur le taux de remplissage (fill-rate), la bande passante mémoire et la consommation VRAM.",
-        "liner_advice": "Conserver la résolution native de l'écran (ex: 2560x1440 ou 3840x2160) combinée à DLSS Quality pour maximiser le piqué des écrans EFIS sans surcharger le GPU.",
-        "ga_advice": "Résolution native recommandée pour préserver la netteté des repères visuels au sol (VFR).",
+        "desc": "MSFS internal frame buffer rendering resolution. Sets the raw pixel grid computed by the graphics pipeline before presentation. In 2D, this matches display resolution; in VR, it governs the desktop mirror.",
+        "cpu_impact": "Negligible MainThread impact. Workload falls almost exclusively on GPU rasterization and pixel shading units.",
+        "gpu_impact": "Extremely heavy impact on raster fill-rate, VRAM footprint, and memory bus bandwidth.",
+        "liner_advice": "Keep native display resolution (e.g. 2560x1440 or 3840x2160) paired with DLSS Quality to maximize EFIS display sharpness without choking the GPU.",
+        "ga_advice": "Native resolution recommended to maintain maximum visual clarity on ground landmarks for VFR navigation.",
         "tradeoffs": [
-            ("Native (100%)", "Clarté 1:1 absolue sur les aiguilles et instruments fins", "Charge GPU maximale en 4K UHD"),
-            ("Inférieure", "Gain immédiat de 25-40% de framerate GPU", "Flou de mise à l'échelle sur les instruments et étiquettes")
+            ("Native (1:1)", "Absolute 1:1 pixel sharpness on analog needles and avionics text", "Full GPU fill-rate workload in 4K UHD"),
+            ("Downscaled", "Instant 25-40% boost in raw GPU framerate", "Severe scaling blur and soft fonts across cockpit panels")
         ]
     },
     "anti_aliasing": {
         "title": "Anti-Aliasing & Upscaling",
-        "desc": "Méthode de filtrage des crénelages et de reconstruction temporelle/IA. DLSS exploite les cœurs Tensor NVIDIA pour reconstruire une image haute fidélité à partir d'un rendu interne optimisé. TAA effectue un suréchantillonnage temporel natif.",
-        "cpu_impact": "DLSS libère du temps CPU en réduisant la charge de rasterisation globale gérée par le pilote.",
-        "gpu_impact": "DLSS Quality réduit la charge GPU brute de 25 à 35% tout en stabilisant les lignes fines contre le scintillement.",
-        "liner_advice": "DLSS (Quality) est fortement conseillé sur cartes RTX pour garantir une marge de sécurité GPU lors d'approches par temps pluvieux/nuageux.",
-        "ga_advice": "DLSS (Quality) ou DLAA. DLAA offre la meilleure netteté si le GPU dispose d'une marge confortable.",
+        "desc": "Edge anti-aliasing method and AI temporal reconstruction. DLSS leverages NVIDIA Tensor Cores to reconstruct a crisp high-resolution image from an optimized internal buffer. TAA performs native temporal supersampling.",
+        "cpu_impact": "DLSS frees CPU time by lowering overall rasterization draw call overhead handled by the graphics driver.",
+        "gpu_impact": "DLSS Quality reduces raw GPU shading load by 25-35% while stabilizing fine geometry lines against aliasing crawl.",
+        "liner_advice": "DLSS (Quality) is strongly recommended on RTX GPUs to guarantee a healthy GPU frame time margin during heavy rain/cloud approaches.",
+        "ga_advice": "DLSS (Quality) or DLAA. DLAA delivers maximum image sharpness when sufficient GPU headroom exists.",
         "tradeoffs": [
-            ("DLSS (Quality)", "Gain de 20-30% de marge GPU, lissage temporel exemplaire", "Léger ghosting possible sur chiffres rapides du PFD"),
-            ("TAA", "Rendu raster natif pur sans interpolation IA", "Charge GPU maximale, scintillement possible sur grillages"),
-            ("DLAA", "Lissage IA suprême à résolution native 1:1", "Aucun gain de framerate, charge GPU identique à TAA")
+            ("DLSS (Quality)", "20-30% GPU performance headroom with pristine temporal anti-aliasing", "Mild temporal ghosting possible on fast rolling digit tapes"),
+            ("TAA", "Pure native raster rendering without neural interpolation", "Full GPU workload; fine wire and fence shimmering"),
+            ("DLAA", "Supreme AI anti-aliasing at native 1:1 resolution", "Zero framerate gain; same GPU workload as native TAA")
         ]
     },
     "max_frame_rate": {
-        "title": "Max Frame Rate (Verrouillage Cadence)",
-        "desc": "Limiteur de trames interne au moteur MSFS (écrit dans UserCfg.opt). Permet de synchroniser la cadence d'émission des images avec un diviseur entier de la fréquence de rafraîchissement de l'écran ou du casque VR.",
-        "cpu_impact": "Essentiel pour le CPU MainThread. Empêche le moteur d'emballer le CPU sur les scènes légères et garantit un temps d'image (frame time) parfaitement régulier, éliminant les micro-saccades.",
-        "gpu_impact": "Réduit considérablement la chauffe GPU et stabilise la latence d'affichage.",
-        "liner_advice": "Verrouiller impérativement au diviseur 1/2 de votre écran (ex: 90 FPS pour 180 Hz, 82 FPS pour 165 Hz, 60 FPS pour 120 Hz) pour une fluidité absolue sans à-coups.",
-        "ga_advice": "Même principe de diviseur 1/2, ou OFF si vous pilotez avec G-Sync/FreeSync actif.",
+        "title": "Max Frame Rate (Cadence Lock)",
+        "desc": "Internal MSFS framerate limiter (written to UserCfg.opt). Synchronizes engine frame delivery intervals with an integer divisor of your display or VR headset refresh rate.",
+        "cpu_impact": "Crucial for CPU MainThread pacing. Prevents the engine from running unconstrained in simple scenes, establishing a perfectly uniform frame time and eliminating micro-stutters.",
+        "gpu_impact": "Substantially lowers GPU power consumption, thermal load, and stabilizes render queue latency.",
+        "liner_advice": "Lock strictly to an exact 1/2 divisor of your monitor (e.g. 90 FPS for 180 Hz, 82 FPS for 165 Hz, 60 FPS for 120 Hz) for silky-smooth, judder-free flight.",
+        "ga_advice": "Use the same 1/2 sync divisor principle, or OFF if running dedicated G-Sync/FreeSync hardware synchronization.",
         "tradeoffs": [
-            ("Diviseur 1/2 (ex: 82 / 90 FPS)", "Frame pacing parfait, zéro saccade, CPU stabilisé", "Plafond de trames strict"),
-            ("OFF (Unlocked)", "Framerate maximal instantané dans le ciel dégagé", "Fluctuations de frame time générant du stuttering visible au sol")
+            ("1/2 Divisor (e.g. 82 / 90 FPS)", "Flawless frame pacing, zero camera judder, stabilized CPU MainThread", "Strict framerate ceiling"),
+            ("OFF (Unlocked)", "Uncapped peak framerate in clear skies", "Frame time variance causing noticeable micro-stutters near dense airports")
         ]
     },
     "vsync": {
-        "title": "V-Sync (Synchronisation Verticale)",
-        "desc": "Synchronise la présentation des tampons d'image avec les cycles de rafraîchissement physique de la dalle. Élimine les déchirures horizontales (tearing) de l'image.",
-        "cpu_impact": "Nul sur le calcul avionique.",
-        "gpu_impact": "Calibre l'alternance des tampons sans surcoût de shading.",
-        "liner_advice": "Activer systématiquement avec G-Sync/FreeSync et le Frame Limiter pour une présentation d'image propre sur les pistes et lignes de guidage.",
-        "ga_advice": "Activer (ON) pour éliminer les déchirures lors des virages à basse altitude.",
+        "title": "Vertical Synchronization (V-Sync)",
+        "desc": "Synchronizes front and back buffer swaps with the physical refresh intervals of your display panel. Eliminates horizontal tearing lines across the screen.",
+        "cpu_impact": "Zero impact on CPU flight physics or avionics compute.",
+        "gpu_impact": "Regulates frame swap timing without additional shading computational overhead.",
+        "liner_advice": "Always enable (ON) alongside G-Sync/FreeSync and the Frame Limiter for clean runway centerline and taxiway presentation.",
+        "ga_advice": "Enable (ON) to eliminate tear lines during steep turns and low-altitude canyon flights.",
         "tradeoffs": [
-            ("ON", "Élimination totale des déchirures horizontales d'image", "Synchronisation liée aux cycles de rafraîchissement"),
-            ("OFF", "Affichage immédiat sans attendre le balayage d'écran", "Déchirures horizontales désagréables lors des rotations de caméra")
+            ("ON", "Completely eliminates horizontal screen tearing", "Buffer swaps locked to monitor refresh cadence"),
+            ("OFF", "Immediate frame presentation without waiting for v-blank interval", "Distracting tear lines across cockpit dials during rapid camera pans")
         ]
     },
     "frame_generation": {
-        "title": "Frame Generation (Génération de Trames)",
-        "desc": "Génération de trames optiques par intelligence artificielle (DLSS 3 Frame Gen sur RTX 4000/5000 ou AMD FSR 3). Interpole une image calculée entre chaque trame native à l'aide de l'Optical Flow Accelerator.",
-        "cpu_impact": "Double la fluidité perçue sans exiger un seul cycle de calcul supplémentaire du CPU MainThread. Solution magique contre les goulots CPU des gros liners.",
-        "gpu_impact": "Consomme environ 1 Go de VRAM et nécessite NVIDIA Reflex actif pour maintenir une latence de contrôle faible.",
-        "liner_advice": "Activer impérativement en 2D (DLSSG 2X). Permet d'obtenir 90 FPS ultra-fluides sur des scènes où le CPU ne délivre que 45 FPS.",
-        "ga_advice": "Activer en 2D pour une fluidité cinématographique.",
+        "title": "Frame Generation",
+        "desc": "AI optical flow frame interpolation (DLSS 3 Frame Generation on RTX 40/50 series or AMD FSR 3). Generates and inserts an AI-computed frame between each native frame using the Optical Flow Accelerator.",
+        "cpu_impact": "Doubles perceived motion smoothness without requiring a single additional compute cycle from the CPU MainThread. The definitive countermeasure against airliner CPU bottlenecks.",
+        "gpu_impact": "Allocates approximately 1 GB additional VRAM and requires NVIDIA Reflex active to ensure low input lag.",
+        "liner_advice": "Keep strictly ON in 2D mode (DLSSG 2X). Delivers 90 FPS fluidity in demanding scenarios where the CPU MainThread only produces 45 native FPS.",
+        "ga_advice": "Keep ON in 2D mode for cinematic motion smoothness.",
         "tradeoffs": [
-            ("DLSSG (2X)", "Fluidité visuelle doublée, soulage le processeur à 100%", "Ajoute ~10ms de latence compensée par Reflex. Strictement PROSCRIT en VR"),
-            ("OFF", "Latence de commande minimale absolue", "Fluidité limitée aux performances natives du CPU")
+            ("DLSSG (2X)", "Doubled visual smoothness, 100% relief for CPU MainThread", "Adds ~10ms latency mitigated by Reflex. STRICTLY PROHIBITED in VR"),
+            ("OFF", "Absolute lowest control input latency", "Visual smoothness strictly bound to native CPU MainThread performance")
         ]
     },
     "framerate_multiplier": {
         "title": "Framerate Multiplier",
-        "desc": "Facteur multiplicateur associé au sous-système de génération de trames dans MSFS.",
-        "cpu_impact": "Neutre.",
-        "gpu_impact": "Géré par l'Optical Flow Accelerator.",
-        "liner_advice": "Conserver à 1 (facteur 2X standard) lorsque Frame Generation est actif.",
-        "ga_advice": "Conserver à 1.",
+        "desc": "Multiplier coefficient coupled to the MSFS frame interpolation subsystem.",
+        "cpu_impact": "Neutral.",
+        "gpu_impact": "Handled by the Optical Flow Accelerator.",
+        "liner_advice": "Keep at 1 (standard 2X interpolation) whenever Frame Generation is enabled.",
+        "ga_advice": "Keep at 1.",
         "tradeoffs": [
-            ("1 (2X Interpolation)", "Cadence symétrique 1:1 entre trames natives et générées", "Ratio fixe"),
+            ("1 (2X Interpolation)", "Symmetrical 1:1 cadence between native and interpolated frames", "Fixed 2X ratio")
         ]
     },
     "reflex": {
         "title": "NVIDIA Reflex Low Latency",
-        "desc": "Technologie de synchronisation dynamique de la file d'attente de rendu GPU développée par NVIDIA. Supprime la file d'attente tampon entre le CPU et le GPU.",
-        "cpu_impact": "Optimise l'émission des paquets de commandes de rendu par le CPU.",
-        "gpu_impact": "Maintient les fréquences d'horloge GPU à leur niveau optimal de performance.",
-        "liner_advice": "Activer sur ON ou ON+BOOST. Réduit drastiquement le délai entre l'action sur le joystick et la réaction visuelle lors de l'arrondi (flare).",
-        "ga_advice": "Activer sur ON.",
+        "desc": "Dynamic GPU render queue synchronization technology engineered by NVIDIA. Eliminates backlogged render frames between the CPU and GPU.",
+        "cpu_impact": "Optimizes CPU render command dispatch timing.",
+        "gpu_impact": "Maintains optimal GPU clock frequencies to prevent render latency spikes.",
+        "liner_advice": "Set to ON or ON+BOOST. Dramatically minimizes control lag between sidestick/yoke input and aircraft visual response during landing flare.",
+        "ga_advice": "Set to ON for crisp flight control feedback.",
         "tradeoffs": [
-            ("ON / ON+BOOST", "Latence minimale aux commandes, pilotage réactif et précis", "GPU maintenu à fréquence haute"),
-            ("OFF", "Gestion d'énergie standard", "Latence perceptible aux commandes lors d'approches délicates")
+            ("ON / ON+BOOST", "Lowest control latency, responsive and precise hand-flying", "GPU held at elevated clock speeds"),
+            ("OFF", "Standard driver power saving", "Noticeable control sluggishness during gusty crosswind landings")
         ]
     },
     "dynamic_settings": {
-        "title": "Dynamic Settings (Résolution Dynamique)",
-        "desc": "Mécanisme interne de MSFS qui abaisse automatiquement l'échelle de résolution de rendu lorsque le GPU commence à saturer.",
-        "cpu_impact": "Neutre.",
-        "gpu_impact": "Prévient les effondrements de framerate sur les configurations très modestes.",
-        "liner_advice": "Désactiver impérativement (OFF). L'abaissement dynamique de résolution floute les écrans PFD/ND de manière imprévisible en courte finale.",
-        "ga_advice": "Désactiver (OFF) pour garantir une image toujours nette.",
+        "title": "Dynamic Settings (Dynamic Resolution Scaling)",
+        "desc": "Internal MSFS mechanism that dynamically downscales 3D render resolution whenever GPU frame time exceeds target thresholds.",
+        "cpu_impact": "Neutral.",
+        "gpu_impact": "Prevents severe framerate drops on entry-level hardware.",
+        "liner_advice": "Keep strictly OFF. Dynamic downscaling unpredictably blurs primary PFD/ND flight instruments on short final approach.",
+        "ga_advice": "Keep OFF to guarantee razor-sharp cockpit readouts at all times.",
         "tradeoffs": [
-            ("OFF", "Netteté constante et immuable des instruments de bord", "Aucun bridage automatique de résolution si GPU à 100%"),
-            ("ON", "Allège la charge GPU lors des pics soudains", "Flou visuel intermittent très gênant en cockpit")
+            ("OFF", "Rock-solid cockpit readout sharpness and consistent visual fidelity", "No automatic downscaling relief if GPU reaches 100% load"),
+            ("ON", "Throttles GPU load during unexpected scene spikes", "Jarring intermittent cockpit blur during critical flight phases")
         ]
     },
     "tlod": {
-        "title": "Terrain LOD (Niveau de Détail du Terrain)",
-        "desc": "Facteur de précision géométrique du maillage de terrain, de l'élévation des reliefs et de la distance d'affichage de la photogrammétrie. Il s'agit du paramètre LE PLUS GOURMAND en temps CPU MainThread de tout le simulateur.",
-        "cpu_impact": "Impact critique. Chaque tranche de 50 points de TLOD augmente le temps MainThread de 3 à 6 ms et multiplie les appels de dessin (draw calls).",
-        "gpu_impact": "Impact modéré sur la VRAM et le calcul géométrique.",
-        "liner_advice": "Maintenir entre 100 et 120 sur avion de ligne (ou déléguer à AutoFPS). Dépasser 140 sur des aéroports denses provoque inévitablement des micro-saccades à l'atterrissage.",
-        "ga_advice": "150 à 200 en aviation générale pour profiter des reliefs montagneux et vallées VFR.",
+        "title": "Terrain Level of Detail (TLOD)",
+        "desc": "Geometric density and distance scaling for the digital elevation terrain mesh and photogrammetry. THIS IS THE SINGLE MOST DEMANDING CPU MAINTHREAD SETTING IN THE SIMULATOR.",
+        "cpu_impact": "Critical impact. Every 50-point increase in TLOD adds 3 to 6 ms to CPU MainThread frame time and dramatically multiplies DirectX draw calls.",
+        "gpu_impact": "Moderate impact on VRAM allocation and vertex geometry shading.",
+        "liner_advice": "Maintain between 100 and 120 on complex airliners (or delegate to AutoFPS). Exceeding 140 at dense international airports triggers MainThread saturation and landing stutters.",
+        "ga_advice": "150 to 200 in General Aviation to enjoy rich mountain ridges and scenic valleys.",
         "tradeoffs": [
-            ("100 - 120", "Préservation absolue du MainThread CPU, atterrissage sans saccade", "Reliefs lointains légèrement simplifiés"),
-            ("200 - 400", "Montagnes et villes lointaines d'une netteté photographique", "Surcharge MainThread majeure, bégaiement inévitable sur gros aéroports")
+            ("100 - 120", "Protects CPU MainThread budget, guarantees stutter-free flare and touchdown", "Distant mountains slightly less detailed"),
+            ("200 - 400", "Photographic distant ridges and urban skylines", "Severe CPU MainThread bottleneck, inevitable landing stutters at hubs")
         ]
     },
     "olod": {
-        "title": "Objects LOD (Niveau de Détail des Objets)",
-        "desc": "Distance d'affichage et complexité des objets 3D : bâtiments aéroportuaires, passerelles télescopiques, éclairages de piste, véhicules de piste et bâtiments de villes.",
-        "cpu_impact": "Impact direct sur le nombre de draw calls CPU aux abords des plateformes aéroportuaires.",
-        "gpu_impact": "Augmente le nombre de polygones et textures à charger.",
-        "liner_advice": "Régler sur 100. Les scènes payware d'aéroports contiennent déjà des milliers d'objets ; un OLOD de 100 évite d'engorger le processeur.",
-        "ga_advice": "100 à 150 pour admirer les hangars et installations des petits aérodromes.",
+        "title": "Objects Level of Detail (OLOD)",
+        "desc": "Draw distance and geometric complexity for 3D scenery models: airport terminals, jetways, airfield lighting fixtures, ground service equipment, and autogen buildings.",
+        "cpu_impact": "Direct driver of CPU draw calls around complex airfield perimeters.",
+        "gpu_impact": "Increases vertex count and texture streaming load.",
+        "liner_advice": "Set to 100. Modern payware hubs already feature tens of thousands of modeled objects; OLOD 100 prevents CPU draw-call overload.",
+        "ga_advice": "100 to 150 to admire hangars and facilities at regional airfields.",
         "tradeoffs": [
-            ("100", "Nombre d'appels de dessin maîtrisé, fluidité maximale au sol", "Disparition des objets très lointains"),
-            ("150 - 400", "Affichage des terminaux et antennes à très grande distance", "Chute sensible du framerate sur les grands hubs internationaux")
+            ("100", "Controlled draw call budget, maximum ground smoothness and stability", "Distant airport vehicles not rendered until closer"),
+            ("150 - 400", "Terminals and hangars visible from extreme distances", "Noticeable framerate penalty on major international hub ramps")
         ]
     },
     "offscreen_precaching": {
-        "title": "Off Screen Pre-Caching (Pré-chargement Hors Écran)",
-        "desc": "Définit la quantité de données géométriques et de textures pré-chargées en mémoire pour les éléments situés en dehors du champ visuel immédiat de la caméra.",
-        "cpu_impact": "Évite les pointes de calcul CPU lors des rotations rapides de la tête ou de la caméra.",
-        "gpu_impact": "Mobilise davantage de RAM système et environ 500 Mo à 1 Go de VRAM.",
-        "liner_advice": "Régler impérativement sur HIGH ou ULTRA. Cela éradique 100% des saccades et gels d'image lorsque vous tournez la tête vers l'overhead panel ou les fenêtres latérales.",
-        "ga_advice": "HIGH ou ULTRA pour un balayage visuel VFR fluide.",
+        "title": "Off Screen Pre-Caching",
+        "desc": "Allocates memory buffers to retain terrain mesh, building geometry, and textures situated outside the immediate camera field of view.",
+        "cpu_impact": "Eliminates sudden CPU thread spikes and draw call bursts when rotating the camera quickly.",
+        "gpu_impact": "Allocates extra system RAM and approximately 500 MB to 1 GB of additional VRAM.",
+        "liner_advice": "Must be set to HIGH or ULTRA. Completely eliminates panning stutters and camera hesitation when scanning between the overhead panel and lateral windows.",
+        "ga_advice": "HIGH or ULTRA for fluid visual scans during circuit flying.",
         "tradeoffs": [
-            ("HIGH / ULTRA", "Fluidité parfaite lors des mouvements de caméra, zéro freeze", "Consomme ~1 Go de mémoire vive supplémentaire"),
-            ("LOW / MEDIUM", "Économie minime de mémoire", "Micro-gels d'image systématiques à chaque rotation de vue")
+            ("HIGH / ULTRA", "Zero hitching during quick view switches and head-tracking panning", "Consumes ~1 GB additional video memory"),
+            ("LOW / MEDIUM", "Minor memory savings", "Frequent micro-freezes whenever view angle changes")
         ]
     },
     "displacement_mapping": {
-        "title": "Displacement Mapping (Tessellation de Relief)",
-        "desc": "Technique de tessellation géométrique créant un micro-relief en 3D sur les dalles de béton de piste et les fissures de tarmac.",
-        "cpu_impact": "Faible à modéré.",
-        "gpu_impact": "Consomme des cycles de tessellation GPU et de la bande passante VRAM.",
-        "liner_advice": "Désactiver (OFF). À hauteur de cockpit d'un A320 ou B737, ce micro-relief est invisible et gaspille inutilement de la mémoire.",
-        "ga_advice": "OFF ou ON. Peu visible au-delà de 2 mètres du sol.",
+        "title": "Displacement Mapping",
+        "desc": "Surface tessellation technique that synthesizes micro-relief height displacement on runway concrete joints, pavement cracks, and terrain.",
+        "cpu_impact": "Low to moderate.",
+        "gpu_impact": "Consumes GPU geometry shader tessellation stages and VRAM bandwidth.",
+        "liner_advice": "Keep OFF. From the cockpit height of an airliner, pavement micro-relief is completely invisible and wastes memory bandwidth.",
+        "ga_advice": "OFF or ON. Barely visible once wheels leave the ground.",
         "tradeoffs": [
-            ("OFF", "Économise de la bande passante VRAM et des cycles de géométrie GPU", "Joints de béton visuellement plats au niveau des roues"),
-            ("ON", "Micro-relief 3D visible uniquement à ras du sol sur les roues", "Consommation géométrique inutile dès le décollage")
+            ("OFF", "Saves VRAM bandwidth and geometry compute passes", "Concrete expansion joints appear flat at wheel level"),
+            ("ON", "Fine pavement surface depth visible only at ground level", "Unnecessary geometry workload throughout all flight phases")
         ]
     },
     "buildings": {
-        "title": "Buildings Quality (Qualité des Bâtiments)",
-        "desc": "Niveau de détail des textures de façades, vitrages et toitures des bâtiments générés par l'intelligence artificielle Blackshark AI.",
-        "cpu_impact": "Très faible.",
-        "gpu_impact": "Faible impact sur le fill-rate.",
-        "liner_advice": "HIGH ou ULTRA. Offre des terminaux aéroportuaires et hangars nets sans impacter les performances de vol.",
-        "ga_advice": "HIGH ou ULTRA pour un environnement urbain réaliste.",
+        "title": "Buildings Quality",
+        "desc": "Mesh polygon budget, roof geometry, and facade texture fidelity for procedural structures generated by Blackshark AI.",
+        "cpu_impact": "Very low.",
+        "gpu_impact": "Minimal raster fill-rate impact.",
+        "liner_advice": "HIGH or ULTRA. Delivers crisp airport terminals and surrounding urban structures with negligible performance penalty.",
+        "ga_advice": "HIGH or ULTRA for realistic cityscapes and suburban landmarks.",
         "tradeoffs": [
-            ("HIGH / ULTRA", "Bâtiments autogen détaillés, reflets réalistes sur vitrages", "Impact de performance quasi imperceptible"),
-            ("LOW / MEDIUM", "Formes géométriques simplifiées", "Aspect carton-pâte peu esthétique")
+            ("HIGH / ULTRA", "Detailed autogen architecture and realistic facade reflections", "Virtually zero framerate penalty"),
+            ("LOW / MEDIUM", "Simplified boxy buildings and low-res roof textures", "Unrealistic cardboard appearance")
         ]
     },
     "trees": {
-        "title": "Trees Quality (Qualité des Arbres)",
-        "desc": "Densité foliaire, modélisation volumétrique 3D des couronnes d'arbres et profondeur des ombres portées du feuillage.",
-        "cpu_impact": "Faible.",
-        "gpu_impact": "Modéré lors du survol de forêts très denses.",
-        "liner_advice": "HIGH. Assure une canopée végétale dense et réaliste sur les trajectoires d'approche sans pénaliser les performances.",
-        "ga_advice": "HIGH ou ULTRA pour l'immersion lors des vols de brousse en rase-mottes.",
+        "title": "Trees Quality",
+        "desc": "Foliage density, 3D crown branch modeling, and shadow self-occlusion for tree canopies.",
+        "cpu_impact": "Low.",
+        "gpu_impact": "Moderate when flying over dense continuous forests.",
+        "liner_advice": "HIGH. Provides rich, authentic tree cover along final approach corridors with zero stutter.",
+        "ga_advice": "HIGH or ULTRA for deep immersion during low-level bush flying.",
         "tradeoffs": [
-            ("HIGH / ULTRA", "Forêts denses, canopée 3D volumineuse, transitions LOD douces", "Léger coût de rasterisation au-dessus des massifs forestiers"),
-            ("LOW / MEDIUM", "Arbres clairsemés", "Végétation aplatie et apparitions brusques (pop-in)")
+            ("HIGH / ULTRA", "Dense 3D tree canopies with smooth LOD cross-fading", "Minor rasterization cost over massive forest regions"),
+            ("LOW / MEDIUM", "Sparse tree patches", "Noticeable geometric pop-in during approach")
         ]
     },
     "grass": {
-        "title": "Grass & Bushes (Herbe et Buissons)",
-        "desc": "Génération procédurale de brins d'herbe 3D, fleurs des champs et buissons au sol.",
-        "cpu_impact": "Très lourd sur les grands aéroports si réglé trop haut (millions d'appels de dessin de brins d'herbe inutiles).",
-        "gpu_impact": "Impact notable sur le taux de remplissage à basse altitude.",
-        "liner_advice": "LOW ou MEDIUM. Sur piste en dur (asphalte/béton), afficher des millions de brins d'herbe 3D invisibles depuis le cockpit est une hérésie qui vole des FPS vitaux à l'atterrissage.",
-        "ga_advice": "HIGH ou ULTRA pour les atterrissages sur pistes en herbe et altisurfaces.",
+        "title": "Grass & Bushes",
+        "desc": "Procedural 3D ground vegetation blades, wild meadow flowers, and airfield perimeter shrubs.",
+        "cpu_impact": "Extremely heavy on large hub airports if set too high (generates millions of redundant grass draw calls).",
+        "gpu_impact": "Substantial fill-rate cost at ground level.",
+        "liner_advice": "LOW or MEDIUM. On paved asphalt/concrete runways, rendering millions of 3D grass blades invisible from the flight deck robs vital FPS on short final.",
+        "ga_advice": "HIGH or ULTRA for backcountry grass strip and mountain altisurface operations.",
         "tradeoffs": [
-            ("LOW / MEDIUM", "Économise des millions d'appels de dessin, booste les FPS au seuil de piste", "Bords de piste en herbe avec texture plane au lieu de brins 3D"),
-            ("HIGH / ULTRA", "Champ d'herbe 3D réaliste pour les pistes non revêtues", "Surcharge draw call inutile sur pistes en béton des gros aéroports")
+            ("LOW / MEDIUM", "Saves millions of draw calls, preserves critical landing FPS", "Grass runway shoulders use flat texture rather than 3D blades"),
+            ("HIGH / ULTRA", "Rich 3D vegetation field for unpaved bush airstrips", "Redundant draw call load on major international runways")
         ]
     },
     "water_waves": {
-        "title": "Water Waves Simulation (Ondes et Vagues)",
-        "desc": "Résolution de la grille FFT (Fast Fourier Transform) calculant la physique de surface des vagues océaniques, des houles et de l'écume.",
-        "cpu_impact": "Très faible.",
-        "gpu_impact": "Géré par des compute shaders sur le GPU.",
-        "liner_advice": "HIGH (512). Offre une houle océanique réaliste sans surcoût sensible.",
-        "ga_advice": "HIGH (512) ou ULTRA (1024) pour les hydravions.",
+        "title": "Water Waves Simulation",
+        "desc": "Fast Fourier Transform (FFT) grid resolution governing ocean wave mechanics, coastal swells, and shoreline foam.",
+        "cpu_impact": "Very low.",
+        "gpu_impact": "Computed via GPU compute shaders.",
+        "liner_advice": "HIGH (512). Offers authentic maritime wave motion with negligible overhead.",
+        "ga_advice": "HIGH (512) or ULTRA (1024) for floatplane and seaplane operations.",
         "tradeoffs": [
-            ("HIGH (512)", "Houle dynamique et reflets marins réalistes", "Surcoût minime"),
-            ("LOW (128)", "Surface de l'eau plus plate avec motif répétitif", "Gain de performance négligeable")
+            ("HIGH (512)", "Dynamic swells and authentic maritime light specular highlights", "Minimal compute cost"),
+            ("LOW (128)", "Flatter water surface with repetitive tiling patterns", "Negligible performance gain")
         ]
     },
     "shadow_maps": {
-        "title": "Shadow Maps Resolution (Résolution des Ombres)",
-        "desc": "Résolution du tampon de profondeur des ombres portées directes du soleil (verrière, ailes, surfaces de contrôle, ombres au sol).",
-        "cpu_impact": "Négligeable.",
-        "gpu_impact": "Mobilise de la VRAM pour allouer les cartes d'ombres.",
-        "liner_advice": "HIGH (1536). Donne des ombres de montants de pare-brise nettes et sans crénelage tremblotant dans le cockpit.",
-        "ga_advice": "HIGH (1536) ou ULTRA (2048).",
+        "title": "Shadow Maps Resolution",
+        "desc": "Depth buffer resolution allocated for direct solar shadows (cockpit canopy frames, wings, control surfaces, and ground scenery).",
+        "cpu_impact": "Negligible.",
+        "gpu_impact": "Allocates dedicated VRAM shadow map render targets.",
+        "liner_advice": "HIGH (1536). Delivers crisp, jitter-free cockpit pillar shadows across flight deck instruments.",
+        "ga_advice": "HIGH (1536) or ULTRA (2048).",
         "tradeoffs": [
-            ("HIGH (1536)", "Ombres nettes et stables sans scintillement dans le cockpit", "Occupation VRAM maîtrisée"),
-            ("LOW (512)", "Ombres très pixelisées et vacillantes au moindre mouvement", "Économie minime de VRAM")
+            ("HIGH (1536)", "Sharp, stable shadows without shimmering or stepping edges", "Controlled VRAM footprint"),
+            ("LOW (512)", "Heavily pixelated, jittering shadows along glare shields", "Minimal VRAM savings")
         ]
     },
     "terrain_shadows": {
-        "title": "Terrain Shadows (Ombres du Relief)",
-        "desc": "Ombres projetées à longue distance par les massifs montagneux et les crêtes selon l'angle d'incidence du soleil.",
-        "cpu_impact": "Faible.",
-        "gpu_impact": "Calcul de raymarching sur le champ de hauteur (HeightField).",
-        "liner_advice": "HIGH (512). Sublime les arrivées au coucher du soleil dans les zones montagneuses (ex: Genève, Nice, Innsbruck).",
-        "ga_advice": "HIGH (512) pour le vol de montagne en VFR.",
+        "title": "Terrain Shadows",
+        "desc": "Long-range cast shadows projected by mountain massifs, peaks, and terrain ridges relative to solar elevation.",
+        "cpu_impact": "Low.",
+        "gpu_impact": "Heightfield raymarching calculations across digital elevation data.",
+        "liner_advice": "HIGH (512). Produces stunning golden-hour arrivals in mountainous terrain (e.g. Innsbruck, Geneva, Nice).",
+        "ga_advice": "HIGH (512) for scenic mountain VFR navigation.",
         "tradeoffs": [
-            ("HIGH (512)", "Reliefs alpins majestueux avec ombres portées spectaculaires", "Légère sollicitation GPU en région montagneuse"),
-            ("LOW (128)", "Reliefs aplatis avec ombrage simplifié", "Gain de performance minime")
+            ("HIGH (512)", "Spectacular alpine ridges with dramatic shadow casting", "Minor GPU shading workload in mountain valleys"),
+            ("LOW (128)", "Flattened terrain relief with simplified illumination", "Negligible framerate gain")
         ]
     },
     "contact_shadows": {
-        "title": "Contact Shadows (Ombres de Contact)",
-        "desc": "Ombres d'occlusion de proximité en espace écran (Screen Space) sous les boutons, commutateurs, roues et commandes de vol.",
-        "cpu_impact": "Nul.",
-        "gpu_impact": "Passe de shader post-traitement très légère (< 0.2 ms).",
-        "liner_advice": "HIGH. Apporte une sensation tactile indispensable aux panneaux du cockpit (Overhead, Pedestal).",
-        "ga_advice": "HIGH pour un cockpit chaleureux et réaliste.",
+        "title": "Contact Shadows",
+        "desc": "Screen-space micro-shadows beneath switches, toggles, rudder pedals, landing gear bogies, and cockpit instrumentation.",
+        "cpu_impact": "Zero.",
+        "gpu_impact": "Very lightweight screen-space shader pass (< 0.2 ms).",
+        "liner_advice": "HIGH. Adds indispensable tactile depth and physical realism to overhead and pedestal panels.",
+        "ga_advice": "HIGH for rich cockpit instrument depth.",
         "tradeoffs": [
-            ("HIGH", "Boutons et leviers ancrés visuellement dans le panneau de bord", "Coût GPU quasiment invisible"),
-            ("OFF / LOW", "Commandes de vol semblant flotter au-dessus de leur socle", "Gain de performance nul")
+            ("HIGH", "Switches and levers appear firmly seated on cockpit panels", "Practically imperceptible GPU cost"),
+            ("OFF / LOW", "Cockpit knobs appear visually detached and floating", "Zero measurable performance gain")
         ]
     },
     "volumetric_lights": {
-        "title": "Volumetric Lights (Lumières Volumétriques)",
-        "desc": "Dispersion de la lumière dans l'atmosphère (faisceaux des phares d'atterrissage, feux de piste et balises clignotantes dans le brouillard et la pluie).",
-        "cpu_impact": "Faible.",
-        "gpu_impact": "Calcul de volume lumineux lors d'approches de nuit sous plafond bas (CAT III).",
-        "liner_advice": "HIGH. Procure l'immersion légendaire des perçées ILS dans la purée de pois la nuit.",
-        "ga_advice": "HIGH pour les vols crépusculaires ou par brume.",
+        "title": "Volumetric Lights",
+        "desc": "Atmospheric light scattering through fog, haze, and rain (landing light beams, runway strobe illumination, and beacon shafts).",
+        "cpu_impact": "Low.",
+        "gpu_impact": "Volumetric light marching during night low-visibility CAT III ILS approaches.",
+        "liner_advice": "HIGH. Delivers iconic immersion as high-intensity runway lights pierce thick overcast at night.",
+        "ga_advice": "HIGH for dawn/dusk and misty morning flights.",
         "tradeoffs": [
-            ("HIGH / ULTRA", "Faisceaux de phares traversant la brume et les nuages", "Léger surcoût GPU au croisement de multiples faisceaux"),
-            ("LOW", "Faisceaux de lumière transparents et peu atmosphériques", "Gain de framerate marginal")
+            ("HIGH / ULTRA", "Authentic light shafts cutting through cloud bases and rain", "Minor GPU fill cost when crossing multiple light cones"),
+            ("LOW", "Thin, transparent light beams lacking atmospheric presence", "Marginal framerate difference")
         ]
     },
     "texture_resolution": {
-        "title": "Texture Resolution (Résolution des Textures)",
-        "desc": "Résolution des textures chargées en mémoire vidéo (VRAM) pour les aéroports, avions, livrées et éléments de décor. CE RÉGLAGE EST LE FACTEUR NUMÉRO 1 DES CRASHS ET SACCADES LIÉS À LA VRAM !",
-        "cpu_impact": "Indirect. Si la VRAM déborde, DirectX 12 effectue du 'paging' vers la RAM système via le bus PCIe, ce qui fige instantanément le CPU et le moteur de rendu.",
-        "gpu_impact": "Détermine directement l'occupation de la VRAM (différence de 6 à 8 Go entre LOW et ULTRA !).",
-        "liner_advice": "Régler impérativement sur LOW ou MEDIUM sur gros porteur. Les écrans vectoriels de bord (PFD, ND, FMC) conservent 100% de leur netteté vectorielle, tandis que vous économisez 6 à 8 Go de VRAM, évitant tout risque de gel D3D12 lors de l'arrondi sur un aéroport lourd.",
-        "ga_advice": "HIGH ou ULTRA. Les avions légers consomment très peu de mémoire vidéo, ce qui permet de pousser les textures au maximum.",
+        "title": "Texture Resolution",
+        "desc": "Resolution of texture mipmaps loaded into Video RAM (VRAM) for airframes, virtual cockpits, liveries, and ground scenery. THIS SETTING IS THE PRIMARY CAUSE OF D3D12 DEVICE-HUNG CRASHES AND SEVERE STUTTERS.",
+        "cpu_impact": "Indirect. When VRAM overflows, DirectX 12 evicts assets to system RAM over the PCIe bus, triggering instantaneous CPU hitches and frame freezes.",
+        "gpu_impact": "Directly determines VRAM allocation (6 to 8 GB difference between LOW and ULTRA!).",
+        "liner_advice": "Set strictly to LOW or MEDIUM on complex airliners. Vector avionics screens (PFD, ND, FMC) retain 100% vector sharpness, while saving 6-8 GB VRAM to eliminate landing flare D3D12 stutters.",
+        "ga_advice": "HIGH or ULTRA. General aviation aircraft consume modest VRAM, leaving ample video memory for max textures.",
         "tradeoffs": [
-            ("LOW (Recommandé Liner)", "Libère 6-8 Go de VRAM, zéro freeze D3D12, écrans de bord 100% nets", "Légère baisse de piqué sur les marquages extérieurs de carlingue vus de près"),
-            ("MEDIUM", "Bon équilibre visuel avec marge VRAM raisonnable sur GPU 16 Go", "Consomme ~3 Go de plus que LOW"),
-            ("ULTRA", "Rivet par rivet ultra-net sur la peinture extérieure", "DANGER VRAM : Débordement garanti sur scènes payware complexes, provocant des saccades massives")
+            ("LOW (Recommended for Airliners)", "Frees 6-8 GB VRAM, zero D3D12 paging freezes, 100% crisp vector cockpit displays", "Slightly softer external fuselage decals when viewed up close in drone view"),
+            ("MEDIUM", "Well-balanced visual quality with safe VRAM margin on 16 GB GPUs", "Consumes ~3 GB more VRAM than LOW"),
+            ("ULTRA", "Rivet-by-rivet sharpness on external paint schemes", "CRITICAL VRAM RISK: Guaranteed memory overflow at complex payware airports causing severe stutters")
         ]
     },
     "glass_cockpits": {
-        "title": "Glass Cockpit Refresh (Fréquence Écrans Avionique)",
-        "desc": "Fréquence de rafraîchissement des écrans avioniques vectoriels en cockpit (PFD, ND, ECAM/EICAS, MCDU/FMC). FACTEUR MAJEUR DU TEMPS CPU MAINTHREAD SUR LES AVIONS PAYWARE !",
-        "cpu_impact": "Impact colossal. Sur des avions complexes comme Fenix A320 ou PMDG, redessiner tous les instruments vectoriels à chaque image sature le MainThread. Brider ce réglage à Medium ou Low libère instantanément 5 à 8 ms de temps CPU !",
-        "gpu_impact": "Faible.",
-        "liner_advice": "MEDIUM (Half) ou LOW (Quarter). Sur gros liner, l'horizon artificiel et les chiffres restent parfaitement lisibles, tout en offrant un gain de fluidité spectaculaire sur l'ensemble du simulateur.",
-        "ga_advice": "HIGH (Full) pour les cockpits Garmin G1000/G3000 si le processeur est puissant.",
+        "title": "Glass Cockpit Refresh Rate",
+        "desc": "Update frequency of vector avionics displays in the flight deck (PFD, ND, EICAS, MCDU/FMC). MAJOR DRIVER OF CPU MAINTHREAD FRAME TIME ON COMPLEX PAYWARE AIRLINERS.",
+        "cpu_impact": "Colossal. In study-level airliners (Fenix, PMDG, iniBuilds), redrawing vector gauges at full framerate exhausts CPU MainThread. Throttling to Medium or Low instantly recovers 5 to 8 ms CPU time.",
+        "gpu_impact": "Low.",
+        "liner_advice": "MEDIUM (Half) or LOW (Quarter). Attitude indicator and numerical tapes remain crystal clear while simulator-wide smoothness improves substantially.",
+        "ga_advice": "HIGH (Full) for Garmin G1000/G3000 synthetic vision on high-end CPUs.",
         "tradeoffs": [
-            ("MEDIUM (Half)", "Économise 5-8 ms sur le MainThread, supprime les micro-saccades", "Mouvement de l'horizon artificiel cadencé à 30 ou 45 Hz au lieu de 60+ Hz"),
-            ("HIGH (Full)", "Animations d'écrans ultra-fluides à 60 Hz", "Surcharge dramatique du processeur sur Fenix/PMDG/iniBuilds")
+            ("MEDIUM (Half)", "Recovers 5-8 ms CPU MainThread budget, eliminates micro-stutters", "Artificial horizon movement animated at 30-45 Hz instead of 60+ Hz"),
+            ("HIGH (Full)", "Silky 60 Hz display animations", "Heavy CPU MainThread saturation on complex airliner avionics")
         ]
     },
     "ambient_occlusion": {
-        "title": "Ambient Occlusion / SSAO (Occlusion Ambiante)",
-        "desc": "Calcul en espace écran des ombres de contact diffuses dans les creux, les coins d'habitacle et sous les casquettes de bord de planche.",
-        "cpu_impact": "Nul.",
-        "gpu_impact": "Passe de shading post-traitement modérée.",
-        "liner_advice": "HIGH. Confère au cockpit sa profondeur volumétrique naturelle et son ambiance feutrée authentique.",
+        "title": "Ambient Occlusion (SSAO)",
+        "desc": "Screen-space calculation of diffuse contact shadows in crevices, cockpit footwells, and beneath instrument glare shields.",
+        "cpu_impact": "Zero.",
+        "gpu_impact": "Moderate post-processing shading pass.",
+        "liner_advice": "HIGH. Bestows natural volumetric depth and authentic flight deck atmosphere.",
         "ga_advice": "HIGH.",
         "tradeoffs": [
-            ("HIGH", "Ombrage d'ambiance naturel dans les recoins du cockpit", "Coût GPU très modéré (< 1 ms)"),
-            ("OFF / LOW", "Habitacle plat et anormalement éclairé de manière uniforme", "Gain GPU minime")
+            ("HIGH", "Natural ambient shading in cockpit recesses and corners", "Very modest GPU frame time cost (< 1 ms)"),
+            ("OFF / LOW", "Flat, unnaturally uniform flight deck illumination", "Minimal GPU gain")
         ]
     },
     "windshield_effects": {
-        "title": "Windshield Effects (Effets sur Pare-Brise)",
-        "desc": "Physique dynamique des gouttes de pluie, ruissellement de l'eau balayée par les essuie-glaces, givrage progressif et buée sur le pare-brise.",
-        "cpu_impact": "Négligeable.",
-        "gpu_impact": "Passes de shaders de réfraction et déformation sous forte pluie.",
-        "liner_advice": "HIGH ou ULTRA. Essentiel pour l'immersion lors des approches sous orage ou givrage sévère.",
-        "ga_advice": "HIGH ou ULTRA.",
+        "title": "Windshield Effects",
+        "desc": "Dynamic physics simulation of windshield raindrops, wiper sweep clearing, progressive structural icing, and condensation.",
+        "cpu_impact": "Negligible.",
+        "gpu_impact": "Refraction and distortion shader passes during heavy precipitation.",
+        "liner_advice": "HIGH or ULTRA. Essential for immersion during stormy or severe icing approaches.",
+        "ga_advice": "HIGH or ULTRA.",
         "tradeoffs": [
-            ("HIGH / ULTRA", "Gouttes de pluie et balayage d'essuie-glaces ultra-réalistes", "Légère charge de shader sous averse torrentielle"),
-            ("LOW", "Gouttes d'eau statiques et simplifiées", "Gain de framerate négligeable")
+            ("HIGH / ULTRA", "Ultra-realistic rain bead aerodynamics and wiper clearing", "Minor shader workload during heavy downpours"),
+            ("LOW", "Static, simplified droplet textures", "Negligible framerate gain")
         ]
     },
     "volumetric_clouds": {
-        "title": "Volumetric Clouds (Nuages Volumétriques)",
-        "desc": "Rendu par lancer de rayons volumétrique (raymarching) de la nébulosité, des stratus, cumulus et orages cumulonimbus avec diffusion lumineuse interne.",
-        "cpu_impact": "Faible.",
-        "gpu_impact": "Très lourd sur les unités de shading et de remplissage GPU lors de la traversée de couches denses.",
-        "liner_advice": "HIGH. Le réglage HIGH offre 95% de la qualité visuelle du mode Ultra tout en libérant 15 à 20% de performances GPU précieuses lors des traversées de couches nuageuses denses.",
+        "title": "Volumetric Clouds",
+        "desc": "Raymarched volumetric cloud rendering of stratus, cumulus, and towering cumulonimbus with multi-bounce internal light scattering.",
+        "cpu_impact": "Low.",
+        "gpu_impact": "Extremely heavy on GPU rasterization and pixel shading units when flying through dense overcast layers.",
+        "liner_advice": "HIGH. HIGH provides 95% of Ultra visual fidelity while reclaiming 15-20% vital GPU performance during cloud penetration.",
         "ga_advice": "HIGH.",
         "tradeoffs": [
-            ("HIGH (Optimal)", "Formations nuageuses denses et magnifiques avec 15% de marge GPU", "Bords de nuages très subtilement plus doux qu'en Ultra"),
-            ("ULTRA", "Piqué maximal des bordures de nuages", "Chute brutale de framerate dès que la caméra plonge dans un overcast épais"),
-            ("MEDIUM / LOW", "Performances maximales", "Nuages pixelisés avec effet de bruit et découpage visible")
+            ("HIGH (Optimal)", "Stunning, dense cloud formations with 15% GPU safety headroom", "Cloud margins subtly softer than Ultra"),
+            ("ULTRA", "Razor-sharp cloud boundary definition", "Substantial framerate drops inside thick overcast soup"),
+            ("MEDIUM / LOW", "Maximum GPU performance", "Noticeable dithering noise and blocky cloud edges")
         ]
     },
     "reflections_ssr": {
-        "title": "Screen Space Reflections / SSR (Reflets en Espace Écran)",
-        "desc": "Calcul des reflets dynamiques de la verrière, des flaques d'eau sur le tarmac mouillé et de la piste par traçage de rayons en espace écran.",
-        "cpu_impact": "Nul.",
-        "gpu_impact": "Modéré en affichage 2D, très lourd en rendu stéréo VR.",
-        "liner_advice": "HIGH en 2D pour admirer le tarmac mouillé de nuit. En VR, réduire à LOW pour préserver la cadence de reprojection.",
-        "ga_advice": "HIGH en 2D, LOW en VR.",
+        "title": "Screen Space Reflections (SSR)",
+        "desc": "Raymarching calculation of real-time mirror reflections across canopy glass, wet tarmac puddles, and reflective runway asphalt.",
+        "cpu_impact": "Zero.",
+        "gpu_impact": "Moderate in 2D; very heavy in stereo VR rendering.",
+        "liner_advice": "HIGH in 2D mode for glistening wet runway visuals at night. In VR, reduce to LOW to preserve reprojection budget.",
+        "ga_advice": "HIGH in 2D, LOW in VR.",
         "tradeoffs": [
-            ("HIGH (2D)", "Superbes reflets brillants sur piste détrempée et reflets de verrière", "Coût GPU de 1 à 2 ms par temps de pluie"),
-            ("LOW (Recommandé VR)", "Soulage considérablement le taux de remplissage stéréo en VR", "Surfaces d'eau et pistes plus mates sans reflets dynamiques")
+            ("HIGH (2D)", "Gorgeous reflections on wet tarmac and canopy surfaces", "1-2 ms GPU cost during rainy conditions"),
+            ("LOW (Recommended VR)", "Greatly alleviates stereo fill-rate pressure in VR headsets", "Water surfaces appear matte without dynamic reflections")
         ]
     },
     "anisotropic_filtering": {
-        "title": "Anisotropic Filtering (Filtrage Anisotrope)",
-        "desc": "Filtrage d'échantillonnage de textures évitant le flou sur les surfaces observées sous un angle rasant (marquages au sol, lignes de seuil de piste, bandes axiales de taxiway).",
-        "cpu_impact": "Absolument nul.",
-        "gpu_impact": "Coût de bande passante mémoire dérisoire (< 0.1 ms sur n'importe quel GPU moderne).",
-        "liner_advice": "16X impérativement. Garantit que les lignes d'axe de piste et les repères de toucher des roues restent parfaitement nets jusqu'à l'horizon.",
+        "title": "Anisotropic Filtering",
+        "desc": "Texture sampling filter preventing oblique surface blurring on runway touchdown markings, threshold lines, and taxiway centerlines.",
+        "cpu_impact": "Zero.",
+        "gpu_impact": "Trivial memory bandwidth cost (< 0.1 ms on any modern GPU).",
+        "liner_advice": "16X without exception. Guarantees runway centerlines and touchdown markers stay razor-sharp to the horizon.",
         "ga_advice": "16X.",
         "tradeoffs": [
-            ("16X", "Lignes de piste et marquages au sol nets jusqu'à l'horizon", "Impact de performance inexistant"),
-            ("OFF / 2X / 4X", "Bandes et lignes floues à plus de 100 mètres", "Aucun gain mesurable de framerate")
+            ("16X", "Centerlines and ground markings remain sharp all the way to horizon", "Practically nonexistent performance cost"),
+            ("OFF / 2X / 4X", "Muddy runway markings beyond 100 meters", "Zero measurable framerate improvement")
         ]
     }
 }
 
 
-def calculate_option_ratings(key: str, options: List[str], is_liner: bool, is_vr: bool, vram_gb: float = 16.0, target_fps: int = 60) -> Dict[str, Dict[str, str]]:
-    """Retourne pour chaque option sa classification ('optimum', 'acceptable', 'hazard') et sa couleur ('emerald', 'amber', 'rose')."""
+def calculate_option_ratings(key: str, options: List[str], is_liner: bool, is_vr: bool, vram_gb: float = 16.0, target_fps: int = 60, native_w: int = 2560, native_h: int = 1440) -> Dict[str, Dict[str, str]]:
+    """Retourne pour chaque option sa classification ('optimum', 'acceptable', 'suboptimal', 'hazard') et sa couleur ('emerald', 'amber', 'orange', 'rose')."""
     ratings = {}
     for opt in options:
         opt_str = str(opt).strip()
@@ -1508,7 +1550,23 @@ def calculate_option_ratings(key: str, options: List[str], is_liner: bool, is_vr
         r = "acceptable"
         c = "amber"
 
-        if key == "texture_resolution":
+        if key == "resolution":
+            try:
+                tokens = opt_str.replace('x', ' ').replace('X', ' ').split()
+                if len(tokens) >= 2:
+                    w, h = int(tokens[0]), int(tokens[1])
+                    if w == native_w and h == native_h:
+                        r, c = "optimum", "emerald"
+                    elif w > native_w or h > native_h:
+                        r, c = "hazard", "rose"
+                    else:
+                        r, c = "suboptimal", "orange"
+                else:
+                    r, c = "acceptable", "amber"
+            except Exception:
+                r, c = "acceptable", "amber"
+
+        elif key == "texture_resolution":
             if is_liner:
                 if "LOW" in o_up:
                     r, c = "optimum", "emerald"
@@ -1718,8 +1776,10 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
     target_vr_ms = round(1000.0 / target_vr_fps, 1)
 
     all_displays = detect_all_displays()
-    active_disp = detect_display_info(preferred_id=preferred_display_id)
+    active_disp = detect_display_info(preferred_id=preferred_display_id, displays_list=all_displays)
     screen_hz = int(active_disp.get("refresh_rate_int", 60))
+    native_w = int(active_disp.get("width", 2560))
+    native_h = int(active_disp.get("height", 1440))
     if screen_hz >= 240:
         target_2d_fps = 120
     elif screen_hz >= 180:
@@ -2041,7 +2101,7 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
             con_desc = con_desc or calc_con_desc
 
         info_db = SETTING_INFO_DATABASE.get(key, {})
-        opt_ratings = calculate_option_ratings(key, options, is_liner, is_vr, vram_gb, target_vr_fps if is_vr else target_2d_fps)
+        opt_ratings = calculate_option_ratings(key, options, is_liner, is_vr, vram_gb, target_vr_fps if is_vr else target_2d_fps, native_w=native_w, native_h=native_h)
 
         return {
             "key": key,
@@ -2374,90 +2434,129 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
     fps_2d_label = "OPTIMUM" if is_2d_fps_opt else ("OFF" if is_2d_fps_off else "SUBOPTIMAL")
     fps_2d_reason = f"Synchronized with {screen_hz} Hz monitor 1/2 divisor ({target_2d_fps} FPS) for zero judder." if is_2d_fps_opt else ("Max frame rate is OFF (uncapped). Frame pacing is free." if is_2d_fps_off else f"Target frame rate ({fps_2d} FPS) does not match the 1/2 sync divisor ({target_2d_fps} FPS) of your {screen_hz} Hz display.")
 
+    # 1. Full Screen Resolution (Shared) Rating & Options
+    cur_w, cur_h = 2560, 1440
+    if res_raw:
+        parts = res_raw.split()
+        if len(parts) >= 2:
+            try:
+                cur_w, cur_h = int(parts[0]), int(parts[1])
+            except Exception:
+                pass
+
+    if cur_w == native_w and cur_h == native_h:
+        res_rating = "optimum"
+        res_color = "emerald"
+        res_label = "OPTIMUM"
+        res_tag_reason = "Matches physical monitor native resolution for pixel-perfect 1:1 rendering."
+    elif cur_w > native_w or cur_h > native_h:
+        res_rating = "hazard"
+        res_color = "rose"
+        res_label = "HAZARD"
+        res_tag_reason = f"Resolution ({cur_w}x{cur_h}) exceeds native monitor resolution ({native_w}x{native_h}). Causes severe GPU fillrate load."
+    else:
+        res_rating = "suboptimal"
+        res_color = "orange"
+        res_label = "SUBOPTIMAL"
+        res_tag_reason = f"Resolution ({cur_w}x{cur_h}) is lower than native ({native_w}x{native_h}). Produces non-native scaling blur and soft fonts."
+
+    base_res_options = ["3840 x 2160", "2560 x 1440", "1920 x 1080"]
+    native_res_str = f"{native_w} x {native_h}"
+    if native_res_str not in base_res_options:
+        base_res_options.append(native_res_str)
+
+    def res_key(r_str):
+        try:
+            toks = r_str.replace('x', ' ').replace('X', ' ').split()
+            return int(toks[0]) * int(toks[1])
+        except Exception:
+            return 0
+    res_options = sorted(list(set(base_res_options)), key=res_key, reverse=True)
+
     # Build 2D Matrix (27 Items across 7 Pages in 2x2 Grid)
     matrix_2d = [
-        # PAGE 1: DISPLAY & SYNC (4)
-        make_setting_item("resolution", "Full Screen Resolution", res_formatted, res_raw, True, "optimum", "emerald", "OPTIMUM", f"Description: Native screen rendering resolution for MSFS.\nCurrent: {res_formatted} (shared with 2D windowing).\nRecommendation: Match physical monitor native resolution and leverage DLSS for optimal sharpness.", ["3840 x 2160", "2560 x 1440", "1920 x 1080"], page=1, tag_reason="Native display resolution ensures 1:1 pixel rendering clarity without scaling blur.", is_vr=False),
+        # PAGE 1: CORE (4)
+        make_setting_item("resolution", "Full Screen Resolution", res_formatted, res_raw, True, res_rating, res_color, res_label, f"Description: Native screen rendering resolution for MSFS.\nCurrent: {res_formatted} (shared with 2D windowing).\nRecommendation: Match physical monitor native resolution and leverage DLSS for optimal sharpness.", res_options, page=1, tag_reason=res_tag_reason, is_vr=False),
         make_setting_item("anti_aliasing", "Anti-Aliasing & Upscaling", val_aa_2d, aa_2d, False, "optimum" if "DLSS" in val_aa_2d else "acceptable", "emerald" if "DLSS" in val_aa_2d else "amber", "OPTIMUM" if "DLSS" in val_aa_2d else "ACCEPTABLE", f"Description: Anti-aliasing method and AI upscaling mode (DLSS/TAA/DLAA).\nCurrent: {val_aa_2d}.\nRecommendation: Use DLSS Quality on RTX GPUs for superior edge stability with 20-30% GPU performance headroom.", ["DLSS (Quality)", "DLSS (Balanced)", "DLSS (Performance)", "TAA", "DLAA"], page=1, tag_reason="DLSS delivers superior edge stability and GPU headroom." if "DLSS" in val_aa_2d else "TAA provides native clarity at higher raster workload.", is_vr=False),
         make_setting_item("max_frame_rate", "Max Frame Rate", f"{fps_2d} FPS" if not is_2d_fps_off else "OFF", fps_2d, False, fps_2d_rating, fps_2d_color, fps_2d_label, f"Description: Frame rate limiter to synchronize frame delivery with monitor refresh intervals. Direct numeric input supported.\nCurrent: {'OFF (Uncapped)' if is_2d_fps_off else f'{fps_2d} FPS'} ({'Synchronized' if is_2d_fps_opt else ('OFF / Uncapped' if is_2d_fps_off else 'Custom')}).\nRecommendation: Lock to an exact sync divisor of your monitor (e.g. 60, 72, 80, 82, 90 FPS) to eliminate frame pacing jitter, or OFF if using external limiter.", fps_options, page=1, is_numeric=True, min_val=0, max_val=240, step=1, tag_reason=fps_2d_reason, is_vr=False),
-        make_setting_item("vsync", "V-Sync", vsync_val, vsync_raw, True, "optimum" if vsync_val == "ON" else "acceptable", "emerald" if vsync_val == "ON" else "amber", "OPTIMUM" if vsync_val == "ON" else "ACCEPTABLE", f"Description: Vertical synchronization with physical monitor refresh cycle.\nCurrent: {vsync_val}.\nRecommendation: Keep ON with G-Sync/FreeSync and frame rate limiter to eliminate screen tearing.", ["ON", "OFF"], page=1, tag_reason="V-Sync locks buffer presentation to refresh boundaries, eliminating tearing." if vsync_val == "ON" else "V-Sync OFF may cause horizontal tearing lines during fast camera pans.", is_vr=False),
+        make_setting_item("texture_resolution", "Texture Resolution", tex_2d_val, tex_2d_raw, False, tex_2d_rating, tex_2d_color, tex_2d_label, tex_2d_tip, q_options, page=1, tag_reason=tex_2d_reason, is_vr=False),
 
-        # PAGE 2: FRAME GEN & LATENCY (4)
+        # PAGE 2: PACING (5)
         make_setting_item("frame_generation", "Frame Generation", fg_2d, fg_2d_raw, False, "optimum" if fg_2d.startswith("DLSSG") else "acceptable", "emerald" if fg_2d.startswith("DLSSG") else "amber", "OPTIMUM" if fg_2d.startswith("DLSSG") else "ACCEPTABLE", f"Description: AI optical flow frame interpolation (DLSS 3 Frame Generation / FSR 3).\nCurrent: {fg_2d}.\nRecommendation: Keep ON (DLSSG 2X) in 2D mode for doubled motion smoothness without increasing CPU MainThread load.", ["DLSSG (2X)", "FSR3 (2X)", "OFF"], page=2, tag_reason="Doubles motion smoothness via optical flow without CPU overhead." if fg_2d.startswith("DLSSG") else "Frame generation is inactive; native rendering requires more CPU/GPU pacing.", is_vr=False),
         make_setting_item("framerate_multiplier", "Framerate Multiplier", f"{mult_2d}X", mult_2d, False, "optimum", "emerald", "OPTIMUM", f"Description: Number of interpolated frames generated per native frame.\nCurrent: {mult_2d}X.\nRecommendation: Set to 1 (2X interpolation) when Frame Generation is active.", ["1 (2X Interpolation)"], page=2, tag_reason="Standard 2X optical flow interpolation factor.", is_vr=False),
         make_setting_item("reflex", "NVIDIA Reflex", reflex_2d, reflex_2d, False, "optimum" if reflex_2d in ["ON", "ON+BOOST"] else "suboptimal", "emerald" if reflex_2d in ["ON", "ON+BOOST"] else "orange", "OPTIMUM" if reflex_2d in ["ON", "ON+BOOST"] else "SUBOPTIMAL", f"Description: NVIDIA Reflex low-latency GPU queue pacing technology.\nCurrent: {reflex_2d}.\nRecommendation: Set to ON or ON+BOOST for responsive flight controls and minimum render queue latency.", ["ON", "ON+BOOST", "OFF"], page=2, tag_reason="Drains GPU render queue to minimize input latency." if reflex_2d in ["ON", "ON+BOOST"] else "Reflex OFF increases input-to-display latency during flight maneuvers.", is_vr=False),
         make_setting_item("dynamic_settings", "Dynamic Settings", dyn_2d, "0" if dyn_2d == "OFF" else "1", False, "optimum" if dyn_2d == "OFF" else "suboptimal", "emerald" if dyn_2d == "OFF" else "orange", "OPTIMUM" if dyn_2d == "OFF" else "SUBOPTIMAL", f"Description: Dynamic internal resolution scaling during heavy scenes.\nCurrent: {dyn_2d}.\nRecommendation: Keep OFF. Dynamic resolution triggers fluctuating cockpit blur and inconsistent image clarity.", ["OFF", "ON"], page=2, tag_reason="Disabled dynamic scaling guarantees consistent render sharpness in all phases." if dyn_2d == "OFF" else "Dynamic scaling lowers resolution unpredictably, blurring cockpit screens.", is_vr=False),
+        make_setting_item("vsync", "V-Sync", vsync_val, vsync_raw, True, "optimum" if vsync_val == "ON" else "acceptable", "emerald" if vsync_val == "ON" else "amber", "OPTIMUM" if vsync_val == "ON" else "ACCEPTABLE", f"Description: Vertical synchronization with physical monitor refresh cycle.\nCurrent: {vsync_val}.\nRecommendation: Keep ON with G-Sync/FreeSync and frame rate limiter to eliminate screen tearing.", ["ON", "OFF"], page=2, tag_reason="V-Sync locks buffer presentation to refresh boundaries, eliminating tearing." if vsync_val == "ON" else "V-Sync OFF may cause horizontal tearing lines during fast camera pans.", is_vr=False),
 
-        # PAGE 3: TERRAIN & LOD (4)
+        # PAGE 3: TERRAIN (4)
         make_setting_item("tlod", "Terrain LOD (TLOD)", f"{tlod_2d_val}" if not autofps else f"Dynamic ({tlod_2d_val})", str(tlod_2d_val), False, tlod_2d_rating, tlod_2d_color, tlod_2d_label, f"Description: Terrain mesh geometric complexity and photogrammetry draw distance. Major driver of CPU MainThread frame time! Direct numeric input supported up to 400.\nCurrent: {tlod_2d_val}{' (Managed by AutoFPS)' if autofps else ''}.\nRecommendation: {'Airliners: Keep 100-120 (or dynamic with AutoFPS) to ensure CPU MainThread stays under 25ms during landing flare.' if is_liner else 'GA: 150-200 provides rich ground relief and mountain detail.'}", lod_options, page=3, is_numeric=True, min_val=10, max_val=400, step=5, tag_reason=tlod_2d_reason, is_vr=False),
         make_setting_item("olod", "Objects LOD (OLOD)", f"{olod_2d_val}" if not autofps else f"Dynamic ({olod_2d_val})", str(olod_2d_val), False, "optimum" if olod_2d_val <= 150 else "acceptable", "emerald" if olod_2d_val <= 150 else "amber", "OPTIMUM" if olod_2d_val <= 150 else "ACCEPTABLE", f"Description: Geometric draw distance for 3D airport buildings, hangars, and autogen. Direct numeric input supported up to 400.\nCurrent: {olod_2d_val}.\nRecommendation: 100-120 for airliners; 120-150 for GA. Values above 200 severely increase CPU draw calls at busy airports.", lod_options, page=3, is_numeric=True, min_val=10, max_val=400, step=5, tag_reason="Balanced 3D building draw distance with controlled draw call count." if olod_2d_val <= 150 else "Elevated draw distance increases CPU draw call overhead at dense hubs.", is_vr=False),
         make_setting_item("offscreen_precaching", "Off Screen Pre-Caching", pre_2d_val, pre_2d_raw, False, "optimum" if pre_2d_val in ["High", "Ultra"] else "hazard", "emerald" if pre_2d_val in ["High", "Ultra"] else "rose", "OPTIMUM" if pre_2d_val in ["High", "Ultra"] else "HAZARD", f"Description: Scenery pre-caching outside the immediate camera field of view.\nCurrent: {pre_2d_val}.\nRecommendation: HIGH or ULTRA is mandatory to eliminate camera panning stutters when looking around the cockpit.", q_options, page=3, tag_reason="Sufficient scenery pre-cached to prevent panning freezes." if pre_2d_val in ["High", "Ultra"] else "Low pre-caching causes stutter whenever camera view rotates.", is_vr=False),
         make_setting_item("displacement_mapping", "Displacement Mapping", disp_2d, "1" if disp_2d == "ON" else "0", False, "optimum" if disp_2d == "OFF" else "suboptimal", "emerald" if disp_2d == "OFF" else "orange", "OPTIMUM" if disp_2d == "OFF" else "SUBOPTIMAL", f"Description: Tessellated micro-surface height displacements on runway pavement and terrain.\nCurrent: {disp_2d}.\nRecommendation: Keep OFF to save VRAM and GPU compute. Visual difference from flight altitude is imperceptible.", ["OFF", "ON"], page=3, tag_reason="Displacement mapping disabled to conserve VRAM and GPU compute." if disp_2d == "OFF" else "Enables surface tessellation at the expense of extra VRAM and draw calls.", is_vr=False),
 
-        # PAGE 4: ENVIRONMENT & FLORA (4)
+        # PAGE 4: ENVIRONMENT (5)
         make_setting_item("buildings", "Buildings Quality", bld_2d_val, bld_2d_raw, False, "optimum" if bld_2d_val in ["High", "Ultra"] else "acceptable", "emerald" if bld_2d_val in ["High", "Ultra"] else "amber", "OPTIMUM" if bld_2d_val in ["High", "Ultra"] else "ACCEPTABLE", f"Description: Procedural 3D buildings mesh detail, window reflections, and roof textures.\nCurrent: {bld_2d_val}.\nRecommendation: HIGH or ULTRA for crisp terminal and city structures with minimal performance impact.", q_options, page=4, tag_reason="Sharp 3D building geometry and roof textures.", is_vr=False),
         make_setting_item("trees", "Trees Quality", tree_2d_val, tree_2d_raw, False, "optimum" if tree_2d_val in ["High", "Ultra"] else "acceptable", "emerald" if tree_2d_val in ["High", "Ultra"] else "amber", "OPTIMUM" if tree_2d_val in ["High", "Ultra"] else "ACCEPTABLE", f"Description: 3D tree canopy geometry density, draw distance, and foliage shadowing.\nCurrent: {tree_2d_val}.\nRecommendation: HIGH offers rich forests and realistic canopy cover with negligible performance cost.", q_options, page=4, tag_reason="High density 3D foliage with smooth LOD transitions.", is_vr=False),
         make_setting_item("grass", "Grass & Bushes", grass_2d_val, grass_2d_raw, False, "optimum" if (grass_2d_val in ["Low", "Medium"] if is_liner else grass_2d_val in ["High", "Ultra"]) else ("acceptable" if is_liner or grass_2d_val == "Medium" else "suboptimal"), "emerald" if (grass_2d_val in ["Low", "Medium"] if is_liner else grass_2d_val in ["High", "Ultra"]) else ("amber" if is_liner or grass_2d_val == "Medium" else "orange"), "OPTIMUM" if (grass_2d_val in ["Low", "Medium"] if is_liner else grass_2d_val in ["High", "Ultra"]) else ("ACCEPTABLE" if is_liner or grass_2d_val == "Medium" else "SUBOPTIMAL"), f"Description: Ground procedural turf, 3D grass, and wild flowers around airfields.\nCurrent: {grass_2d_val}.\nRecommendation: {'Airliners: LOW or MEDIUM eliminates useless 3D grass triangles on concrete runways, saving CPU draw calls.' if is_liner else 'GA: HIGH or ULTRA for realistic grass airfields and bush strips.'}", q_options, page=4, tag_reason="Airliner concrete operations: Low/Medium grass eliminates millions of useless 3D turf draw calls, maximizing approach framerate." if is_liner and grass_2d_val in ["Low", "Medium"] else ("High grass generates millions of 3D vegetation triangles invisible from airliner cockpit on concrete runways." if is_liner else ("Immersive 3D grass and wildflowers for grass strips and bush runway landings." if grass_2d_val in ["High", "Ultra"] else "Low grass flattens bush runways and grass strips during VFR sightseeing.")), is_vr=False),
         make_setting_item("water_waves", "Water Waves Simulation", water_2d_val, water_2d_raw, False, "optimum" if "512" in water_2d_val or "1024" in water_2d_val else "acceptable", "emerald" if "512" in water_2d_val or "1024" in water_2d_val else "amber", "OPTIMUM" if "512" in water_2d_val or "1024" in water_2d_val else "ACCEPTABLE", f"Description: Fast Fourier Transform (FFT) ocean and lake wave simulation resolution grid.\nCurrent: {water_2d_val}.\nRecommendation: HIGH (512) for realistic open water swells without GPU compute penalty.", water_options, page=4, tag_reason="High FFT wave resolution provides realistic ocean swells and reflections.", is_vr=False),
+        make_setting_item("volumetric_clouds", "Volumetric Clouds", cld_2d_val, cld_2d_raw, False, "optimum" if cld_2d_val == "High" else "acceptable", "emerald" if cld_2d_val == "High" else "amber", "OPTIMUM" if cld_2d_val == "High" else "ACCEPTABLE", f"Description: Raymarched volumetric cloud rendering quality and boundary scattering.\nCurrent: {cld_2d_val}.\nRecommendation: HIGH delivers near-identical visual fidelity to Ultra with 15% better GPU performance in overcast weather.", q_options, page=4, tag_reason="Optimal volumetric raymarching quality without GPU fill-rate drop." if cld_2d_val == "High" else "Cloud quality may impact GPU frame rate during heavy overcast.", is_vr=False),
 
-        # PAGE 5: SHADOWS & LIGHTS (4)
+        # PAGE 5: LIGHTING (4)
         make_setting_item("shadow_maps", "Shadow Maps Resolution", shd_2d_val, shd_2d_raw, False, "optimum" if "1536" in shd_2d_val or "2048" in shd_2d_val else "acceptable", "emerald" if "1536" in shd_2d_val or "2048" in shd_2d_val else "amber", "OPTIMUM" if "1536" in shd_2d_val or "2048" in shd_2d_val else "ACCEPTABLE", f"Description: Direct sunlight shadow map buffer resolution for airframe and structures.\nCurrent: {shd_2d_val}.\nRecommendation: HIGH (1536) for clean shadow lines without shimmering.", shadow_options, page=5, tag_reason="High shadow map resolution delivers sharp cockpit and airframe shadows.", is_vr=False),
         make_setting_item("terrain_shadows", "Terrain Shadows", tshd_2d_val, tshd_2d_raw, False, "optimum" if "512" in tshd_2d_val or "1024" in tshd_2d_val else "acceptable", "emerald" if "512" in tshd_2d_val or "1024" in tshd_2d_val else "amber", "OPTIMUM" if "512" in tshd_2d_val or "1024" in tshd_2d_val else "ACCEPTABLE", f"Description: Long-distance heightfield mountain and ridge self-shadowing.\nCurrent: {tshd_2d_val}.\nRecommendation: HIGH (512) for realistic mountain terrain relief during golden hour approaches.", hf_options, page=5, tag_reason="Realistic mountain shadowing during sunrise and sunset.", is_vr=False),
         make_setting_item("contact_shadows", "Contact Shadows", cshd_2d_val, cshd_2d_raw, False, "optimum" if cshd_2d_val in ["High", "Ultra"] else "acceptable", "emerald" if cshd_2d_val in ["High", "Ultra"] else "amber", "OPTIMUM" if cshd_2d_val in ["High", "Ultra"] else "ACCEPTABLE", f"Description: Screen-space micro-shadows beneath wheels, switches, levers, and small cockpit fixtures.\nCurrent: {cshd_2d_val}.\nRecommendation: HIGH provides realistic contact depth in the cockpit with negligible GPU impact.", q_options, page=5, tag_reason="Enhances tactile depth around cockpit instruments and switches.", is_vr=False),
         make_setting_item("volumetric_lights", "Volumetric Lights", vl_2d_val, vl_2d_raw, False, "optimum" if vl_2d_val in ["High", "Ultra"] else "acceptable", "emerald" if vl_2d_val in ["High", "Ultra"] else "amber", "OPTIMUM" if vl_2d_val in ["High", "Ultra"] else "ACCEPTABLE", f"Description: Atmospheric light beam scattering from runway lights, beacons, and landing lights in fog/clouds.\nCurrent: {vl_2d_val}.\nRecommendation: HIGH for dramatic night lighting and authentic low-visibility CAT III approaches.", q_options, page=5, tag_reason="Atmospheric light shaft rendering during night and low-visibility weather.", is_vr=False),
 
-        # PAGE 6: COCKPIT & AVIONICS (4)
-        make_setting_item("texture_resolution", "Texture Resolution", tex_2d_val, tex_2d_raw, False, tex_2d_rating, tex_2d_color, tex_2d_label, tex_2d_tip, q_options, page=6, tag_reason=tex_2d_reason, is_vr=False),
+        # PAGE 6: COCKPIT (3)
         make_setting_item("glass_cockpits", "Glass Cockpit Refresh", glass_2d_val, glass_2d_raw, False, glass_2d_rating, glass_2d_color, glass_2d_label, glass_2d_tip, glass_options, page=6, tag_reason=glass_2d_reason, is_vr=False),
         make_setting_item("ambient_occlusion", "Ambient Occlusion (SSAO)", ssao_2d_val, ssao_2d_raw, False, "optimum" if ssao_2d_val in ["High", "Ultra"] else "acceptable", "emerald" if ssao_2d_val in ["High", "Ultra"] else "amber", "OPTIMUM" if ssao_2d_val in ["High", "Ultra"] else "ACCEPTABLE", f"Description: Screen-space ambient occlusion (SSAO) providing realistic contact shading in crevices and corners.\nCurrent: {ssao_2d_val}.\nRecommendation: HIGH provides natural cockpit lighting and shadow depth without excessive shader overhead.", q_options, page=6, tag_reason="Natural contact shading in cockpit crevices and airframe recesses.", is_vr=False),
         make_setting_item("windshield_effects", "Windshield Effects", wind_2d_val, wind_2d_raw, False, "optimum" if wind_2d_val in ["High", "Ultra"] else "acceptable", "emerald" if wind_2d_val in ["High", "Ultra"] else "amber", "OPTIMUM" if wind_2d_val in ["High", "Ultra"] else "ACCEPTABLE", f"Description: Dynamic raindrops, icing accretion, wiper blade sweeps, and glass reflection effects on windshield.\nCurrent: {wind_2d_val}.\nRecommendation: HIGH or ULTRA for full weather immersion on the flight deck.", q_options, page=6, tag_reason="Realistic dynamic rain, icing, and wiper sweep effects.", is_vr=False),
 
-        # PAGE 7: WEATHER & REFLECTIONS (3)
-        make_setting_item("volumetric_clouds", "Volumetric Clouds", cld_2d_val, cld_2d_raw, False, "optimum" if cld_2d_val == "High" else "acceptable", "emerald" if cld_2d_val == "High" else "amber", "OPTIMUM" if cld_2d_val == "High" else "ACCEPTABLE", f"Description: Raymarched volumetric cloud rendering quality and boundary scattering.\nCurrent: {cld_2d_val}.\nRecommendation: HIGH delivers near-identical visual fidelity to Ultra with 15% better GPU performance in overcast weather.", q_options, page=7, tag_reason="Optimal volumetric raymarching quality without GPU fill-rate drop." if cld_2d_val == "High" else "Cloud quality may impact GPU frame rate during heavy overcast.", is_vr=False),
+        # PAGE 7: POST-PROCESSING (2)
         make_setting_item("reflections_ssr", "Screen Reflections (SSR)", ssr_2d_val, ssr_2d_raw, False, "optimum" if ssr_2d_val in ["High", "Ultra"] else "acceptable", "emerald" if ssr_2d_val in ["High", "Ultra"] else "amber", "OPTIMUM" if ssr_2d_val in ["High", "Ultra"] else "ACCEPTABLE", f"Description: Screen space reflections on wet runways, water puddles, and cockpit windshields.\nCurrent: {ssr_2d_val}.\nRecommendation: HIGH in 2D mode for realistic rainy runway reflections; LOW in VR mode to save GPU fill rate.", q_options, page=7, tag_reason="Realistic apron wetness reflections during rain and night lighting.", is_vr=False),
         make_setting_item("anisotropic_filtering", "Anisotropic Filtering", aniso_2d_val, aniso_2d_raw, False, "optimum" if aniso_2d_val == "16X" else "acceptable", "emerald" if aniso_2d_val == "16X" else "amber", "OPTIMUM" if aniso_2d_val == "16X" else "ACCEPTABLE", f"Description: Texture sampling filter preventing runway markings and taxiway lines from blurring at acute angles.\nCurrent: {aniso_2d_val}.\nRecommendation: Set to 16X. Impact on modern GPUs is negligible (< 0.1 ms) and it ensures razor-sharp runway centerline lines.", aniso_options, page=7, tag_reason="16X anisotropic filtering keeps runway and taxiway markings sharp at glancing angles.", is_vr=False),
     ]
 
     # Build VR Matrix (27 Items across 7 Pages in 2x2 Grid)
     matrix_vr = [
-        # PAGE 1: DISPLAY & SYNC (4)
-        make_setting_item("resolution", "Full Screen Resolution", res_formatted, res_raw, True, "optimum", "emerald", "OPTIMUM", f"Description: Desktop mirror resolution for MSFS VR mode.\nCurrent: {res_formatted} (shared with 2D windowing).\nRecommendation: Match your native screen resolution.", ["3840 x 2160", "2560 x 1440", "1920 x 1080"], page=1, tag_reason="Desktop mirror resolution.", is_vr=True),
+        # PAGE 1: CORE (4)
+        make_setting_item("resolution", "Full Screen Resolution", res_formatted, res_raw, True, res_rating, res_color, res_label, f"Description: Desktop mirror resolution for MSFS VR mode.\nCurrent: {res_formatted} (shared with 2D windowing).\nRecommendation: Match your native screen resolution.", res_options, page=1, tag_reason=res_tag_reason, is_vr=True),
         make_setting_item("anti_aliasing", "Anti-Aliasing & Upscaling", val_aa_vr, aa_vr, False, "optimum" if "DLSS" in val_aa_vr else "acceptable", "emerald" if "DLSS" in val_aa_vr else "amber", "OPTIMUM" if "DLSS" in val_aa_vr else "ACCEPTABLE", f"Description: Anti-aliasing and upscaling mode in VR stereo.\nCurrent: {val_aa_vr}.\nRecommendation: DLSS Balanced or Quality is essential in VR to reduce stereo rendering load.", ["DLSS (Quality)", "DLSS (Balanced)", "DLSS (Performance)", "TAA"], page=1, tag_reason="DLSS reduces VR stereo rendering load while preserving cockpit clarity.", is_vr=True),
         make_setting_item("max_frame_rate", "Max Frame Rate", f"{fps_vr} FPS" if not is_vr_fps_off else "OFF", fps_vr, False, vr_fps_rating, vr_fps_color, vr_fps_label, vr_fps_tooltip, fps_options, page=1, is_numeric=True, min_val=0, max_val=240, step=1, tag_reason=vr_fps_reason, is_vr=True),
-        make_setting_item("vsync", "V-Sync", vsync_val, vsync_raw, True, "optimum", "emerald", "OPTIMUM", f"Description: Global V-Sync state.\nCurrent: {vsync_val}.\nRecommendation: Handled by VR compositor.", ["ON", "OFF"], page=1, tag_reason="VR compositor manages display synchronization.", is_vr=True),
+        make_setting_item("texture_resolution", "Texture Resolution", tex_vr_val, tex_vr_raw, False, tex_vr_rating, tex_vr_color, tex_vr_label, tex_vr_tip, q_options, page=1, tag_reason=tex_vr_reason, is_vr=True),
 
-        # PAGE 2: FRAME GEN & LATENCY (4)
+        # PAGE 2: PACING (5)
         make_setting_item("frame_generation", "Frame Generation", fg_vr, fg_vr_raw, False, "optimum" if fg_vr == "OFF" else "hazard", "emerald" if fg_vr == "OFF" else "rose", "OPTIMUM" if fg_vr == "OFF" else "HAZARD", f"Description: AI optical flow frame generation in VR headsets.\nCurrent: {fg_vr}.\nRecommendation: Keep strictly OFF in VR. Frame generation adds motion-to-photon latency and causes severe head-tracking warping.", ["OFF", "DLSSG (2X)"], page=2, tag_reason="Frame generation OFF preserves native low-latency stereo head-tracking." if fg_vr == "OFF" else "Frame generation in VR causes severe motion judder and head-tracking distortion.", is_vr=True),
         make_setting_item("framerate_multiplier", "Framerate Multiplier", f"{mult_vr}X", mult_vr, False, "optimum", "emerald", "OPTIMUM", f"Description: Multiplier in VR.\nCurrent: {mult_vr}X.\nRecommendation: Kept at 1 in VR.", ["1"], page=2, tag_reason="Standard multiplier for VR stereo.", is_vr=True),
         make_setting_item("reflex", "NVIDIA Reflex", reflex_vr, reflex_vr, False, "optimum" if reflex_vr in ["ON", "ON+BOOST"] else "suboptimal", "emerald" if reflex_vr in ["ON", "ON+BOOST"] else "orange", "OPTIMUM" if reflex_vr in ["ON", "ON+BOOST"] else "SUBOPTIMAL", f"Description: NVIDIA Reflex in VR.\nCurrent: {reflex_vr}.\nRecommendation: ON reduces VR motion-to-photon latency.", ["ON", "ON+BOOST", "OFF"], page=2, tag_reason="Reduces VR motion-to-photon latency.", is_vr=True),
         make_setting_item("dynamic_settings", "Dynamic Settings", dyn_vr, "0" if dyn_vr == "OFF" else "1", False, "optimum" if dyn_vr == "OFF" else "suboptimal", "emerald" if dyn_vr == "OFF" else "orange", "OPTIMUM" if dyn_vr == "OFF" else "SUBOPTIMAL", f"Description: Dynamic resolution in VR.\nCurrent: {dyn_vr}.\nRecommendation: Keep OFF in VR to avoid sudden stereo blurriness.", ["OFF", "ON"], page=2, tag_reason="Disabled dynamic scaling prevents sudden VR stereo resolution drops.", is_vr=True),
+        make_setting_item("vsync", "V-Sync", vsync_val, vsync_raw, True, "optimum", "emerald", "OPTIMUM", f"Description: Global V-Sync state.\nCurrent: {vsync_val}.\nRecommendation: Handled by VR compositor.", ["ON", "OFF"], page=2, tag_reason="VR compositor manages display synchronization.", is_vr=True),
 
-        # PAGE 3: TERRAIN & LOD (4)
+        # PAGE 3: TERRAIN (4)
         make_setting_item("tlod", "Terrain LOD (TLOD)", f"{tlod_vr_val}" if not autofps else f"Dynamic ({tlod_vr_val})", str(tlod_vr_val), False, "optimum" if tlod_vr_val <= 100 else ("acceptable" if tlod_vr_val <= 120 else "hazard"), "emerald" if tlod_vr_val <= 100 else ("amber" if tlod_vr_val <= 120 else "rose"), "OPTIMUM" if tlod_vr_val <= 100 else ("ACCEPTABLE" if tlod_vr_val <= 120 else "HAZARD"), f"Description: Terrain mesh and photogrammetry draw distance in VR stereo. Direct numeric input supported up to 400.\nCurrent: {tlod_vr_val}{' (Managed by AutoFPS)' if autofps else ''}.\nRecommendation: Keep TLOD <= 100 in VR to protect stereo frame time budget and prevent motion reprojection drops.", lod_options, page=3, is_numeric=True, min_val=10, max_val=400, step=5, tag_reason="Dynamic AutoFPS management active." if autofps else ("Within safe VR stereo MainThread latency budget." if tlod_vr_val <= 100 else "High TLOD in VR triggers severe stereo reprojection judder."), is_vr=True),
         make_setting_item("olod", "Objects LOD (OLOD)", f"{olod_vr_val}" if not autofps else f"Dynamic ({olod_vr_val})", str(olod_vr_val), False, "optimum" if olod_vr_val <= 100 else "acceptable", "emerald" if olod_vr_val <= 100 else "amber", "OPTIMUM" if olod_vr_val <= 100 else "ACCEPTABLE", f"Description: 3D objects distance in VR up to 400.\nCurrent: {olod_vr_val}.\nRecommendation: Keep OLOD <= 100 in VR.", lod_options, page=3, is_numeric=True, min_val=10, max_val=400, step=5, tag_reason="Controlled 3D objects draw distance for VR stereo.", is_vr=True),
         make_setting_item("offscreen_precaching", "Off Screen Pre-Caching", pre_vr_val, pre_vr_raw, False, "optimum" if pre_vr_val in ["High", "Ultra"] else "hazard", "emerald" if pre_vr_val in ["High", "Ultra"] else "rose", "OPTIMUM" if pre_vr_val in ["High", "Ultra"] else "HAZARD", f"Description: Scenery pre-caching in VR.\nCurrent: {pre_vr_val}.\nRecommendation: HIGH or ULTRA is essential for smooth head rotation in VR.", q_options, page=3, tag_reason="Essential for smooth head rotation without border popping in VR.", is_vr=True),
         make_setting_item("displacement_mapping", "Displacement Mapping", disp_vr, "1" if disp_vr == "ON" else "0", False, "optimum" if disp_vr == "OFF" else "suboptimal", "emerald" if disp_vr == "OFF" else "orange", "OPTIMUM" if disp_vr == "OFF" else "SUBOPTIMAL", f"Description: Displacement mapping in VR.\nCurrent: {disp_vr}.\nRecommendation: Keep OFF in VR to save VRAM and GPU compute.", ["OFF", "ON"], page=3, tag_reason="Disabled displacement mapping saves GPU compute in VR.", is_vr=True),
 
-        # PAGE 4: ENVIRONMENT & FLORA (4)
+        # PAGE 4: ENVIRONMENT (5)
         make_setting_item("buildings", "Buildings Quality", bld_vr_val, bld_vr_raw, False, "optimum" if bld_vr_val in ["High", "Medium"] else "acceptable", "emerald" if bld_vr_val in ["High", "Medium"] else "amber", "OPTIMUM" if bld_vr_val in ["High", "Medium"] else "ACCEPTABLE", f"Description: 3D building fidelity in VR.\nCurrent: {bld_vr_val}.\nRecommendation: HIGH or MEDIUM for optimal stereo performance.", q_options, page=4, tag_reason="Sharp building geometry in VR.", is_vr=True),
         make_setting_item("trees", "Trees Quality", tree_vr_val, tree_vr_raw, False, "optimum" if tree_vr_val in ["High", "Medium"] else "acceptable", "emerald" if tree_vr_val in ["High", "Medium"] else "amber", "OPTIMUM" if tree_vr_val in ["High", "Medium"] else "ACCEPTABLE", f"Description: Trees geometry in VR.\nCurrent: {tree_vr_val}.\nRecommendation: HIGH or MEDIUM.", q_options, page=4, tag_reason="Optimized 3D trees geometry in VR.", is_vr=True),
         make_setting_item("grass", "Grass & Bushes", grass_vr_val, grass_vr_raw, False, "optimum" if (grass_vr_val in ["Low", "Medium"] if is_liner else grass_vr_val in ["Medium", "High"]) else "acceptable", "emerald" if (grass_vr_val in ["Low", "Medium"] if is_liner else grass_vr_val in ["Medium", "High"]) else "amber", "OPTIMUM" if (grass_vr_val in ["Low", "Medium"] if is_liner else grass_vr_val in ["Medium", "High"]) else "ACCEPTABLE", f"Description: Ground procedural vegetation in VR.\nCurrent: {grass_vr_val}.\nRecommendation: LOW or MEDIUM saves GPU fill rate in VR stereo.", q_options, page=4, tag_reason="Low grass saves critical VR stereo fill rate and draw calls on airliner approaches." if is_liner and grass_vr_val in ["Low", "Medium"] else ("High grass incurs heavy stereo fill-rate penalty in VR." if is_liner else "Balanced vegetation density for VR stereo."), is_vr=True),
         make_setting_item("water_waves", "Water Waves Simulation", water_vr_val, water_vr_raw, False, "optimum" if "256" in water_vr_val or "512" in water_vr_val else "acceptable", "emerald" if "256" in water_vr_val or "512" in water_vr_val else "amber", "OPTIMUM" if "256" in water_vr_val or "512" in water_vr_val else "ACCEPTABLE", f"Description: Water FFT physics in VR.\nCurrent: {water_vr_val}.\nRecommendation: MEDIUM (256) or HIGH (512).", water_options, page=4, tag_reason="Realistic water wave physics in VR.", is_vr=True),
+        make_setting_item("volumetric_clouds", "Volumetric Clouds", cld_vr_val, cld_vr_raw, False, "optimum" if cld_vr_val in ["High", "Medium"] else "acceptable", "emerald" if cld_vr_val in ["High", "Medium"] else "amber", "OPTIMUM" if cld_vr_val in ["High", "Medium"] else "ACCEPTABLE", f"Description: Volumetric clouds in VR stereo.\nCurrent: {cld_vr_val}.\nRecommendation: HIGH or MEDIUM provides smooth frame pacing in VR.", q_options, page=4, tag_reason="Smooth frame pacing during cloudy flights in VR.", is_vr=True),
 
-        # PAGE 5: SHADOWS & LIGHTS (4)
+        # PAGE 5: LIGHTING (4)
         make_setting_item("shadow_maps", "Shadow Maps Resolution", shd_vr_val, shd_vr_raw, False, "optimum" if "1024" in shd_vr_val or "1536" in shd_vr_val else "acceptable", "emerald" if "1024" in shd_vr_val or "1536" in shd_vr_val else "amber", "OPTIMUM" if "1024" in shd_vr_val or "1536" in shd_vr_val else "ACCEPTABLE", f"Description: Shadows buffer size in VR.\nCurrent: {shd_vr_val}.\nRecommendation: MEDIUM (1024) or HIGH (1536).", shadow_options, page=5, tag_reason="Clean shadow rendering in VR headset.", is_vr=True),
         make_setting_item("terrain_shadows", "Terrain Shadows", tshd_vr_val, tshd_vr_raw, False, "optimum" if "256" in tshd_vr_val or "512" in tshd_vr_val else "acceptable", "emerald" if "256" in tshd_vr_val or "512" in tshd_vr_val else "amber", "OPTIMUM" if "256" in tshd_vr_val or "512" in tshd_vr_val else "ACCEPTABLE", f"Description: Heightfield mountain shadows in VR.\nCurrent: {tshd_vr_val}.\nRecommendation: MEDIUM (256) or HIGH (512).", hf_options, page=5, tag_reason="Terrain self-shadowing in VR.", is_vr=True),
         make_setting_item("contact_shadows", "Contact Shadows", cshd_vr_val, cshd_vr_raw, False, "optimum" if cshd_vr_val in ["Medium", "High"] else "acceptable", "emerald" if cshd_vr_val in ["Medium", "High"] else "amber", "OPTIMUM" if cshd_vr_val in ["Medium", "High"] else "ACCEPTABLE", f"Description: Cockpit contact shadows in VR.\nCurrent: {cshd_vr_val}.\nRecommendation: MEDIUM or HIGH for cockpit depth.", q_options, page=5, tag_reason="Tactile depth for cockpit controls in VR.", is_vr=True),
         make_setting_item("volumetric_lights", "Volumetric Lights", vl_vr_val, vl_vr_raw, False, "optimum" if vl_vr_val in ["Low", "Medium"] else "acceptable", "emerald" if vl_vr_val in ["Low", "Medium"] else "amber", "OPTIMUM" if vl_vr_val in ["Low", "Medium"] else "ACCEPTABLE", f"Description: Fog and landing light scattering in VR.\nCurrent: {vl_vr_val}.\nRecommendation: LOW or MEDIUM in VR.", q_options, page=5, tag_reason="Atmospheric light shafts in VR.", is_vr=True),
 
-        # PAGE 6: COCKPIT & AVIONICS (4)
-        make_setting_item("texture_resolution", "Texture Resolution", tex_vr_val, tex_vr_raw, False, tex_vr_rating, tex_vr_color, tex_vr_label, tex_vr_tip, q_options, page=6, tag_reason=tex_vr_reason, is_vr=True),
+        # PAGE 6: COCKPIT (3)
         make_setting_item("glass_cockpits", "Glass Cockpit Refresh", glass_vr_val, glass_vr_raw, False, glass_vr_rating, glass_vr_color, glass_vr_label, glass_vr_tip, glass_options, page=6, tag_reason=glass_vr_reason, is_vr=True),
         make_setting_item("ambient_occlusion", "Ambient Occlusion (SSAO)", ssao_vr_val, ssao_vr_raw, False, "optimum" if ssao_vr_val in ["Low", "Medium"] else "acceptable", "emerald" if ssao_vr_val in ["Low", "Medium"] else "amber", "OPTIMUM" if ssao_vr_val in ["Low", "Medium"] else "ACCEPTABLE", f"Description: Ambient shading in VR.\nCurrent: {ssao_vr_val}.\nRecommendation: LOW or MEDIUM saves stereo fill rate.", q_options, page=6, tag_reason="Cockpit ambient shading in VR.", is_vr=True),
         make_setting_item("windshield_effects", "Windshield Effects", wind_vr_val, wind_vr_raw, False, "optimum" if wind_vr_val in ["High", "Ultra"] else "acceptable", "emerald" if wind_vr_val in ["High", "Ultra"] else "amber", "OPTIMUM" if wind_vr_val in ["High", "Ultra"] else "ACCEPTABLE", f"Description: Canopy rain and wipers in VR.\nCurrent: {wind_vr_val}.\nRecommendation: HIGH or ULTRA for cockpit immersion in VR.", q_options, page=6, tag_reason="Dynamic rain and wiper sweeps in VR.", is_vr=True),
 
-        # PAGE 7: WEATHER & REFLECTIONS (3)
-        make_setting_item("volumetric_clouds", "Volumetric Clouds", cld_vr_val, cld_vr_raw, False, "optimum" if cld_vr_val in ["High", "Medium"] else "acceptable", "emerald" if cld_vr_val in ["High", "Medium"] else "amber", "OPTIMUM" if cld_vr_val in ["High", "Medium"] else "ACCEPTABLE", f"Description: Volumetric clouds in VR stereo.\nCurrent: {cld_vr_val}.\nRecommendation: HIGH or MEDIUM provides smooth frame pacing in VR.", q_options, page=7, tag_reason="Smooth frame pacing during cloudy flights in VR.", is_vr=True),
+        # PAGE 7: POST-PROCESSING (2)
         make_setting_item("reflections_ssr", "Screen Reflections (SSR)", ssr_vr_val, ssr_vr_raw, False, "optimum" if ssr_vr_val in ["Low", "Medium"] else "acceptable", "emerald" if ssr_vr_val in ["Low", "Medium"] else "amber", "OPTIMUM" if ssr_vr_val in ["Low", "Medium"] else "ACCEPTABLE", f"Description: Cockpit and puddle reflections in VR.\nCurrent: {ssr_vr_val}.\nRecommendation: LOW or MEDIUM to maintain high VR frame rates.", q_options, page=7, tag_reason="Puddle and glass reflections in VR.", is_vr=True),
         make_setting_item("anisotropic_filtering", "Anisotropic Filtering", aniso_vr_val, aniso_vr_raw, False, "optimum" if aniso_vr_val == "16X" else "acceptable", "emerald" if aniso_vr_val == "16X" else "amber", "OPTIMUM" if aniso_vr_val == "16X" else "ACCEPTABLE", f"Description: Ground texture sharpness in VR headset.\nCurrent: {aniso_vr_val}.\nRecommendation: 16X keeps runway lines sharp in VR.", aniso_options, page=7, tag_reason="16X filtering keeps runway lines sharp in VR.", is_vr=True),
     ]
@@ -2869,14 +2968,14 @@ def calculate_frame_pacing(screen_hz: float, use_frame_gen: bool = True) -> Dict
         "base_engine_fps_target": base_engine_fps,
         "frame_budget_ms": frame_budget_ms,
         "sync_ratio": f"{divisor}:1",
-        "description": f"Écran {hz:.0f} Hz / Diviseur {divisor} -> {displayed_fps} FPS affichés ({base_engine_fps} FPS moteur). Budget temps CPU MainThread : {frame_budget_ms} ms."
+        "description": f"{hz:.0f} Hz Display / Divisor {divisor} -> {displayed_fps} Target FPS ({base_engine_fps} Engine FPS). CPU MainThread frame budget: {frame_budget_ms} ms."
     }
 
 
 def generate_optimized_rig_profile(user_specs: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Génère l'ensemble des recommandations graphiques, AutoFPS et SceneryX
-    en combinant le matériel détecté/ajusté et l'appareil sélectionné.
+    Generates recommended graphics profile, AutoFPS thresholds, and SceneryX settings
+    combining detected hardware and aircraft studio profiles.
     """
     screen_hz = float(user_specs.get("screen_hz", 180.0))
     vram_gb = float(user_specs.get("vram_gb", 16.0))
@@ -2889,20 +2988,20 @@ def generate_optimized_rig_profile(user_specs: Dict[str, Any]) -> Dict[str, Any]
     if vram_gb <= 12.0:
         terrain_detail = "LOW"
         dlss_preset = "Balanced"
-        vram_risk = "Élevé (Paging D3D12 probable en textures Ultra)"
+        vram_risk = "High (Probable D3D12 paging on Ultra textures)"
     elif vram_gb <= 16.0:
         if studio_id in ["fslabs", "fenix", "inibuilds"]:
             terrain_detail = "LOW"
             dlss_preset = "Quality"
-            vram_risk = "Modéré à Maîtrisé (Terrain Detail LOW libère ~7 Go de VRAM)"
+            vram_risk = "Moderate to Controlled (Low Terrain Detail frees ~7 GB VRAM)"
         else:
             terrain_detail = "MEDIUM"
             dlss_preset = "Quality"
-            vram_risk = "Faible"
+            vram_risk = "Low"
     else:
         terrain_detail = "HIGH"
         dlss_preset = "Quality"
-        vram_risk = "Nul (Marge VRAM confortable)"
+        vram_risk = "Zero (Comfortable VRAM headroom)"
 
     autofps = {
         "target_fps": pacing["displayed_fps_target"],
@@ -2922,10 +3021,10 @@ def generate_optimized_rig_profile(user_specs: Dict[str, Any]) -> Dict[str, Any]
     }
 
     sceneryx_recommendations = {
-        "isolation_mode": "Direct A -> B (Recommandé)",
-        "memory_saving_commit": "~ 2.70 Go Commit RAM",
-        "memory_saving_vram": "~ 650 Mo VRAM libérée",
-        "stutter_reduction": "Élimine 100% des accès I/O disque des scènes intermédiaires"
+        "isolation_mode": "Direct A -> B (Recommended)",
+        "memory_saving_commit": "~ 2.70 GB Commit RAM",
+        "memory_saving_vram": "~ 650 MB VRAM freed",
+        "stutter_reduction": "Eliminates 100% of intermediate scenery disk I/O"
     }
 
     return {
@@ -2940,22 +3039,48 @@ def generate_optimized_rig_profile(user_specs: Dict[str, Any]) -> Dict[str, Any]
     }
 
 
-def get_full_rig_diagnostics(flight_profile: str = 'LINER', vr_refresh_rate: int = 72, preferred_display_id: Optional[str] = None) -> Dict[str, Any]:
+_cached_hardware_specs: Optional[Dict[str, Any]] = None
+
+def get_full_rig_diagnostics(flight_profile: str = 'LINER', vr_refresh_rate: int = 72, preferred_display_id: Optional[str] = None, force_refresh: bool = False) -> Dict[str, Any]:
     """Point d'entrée complet : retourne le diagnostic matériel complet et les listes pour l'UI."""
-    cpu = detect_cpu_info()
-    gpu = detect_gpu_info()
-    ram = detect_ram_and_xmp()
-    disp = detect_display_info(preferred_id=preferred_display_id)
-    all_displays = detect_all_displays()
-    hags = detect_windows_hags()
-    dlss = detect_dlss_version()
+    global _cached_hardware_specs
+    if force_refresh or _cached_hardware_specs is None:
+        cpu = detect_cpu_info()
+        gpu = detect_gpu_info()
+        ram = detect_ram_and_xmp()
+        all_displays = detect_all_displays()
+        hags = detect_windows_hags()
+        dlss = detect_dlss_version()
+        installed = detect_installed_aircraft()
+        balance = analyze_system_balance(cpu, gpu, ram)
+        vr_headset = detect_vr_headset()
+        _cached_hardware_specs = {
+            "cpu": cpu,
+            "gpu": gpu,
+            "ram": ram,
+            "all_displays": all_displays,
+            "hags": hags,
+            "dlss": dlss,
+            "installed": installed,
+            "balance": balance,
+            "vr_headset": vr_headset
+        }
+    else:
+        cpu = _cached_hardware_specs["cpu"]
+        gpu = _cached_hardware_specs["gpu"]
+        ram = _cached_hardware_specs["ram"]
+        all_displays = _cached_hardware_specs["all_displays"]
+        hags = _cached_hardware_specs["hags"]
+        dlss = _cached_hardware_specs["dlss"]
+        installed = _cached_hardware_specs["installed"]
+        balance = _cached_hardware_specs["balance"]
+        vr_headset = _cached_hardware_specs["vr_headset"]
+
+    disp = detect_display_info(preferred_id=preferred_display_id, displays_list=all_displays)
     cfg = detect_msfs_user_cfg()
     # Silently ensure pristine copy of user's original UserCfg.opt is preserved
     ensure_original_user_cfg_backup(cfg.get("path"))
 
-    installed = detect_installed_aircraft()
-    balance = analyze_system_balance(cpu, gpu, ram)
-    vr_headset = detect_vr_headset()
     effective_vr_hz = vr_headset["refresh_rate_hz"] if (vr_headset.get("detected") and vr_headset.get("refresh_rate_hz")) else 72
 
     matrix_data = build_msfs_settings_matrix(user_cfg_path=cfg.get("path"), gpu_info=gpu, cpu_info=cpu, flight_profile=flight_profile, vr_refresh_rate=effective_vr_hz, preferred_display_id=preferred_display_id)

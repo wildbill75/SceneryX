@@ -16340,85 +16340,49 @@ async function loadRigDiagnostics() {
         const cpuNameEl = document.getElementById('opt-detected-cpu-name');
         const cpuCoresEl = document.getElementById('opt-detected-cpu-cores');
         if (cpuNameEl && det.cpu) {
-            cpuNameEl.textContent = det.cpu.name || 'Unknown CPU';
-            if (cpuCoresEl) cpuCoresEl.textContent = `${det.cpu.cores || 8} Cores / ${det.cpu.threads || 16} Threads`;
+            cpuNameEl.textContent = (det.cpu.name_simplified || det.cpu.name || 'UNKNOWN CPU').toUpperCase();
+            if (cpuCoresEl) {
+                cpuCoresEl.innerHTML = `
+                    <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-200 uppercase">${det.cpu.cores || 8} CORES</span>
+                    <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-200 uppercase">${det.cpu.threads || 16} THREADS</span>
+                `;
+            }
         }
 
         const gpuNameEl = document.getElementById('opt-detected-gpu-name');
         const gpuVramEl = document.getElementById('opt-detected-gpu-vram');
         if (gpuNameEl && det.gpu) {
-            gpuNameEl.textContent = det.gpu.name || 'Unknown GPU';
-            if (gpuVramEl) gpuVramEl.textContent = `${det.gpu.vram_total_gb || 16} GB VRAM • Driver ${det.gpu.driver_version || 'Latest'}`;
+            gpuNameEl.textContent = (det.gpu.name_simplified || det.gpu.name || 'UNKNOWN GPU').toUpperCase();
+            if (gpuVramEl) {
+                gpuVramEl.innerHTML = `
+                    <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-cyan-300 uppercase">${det.gpu.vram_total_gb || 16} GB VRAM</span>
+                    <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-300 uppercase">DRIVER ${det.gpu.driver_version || 'LATEST'}</span>
+                `;
+            }
         }
 
         const displayHzEl = document.getElementById('opt-detected-display-hz');
         const displayResEl = document.getElementById('opt-detected-display-res');
-        const displaySwitcherEl = document.getElementById('opt-detected-display-switcher');
-        const displayCountBadge = document.getElementById('opt-display-count-badge');
         if (det.display) {
             if (displayHzEl) {
-                const hz = det.display.refresh_rate_int || 60;
-                displayHzEl.textContent = `${hz} HZ REFRESH RATE (${det.display.id || 'DISPLAY1'})`;
+                displayHzEl.textContent = `${det.display.width || 2560} x ${det.display.height || 1440}`;
             }
             if (displayResEl) {
-                displayResEl.textContent = `${det.display.width || 2560} x ${det.display.height || 1440} • ${det.display.friendly_name || 'Monitor'}`;
-            }
-            if (det.all_displays && det.all_displays.length > 1) {
-                if (displayCountBadge) displayCountBadge.classList.remove('hidden');
-                if (displaySwitcherEl) {
-                    displaySwitcherEl.classList.remove('hidden');
+                if (det.all_displays && det.all_displays.length > 0) {
                     const activeId = det.display.id;
-                    displaySwitcherEl.innerHTML = det.all_displays.map(d => {
+                    displayResEl.innerHTML = det.all_displays.map(d => {
                         const isSel = (d.id === activeId || String(d.index) === String(activeId));
-                        return `<button type="button" onclick="selectCadenceDisplay('${d.id}')" class="px-2 py-0.5 rounded text-[10px] font-bold ${isSel ? 'bg-cyan-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'} transition-colors cursor-pointer" title="${d.formatted}">${d.id} (${d.refresh_rate_int} Hz)</button>`;
+                        const hz = d.refresh_rate_int || 60;
+                        const bgClass = isSel ? 'bg-cyan-600 text-white shadow-sm' : 'bg-slate-800 text-slate-300 hover:bg-slate-700';
+                        return `<button type="button" onclick="selectCadenceDisplay('${d.id}')" class="px-2 py-0.5 rounded text-[10px] font-mono font-bold ${bgClass} transition-colors cursor-pointer" title="${d.formatted || d.id}">${d.id} (${hz} HZ)</button>`;
                     }).join('');
-                }
-            } else {
-                if (displayCountBadge) displayCountBadge.classList.add('hidden');
-                if (displaySwitcherEl) displaySwitcherEl.classList.add('hidden');
-            }
-        }
-
-        const ramValEl = document.getElementById('opt-detected-ram-val');
-        const ramXmpEl = document.getElementById('opt-detected-ram-xmp');
-        if (ramValEl && det.ram) {
-            ramValEl.textContent = `${det.ram.total_gb} GB @ ${det.ram.speed_mhz} MHz`;
-            if (ramXmpEl) {
-                if (det.ram.is_xmp_active) {
-                    ramXmpEl.textContent = 'XMP Active';
-                    ramXmpEl.className = 'font-bold text-emerald-400';
                 } else {
-                    ramXmpEl.textContent = 'XMP Inactive';
-                    ramXmpEl.className = 'font-bold text-slate-500';
+                    displayResEl.innerHTML = `
+                        <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-900/60 text-cyan-300 uppercase">${det.display.refresh_rate_int || 60} HZ</span>
+                        <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-300 uppercase">${det.display.width}x${det.display.height}</span>
+                    `;
                 }
             }
-        }
-
-        const rbarEl = document.getElementById('opt-detected-rbar');
-        if (rbarEl) {
-            if (det.rbar_active) {
-                rbarEl.textContent = 'Re-Size BAR Active';
-                rbarEl.className = 'font-bold text-emerald-400';
-            } else {
-                rbarEl.textContent = 'Re-Size BAR Inactive';
-                rbarEl.className = 'font-bold text-slate-500';
-            }
-        }
-
-        const hagsEl = document.getElementById('opt-detected-hags');
-        if (hagsEl) {
-            if (det.hags_active) {
-                hagsEl.textContent = 'HAGS Active';
-                hagsEl.className = 'font-bold text-emerald-400';
-            } else {
-                hagsEl.textContent = 'HAGS Inactive';
-                hagsEl.className = 'font-bold text-slate-500';
-            }
-        }
-
-        const dlssEl = document.getElementById('opt-detected-dlss-ver');
-        if (dlssEl && det.dlss) {
-            dlssEl.textContent = `DLSS ${det.dlss.version || 'v3.10'}`;
         }
 
         // VR Headset Card in MY RIG
@@ -16427,23 +16391,46 @@ async function loadRigDiagnostics() {
         if (vrNameEl) {
             const vrHeadset = det.vr_headset;
             if (vrHeadset && vrHeadset.detected) {
-                vrNameEl.textContent = vrHeadset.name || 'VR Headset';
-                vrNameEl.className = 'font-bold text-cyan-400 truncate';
+                vrNameEl.textContent = (vrHeadset.name || 'VR HEADSET').toUpperCase();
                 if (vrHzEl) {
-                    vrHzEl.textContent = `${vrHeadset.refresh_rate_hz || 72} Hz Active`;
-                    vrHzEl.className = 'text-[11px] text-emerald-400 font-bold';
+                    vrHzEl.innerHTML = `<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-900/60 text-cyan-300 uppercase">${vrHeadset.refresh_rate_hz || 72} HZ ACTIVE</span>`;
                 }
                 if (vrHeadset.refresh_rate_hz) {
                     currentVrRefreshRate = vrHeadset.refresh_rate_hz;
                 }
             } else {
-                vrNameEl.textContent = 'None Detected';
-                vrNameEl.className = 'font-bold text-slate-400 truncate';
+                vrNameEl.textContent = 'NONE DETECTED';
                 if (vrHzEl) {
-                    vrHzEl.textContent = 'Desktop Mode';
-                    vrHzEl.className = 'text-[11px] text-slate-500 font-bold';
+                    vrHzEl.innerHTML = `<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-400 uppercase">DESKTOP MODE</span>`;
                 }
             }
+        }
+
+        // RAM Card in MY RIG
+        const ramValEl = document.getElementById('opt-detected-ram-val');
+        const ramBadgesEl = document.getElementById('opt-detected-ram-badges');
+        if (ramValEl && det.ram) {
+            ramValEl.textContent = `${det.ram.total_gb || 32} GB RAM`;
+            if (ramBadgesEl) {
+                const xmpClass = det.ram.is_xmp_active ? 'bg-emerald-950 text-emerald-300' : 'bg-slate-800 text-slate-400';
+                ramBadgesEl.innerHTML = `
+                    <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-200 uppercase">${det.ram.speed_mhz || 3200} MHZ</span>
+                    <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold ${xmpClass} uppercase">${det.ram.is_xmp_active ? 'XMP ON' : 'XMP OFF'}</span>
+                `;
+            }
+        }
+
+        // DRIVERS & MISC Card in MY RIG
+        const miscBadgesEl = document.getElementById('opt-detected-misc-badges');
+        if (miscBadgesEl) {
+            const rbarClass = det.rbar_active ? 'bg-emerald-950 text-emerald-300' : 'bg-slate-800 text-slate-400';
+            const hagsClass = det.hags_active ? 'bg-emerald-950 text-emerald-300' : 'bg-slate-800 text-slate-400';
+            const dlssVer = (det.dlss && det.dlss.version) ? det.dlss.version : '3.10';
+            miscBadgesEl.innerHTML = `
+                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold ${rbarClass} uppercase">R-BAR</span>
+                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold ${hagsClass} uppercase">HAGS</span>
+                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-cyan-300 uppercase">DLSS ${dlssVer}</span>
+            `;
         }
 
         // System Balance Badge & Description
@@ -16543,20 +16530,12 @@ function toggleComboboxDropdown(key, event) {
         event.stopPropagation();
     }
     const menu = document.getElementById(`opt-combo-menu-${key}`);
-    const input = document.getElementById(`opt-combo-input-${key}`);
     if (!menu) return;
     const isHidden = menu.classList.contains('hidden');
     closeAllComboboxes();
     if (isHidden) {
-        // Position upwards for max_frame_rate or when near the bottom of viewport to avoid container clipping
-        const rect = input ? input.getBoundingClientRect() : null;
-        if (key === 'max_frame_rate' || (rect && (window.innerHeight - rect.bottom < 250 || rect.bottom > 500))) {
-            menu.classList.remove('top-full', 'mt-1');
-            menu.classList.add('bottom-full', 'mb-1');
-        } else {
-            menu.classList.remove('bottom-full', 'mb-1');
-            menu.classList.add('top-full', 'mt-1');
-        }
+        menu.classList.remove('bottom-full', 'mb-1');
+        menu.classList.add('top-full', 'mt-1');
         menu.classList.remove('hidden');
     }
 }
@@ -16673,6 +16652,10 @@ function renderMsfsSettingsMatrix() {
         const ratingBadge = `<span class="px-2.5 py-0.5 rounded text-xs font-mono font-bold uppercase tracking-wider shrink-0 shadow-sm cursor-help ${badgeColorClass}" title="${tagTooltip}">${cleanTag}</span>`;
         const infoButton = `<button type="button" onclick="openSettingInfoModal('${item.key}')" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-mono text-xs font-bold transition-colors cursor-pointer shrink-0 select-none" title="Detailed Technical Information">i</button>`;
 
+        // AutoFPS dynamic regulation check
+        const isAutoFpsManaged = (item.key === 'tlod' || item.key === 'olod') && (msfsSettingsMatrixData && msfsSettingsMatrixData.autofps_active);
+        const autoFpsBadge = isAutoFpsManaged ? '<span class="px-2 py-0.5 rounded text-xs font-mono font-bold bg-cyan-900 text-cyan-300 uppercase tracking-wider shrink-0" title="Dynamically regulated in real-time by AutoFPS">AUTOFPS</span>' : '';
+
         // Unified SVG down arrow chevron identical on both text/numeric inputs and select dropdowns
         const chevronSvg = `
             <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400">
@@ -16683,7 +16666,17 @@ function renderMsfsSettingsMatrix() {
         `;
 
         let inputHtml = '';
-        if (item.is_numeric) {
+        if (isAutoFpsManaged) {
+            inputHtml = `
+                <div class="relative w-full pt-0.5">
+                    <input type="text"
+                           value="HANDLED BY AUTOFPS"
+                           disabled
+                           class="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-2 text-xs text-cyan-400 font-mono font-bold cursor-not-allowed opacity-80"
+                           title="This setting is dynamically regulated in real-time by AutoFPS according to your target frame rate.">
+                </div>
+            `;
+        } else if (item.is_numeric) {
             let displayVal = item.raw_value;
             if (item.key === 'max_frame_rate') {
                 displayVal = (item.raw_value === '0' || item.value === '0' || String(item.value).toUpperCase() === 'OFF' || String(item.value).toLowerCase().includes('unlocked')) ? 'OFF' : item.raw_value;
@@ -16696,22 +16689,16 @@ function renderMsfsSettingsMatrix() {
                 presetListItems = item.options.map(opt => {
                     const isCur = String(opt).toUpperCase() === String(displayVal).toUpperCase();
                     const optRating = (item.option_ratings && item.option_ratings[opt]) ? item.option_ratings[opt].rating : 'acceptable';
-                    let dotClass = 'bg-amber-400';
                     let textClass = 'text-amber-200';
                     if (optRating === 'optimum') {
-                        dotClass = 'bg-emerald-400';
                         textClass = 'text-emerald-300 font-bold';
                     } else if (optRating === 'hazard') {
-                        dotClass = 'bg-rose-400';
                         textClass = 'text-rose-400 font-bold';
                     }
                     return `
                         <div class="px-3 py-1.5 hover:bg-slate-800 ${isCur ? 'bg-slate-800/90 text-white font-bold' : textClass} cursor-pointer transition-colors flex items-center justify-between text-xs font-mono"
                              onmousedown="selectComboboxPreset('${item.key}', '${opt}', ${item.min_val ?? 0}, ${item.max_val ?? 400})">
-                            <div class="flex items-center gap-2">
-                                <span class="w-2 h-2 rounded-full shrink-0 ${dotClass}"></span>
-                                <span>${opt}</span>
-                            </div>
+                            <span class="font-bold">${opt}</span>
                             ${isCur ? '<span class="text-[9px] font-bold bg-slate-700 text-slate-200 px-1.5 py-0.2 rounded">CURRENT</span>' : ''}
                         </div>
                     `;
@@ -16770,6 +16757,7 @@ function renderMsfsSettingsMatrix() {
                 <div class="flex items-center justify-between gap-2">
                     <span class="text-sm font-mono font-bold text-slate-100 uppercase tracking-wide truncate" title="${item.name}">${(item.name || '').toUpperCase()}</span>
                     <div class="flex items-center gap-1.5 shrink-0">
+                        ${autoFpsBadge}
                         ${sharedBadge}
                         ${ratingBadge}
                         ${infoButton}
@@ -17054,11 +17042,11 @@ function openSettingInfoModal(settingKey) {
         ratingEl.className = `px-2.5 py-0.5 rounded text-xs font-mono font-bold uppercase ${badgeClass}`;
     }
 
-    if (descEl) descEl.textContent = item.info_desc || item.tooltip || 'Paramètre de configuration du moteur graphique MSFS.';
-    if (cpuEl) cpuEl.textContent = item.info_cpu || 'Impact modéré sur le CPU MainThread.';
-    if (gpuEl) gpuEl.textContent = item.info_gpu || 'Impact standard sur le GPU et la mémoire VRAM.';
-    if (linerEl) linerEl.textContent = item.info_liner || 'Recommandé pour préserver le MainThread et la VRAM lors des opérations IFR.';
-    if (gaEl) gaEl.textContent = item.info_ga || 'Idéal pour le vol VFR et la netteté visuelle des paysages.';
+    if (descEl) descEl.textContent = item.info_desc || item.tooltip || 'MSFS graphics engine configuration setting.';
+    if (cpuEl) cpuEl.textContent = item.info_cpu || 'Moderate impact on CPU MainThread.';
+    if (gpuEl) gpuEl.textContent = item.info_gpu || 'Standard impact on GPU and VRAM.';
+    if (linerEl) linerEl.textContent = item.info_liner || 'Recommended to preserve MainThread and VRAM during IFR operations.';
+    if (gaEl) gaEl.textContent = item.info_ga || 'Ideal for VFR flight and scenery visual sharpness.';
 
     if (optionsListEl && Array.isArray(item.options)) {
         optionsListEl.innerHTML = item.options.map(opt => {
@@ -17066,22 +17054,21 @@ function openSettingInfoModal(settingKey) {
             const optRating = (item.option_ratings && item.option_ratings[opt]) ? item.option_ratings[opt].rating : 'acceptable';
             
             let tagText = 'ACCEPTABLE';
-            let tagBg = 'bg-amber-900 text-amber-300';
-            let dotBg = 'bg-amber-400';
+            let tagBg = 'bg-amber-600 text-white font-bold';
             if (optRating === 'optimum') {
                 tagText = 'OPTIMUM';
-                tagBg = 'bg-emerald-900 text-emerald-300';
-                dotBg = 'bg-emerald-400';
+                tagBg = 'bg-emerald-600 text-white font-bold';
             } else if (optRating === 'hazard') {
                 tagText = 'HAZARD';
-                tagBg = 'bg-rose-900 text-rose-300';
-                dotBg = 'bg-rose-400';
+                tagBg = 'bg-rose-600 text-white font-bold';
+            } else if (optRating === 'suboptimal') {
+                tagText = 'SUBOPTIMAL';
+                tagBg = 'bg-orange-600 text-white font-bold';
             }
 
             return `
                 <div class="p-2.5 rounded-xl bg-slate-950 border ${isCur ? 'border-cyan-500 bg-cyan-950/20' : 'border-slate-800'} flex items-center justify-between text-xs">
                     <div class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full shrink-0 ${dotBg}"></span>
                         <span class="font-mono font-bold text-slate-200">${opt}</span>
                         ${isCur ? '<span class="text-[9px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 font-bold ml-1">CURRENT</span>' : ''}
                     </div>

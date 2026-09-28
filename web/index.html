@@ -2140,52 +2140,42 @@
             <div class="p-3.5 rounded-2xl bg-slate-950 border border-slate-800 space-y-2.5">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
-                        <span class="text-xs font-mono font-black text-white uppercase tracking-wider">MY RIG</span>
+                        <span class="text-base font-mono font-black text-slate-100 uppercase tracking-wider">MY RIG</span>
                     </div>
                     <span id="opt-rig-summary-desc" class="text-xs text-slate-400 truncate max-w-[520px]">High-end CPU, GPU, and RAM perfectly balanced for complex flight sim operations.</span>
                 </div>
                 <!-- Pure Informative Detected Hardware Cards (No Comboboxes) -->
                 <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 text-xs font-mono">
                     <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-1" title="Detected CPU model, core architecture, and single-thread capabilities.">
-                        <span class="text-[10px] text-slate-400 uppercase font-bold block">Processor (CPU)</span>
-                        <div id="opt-detected-cpu-name" class="font-bold text-emerald-400 truncate">Detecting...</div>
-                        <div id="opt-detected-cpu-cores" class="text-[11px] text-slate-400">--</div>
+                        <span class="text-[10px] text-slate-400 uppercase font-bold block">CPU</span>
+                        <div id="opt-detected-cpu-name" class="font-bold text-white truncate">Detecting...</div>
+                        <div id="opt-detected-cpu-cores" class="flex items-center gap-1.5 pt-0.5 flex-wrap">--</div>
                     </div>
                     <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-1" title="Detected GPU model, dedicated VRAM capacity, and driver version.">
-                        <span class="text-[10px] text-slate-400 uppercase font-bold block">Graphics Card (GPU)</span>
-                        <div id="opt-detected-gpu-name" class="font-bold text-emerald-400 truncate">Detecting...</div>
-                        <div id="opt-detected-gpu-vram" class="text-[11px] text-slate-400">--</div>
+                        <span class="text-[10px] text-slate-400 uppercase font-bold block">GPU</span>
+                        <div id="opt-detected-gpu-name" class="font-bold text-white truncate">Detecting...</div>
+                        <div id="opt-detected-gpu-vram" class="flex items-center gap-1.5 pt-0.5 flex-wrap">--</div>
                     </div>
                     <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-1" title="Detected active display monitor resolution and native refresh rate frequency in Hz.">
-                        <div class="flex items-center justify-between">
-                            <span class="text-[10px] text-slate-400 uppercase font-bold block">Active Display (Monitor)</span>
-                            <span id="opt-display-count-badge" class="hidden text-[9px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-cyan-300 font-bold">MULTI-MONITOR</span>
-                        </div>
-                        <div id="opt-detected-display-hz" class="font-bold text-emerald-400 truncate">Detecting...</div>
-                        <div id="opt-detected-display-res" class="text-[11px] text-slate-400">--</div>
+                        <span class="text-[10px] text-slate-400 uppercase font-bold block">DISPLAY</span>
+                        <div id="opt-detected-display-hz" class="font-bold text-white truncate">Detecting...</div>
+                        <div id="opt-detected-display-res" class="flex items-center gap-1.5 pt-0.5 flex-wrap">--</div>
                         <div id="opt-detected-display-switcher" class="hidden flex items-center gap-1.5 pt-1 flex-wrap font-mono"></div>
                     </div>
                     <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-1" title="Detected Virtual Reality (VR) headset hardware and native refresh rate cadence.">
-                        <span class="text-[10px] text-slate-400 uppercase font-bold block">VR Headset</span>
-                        <div id="opt-detected-vr-name" class="font-bold text-cyan-400 truncate">Detecting...</div>
-                        <div id="opt-detected-vr-hz" class="text-[11px] text-slate-400 font-bold">--</div>
+                        <span class="text-[10px] text-slate-400 uppercase font-bold block">VR HEADSET</span>
+                        <div id="opt-detected-vr-name" class="font-bold text-white truncate">Detecting...</div>
+                        <div id="opt-detected-vr-hz" class="flex items-center gap-1.5 pt-0.5 flex-wrap">--</div>
                     </div>
                     <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-1" title="Detected System RAM capacity, frequency, and XMP state.">
-                        <span class="text-[10px] text-slate-400 uppercase font-bold block">System Memory (RAM)</span>
-                        <div class="flex items-center gap-1.5 flex-wrap">
-                            <span id="opt-detected-ram-val" class="font-bold text-slate-200">--</span>
-                            <span id="opt-detected-ram-xmp" class="font-bold text-emerald-400">XMP Active</span>
-                        </div>
-                        <div class="text-[11px] text-slate-400">High-speed DDR bus</div>
+                        <span class="text-[10px] text-slate-400 uppercase font-bold block">RAM</span>
+                        <div id="opt-detected-ram-val" class="font-bold text-white truncate">--</div>
+                        <div id="opt-detected-ram-badges" class="flex items-center gap-1.5 pt-0.5 flex-wrap">--</div>
                     </div>
                     <div class="p-2.5 rounded-xl bg-slate-900/60 border border-slate-800/80 space-y-1" title="Windows Hardware-Accelerated GPU Scheduling (HAGS), Re-Size BAR, and DLSS runtime.">
-                        <span class="text-[10px] text-slate-400 uppercase font-bold block">Accelerators & Drivers</span>
-                        <div class="flex items-center gap-1.5 flex-wrap">
-                            <span id="opt-detected-rbar" class="font-bold text-emerald-400">Re-Size BAR</span>
-                            <span class="text-slate-600">•</span>
-                            <span id="opt-detected-hags" class="font-bold text-emerald-400">HAGS</span>
-                        </div>
-                        <div id="opt-detected-dlss-ver" class="text-[11px] text-cyan-400 font-bold">DLSS Active</div>
+                        <span class="text-[10px] text-slate-400 uppercase font-bold block">DRIVERS & MISC.</span>
+                        <div id="opt-detected-misc-title" class="font-bold text-white truncate">ACCELERATORS</div>
+                        <div id="opt-detected-misc-badges" class="flex items-center gap-1.5 pt-0.5 flex-wrap">--</div>
                     </div>
                 </div>
             </div>
@@ -2194,7 +2184,7 @@
             <div class="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-3.5">
                 <!-- ROW 1: HEADER (CLEAN & MINIMALIST) -->
                 <div class="flex items-center justify-between pb-2 border-b border-slate-900">
-                    <span class="text-xs font-mono font-black text-white uppercase tracking-wider">MSFS GRAPHICS SETTINGS</span>
+                    <span class="text-base font-mono font-black text-slate-100 uppercase tracking-wider">MSFS GRAPHICS SETTINGS</span>
                 </div>
 
                 <!-- ROW 1B: CENTERED CONTROL PILLS (MODE, PROFILE, VR HZ, AUTOFPS) -->
@@ -2228,74 +2218,74 @@
                 <!-- ROW 2: CLEAN MINIMALIST TABS (7 RUBRIQUES IN 2x2 SECTIONS) -->
                 <div class="flex items-center flex-nowrap justify-between gap-1.5 bg-slate-900/90 p-1.5 rounded-xl border border-slate-800 text-xs font-mono font-bold w-full overflow-x-auto custom-scrollbar">
                     <button id="opt-page-pill-0" onclick="switchGraphicsSettingsPage(0)" class="px-3.5 py-2 rounded-lg bg-cyan-600 text-white transition-all cursor-pointer font-bold shadow-sm whitespace-nowrap">
-                        DISPLAY & SYNC
+                        CORE
                     </button>
                     <button id="opt-page-pill-1" onclick="switchGraphicsSettingsPage(1)" class="px-3.5 py-2 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold whitespace-nowrap">
-                        FRAME GEN & LATENCY
+                        PACING
                     </button>
                     <button id="opt-page-pill-2" onclick="switchGraphicsSettingsPage(2)" class="px-3.5 py-2 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold whitespace-nowrap">
-                        TERRAIN & LOD
+                        TERRAIN
                     </button>
                     <button id="opt-page-pill-3" onclick="switchGraphicsSettingsPage(3)" class="px-3.5 py-2 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold whitespace-nowrap">
-                        ENVIRONMENT & FLORA
+                        ENVIRONMENT
                     </button>
                     <button id="opt-page-pill-4" onclick="switchGraphicsSettingsPage(4)" class="px-3.5 py-2 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold whitespace-nowrap">
-                        SHADOWS & LIGHTS
+                        LIGHTING
                     </button>
                     <button id="opt-page-pill-5" onclick="switchGraphicsSettingsPage(5)" class="px-3.5 py-2 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold whitespace-nowrap">
-                        COCKPIT & AVIONICS
+                        COCKPIT
                     </button>
                     <button id="opt-page-pill-6" onclick="switchGraphicsSettingsPage(6)" class="px-3.5 py-2 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold whitespace-nowrap">
-                        WEATHER & REFLECTIONS
+                        POST-PROCESSING
                     </button>
                 </div>
 
                 <!-- CAROUSEL TRACK VIEWPORT (LATERAL SLIDE CONTAINER - 2x2 PER PAGE) -->
                 <div class="overflow-hidden relative w-full rounded-xl">
                     <div id="opt-msfs-carousel-track" class="flex transition-transform duration-300 ease-out" style="transform: translateX(0%);">
-                        <!-- PAGE 1: DISPLAY & SYNC (4 CARDS IN 2x2 GRID) -->
+                        <!-- PAGE 1: CORE (4 CARDS IN 2x2 GRID) -->
                         <div class="w-full shrink-0">
                             <div id="opt-msfs-settings-grid-p1" class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                                 <!-- Rendered dynamically by JS -->
                             </div>
                         </div>
 
-                        <!-- PAGE 2: FRAME GEN & LATENCY (4 CARDS IN 2x2 GRID) -->
+                        <!-- PAGE 2: PACING (4 CARDS IN 2x2 GRID) -->
                         <div class="w-full shrink-0">
                             <div id="opt-msfs-settings-grid-p2" class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                                 <!-- Rendered dynamically by JS -->
                             </div>
                         </div>
 
-                        <!-- PAGE 3: TERRAIN & LOD (4 CARDS IN 2x2 GRID) -->
+                        <!-- PAGE 3: TERRAIN (4 CARDS IN 2x2 GRID) -->
                         <div class="w-full shrink-0">
                             <div id="opt-msfs-settings-grid-p3" class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                                 <!-- Rendered dynamically by JS -->
                             </div>
                         </div>
 
-                        <!-- PAGE 4: ENVIRONMENT & FLORA (4 CARDS IN 2x2 GRID) -->
+                        <!-- PAGE 4: ENVIRONMENT (4 CARDS IN 2x2 GRID) -->
                         <div class="w-full shrink-0">
                             <div id="opt-msfs-settings-grid-p4" class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                                 <!-- Rendered dynamically by JS -->
                             </div>
                         </div>
 
-                        <!-- PAGE 5: SHADOWS & LIGHTS (4 CARDS IN 2x2 GRID) -->
+                        <!-- PAGE 5: LIGHTING (4 CARDS IN 2x2 GRID) -->
                         <div class="w-full shrink-0">
                             <div id="opt-msfs-settings-grid-p5" class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                                 <!-- Rendered dynamically by JS -->
                             </div>
                         </div>
 
-                        <!-- PAGE 6: COCKPIT & AVIONICS (4 CARDS IN 2x2 GRID) -->
+                        <!-- PAGE 6: COCKPIT (4 CARDS IN 2x2 GRID) -->
                         <div class="w-full shrink-0">
                             <div id="opt-msfs-settings-grid-p6" class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                                 <!-- Rendered dynamically by JS -->
                             </div>
                         </div>
 
-                        <!-- PAGE 7: WEATHER & REFLECTIONS (3 CARDS IN 2x2 GRID) -->
+                        <!-- PAGE 7: POST-PROCESSING (3 CARDS IN 2x2 GRID) -->
                         <div class="w-full shrink-0">
                             <div id="opt-msfs-settings-grid-p7" class="grid grid-cols-1 md:grid-cols-2 gap-3.5">
                                 <!-- Rendered dynamically by JS -->
@@ -2304,11 +2294,8 @@
                     </div>
                 </div>
 
-                <!-- BOTTOM ACTION BAR: ROLLBACK & OPTIMIZE PROFILE (BOTTOM RIGHT) -->
+                <!-- BOTTOM ACTION BAR: OPTIMIZE PROFILE (BOTTOM RIGHT) -->
                 <div class="flex items-center justify-end gap-3 pt-3 border-t border-slate-900">
-                    <button onclick="openUserCfgBackupModal()" id="opt-btn-restore-backup" class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-mono font-bold transition-all cursor-pointer shadow-sm uppercase tracking-wider" title="Rollback UserCfg.opt to a previous timestamped backup">
-                        ROLLBACK
-                    </button>
                     <button onclick="applyOptimalMsfsSettingsCurrentMode()" id="opt-btn-apply-settings" class="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-mono font-black transition-all cursor-pointer shadow-sm uppercase tracking-wider" title="Apply optimal calibrated graphics profile to UserCfg.opt with automatic safety backup">
                         OPTIMIZE PROFILE
                     </button>
@@ -2732,25 +2719,25 @@
             <div class="p-6 overflow-y-auto space-y-5 text-sm text-slate-300 divide-y divide-slate-800">
                 <!-- Description -->
                 <div class="space-y-1.5">
-                    <div class="text-xs font-mono text-slate-400 uppercase font-bold tracking-wider">FONCTION TECHNIQUE DANS MSFS</div>
+                    <div class="text-xs font-mono text-slate-400 uppercase font-bold tracking-wider">TECHNICAL FUNCTION IN MSFS</div>
                     <p id="opt-info-desc" class="text-slate-200 leading-relaxed"></p>
                 </div>
 
                 <!-- Hardware Impact -->
                 <div class="pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
-                        <div class="text-xs font-mono text-cyan-400 uppercase font-bold">IMPACT CPU / MAINTHREAD</div>
+                        <div class="text-xs font-mono text-cyan-400 uppercase font-bold">CPU / MAINTHREAD IMPACT</div>
                         <p id="opt-info-cpu" class="text-xs text-slate-300 leading-relaxed"></p>
                     </div>
                     <div class="p-3.5 rounded-xl bg-slate-950 border border-slate-800 space-y-1">
-                        <div class="text-xs font-mono text-emerald-400 uppercase font-bold">IMPACT GPU / VRAM</div>
+                        <div class="text-xs font-mono text-emerald-400 uppercase font-bold">GPU / VRAM IMPACT</div>
                         <p id="opt-info-gpu" class="text-xs text-slate-300 leading-relaxed"></p>
                     </div>
                 </div>
 
                 <!-- Mission Advice -->
                 <div class="pt-4 space-y-3">
-                    <div class="text-xs font-mono text-slate-400 uppercase font-bold tracking-wider">RECOMMANDATIONS PAR TYPE DE VOL</div>
+                    <div class="text-xs font-mono text-slate-400 uppercase font-bold tracking-wider">RECOMMENDATIONS BY FLIGHT PROFILE</div>
                     <div class="space-y-2">
                         <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-start gap-2.5">
                             <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-900 text-cyan-200 uppercase shrink-0 mt-0.5">IFR LINERS</span>
@@ -2765,7 +2752,7 @@
 
                 <!-- Options Evaluation -->
                 <div class="pt-4 space-y-2" id="opt-info-tradeoffs-block">
-                    <div class="text-xs font-mono text-slate-400 uppercase font-bold tracking-wider">ÉVALUATION DES OPTIONS</div>
+                    <div class="text-xs font-mono text-slate-400 uppercase font-bold tracking-wider">OPTIONS EVALUATION</div>
                     <div id="opt-info-options-list" class="space-y-2"></div>
                 </div>
             </div>
@@ -2773,7 +2760,7 @@
             <!-- Modal Footer -->
             <div class="px-6 py-3 bg-slate-800/80 border-t border-slate-700 flex items-center justify-end">
                 <button onclick="closeSettingInfoModal()" class="px-5 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs font-mono uppercase tracking-wider transition-colors cursor-pointer">
-                    FERMER
+                    CLOSE
                 </button>
             </div>
         </div>

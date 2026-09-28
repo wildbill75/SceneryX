@@ -64,41 +64,43 @@ The purpose of this module is to serve as an intelligent advisory, calibration, 
 ---
 
 ## 4. MSFS Graphics Settings Architecture (27 Parameters across 7 Rubriques in 2x2 Layout)
-To maximize readability and prevent visual clutter, the graphics configuration interface features a 7-rubrique lateral carousel with a spacious $2 \times 2$ grid (4 parameters per page, 3 on the final page):
+To maximize readability, maintain logical categorization, and prevent visual clutter, the graphics configuration interface features a 7-rubrique lateral carousel with a spacious $2 \times 2$ grid:
 
-### Page 1: DISPLAY & SYNC (4 Parameters)
+### Page 1: CORE (4 Parameters)
 | Parameter | 2D Key | VR Key | Shared? | Input Mode | Optimum Criteria |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Full Screen Resolution** | `FullScreenResolution` | Headset Native | **Yes** | Select | Native display resolution |
+| **Full Screen Resolution** | `FullScreenResolution` | Headset Native | **Yes** | Select | Native display resolution (Emerald); >Native (Rose Hazard); <Native (Orange Suboptimal) |
 | **Anti-Aliasing & Upscaling** | `AntiAliasing` / `DLSSMode` | `AntiAliasingVR` / `DLSSModeVR` | No | Select | DLSS Quality / Balanced |
 | **Max Frame Rate** | `TargetFrameRate` | `TargetFrameRateVR` | No | **Custom Combobox (Numeric + Presets)** | Display sync divisor (2D) / 1/2 Headset Hz (VR) |
-| **V-Sync** | `VSync` | `VSync` | **Yes** | Select | ON for G-Sync/FreeSync pacing |
+| **Texture Resolution** | `{Texture Quality}` | `{Texture Quality}` | No | Select | Low (Airliners - VRAM Optimization) / High-Ultra (GA) |
 
-### Page 2: FRAME GEN & LATENCY (4 Parameters)
+### Page 2: PACING (5 Parameters)
 | Parameter | 2D Key | VR Key | Shared? | Input Mode | Optimum Criteria |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Frame Generation** | `FrameGeneration` | `FrameGenerationVR` | No | Select | DLSSG (2D) / OFF (VR mandatory) |
 | **Framerate Multiplier** | `NBFramesToGenerate` | `NBFramesToGenerateVR` | No | Select | 1 (Standard 2X DLSSG) |
 | **NVIDIA Reflex** | `Reflex` | `ReflexVR` | No | Select | ON / ON+BOOST (minimizes input latency) |
 | **Dynamic Settings** | `DynamicSettings` | `DynamicSettingsVR` | No | Select | OFF (prevents random resolution drops) |
+| **V-Sync** | `VSync` | `VSync` | **Yes** | Select | ON for G-Sync/FreeSync pacing |
 
-### Page 3: TERRAIN & LOD (4 Parameters)
+### Page 3: TERRAIN (4 Parameters)
 | Parameter | 2D Key | VR Key | Shared? | Input Mode | Optimum Criteria |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Terrain LOD (TLOD)** | `{Terrain LoDFactor}` | `{Terrain LoDFactor}` | No | **Custom Combobox (Numeric + Presets)** | 100-120 (Airliners) / 150-200 (GA) / AutoFPS |
-| **Objects LOD (OLOD)** | `{ObjectsLoD LoDFactor}` | `{ObjectsLoD LoDFactor}` | No | **Custom Combobox (Numeric + Presets)** | 100-120 |
+| **Objects LOD (OLOD)** | `{ObjectsLoD LoDFactor}` | `{ObjectsLoD LoDFactor}` | No | **Custom Combobox (Numeric + Presets)** | 100-120 / AutoFPS |
 | **Off Screen Pre-Caching** | `{OffscreenTerrainPreCaching}` | `{OffscreenTerrainPreCaching}` | No | Select | High / Ultra (prevents camera pan stutters) |
 | **Displacement Mapping** | `{DisplacementMapping Enabled}` | `{DisplacementMapping Enabled}` | No | Select | OFF (spares GPU compute & VRAM) |
 
-### Page 4: ENVIRONMENT & FLORA (4 Parameters)
+### Page 4: ENVIRONMENT (5 Parameters)
 | Parameter | 2D Key | VR Key | Shared? | Input Mode | Optimum Criteria |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Buildings Quality** | `{Buildings Quality}` | `{Buildings Quality}` | No | Select | High / Ultra |
 | **Trees Quality** | `{Procedural TreesQuality}` | `{Procedural TreesQuality}` | No | Select | High |
 | **Grass & Bushes** | `{Procedural GrassQuality}` | `{Procedural GrassQuality}` | No | Select | Low / Medium (Airliners) / High (GA) |
 | **Water Waves Simulation** | `{Water FFTSize}` | `{Water FFTSize}` | No | Select | High (512) (2D) / Medium (256) (VR) |
+| **Volumetric Clouds** | `{VolumetricClouds Quality}` | `{VolumetricClouds Quality}` | No | Select | High |
 
-### Page 5: SHADOWS & LIGHTS (4 Parameters)
+### Page 5: LIGHTING (4 Parameters)
 | Parameter | 2D Key | VR Key | Shared? | Input Mode | Optimum Criteria |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Shadow Maps Resolution** | `{Shadows Size}` | `{Shadows Size}` | No | Select | High (1536) (2D) / Medium (1024) (VR) |
@@ -106,18 +108,16 @@ To maximize readability and prevent visual clutter, the graphics configuration i
 | **Contact Shadows** | `{ContactShadows Quality}` | `{ContactShadows Quality}` | No | Select | High (2D) / Medium (VR) |
 | **Volumetric Lights** | `{VolumetricLights Quality}` | `{VolumetricLights Quality}` | No | Select | High (2D) / Low-Medium (VR) |
 
-### Page 6: COCKPIT & AVIONICS (4 Parameters)
+### Page 6: COCKPIT (3 Parameters)
 | Parameter | 2D Key | VR Key | Shared? | Input Mode | Optimum Criteria |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Texture Resolution** | `{Texture Quality}` | `{Texture Quality}` | No | Select | Low (Airliners - VRAM Optimization) / High-Ultra (GA) |
 | **Glass Cockpit Refresh** | `{GlassCockpitsRefreshRate Quality}` | `{GlassCockpitsRefreshRate Quality}` | No | Select | Medium / Low (Airliners) / High (GA) |
 | **Ambient Occlusion (SSAO)** | `{SSAO Quality}` | `{SSAO Quality}` | No | Select | High (2D) / Low-Medium (VR) |
 | **Windshield Effects** | `{WindShield Quality}` | `{WindShield Quality}` | No | Select | High / Ultra |
 
-### Page 7: WEATHER & REFLECTIONS (3 Parameters)
+### Page 7: POST-PROCESSING (2 Parameters)
 | Parameter | 2D Key | VR Key | Shared? | Input Mode | Optimum Criteria |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Volumetric Clouds** | `{VolumetricClouds Quality}` | `{VolumetricClouds Quality}` | No | Select | High |
 | **Screen Reflections (SSR)** | `{SSR Quality}` | `{SSR Quality}` | No | Select | High (2D) / Low-Medium (VR) |
 | **Anisotropic Filtering** | `{Texture MaxAnisotropy}` | `{Texture MaxAnisotropy}` | No | Select | 16X |
 
@@ -127,18 +127,23 @@ To maximize readability and prevent visual clutter, the graphics configuration i
 1. **Streamlined Card Header Layout**:
    - Setting title on the left (`text-sm font-mono font-bold text-slate-100 uppercase`).
    - Right-side cluster:
-     - `[ SHARED ]` badge (when parameter is shared between 2D and VR), positioned immediately to the left of the rating tag with matching height and typography (`px-2 py-0.5 rounded text-xs font-mono font-bold bg-slate-800 text-slate-300`).
-     - `[ OPTIMUM / ACCEPTABLE / HAZARD ]` tag (`px-2.5 py-0.5 rounded text-xs font-mono font-bold uppercase`).
-     - `[ i ]` information button (`w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-mono text-xs font-bold`) triggering the in-depth technical modal.
-2. **De-Cluttered Card Footers**:
-   - Redundant bottom trade-off pills (`+ PRO` / `- CON`) have been eliminated from the card surface, preventing card height distortion and dropdown clipping.
-   - All trade-off analysis and technical explanations are centralized inside the dedicated `[ i ]` modal.
+     - `[ AUTOFPS ]` badge (when parameter is dynamically regulated in real-time by AutoFPS), disabling manual input with `HANDLED BY AUTOFPS`.
+     - `[ SHARED ]` badge (when parameter is globally shared between 2D and VR), positioned immediately to the left of the rating tag with matching height and typography (`px-2 py-0.5 rounded text-xs font-mono font-bold bg-slate-800 text-slate-300`).
+     - `[ OPTIMUM / ACCEPTABLE / SUBOPTIMAL / HAZARD ]` tag (`px-2.5 py-0.5 rounded text-xs font-mono font-bold uppercase`).
+     - `[ i ]` information button (`w-6 h-6 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-mono text-xs font-bold`) triggering the in-depth technical modal in professional English.
+2. **De-Cluttered Card Footers & Downward Popovers**:
+   - Bottom trade-off pills have been eliminated from the card surface, preventing container distortion.
+   - Combobox menus strictly open downwards (`top-full mt-1`) without obscuring the input header.
+   - Indicator bullet dots have been removed from the combobox preset list for a clean, minimalist typography presentation.
 3. **Color-Coded Dropdown & Combobox Options**:
    - Options are classified and styled according to their impact:
      - **Optimum**: Emerald green (`text-emerald-400 font-bold`).
      - **Acceptable**: Amber (`text-amber-300 font-bold`).
-     - **Hazard / Suboptimal**: Rose / Red (`text-rose-400 font-bold`).
-   - In combobox popover menus, each option is accompanied by a color-coded indicator dot (`bg-emerald-400`, `bg-amber-400`, `bg-rose-400`) for immediate visual identification.
+     - **Suboptimal**: Orange (`text-orange-400 font-bold`).
+     - **Hazard**: Rose / Red (`text-rose-400 font-bold`).
+4. **Hardware Caching & Windowless Execution**:
+   - Hardware detection results are cached in-memory (`_cached_hardware_specs`), enabling instant setting modification responses without multi-second WMI delays.
+   - All background subprocess calls enforce `creationflags=CREATE_NO_WINDOW`, preventing any terminal window or console flashing during interaction.
 
 ---
 
