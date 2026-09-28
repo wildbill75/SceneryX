@@ -6960,9 +6960,9 @@ function renderAirlineDestinationsList(originAp) {
                             ${badgeText}
                         </span>
                         <button onclick="centerMapOnDestination('${item.icao}', event)" title="Locate on map" class="w-8 h-8 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-xs border border-slate-700/60 transition-colors cursor-pointer">
-                            <i class="fa-solid fa-crosshairs"></i>
+                            ${getIcon('target', 'w-4 h-4')}
                         </button>
-                        <i class="fa-solid fa-chevron-${isExpanded ? 'up' : 'down'} text-xs text-slate-400 group-hover:text-white transition-colors ml-0.5"></i>
+                        <span class="inline-flex items-center ml-0.5">${getIcon(isExpanded ? 'arrow-up' : 'chevron-down', 'w-3 h-3 text-slate-400 group-hover:text-white transition-colors')}</span>
                     </div>
                 </div>
 

@@ -831,7 +831,7 @@
                            placeholder="Search ICAO, Airport, Country..." 
                            class="w-full bg-slate-900/50 hover:bg-slate-900/70 border border-slate-700/60 focus:border-cyan-400 rounded-xl pl-9 pr-8 py-2 text-xs text-slate-100 placeholder-slate-400 focus:outline-none font-medium transition-all shadow-inner">
                     <button id="clear-search" onclick="clearSearch()" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white text-xs p-1 cursor-pointer">
-                        <i class="fa-solid fa-xmark"></i>
+                        <span data-icon="x-square" class="w-3.5 h-3.5 block"></span>
                     </button>
                 </div>
 
@@ -957,11 +957,11 @@
                 <!-- Drag Handle & Modal Header -->
                 <div id="radial-airlines-modal-header" class="h-9 flex items-center justify-between pb-2 border-b border-slate-700/40 shrink-0 cursor-grab active:cursor-grabbing">
                     <div class="flex items-center gap-2 pointer-events-none">
-                        <i class="fa-solid fa-grip-vertical text-xs text-slate-400 mr-1 opacity-75"></i>
+                        <span data-icon="grip-vertical" class="w-3.5 h-3.5 block text-slate-400 mr-1 opacity-75"></span>
                         <span class="text-xs font-black font-mono tracking-wider text-white uppercase drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" data-i18n="drawer.operating_airlines">Operating Airlines</span>
                     </div>
                     <button onclick="closeRadialAirlinesModal(event)" title="Close" class="w-7 h-7 rounded-xl bg-slate-800/60 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition-colors border border-slate-700/50 cursor-pointer">
-                        <i class="fa-solid fa-xmark"></i>
+                        <span data-icon="x-square" class="w-3.5 h-3.5 block"></span>
                     </button>
                 </div>
 
@@ -1062,9 +1062,13 @@
                  style="transform: translateX(-50%);">
                 
                 <!-- Drag Handle & Modal Header -->
-                <div id="radial-details-modal-header" class="h-9 flex items-center justify-end pb-2 border-b border-slate-700/40 shrink-0 cursor-grab active:cursor-grabbing">
+                <div id="radial-details-modal-header" class="h-9 flex items-center justify-between pb-2 border-b border-slate-700/40 shrink-0 cursor-grab active:cursor-grabbing">
+                    <div class="flex items-center gap-2 pointer-events-none">
+                        <span data-icon="grip-vertical" class="w-3.5 h-3.5 block text-slate-400 opacity-75"></span>
+                        <span class="text-xs font-black font-mono tracking-wider text-white uppercase drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]" data-i18n="radial.details">Airport Details</span>
+                    </div>
                     <button onclick="closeRadialDetailsModal(event)" title="Close" class="w-7 h-7 rounded-xl bg-slate-800/60 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition-colors border border-slate-700/50 cursor-pointer">
-                        ✕
+                        <span data-icon="x-square" class="w-3.5 h-3.5 block"></span>
                     </button>
                 </div>
 
@@ -1190,7 +1194,7 @@
             <div id="flight-planning-banner" class="hidden absolute z-[1000] px-4 py-2.5 rounded-2xl shadow-xl shadow-black/50 items-center gap-3.5 select-none cursor-grab active:cursor-grabbing pointer-events-auto transition-all whitespace-nowrap flex-nowrap shrink-0">
                 <!-- DRAG HANDLE GRIP -->
                 <div class="text-slate-400 opacity-75 hover:opacity-100 flex items-center pr-1 cursor-grab active:cursor-grabbing shrink-0" title="Click and drag banner to move">
-                    <i class="fa-solid fa-grip-vertical text-xs"></i>
+                    <span data-icon="grip-vertical" class="w-3.5 h-3.5 block text-slate-400"></span>
                 </div>
 
                 <div id="fp-title-zone" class="flex items-center gap-2 cursor-default transition-colors whitespace-nowrap shrink-0">
@@ -1262,8 +1266,8 @@
                     <button onclick="executeRestoreAllSceneries()" id="btn-restore-all" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs border border-slate-700 transition-all cursor-pointer flex items-center gap-1">
                         <i class="fa-solid fa-rotate-left text-slate-400"></i> <span data-i18n="optimizer.restore_all">Restore All</span>
                     </button>
-                    <button onclick="clearFlightSelection()" class="text-slate-500 hover:text-white p-1 text-xs transition-colors" title="Clear Flight Selection">
-                        <i class="fa-solid fa-xmark"></i>
+                    <button onclick="clearFlightSelection()" class="w-7 h-7 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition-colors cursor-pointer border-0" title="Clear Flight Selection">
+                        <span data-icon="x-square" class="w-3.5 h-3.5 block"></span>
                     </button>
                 </div>
             </div>
@@ -1960,12 +1964,15 @@
         <div class="glass-modal pointer-events-auto w-[540px] max-w-[560px] h-[calc(100vh-142px)] max-h-[calc(100vh-142px)] rounded-3xl p-5 shadow-2xl border border-slate-800 bg-slate-900 flex flex-col overflow-hidden">
             <!-- Header (Draggable) -->
             <div id="gsx-audit-modal-header" class="flex items-center justify-between border-b border-slate-800 pb-3.5 shrink-0 cursor-grab active:cursor-grabbing">
-                <div>
-                    <span class="text-[10px] font-mono text-cyan-400 uppercase font-bold tracking-wider block mb-1">SceneryX System</span>
-                    <h2 class="text-base font-bold text-white leading-tight flex items-center gap-2">
-                        <span data-i18n="gsx.audit_modal_title">GSX Profiles Details</span>
-                        <span id="gsx-audit-total-badge" class="hidden text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-amber-500 text-slate-950 border-0"></span>
-                    </h2>
+                <div class="flex items-center gap-2.5">
+                    <span data-icon="grip-vertical" class="w-3.5 h-3.5 block text-slate-400 opacity-75 shrink-0 pointer-events-none"></span>
+                    <div>
+                        <span class="text-[10px] font-mono text-cyan-400 uppercase font-bold tracking-wider block mb-1">SceneryX System</span>
+                        <h2 class="text-base font-bold text-white leading-tight flex items-center gap-2">
+                            <span data-i18n="gsx.audit_modal_title">GSX Profiles Details</span>
+                            <span id="gsx-audit-total-badge" class="hidden text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-amber-500 text-slate-950 border-0"></span>
+                        </h2>
+                    </div>
                 </div>
                 <button onclick="closeGsxAuditModal()" title="Close" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition-all cursor-pointer border-0">
                     <span data-icon="x-square" class="w-4 h-4 block"></span>
@@ -2039,21 +2046,27 @@
          class="hidden fixed z-[1200] w-[1180px] max-w-[96vw] rounded-3xl p-6 shadow-2xl border border-slate-700 bg-slate-900 flex flex-col space-y-3.5 overflow-hidden text-slate-100 select-none pointer-events-auto">
         <!-- HEADER & DRAG HANDLE -->
         <div id="opt-modal-header" class="flex items-center justify-between pb-3.5 border-b border-slate-800 shrink-0 cursor-grab active:cursor-grabbing">
-            <div>
+            <div class="flex items-center gap-2.5">
+                <span data-icon="grip-vertical" class="w-4 h-4 block text-slate-400 opacity-75 shrink-0 pointer-events-none"></span>
                 <h2 class="text-xl font-bold text-white tracking-tight">Flight Optimizer</h2>
             </div>
 
-            <!-- TABS SWITCHER -->
-            <div class="flex items-center bg-slate-950 p-1 rounded-2xl border border-slate-800 shrink-0">
-                <button id="opt-tab-btn-route" onclick="switchOptimizerTab('route')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer bg-cyan-600 text-white shadow-sm shadow-cyan-600/30 flex items-center gap-1.5">
-                    <span>ROUTE</span>
-                </button>
-                <button id="opt-tab-btn-rig" onclick="switchOptimizerTab('rig')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition-all cursor-pointer flex items-center gap-1.5">
-                    <span>HARDWARE</span>
-                </button>
-                <button id="opt-tab-btn-blackbox" onclick="switchOptimizerTab('blackbox')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition-all cursor-pointer flex items-center gap-1.5">
-                    <span>TELEMETRY</span>
-                    <span id="opt-tab-rec-dot" class="hidden w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+            <!-- TABS SWITCHER & CLOSE -->
+            <div class="flex items-center gap-3">
+                <div class="flex items-center bg-slate-950 p-1 rounded-2xl border border-slate-800 shrink-0">
+                    <button id="opt-tab-btn-route" onclick="switchOptimizerTab('route')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer bg-cyan-600 text-white shadow-sm shadow-cyan-600/30 flex items-center gap-1.5">
+                        <span>ROUTE</span>
+                    </button>
+                    <button id="opt-tab-btn-rig" onclick="switchOptimizerTab('rig')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition-all cursor-pointer flex items-center gap-1.5">
+                        <span>HARDWARE</span>
+                    </button>
+                    <button id="opt-tab-btn-blackbox" onclick="switchOptimizerTab('blackbox')" class="px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition-all cursor-pointer flex items-center gap-1.5">
+                        <span>TELEMETRY</span>
+                        <span id="opt-tab-rec-dot" class="hidden w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
+                    </button>
+                </div>
+                <button onclick="closeFlightOptimizerModal()" title="Close" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition-colors border-0 cursor-pointer shrink-0">
+                    <span data-icon="x-square" class="w-4 h-4 block"></span>
                 </button>
             </div>
         </div>

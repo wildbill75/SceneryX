@@ -72,20 +72,39 @@ window.SCENERYX_ICONS = {
     "x-circle": "<g id=\"Complete\"> <g id=\"x-circle\"> <g> <circle cx=\"12\" cy=\"12\" data-name=\"--Circle\" fill=\"none\" id=\"_--Circle\" r=\"10\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\"/> <line fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" x1=\"14.5\" x2=\"9.5\" y1=\"9.5\" y2=\"14.5\"/> <line fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" x1=\"14.5\" x2=\"9.5\" y1=\"14.5\" y2=\"9.5\"/> </g> </g> </g>",
     "x-square": "<g id=\"Complete\"> <g id=\"x-square\"> <g> <rect data-name=\"--Rectangle\" fill=\"none\" height=\"20\" id=\"_--Rectangle\" rx=\"2\" ry=\"2\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" width=\"20\" x=\"2\" y=\"2\"/> <line fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" x1=\"14.5\" x2=\"9.5\" y1=\"9.5\" y2=\"14.5\"/> <line fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" x1=\"14.5\" x2=\"9.5\" y1=\"14.5\" y2=\"9.5\"/> </g> </g> </g>",
     "zoom-out": "<g id=\"Complete\"> <g id=\"zoom-out\"> <g> <circle cx=\"10.1\" cy=\"10.1\" fill=\"none\" r=\"8\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\"/> <line fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" x1=\"21.9\" x2=\"16.3\" y1=\"21.9\" y2=\"16.3\"/> <line fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" x1=\"13.1\" x2=\"7.1\" y1=\"10.1\" y2=\"10.1\"/> </g> </g> </g>",
+    "grip-vertical": "<g fill=\"currentColor\" stroke=\"none\"><circle cx=\"9\" cy=\"6\" r=\"1.5\"/><circle cx=\"15\" cy=\"6\" r=\"1.5\"/><circle cx=\"9\" cy=\"12\" r=\"1.5\"/><circle cx=\"15\" cy=\"12\" r=\"1.5\"/><circle cx=\"9\" cy=\"18\" r=\"1.5\"/><circle cx=\"15\" cy=\"18\" r=\"1.5\"/></g>",
+    "target": {
+        viewBox: "0 0 512 512",
+        fill: "currentColor",
+        stroke: "none",
+        strokeWidth: "0",
+        svg: "<path d=\"M321.85,250.69c-4-33.61-30.39-61-65.85-61-36,0-66.34,30.31-66.34,66.34S220,322.34,256,322.34c35.47,0,61.84-27.41,65.85-61a18.39,18.39,0,0,0,.49-5.32A18.71,18.71,0,0,0,321.85,250.69ZM225.12,256c0-39.95,59.88-39.6,61.76,0C285,295.55,225.12,296,225.12,256Z\"/><path d=\"M433.3,238.27H395c-7.27-51.81-41.57-96.15-91.93-114.52a133.34,133.34,0,0,0-29.29-7v-38c0-22.82-35.46-22.86-35.46,0V117c-34.91,4.65-68,22.22-90.69,50.08a141.57,141.57,0,0,0-30.44,71.24H78.7c-22.82,0-22.86,35.46,0,35.46H117a137.24,137.24,0,0,0,18.61,54.45c22.57,37.45,60.88,61.14,102.69,66.63V433.3c0,22.82,35.46,22.86,35.46,0V395.07c2.92-.35,5.85-.75,8.76-1.28,60.25-10.79,104-61.36,112.44-120.06H433.3C456.12,273.73,456.16,238.27,433.3,238.27ZM291.38,354.83a106,106,0,0,1-115.8-31.39c-62-73.5,5.19-188.93,99.84-170.61,49.75,9.63,84.51,53,85.5,103.17C360.05,299.87,333.32,340,291.38,354.83Z\"/>"
+    },
+    "crosshairs": "target"
 };
 
 
 /**
  * Retourne le code SVG d'une icône avec classes CSS dynamiques.
- * @param {string} name - Nom de l'icône (ex: 'folder', 'stopwatch', 'navigation')
+ * @param {string} name - Nom de l'icône (ex: 'folder', 'target', 'grip-vertical')
  * @param {string} classes - Classes CSS Tailwind (ex: 'w-4 h-4 text-slate-400')
  * @param {string} attrs - Attributs HTML optionnels
  * @returns {string} Code HTML du SVG
  */
 function getIcon(name, classes = 'w-4 h-4', attrs = '') {
-    const inner = window.SCENERYX_ICONS[name] || '';
-    if (!inner) return '';
-    return `<svg class="${classes} shrink-0 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ${attrs}>${inner}</svg>`;
+    let entry = window.SCENERYX_ICONS[name];
+    if (typeof entry === 'string' && window.SCENERYX_ICONS[entry]) {
+        entry = window.SCENERYX_ICONS[entry];
+    }
+    if (!entry) return '';
+    if (typeof entry === 'object') {
+        const viewBox = entry.viewBox || '0 0 24 24';
+        const fill = entry.fill || 'none';
+        const stroke = entry.stroke || 'currentColor';
+        const strokeWidth = entry.strokeWidth !== undefined ? entry.strokeWidth : '2';
+        return `<svg class="${classes} shrink-0 pointer-events-none" viewBox="${viewBox}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeWidth}" stroke-linecap="round" stroke-linejoin="round" ${attrs}>${entry.svg}</svg>`;
+    }
+    return `<svg class="${classes} shrink-0 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" ${attrs}>${entry}</svg>`;
 }
 
 /**
