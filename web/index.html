@@ -2378,28 +2378,28 @@
 
             <!-- Live HUD Telemetry Cards Grid (4-Column Layout) -->
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                <div class="p-2.5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-0.5">
+                <div class="p-2.5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-0.5" title="Displayed Frame Rate (with Frame Generation if active)">
                     <span class="text-[10px] font-mono text-slate-400 uppercase font-bold block">Displayed FPS</span>
                     <div class="flex items-baseline gap-1.5 font-mono">
                         <span id="live-fps-val" class="text-xl font-black text-emerald-400">--</span>
                         <span id="live-fps-base" class="text-xs text-slate-400">(-- base)</span>
                     </div>
                 </div>
-                <div class="p-2.5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-0.5">
-                    <span class="text-[10px] font-mono text-slate-400 uppercase font-bold block">MainThread CPU</span>
+                <div class="p-2.5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-0.5" title="Calculated frame pacing budget (1000 / base FPS)">
+                    <span class="text-[10px] font-mono text-slate-400 uppercase font-bold block">Frame Pacing</span>
                     <div class="flex items-baseline gap-1.5 font-mono">
                         <span id="live-mt-val" class="text-xl font-black text-emerald-400">--</span>
                         <span class="text-xs text-slate-400">ms</span>
                     </div>
                 </div>
-                <div class="p-2.5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-0.5">
-                    <span class="text-[10px] font-mono text-slate-400 uppercase font-bold block">VRAM In-Use</span>
+                <div class="p-2.5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-0.5" title="Total dedicated GPU VRAM allocated across Windows and MSFS">
+                    <span class="text-[10px] font-mono text-slate-400 uppercase font-bold block">Total GPU VRAM</span>
                     <div class="flex items-baseline gap-1.5 font-mono">
                         <span id="live-vram-val" class="text-lg font-black text-cyan-400">--</span>
                         <span id="live-vram-pct" class="text-xs text-slate-400">(--%)</span>
                     </div>
                 </div>
-                <div class="p-2.5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-0.5">
+                <div class="p-2.5 rounded-2xl bg-slate-950/60 border border-slate-800 space-y-0.5" title="Real-time disk reading speed on MSFS rolling cache and packages">
                     <span class="text-[10px] font-mono text-slate-400 uppercase font-bold block">Rolling Cache</span>
                     <div class="flex items-baseline gap-1.5 font-mono">
                         <span id="live-cache-val" class="text-lg font-black text-amber-400">--</span>

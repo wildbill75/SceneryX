@@ -16006,6 +16006,9 @@ function switchOptimizerTab(tabName) {
             }
         }
     });
+    if (tabName === 'blackbox') {
+        refreshBenchmarksList();
+    }
 }
 
 function updateOptimizerRouteUI() {

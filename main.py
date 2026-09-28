@@ -3564,7 +3564,8 @@ class Api:
 
     def list_flight_benchmarks(self):
         try:
-            bench_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'benchmarks')
+            base_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+            bench_dir = os.path.join(base_dir, 'benchmarks')
             if not os.path.exists(bench_dir):
                 return json.dumps([], ensure_ascii=False)
             files = []
@@ -3584,7 +3585,8 @@ class Api:
 
     def open_benchmark_report(self, filename_or_path):
         try:
-            bench_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'benchmarks')
+            base_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+            bench_dir = os.path.join(base_dir, 'benchmarks')
             if not os.path.isabs(filename_or_path):
                 p = os.path.join(bench_dir, filename_or_path)
             else:

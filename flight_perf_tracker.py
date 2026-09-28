@@ -268,6 +268,13 @@ def format_time_delta(seconds):
         return f"{h:02d}h {m:02d}m {s:02d}s"
     return f"{m:02d}m {s:02d}s"
 
+def get_benchmarks_directory():
+    base_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+    benchmarks_dir = os.path.join(base_dir, 'benchmarks')
+    os.makedirs(benchmarks_dir, exist_ok=True)
+    return benchmarks_dir
+
+
 def generate_automated_flight_narrative(samples, session_info):
     """
     Génère un diagnostic textuel expert et automatisé du vol
@@ -284,14 +291,14 @@ def generate_automated_flight_narrative(samples, session_info):
     tlods = [s['tlod'] for s in samples if s.get('tlod') is not None]
     io_reads = [s.get('cache_read_mbps', 0) for s in samples]
 
-    peak_vram = max(vrams)
-    total_vram = samples[0]['vram_total']
+    peak_vram = max(vrams) if vrams else 0
+    total_vram = samples[0].get('vram_total', 16376) if samples else 16376
     vram_peak_pct = round((peak_vram / total_vram) * 100, 1) if total_vram else 0
-    avg_vram = round(sum(vrams) / len(vrams), 0)
+    avg_vram = round(sum(vrams) / len(vrams), 0) if vrams else 0
 
     avg_fps = round(sum(fps_list) / len(fps_list), 1) if fps_list else "N/A"
     avg_mt = round(sum(mt_list) / len(mt_list), 1) if mt_list else "N/A"
-    avg_gpu = round(sum(gpus) / len(gpus), 1)
+    avg_gpu = round(sum(gpus) / len(gpus), 1) if gpus else 0
     avg_tlod = round(sum(tlods) / len(tlods), 0) if tlods else "Fixe"
     peak_io = round(max(io_reads), 1) if io_reads else 0.0
 
@@ -328,6 +335,7 @@ def generate_automated_flight_narrative(samples, session_info):
     """
     return narrative
 
+
 def generate_html_report(csv_path, session_info, samples):
     html_path = csv_path.replace('.csv', '.html')
     os.makedirs(os.path.dirname(os.path.abspath(html_path)), exist_ok=True)
@@ -344,7 +352,7 @@ def generate_html_report(csv_path, session_info, samples):
 
     peak_vram = max(vram_vals) if vram_vals else 0
     avg_vram = round(sum(vram_vals) / len(vram_vals), 1) if vram_vals else 0
-    total_vram = samples[0]['vram_total'] if samples else 16376
+    total_vram = samples[0].get('vram_total', 16376) if samples else 16376
     peak_vram_pct = round((peak_vram / total_vram) * 100, 1) if total_vram else 0
 
     peak_ram = max(msfs_ram_vals) if msfs_ram_vals else 0
@@ -726,8 +734,7 @@ def main():
 
     os.system('cls' if os.name == 'nt' else 'clear')
     
-    benchmarks_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'benchmarks')
-    os.makedirs(benchmarks_dir, exist_ok=True)
+    benchmarks_dir = get_benchmarks_directory()
 
     timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     mode_str, is_corridor, dep, arr, dis_count, prof_slug = get_sceneryx_flight_mode()
@@ -1012,7 +1019,7 @@ class BlackboxSession:
             telemetry["vram_pct"] = gpu.get("vram_pct", 0)
             telemetry["gpu_power_w"] = gpu.get("power_w", 0)
         if autofps:
-            telemetry["displayed_fps"] = autofps.get("disp_fps")
+            telemetry["displayed_fps"] = autofps.get("displayed_fps") or autofps.get("disp_fps")
             telemetry["base_fps"] = autofps.get("base_fps")
             telemetry["main_thread_ms"] = autofps.get("main_thread_ms")
             telemetry["tlod"] = autofps.get("tlod")
@@ -1022,8 +1029,7 @@ class BlackboxSession:
         return telemetry
 
     def _worker(self, flight_name, dep, arr, aircraft):
-        benchmarks_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'benchmarks')
-        os.makedirs(benchmarks_dir, exist_ok=True)
+        benchmarks_dir = get_benchmarks_directory()
         timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         mode_str, is_corridor, cur_dep, cur_arr, dis_count, prof_slug = get_sceneryx_flight_mode()
 
@@ -1060,7 +1066,7 @@ class BlackboxSession:
             elapsed = round(now_tick - start_time, 1)
             time_formatted = format_time_delta(elapsed)
 
-            disp_fps = autofps.get('disp_fps') if autofps else None
+            disp_fps = (autofps.get('displayed_fps') or autofps.get('disp_fps')) if autofps else None
             base_fps = autofps.get('base_fps') if autofps else None
             mt_ms = autofps.get('main_thread_ms') if autofps else None
             tlod = autofps.get('tlod') if autofps else None
@@ -1139,6 +1145,7 @@ class BlackboxSession:
                 'fpm': fpm,
                 'cache_mbps': cache_read_mbps,
                 'vram_used': v_used,
+                'vram_total': v_total,
                 'vram_pct': v_pct,
                 'gpu_util': gpu.get('util_pct', 0),
                 'gpu_temp': gpu.get('temp_c', 0),
