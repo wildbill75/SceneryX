@@ -17402,6 +17402,15 @@ function startBlackboxTelemetryPolling() {
             if (cacheVal) {
                 cacheVal.textContent = telem.cache_read_mbps !== undefined ? `${telem.cache_read_mbps}` : '0.0';
             }
+
+            const scBadge = document.getElementById('opt-simconnect-badge');
+            if (scBadge) {
+                if (telem.simconnect_connected) {
+                    scBadge.classList.remove('hidden');
+                } else {
+                    scBadge.classList.add('hidden');
+                }
+            }
         } catch (e) {
             // silent polling catch
         }

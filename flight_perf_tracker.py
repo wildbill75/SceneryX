@@ -21,6 +21,18 @@ import webbrowser
 import threading
 from datetime import datetime
 
+try:
+    from SimConnect import SimConnect, RECV_EVENT_FRAME, PERIOD_SECOND
+    import SimConnect.scdefs as scdefs
+    HAS_SIMCONNECT = True
+except Exception:
+    HAS_SIMCONNECT = False
+    SimConnect = None
+    RECV_EVENT_FRAME = None
+    PERIOD_SECOND = None
+    scdefs = None
+
+
 # Windows Memory API Structures
 class PROCESS_MEMORY_COUNTERS_EX(ctypes.Structure):
     _fields_ = [
@@ -233,6 +245,198 @@ def get_latest_autofps_data():
     except Exception:
         pass
     return _last_autofps_cache
+
+class SimConnectTelemetryClient:
+    """
+    Client de télémétrie natif haute précision SimConnect.
+    Capture en continu les événements Frame (fFrameRate réel) et SimVars de vol
+    directement depuis le moteur MSFS via l'API officielle SimConnect.
+    """
+    def __init__(self):
+        self._lock = threading.Lock()
+        self.connected = False
+        self.sc = None
+        self.simdata_dd = None
+        self.frame_rate = None
+        self.base_fps = None
+        self.displayed_fps = None
+        self.frame_time_ms = None
+        self.agl_ft = None
+        self.vertical_speed_fpm = None
+        self.airspeed_kts = None
+        self.on_ground = None
+        self._stop_event = threading.Event()
+        self._thread = None
+        self._accum_fps = 0.0
+        self._frame_count = 0
+        self._latest_instant_fps = None
+
+    def start(self):
+        if self._thread and self._thread.is_alive():
+            return
+        self._stop_event.clear()
+        self._thread = threading.Thread(target=self._run_loop, daemon=True, name="SimConnectTelemetryWorker")
+        self._thread.start()
+
+    def stop(self):
+        self._stop_event.set()
+        if self._thread and self._thread.is_alive():
+            self._thread.join(timeout=2.0)
+        self._cleanup()
+
+    def _cleanup(self):
+        with self._lock:
+            self.connected = False
+            self.frame_rate = None
+            self.base_fps = None
+            self.displayed_fps = None
+            self.frame_time_ms = None
+            self.agl_ft = None
+            self.vertical_speed_fpm = None
+            self.airspeed_kts = None
+            self.on_ground = None
+            self._accum_fps = 0.0
+            self._frame_count = 0
+            self._latest_instant_fps = None
+        if self.sc:
+            try:
+                self.sc.Close()
+            except Exception:
+                pass
+            self.sc = None
+        self.simdata_dd = None
+
+    def _on_frame(self, recv):
+        try:
+            fps = float(recv.fFrameRate)
+            if fps > 0.0:
+                with self._lock:
+                    self._accum_fps += fps
+                    self._frame_count += 1
+                    self._latest_instant_fps = fps
+        except Exception:
+            pass
+        return True
+
+    def _run_loop(self):
+        while not self._stop_event.is_set():
+            pid, _ = find_msfs_pid()
+            if not pid or not HAS_SIMCONNECT:
+                if self.connected:
+                    self._cleanup()
+                self._stop_event.wait(2.0)
+                continue
+
+            # Tenter la connexion SimConnect si non connectée
+            if not self.connected or self.sc is None:
+                try:
+                    sc = SimConnect(name='SceneryX_Telemetry', poll_interval_seconds=0.02)
+                    sc.add_receiver(RECV_EVENT_FRAME, self._on_frame)
+                    EVENT_ID_FRAME = 1
+                    sc.SubscribeToSystemEvent(EVENT_ID_FRAME, "Frame")
+
+                    # Souscription aux SimVars de vol
+                    try:
+                        simvars = [
+                            {"name": "PLANE ALT ABOVE GROUND", "units": "feet"},
+                            {"name": "VERTICAL SPEED", "units": "feet/minute"},
+                            {"name": "AIRSPEED INDICATED", "units": "knots"},
+                            {"name": "SIM ON GROUND", "units": "bool"}
+                        ]
+                        simdata_dd = sc.subscribe_simdata(simvars, period=PERIOD_SECOND)
+                    except Exception:
+                        simdata_dd = None
+
+                    self.sc = sc
+                    self.simdata_dd = simdata_dd
+                    with self._lock:
+                        self.connected = True
+                        self._accum_fps = 0.0
+                        self._frame_count = 0
+                except Exception:
+                    self._cleanup()
+                    self._stop_event.wait(3.0)
+                    continue
+
+            # Boucle active de réception de télémétrie
+            last_calc_time = time.time()
+            try:
+                while not self._stop_event.is_set():
+                    # Vérifier que le processus MSFS est toujours actif
+                    if time.time() - last_calc_time >= 2.0:
+                        p_check, _ = find_msfs_pid()
+                        if not p_check:
+                            self._cleanup()
+                            break
+
+                    self.sc.receive(timeout_seconds=0.05)
+                    time.sleep(0.01)
+
+                    now = time.time()
+                    if now - last_calc_time >= 0.5:
+                        with self._lock:
+                            if self._frame_count > 0:
+                                avg_fps = self._accum_fps / self._frame_count
+                            elif self._latest_instant_fps:
+                                avg_fps = self._latest_instant_fps
+                            else:
+                                avg_fps = None
+
+                            if avg_fps and avg_fps > 0:
+                                self.frame_rate = round(avg_fps, 1)
+                                self.base_fps = round(avg_fps)
+                                self.frame_time_ms = round(1000.0 / avg_fps, 1)
+
+                                # Vérifier l'état Frame Generation dans UserCfg.opt
+                                fg_active = False
+                                try:
+                                    import flight_rig_optimizer
+                                    user_cfg = flight_rig_optimizer.detect_msfs_user_cfg()
+                                    fg_active = user_cfg.get("frame_generation", False)
+                                except Exception:
+                                    pass
+
+                                if fg_active:
+                                    self.displayed_fps = round(avg_fps * 2)
+                                else:
+                                    self.displayed_fps = self.base_fps
+
+                                self._accum_fps = 0.0
+                                self._frame_count = 0
+
+                            # Mise à jour des SimVars
+                            if self.simdata_dd and getattr(self.simdata_dd, 'simdata', None):
+                                sdata = self.simdata_dd.simdata
+                                if 'PLANE ALT ABOVE GROUND' in sdata:
+                                    self.agl_ft = round(float(sdata['PLANE ALT ABOVE GROUND']))
+                                if 'VERTICAL SPEED' in sdata:
+                                    self.vertical_speed_fpm = round(float(sdata['VERTICAL SPEED']))
+                                if 'AIRSPEED INDICATED' in sdata:
+                                    self.airspeed_kts = round(float(sdata['AIRSPEED INDICATED']))
+                                if 'SIM ON GROUND' in sdata:
+                                    self.on_ground = bool(sdata['SIM ON GROUND'])
+
+                        last_calc_time = now
+
+            except Exception:
+                self._cleanup()
+                self._stop_event.wait(2.0)
+
+    def get_data(self):
+        with self._lock:
+            return {
+                "connected": self.connected,
+                "base_fps": self.base_fps,
+                "displayed_fps": self.displayed_fps,
+                "frame_time_ms": self.frame_time_ms,
+                "agl_ft": self.agl_ft,
+                "fpm": self.vertical_speed_fpm,
+                "airspeed_kts": self.airspeed_kts,
+                "on_ground": self.on_ground
+            }
+
+SIMCONNECT_CLIENT = SimConnectTelemetryClient()
+SIMCONNECT_CLIENT.start()
 
 def get_sceneryx_flight_mode():
     appdata = os.getenv('APPDATA', '')
@@ -834,14 +1038,28 @@ def main():
                 msfs_commit = msfs['commit_mb']
                 if msfs_commit > peak_msfs_commit: peak_msfs_commit = msfs_commit
 
-                disp_fps = autofps.get('displayed_fps') if autofps else None
-                base_fps = autofps.get('base_fps') if autofps else None
-                main_thread_ms = autofps.get('main_thread_ms') if autofps else None
-                tlod = autofps.get('tlod') if autofps else None
-                olod = autofps.get('olod') if autofps else None
-                agl_ft = autofps.get('agl_ft') if autofps else None
-                fpm = autofps.get('fpm') if autofps else None
-                fg_mode = autofps.get('fg_mode', '') if autofps else ''
+                sc_data = SIMCONNECT_CLIENT.get_data() if SIMCONNECT_CLIENT else {}
+                sc_connected = sc_data.get("connected", False)
+
+                if sc_connected and sc_data.get("base_fps") is not None:
+                    disp_fps = sc_data.get('displayed_fps')
+                    base_fps = sc_data.get('base_fps')
+                    main_thread_ms = sc_data.get('frame_time_ms')
+                    agl_ft = sc_data.get('agl_ft')
+                    fpm = sc_data.get('fpm')
+                    tlod = autofps.get('tlod') if autofps else None
+                    olod = autofps.get('olod') if autofps else None
+                    fg_mode = 'DLSSG (2X)' if (disp_fps and base_fps and disp_fps > base_fps) else 'NATIVE'
+                else:
+                    disp_fps = autofps.get('displayed_fps') if autofps else None
+                    base_fps = autofps.get('base_fps') if autofps else None
+                    main_thread_ms = autofps.get('main_thread_ms') if autofps else None
+                    tlod = autofps.get('tlod') if autofps else None
+                    olod = autofps.get('olod') if autofps else None
+                    agl_ft = autofps.get('agl_ft') if autofps else None
+                    fpm = autofps.get('fpm') if autofps else None
+                    fg_mode = autofps.get('fg_mode', '') if autofps else ''
+
 
                 # Append to sample list
                 samples.append({
@@ -1009,24 +1227,36 @@ class BlackboxSession:
         gpu = get_nvidia_gpu_telemetry()
         sys_ram_used, sys_ram_total = get_system_ram()
         autofps = get_latest_autofps_data()
+        sc_data = SIMCONNECT_CLIENT.get_data() if SIMCONNECT_CLIENT else {}
+        sc_connected = sc_data.get("connected", False)
         
         telemetry = dict(self.latest_telemetry)
         telemetry["is_tracking"] = self.is_running
         telemetry["msfs_active"] = msfs is not None
+        telemetry["simconnect_connected"] = sc_connected
         if gpu:
             telemetry["vram_used_mb"] = gpu.get("vram_used_mb", 0)
             telemetry["vram_total_mb"] = gpu.get("vram_total_mb", 16376)
             telemetry["vram_pct"] = gpu.get("vram_pct", 0)
-            telemetry["gpu_power_w"] = gpu.get("power_w", 0)
-        if autofps:
+            telemetry["gpu_power_w"] = gpu.get("gpu_power_w", 0)
+
+        if sc_connected and sc_data.get("base_fps") is not None:
+            telemetry["displayed_fps"] = sc_data.get("displayed_fps")
+            telemetry["base_fps"] = sc_data.get("base_fps")
+            telemetry["main_thread_ms"] = sc_data.get("frame_time_ms")
+            if autofps:
+                telemetry["tlod"] = autofps.get("tlod")
+                telemetry["olod"] = autofps.get("olod")
+        elif autofps:
             telemetry["displayed_fps"] = autofps.get("displayed_fps") or autofps.get("disp_fps")
             telemetry["base_fps"] = autofps.get("base_fps")
             telemetry["main_thread_ms"] = autofps.get("main_thread_ms")
             telemetry["tlod"] = autofps.get("tlod")
             telemetry["olod"] = autofps.get("olod")
         if msfs:
-            telemetry["msfs_ram_mb"] = msfs.get("ws_mb", 0)
+            telemetry["msfs_ram_mb"] = msfs.get("ram_mb", 0)
         return telemetry
+
 
     def _worker(self, flight_name, dep, arr, aircraft):
         benchmarks_dir = get_benchmarks_directory()
@@ -1066,14 +1296,27 @@ class BlackboxSession:
             elapsed = round(now_tick - start_time, 1)
             time_formatted = format_time_delta(elapsed)
 
-            disp_fps = (autofps.get('displayed_fps') or autofps.get('disp_fps')) if autofps else None
-            base_fps = autofps.get('base_fps') if autofps else None
-            mt_ms = autofps.get('main_thread_ms') if autofps else None
-            tlod = autofps.get('tlod') if autofps else None
-            olod = autofps.get('olod') if autofps else None
-            agl = autofps.get('agl_ft') if autofps else None
-            fpm = autofps.get('fpm') if autofps else None
-            fg_mode = autofps.get('fg_mode') if autofps else None
+            sc_data = SIMCONNECT_CLIENT.get_data() if SIMCONNECT_CLIENT else {}
+            sc_connected = sc_data.get("connected", False)
+
+            if sc_connected and sc_data.get("base_fps") is not None:
+                disp_fps = sc_data.get('displayed_fps')
+                base_fps = sc_data.get('base_fps')
+                mt_ms = sc_data.get('frame_time_ms')
+                agl = sc_data.get('agl_ft')
+                fpm = sc_data.get('fpm')
+                tlod = autofps.get('tlod') if autofps else None
+                olod = autofps.get('olod') if autofps else None
+                fg_mode = 'DLSSG (2X)' if (disp_fps and base_fps and disp_fps > base_fps) else 'NATIVE'
+            else:
+                disp_fps = (autofps.get('displayed_fps') or autofps.get('disp_fps')) if autofps else None
+                base_fps = autofps.get('base_fps') if autofps else None
+                mt_ms = autofps.get('main_thread_ms') if autofps else None
+                tlod = autofps.get('tlod') if autofps else None
+                olod = autofps.get('olod') if autofps else None
+                agl = autofps.get('agl_ft') if autofps else None
+                fpm = autofps.get('fpm') if autofps else None
+                fg_mode = autofps.get('fg_mode') if autofps else None
 
             # Rolling Cache I/O
             cur_read_bytes = msfs.get('read_bytes', 0) if msfs else 0
@@ -1104,11 +1347,12 @@ class BlackboxSession:
                 "vram_total_mb": v_total,
                 "vram_pct": v_pct,
                 "cache_read_mbps": cache_read_mbps,
-                "msfs_ram_mb": msfs.get('ws_mb', 0) if msfs else 0,
-                "gpu_power_w": gpu.get('power_w', 0),
+                "msfs_ram_mb": msfs.get('ram_mb', 0) if msfs else 0,
+                "gpu_power_w": gpu.get('gpu_power_w', 0),
                 "elapsed_sec": elapsed,
                 "elapsed_str": time_formatted,
-                "msfs_active": msfs is not None
+                "msfs_active": msfs is not None,
+                "simconnect_connected": sc_connected
             }
 
             row = [
@@ -1123,8 +1367,8 @@ class BlackboxSession:
                 fg_mode or '',
                 cache_read_mbps, cache_read_mbs,
                 v_used, v_total, v_pct,
-                gpu.get('util_pct', 0), gpu.get('temp_c', 0), gpu.get('power_w', 0), gpu.get('clock_mhz', 0), gpu.get('mem_bus_pct', 0),
-                msfs.get('ws_mb', 0) if msfs else 0, msfs.get('commit_mb', 0) if msfs else 0, 0,
+                gpu.get('gpu_util_pct', 0), gpu.get('gpu_temp_c', 0), gpu.get('gpu_power_w', 0), gpu.get('gpu_clock_mhz', 0), gpu.get('gpu_mem_bus_pct', 0),
+                msfs.get('ram_mb', 0) if msfs else 0, msfs.get('commit_mb', 0) if msfs else 0, 0,
                 sys_ram_used, sys_ram_total
             ]
             try:
@@ -1147,12 +1391,12 @@ class BlackboxSession:
                 'vram_used': v_used,
                 'vram_total': v_total,
                 'vram_pct': v_pct,
-                'gpu_util': gpu.get('util_pct', 0),
-                'gpu_temp': gpu.get('temp_c', 0),
-                'gpu_power': gpu.get('power_w', 0),
-                'gpu_clock': gpu.get('clock_mhz', 0),
-                'gpu_bus': gpu.get('mem_bus_pct', 0),
-                'msfs_ram': msfs.get('ws_mb', 0) if msfs else 0,
+                'gpu_util': gpu.get('gpu_util_pct', 0),
+                'gpu_temp': gpu.get('gpu_temp_c', 0),
+                'gpu_power': gpu.get('gpu_power_w', 0),
+                'gpu_clock': gpu.get('gpu_clock_mhz', 0),
+                'gpu_bus': gpu.get('gpu_mem_bus_pct', 0),
+                'msfs_ram': msfs.get('ram_mb', 0) if msfs else 0,
                 'msfs_commit': msfs.get('commit_mb', 0) if msfs else 0,
                 'sys_ram_used': sys_ram_used,
                 'sys_ram_total': sys_ram_total
