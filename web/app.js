@@ -17332,6 +17332,11 @@ async function toggleBlackboxRecording() {
             if (btnText) btnText.textContent = "Stop Flight & Debrief";
             if (btn) btn.className = "px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-extrabold text-xs transition-all cursor-pointer active:scale-95 flex items-center gap-2 shadow-lg shadow-amber-600/30";
             if (recDot) recDot.classList.remove('hidden');
+            const statusLbl = document.getElementById('opt-blackbox-status-label');
+            if (statusLbl) {
+                statusLbl.textContent = "Recording flight...";
+                statusLbl.className = "text-[10px] text-emerald-400 font-bold block animate-pulse";
+            }
             if (typeof showToast === 'function') showToast("Blackbox started! Recording flight telemetry...", "success");
         } catch (e) {
             if (typeof showToast === 'function') showToast("Error starting Blackbox: " + e, "error");
@@ -17345,6 +17350,11 @@ async function toggleBlackboxRecording() {
             if (btn) btn.className = "px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-extrabold text-xs transition-all cursor-pointer active:scale-95 flex items-center gap-2 shadow-lg shadow-red-600/30";
             if (recDot) recDot.classList.add('hidden');
             if (lastReportBtn) lastReportBtn.classList.remove('hidden');
+            const statusLbl = document.getElementById('opt-blackbox-status-label');
+            if (statusLbl) {
+                statusLbl.textContent = "Ready to record";
+                statusLbl.className = "text-[10px] text-slate-400 block";
+            }
 
             if (typeof showToast === 'function') showToast("Flight recorded! Performance benchmark generated successfully.", "success");
             refreshBenchmarksList();
@@ -17370,8 +17380,23 @@ function startBlackboxTelemetryPolling() {
             const telem = JSON.parse(resStr);
 
             const timerEl = document.getElementById('opt-blackbox-timer');
-            if (timerEl && telem.elapsed_str) {
-                timerEl.textContent = telem.elapsed_str;
+            if (timerEl) {
+                if (telem.elapsed_str) {
+                    timerEl.textContent = telem.elapsed_str;
+                } else if (!telem.is_tracking) {
+                    timerEl.textContent = "00:00:00";
+                }
+            }
+
+            const statusLbl = document.getElementById('opt-blackbox-status-label');
+            if (statusLbl) {
+                if (telem.is_tracking) {
+                    statusLbl.textContent = "Recording flight...";
+                    statusLbl.className = "text-[10px] text-emerald-400 font-bold block animate-pulse";
+                } else if (!isBlackboxRunning) {
+                    statusLbl.textContent = "Ready to record";
+                    statusLbl.className = "text-[10px] text-slate-400 block";
+                }
             }
 
             const fpsVal = document.getElementById('live-fps-val');

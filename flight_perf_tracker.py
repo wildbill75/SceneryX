@@ -10,6 +10,7 @@ avec compte-rendu textuel automatisé des goulets d'étranglement.
 import os
 import sys
 import time
+import math
 import json
 import csv
 import re
@@ -102,22 +103,36 @@ def get_system_ram():
 
 def find_msfs_pid():
     hSnapshot = ctypes.windll.kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
-    if not hSnapshot or hSnapshot == -1:
-        return None, None
-    pe = PROCESSENTRY32()
-    pe.dwSize = ctypes.sizeof(PROCESSENTRY32)
     found_pid = None
     found_name = None
-    if ctypes.windll.kernel32.Process32First(hSnapshot, ctypes.byref(pe)):
-        while True:
-            exe_name = pe.szExeFile.decode('utf-8', errors='ignore').lower()
-            if 'flightsimulator' in exe_name:
-                found_pid = pe.th32ProcessID
-                found_name = pe.szExeFile.decode('utf-8', errors='ignore')
-                break
-            if not ctypes.windll.kernel32.Process32Next(hSnapshot, ctypes.byref(pe)):
-                break
-    ctypes.windll.kernel32.CloseHandle(hSnapshot)
+    if hSnapshot and hSnapshot != -1:
+        pe = PROCESSENTRY32()
+        pe.dwSize = ctypes.sizeof(PROCESSENTRY32)
+        if ctypes.windll.kernel32.Process32First(hSnapshot, ctypes.byref(pe)):
+            while True:
+                exe_name = pe.szExeFile.decode('utf-8', errors='ignore').lower()
+                if 'flightsimulator' in exe_name or 'flightsim' in exe_name:
+                    found_pid = pe.th32ProcessID
+                    found_name = pe.szExeFile.decode('utf-8', errors='ignore')
+                    break
+                if not ctypes.windll.kernel32.Process32Next(hSnapshot, ctypes.byref(pe)):
+                    break
+        ctypes.windll.kernel32.CloseHandle(hSnapshot)
+    
+    # Fallback Windows tasklist if Toolhelp snapshot was blocked by UWP/elevation
+    if not found_pid:
+        try:
+            cmd = ['tasklist', '/FO', 'CSV', '/NH', '/FI', 'IMAGENAME eq FlightSimulator*']
+            out = subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL, creationflags=CREATE_NO_WINDOW)
+            for line in out.splitlines():
+                parts = [p.strip(' "') for p in line.split('","')]
+                if len(parts) >= 2 and 'flightsimulator' in parts[0].lower():
+                    found_pid = int(parts[1])
+                    found_name = parts[0]
+                    break
+        except Exception:
+            pass
+
     return found_pid, found_name
 
 class PDH_FMT_COUNTERVALUE_ITEM_DOUBLE(ctypes.Structure):
@@ -457,6 +472,10 @@ def resolve_flight_context(lat=None, lon=None, on_ground=False):
             route_display = f"{dep} ➔ {arr}"
     else:
         if lat is not None and lon is not None:
+            # Handle possible radians conversion
+            if abs(lat) <= 3.14159 and abs(lon) <= 3.14159 and (lat != 0.0 or lon != 0.0):
+                lat = math.degrees(lat)
+                lon = math.degrees(lon)
             near_icao, near_name, dist_nm = find_nearest_airport(lat, lon)
             if near_icao:
                 if on_ground or dist_nm <= 4.0:
@@ -544,7 +563,7 @@ class SimConnectTelemetryClient:
     directement depuis le moteur MSFS via l'API officielle SimConnect.
     """
     def __init__(self):
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self.connected = False
         self.sc = None
         self.simdata_dd = None
@@ -617,11 +636,8 @@ class SimConnectTelemetryClient:
 
     def _run_loop(self):
         while not self._stop_event.is_set():
-            pid, _ = find_msfs_pid()
-            if not pid or not HAS_SIMCONNECT:
-                if self.connected:
-                    self._cleanup()
-                self._stop_event.wait(2.0)
+            if not HAS_SIMCONNECT:
+                self._stop_event.wait(5.0)
                 continue
 
             # Tenter la connexion SimConnect si non connectée
@@ -640,45 +656,28 @@ class SimConnectTelemetryClient:
                             {"name": "AIRSPEED INDICATED", "units": "knots"},
                             {"name": "SIM ON GROUND", "units": "bool"},
                             {"name": "PLANE LATITUDE", "units": "degrees"},
-                            {"name": "PLANE LONGITUDE", "units": "degrees"}
+                            {"name": "PLANE LONGITUDE", "units": "degrees"},
+                            {"name": "TITLE"}
                         ]
                         simdata_dd = sc.subscribe_simdata(simvars, period=PERIOD_SECOND)
                     except Exception:
                         simdata_dd = None
 
-                    # Tenter de lire le modèle d'avion (TITLE)
-                    aircraft_title = None
-                    try:
-                        title_val = sc.get_simdatum('TITLE', timeout_seconds=0.5)
-                        if title_val:
-                            aircraft_title = str(title_val).strip()
-                    except Exception:
-                        pass
-
                     self.sc = sc
                     self.simdata_dd = simdata_dd
                     with self._lock:
                         self.connected = True
-                        if aircraft_title:
-                            self.aircraft_title = aircraft_title
                         self._accum_fps = 0.0
                         self._frame_count = 0
                 except Exception:
                     self._cleanup()
-                    self._stop_event.wait(3.0)
+                    self._stop_event.wait(2.5)
                     continue
 
             # Boucle active de réception de télémétrie
             last_calc_time = time.time()
             try:
                 while not self._stop_event.is_set():
-                    # Vérifier que le processus MSFS est toujours actif
-                    if time.time() - last_calc_time >= 2.0:
-                        p_check, _ = find_msfs_pid()
-                        if not p_check:
-                            self._cleanup()
-                            break
-
                     self.sc.receive(timeout_seconds=0.05)
                     time.sleep(0.01)
 
@@ -717,25 +716,28 @@ class SimConnectTelemetryClient:
                             # Mise à jour des SimVars
                             if self.simdata_dd and getattr(self.simdata_dd, 'simdata', None):
                                 sdata = self.simdata_dd.simdata
-                                if 'PLANE ALT ABOVE GROUND' in sdata:
+                                if 'PLANE ALT ABOVE GROUND' in sdata and sdata['PLANE ALT ABOVE GROUND'] is not None:
                                     self.agl_ft = round(float(sdata['PLANE ALT ABOVE GROUND']))
-                                if 'VERTICAL SPEED' in sdata:
+                                if 'VERTICAL SPEED' in sdata and sdata['VERTICAL SPEED'] is not None:
                                     self.vertical_speed_fpm = round(float(sdata['VERTICAL SPEED']))
-                                if 'AIRSPEED INDICATED' in sdata:
+                                if 'AIRSPEED INDICATED' in sdata and sdata['AIRSPEED INDICATED'] is not None:
                                     self.airspeed_kts = round(float(sdata['AIRSPEED INDICATED']))
-                                if 'SIM ON GROUND' in sdata:
+                                if 'SIM ON GROUND' in sdata and sdata['SIM ON GROUND'] is not None:
                                     self.on_ground = bool(sdata['SIM ON GROUND'])
-                                if 'PLANE LATITUDE' in sdata:
-                                    self.lat = float(sdata['PLANE LATITUDE'])
-                                if 'PLANE LONGITUDE' in sdata:
-                                    self.lon = float(sdata['PLANE LONGITUDE'])
-                                if not self.aircraft_title:
-                                    try:
-                                        title_val = self.sc.get_simdatum('TITLE', timeout_seconds=0.2)
-                                        if title_val:
-                                            self.aircraft_title = str(title_val).strip()
-                                    except Exception:
-                                        pass
+                                if 'PLANE LATITUDE' in sdata and sdata['PLANE LATITUDE'] is not None:
+                                    lat_val = float(sdata['PLANE LATITUDE'])
+                                    if abs(lat_val) <= 3.14159 and lat_val != 0.0:
+                                        lat_val = math.degrees(lat_val)
+                                    self.lat = lat_val
+                                if 'PLANE LONGITUDE' in sdata and sdata['PLANE LONGITUDE'] is not None:
+                                    lon_val = float(sdata['PLANE LONGITUDE'])
+                                    if abs(lon_val) <= 3.14159 and lon_val != 0.0:
+                                        lon_val = math.degrees(lon_val)
+                                    self.lon = lon_val
+                                if 'TITLE' in sdata and sdata['TITLE']:
+                                    t_str = str(sdata['TITLE']).strip()
+                                    if t_str and t_str.lower() != 'none':
+                                        self.aircraft_title = t_str
 
                         last_calc_time = now
 
