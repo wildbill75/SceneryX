@@ -14122,6 +14122,9 @@ async function openSettingsModal() {
 
     loadSimBriefSettingsUI();
     renderSettingsPathsList();
+    if (typeof refreshIngamePanelStatus === 'function') {
+        refreshIngamePanelStatus();
+    }
     const modal = document.getElementById('settings-modal');
     if (modal) {
         modal.classList.remove('hidden');
@@ -17850,5 +17853,88 @@ async function saveSmartLodUiConfig() {
         console.error("Error saving Smart LOD UI config:", e);
     }
 }
+
+// ================= MSFS IN-GAME TOOLBAR PANEL UI CONTROLLERS =================
+
+let isIngamePanelInstalled = false;
+
+async function refreshIngamePanelStatus() {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.get_ingame_panel_status) return;
+    try {
+        const resStr = await window.pywebview.api.get_ingame_panel_status();
+        const res = JSON.parse(resStr);
+        const badge = document.getElementById('cfg-ingame-panel-badge');
+        const pathEl = document.getElementById('cfg-ingame-panel-path');
+        const btn = document.getElementById('cfg-ingame-panel-btn');
+
+        if (!res.available) {
+            if (badge) {
+                badge.className = 'px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-400';
+                badge.textContent = 'COMMUNITY INTROUVABLE';
+            }
+            if (btn) btn.disabled = true;
+            return;
+        }
+
+        isIngamePanelInstalled = !!res.installed;
+
+        if (pathEl) {
+            pathEl.textContent = res.path || 'Community/sceneryx-ingame-panel';
+            pathEl.title = res.path || '';
+        }
+
+        if (badge) {
+            if (isIngamePanelInstalled) {
+                badge.className = 'px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+                badge.textContent = 'INSTALLÉ DANS COMMUNITY';
+            } else {
+                badge.className = 'px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-400';
+                badge.textContent = 'NON INSTALLÉ';
+            }
+        }
+
+        if (btn) {
+            btn.disabled = false;
+            if (isIngamePanelInstalled) {
+                btn.className = 'px-3.5 py-1.5 rounded-lg bg-rose-600/80 hover:bg-rose-500 text-white font-mono text-xs font-bold transition-all cursor-pointer';
+                btn.textContent = 'Désinstaller de Community';
+            } else {
+                btn.className = 'px-3.5 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-mono text-xs font-bold transition-all cursor-pointer';
+                btn.textContent = 'Installer dans Community';
+            }
+        }
+    } catch (e) {
+        console.error("Error refreshing in-game panel status:", e);
+    }
+}
+
+async function toggleIngamePanelInstall() {
+    if (!window.pywebview || !window.pywebview.api) return;
+    try {
+        if (isIngamePanelInstalled) {
+            if (!window.pywebview.api.uninstall_ingame_panel) return;
+            const resStr = await window.pywebview.api.uninstall_ingame_panel();
+            const res = JSON.parse(resStr);
+            if (res.success) {
+                if (typeof showToast === 'function') showToast(res.message, "info");
+            } else {
+                if (typeof showToast === 'function') showToast(res.message || "Erreur de désinstallation.", "error");
+            }
+        } else {
+            if (!window.pywebview.api.install_ingame_panel) return;
+            const resStr = await window.pywebview.api.install_ingame_panel();
+            const res = JSON.parse(resStr);
+            if (res.success) {
+                if (typeof showToast === 'function') showToast(res.message, "success");
+            } else {
+                if (typeof showToast === 'function') showToast(res.message || "Erreur d'installation.", "error");
+            }
+        }
+        await refreshIngamePanelStatus();
+    } catch (e) {
+        console.error("Error toggling in-game panel install:", e);
+    }
+}
+
 
 

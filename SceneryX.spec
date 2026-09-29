@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('D:\\SceneryX\\airports.json', '.'), ('D:\\SceneryX\\airport_airlines.json', '.'), ('D:\\SceneryX\\airport_routes.json', '.'), ('D:\\SceneryX\\airport_runways.json', '.'), ('D:\\SceneryX\\installed_airports.json', '.'), ('D:\\SceneryX\\icon.ico', '.'), ('D:\\SceneryX\\web', 'web')]
+datas = [('D:\\SceneryX\\airports.json', '.'), ('D:\\SceneryX\\airport_airlines.json', '.'), ('D:\\SceneryX\\airport_routes.json', '.'), ('D:\\SceneryX\\airport_runways.json', '.'), ('D:\\SceneryX\\installed_airports.json', '.'), ('D:\\SceneryX\\icon.ico', '.'), ('D:\\SceneryX\\web', 'web'), ('D:\\SceneryX\\sceneryx-ingame-panel', 'sceneryx-ingame-panel')]
 binaries = []
 hiddenimports = []
 tmp_ret = collect_all('SimConnect')

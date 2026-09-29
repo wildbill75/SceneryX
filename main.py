@@ -3635,6 +3635,73 @@ class Api:
         except Exception as e:
             return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
 
+    # ================= MSFS IN-GAME TOOLBAR PANEL MANAGEMENT =================
+
+    def _get_primary_community_path(self):
+        try:
+            settings = get_settings()
+            for sp in settings.get("scan_paths", []):
+                p = sp.get("path", "")
+                if "community" in p.lower() and os.path.exists(p):
+                    return p
+        except Exception:
+            pass
+        return None
+
+    def get_ingame_panel_status(self):
+        try:
+            community_path = self._get_primary_community_path()
+            if not community_path:
+                return json.dumps({"available": False, "installed": False, "message": "Dossier Community non détecté."})
+            target_dir = os.path.join(community_path, "sceneryx-ingame-panel")
+            installed = os.path.exists(os.path.join(target_dir, "manifest.json"))
+            return json.dumps({
+                "available": True,
+                "installed": installed,
+                "path": target_dir,
+                "community": community_path
+            }, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"available": False, "installed": False, "error": str(e)}, ensure_ascii=False)
+
+    def install_ingame_panel(self):
+        try:
+            import shutil
+            community_path = self._get_primary_community_path()
+            if not community_path:
+                return json.dumps({"success": False, "message": "Dossier Community non détecté."})
+            
+            # Locate sceneryx-ingame-panel source folder
+            base_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+            src_dir = os.path.join(base_dir, "sceneryx-ingame-panel")
+            if not os.path.exists(src_dir):
+                src_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sceneryx-ingame-panel")
+            if not os.path.exists(src_dir):
+                src_dir = os.path.join(os.getcwd(), "sceneryx-ingame-panel")
+            
+            if not os.path.exists(src_dir):
+                return json.dumps({"success": False, "message": f"Dossier source introuvable: {src_dir}"})
+            
+            target_dir = os.path.join(community_path, "sceneryx-ingame-panel")
+            shutil.copytree(src_dir, target_dir, dirs_exist_ok=True)
+            return json.dumps({"success": True, "message": "Panel In-Game installé avec succès dans Community !"})
+        except Exception as e:
+            return json.dumps({"success": False, "message": str(e)})
+
+    def uninstall_ingame_panel(self):
+        try:
+            import shutil
+            community_path = self._get_primary_community_path()
+            if not community_path:
+                return json.dumps({"success": False, "message": "Dossier Community non détecté."})
+            target_dir = os.path.join(community_path, "sceneryx-ingame-panel")
+            if os.path.exists(target_dir):
+                shutil.rmtree(target_dir)
+            return json.dumps({"success": True, "message": "Panel In-Game désinstallé de Community."})
+        except Exception as e:
+            return json.dumps({"success": False, "message": str(e)})
+
+
 
 
 _SINGLE_INSTANCE_MUTEX = None
@@ -3750,6 +3817,11 @@ def main():
 
     def on_closing():
         if getattr(api, '_force_closing', False):
+            try:
+                import flight_remote_server
+                flight_remote_server.stop_remote_server()
+            except Exception:
+                pass
             return True
         st = get_settings()
         fm = st.get('flight_mode', {})
@@ -3757,9 +3829,21 @@ def main():
             import threading
             threading.Timer(0.05, lambda: window.evaluate_js('promptClosingFlightMode()')).start()
             return False
+        try:
+            import flight_remote_server
+            flight_remote_server.stop_remote_server()
+        except Exception:
+            pass
         return True
 
     window.events.closing += on_closing
+
+    # Start Micro HTTP REST Server for In-Game Toolbar Panel
+    try:
+        import flight_remote_server
+        flight_remote_server.start_remote_server()
+    except Exception as e:
+        print(f"[RemoteServer] Startup error: {e}")
 
     base_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
     icon_path = os.path.join(base_dir, 'icon.ico')

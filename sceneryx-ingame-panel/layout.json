@@ -1,0 +1,39 @@
+{
+  "content": [
+    {
+      "path": "contentinfo/sceneryx-ingame-panel/thumbnail.jpg",
+      "size": 7542,
+      "date": 134336835520000000
+    },
+    {
+      "path": "html_ui/icons/toolbar/icon_toolbar_html_widget.svg",
+      "size": 2995,
+      "date": 134328454749483904
+    },
+    {
+      "path": "html_ui/ingamepanels/htmlwidgetpanel/htmlwidgetpanel.css",
+      "size": 7775,
+      "date": 134351432930526864
+    },
+    {
+      "path": "html_ui/ingamepanels/htmlwidgetpanel/htmlwidgetpanel.html",
+      "size": 6622,
+      "date": 134351432802474752
+    },
+    {
+      "path": "html_ui/ingamepanels/htmlwidgetpanel/htmlwidgetpanel.js",
+      "size": 12245,
+      "date": 134351433084407536
+    },
+    {
+      "path": "html_ui/textures/menu/toolbar/icon_toolbar_html_widget.svg",
+      "size": 2995,
+      "date": 134328454749483904
+    },
+    {
+      "path": "ingamepanels/ingamepanel_htmlwidgetpanel.spb",
+      "size": 692,
+      "date": 134336835520000000
+    }
+  ]
+}

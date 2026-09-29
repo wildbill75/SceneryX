@@ -1844,6 +1844,29 @@
                         <input type="checkbox" id="cfg-autofps-autokill" class="w-4 h-4 accent-cyan-500 rounded cursor-pointer shrink-0">
                     </div>
                 </div>
+
+                <!-- MSFS IN-GAME TOOLBAR PANEL -->
+                <div class="pt-4 border-t border-slate-800/80 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <span data-icon="monitor" class="w-4 h-4 text-cyan-400"></span>
+                            <label class="text-xs font-bold text-slate-400 uppercase tracking-wider block">MSFS In-Game Toolbar Panel</label>
+                        </div>
+                        <span id="cfg-ingame-panel-badge" class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-400">VÉRIFICATION...</span>
+                    </div>
+
+                    <div class="p-3 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-2.5">
+                        <p class="text-xs text-slate-300 leading-relaxed">
+                            Télécommande tête haute intégrée directement dans la barre d'outils de MSFS (2D et VR) pour contrôler Smart LOD, suivre les FPS en direct et gérer la boîte noire en plein vol.
+                        </p>
+                        <div class="flex items-center justify-between pt-1">
+                            <span id="cfg-ingame-panel-path" class="text-[10px] font-mono text-slate-500 truncate max-w-[280px]">Community:...</span>
+                            <button type="button" id="cfg-ingame-panel-btn" onclick="toggleIngamePanelInstall()" class="px-3.5 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-mono text-xs font-bold transition-all cursor-pointer">
+                                Installer dans Community
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Pinned Footer -->
