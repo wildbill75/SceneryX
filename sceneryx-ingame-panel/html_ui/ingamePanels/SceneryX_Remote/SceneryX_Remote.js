@@ -139,9 +139,27 @@ class SceneryXPanel extends TemplateElement {
 
     pollTelemetry() {
         let self = this;
+        let url = this.API_BASE + "/telemetry";
+
+        if (typeof fetch !== "undefined") {
+            fetch(url, { cache: "no-store" })
+                .then(function(res) {
+                    if (!res.ok) throw new Error("HTTP " + res.status);
+                    return res.json();
+                })
+                .then(function(data) {
+                    self.setConnectedState(true);
+                    self.updateTelemetryUI(data);
+                })
+                .catch(function() {
+                    self.setConnectedState(false);
+                });
+            return;
+        }
+
         let xhr = new XMLHttpRequest();
-        xhr.open("GET", this.API_BASE + "/telemetry?t=" + Date.now(), true);
-        xhr.timeout = 1500;
+        xhr.open("GET", url, true);
+        xhr.timeout = 2000;
 
         xhr.onload = function () {
             if (xhr.status >= 200 && xhr.status < 300) {
@@ -190,13 +208,19 @@ class SceneryXPanel extends TemplateElement {
 
         // 1. SMART LOD CONTROLLER
         let lod = data.smart_lod || {};
-        let lodActive = !!lod.active;
-        let curTlod = lod.current_tlod !== undefined ? lod.current_tlod : "--";
-        let curOlod = lod.current_olod !== undefined ? lod.current_olod : "--";
+        let lodActive = (lod.active !== undefined) ? !!lod.active : (!!data.smart_lod_running && !!data.smart_lod_enabled);
+        let curTlod = (lod.current_tlod !== undefined && lod.current_tlod !== null) ? lod.current_tlod : (data.smart_lod_tlod !== undefined ? data.smart_lod_tlod : "--");
+        let curOlod = (lod.current_olod !== undefined && lod.current_olod !== null) ? lod.current_olod : "--";
         let targetFps = lod.target_fps || "--";
 
         if (this.elSmartLodTlodBadge) {
-            this.elSmartLodTlodBadge.textContent = "TLOD " + curTlod + " / OLOD " + curOlod;
+            if (curTlod !== "--" && curOlod !== "--") {
+                this.elSmartLodTlodBadge.textContent = "TLOD " + Math.round(curTlod) + " / OLOD " + Math.round(curOlod);
+            } else if (curTlod !== "--") {
+                this.elSmartLodTlodBadge.textContent = "TLOD: " + Math.round(curTlod);
+            } else {
+                this.elSmartLodTlodBadge.textContent = "TLOD: --";
+            }
         }
 
         if (this.elSmartLodBtn && !this.isSmartLodToggling) {
@@ -213,25 +237,25 @@ class SceneryXPanel extends TemplateElement {
 
         // 2. LIVE FPS & PERFORMANCE
         let perf = data.perf || {};
-        let dispFps = perf.displayed_fps !== undefined ? perf.displayed_fps : 0;
-        let baseFps = perf.fps !== undefined ? perf.fps : 0;
-        let mtMs = perf.main_thread_ms !== undefined ? perf.main_thread_ms : 0;
+        let dispFps = (perf.displayed_fps !== undefined && perf.displayed_fps !== null) ? perf.displayed_fps : (data.displayed_fps || 0);
+        let baseFps = (perf.fps !== undefined && perf.fps !== null) ? perf.fps : (data.base_fps || 0);
+        let mtMs = (perf.main_thread_ms !== undefined && perf.main_thread_ms !== null) ? perf.main_thread_ms : (data.main_thread_ms || 0);
         let pacing = perf.frame_pacing || "OPTIMAL";
 
         if (this.elFpsVal) {
-            this.elFpsVal.textContent = Math.round(dispFps);
+            this.elFpsVal.textContent = dispFps > 0 ? Math.round(dispFps) : "--";
         }
         if (this.elFpsBase) {
-            this.elFpsBase.textContent = "(" + Math.round(baseFps) + " base)";
+            this.elFpsBase.textContent = baseFps > 0 ? "(" + Math.round(baseFps) + " base)" : "(-- base)";
         }
         if (this.elMtVal) {
-            this.elMtVal.textContent = mtMs.toFixed(1);
+            this.elMtVal.textContent = mtMs > 0 ? mtMs.toFixed(1) : "--";
         }
         if (this.elPacingStatus) {
             this.elPacingStatus.textContent = pacing;
-            if (pacing === "OPTIMAL") {
+            if (pacing === "OPTIMAL" || pacing === "FLUIDE") {
                 this.elPacingStatus.className = "status-pill status-optimum";
-            } else if (pacing === "ACCEPTABLE") {
+            } else if (pacing === "ACCEPTABLE" || pacing === "CHARGE") {
                 this.elPacingStatus.className = "status-pill status-warning";
             } else {
                 this.elPacingStatus.className = "status-pill status-danger";
@@ -249,10 +273,13 @@ class SceneryXPanel extends TemplateElement {
 
         // 4. VRAM & ROLLING CACHE
         if (this.elVramVal) {
-            this.elVramVal.textContent = (data.vram_used_gb || 0).toFixed(1) + " / " + (data.vram_total_gb || 0).toFixed(1) + " Go";
+            let vramUsed = data.vram_used_gb !== undefined ? data.vram_used_gb : (data.msfs_vram_mb ? (data.msfs_vram_mb / 1024).toFixed(1) : 0);
+            let vramTot = data.vram_total_gb !== undefined ? data.vram_total_gb : (data.vram_total_mb ? (data.vram_total_mb / 1024).toFixed(1) : 0);
+            this.elVramVal.textContent = (vramUsed || "--") + " / " + (vramTot || "--") + " Go";
         }
         if (this.elCacheVal) {
-            this.elCacheVal.textContent = (data.rolling_cache_gb || 0).toFixed(1) + " Go";
+            let cacheVal = data.rolling_cache_gb !== undefined ? data.rolling_cache_gb : (data.cache_read_mbps || 0);
+            this.elCacheVal.textContent = cacheVal + " Go";
         }
 
         // 5. BLACKBOX RECORDER
@@ -342,8 +369,23 @@ class SceneryXPanel extends TemplateElement {
     onSmartLodClick() {
         let self = this;
         this.isSmartLodToggling = true;
+        let url = this.API_BASE + "/smart_lod/toggle";
+
+        if (typeof fetch !== "undefined") {
+            fetch(url, { method: "POST" })
+                .then(function(r) { return r.json(); })
+                .then(function() {
+                    self.isSmartLodToggling = false;
+                    self.pollTelemetry();
+                })
+                .catch(function() {
+                    self.isSmartLodToggling = false;
+                });
+            return;
+        }
+
         let xhr = new XMLHttpRequest();
-        xhr.open("POST", this.API_BASE + "/smart_lod/toggle", true);
+        xhr.open("POST", url, true);
         xhr.timeout = 2000;
         xhr.onload = function () {
             self.isSmartLodToggling = false;
@@ -358,8 +400,23 @@ class SceneryXPanel extends TemplateElement {
     onBlackboxClick() {
         let self = this;
         this.isBlackboxToggling = true;
+        let url = this.API_BASE + "/blackbox/toggle";
+
+        if (typeof fetch !== "undefined") {
+            fetch(url, { method: "POST" })
+                .then(function(r) { return r.json(); })
+                .then(function() {
+                    self.isBlackboxToggling = false;
+                    self.pollTelemetry();
+                })
+                .catch(function() {
+                    self.isBlackboxToggling = false;
+                });
+            return;
+        }
+
         let xhr = new XMLHttpRequest();
-        xhr.open("POST", this.API_BASE + "/blackbox/toggle", true);
+        xhr.open("POST", url, true);
         xhr.timeout = 2000;
         xhr.onload = function () {
             self.isBlackboxToggling = false;
