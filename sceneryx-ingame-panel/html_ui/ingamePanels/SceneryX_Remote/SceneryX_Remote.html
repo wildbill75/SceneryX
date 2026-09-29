@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="/SCSS/common.css" />
+    <link rel="stylesheet" href="SceneryX_Remote.css?v=2" />
+
+    <script type="text/javascript" src="/JS/coherent.js"></script>
+    <script type="text/javascript" src="/JS/common.js"></script>
+    <script type="text/javascript" src="/JS/dataStorage.js"></script>
+    <script type="text/javascript" src="/JS/buttons.js"></script>
+    <script type="text/javascript" src="/JS/Services/ToolBarPanels.js"></script>
+    <script type="text/javascript" src="/Pages/VCockpit/Instruments/Shared/BaseInstrument.js"></script>
+
+    <link rel="import" href="/templates/NewPushButton/NewPushButton.html" />
+    <link rel="import" href="/templates/ToggleButton/toggleButton.html" />
+    <link rel="import" href="/templates/tabMenu/tabMenu.html" />
+    <link rel="import" href="/templates/ingameUi/ingameUi.html" />
+    <link rel="import" href="/templates/ingameUiHeader/ingameUiHeader.html" />
+    <link rel="import" href="/templates/NewListButton/NewListButton.html" />
+    <script type="text/javascript" src="SceneryX_Remote.js?v=2"></script>
+</head>
+<body class="border-box color-white">
+    <sceneryx-panel>
+        <ingame-ui id="SceneryX_Remote" panel-id="PANEL_SCENERYX_R" title="SCENERYX REMOTE" class="ingameUiFrame panelInvisible" content-fit="true" min-width="330" min-height="350">
+            <section id="sceneryx-panel-root" class="sceneryx-container">
+                <!-- TOP HEADER -->
+                <div class="panel-header">
+                    <div class="header-left">
+                        <span class="app-icon">✈</span>
+                        <span class="app-title">SCENERYX REMOTE</span>
+                    </div>
+                    <div class="header-right">
+                        <span id="conn-badge" class="badge-offline">OFFLINE</span>
+                        <button type="button" id="panel-close-btn" class="close-btn" title="Fermer">✕</button>
+                    </div>
+                </div>
+
+                <!-- DISCONNECTED SCREEN -->
+                <div id="disconnected-view" class="disconnected-box">
+                    <div class="offline-icon">⚠</div>
+                    <div class="offline-title">SceneryX non connecté</div>
+                    <div class="offline-desc">Veuillez lancer l'application <strong>SceneryX</strong> sur le bureau Windows pour activer la télécommande et Smart LOD.</div>
+                </div>
+
+                <!-- MAIN LIVE CONTENT -->
+                <div id="connected-view" class="main-content hidden">
+
+                    <!-- SECTION 1: SMART LOD CONTROLLER -->
+                    <div class="card smart-lod-card">
+                        <div class="card-header">
+                            <span class="card-title">SMART LOD ENGINE</span>
+                            <span id="smart-lod-tlod-badge" class="badge-tlod">TLOD: --</span>
+                        </div>
+                        <div class="smart-lod-body">
+                            <button type="button" id="smart-lod-toggle-btn" class="btn-smart-lod btn-inactive">
+                                <span class="dot" id="smart-lod-dot"></span>
+                                <span id="smart-lod-btn-label">SMART LOD : INACTIF</span>
+                            </button>
+                            <span id="smart-lod-status-desc" class="subtext">Régulation en mémoire</span>
+                        </div>
+                    </div>
+
+                    <!-- SECTION 2: LIVE PERFORMANCE & HOT FPS IMPACT -->
+                    <div class="card perf-card">
+                        <div class="perf-grid">
+                            <!-- Displayed FPS -->
+                            <div class="perf-col">
+                                <span class="metric-label">DISPLAYED FPS</span>
+                                <div class="metric-main">
+                                    <span id="live-fps-val" class="metric-number">--</span>
+                                    <span class="metric-unit">FPS</span>
+                                </div>
+                                <span id="live-fps-base" class="subtext">(-- base)</span>
+                            </div>
+
+                            <!-- CPU Frame Pacing -->
+                            <div class="perf-col">
+                                <span class="metric-label">CPU MAIN THREAD</span>
+                                <div class="metric-main">
+                                    <span id="live-mt-val" class="metric-number">--</span>
+                                    <span class="metric-unit">ms</span>
+                                </div>
+                                <span id="live-pacing-status" class="status-pill status-optimum">FLUIDE</span>
+                            </div>
+                        </div>
+
+                        <!-- LIVE FPS TREND (30-SEC SPARKLINE TO SEE HOT IMPACT) -->
+                        <div class="sparkline-wrapper">
+                            <div class="sparkline-header">
+                                <span class="sparkline-title">Tendance FPS (30s) • Impact à chaud</span>
+                                <span id="fps-delta-label" class="delta-label">--</span>
+                            </div>
+                            <canvas id="fps-sparkline-canvas" width="280" height="34" class="sparkline-canvas"></canvas>
+                        </div>
+                    </div>
+
+                    <!-- SECTION 3: VRAM & ROLLING CACHE METRICS -->
+                    <div class="card mini-card">
+                        <div class="mini-grid">
+                            <div class="mini-item">
+                                <span class="mini-label">MSFS VRAM:</span>
+                                <span id="live-vram-val" class="mini-val">--</span>
+                            </div>
+                            <div class="mini-item">
+                                <span class="mini-label">Rolling Cache:</span>
+                                <span id="live-cache-val" class="mini-val">--</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SECTION 4: BLACKBOX TELEMETRY RECORDER -->
+                    <div class="card rec-card">
+                        <button type="button" id="blackbox-toggle-btn" class="btn-rec btn-rec-inactive">
+                            <span class="rec-dot" id="rec-dot"></span>
+                            <span id="rec-btn-label">ENREGISTREMENT FLIGHT RIG</span>
+                        </button>
+                    </div>
+
+                </div>
+            </section>
+        </ingame-ui>
+    </sceneryx-panel>
+</body>
+</html>

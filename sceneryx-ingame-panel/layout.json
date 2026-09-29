@@ -1,39 +1,154 @@
 {
   "content": [
     {
-      "path": "contentinfo/sceneryx-ingame-panel/thumbnail.jpg",
-      "size": 7542,
-      "date": 134336835520000000
+      "path": "en-US.locPak",
+      "size": 430,
+      "date": 134351450470000000
     },
     {
-      "path": "html_ui/icons/toolbar/icon_toolbar_html_widget.svg",
-      "size": 2995,
-      "date": 134328454749483904
+      "path": "manifest.json",
+      "size": 363,
+      "date": 134351450470000000
     },
     {
-      "path": "html_ui/ingamepanels/htmlwidgetpanel/htmlwidgetpanel.css",
-      "size": 7775,
-      "date": 134351432930526864
+      "path": "html_ui/icons/toolbar/ICON_TOOLBAR_SCENERYX-OFF.svg",
+      "size": 598,
+      "date": 134351450470000000
     },
     {
-      "path": "html_ui/ingamepanels/htmlwidgetpanel/htmlwidgetpanel.html",
-      "size": 6622,
-      "date": 134351432802474752
+      "path": "html_ui/icons/toolbar/ICON_TOOLBAR_SCENERYX.svg",
+      "size": 797,
+      "date": 134351450470000000
     },
     {
-      "path": "html_ui/ingamepanels/htmlwidgetpanel/htmlwidgetpanel.js",
-      "size": 12245,
-      "date": 134351433084407536
+      "path": "html_ui/icons/toolbar/ICON_TOOLBAR_SCENERYXPANEL-OFF.svg",
+      "size": 598,
+      "date": 134351450470000000
     },
     {
-      "path": "html_ui/textures/menu/toolbar/icon_toolbar_html_widget.svg",
-      "size": 2995,
-      "date": 134328454749483904
+      "path": "html_ui/icons/toolbar/ICON_TOOLBAR_SCENERYXPANEL.svg",
+      "size": 797,
+      "date": 134351450470000000
     },
     {
-      "path": "ingamepanels/ingamepanel_htmlwidgetpanel.spb",
-      "size": 692,
-      "date": 134336835520000000
+      "path": "html_ui/icons/toolbar/ICON_TOOLBAR_SCENERYX_R-OFF.svg",
+      "size": 598,
+      "date": 134351450470000000
+    },
+    {
+      "path": "html_ui/icons/toolbar/ICON_TOOLBAR_SCENERYX_R.svg",
+      "size": 797,
+      "date": 134351450470000000
+    },
+    {
+      "path": "html_ui/icons/toolbar/SceneryX-OFF.svg",
+      "size": 598,
+      "date": 134351450470000000
+    },
+    {
+      "path": "html_ui/icons/toolbar/SceneryX.svg",
+      "size": 797,
+      "date": 134351450470000000
+    },
+    {
+      "path": "html_ui/icons/toolbar/SceneryXPanel-OFF.svg",
+      "size": 598,
+      "date": 134351450470000000
+    },
+    {
+      "path": "html_ui/icons/toolbar/SceneryXPanel.svg",
+      "size": 797,
+      "date": 134351450470000000
+    },
+    {
+      "path": "html_ui/icons/toolbar/SceneryX_R-OFF.svg",
+      "size": 598,
+      "date": 134351450470000000
+    },
+    {
+      "path": "html_ui/icons/toolbar/SceneryX_R.svg",
+      "size": 797,
+      "date": 134351450470000000
+    },
+    {
+      "path": "html_ui/ingamePanels/SceneryX_Remote/SceneryX_Remote.css",
+      "size": 8368,
+      "date": 134351450470000000
+    },
+    {
+      "path": "html_ui/ingamePanels/SceneryX_Remote/SceneryX_Remote.html",
+      "size": 6874,
+      "date": 134351450470000000
+    },
+    {
+      "path": "html_ui/ingamePanels/SceneryX_Remote/SceneryX_Remote.js",
+      "size": 14436,
+      "date": 134351450470000000
+    },
+    {
+      "path": "html_ui/Textures/Menu/toolbar/ICON_TOOLBAR_SCENERYX-OFF.svg",
+      "size": 598,
+      "date": 134351450470000000
+    },
+    {
+      "path": "html_ui/Textures/Menu/toolbar/ICON_TOOLBAR_SCENERYX.svg",
+      "size": 797,
+      "date": 134351450470000000
+    },
+    {
+      "path": "html_ui/Textures/Menu/toolbar/ICON_TOOLBAR_SCENERYXPANEL-OFF.svg",
+      "size": 598,
+      "date": 134351450470000000
+    },
+    {
+      "path": "html_ui/Textures/Menu/toolbar/ICON_TOOLBAR_SCENERYXPANEL.svg",
+      "size": 797,
+      "date": 134351450470000000
+    },
+    {
+      "path": "html_ui/Textures/Menu/toolbar/ICON_TOOLBAR_SCENERYX_R-OFF.svg",
+      "size": 598,
+      "date": 134351450470000000
+    },
+    {
+      "path": "html_ui/Textures/Menu/toolbar/ICON_TOOLBAR_SCENERYX_R.svg",
+      "size": 797,
+      "date": 134351450470000000
+    },
+    {
+      "path": "html_ui/Textures/Menu/toolbar/SceneryX-OFF.svg",
+      "size": 598,
+      "date": 134351450470000000
+    },
+    {
+      "path": "html_ui/Textures/Menu/toolbar/SceneryX.svg",
+      "size": 797,
+      "date": 134351450470000000
+    },
+    {
+      "path": "html_ui/Textures/Menu/toolbar/SceneryXPanel-OFF.svg",
+      "size": 598,
+      "date": 134351450470000000
+    },
+    {
+      "path": "html_ui/Textures/Menu/toolbar/SceneryXPanel.svg",
+      "size": 797,
+      "date": 134351450470000000
+    },
+    {
+      "path": "html_ui/Textures/Menu/toolbar/SceneryX_R-OFF.svg",
+      "size": 598,
+      "date": 134351450470000000
+    },
+    {
+      "path": "html_ui/Textures/Menu/toolbar/SceneryX_R.svg",
+      "size": 797,
+      "date": 134351450470000000
+    },
+    {
+      "path": "InGamePanels/InGamePanel_SceneryX.spb",
+      "size": 724,
+      "date": 134351450470000000
     }
   ]
 }

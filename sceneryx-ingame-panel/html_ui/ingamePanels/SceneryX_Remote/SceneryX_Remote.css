@@ -1,0 +1,448 @@
+/* =========================================================
+   SceneryX MSFS In-Game Toolbar Panel - Blue Glass CSS Theme
+   ========================================================= */
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+body.border-box {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: transparent;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: #e2e8f0;
+}
+
+sceneryx-panel {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.sceneryx-container {
+    width: 100%;
+    min-width: 310px;
+    max-width: 340px;
+    background: rgba(10, 18, 30, 0.94);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+/* HEADER */
+.panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(56, 189, 248, 0.15);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.app-icon {
+    color: #00d2ff;
+    font-size: 14px;
+}
+
+.app-title {
+    font-family: 'Consolas', monospace;
+    font-weight: 800;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+    color: #f8fafc;
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.badge-offline {
+    background: rgba(239, 68, 68, 0.2);
+    border: 1px solid rgba(239, 68, 68, 0.5);
+    color: #f87171;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 6px;
+    letter-spacing: 0.5px;
+}
+
+.badge-online {
+    background: rgba(16, 185, 129, 0.2);
+    border: 1px solid rgba(16, 185, 129, 0.5);
+    color: #34d399;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 6px;
+    letter-spacing: 0.5px;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: #64748b;
+    font-size: 14px;
+    cursor: pointer;
+    line-height: 1;
+    padding: 2px;
+    transition: color 0.15s ease;
+}
+
+.close-btn:hover {
+    color: #f87171;
+}
+
+/* DISCONNECTED VIEW */
+.disconnected-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 20px 10px;
+    background: rgba(15, 23, 42, 0.6);
+    border-radius: 8px;
+    border: 1px dashed rgba(100, 116, 139, 0.3);
+}
+
+.offline-icon {
+    font-size: 28px;
+    color: #f59e0b;
+    margin-bottom: 8px;
+}
+
+.offline-title {
+    font-weight: 700;
+    font-size: 13px;
+    color: #e2e8f0;
+    margin-bottom: 4px;
+}
+
+.offline-desc {
+    font-size: 11px;
+    color: #94a3b8;
+    line-height: 1.4;
+}
+
+/* CARDS */
+.main-content {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.card {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(56, 189, 248, 0.15);
+    border-radius: 8px;
+    padding: 8px 10px;
+}
+
+.card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.card-title {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: #94a3b8;
+}
+
+.badge-tlod {
+    font-family: 'Consolas', monospace;
+    font-size: 11px;
+    font-weight: 800;
+    color: #38bdf8;
+    background: rgba(56, 189, 248, 0.15);
+    padding: 1px 6px;
+    border-radius: 4px;
+    border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+/* SMART LOD BODY */
+.smart-lod-body {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.btn-smart-lod {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+}
+
+.btn-active {
+    background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+    color: #ffffff;
+    box-shadow: 0 0 15px rgba(16, 185, 129, 0.4);
+}
+
+.btn-active:hover {
+    background: linear-gradient(135deg, #047857 0%, #059669 100%);
+}
+
+.btn-inactive {
+    background: rgba(30, 41, 59, 0.8);
+    color: #94a3b8;
+    border: 1px solid rgba(100, 116, 139, 0.3);
+}
+
+.btn-inactive:hover {
+    background: rgba(51, 65, 85, 0.8);
+    color: #f1f5f9;
+}
+
+.dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+
+.btn-active .dot {
+    background: #ffffff;
+    box-shadow: 0 0 6px #ffffff;
+}
+
+.btn-inactive .dot {
+    background: #64748b;
+}
+
+.subtext {
+    font-size: 10px;
+    color: #64748b;
+    text-align: center;
+}
+
+/* PERF GRID */
+.perf-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.perf-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: rgba(10, 15, 25, 0.5);
+    border-radius: 6px;
+    padding: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.metric-label {
+    font-size: 9px;
+    font-weight: 700;
+    color: #64748b;
+    letter-spacing: 0.5px;
+    margin-bottom: 2px;
+}
+
+.metric-main {
+    display: flex;
+    align-items: baseline;
+    gap: 3px;
+}
+
+.metric-number {
+    font-family: 'Consolas', monospace;
+    font-size: 20px;
+    font-weight: 800;
+    color: #38bdf8;
+    line-height: 1;
+}
+
+.metric-unit {
+    font-size: 10px;
+    font-weight: 600;
+    color: #64748b;
+}
+
+.status-pill {
+    margin-top: 4px;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 4px;
+    letter-spacing: 0.5px;
+}
+
+.status-optimum {
+    background: rgba(16, 185, 129, 0.2);
+    color: #34d399;
+}
+
+.status-warning {
+    background: rgba(245, 158, 11, 0.2);
+    color: #fbbf24;
+}
+
+.status-danger {
+    background: rgba(239, 68, 68, 0.2);
+    color: #f87171;
+}
+
+/* SPARKLINE */
+.sparkline-wrapper {
+    background: rgba(10, 15, 25, 0.6);
+    border-radius: 6px;
+    padding: 6px 8px;
+    border: 1px solid rgba(56, 189, 248, 0.1);
+}
+
+.sparkline-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+}
+
+.sparkline-title {
+    font-size: 9px;
+    font-weight: 600;
+    color: #94a3b8;
+}
+
+.delta-label {
+    font-family: 'Consolas', monospace;
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.delta-up {
+    color: #34d399;
+}
+
+.delta-down {
+    color: #f87171;
+}
+
+.delta-neutral {
+    color: #94a3b8;
+}
+
+.sparkline-canvas {
+    width: 100%;
+    height: 34px;
+    display: block;
+}
+
+/* MINI METRICS */
+.mini-card {
+    padding: 6px 8px;
+}
+
+.mini-grid {
+    display: flex;
+    justify-content: space-around;
+}
+
+.mini-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 10px;
+}
+
+.mini-label {
+    color: #64748b;
+}
+
+.mini-val {
+    font-family: 'Consolas', monospace;
+    font-weight: 700;
+    color: #e2e8f0;
+}
+
+/* BLACKBOX BUTTON */
+.btn-rec {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    padding: 6px 10px;
+    border-radius: 6px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+}
+
+.btn-rec-inactive {
+    background: rgba(30, 41, 59, 0.7);
+    color: #94a3b8;
+    border: 1px solid rgba(100, 116, 139, 0.2);
+}
+
+.btn-rec-inactive:hover {
+    background: rgba(51, 65, 85, 0.7);
+    color: #e2e8f0;
+}
+
+.btn-rec-active {
+    background: rgba(239, 68, 68, 0.25);
+    border: 1px solid rgba(239, 68, 68, 0.6);
+    color: #fca5a5;
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.3);
+}
+
+.rec-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+}
+
+.btn-rec-inactive .rec-dot {
+    background: #64748b;
+}
+
+.btn-rec-active .rec-dot {
+    background: #ef4444;
+    box-shadow: 0 0 6px #ef4444;
+    animation: blink 1s infinite alternate;
+}
+
+@keyframes blink {
+    0% { opacity: 0.3; }
+    100% { opacity: 1; }
+}
+
+.hidden {
+    display: none !important;
+}
