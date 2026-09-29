@@ -3598,6 +3598,44 @@ class Api:
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
 
+    # ================= SMART LOD (DYNAMIC PERFORMANCE ENGINE) =================
+
+    def get_smart_lod_status(self):
+        try:
+            import flight_lod_controller
+            ctrl = flight_lod_controller.get_smart_lod_controller()
+            return json.dumps(ctrl.get_status(), ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"error": str(e)}, ensure_ascii=False)
+
+    def set_smart_lod_enabled(self, enabled, force_kill_autofps=False):
+        try:
+            import flight_lod_controller
+            ctrl = flight_lod_controller.get_smart_lod_controller()
+            res = ctrl.set_enabled(bool(enabled), force_kill_autofps=bool(force_kill_autofps))
+            return json.dumps(res, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+
+    def save_smart_lod_config(self, config_json_str):
+        try:
+            import flight_lod_controller
+            cfg = json.loads(config_json_str) if isinstance(config_json_str, str) else config_json_str
+            ctrl = flight_lod_controller.get_smart_lod_controller()
+            ok = ctrl.save_config(cfg)
+            return json.dumps({"success": ok, "config": ctrl.get_config()}, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+
+    def kill_external_autofps(self):
+        try:
+            from flight_memory_engine import FlightMemoryEngine
+            ok = FlightMemoryEngine.kill_autofps_process()
+            return json.dumps({"success": ok}, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+
+
 
 _SINGLE_INSTANCE_MUTEX = None
 

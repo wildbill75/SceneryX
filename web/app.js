@@ -14111,6 +14111,15 @@ async function openSettingsModal() {
     const chkCity = document.getElementById('cfg-label-city');
     if (chkCity) chkCity.checked = currentSettings.show_label_city !== false;
 
+    const lodSelect = document.getElementById('cfg-dynamic-lod-engine');
+    if (lodSelect) {
+        lodSelect.value = currentSettings.dynamic_lod_engine || 'smart_lod';
+    }
+    const chkAutoFpsKill = document.getElementById('cfg-autofps-autokill');
+    if (chkAutoFpsKill) {
+        chkAutoFpsKill.checked = !!currentSettings.autofps_autokill;
+    }
+
     loadSimBriefSettingsUI();
     renderSettingsPathsList();
     const modal = document.getElementById('settings-modal');
@@ -14314,6 +14323,21 @@ async function saveSettings() {
     if (chkName) currentSettings.show_label_name = chkName.checked;
     const chkCity = document.getElementById('cfg-label-city');
     if (chkCity) currentSettings.show_label_city = chkCity.checked;
+
+    const lodSelect = document.getElementById('cfg-dynamic-lod-engine');
+    if (lodSelect) {
+        currentSettings.dynamic_lod_engine = lodSelect.value;
+    }
+    const chkAutoFpsKill = document.getElementById('cfg-autofps-autokill');
+    if (chkAutoFpsKill) {
+        currentSettings.autofps_autokill = chkAutoFpsKill.checked;
+    }
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.save_smart_lod_config) {
+        window.pywebview.api.save_smart_lod_config(JSON.stringify({
+            "source": lodSelect ? (lodSelect.value === 'external_autofps' ? 'external_autofps' : (lodSelect.value === 'disabled' ? 'manual' : 'native')) : 'native',
+            "auto_kill_autofps": chkAutoFpsKill ? chkAutoFpsKill.checked : false
+        })).catch(() => {});
+    }
 
     const sbInput = document.getElementById('cfg-simbrief-id');
     if (sbInput) {
@@ -16293,7 +16317,13 @@ function switchFlightMissionProfile(profile) {
             btnGa.className = 'px-3 py-1 rounded-lg bg-indigo-600 text-white transition-all cursor-pointer font-bold shadow-sm';
         }
     }
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.save_smart_lod_config) {
+        window.pywebview.api.save_smart_lod_config(JSON.stringify({ "mode": profile === 'LINER' ? 'IFR' : 'VFR' })).catch(() => {});
+    }
     loadRigDiagnostics();
+    if (typeof refreshSmartLodStatus === 'function') {
+        refreshSmartLodStatus();
+    }
 }
 
 function updateVrHzButtonsUI() {
@@ -16475,6 +16505,9 @@ async function loadRigDiagnostics() {
 
         msfsSettingsMatrixData = data.settings_matrix;
         switchMsfsGraphicsMode(currentMsfsGraphicsMode);
+        if (typeof refreshSmartLodStatus === 'function') {
+            refreshSmartLodStatus();
+        }
 
         // Check hardware display cadence (2D screen Hz and VR headset Hz)
         await checkAndPromptCadenceCalibration(det, data);
@@ -16655,9 +16688,12 @@ function renderMsfsSettingsMatrix() {
         const ratingBadge = `<span class="px-2.5 py-0.5 rounded text-xs font-mono font-bold uppercase tracking-wider shrink-0 shadow-sm cursor-help ${badgeColorClass}" title="${tagTooltip}">${cleanTag}</span>`;
         const infoButton = `<button type="button" onclick="openSettingInfoModal('${item.key}')" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-mono text-xs font-bold transition-colors cursor-pointer shrink-0 select-none" title="Detailed Technical Information">i</button>`;
 
-        // AutoFPS dynamic regulation check
-        const isAutoFpsManaged = (item.key === 'tlod' || item.key === 'olod') && (msfsSettingsMatrixData && msfsSettingsMatrixData.autofps_active);
-        const autoFpsBadge = isAutoFpsManaged ? '<span class="px-2 py-0.5 rounded text-xs font-mono font-bold bg-cyan-900 text-cyan-300 uppercase tracking-wider shrink-0" title="Dynamically regulated in real-time by AutoFPS">AUTOFPS</span>' : '';
+        // AutoFPS & Smart LOD dynamic regulation check
+        const isSmartLodManaged = (item.key === 'tlod' || item.key === 'olod') && window.smartLodActive;
+        const isAutoFpsManaged = (item.key === 'tlod' || item.key === 'olod') && !isSmartLodManaged && (msfsSettingsMatrixData && msfsSettingsMatrixData.autofps_active);
+        const autoFpsBadge = isSmartLodManaged 
+            ? '<span class="px-2 py-0.5 rounded text-xs font-mono font-bold bg-cyan-900 text-cyan-300 uppercase tracking-wider shrink-0" title="Dynamically regulated in real-time by Smart LOD">SMART LOD</span>' 
+            : (isAutoFpsManaged ? '<span class="px-2 py-0.5 rounded text-xs font-mono font-bold bg-cyan-900 text-cyan-300 uppercase tracking-wider shrink-0" title="Dynamically regulated in real-time by AutoFPS">AUTOFPS</span>' : '');
 
         // Unified SVG down arrow chevron identical on both text/numeric inputs and select dropdowns
         const chevronSvg = `
@@ -16669,7 +16705,17 @@ function renderMsfsSettingsMatrix() {
         `;
 
         let inputHtml = '';
-        if (isAutoFpsManaged) {
+        if (isSmartLodManaged) {
+            inputHtml = `
+                <div class="relative w-full pt-0.5">
+                    <input type="text"
+                           value="HANDLED BY SMART LOD"
+                           disabled
+                           class="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-2 text-xs text-cyan-400 font-mono font-bold cursor-not-allowed opacity-80"
+                           title="This setting is dynamically regulated in real-time by SceneryX Smart LOD according to your target frame rate.">
+                </div>
+            `;
+        } else if (isAutoFpsManaged) {
             inputHtml = `
                 <div class="relative w-full pt-0.5">
                     <input type="text"
@@ -17471,6 +17517,11 @@ function startBlackboxTelemetryPolling() {
             if (modeEl && telem.mode_display) {
                 modeEl.textContent = telem.mode_display;
             }
+
+            // Poll Smart LOD real-time status and live TLOD
+            if (typeof pollSmartLodTelemetry === 'function') {
+                pollSmartLodTelemetry();
+            }
         } catch (e) {
             // silent polling catch
         }
@@ -17527,4 +17578,277 @@ function openLatestBenchmarkReport() {
         });
     }
 }
+
+// ================= SMART LOD (DYNAMIC PERFORMANCE ENGINE) UI CONTROLLERS =================
+
+window.smartLodActive = false;
+let smartLodAccordionOpen = false;
+
+function toggleSmartLodAccordion() {
+    const drawer = document.getElementById('opt-smart-lod-accordion');
+    const chevron = document.getElementById('opt-smart-lod-chevron');
+    if (!drawer) return;
+
+    smartLodAccordionOpen = !smartLodAccordionOpen;
+    if (smartLodAccordionOpen) {
+        drawer.classList.remove('hidden');
+        if (chevron) chevron.classList.add('rotate-180');
+        refreshSmartLodStatus();
+    } else {
+        drawer.classList.add('hidden');
+        if (chevron) chevron.classList.remove('rotate-180');
+    }
+}
+
+function updateSmartLodSliderValue(field, val) {
+    if (field === 'ground-tlod') {
+        const el = document.getElementById('smart-lod-val-ground-tlod');
+        if (el) el.textContent = val;
+    } else if (field === 'cruise-tlod') {
+        const el = document.getElementById('smart-lod-val-cruise-tlod');
+        if (el) el.textContent = val;
+    } else if (field === 'alt-trans') {
+        const el = document.getElementById('smart-lod-val-alt-trans');
+        if (el) el.textContent = `${val} ft`;
+    }
+}
+
+function updateSmartLodUIFromStatus(status) {
+    if (!status) return;
+    const wasActive = window.smartLodActive;
+    window.smartLodActive = !!(status.enabled && status.is_running);
+
+    // Indicator Dot on Button
+    const dot = document.getElementById('opt-smart-lod-indicator-dot');
+    if (dot) {
+        if (window.smartLodActive) {
+            dot.className = 'w-2 h-2 rounded-full bg-emerald-400 animate-pulse';
+        } else {
+            dot.className = 'w-2 h-2 rounded-full bg-slate-500';
+        }
+    }
+
+    // Live TLOD readout
+    const liveTlod = document.getElementById('smart-lod-live-tlod');
+    if (liveTlod) {
+        if (window.smartLodActive && status.current_tlod_setpoint) {
+            liveTlod.textContent = Math.round(status.current_tlod_setpoint);
+            liveTlod.className = 'text-cyan-400 font-bold';
+        } else {
+            liveTlod.textContent = '--';
+            liveTlod.className = 'text-slate-500 font-bold';
+        }
+    }
+
+    // Active Badge
+    const activeBadge = document.getElementById('smart-lod-active-badge');
+    if (activeBadge) {
+        if (window.smartLodActive) {
+            activeBadge.className = 'px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+            activeBadge.textContent = 'ACTIF';
+        } else {
+            activeBadge.className = 'px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-400';
+            activeBadge.textContent = 'INACTIF';
+        }
+    }
+
+    // Toggle button in accordion
+    const toggleDot = document.getElementById('smart-lod-toggle-dot');
+    const toggleText = document.getElementById('smart-lod-toggle-text');
+    const mainToggle = document.getElementById('smart-lod-main-toggle');
+    if (mainToggle && toggleDot && toggleText) {
+        if (window.smartLodActive) {
+            mainToggle.className = 'px-4 py-1.5 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-200 font-mono text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border border-emerald-500/50';
+            toggleDot.className = 'w-2 h-2 rounded-full bg-emerald-400';
+            toggleText.textContent = 'DÉSACTIVER';
+        } else {
+            mainToggle.className = 'px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-mono text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border border-slate-700';
+            toggleDot.className = 'w-2 h-2 rounded-full bg-slate-500';
+            toggleText.textContent = 'ACTIVER';
+        }
+    }
+
+    // Conflict banner in accordion
+    const conflictBanner = document.getElementById('smart-lod-conflict-banner');
+    if (conflictBanner) {
+        if (status.autofps_conflict) {
+            conflictBanner.classList.remove('hidden');
+        } else {
+            conflictBanner.classList.add('hidden');
+        }
+    }
+
+    // If state changed from inactive to active or vice-versa, re-render matrix
+    if (wasActive !== window.smartLodActive) {
+        if (typeof renderMsfsSettingsMatrix === 'function') {
+            renderMsfsSettingsMatrix();
+        }
+    }
+}
+
+async function refreshSmartLodStatus() {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.get_smart_lod_status) return;
+    try {
+        const resStr = await window.pywebview.api.get_smart_lod_status();
+        const status = JSON.parse(resStr);
+        if (status) {
+            updateSmartLodUIFromStatus(status);
+
+            // Populate sliders with existing config if present
+            if (status.config) {
+                const cfg = status.config;
+                const isIfr = (currentFlightMissionProfile || 'LINER') === 'LINER';
+                const groundTlod = isIfr ? (cfg.ifr_tlod_ground || 100) : (cfg.vfr_tlod_ground || 120);
+                const cruiseTlod = isIfr ? (cfg.ifr_tlod_cruise || 250) : (cfg.vfr_tlod_cruise || 300);
+                const altTrans = isIfr ? (cfg.ifr_alt_transition || 5000) : (cfg.vfr_alt_transition || 3000);
+                const targetFps = isIfr ? (cfg.ifr_target_fps || 40) : (cfg.vfr_target_fps || 40);
+
+                const slG = document.getElementById('smart-lod-slider-ground-tlod');
+                if (slG) { slG.value = groundTlod; updateSmartLodSliderValue('ground-tlod', groundTlod); }
+                const slC = document.getElementById('smart-lod-slider-cruise-tlod');
+                if (slC) { slC.value = cruiseTlod; updateSmartLodSliderValue('cruise-tlod', cruiseTlod); }
+                const slA = document.getElementById('smart-lod-slider-alt-trans');
+                if (slA) { slA.value = altTrans; updateSmartLodSliderValue('alt-trans', altTrans); }
+                const inFps = document.getElementById('smart-lod-input-fps');
+                if (inFps) inFps.value = targetFps;
+                const chkCloud = document.getElementById('smart-lod-cloud-recovery');
+                if (chkCloud) chkCloud.checked = cfg.cloud_recovery !== false;
+            }
+        }
+    } catch (e) {
+        console.error("Error refreshing Smart LOD status:", e);
+    }
+}
+
+async function pollSmartLodTelemetry() {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.get_smart_lod_status) return;
+    try {
+        const resStr = await window.pywebview.api.get_smart_lod_status();
+        const status = JSON.parse(resStr);
+        if (status) {
+            updateSmartLodUIFromStatus(status);
+        }
+    } catch (e) {
+        // silent
+    }
+}
+
+async function toggleSmartLodActive() {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.set_smart_lod_enabled) return;
+    try {
+        if (window.smartLodActive) {
+            // Désactiver
+            const resStr = await window.pywebview.api.set_smart_lod_enabled(false, false);
+            const res = JSON.parse(resStr);
+            if (res.success) {
+                window.smartLodActive = false;
+                await refreshSmartLodStatus();
+                if (typeof showToast === 'function') showToast("Smart LOD désactivé.", "info");
+                if (typeof renderMsfsSettingsMatrix === 'function') renderMsfsSettingsMatrix();
+            }
+        } else {
+            // Activer - sans forcer d'abord pour vérifier si AutoFPS tourne
+            const resStr = await window.pywebview.api.set_smart_lod_enabled(true, false);
+            const res = JSON.parse(resStr);
+            if (res.conflict) {
+                // Conflit détecté avec AutoFPS -> Afficher la modale de conflit
+                openSmartLodConflictModal();
+            } else if (res.success) {
+                window.smartLodActive = true;
+                await refreshSmartLodStatus();
+                if (typeof showToast === 'function') showToast("Smart LOD activé (Moteur de régulation dynamique engagé).", "success");
+                if (typeof renderMsfsSettingsMatrix === 'function') renderMsfsSettingsMatrix();
+            } else {
+                if (typeof showToast === 'function') showToast(res.error || "Impossible d'activer Smart LOD.", "error");
+            }
+        }
+    } catch (e) {
+        console.error("Error toggling Smart LOD:", e);
+    }
+}
+
+function openSmartLodConflictModal() {
+    const modal = document.getElementById('smart-lod-conflict-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+}
+
+function closeSmartLodConflictModal() {
+    const modal = document.getElementById('smart-lod-conflict-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+}
+
+async function resolveAutoFpsConflict(action) {
+    closeSmartLodConflictModal();
+    if (action === 'kill_and_enable') {
+        if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.set_smart_lod_enabled) return;
+        try {
+            const resStr = await window.pywebview.api.set_smart_lod_enabled(true, true);
+            const res = JSON.parse(resStr);
+            if (res.success) {
+                window.smartLodActive = true;
+                await refreshSmartLodStatus();
+                if (typeof showToast === 'function') {
+                    showToast("Processus AutoFPS arrêté avec succès. Smart LOD est désormais actif !", "success");
+                }
+                if (typeof renderMsfsSettingsMatrix === 'function') renderMsfsSettingsMatrix();
+                if (typeof loadRigDiagnostics === 'function') loadRigDiagnostics();
+            } else {
+                if (typeof showToast === 'function') {
+                    showToast(res.message || "Erreur lors de la fermeture d'AutoFPS.", "error");
+                }
+            }
+        } catch (e) {
+            console.error("Error resolving AutoFPS conflict:", e);
+        }
+    }
+}
+
+async function saveSmartLodUiConfig() {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.save_smart_lod_config) return;
+    try {
+        const isIfr = (currentFlightMissionProfile || 'LINER') === 'LINER';
+        const groundVal = parseInt(document.getElementById('smart-lod-slider-ground-tlod')?.value || '100', 10);
+        const cruiseVal = parseInt(document.getElementById('smart-lod-slider-cruise-tlod')?.value || '250', 10);
+        const transVal = parseInt(document.getElementById('smart-lod-slider-alt-trans')?.value || '5000', 10);
+        const fpsVal = parseInt(document.getElementById('smart-lod-input-fps')?.value || '40', 10);
+        const cloudVal = !!document.getElementById('smart-lod-cloud-recovery')?.checked;
+
+        const updatePayload = {
+            "cloud_recovery": cloudVal
+        };
+
+        if (isIfr) {
+            updatePayload.ifr_tlod_ground = groundVal;
+            updatePayload.ifr_tlod_cruise = cruiseVal;
+            updatePayload.ifr_alt_transition = transVal;
+            updatePayload.ifr_target_fps = fpsVal;
+        } else {
+            updatePayload.vfr_tlod_ground = groundVal;
+            updatePayload.vfr_tlod_cruise = cruiseVal;
+            updatePayload.vfr_alt_transition = transVal;
+            updatePayload.vfr_target_fps = fpsVal;
+        }
+
+        const resStr = await window.pywebview.api.save_smart_lod_config(JSON.stringify(updatePayload));
+        const res = JSON.parse(resStr);
+        if (res.success) {
+            if (typeof showToast === 'function') {
+                showToast(`Profil Smart LOD ${isIfr ? 'IFR' : 'VFR'} sauvegardé !`, "success");
+            }
+        } else {
+            if (typeof showToast === 'function') {
+                showToast("Erreur de sauvegarde de la configuration Smart LOD.", "error");
+            }
+        }
+    } catch (e) {
+        console.error("Error saving Smart LOD UI config:", e);
+    }
+}
+
 

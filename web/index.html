@@ -1816,6 +1816,34 @@
                         </select>
                     </div>
                 </div>
+
+                <!-- DYNAMIC LOD & PERFORMANCE ENGINE SETTINGS -->
+                <div class="pt-4 border-t border-slate-800/80 space-y-3">
+                    <div class="flex items-center gap-2">
+                        <span data-icon="stopwatch" class="w-4 h-4 text-cyan-400"></span>
+                        <label class="text-xs font-bold text-slate-400 uppercase tracking-wider block">Dynamic LOD &amp; Performance</label>
+                    </div>
+                    
+                    <div class="space-y-1.5">
+                        <div class="flex items-center justify-between">
+                            <label class="text-xs font-semibold text-slate-300">Moteur Dynamic LOD Préféré</label>
+                            <span class="text-[11px] text-slate-500 font-mono">MSFS 2020 / 2024</span>
+                        </div>
+                        <select id="cfg-dynamic-lod-engine" class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 cursor-pointer">
+                            <option value="smart_lod">Smart LOD (Moteur intégré SceneryX - Recommandé)</option>
+                            <option value="external_autofps">AutoFPS Externe (MSFS_AutoFPS.exe)</option>
+                            <option value="disabled">Désactivé (Gestion manuelle fixe)</option>
+                        </select>
+                    </div>
+
+                    <div class="flex items-center justify-between bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
+                        <div>
+                            <label for="cfg-autofps-autokill" class="text-xs font-semibold text-slate-300 cursor-pointer block">Fermer AutoFPS externe au démarrage</label>
+                            <span class="text-[10px] text-slate-500">Évite les conflits d'asservissement mémoire en fermant MSFS_AutoFPS si Smart LOD est sélectionné</span>
+                        </div>
+                        <input type="checkbox" id="cfg-autofps-autokill" class="w-4 h-4 accent-cyan-500 rounded cursor-pointer shrink-0">
+                    </div>
+                </div>
             </div>
 
             <!-- Pinned Footer -->
@@ -2217,11 +2245,109 @@
                         </button>
                     </div>
 
+                    <!-- SMART LOD Interactive Button / Accordion Trigger -->
+                    <button id="opt-smart-lod-pill-btn" onclick="toggleSmartLodAccordion()" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-mono font-bold transition-all shadow-sm flex items-center gap-2 cursor-pointer border border-slate-700/60" title="Smart LOD: Dynamic Performance Engine. Click to toggle dashboard.">
+                        <span class="w-2 h-2 rounded-full bg-slate-500 transition-colors" id="opt-smart-lod-indicator-dot"></span>
+                        <span>SMART LOD</span>
+                        <span id="opt-smart-lod-chevron" data-icon="chevron-down" class="w-3.5 h-3.5 text-slate-400 transition-transform duration-200"></span>
+                    </button>
+
                     <!-- AutoFPS Status Pill (Solid Aplat) -->
                     <div id="opt-autofps-status-pill" class="px-3 py-1.5 rounded-xl bg-slate-800 text-slate-400 text-xs font-mono font-bold transition-all shadow-sm" title="AutoFPS status in background tasks. When active, TLOD and OLOD are dynamically calibrated in real-time.">
                         AUTOFPS
                     </div>
                 </div>
+
+                <!-- ACCORDION DRAWER: SMART LOD DASHBOARD (EXPANDABLE) -->
+                <div id="opt-smart-lod-accordion" class="hidden transition-all duration-300 ease-in-out p-4 rounded-2xl bg-slate-900/90 border border-cyan-500/30 shadow-lg shadow-cyan-950/20 space-y-3.5">
+                    <!-- Top Status Bar of Accordion -->
+                    <div class="flex items-center justify-between pb-3 border-b border-slate-800/80 flex-wrap gap-2">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-xl bg-cyan-600 text-white flex items-center justify-center font-black text-xs shadow-inner">
+                                <span data-icon="stopwatch" class="w-4 h-4"></span>
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-sm font-mono font-black text-white uppercase tracking-wider">SMART LOD</span>
+                                    <span id="smart-lod-active-badge" class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-400">INACTIF</span>
+                                </div>
+                                <span class="text-[11px] font-mono text-cyan-400/90">Dynamic Performance Engine (MSFS 2020 &amp; 2024)</span>
+                            </div>
+                        </div>
+
+                        <!-- Live Telemetry Readout & Main Switch -->
+                        <div class="flex items-center gap-3">
+                            <div class="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-mono text-slate-300 flex items-center gap-2">
+                                <span class="text-slate-500 text-[10px] uppercase font-bold">LIVE TLOD:</span>
+                                <span id="smart-lod-live-tlod" class="text-cyan-400 font-bold">--</span>
+                            </div>
+                            <button id="smart-lod-main-toggle" onclick="toggleSmartLodActive()" class="px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-mono text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border border-slate-700">
+                                <span class="w-2 h-2 rounded-full bg-slate-500" id="smart-lod-toggle-dot"></span>
+                                <span id="smart-lod-toggle-text">ACTIVER</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- AutoFPS Conflict Alert Banner (Shown only if AutoFPS is detected while Smart LOD is on or requested) -->
+                    <div id="smart-lod-conflict-banner" class="hidden p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between gap-3 text-xs font-mono">
+                        <div class="flex items-center gap-2 text-amber-300">
+                            <span data-icon="info-square" class="w-4 h-4 text-amber-400 shrink-0"></span>
+                            <span>AutoFPS externe est actif en arrière-plan. Conflit mémoire détecté.</span>
+                        </div>
+                        <button onclick="resolveAutoFpsConflict('kill_and_enable')" class="px-3 py-1 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-bold transition-colors cursor-pointer text-xs shrink-0">
+                            Fermer AutoFPS et Activer Smart LOD
+                        </button>
+                    </div>
+
+                    <!-- Config Controls Grid -->
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-3 pt-1">
+                        <!-- Card 1: Ground TLOD (Min) -->
+                        <div class="p-3 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2">
+                            <div class="flex items-center justify-between">
+                                <span class="text-[10px] font-mono text-slate-400 uppercase font-bold">TLOD SOL / MIN</span>
+                                <span id="smart-lod-val-ground-tlod" class="text-xs font-mono font-bold text-cyan-400">100</span>
+                            </div>
+                            <input type="range" id="smart-lod-slider-ground-tlod" min="50" max="200" step="5" value="100" oninput="updateSmartLodSliderValue('ground-tlod', this.value)" class="w-full accent-cyan-500 cursor-pointer">
+                            <span class="text-[10px] text-slate-500 block leading-tight">Sol et approche jusqu'au toucher des roues</span>
+                        </div>
+
+                        <!-- Card 2: Cruise TLOD (Max) -->
+                        <div class="p-3 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2">
+                            <div class="flex items-center justify-between">
+                                <span class="text-[10px] font-mono text-slate-400 uppercase font-bold">TLOD CROISIÈRE / MAX</span>
+                                <span id="smart-lod-val-cruise-tlod" class="text-xs font-mono font-bold text-cyan-400">250</span>
+                            </div>
+                            <input type="range" id="smart-lod-slider-cruise-tlod" min="150" max="400" step="10" value="250" oninput="updateSmartLodSliderValue('cruise-tlod', this.value)" class="w-full accent-cyan-500 cursor-pointer">
+                            <span class="text-[10px] text-slate-500 block leading-tight">Altitude de croisière et paysages lointains</span>
+                        </div>
+
+                        <!-- Card 3: Transition Altitude AGL -->
+                        <div class="p-3 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2">
+                            <div class="flex items-center justify-between">
+                                <span class="text-[10px] font-mono text-slate-400 uppercase font-bold">ALTITUDE TRANSITION</span>
+                                <span id="smart-lod-val-alt-trans" class="text-xs font-mono font-bold text-cyan-400">5000 ft</span>
+                            </div>
+                            <input type="range" id="smart-lod-slider-alt-trans" min="2000" max="10000" step="500" value="5000" oninput="updateSmartLodSliderValue('alt-trans', this.value)" class="w-full accent-cyan-500 cursor-pointer">
+                            <span class="text-[10px] text-slate-500 block leading-tight">Seuil AGL d'atteinte du TLOD croisière</span>
+                        </div>
+
+                        <!-- Card 4: Target FPS & Cloud Recovery -->
+                        <div class="p-3 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2">
+                            <div class="flex items-center justify-between">
+                                <span class="text-[10px] font-mono text-slate-400 uppercase font-bold">FPS CIBLE RENDU</span>
+                                <input type="number" id="smart-lod-input-fps" min="20" max="120" value="40" class="w-14 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-xs font-mono font-bold text-right text-cyan-400 focus:outline-none">
+                            </div>
+                            <div class="flex items-center justify-between pt-1">
+                                <label for="smart-lod-cloud-recovery" class="text-[10px] font-mono text-slate-300 cursor-pointer">Auto Réduction Nuages</label>
+                                <input type="checkbox" id="smart-lod-cloud-recovery" checked class="w-3.5 h-3.5 accent-cyan-500 rounded cursor-pointer">
+                            </div>
+                            <button onclick="saveSmartLodUiConfig()" class="w-full py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-mono text-[10px] font-bold uppercase transition-all cursor-pointer mt-1">
+                                Sauvegarder Profil
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
 
                 <!-- ROW 2: CLEAN MINIMALIST TABS (7 RUBRIQUES IN 2x2 SECTIONS) -->
                 <div class="flex items-center flex-nowrap justify-between gap-1.5 bg-slate-900/90 p-1.5 rounded-xl border border-slate-800 text-xs font-mono font-bold w-full overflow-x-auto custom-scrollbar">
@@ -2535,6 +2661,45 @@
             <!-- Vertical Stores List -->
             <div id="payware-stores-list" class="space-y-2 pt-1 max-h-[60vh] overflow-y-auto">
                 <!-- Dynamically populated by app.js -->
+            </div>
+        </div>
+    </div>
+
+    <!-- SMART LOD AUTOFPS CONFLICT MODAL -->
+    <div id="smart-lod-conflict-modal" class="hidden fixed inset-0 z-[3100] items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md">
+        <div class="w-full max-w-lg rounded-2xl p-6 bg-slate-900 border border-amber-500/40 shadow-2xl shadow-slate-950/90 space-y-4">
+            <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+                <div class="flex items-center gap-2.5">
+                    <span data-icon="info-square" class="w-5 h-5 text-amber-400"></span>
+                    <div>
+                        <span class="text-[10px] font-mono text-amber-400 uppercase font-bold tracking-wider block">Conflit de Performance</span>
+                        <h3 class="text-base font-bold text-white tracking-wide">AutoFPS externe est en cours d'exécution</h3>
+                    </div>
+                </div>
+                <button onclick="closeSmartLodConflictModal()" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition-colors cursor-pointer border-0">
+                    <span data-icon="x-square" class="w-4 h-4"></span>
+                </button>
+            </div>
+
+            <div class="text-xs text-slate-300 leading-relaxed space-y-2">
+                <p>
+                    L'application externe <strong class="text-white">MSFS_AutoFPS</strong> est actuellement active en arrière-plan.
+                </p>
+                <p class="text-slate-400">
+                    Deux gestionnaires dynamiques ne peuvent pas écrire simultanément dans la mémoire de MSFS sans provoquer des conflits d'asservissement, des saccades ou des instabilités.
+                </p>
+                <div class="p-3 rounded-xl bg-slate-950/80 border border-slate-800 text-[11px] text-cyan-300 font-mono">
+                    Pour engager <strong>Smart LOD</strong>, SceneryX doit arrêter l'instance d'AutoFPS externe.
+                </div>
+            </div>
+
+            <div class="flex items-center justify-end gap-3 pt-2 border-t border-slate-800">
+                <button onclick="closeSmartLodConflictModal()" class="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-mono text-xs font-bold transition-all cursor-pointer">
+                    Conserver AutoFPS
+                </button>
+                <button onclick="resolveAutoFpsConflict('kill_and_enable')" class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-mono text-xs font-black uppercase tracking-wider transition-all cursor-pointer shadow-md shadow-emerald-950/50">
+                    Fermer AutoFPS &amp; Activer Smart LOD
+                </button>
             </div>
         </div>
     </div>
