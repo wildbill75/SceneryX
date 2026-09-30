@@ -475,17 +475,15 @@
             box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.85);
         }
         #filter-radial-center-hub:not(.hub-mode-dual):hover {
-            background: rgba(255, 255, 255, 0.45) !important;
-            border-color: rgba(255, 255, 255, 0.90) !important;
-            border-width: 2.5px !important;
-            filter: drop-shadow(0 0 16px rgba(255, 255, 255, 0.50)) !important;
+            background: rgba(255, 255, 255, 0.35) !important;
+            border-color: rgba(255, 255, 255, 0.85) !important;
+            border-width: 2px !important;
         }
         #filter-radial-center-hub:not(.hub-mode-dual):hover span {
             color: #ffffff !important;
-            text-shadow: 0 0 10px rgba(0, 0, 0, 0.9) !important;
         }
         #filter-radial-center-hub:active {
-            filter: brightness(1.35);
+            filter: brightness(1.2);
         }
         #filter-radial-center-hub.cursor-grabbing {
             cursor: grabbing !important;
@@ -493,39 +491,38 @@
 
         /* Dual Semi-Circle Hub Styling (First Right-Click) */
         .hub-semicircle-path {
-            fill: rgba(15, 23, 42, 0.88);
-            stroke: rgba(148, 163, 184, 0.45);
-            stroke-width: 2px;
-            transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+            fill: rgba(15, 23, 42, 0.85);
+            stroke: rgba(148, 163, 184, 0.40);
+            stroke-width: 1.75px;
+            transition: all 0.15s ease-out;
             cursor: pointer;
         }
         .hub-semicircle:hover .hub-semicircle-path {
-            fill: #0ea5e9 !important;
-            stroke: #38bdf8 !important;
-            stroke-width: 2.5px !important;
-            filter: drop-shadow(0 0 14px rgba(56, 189, 248, 0.70)) !important;
+            fill: rgba(255, 255, 255, 0.40) !important;
+            stroke: rgba(255, 255, 255, 0.85) !important;
+            stroke-width: 2px !important;
         }
         .hub-semicircle:hover text {
             fill: #ffffff !important;
+            text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
         }
 
         /* Flight Optimizer Radial Sector Styling (6 Equal 60-deg Slices) */
         .radial-flight-sector .radial-flight-sector-path {
-            fill: rgba(15, 23, 42, 0.85);
+            fill: rgba(15, 23, 42, 0.82);
             stroke: rgba(148, 163, 184, 0.40);
-            stroke-width: 2px;
-            transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+            stroke-width: 1.75px;
+            transition: all 0.15s ease-out;
             cursor: pointer;
         }
         .radial-flight-sector:hover .radial-flight-sector-path {
-            fill: #0ea5e9 !important;
-            stroke: #38bdf8 !important;
-            stroke-width: 2.5px !important;
-            filter: drop-shadow(0 0 16px rgba(56, 189, 248, 0.70)) !important;
+            fill: rgba(255, 255, 255, 0.40) !important;
+            stroke: rgba(255, 255, 255, 0.85) !important;
+            stroke-width: 2px !important;
         }
         .radial-flight-sector:hover span {
             color: #ffffff !important;
-            text-shadow: 0 0 10px rgba(0, 0, 0, 0.9);
+            text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
         }
 
         /* Snappy Bounce Animations for Filter Radial Menu */
@@ -916,8 +913,8 @@
                     <!-- SVG Ring with Concentric Annular Sectors (Tier 1 Categories + Tier 2 Sub-items) -->
                     <svg id="filter-radial-svg" class="absolute inset-0 w-full h-full filter drop-shadow-2xl overflow-visible pointer-events-none" viewBox="0 0 620 620" style="transform-origin: 310px 310px;"></svg>
 
-                    <!-- CENTRAL HUB (DRAGGABLE & CLICKABLE TO CLOSE) -->
-                    <div id="filter-radial-center-hub" class="absolute z-30 w-[140px] h-[140px] rounded-full flex flex-col items-center justify-center pointer-events-auto active:scale-95 group text-center p-2 cursor-grab select-none shadow-2xl" title="Drag to move or click to close">
+                    <!-- CENTRAL HUB (DRAGGABLE & DUAL CONTEXTUAL MODE) -->
+                    <div id="filter-radial-center-hub" class="absolute z-30 w-[140px] h-[140px] rounded-full flex flex-col items-center justify-center pointer-events-auto active:scale-95 group text-center cursor-grab select-none shadow-2xl">
                         <!-- Rendered dynamically -->
                     </div>
                 </div>
@@ -933,8 +930,8 @@
                     <svg id="radial-sectors-svg" class="absolute inset-0 w-full h-full filter drop-shadow-2xl overflow-visible pointer-events-none transition-all duration-300" viewBox="0 0 540 540" style="transform-origin: 270px 270px;">
                         <!-- TOP-RIGHT SECTOR: SCENERIES -->
                         <g id="radial-sector-scenery" onclick="triggerRadialScenerySelector()" class="radial-sector radial-sector-scenery group cursor-pointer pointer-events-auto" role="button" aria-label="Sceneries">
-                            <path class="radial-sector-path" d="M 293.10 6.01 A 265 265 0 0 1 510.17 381.99 L 387.82 324.94 A 130 130 0 0 0 281.33 140.49 Z" />
-                            <foreignObject x="361" y="136" width="160" height="70" class="pointer-events-none">
+                            <path class="radial-sector-path" d="M 273.00 5.02 A 265 265 0 0 1 500.98 399.89 L 384.05 332.38 A 130 130 0 0 0 273.00 140.03 Z" />
+                            <foreignObject x="361" y="141" width="160" height="60" class="pointer-events-none">
                                 <div class="w-full h-full flex items-center justify-center text-center filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
                                     <span data-i18n="radial.sceneries" class="text-xs font-black tracking-widest text-slate-200 group-hover:text-white uppercase leading-none">Sceneries</span>
                                 </div>
@@ -943,8 +940,8 @@
 
                         <!-- SOUTH SECTOR: DETAILS -->
                         <g id="radial-sector-details" onclick="triggerRadialFullDetails()" class="radial-sector radial-sector-details group cursor-pointer pointer-events-auto" role="button" aria-label="Airport Details">
-                            <path class="radial-sector-path" d="M 487.08 422.00 A 265 265 0 0 1 52.92 422.00 L 163.51 344.56 A 130 130 0 0 0 376.49 344.56 Z" />
-                            <foreignObject x="170" y="425" width="200" height="70" class="pointer-events-none">
+                            <path class="radial-sector-path" d="M 497.98 405.09 A 265 265 0 0 1 42.02 405.09 L 158.95 337.58 A 130 130 0 0 0 381.05 337.58 Z" />
+                            <foreignObject x="170" y="437" width="200" height="60" class="pointer-events-none">
                                 <div class="w-full h-full flex items-center justify-center text-center filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">
                                     <span data-i18n="radial.details" class="text-xs font-black tracking-widest text-slate-200 group-hover:text-white uppercase leading-tight text-center">Airport Details</span>
                                 </div>
@@ -953,8 +950,8 @@
 
                         <!-- TOP-LEFT SECTOR: OPERATING AIRLINES -->
                         <g id="radial-sector-airlines" onclick="triggerRadialOperatingAirlines()" class="radial-sector radial-sector-airlines group cursor-pointer pointer-events-auto" role="button" aria-label="Operating Airlines">
-                            <path class="radial-sector-path" d="M 29.83 381.99 A 265 265 0 0 1 246.90 6.01 L 258.67 140.49 A 130 130 0 0 0 152.18 324.94 Z" />
-                            <foreignObject x="19" y="136" width="160" height="70" class="pointer-events-none">
+                            <path class="radial-sector-path" d="M 39.02 399.89 A 265 265 0 0 1 267.00 5.02 L 267.00 140.03 A 130 130 0 0 0 155.95 332.38 Z" />
+                            <foreignObject x="19" y="141" width="160" height="60" class="pointer-events-none">
                                 <div class="w-full h-full flex flex-col items-center justify-center text-center filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)] px-1">
                                     <span data-i18n="radial.operating_airlines" class="text-[11px] sm:text-xs font-black tracking-wider text-slate-200 group-hover:text-white uppercase leading-tight">Operating Airlines</span>
                                 </div>

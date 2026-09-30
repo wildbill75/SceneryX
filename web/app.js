@@ -12730,7 +12730,6 @@ function initDraggableFilterRadial() {
 
     function handleDragStart(e, isHub) {
         if (e.button !== 0) return; // Only primary left click
-        e.preventDefault();
         e.stopPropagation();
 
         isFilterRadialDragging = true;
@@ -12742,28 +12741,29 @@ function initDraggableFilterRadial() {
             y: parseFloat(menuEl.style.top) || (window.innerHeight / 2)
         };
 
-        hubEl.classList.add('cursor-grabbing');
-        hubEl.classList.remove('cursor-grab');
-
         const onMouseMove = (moveEvent) => {
             if (!isFilterRadialDragging) return;
-            moveEvent.preventDefault();
-            moveEvent.stopPropagation();
 
             const dx = moveEvent.clientX - filterRadialDragStart.x;
             const dy = moveEvent.clientY - filterRadialDragStart.y;
 
             if (Math.hypot(dx, dy) > 4) {
-                filterRadialHasMoved = true;
+                if (!filterRadialHasMoved) {
+                    filterRadialHasMoved = true;
+                    hubEl.classList.add('cursor-grabbing');
+                    hubEl.classList.remove('cursor-grab');
+                }
+                moveEvent.preventDefault();
+                moveEvent.stopPropagation();
+
+                const menuRadius = 310;
+                const margin = 10;
+                const newX = Math.max(menuRadius + margin, Math.min(window.innerWidth - menuRadius - margin, filterRadialMenuInitialPos.x + dx));
+                const newY = Math.max(menuRadius + margin, Math.min(window.innerHeight - menuRadius - margin, filterRadialMenuInitialPos.y + dy));
+
+                menuEl.style.left = `${newX}px`;
+                menuEl.style.top = `${newY}px`;
             }
-
-            const menuRadius = 310;
-            const margin = 10;
-            const newX = Math.max(menuRadius + margin, Math.min(window.innerWidth - menuRadius - margin, filterRadialMenuInitialPos.x + dx));
-            const newY = Math.max(menuRadius + margin, Math.min(window.innerHeight - menuRadius - margin, filterRadialMenuInitialPos.y + dy));
-
-            menuEl.style.left = `${newX}px`;
-            menuEl.style.top = `${newY}px`;
         };
 
         const onMouseUp = (upEvent) => {
@@ -12777,7 +12777,20 @@ function initDraggableFilterRadial() {
             window.removeEventListener('mouseup', onMouseUp, true);
 
             if (!filterRadialHasMoved && isHub) {
-                if (filterRadialContextMode !== 'hub') {
+                if (filterRadialContextMode === 'hub') {
+                    const semi = upEvent.target ? upEvent.target.closest('.hub-semicircle') : null;
+                    if (semi && semi.dataset.mode) {
+                        selectContextualRadialMode(semi.dataset.mode);
+                        return;
+                    }
+                    const rect = hubEl.getBoundingClientRect();
+                    const relY = upEvent.clientY - (rect.top + rect.height / 2);
+                    if (relY <= 0) {
+                        selectContextualRadialMode('filters');
+                    } else {
+                        selectContextualRadialMode('flight_optimizer');
+                    }
+                } else {
                     handleFilterRadialCenterClick();
                 }
             }
@@ -12834,6 +12847,7 @@ function openFilterRadialMenu(clientX, clientY) {
 let filterRadialContextMode = 'hub'; // 'hub' | 'filters' | 'flight_optimizer'
 
 function selectContextualRadialMode(mode) {
+    if (filterRadialContextMode === mode && mode !== 'hub') return;
     filterRadialContextMode = mode;
     const hubEl = document.getElementById('filter-radial-center-hub');
     const svgEl = document.getElementById('filter-radial-svg');
@@ -12862,19 +12876,19 @@ function renderContextualRadialHub() {
         hubEl.innerHTML = `
             <svg width="140" height="140" viewBox="0 0 140 140" class="overflow-visible pointer-events-auto filter drop-shadow-2xl">
                 <!-- TOP SEMI-CIRCLE: FILTERS -->
-                <g class="hub-semicircle group cursor-pointer" onclick="selectContextualRadialMode('filters')">
+                <g class="hub-semicircle group cursor-pointer" data-mode="filters" onclick="selectContextualRadialMode('filters')">
                     <path class="hub-semicircle-path" d="M 2.03 68.00 A 68 68 0 0 1 137.97 68.00 Z" />
                     <text x="70" y="44" text-anchor="middle"
                           class="fill-slate-200 group-hover:fill-white font-mono font-black text-xs uppercase tracking-wider pointer-events-none select-none">
                         FILTERS
                     </text>
                 </g>
-                <!-- BOTTOM SEMI-CIRCLE: FLIGHT OPTIMIZER -->
-                <g class="hub-semicircle group cursor-pointer" onclick="selectContextualRadialMode('flight_optimizer')">
+                <!-- BOTTOM SEMI-CIRCLE: OPTIMIZER -->
+                <g class="hub-semicircle group cursor-pointer" data-mode="flight_optimizer" onclick="selectContextualRadialMode('flight_optimizer')">
                     <path class="hub-semicircle-path" d="M 137.97 72.00 A 68 68 0 0 1 2.03 72.00 Z" />
-                    <text x="70" y="99" text-anchor="middle"
-                          class="fill-slate-200 group-hover:fill-white font-mono font-black text-[10px] uppercase tracking-wider pointer-events-none select-none">
-                        FLIGHT OPTIMIZER
+                    <text x="70" y="101" text-anchor="middle"
+                          class="fill-slate-200 group-hover:fill-white font-mono font-black text-xs uppercase tracking-wider pointer-events-none select-none">
+                        OPTIMIZER
                     </text>
                 </g>
             </svg>
@@ -12883,8 +12897,7 @@ function renderContextualRadialHub() {
         hubEl.classList.remove('hub-mode-dual');
         hubEl.innerHTML = `
             <div class="flex flex-col items-center justify-center pointer-events-auto select-none text-center cursor-pointer w-full h-full" onclick="selectContextualRadialMode('hub')">
-                <span class="text-[9.5px] font-bold tracking-widest text-slate-400 uppercase leading-tight">FLIGHT</span>
-                <span class="text-base font-black font-mono text-white leading-none mt-0.5 tracking-tight">OPTIMIZER</span>
+                <span class="text-base font-black font-mono text-white leading-none tracking-tight">OPTIMIZER</span>
                 <span class="text-[8.5px] font-mono font-bold text-sky-400 uppercase mt-1.5">CLICK TO BACK</span>
             </div>
         `;
@@ -13197,15 +13210,7 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
     const shouldAnimateOuter = forceAnimateOuter || (filterRadialActiveCategory !== filterRadialLastAnimatedCategory);
     filterRadialLastAnimatedCategory = filterRadialActiveCategory;
 
-    const count = currentlyFilteredAirports ? currentlyFilteredAirports.length : (allAirportsData ? allAirportsData.length : 0);
-    hubEl.innerHTML = `
-        <div class="flex flex-col items-center justify-center pointer-events-none select-none text-center">
-            <span class="text-[10px] font-bold tracking-widest text-slate-400 uppercase leading-tight">${t('radial.map_view', 'MAP VIEW')}</span>
-            <span class="text-[10px] font-bold tracking-widest text-slate-400 uppercase leading-tight mt-0.5">${t('radial.filtered_by', 'FILTERED BY')}</span>
-            <span class="text-2xl font-black font-mono text-white leading-none mt-1.5 tracking-tight">${count}</span>
-            <span class="text-[9.5px] font-normal tracking-wider text-slate-400 uppercase leading-tight mt-0.5">${t('radial.airports_caps', 'AIRPORTS')}</span>
-        </div>
-    `;
+    renderContextualRadialHub();
 
     const cx = 310;
     const cy = 310;
