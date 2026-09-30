@@ -1,14 +1,14 @@
 {
   "dependencies": [],
   "content_type": "UI",
-  "title": "SceneryX Live Remote",
+  "title": "SCENERY X",
   "manufacturer": "SceneryX",
   "creator": "wildbill75",
-  "package_version": "1.0.0",
+  "package_version": "1.0.3",
   "minimum_game_version": "1.0.0",
   "release_notes": {
     "neutral": {
-      "LastUpdate": "SceneryX Live Remote & Smart LOD In-Game Panel",
+      "LastUpdate": "SceneryX In-Game Panel V1.0.3 - Live Telemetry & Smart LOD Remote",
       "OlderHistory": ""
     }
   }

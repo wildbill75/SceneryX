@@ -12819,17 +12819,144 @@ function openFilterRadialMenu(clientX, clientY) {
         filterRadialHoverTimer = null;
     }
     filterRadialTier2Hovered = false;
-    if (!filterRadialActiveCategory) {
-        filterRadialActiveCategory = 'pricing';
-    }
 
-    filterRadialLastAnimatedCategory = null; // Force cascade animation on open
-    renderFilterRadialWheel(true);
+    // First right-click always displays the dual-half hub (FILTERS / FLIGHT OPTIMIZER)
+    selectContextualRadialMode('hub');
 
     // Trigger snappy bounce animation identical to addon radial menu
     menuEl.classList.remove('animate-filter-radial-open');
     void menuEl.offsetWidth; // Force reflow
     menuEl.classList.add('animate-filter-radial-open');
+}
+
+let filterRadialContextMode = 'hub'; // 'hub' | 'filters' | 'flight_optimizer'
+
+function selectContextualRadialMode(mode) {
+    filterRadialContextMode = mode;
+    const hubEl = document.getElementById('filter-radial-center-hub');
+    const svgEl = document.getElementById('filter-radial-svg');
+    const backdropEl = document.getElementById('filter-radial-inner-backdrop');
+
+    if (mode === 'hub') {
+        if (backdropEl) backdropEl.classList.add('hidden');
+        if (svgEl) svgEl.innerHTML = '';
+        renderContextualRadialHub();
+    } else if (mode === 'filters') {
+        if (backdropEl) backdropEl.classList.remove('hidden');
+        if (!filterRadialActiveCategory) filterRadialActiveCategory = 'pricing';
+        renderFilterRadialWheel(true);
+    } else if (mode === 'flight_optimizer') {
+        if (backdropEl) backdropEl.classList.remove('hidden');
+        renderFlightOptimizerRadialWheel();
+    }
+}
+
+function renderContextualRadialHub() {
+    const hubEl = document.getElementById('filter-radial-center-hub');
+    if (!hubEl) return;
+
+    if (filterRadialContextMode === 'hub') {
+        hubEl.classList.add('hub-mode-dual');
+        hubEl.innerHTML = `
+            <svg width="154" height="154" viewBox="0 0 154 154" class="overflow-visible pointer-events-auto filter drop-shadow-2xl">
+                <!-- TOP SEMI-CIRCLE: FILTERS -->
+                <g class="hub-semicircle group cursor-pointer" onclick="selectContextualRadialMode('filters')">
+                    <path class="hub-semicircle-path" d="M 5.03 73.00 A 70 70 0 0 1 144.97 73.00 Z" />
+                    <text x="75" y="47" text-anchor="middle"
+                          class="fill-slate-200 group-hover:fill-white font-mono font-black text-xs uppercase tracking-wider pointer-events-none select-none">
+                        FILTERS
+                    </text>
+                </g>
+                <!-- BOTTOM SEMI-CIRCLE: FLIGHT OPTIMIZER -->
+                <g class="hub-semicircle group cursor-pointer" onclick="selectContextualRadialMode('flight_optimizer')">
+                    <path class="hub-semicircle-path" d="M 144.97 77.00 A 70 70 0 0 1 5.03 77.00 Z" />
+                    <text x="75" y="103" text-anchor="middle"
+                          class="fill-slate-200 group-hover:fill-white font-mono font-black text-[10.5px] uppercase tracking-wider pointer-events-none select-none">
+                        FLIGHT OPTIMIZER
+                    </text>
+                </g>
+            </svg>
+        `;
+    } else if (filterRadialContextMode === 'flight_optimizer') {
+        hubEl.classList.remove('hub-mode-dual');
+        hubEl.innerHTML = `
+            <div class="flex flex-col items-center justify-center pointer-events-none select-none text-center">
+                <span class="text-[9.5px] font-bold tracking-widest text-slate-400 uppercase leading-tight">FLIGHT</span>
+                <span class="text-base font-black font-mono text-white leading-none mt-0.5 tracking-tight">OPTIMIZER</span>
+                <span class="text-[8.5px] font-mono font-bold text-sky-400 uppercase mt-1.5">CLICK TO BACK</span>
+            </div>
+        `;
+    } else {
+        hubEl.classList.remove('hub-mode-dual');
+        const count = currentlyFilteredAirports ? currentlyFilteredAirports.length : (allAirportsData ? allAirportsData.length : 0);
+        hubEl.innerHTML = `
+            <div class="flex flex-col items-center justify-center pointer-events-none select-none text-center">
+                <span class="text-[10px] font-bold tracking-widest text-slate-400 uppercase leading-tight">${t('radial.map_view', 'MAP VIEW')}</span>
+                <span class="text-[10px] font-bold tracking-widest text-slate-400 uppercase leading-tight mt-0.5">${t('radial.filtered_by', 'FILTERED BY')}</span>
+                <span class="text-2xl font-black font-mono text-white leading-none mt-1.5 tracking-tight">${count}</span>
+                <span class="text-[9.5px] font-normal tracking-wider text-slate-400 uppercase leading-tight mt-0.5">${t('radial.airports_caps', 'AIRPORTS')}</span>
+                <span class="text-[8.5px] font-mono font-bold text-sky-400 uppercase mt-1">CLICK TO BACK</span>
+            </div>
+        `;
+    }
+}
+
+const FLIGHT_OPT_SECTORS = [
+    { key: 'my_rig', label: 'MY RIG' },
+    { key: 'graphics', label: 'MSFS GRAPHIC<br>SETTINGS' },
+    { key: 'smart_lod', label: 'SMART LOD' },
+    { key: 'telemetry', label: 'TELEMETRY' },
+    { key: 'perf_assessment', label: 'PERFORMANCE<br>ASSESSMENT' },
+    { key: 'route', label: 'ROUTE<br>OPTIMIZATION' }
+];
+
+function renderFlightOptimizerRadialWheel() {
+    const hubEl = document.getElementById('filter-radial-center-hub');
+    const svgEl = document.getElementById('filter-radial-svg');
+    const backdropEl = document.getElementById('filter-radial-inner-backdrop');
+    if (!hubEl || !svgEl) return;
+
+    if (backdropEl) backdropEl.classList.remove('hidden');
+    renderContextualRadialHub();
+
+    const cx = 310;
+    const cy = 310;
+    const r_in = 80;
+    const r_out = 205;
+    const midR = (r_in + r_out) / 2;
+
+    let svgHtml = '';
+    FLIGHT_OPT_SECTORS.forEach((item, idx) => {
+        const startAngle = -30 + (idx * 60);
+        const endAngle = startAngle + 60;
+        const midAngle = (startAngle + endAngle) / 2;
+        const pathD = getAnnularSectorPath(cx, cy, r_in, r_out, startAngle, endAngle, 8.0);
+
+        const rad = (midAngle - 90) * Math.PI / 180;
+        const tx = cx + midR * Math.cos(rad);
+        const ty = cy + midR * Math.sin(rad);
+
+        svgHtml += `
+            <g class="radial-flight-sector animate-sector-bounce pointer-events-auto cursor-pointer group"
+               style="animation-delay: ${(idx * 0.04).toFixed(2)}s;"
+               onclick="handleFlightOptimizerSectorClick('${item.key}')"
+               role="button" aria-label="${item.label.replace(/<br>/gi, ' ')}">
+                <path class="radial-flight-sector-path" d="${pathD}" />
+                <foreignObject x="${(tx - 58).toFixed(1)}" y="${(ty - 24).toFixed(1)}" width="116" height="48" class="pointer-events-none">
+                    <div class="w-full h-full flex flex-col items-center justify-center text-center leading-tight px-1">
+                        <span class="text-[10px] font-mono font-black tracking-wider uppercase text-slate-200 group-hover:text-white">${item.label}</span>
+                    </div>
+                </foreignObject>
+            </g>
+        `;
+    });
+
+    svgEl.innerHTML = svgHtml;
+}
+
+function handleFlightOptimizerSectorClick(key) {
+    closeFilterRadialMenu();
+    openFloatingWindow(key);
 }
 
 function toggleFilterRadialMenuAtCenter() {
@@ -12856,7 +12983,11 @@ function closeFilterRadialMenu() {
 }
 
 function handleFilterRadialCenterClick() {
-    closeFilterRadialMenu();
+    if (filterRadialContextMode === 'hub') {
+        closeFilterRadialMenu();
+    } else {
+        selectContextualRadialMode('hub');
+    }
 }
 
 /**
@@ -15777,38 +15908,135 @@ function triggerRadialFlightOptimizer() {
     }
 }
 
+let topFloatingZIndex = 1200;
+
+function bringFloatingWindowToFront(winEl) {
+    if (!winEl) return;
+    topFloatingZIndex += 2;
+    winEl.style.zIndex = topFloatingZIndex;
+}
+
+function initDraggableFloatingWindow(winEl, headerEl) {
+    if (!winEl || !headerEl || headerEl._dragInitialized) return;
+    headerEl._dragInitialized = true;
+
+    headerEl.addEventListener('mousedown', (e) => {
+        if (e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) return;
+        bringFloatingWindowToFront(winEl);
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const rect = winEl.getBoundingClientRect();
+        const origLeft = rect.left;
+        const origTop = rect.top;
+
+        function onMouseMove(ev) {
+            const dx = ev.clientX - startX;
+            const dy = ev.clientY - startY;
+            const newLeft = Math.max(10, Math.min(window.innerWidth - 80, origLeft + dx));
+            const newTop = Math.max(10, Math.min(window.innerHeight - 80, origTop + dy));
+            winEl.style.left = `${newLeft}px`;
+            winEl.style.top = `${newTop}px`;
+            winEl.style.transform = 'none';
+            winEl._hasBeenDragged = true;
+        }
+
+        function onMouseUp() {
+            window.removeEventListener('mousemove', onMouseMove, true);
+            window.removeEventListener('mouseup', onMouseUp, true);
+        }
+
+        window.addEventListener('mousemove', onMouseMove, true);
+        window.addEventListener('mouseup', onMouseUp, true);
+    });
+
+    winEl.addEventListener('mousedown', () => {
+        bringFloatingWindowToFront(winEl);
+    });
+}
+
+const FLOATING_WINDOW_MAP = {
+    'my_rig': 'float-win-my-rig',
+    'rig': 'float-win-my-rig',
+    'graphics': 'float-win-graphics',
+    'smart_lod': 'float-win-smart-lod',
+    'telemetry': 'float-win-telemetry',
+    'blackbox': 'float-win-telemetry',
+    'perf_assessment': 'float-win-perf-assessment',
+    'route': 'float-win-route-opt'
+};
+
+const FLOATING_DEFAULT_OFFSETS = {
+    'my_rig': { x: 80, y: 70 },
+    'graphics': { x: 180, y: 80 },
+    'smart_lod': { x: 280, y: 110 },
+    'telemetry': { x: 220, y: 150 },
+    'perf_assessment': { x: 320, y: 180 },
+    'route': { x: 120, y: 90 }
+};
+
+function openFloatingWindow(winKey, targetAp = null) {
+    const elId = FLOATING_WINDOW_MAP[winKey] || winKey;
+    const winEl = document.getElementById(elId);
+    if (!winEl) {
+        console.warn('Floating window not found:', winKey, elId);
+        return;
+    }
+
+    const headerEl = winEl.querySelector('.floating-win-header');
+    if (headerEl) {
+        initDraggableFloatingWindow(winEl, headerEl);
+    }
+
+    if (!winEl._hasBeenDragged && !winEl.style.left) {
+        const offset = FLOATING_DEFAULT_OFFSETS[winKey] || { x: 140, y: 100 };
+        const left = Math.max(20, Math.min(window.innerWidth - 650, offset.x));
+        const top = Math.max(20, Math.min(window.innerHeight - 500, offset.y));
+        winEl.style.left = `${left}px`;
+        winEl.style.top = `${top}px`;
+    }
+
+    winEl.classList.remove('hidden');
+    bringFloatingWindowToFront(winEl);
+
+    if (winKey === 'my_rig' || winKey === 'rig') {
+        if (typeof fetchRigHardwareSpecs === 'function') fetchRigHardwareSpecs();
+    } else if (winKey === 'graphics') {
+        if (typeof renderMsfsSettingsMatrix === 'function') renderMsfsSettingsMatrix();
+        if (typeof fetchAndRenderCustomProfiles === 'function') fetchAndRenderCustomProfiles();
+    } else if (winKey === 'smart_lod') {
+        if (typeof fetchSmartLodStatus === 'function') fetchSmartLodStatus();
+    } else if (winKey === 'telemetry' || winKey === 'blackbox') {
+        startBlackboxTelemetryPolling();
+        refreshBenchmarksList();
+    } else if (winKey === 'route') {
+        if (targetAp) {
+            optimizerOrigin = targetAp;
+            flightPlanningDeparture = targetAp;
+            selectedAirport = targetAp;
+        }
+        updateOptimizerRouteUI();
+    }
+}
+
+function closeFloatingWindow(winKey) {
+    const elId = FLOATING_WINDOW_MAP[winKey] || winKey;
+    const winEl = document.getElementById(elId);
+    if (winEl) {
+        winEl.classList.add('hidden');
+    }
+}
+
 function openFlightOptimizerModal(initialTab = 'route', targetAp = null) {
-    const modal = document.getElementById('flight-optimizer-modal');
-    if (!modal) return;
-    initDraggableFlightOptimizerModal();
-
-    if (targetAp) {
-        optimizerOrigin = targetAp;
-        optimizerActiveAnchorAirport = targetAp;
-        flightPlanningDeparture = targetAp;
-        selectedAirport = targetAp;
-    } else if (!optimizerOrigin) {
-        if (typeof flightOriginAirport !== 'undefined' && flightOriginAirport) optimizerOrigin = flightOriginAirport;
-        else if (typeof currentRadialAirport !== 'undefined' && currentRadialAirport) optimizerOrigin = currentRadialAirport;
-        else if (typeof selectedAirport !== 'undefined' && selectedAirport) optimizerOrigin = selectedAirport;
-        optimizerActiveAnchorAirport = optimizerOrigin;
-    } else if (!optimizerActiveAnchorAirport) {
-        optimizerActiveAnchorAirport = optimizerOrigin;
+    if (initialTab === 'route') {
+        openFloatingWindow('route', targetAp);
+    } else if (initialTab === 'rig') {
+        openFloatingWindow('my_rig');
+        openFloatingWindow('graphics');
+    } else if (initialTab === 'blackbox') {
+        openFloatingWindow('telemetry');
+    } else {
+        openFloatingWindow(initialTab, targetAp);
     }
-
-    modal.classList.remove('hidden');
-    modal.classList.add('flex');
-
-    if (!hasUserDraggedOptimizerModal) {
-        positionFlightOptimizerModal(targetAp || optimizerActiveAnchorAirport || optimizerOrigin);
-        startOptimizerPanTracking(1400);
-    }
-
-    updateOptimizerRouteUI();
-    switchOptimizerTab(initialTab);
-    loadRigDiagnostics();
-    refreshBenchmarksList();
-    startBlackboxTelemetryPolling();
 }
 
 function exitFlightOptimizerMode() {
@@ -16511,6 +16739,7 @@ async function loadRigDiagnostics() {
         if (typeof refreshSmartLodStatus === 'function') {
             refreshSmartLodStatus();
         }
+        await fetchAndRenderCustomProfiles();
 
         // Check hardware display cadence (2D screen Hz and VR headset Hz)
         await checkAndPromptCadenceCalibration(det, data);
@@ -16522,18 +16751,16 @@ async function loadRigDiagnostics() {
 
 function switchMsfsGraphicsMode(mode) {
     currentMsfsGraphicsMode = mode;
+    const btnCommon = document.getElementById('opt-msfs-mode-btn-common');
     const btn2d = document.getElementById('opt-msfs-mode-btn-2d');
     const btnVr = document.getElementById('opt-msfs-mode-btn-vr');
 
-    if (btn2d && btnVr) {
-        if (mode === '2D') {
-            btn2d.className = 'px-3 py-1 rounded-lg bg-cyan-600 text-white transition-all cursor-pointer font-bold shadow-sm';
-            btnVr.className = 'px-3 py-1 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold';
-        } else {
-            btn2d.className = 'px-3 py-1 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold';
-            btnVr.className = 'px-3 py-1 rounded-lg bg-cyan-600 text-white transition-all cursor-pointer font-bold shadow-sm';
-        }
-    }
+    const activeClass = 'px-3.5 py-1.5 rounded-lg bg-cyan-600 text-white transition-all cursor-pointer font-bold shadow-sm';
+    const inactiveClass = 'px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold';
+
+    if (btnCommon) btnCommon.className = (mode === 'COMMON') ? activeClass : inactiveClass;
+    if (btn2d) btn2d.className = (mode === '2D') ? activeClass : inactiveClass;
+    if (btnVr) btnVr.className = (mode === 'VR') ? activeClass : inactiveClass;
 
     renderMsfsSettingsMatrix();
 }
@@ -16600,67 +16827,96 @@ document.addEventListener('click', (e) => {
 function renderMsfsSettingsMatrix() {
     if (!msfsSettingsMatrixData) return;
 
-    const list = currentMsfsGraphicsMode === '2D' ? (msfsSettingsMatrixData.matrix_2d || []) : (msfsSettingsMatrixData.matrix_vr || []);
-    const pacing = currentMsfsGraphicsMode === '2D' ? msfsSettingsMatrixData.target_pacing_2d : msfsSettingsMatrixData.target_pacing_vr;
-    const advisory = currentMsfsGraphicsMode === '2D' ? msfsSettingsMatrixData.graphics_advisory_2d : msfsSettingsMatrixData.graphics_advisory_vr;
-
-    // Render Metrics
-    if (pacing) {
-        const targetFpsEl = document.getElementById('opt-metric-target-fps');
-        const frameGenBadge = document.getElementById('opt-metric-framegen-badge');
-        const mainThreadEl = document.getElementById('opt-metric-mainthread');
-        const mainThreadStatus = document.getElementById('opt-metric-mainthread-status');
-        const vramHeadroomEl = document.getElementById('opt-metric-vram-headroom');
-        const vramStatus = document.getElementById('opt-metric-vram-status');
-
-        if (targetFpsEl) targetFpsEl.textContent = pacing.target_fps;
-        if (frameGenBadge) {
-            frameGenBadge.textContent = pacing.frame_gen_label;
-            frameGenBadge.className = `text-[10px] font-mono font-bold text-${pacing.frame_gen_color}-400 pt-0.5`;
-        }
-        if (mainThreadEl) mainThreadEl.textContent = pacing.target_mainthread;
-        if (mainThreadStatus) mainThreadStatus.className = `text-[10px] font-mono font-bold text-${pacing.mainthread_color}-400 pt-0.5`;
-        if (vramHeadroomEl) vramHeadroomEl.textContent = pacing.vram_headroom;
-        if (vramStatus) vramStatus.className = `text-[10px] font-mono font-bold text-${pacing.vram_color}-400 pt-0.5`;
+    let list = [];
+    if (currentMsfsGraphicsMode === 'COMMON') {
+        list = msfsSettingsMatrixData.matrix_common || [];
+    } else if (currentMsfsGraphicsMode === '2D') {
+        list = msfsSettingsMatrixData.matrix_2d || [];
+    } else {
+        list = msfsSettingsMatrixData.matrix_vr || [];
     }
 
-    // Render Advisory
-    if (advisory) {
-        const msfsTierEl = document.getElementById('opt-debrief-msfs-tier');
-        const msfsTextEl = document.getElementById('opt-debrief-msfs-text');
-        if (msfsTierEl) msfsTierEl.textContent = advisory.status.toUpperCase();
-        if (msfsTextEl) {
-            const recs = Array.isArray(advisory.recommendations) ? advisory.recommendations.join(' • ') : '';
-            msfsTextEl.textContent = `${advisory.summary} ${recs}`;
-        }
+    const pacing = currentMsfsGraphicsMode === 'VR' 
+        ? msfsSettingsMatrixData.target_pacing_vr 
+        : (msfsSettingsMatrixData.target_pacing_2d || msfsSettingsMatrixData.target_pacing_vr);
+    const advisory = currentMsfsGraphicsMode === 'VR'
+        ? msfsSettingsMatrixData.graphics_advisory_vr
+        : (msfsSettingsMatrixData.graphics_advisory_2d || msfsSettingsMatrixData.graphics_advisory_vr);
 
-        // Render Cross-Settings Interdependences
-        const interList = document.getElementById('opt-interdependence-list');
-        if (interList) {
-            const synergies = advisory.synergies || [];
-            const conflicts = advisory.conflicts || [];
-            if (synergies.length === 0 && conflicts.length === 0) {
-                interList.innerHTML = '<span class="text-slate-500 italic">No cross-setting conflicts detected.</span>';
-            } else {
-                let interHtml = '';
-                conflicts.forEach(c => {
-                    interHtml += `
-                        <div class="flex items-start gap-1.5 text-rose-400">
-                            <span class="px-1.5 py-0.2 rounded text-[8px] font-mono font-bold bg-rose-600 text-white shrink-0 mt-0.5">ALERT</span>
-                            <span>${c}</span>
-                        </div>
-                    `;
-                });
-                synergies.forEach(s => {
-                    interHtml += `
-                        <div class="flex items-start gap-1.5 text-emerald-400">
-                            <span class="px-1.5 py-0.2 rounded text-[8px] font-mono font-bold bg-emerald-600 text-white shrink-0 mt-0.5">SYNERGY</span>
-                            <span>${s}</span>
-                        </div>
-                    `;
-                });
-                interList.innerHTML = interHtml;
-            }
+    // Render Pacing & Performance Projection (Simplified Single Block)
+    const pacingStatusBadge = document.getElementById('opt-pacing-status-badge');
+    const pacingTargetSummary = document.getElementById('opt-pacing-target-summary');
+    const pacingSummaryText = document.getElementById('opt-pacing-summary-text');
+    const prosList = document.getElementById('opt-pros-list');
+    const consList = document.getElementById('opt-cons-list');
+
+    if (pacingStatusBadge && advisory) {
+        let status = (advisory.status || 'OPTIMAL').toUpperCase();
+        let badgeColor = 'bg-emerald-600 text-white';
+        if (status.includes('BOTTLENECK') || status.includes('HAZARD') || status.includes('CRITICAL')) {
+            status = 'BOTTLENECK';
+            badgeColor = 'bg-rose-600 text-white';
+        } else if (status.includes('SUB') || status.includes('WATCH') || status.includes('PRESSURE') || status.includes('ACCEPTABLE')) {
+            status = 'BALANCED';
+            badgeColor = 'bg-amber-600 text-white';
+        } else {
+            status = 'OPTIMAL';
+            badgeColor = 'bg-emerald-600 text-white';
+        }
+        pacingStatusBadge.textContent = status;
+        pacingStatusBadge.className = `px-2.5 py-0.5 rounded text-[11px] font-mono font-bold uppercase ${badgeColor}`;
+    }
+
+    if (pacingTargetSummary) {
+        if (currentMsfsGraphicsMode === 'COMMON') {
+            pacingTargetSummary.textContent = 'GLOBAL SETTINGS';
+        } else if (pacing) {
+            pacingTargetSummary.textContent = `${pacing.target_fps} FPS • ${pacing.target_mainthread} • ${pacing.vram_headroom}`;
+        }
+    }
+
+    if (pacingSummaryText && advisory) {
+        const recs = Array.isArray(advisory.recommendations) && advisory.recommendations.length > 0 
+            ? ' ' + advisory.recommendations.slice(0, 2).join(' • ')
+            : '';
+        pacingSummaryText.textContent = `${advisory.summary || 'Hardware and graphics settings evaluated.'}${recs}`;
+    }
+
+    // Render Pros & Cons columns
+    if (prosList) {
+        const synergies = (advisory && advisory.synergies) ? advisory.synergies : [];
+        if (synergies.length > 0) {
+            prosList.innerHTML = synergies.map(s => `
+                <div class="flex items-start gap-2 text-emerald-400">
+                    <span class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-emerald-950 text-emerald-300 border border-emerald-800/80 shrink-0 mt-0.5">+</span>
+                    <span class="text-slate-200 leading-tight">${s}</span>
+                </div>
+            `).join('');
+        } else {
+            prosList.innerHTML = `
+                <div class="flex items-start gap-2 text-emerald-400">
+                    <span class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-emerald-950 text-emerald-300 border border-emerald-800/80 shrink-0 mt-0.5">+</span>
+                    <span class="text-slate-200 leading-tight">Stable frametimes and synchronized display pacing</span>
+                </div>
+                <div class="flex items-start gap-2 text-emerald-400">
+                    <span class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-emerald-950 text-emerald-300 border border-emerald-800/80 shrink-0 mt-0.5">+</span>
+                    <span class="text-slate-200 leading-tight">VRAM buffer calibrated within safety margin</span>
+                </div>
+            `;
+        }
+    }
+
+    if (consList) {
+        const conflicts = (advisory && advisory.conflicts) ? advisory.conflicts : [];
+        if (conflicts.length > 0) {
+            consList.innerHTML = conflicts.map(c => `
+                <div class="flex items-start gap-2 text-rose-400">
+                    <span class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-rose-950 text-rose-300 border border-rose-800/80 shrink-0 mt-0.5">-</span>
+                    <span class="text-slate-200 leading-tight">${c}</span>
+                </div>
+            `).join('');
+        } else {
+            consList.innerHTML = `<span class="text-slate-500 italic text-[11px]">No critical bottlenecks detected.</span>`;
         }
     }
 
@@ -17173,125 +17429,112 @@ function switchUnifiedModalView(view, fromFeedback = false) {
     modal.classList.remove('hidden');
 }
 
-function openOptFeedbackModal(res) {
-    const modeEl = document.getElementById('opt-feedback-mode');
-    const profileEl = document.getElementById('opt-feedback-profile');
-    const backupEl = document.getElementById('opt-feedback-backup');
-    const detailsEl = document.getElementById('opt-feedback-details');
+// -------------------------------------------------------------------------
+// CUSTOM PROFILES MANAGEMENT (SAVE, ACTIVATE, DELETE, RESTORE ORIGINAL)
+// -------------------------------------------------------------------------
 
-    if (modeEl) modeEl.textContent = `${currentMsfsGraphicsMode} DISPLAY${currentMsfsGraphicsMode === 'VR' ? ` (${currentVrRefreshRate} Hz)` : ''}`;
-    if (profileEl) profileEl.textContent = currentFlightMissionProfile === 'LINER' ? 'IFR AIRLINER (VRAM OPTIMIZATION)' : 'VFR GENERAL AVIATION (High Detail)';
-    if (backupEl) backupEl.textContent = (res && res.backup_created) || 'UserCfg.opt.backup_...';
+let currentCustomProfiles = [];
 
-    if (detailsEl) {
-        let detailsHtml = '';
-        if (currentMsfsGraphicsMode === '2D') {
-            detailsHtml += `
-                <div class="flex items-center gap-2 text-emerald-400 font-mono"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded">OK</span><span>Texture Resolution: ${currentFlightMissionProfile === 'LINER' ? 'LOW (VRAM Optimization - Frees 6-8 GB VRAM)' : 'HIGH (Full Detail)'}</span></div>
-                <div class="flex items-center gap-2 text-emerald-400 font-mono"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded">OK</span><span>Glass Cockpit Refresh: ${currentFlightMissionProfile === 'LINER' ? 'MEDIUM (Saves 5-8 ms MainThread frame time)' : 'HIGH (Full Synthetic Vision)'}</span></div>
-                <div class="flex items-center gap-2 text-emerald-400 font-mono"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded">OK</span><span>Terrain LOD (TLOD): ${currentFlightMissionProfile === 'LINER' ? '100 (Protects MainThread from WASM avionics)' : '150 (Smooth for VFR)'}</span></div>
-                <div class="flex items-center gap-2 text-emerald-400 font-mono"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded">OK</span><span>Anti-Aliasing & Pacing: DLSS (Quality) + Frame Generation DLSSG (2X)</span></div>
-                <div class="flex items-center gap-2 text-emerald-400 font-mono"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded">OK</span><span>Environment & Shadows: 27 Settings Calibrated across 7 Rubriques</span></div>
-            `;
-        } else {
-            const targetVrFps = Math.max(30, Math.floor(currentVrRefreshRate / 2));
-            detailsHtml += `
-                <div class="flex items-center gap-2 text-emerald-400 font-mono"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded">OK</span><span>Max Frame Rate: ${targetVrFps} FPS (Exact 1/2 sync divisor for ${currentVrRefreshRate} Hz headset)</span></div>
-                <div class="flex items-center gap-2 text-emerald-400 font-mono"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded">OK</span><span>Frame Generation: OFF (Mandatory to prevent VR latency and artifacting)</span></div>
-                <div class="flex items-center gap-2 text-emerald-400 font-mono"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded">OK</span><span>Texture Resolution: ${currentFlightMissionProfile === 'LINER' ? 'LOW (Frees 6-8 GB VRAM, avoids compositor crashes)' : 'MEDIUM (Balanced for VFR)'}</span></div>
-                <div class="flex items-center gap-2 text-emerald-400 font-mono"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded">OK</span><span>Glass Cockpit Refresh: LOW (Quarter rate frees stereo MainThread budget)</span></div>
-                <div class="flex items-center gap-2 text-emerald-400 font-mono"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded">OK</span><span>VR Environment & Terrain: 27 Settings Calibrated for Zero Judder</span></div>
-            `;
-        }
-        detailsEl.innerHTML = detailsHtml;
-    }
+async function fetchAndRenderCustomProfiles() {
+    const dropdown = document.getElementById('opt-profiles-dropdown');
+    const indicator = document.getElementById('active-profile-indicator');
+    if (!dropdown || !window.pywebview || !window.pywebview.api || !window.pywebview.api.get_custom_profiles) return;
 
-    unifiedModalOpenedFromFeedback = false;
-    switchUnifiedModalView('feedback');
-}
-
-function openUserCfgBackupModal() {
-    unifiedModalOpenedFromFeedback = false;
-    switchUnifiedModalView('backups');
-}
-
-function closeUnifiedUserCfgModal() {
-    const modal = document.getElementById('unified-user-cfg-modal');
-    if (modal) {
-        modal.style.display = 'none';
-        modal.classList.add('hidden');
-    }
-}
-
-function closeOptFeedbackModal() {
-    closeUnifiedUserCfgModal();
-}
-
-function closeUserCfgBackupModal() {
-    closeUnifiedUserCfgModal();
-}
-
-async function fetchAndRenderUserCfgBackups() {
-    const listEl = document.getElementById('user-cfg-backup-list');
-    if (!listEl) return;
-
-    if (window.pywebview && window.pywebview.api && window.pywebview.api.get_user_cfg_backups) {
-        try {
-            const resStr = await window.pywebview.api.get_user_cfg_backups();
-            userCfgBackupsList = JSON.parse(resStr);
-        } catch (e) {
-            console.error("Error fetching backups:", e);
-        }
-    }
-
-    if (!userCfgBackupsList || userCfgBackupsList.length === 0) {
-        listEl.innerHTML = '<div class="p-6 text-center text-slate-500 font-mono text-xs">No backups found yet. Backups are created automatically when applying profile changes.</div>';
-    } else {
-        let html = '';
-        userCfgBackupsList.slice(0, 20).forEach((b, index) => {
-            const isLatest = (index === 0);
-            html += `
-                <div class="p-3 rounded-2xl bg-slate-950 border border-slate-800 flex items-center justify-between gap-3">
-                    <div class="flex items-center gap-2.5">
-                        <div class="w-8 h-8 rounded-xl bg-slate-800 text-slate-400 flex items-center justify-center shrink-0">
-                            <span class="font-mono text-[9px] font-black">BAK</span>
-                        </div>
-                        <span class="font-mono text-xs font-bold text-white tracking-wide">${b.timestamp}</span>
-                    </div>
-                    <div class="flex items-center gap-2 shrink-0">
-                        ${isLatest ? `<span class="px-3.5 py-1.5 rounded-xl bg-amber-500 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center">MOST RECENT</span>` : ''}
-                        <button onclick="restoreUserCfgBackupTarget('${b.filename}')" class="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs transition-all cursor-pointer active:scale-95 uppercase tracking-wider">
-                            RESTORE
-                        </button>
-                        <button onclick="deleteUserCfgBackupTarget('${b.filename}')" class="p-2 text-slate-400 hover:text-white transition-all cursor-pointer active:scale-95 flex items-center justify-center" title="Delete backup">
-                            <i class="fa-solid fa-trash-can text-sm"></i>
-                        </button>
-                    </div>
-                </div>
-            `;
-        });
-        listEl.innerHTML = html;
-    }
-}
-
-async function restoreUserCfgBackupTarget(filename) {
-    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.restore_user_cfg_backup) return;
     try {
-        const resStr = await window.pywebview.api.restore_user_cfg_backup(filename);
-        const res = JSON.parse(resStr);
-        if (res.status === 'success') {
-            closeUnifiedUserCfgModal();
-            if (typeof showToast === 'function') {
-                showToast(`UserCfg.opt restored from ${filename}!`, 'success');
+        const resStr = await window.pywebview.api.get_custom_profiles();
+        currentCustomProfiles = JSON.parse(resStr) || [];
+        
+        let activeProfile = currentCustomProfiles.find(p => p.is_active);
+        
+        if (indicator) {
+            if (activeProfile) {
+                indicator.textContent = `${activeProfile.name.toUpperCase()} ACTIVE`;
+                indicator.className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 font-bold border border-cyan-800/80 uppercase';
+            } else {
+                indicator.textContent = 'USERCFG.OPT ACTIVE';
+                indicator.className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 font-bold border border-emerald-800/80 uppercase';
             }
-            await loadRigDiagnostics();
+        }
+
+        if (currentCustomProfiles.length === 0) {
+            dropdown.innerHTML = '<option value="">No saved profiles yet</option>';
         } else {
-            if (typeof showToast === 'function') {
-                showToast(`Rollback failed: ${res.message}`, 'error');
-            }
+            dropdown.innerHTML = currentCustomProfiles.map(p => `
+                <option value="${p.id}" ${p.is_active ? 'selected' : ''}>${p.name} (${p.created_at}) ${p.is_active ? '★ ACTIVE' : ''}</option>
+            `).join('');
         }
     } catch (e) {
-        console.error("Error restoring backup:", e);
+        console.error("Error fetching custom profiles:", e);
+    }
+}
+
+async function saveCurrentCustomProfile() {
+    const input = document.getElementById('opt-profile-name-input');
+    let name = input ? input.value.trim() : '';
+    if (!name) {
+        const now = new Date();
+        name = `Profile_${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}h${String(now.getMinutes()).padStart(2,'0')}`;
+    }
+
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.save_custom_profile) return;
+    try {
+        const resStr = await window.pywebview.api.save_custom_profile(name);
+        const res = JSON.parse(resStr);
+        if (res.status === 'success') {
+            if (input) input.value = '';
+            if (typeof showToast === 'function') showToast(`Profile "${name}" saved!`, 'success');
+            await fetchAndRenderCustomProfiles();
+        } else {
+            if (typeof showToast === 'function') showToast(`Save error: ${res.message}`, 'error');
+        }
+    } catch (e) {
+        console.error("Error saving profile:", e);
+        if (typeof showToast === 'function') showToast(`Error saving profile: ${e}`, 'error');
+    }
+}
+
+async function activateSelectedCustomProfile() {
+    const dropdown = document.getElementById('opt-profiles-dropdown');
+    const profileId = dropdown ? dropdown.value : '';
+    if (!profileId) {
+        if (typeof showToast === 'function') showToast("Please select a profile to activate.", "warning");
+        return;
+    }
+
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.activate_custom_profile) return;
+    try {
+        const resStr = await window.pywebview.api.activate_custom_profile(profileId);
+        const res = JSON.parse(resStr);
+        if (res.status === 'success') {
+            if (typeof showToast === 'function') showToast(`Profile "${res.profile_name}" activated into MSFS!`, 'success');
+            await fetchAndRenderCustomProfiles();
+            await loadRigDiagnostics();
+        } else {
+            if (typeof showToast === 'function') showToast(`Activation failed: ${res.message}`, 'error');
+        }
+    } catch (e) {
+        console.error("Error activating profile:", e);
+        if (typeof showToast === 'function') showToast(`Error activating profile: ${e}`, 'error');
+    }
+}
+
+async function deleteSelectedCustomProfile() {
+    const dropdown = document.getElementById('opt-profiles-dropdown');
+    const profileId = dropdown ? dropdown.value : '';
+    if (!profileId) return;
+
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.delete_custom_profile) return;
+    try {
+        const resStr = await window.pywebview.api.delete_custom_profile(profileId);
+        const res = JSON.parse(resStr);
+        if (res.status === 'success') {
+            if (typeof showToast === 'function') showToast("Profile deleted", 'info');
+            await fetchAndRenderCustomProfiles();
+        } else {
+            if (typeof showToast === 'function') showToast(`Delete failed: ${res.message}`, 'error');
+        }
+    } catch (e) {
+        console.error("Error deleting profile:", e);
     }
 }
 
@@ -17301,10 +17544,10 @@ async function restoreOriginalUserCfgTarget() {
         const resStr = await window.pywebview.api.restore_original_user_cfg();
         const res = typeof resStr === 'string' ? JSON.parse(resStr) : resStr;
         if (res && res.status === 'success') {
-            closeUnifiedUserCfgModal();
             if (typeof showToast === 'function') {
                 showToast("Original UserCfg.opt restored successfully!", "success");
             }
+            await fetchAndRenderCustomProfiles();
             await loadRigDiagnostics();
         } else {
             if (typeof showToast === 'function') {
@@ -17503,6 +17746,15 @@ function startBlackboxTelemetryPolling() {
                     autofpsBadge.classList.remove('hidden');
                 } else {
                     autofpsBadge.classList.add('hidden');
+                }
+            }
+
+            const smartLodBadge = document.getElementById('opt-smartlod-badge');
+            if (smartLodBadge) {
+                if (window.smartLodActive) {
+                    smartLodBadge.classList.remove('hidden');
+                } else {
+                    smartLodBadge.classList.add('hidden');
                 }
             }
 
@@ -17863,45 +18115,24 @@ async function refreshIngamePanelStatus() {
     try {
         const resStr = await window.pywebview.api.get_ingame_panel_status();
         const res = JSON.parse(resStr);
-        const badge = document.getElementById('cfg-ingame-panel-badge');
-        const pathEl = document.getElementById('cfg-ingame-panel-path');
         const btn = document.getElementById('cfg-ingame-panel-btn');
+        if (!btn) return;
 
         if (!res.available) {
-            if (badge) {
-                badge.className = 'px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-400';
-                badge.textContent = 'COMMUNITY INTROUVABLE';
-            }
-            if (btn) btn.disabled = true;
+            btn.disabled = true;
+            btn.textContent = 'COMMUNITY NOT FOUND';
+            btn.className = 'px-4 py-1.5 rounded-xl bg-slate-800 text-slate-500 font-mono text-xs font-bold cursor-not-allowed';
             return;
         }
 
         isIngamePanelInstalled = !!res.installed;
-
-        if (pathEl) {
-            pathEl.textContent = res.path || 'Community/sceneryx-ingame-panel';
-            pathEl.title = res.path || '';
-        }
-
-        if (badge) {
-            if (isIngamePanelInstalled) {
-                badge.className = 'px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
-                badge.textContent = 'INSTALLÉ DANS COMMUNITY';
-            } else {
-                badge.className = 'px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-400';
-                badge.textContent = 'NON INSTALLÉ';
-            }
-        }
-
-        if (btn) {
-            btn.disabled = false;
-            if (isIngamePanelInstalled) {
-                btn.className = 'px-3.5 py-1.5 rounded-lg bg-rose-600/80 hover:bg-rose-500 text-white font-mono text-xs font-bold transition-all cursor-pointer';
-                btn.textContent = 'Désinstaller de Community';
-            } else {
-                btn.className = 'px-3.5 py-1.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-mono text-xs font-bold transition-all cursor-pointer';
-                btn.textContent = 'Installer dans Community';
-            }
+        btn.disabled = false;
+        if (isIngamePanelInstalled) {
+            btn.className = 'px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white font-mono text-xs font-bold transition-all cursor-pointer';
+            btn.textContent = 'UNINSTALL';
+        } else {
+            btn.className = 'px-4 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-white font-mono text-xs font-bold transition-all cursor-pointer';
+            btn.textContent = 'INSTALL';
         }
     } catch (e) {
         console.error("Error refreshing in-game panel status:", e);

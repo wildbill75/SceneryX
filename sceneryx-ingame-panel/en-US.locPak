@@ -2,14 +2,13 @@
   "LocalisationPackage": {
     "Language": "en-US",
     "Strings": {
-      "SceneryX_Remote": "SceneryX Remote",
-      "PANEL_SCENERYX_R": "SceneryX Remote",
-      "PANEL_SCENERYX": "SceneryX Remote",
-      "SceneryX Panel": "SceneryX Remote",
-      "SceneryXPanel": "SceneryX Remote",
-      "SCENERYXPANEL": "SceneryX Remote",
-      "SceneryX_R": "SceneryX Remote",
-      "SceneryX": "SceneryX Remote"
+      "SCENERY X": "SCENERY X",
+      "SceneryX": "SCENERY X",
+      "SCENERYX": "SCENERY X",
+      "PANEL_SCENERYX": "SCENERY X",
+      "SceneryX_Remote": "SCENERY X",
+      "ICON_TOOLBAR_SCENERYX": "SCENERY X",
+      "wildbill75-sceneryx": "SCENERY X"
     }
   }
 }

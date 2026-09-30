@@ -3541,6 +3541,34 @@ class Api:
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
 
+    def get_custom_profiles(self):
+        try:
+            profiles = flight_rig_optimizer.get_custom_profiles()
+            return json.dumps(profiles, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps([], ensure_ascii=False)
+
+    def save_custom_profile(self, profile_name):
+        try:
+            res = flight_rig_optimizer.save_custom_profile(profile_name)
+            return json.dumps(res, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    def activate_custom_profile(self, profile_id):
+        try:
+            res = flight_rig_optimizer.activate_custom_profile(profile_id)
+            return json.dumps(res, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    def delete_custom_profile(self, profile_id):
+        try:
+            res = flight_rig_optimizer.delete_custom_profile(profile_id)
+            return json.dumps(res, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
     def start_flight_blackbox(self, flight_name, dep_icao, arr_icao, aircraft):
         try:
             res = flight_perf_tracker.BLACKBOX.start(flight_name=flight_name, dep=dep_icao, arr=arr_icao, aircraft=aircraft)
@@ -3637,29 +3665,38 @@ class Api:
 
     # ================= MSFS IN-GAME TOOLBAR PANEL MANAGEMENT =================
 
-    def _get_primary_community_path(self):
+    def _get_all_community_paths(self):
+        paths = []
         try:
             settings = get_settings()
             for sp in settings.get("scan_paths", []):
                 p = sp.get("path", "")
-                if "community" in p.lower() and os.path.exists(p):
-                    return p
+                if "community" in p.lower() and os.path.exists(p) and p not in paths:
+                    paths.append(p)
         except Exception:
             pass
-        return None
+        return paths
+
+    def _get_primary_community_path(self):
+        all_paths = self._get_all_community_paths()
+        for p in all_paths:
+            if "community2024" in p.lower():
+                return p
+        return all_paths[0] if all_paths else None
 
     def get_ingame_panel_status(self):
         try:
-            community_path = self._get_primary_community_path()
-            if not community_path:
+            all_paths = self._get_all_community_paths()
+            if not all_paths:
                 return json.dumps({"available": False, "installed": False, "message": "Dossier Community non détecté."})
-            target_dir = os.path.join(community_path, "sceneryx-ingame-panel")
+            primary = self._get_primary_community_path()
+            target_dir = os.path.join(primary, "sceneryx-ingame-panel")
             installed = os.path.exists(os.path.join(target_dir, "manifest.json"))
             return json.dumps({
                 "available": True,
                 "installed": installed,
                 "path": target_dir,
-                "community": community_path
+                "community": primary
             }, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"available": False, "installed": False, "error": str(e)}, ensure_ascii=False)
@@ -3667,8 +3704,8 @@ class Api:
     def install_ingame_panel(self):
         try:
             import shutil
-            community_path = self._get_primary_community_path()
-            if not community_path:
+            all_paths = self._get_all_community_paths()
+            if not all_paths:
                 return json.dumps({"success": False, "message": "Dossier Community non détecté."})
             
             # Locate sceneryx-ingame-panel source folder
@@ -3682,21 +3719,51 @@ class Api:
             if not os.path.exists(src_dir):
                 return json.dumps({"success": False, "message": f"Dossier source introuvable: {src_dir}"})
             
-            target_dir = os.path.join(community_path, "sceneryx-ingame-panel")
-            shutil.copytree(src_dir, target_dir, dirs_exist_ok=True)
-            return json.dumps({"success": True, "message": "Panel In-Game installé avec succès dans Community !"})
+            targets = ["sceneryx-ingame-panel", "wildbill75-sceneryx"]
+            for c_path in all_paths:
+                for tname in targets:
+                    target_dir = os.path.join(c_path, tname)
+                    shutil.copytree(src_dir, target_dir, dirs_exist_ok=True)
+
+            # Ensure Content.xml activation
+            for p in get_content_xml_paths():
+                if os.path.exists(p):
+                    try:
+                        with open(p, "r", encoding="utf-8") as f:
+                            cxml = f.read()
+                        needed = [
+                            "communityfs20-wildbill75-sceneryx",
+                            "communityfs24-wildbill75-sceneryx",
+                            "communityfs20-sceneryx-ingame-panel",
+                            "communityfs24-sceneryx-ingame-panel"
+                        ]
+                        mod = False
+                        for pk in needed:
+                            if f'<Package name="{pk}"' not in cxml and '</Packages>' in cxml:
+                                cxml = cxml.replace('</Packages>', f'\t<Package name="{pk}" active="Activated" />\n</Packages>')
+                                mod = True
+                        if mod:
+                            with open(p, "w", encoding="utf-8") as f:
+                                f.write(cxml)
+                    except Exception:
+                        pass
+
+            return json.dumps({"success": True, "message": "Panel In-Game installé avec succès dans les dossiers Community !"})
         except Exception as e:
             return json.dumps({"success": False, "message": str(e)})
 
     def uninstall_ingame_panel(self):
         try:
             import shutil
-            community_path = self._get_primary_community_path()
-            if not community_path:
+            all_paths = self._get_all_community_paths()
+            if not all_paths:
                 return json.dumps({"success": False, "message": "Dossier Community non détecté."})
-            target_dir = os.path.join(community_path, "sceneryx-ingame-panel")
-            if os.path.exists(target_dir):
-                shutil.rmtree(target_dir)
+            targets = ["sceneryx-ingame-panel", "wildbill75-sceneryx"]
+            for c_path in all_paths:
+                for tname in targets:
+                    target_dir = os.path.join(c_path, tname)
+                    if os.path.exists(target_dir):
+                        shutil.rmtree(target_dir)
             return json.dumps({"success": True, "message": "Panel In-Game désinstallé de Community."})
         except Exception as e:
             return json.dumps({"success": False, "message": str(e)})

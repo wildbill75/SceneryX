@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>SCENERY X</title>
+    <link rel="stylesheet" href="/SCSS/common.css" />
+    <link rel="stylesheet" href="SceneryX_Remote.css" />
+    <script type="text/javascript" src="/JS/coherent.js"></script>
+    <script type="text/javascript" src="/JS/common.js"></script>
+    <script type="text/javascript" src="/JS/buttons.js"></script>
+    <script type="text/javascript" src="/JS/dataStorage.js"></script>
+    <script type="text/javascript" src="/JS/Services/ToolBarPanels.js"></script>
+    <script type="text/javascript" src="/Pages/VCockpit/Instruments/Shared/BaseInstrument.js"></script>
+    <link rel="import" href="/templates/NewPushButton/NewPushButton.html" />
+    <link rel="import" href="/templates/ToggleButton/toggleButton.html" />
+    <link rel="import" href="/templates/tabMenu/tabMenu.html" />
+    <link rel="import" href="/templates/ingameUi/ingameUi.html" />
+    <link rel="import" href="/templates/ingameUiHeader/ingameUiHeader.html" />
+    <script type="text/javascript" src="SceneryX_Remote.js"></script>
+</head>
+<body class="border-box">
+    <ingamepanel-sceneryx>
+        <ingame-ui id="SceneryX_Remote" panel-id="PANEL_SCENERYX" title="SCENERY X"
+                   class="ingameUiFrame panelInvisible"
+                   content-fit="true" resize="both"
+                   min-width="320" min-height="220">
+
+            <!-- OFFLINE VIEW -->
+            <div id="disconnected-view" class="offline-box">
+                <div class="offline-title">Please launch Scenery X</div>
+            </div>
+
+            <!-- ONLINE VIEW -->
+            <div id="connected-view" class="main-content hidden">
+                <!-- SECTION 1: SMART LOD -->
+                <div class="panel-section">
+                    <div class="section-header">
+                        <span class="section-title">SMART LOD</span>
+                    </div>
+                    <button type="button" id="smart-lod-toggle-btn" class="msfs-btn btn-primary">
+                        <span id="smart-lod-btn-label">ENGAGE</span>
+                    </button>
+                    <!-- On-the-fly LOD Controls -->
+                    <div class="lod-controls-box">
+                        <div class="lod-control-row" id="tlod-row">
+                            <span class="lod-name" id="tlod-name-label" title="Terrain LOD (Double-click to reset to Auto)">TLOD</span>
+                            <button type="button" class="lod-step-btn" id="tlod-minus-btn" title="Decrease TLOD by 10">-10</button>
+                            <input type="range" class="lod-slider" id="tlod-slider" min="10" max="400" step="10" value="100" title="Double-click thumb to reset to Auto" />
+                            <button type="button" class="lod-step-btn" id="tlod-plus-btn" title="Increase TLOD by 10">+10</button>
+                            <span class="lod-val" id="tlod-val-label" title="Double-click to reset to Auto">100</span>
+                            <span class="lod-mode-badge badge-mode-auto" id="tlod-mode-badge" title="Double-click slider or click badge to reset to Auto">AUTO</span>
+                        </div>
+                        <div class="lod-control-row" id="olod-row">
+                            <span class="lod-name" id="olod-name-label" title="Object LOD (Double-click to reset to Auto)">OLOD</span>
+                            <button type="button" class="lod-step-btn" id="olod-minus-btn" title="Decrease OLOD by 10">-10</button>
+                            <input type="range" class="lod-slider" id="olod-slider" min="10" max="300" step="10" value="100" title="Double-click thumb to reset to Auto" />
+                            <button type="button" class="lod-step-btn" id="olod-plus-btn" title="Increase OLOD by 10">+10</button>
+                            <span class="lod-val" id="olod-val-label" title="Double-click to reset to Auto">100</span>
+                            <span class="lod-mode-badge badge-mode-auto" id="olod-mode-badge" title="Double-click slider or click badge to reset to Auto">AUTO</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECTION 2: PERFORMANCE -->
+                <div class="panel-section">
+                    <div class="section-header">
+                        <span class="section-title">PERFORMANCE</span>
+                        <span id="live-pacing-status" class="badge-tag tag-green">OPTIMAL</span>
+                    </div>
+                    <div class="perf-row">
+                        <div class="perf-metric">
+                            <span class="metric-label">DISPLAYED FPS</span>
+                            <div class="metric-val-wrap">
+                                <span id="live-fps-val" class="metric-number">--</span>
+                                <span class="metric-unit">FPS</span>
+                                <span id="live-fps-base" class="metric-sub"></span>
+                            </div>
+                        </div>
+                        <div class="perf-metric">
+                            <span class="metric-label">CPU MAIN THREAD</span>
+                            <div class="metric-val-wrap">
+                                <span id="live-mt-val" class="metric-number">--</span>
+                                <span class="metric-unit">ms</span>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Sparkline -->
+                    <div class="sparkline-box">
+                        <div class="sparkline-top">
+                            <span class="sparkline-title">30S TREND</span>
+                            <span id="fps-delta-label" class="delta-label delta-neutral">0 FPS</span>
+                        </div>
+                        <canvas id="fps-sparkline-canvas" class="sparkline-canvas" width="280" height="32"></canvas>
+                    </div>
+                </div>
+
+                <!-- SECTION 3: SYSTEM METRICS -->
+                <div class="panel-section">
+                    <div class="metrics-row">
+                        <div class="metric-compact">
+                            <span class="compact-label">VRAM:</span>
+                            <span id="live-vram-val" class="compact-val">-- GB</span>
+                        </div>
+                        <div class="metric-compact">
+                            <span class="compact-label">CACHE:</span>
+                            <span id="live-cache-val" class="compact-val">-- MB/s</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SECTION 4: BLACKBOX RECORDER -->
+                <div class="panel-section section-rec">
+                    <button type="button" id="blackbox-toggle-btn" class="msfs-btn btn-primary">
+                        <span id="rec-btn-label">START RECORDING</span>
+                    </button>
+                </div>
+            </div>
+        </ingame-ui>
+    </ingamepanel-sceneryx>
+</body>
+</html>

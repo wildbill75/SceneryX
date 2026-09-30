@@ -497,6 +497,116 @@ def resolve_flight_context(lat=None, lon=None, on_ground=False):
         "prof_slug": prof_slug
     }
 
+def get_current_lod_data(autofps_data=None):
+    """
+    Retrieves current TLOD and OLOD, prioritizing SceneryX Smart LOD if active,
+    falling back to external AutoFPS if present.
+    """
+    try:
+        from flight_lod_controller import get_smart_lod_controller
+        s_ctrl = get_smart_lod_controller()
+        if s_ctrl and s_ctrl.config.get("enabled"):
+            st = s_ctrl.get_status()
+            tlod_val = st.get("current_tlod_setpoint")
+            olod_val = st.get("current_olod_setpoint")
+            if tlod_val is not None and tlod_val > 0:
+                return round(tlod_val), round(olod_val) if olod_val is not None else None, True
+    except Exception:
+        pass
+
+    if autofps_data:
+        return autofps_data.get('tlod'), autofps_data.get('olod'), False
+    return None, None, False
+
+
+def analyze_smart_lod_performance(samples, session_info=None):
+    """
+    Analyse détaillée de l'efficacité de Smart LOD :
+    - Évalue les performances (FPS, MainThread ms) selon les paliers d'altitude
+      (Sol < 500ft, Montée/Descente 500-5000ft, Croisière > 5000ft).
+    - Calcule les gains ou pertes de FPS et de MainThread avant/après chaque seuil.
+    - Liste les déclenchements précis enregistrés pendant la session.
+    """
+    if not samples:
+        return None
+
+    def avg_val(lst, key):
+        vals = [s[key] for s in lst if s.get(key) is not None]
+        return round(sum(vals) / len(vals), 1) if vals else None
+
+    # Tiers d'altitude
+    ground_samples = [s for s in samples if (s.get('agl_ft') is not None and s.get('agl_ft') < 500) or s.get('on_ground')]
+    trans_samples = [s for s in samples if s.get('agl_ft') is not None and 500 <= s.get('agl_ft') < 5000]
+    cruise_samples = [s for s in samples if s.get('agl_ft') is not None and s.get('agl_ft') >= 5000]
+
+    tier_ground = {
+        'name': 'Sol & Décollage (< 500 ft)',
+        'tlod': avg_val(ground_samples, 'tlod') or 100,
+        'fps': avg_val(ground_samples, 'disp_fps'),
+        'mt': avg_val(ground_samples, 'main_thread_ms'),
+        'count': len(ground_samples)
+    }
+
+    tier_trans = {
+        'name': 'Montée / Transition (500 - 5000 ft)',
+        'tlod': avg_val(trans_samples, 'tlod') or 175,
+        'fps': avg_val(trans_samples, 'disp_fps'),
+        'mt': avg_val(trans_samples, 'main_thread_ms'),
+        'count': len(trans_samples)
+    }
+
+    tier_cruise = {
+        'name': 'Croisière & Haute Altitude (> 5000 ft)',
+        'tlod': avg_val(cruise_samples, 'tlod') or 250,
+        'fps': avg_val(cruise_samples, 'disp_fps'),
+        'mt': avg_val(cruise_samples, 'main_thread_ms'),
+        'count': len(cruise_samples)
+    }
+
+    # Calcul des Deltas (Gain / Perte)
+    deltas = []
+    if tier_ground['fps'] and tier_trans['fps']:
+        fps_diff = round(tier_trans['fps'] - tier_ground['fps'], 1)
+        mt_diff = round(tier_trans['mt'] - tier_ground['mt'], 1) if tier_ground['mt'] and tier_trans['mt'] else 0.0
+        fps_sign = f"+{fps_diff}" if fps_diff > 0 else str(fps_diff)
+        mt_sign = f"+{mt_diff}" if mt_diff > 0 else str(mt_diff)
+        deltas.append({
+            'label': 'Seuil Décollage / Montée (500 ft)',
+            'tlod_trans': f"{round(tier_ground['tlod'])} ➔ {round(tier_trans['tlod'])}",
+            'fps_delta': f"{fps_sign} FPS",
+            'fps_color': '#10b981' if fps_diff >= 0 else '#f43f5e',
+            'mt_delta': f"{mt_sign} ms",
+            'mt_color': '#10b981' if mt_diff <= 0 else '#f59e0b',
+            'verdict': 'MainThread préservé au sol, expansion progressive du décor' if mt_diff <= 2 else 'Augmentation attendue de charge décor'
+        })
+
+    if tier_trans['fps'] and tier_cruise['fps']:
+        fps_diff = round(tier_cruise['fps'] - tier_trans['fps'], 1)
+        mt_diff = round(tier_cruise['mt'] - tier_trans['mt'], 1) if tier_trans['mt'] and tier_cruise['mt'] else 0.0
+        fps_sign = f"+{fps_diff}" if fps_diff > 0 else str(fps_diff)
+        mt_sign = f"+{mt_diff}" if mt_diff > 0 else str(mt_diff)
+        deltas.append({
+            'label': 'Seuil Altitude de Croisière (5000 ft)',
+            'tlod_trans': f"{round(tier_trans['tlod'])} ➔ {round(tier_cruise['tlod'])}",
+            'fps_delta': f"{fps_sign} FPS",
+            'fps_color': '#10b981' if fps_diff >= 0 else '#f43f5e',
+            'mt_delta': f"{mt_sign} ms",
+            'mt_color': '#10b981' if mt_diff <= 0 else '#f59e0b',
+            'verdict': 'Qualité visuelle maximale atteinte avec fluidité stable' if fps_diff >= -3 else 'Ajustement dynamique recommandé si saccades'
+        })
+
+    # Récupérer les événements Smart LOD spécifiques s'ils existent
+    smart_events = []
+    if session_info and session_info.get('smart_lod'):
+        smart_events = session_info['smart_lod'].get('events') or []
+
+    return {
+        'tiers': [tier_ground, tier_trans, tier_cruise],
+        'deltas': deltas,
+        'events': smart_events
+    }
+
+
 def analyze_flight_milestones(samples, session_info=None):
     """
     Analyse chronologique complète des phases de vol :
@@ -1053,6 +1163,18 @@ def generate_html_report(csv_path, session_info, samples):
     gpu_power_vals = [s.get('gpu_power_w', 0) for s in samples]
     io_reads_mbps = [s.get('cache_read_mbps', 0) for s in samples]
 
+    # Smart LOD Trigger points overlay for lodChart
+    smart_triggers = []
+    last_t = None
+    for s in samples:
+        cur_t = s.get('tlod')
+        if cur_t is not None and last_t is not None and abs(cur_t - last_t) >= 5:
+            smart_triggers.append(cur_t)
+        else:
+            smart_triggers.append(None)
+        if cur_t is not None:
+            last_t = cur_t
+
     fps_vals = [s['disp_fps'] for s in samples if s.get('disp_fps') is not None]
     base_fps_vals = [s['base_fps'] for s in samples if s.get('base_fps') is not None]
     mainthread_vals = [s['main_thread_ms'] for s in samples if s.get('main_thread_ms') is not None]
@@ -1123,14 +1245,101 @@ def generate_html_report(csv_path, session_info, samples):
     autofps_cfg = session_info.get('autofps_config', {})
     cloud_status = session_info.get('cloud_events', 'Nominale')
 
-    if autofps_active:
+    smart_lod_info = session_info.get('smart_lod') or {}
+    smart_lod_active = bool(smart_lod_info.get('enabled'))
+    smart_lod_cfg = smart_lod_info.get('config', {})
+
+    if smart_lod_active:
+        st_mode = smart_lod_info.get('mode', 'IFR').lower()
+        t_fps = smart_lod_cfg.get(f'{st_mode}_target_fps', 40)
+        min_tlod = smart_lod_cfg.get(f'{st_mode}_tlod_ground', 100)
+        max_tlod = smart_lod_cfg.get(f'{st_mode}_tlod_cruise', 250)
+        lod_engine_badge = f'<span style="color:#06b6d4; font-weight:bold; font-family:monospace; background:rgba(6,182,212,0.15); border:1px solid #06b6d4; padding:3px 8px; border-radius:6px; font-size:11px;">SMART LOD ACTIF (Cible {t_fps} FPS • TLOD {min_tlod} ➔ {max_tlod})</span>'
+    elif autofps_active:
         tfps = autofps_cfg.get('target_fps_fg') or autofps_cfg.get('targetFps', '--') if autofps_cfg else '--'
         min_t = autofps_cfg.get('min_tlod') or autofps_cfg.get('minTLod', '--') if autofps_cfg else '--'
         max_t = autofps_cfg.get('max_tlod') or autofps_cfg.get('maxTLod', '--') if autofps_cfg else '--'
         cfg_sub = f" (Cible {tfps} FPS | TLOD {min_t}-{max_t})" if autofps_cfg else ""
-        autofps_badge_html = f'<span style="color:#38bdf8; font-weight:bold; font-family:monospace; background:rgba(56,189,248,0.15); border:1px solid #38bdf8; padding:3px 8px; border-radius:6px; font-size:11px;">AUTOFPS LIVE{cfg_sub}</span>'
+        lod_engine_badge = f'<span style="color:#38bdf8; font-weight:bold; font-family:monospace; background:rgba(56,189,248,0.15); border:1px solid #38bdf8; padding:3px 8px; border-radius:6px; font-size:11px;">AUTOFPS LIVE{cfg_sub}</span>'
     else:
-        autofps_badge_html = '<span style="color:#94a3b8; font-size:11px; background:rgba(148,163,184,0.1); border:1px solid #334155; padding:3px 8px; border-radius:6px;">Inactif / Non Détecté</span>'
+        lod_engine_badge = '<span style="color:#94a3b8; font-size:11px; background:rgba(148,163,184,0.1); border:1px solid #334155; padding:3px 8px; border-radius:6px;">Inactif / Non Détecté</span>'
+
+    # Build Smart LOD Performance & Threshold Analysis section
+    smart_lod_perf = analyze_smart_lod_performance(samples, session_info)
+    smart_lod_section = ""
+    if smart_lod_perf and smart_lod_perf.get('deltas'):
+        delta_rows = ""
+        for d in smart_lod_perf['deltas']:
+            delta_rows += f"""
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                <td style="padding:10px 12px; font-weight:bold; color:#f8fafc;">{d['label']}</td>
+                <td style="padding:10px 12px; color:#38bdf8; font-family:monospace; font-weight:bold;">{d['tlod_trans']}</td>
+                <td style="padding:10px 12px; color:{d['fps_color']}; font-family:monospace; font-weight:bold;">{d['fps_delta']}</td>
+                <td style="padding:10px 12px; color:{d['mt_color']}; font-family:monospace; font-weight:bold;">{d['mt_delta']}</td>
+                <td style="padding:10px 12px; color:#cbd5e1; font-size:12px;">{d['verdict']}</td>
+            </tr>
+            """
+
+        event_rows = ""
+        events = smart_lod_perf.get('events', [])
+        if events:
+            for ev in events[-8:]:
+                event_rows += f"""
+                <tr style="border-bottom:1px solid rgba(255,255,255,0.03); font-size:12px;">
+                    <td style="padding:6px 12px; color:#94a3b8; font-family:monospace;">{ev.get('time_str')}</td>
+                    <td style="padding:6px 12px; color:#06b6d4; font-family:monospace;">{ev.get('agl_ft')} ft</td>
+                    <td style="padding:6px 12px; color:#ec4899; font-family:monospace; font-weight:bold;">TLOD {ev.get('old_tlod')} ➔ {ev.get('new_tlod')}</td>
+                    <td style="padding:6px 12px; color:#10b981; font-family:monospace;">{ev.get('fps')} FPS</td>
+                    <td style="padding:6px 12px; color:#cbd5e1;">{ev.get('reason')}</td>
+                </tr>
+                """
+            events_table_html = f"""
+            <div style="margin-top:16px; border-top:1px solid #1e293b; padding-top:12px;">
+                <div style="font-size:12px; font-weight:bold; color:#38bdf8; margin-bottom:8px;">⚡ Journal des Déclenchements & Régulations Dynamiques :</div>
+                <table style="width:100%; border-collapse:collapse; text-align:left;">
+                    <thead>
+                        <tr style="color:#64748b; font-size:11px; text-transform:uppercase;">
+                            <th style="padding:6px 12px;">Heure</th>
+                            <th style="padding:6px 12px;">Altitude</th>
+                            <th style="padding:6px 12px;">Consigne TLOD</th>
+                            <th style="padding:6px 12px;">Cadence Mesurée</th>
+                            <th style="padding:6px 12px;">Motif de Déclenchement</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {event_rows}
+                    </tbody>
+                </table>
+            </div>
+            """
+        else:
+            events_table_html = ""
+
+        smart_lod_section = f"""
+        <div class="chart-box" style="padding: 20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
+                <div class="chart-title" style="margin-bottom:0;">⚡ Analyse Déclenchements Smart LOD & Efficacité Paliers</div>
+                <div style="font-size:12px; color:#06b6d4; font-weight:bold;">Régulation Dynamique MSFS</div>
+            </div>
+            <div style="overflow-x:auto;">
+                <table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">
+                    <thead>
+                        <tr style="border-bottom:1px solid #334155; color:#94a3b8; font-size:11px; text-transform:uppercase;">
+                            <th style="padding:8px 12px;">Seuil / Transition</th>
+                            <th style="padding:8px 12px;">Variation TLOD</th>
+                            <th style="padding:8px 12px;">Delta FPS (Gain/Perte)</th>
+                            <th style="padding:8px 12px;">Delta MainThread (ms)</th>
+                            <th style="padding:8px 12px;">Bénéfice & Impact Réel</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {delta_rows}
+                    </tbody>
+                </table>
+            </div>
+            {events_table_html}
+        </div>
+        """
 
     # Build Milestones section
     milestones = analyze_flight_milestones(samples, session_info)
@@ -1320,8 +1529,8 @@ def generate_html_report(csv_path, session_info, samples):
                 <div style="color:#10b981; font-weight:bold; font-size:14px; margin-top:2px;">{mode_display}</div>
             </div>
             <div>
-                <div style="color:#64748b; font-size:11px; font-weight:bold; text-transform:uppercase;">AutoFPS</div>
-                <div style="margin-top:2px;">{autofps_badge_html}</div>
+                <div style="color:#64748b; font-size:11px; font-weight:bold; text-transform:uppercase;">Régulation LOD</div>
+                <div style="margin-top:2px;">{lod_engine_badge}</div>
             </div>
         </div>
 
@@ -1330,6 +1539,9 @@ def generate_html_report(csv_path, session_info, samples):
 
         <!-- PALIERS D'ALTITUDE & IMPACTS LOD -->
         {milestones_section}
+
+        <!-- ANALYSE DECLENCHEMENTS SMART LOD & DELTAS -->
+        {smart_lod_section}
 
         <div class="grid">
             <div class="card">
@@ -1519,6 +1731,20 @@ def generate_html_report(csv_path, session_info, samples):
                         tension: 0.2,
                         yAxisID: 'yLod',
                         pointRadius: 0
+                    }},
+                    {{
+                        label: '⚡ Déclencheur Smart LOD',
+                        data: {json.dumps(smart_triggers)},
+                        borderColor: '#38bdf8',
+                        backgroundColor: '#38bdf8',
+                        pointBackgroundColor: '#ffffff',
+                        pointBorderColor: '#38bdf8',
+                        pointBorderWidth: 2.5,
+                        pointRadius: 6,
+                        pointHoverRadius: 9,
+                        pointStyle: 'rectRot',
+                        showLine: false,
+                        yAxisID: 'yLod'
                     }}
                 ]
             }},
@@ -1686,21 +1912,21 @@ def main():
                 sc_data = SIMCONNECT_CLIENT.get_data() if SIMCONNECT_CLIENT else {}
                 sc_connected = sc_data.get("connected", False)
 
+                cur_tlod, cur_olod, _ = get_current_lod_data(autofps)
+                tlod = cur_tlod
+                olod = cur_olod
+
                 if sc_connected and sc_data.get("base_fps") is not None:
                     disp_fps = sc_data.get('displayed_fps')
                     base_fps = sc_data.get('base_fps')
                     main_thread_ms = sc_data.get('frame_time_ms')
                     agl_ft = sc_data.get('agl_ft')
                     fpm = sc_data.get('fpm')
-                    tlod = autofps.get('tlod') if autofps else None
-                    olod = autofps.get('olod') if autofps else None
                     fg_mode = 'DLSSG (2X)' if (disp_fps and base_fps and disp_fps > base_fps) else 'NATIVE'
                 else:
                     disp_fps = autofps.get('displayed_fps') if autofps else None
                     base_fps = autofps.get('base_fps') if autofps else None
                     main_thread_ms = autofps.get('main_thread_ms') if autofps else None
-                    tlod = autofps.get('tlod') if autofps else None
-                    olod = autofps.get('olod') if autofps else None
                     agl_ft = autofps.get('agl_ft') if autofps else None
                     fpm = autofps.get('fpm') if autofps else None
                     fg_mode = autofps.get('fg_mode', '') if autofps else ''
@@ -1810,6 +2036,16 @@ def main():
         autofps_cfg = get_autofps_config()
         autofps_active = is_autofps_active()
 
+        smart_lod_info = {}
+        try:
+            from flight_lod_controller import get_smart_lod_controller
+            s_ctrl = get_smart_lod_controller()
+            if s_ctrl:
+                smart_lod_info = s_ctrl.get_status()
+                smart_lod_info['events'] = s_ctrl.get_trigger_events()
+        except Exception:
+            pass
+
         session_info = {
             'mode_str': mode_str,
             'is_corridor': is_corridor,
@@ -1820,7 +2056,8 @@ def main():
             'mode_display': ctx['mode_display'],
             'autofps_config': autofps_cfg,
             'autofps_active': autofps_active,
-            'cloud_events': cloud_status
+            'cloud_events': cloud_status,
+            'smart_lod': smart_lod_info
         }
         html_file = generate_html_report(csv_path, session_info, samples)
         if html_file and os.path.exists(html_file):
@@ -1980,21 +2217,21 @@ class BlackboxSession:
             sc_data = SIMCONNECT_CLIENT.get_data() if SIMCONNECT_CLIENT else {}
             sc_connected = sc_data.get("connected", False)
 
+            cur_tlod, cur_olod, _ = get_current_lod_data(autofps)
+            tlod = cur_tlod
+            olod = cur_olod
+
             if sc_connected and sc_data.get("base_fps") is not None:
                 disp_fps = sc_data.get('displayed_fps')
                 base_fps = sc_data.get('base_fps')
                 mt_ms = sc_data.get('frame_time_ms')
                 agl = sc_data.get('agl_ft')
                 fpm = sc_data.get('fpm')
-                tlod = autofps.get('tlod') if autofps else None
-                olod = autofps.get('olod') if autofps else None
                 fg_mode = 'DLSSG (2X)' if (disp_fps and base_fps and disp_fps > base_fps) else 'NATIVE'
             else:
                 disp_fps = (autofps.get('displayed_fps') or autofps.get('disp_fps')) if autofps else None
                 base_fps = autofps.get('base_fps') if autofps else None
                 mt_ms = autofps.get('main_thread_ms') if autofps else None
-                tlod = autofps.get('tlod') if autofps else None
-                olod = autofps.get('olod') if autofps else None
                 agl = autofps.get('agl_ft') if autofps else None
                 fpm = autofps.get('fpm') if autofps else None
                 fg_mode = autofps.get('fg_mode') if autofps else None
@@ -2112,6 +2349,16 @@ class BlackboxSession:
             final_aircraft = last_sc.get('aircraft') or aircraft or "Avion non détecté"
             cloud_status = check_autofps_cloud_events()
 
+            smart_lod_info = {}
+            try:
+                from flight_lod_controller import get_smart_lod_controller
+                s_ctrl = get_smart_lod_controller()
+                if s_ctrl:
+                    smart_lod_info = s_ctrl.get_status()
+                    smart_lod_info['events'] = s_ctrl.get_trigger_events()
+            except Exception:
+                pass
+
             session_info = {
                 'mode_str': mode_str,
                 'is_corridor': is_corridor,
@@ -2124,7 +2371,8 @@ class BlackboxSession:
                 'arr': arr or cur_arr or ctx.get('arr'),
                 'autofps_config': autofps_cfg,
                 'autofps_active': autofps_is_active or is_autofps_active(),
-                'cloud_events': cloud_status
+                'cloud_events': cloud_status,
+                'smart_lod': smart_lod_info
             }
             html_file = generate_html_report(csv_path, session_info, samples)
             self.last_report_path = html_file

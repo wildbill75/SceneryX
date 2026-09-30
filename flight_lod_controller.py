@@ -72,10 +72,15 @@ class SmartLodController:
         # Télémétrie interne et lissage
         self.current_tlod_setpoint: float = 100.0
         self.current_olod_setpoint: float = 100.0
+        self.manual_olod: Optional[float] = None
+        self.manual_tlod: Optional[float] = None
         self.last_adjustment_time: float = 0.0
-        self.status_message: str = "Prêt (Inactif)"
+        self.status_message: str = "Ready (Standby)"
         self.in_cloud_reduction: bool = False
         self.original_cloud_quality: Optional[int] = None
+        self.trigger_events: List[Dict[str, Any]] = []
+        self._last_logged_tlod: Optional[float] = None
+        self._last_phase: str = "ground"
 
         if self.config.get("enabled", False):
             if self.config.get("auto_kill_autofps", False):
@@ -84,6 +89,34 @@ class SmartLodController:
                     print("[SmartLOD] Auto-terminating external AutoFPS based on user preference...")
                     self.engine.kill_autofps_process()
             self.start()
+
+    def get_trigger_events(self, clear: bool = False) -> List[Dict[str, Any]]:
+        with self._lock:
+            events = list(self.trigger_events)
+            if clear:
+                self.trigger_events.clear()
+            return events
+
+    def reset_manual_override(self, axis: str = "all") -> Dict[str, Any]:
+        """Réengage les limitations d'altitude et l'automatisation en supprimant le débrayage manuel."""
+        with self._lock:
+            if axis in ("tlod", "all"):
+                self.manual_tlod = None
+            if axis in ("olod", "all"):
+                self.manual_olod = None
+        if self.is_running:
+            try:
+                self._tick()
+            except Exception:
+                pass
+        return {
+            "success": True,
+            "axis": axis,
+            "manual_tlod": self.manual_tlod is not None,
+            "manual_olod": self.manual_olod is not None,
+            "current_tlod": round(self.current_tlod_setpoint, 1),
+            "current_olod": round(self.current_olod_setpoint, 1)
+        }
 
     # ================= CONFIG PERSISTENCE =================
 
@@ -217,48 +250,103 @@ class SmartLodController:
         deadband = self.config.get("deadband_fps", 2)
         step = self.config.get("step_size", 5)
 
-        # 4. Calcul de la consigne d'altitude (Interpolation Sol -> Croisière)
-        if on_ground or agl < 500:
-            altitude_target_tlod = float(tlod_ground)
-        elif agl >= alt_trans:
-            altitude_target_tlod = float(tlod_cruise)
+        # 4-6. Gestion du Terrain LOD (TLOD)
+        if getattr(self, "manual_tlod", None) is not None:
+            # Mode Débrayé / Manual Override : Consigne manuelle stricte (contourne les profils d'altitude)
+            self.current_tlod_setpoint = float(self.manual_tlod)
         else:
-            # Interpolation linéaire douce
-            ratio = max(0.0, min(1.0, (agl - 500) / max(1, alt_trans - 500)))
-            altitude_target_tlod = tlod_ground + ratio * (tlod_cruise - tlod_ground)
+            # Mode Automatique : Calcul de la consigne d'altitude (Interpolation Sol -> Croisière)
+            if on_ground or agl < 500:
+                altitude_target_tlod = float(tlod_ground)
+            elif agl >= alt_trans:
+                altitude_target_tlod = float(tlod_cruise)
+            else:
+                # Interpolation linéaire douce
+                ratio = max(0.0, min(1.0, (agl - 500) / max(1, alt_trans - 500)))
+                altitude_target_tlod = tlod_ground + ratio * (tlod_cruise - tlod_ground)
 
-        # 5. Ajustement selon le framerate réel (si en vol et FPS disponible)
-        target_tlod = altitude_target_tlod
-        if base_fps > 0 and agl >= 1000:
-            if base_fps < (target_fps - deadband):
-                # Sous-performance : Baisse du TLOD
-                deficit = (target_fps - base_fps)
-                target_tlod = max(tlod_ground, self.current_tlod_setpoint - (step * (deficit / 3.0)))
-            elif base_fps > (target_fps + deadband):
-                # Marge de performance : Remontée progressive
-                target_tlod = min(altitude_target_tlod, self.current_tlod_setpoint + step)
+            # 5. Ajustement selon le framerate réel (si en vol et FPS disponible)
+            target_tlod = altitude_target_tlod
+            if base_fps > 0 and agl >= 1000:
+                if base_fps < (target_fps - deadband):
+                    # Sous-performance : Baisse du TLOD
+                    deficit = (target_fps - base_fps)
+                    target_tlod = max(tlod_ground, self.current_tlod_setpoint - (step * (deficit / 3.0)))
+                elif base_fps > (target_fps + deadband):
+                    # Marge de performance : Remontée progressive
+                    target_tlod = min(altitude_target_tlod, self.current_tlod_setpoint + step)
 
-        # 6. Lissage progressif anti-saccades (Max step par cycle)
-        delta = target_tlod - self.current_tlod_setpoint
-        if abs(delta) > step:
-            delta = step if delta > 0 else -step
-        self.current_tlod_setpoint += delta
-        self.current_tlod_setpoint = max(float(tlod_ground), min(float(tlod_cruise), self.current_tlod_setpoint))
+            # 6. Lissage progressif anti-saccades (Max step par cycle)
+            delta = target_tlod - self.current_tlod_setpoint
+            if abs(delta) > step:
+                delta = step if delta > 0 else -step
+            self.current_tlod_setpoint += delta
+            self.current_tlod_setpoint = max(float(tlod_ground), min(float(tlod_cruise), self.current_tlod_setpoint))
 
         # 7. Écriture en mémoire
         ok = self.engine.write_tlod(self.current_tlod_setpoint)
         
         # 8. Gestion de l'Object LOD (OLOD)
-        olod_ground = self.config.get(f"{mode.lower()}_olod_ground", 100)
-        olod_cruise = self.config.get(f"{mode.lower()}_olod_cruise", 50)
-        if agl >= alt_trans:
-            target_olod = float(olod_cruise)
+        if getattr(self, "manual_olod", None) is not None:
+            # Mode Débrayé / Manual Override : Consigne manuelle stricte
+            self.current_olod_setpoint = float(self.manual_olod)
+            self.engine.write_olod(self.current_olod_setpoint)
         else:
-            ratio = max(0.0, min(1.0, agl / max(1, alt_trans)))
-            target_olod = olod_ground - ratio * (olod_ground - olod_cruise)
-        self.engine.write_olod(target_olod)
+            # Mode Automatique : Interpolation selon profil d'altitude
+            olod_ground = self.config.get(f"{mode.lower()}_olod_ground", 100)
+            olod_cruise = self.config.get(f"{mode.lower()}_olod_cruise", 50)
+            if agl >= alt_trans:
+                target_olod = float(olod_cruise)
+            else:
+                ratio = max(0.0, min(1.0, agl / max(1, alt_trans)))
+                target_olod = olod_ground - ratio * (olod_ground - olod_cruise)
+            self.current_olod_setpoint = target_olod
+            self.engine.write_olod(target_olod)
 
         if ok:
+            # Enregistrement des déclenchements (Triggers) pour feedback visuel et télémétrie
+            current_phase = "ground" if (on_ground or agl < 500) else ("cruise" if agl >= alt_trans else "climb_descent")
+            phase_changed = current_phase != self._last_phase
+            tlod_rounded = round(self.current_tlod_setpoint)
+            last_tlod = self._last_logged_tlod if self._last_logged_tlod is not None else tlod_rounded
+            tlod_diff = abs(tlod_rounded - last_tlod)
+
+            if phase_changed or tlod_diff >= 10:
+                import datetime
+                now_iso = datetime.datetime.now().strftime("%H:%M:%S")
+                trigger_type = "phase_transition" if phase_changed else ("fps_regulation_drop" if tlod_rounded < last_tlod else "fps_regulation_boost")
+                reason_text = ""
+                if phase_changed:
+                    if current_phase == "cruise":
+                        reason_text = f"Plafond croisière atteint (> {alt_trans} ft) -> TLOD {tlod_rounded}"
+                    elif current_phase == "ground":
+                        reason_text = f"Zone sol / approche (< 500 ft) -> TLOD {tlod_rounded} (protection MainThread)"
+                    else:
+                        reason_text = f"Transition montée/descente ({round(agl)} ft) -> TLOD {tlod_rounded}"
+                elif tlod_rounded < last_tlod:
+                    reason_text = f"Régulation FPS : baisse TLOD {last_tlod} -> {tlod_rounded} (FPS {round(base_fps)} < {target_fps})"
+                else:
+                    reason_text = f"Marge de fluidité : montée TLOD {last_tlod} -> {tlod_rounded} (FPS {round(base_fps)})"
+
+                event = {
+                    "timestamp": time.time(),
+                    "time_str": now_iso,
+                    "agl_ft": round(agl),
+                    "phase": current_phase,
+                    "old_tlod": last_tlod,
+                    "new_tlod": tlod_rounded,
+                    "fps": round(base_fps, 1),
+                    "type": trigger_type,
+                    "reason": reason_text
+                }
+                with self._lock:
+                    self.trigger_events.append(event)
+                    if len(self.trigger_events) > 100:
+                        self.trigger_events.pop(0)
+
+                self._last_logged_tlod = tlod_rounded
+                self._last_phase = current_phase
+
             self.status_message = f"Actif • TLOD {round(self.current_tlod_setpoint)} • {mode} ({round(base_fps)} FPS)"
         else:
             self.status_message = "Erreur d'écriture mémoire"
@@ -293,12 +381,16 @@ class SmartLodController:
             "status_message": self.status_message,
             "current_tlod_setpoint": round(self.current_tlod_setpoint, 1),
             "current_olod_setpoint": round(self.current_olod_setpoint, 1),
+            "manual_tlod": self.manual_tlod is not None,
+            "manual_olod": self.manual_olod is not None,
             "mode": self.config.get("mode", "IFR"),
             "source": self.config.get("source", "native"),
             "autofps_conflict": is_af_running,
             "autofps_pid": af_pid,
             "memory": mem_status,
-            "config": self.config
+            "config": self.config,
+            "trigger_events_count": len(self.trigger_events),
+            "last_trigger": self.trigger_events[-1] if self.trigger_events else None
         }
 
 

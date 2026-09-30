@@ -1,344 +1,145 @@
 // =========================================================
-// SceneryX MSFS In-Game Toolbar Panel - Remote Controller
+// SceneryX MSFS In-Game Toolbar Panel - Resilient Controller
 // =========================================================
 
-class SceneryXPanel extends TemplateElement {
+class IngamePanelSceneryX extends TemplateElement {
     constructor() {
-        super();
-        this.API_BASE = "http://127.0.0.1:8383/api";
-        this.POLL_INTERVAL_MS = 1000;
-        this.MAX_HISTORY_POINTS = 30;
-
-        this.isConnected = false;
-        this.fpsHistory = [];
-        this.isSmartLodToggling = false;
-        this.isBlackboxToggling = false;
-
-        // DOM Elements
-        this.elConnBadge = null;
-        this.elDisconnectedView = null;
-        this.elConnectedView = null;
-        this.elPanelCloseBtn = null;
-
-        this.elSmartLodBtn = null;
-        this.elSmartLodLabel = null;
-        this.elSmartLodDot = null;
-        this.elSmartLodTlodBadge = null;
-        this.elSmartLodDesc = null;
-
-        this.elFpsVal = null;
-        this.elFpsBase = null;
-        this.elMtVal = null;
-        this.elPacingStatus = null;
-        this.elDeltaLabel = null;
-        this.canvasSparkline = null;
-        this.ctxSparkline = null;
-
-        this.elVramVal = null;
-        this.elCacheVal = null;
-        this.elBlackboxBtn = null;
-        this.elRecDot = null;
-        this.elRecBtnLabel = null;
+        super(...arguments);
+        this.ingameUi = null;
     }
 
     connectedCallback() {
         super.connectedCallback();
-        let self = this;
-
-        function replaceText(node) {
-            if (node.nodeType === Node.TEXT_NODE) {
-                if (node.nodeValue && node.nodeValue.toUpperCase().trim() === "PANEL_SCENERYX_R") {
-                    node.nodeValue = "SCENERYX REMOTE";
-                }
-            } else if (node.nodeType === Node.ELEMENT_NODE) {
-                if (node.shadowRoot) {
-                    for (let child of node.shadowRoot.childNodes) replaceText(child);
-                }
-                for (let child of node.childNodes) replaceText(child);
-            }
-        }
-
-        function forceTitle() {
-            replaceText(document.documentElement);
-            let ui = document.querySelector("ingame-ui");
-            if (ui) ui.setAttribute("title", "SCENERYX REMOTE");
-            let header = document.querySelector("ingame-ui-header");
-            if (header) {
-                header.setAttribute("title", "SCENERYX REMOTE");
-                if (header.shadowRoot) {
-                    let titleElem = header.shadowRoot.querySelector(".title");
-                    if (titleElem) titleElem.innerText = "SCENERYX REMOTE";
-                }
-            }
-        }
-
-        setTimeout(forceTitle, 500);
-        setTimeout(forceTitle, 1500);
-        setTimeout(forceTitle, 3000);
-
-        setTimeout(() => {
-            self.init();
-        }, 300);
-    }
-
-    init() {
-        let root = this;
-
-        this.elConnBadge = root.querySelector("#conn-badge");
-        this.elDisconnectedView = root.querySelector("#disconnected-view");
-        this.elConnectedView = root.querySelector("#connected-view");
-        this.elPanelCloseBtn = root.querySelector("#panel-close-btn");
-
-        this.elSmartLodBtn = root.querySelector("#smart-lod-toggle-btn");
-        this.elSmartLodLabel = root.querySelector("#smart-lod-btn-label");
-        this.elSmartLodDot = root.querySelector("#smart-lod-dot");
-        this.elSmartLodTlodBadge = root.querySelector("#smart-lod-tlod-badge");
-        this.elSmartLodDesc = root.querySelector("#smart-lod-status-desc");
-
-        this.elFpsVal = root.querySelector("#live-fps-val");
-        this.elFpsBase = root.querySelector("#live-fps-base");
-        this.elMtVal = root.querySelector("#live-mt-val");
-        this.elPacingStatus = root.querySelector("#live-pacing-status");
-        this.elDeltaLabel = root.querySelector("#fps-delta-label");
-
-        this.canvasSparkline = root.querySelector("#fps-sparkline-canvas");
-        if (this.canvasSparkline && this.canvasSparkline.getContext) {
-            this.ctxSparkline = this.canvasSparkline.getContext("2d");
-        }
-
-        this.elVramVal = root.querySelector("#live-vram-val");
-        this.elCacheVal = root.querySelector("#live-cache-val");
-        this.elBlackboxBtn = root.querySelector("#blackbox-toggle-btn");
-        this.elRecDot = root.querySelector("#rec-dot");
-        this.elRecBtnLabel = root.querySelector("#rec-btn-label");
-
-        if (this.elSmartLodBtn) {
-            this.elSmartLodBtn.addEventListener("click", () => this.onSmartLodClick());
-        }
-
-        if (this.elBlackboxBtn) {
-            this.elBlackboxBtn.addEventListener("click", () => this.onBlackboxClick());
-        }
-
-        if (this.elPanelCloseBtn) {
-            this.elPanelCloseBtn.addEventListener("click", () => {
-                let ui = document.querySelector("ingame-ui");
-                if (ui && ui.close) {
-                    ui.close();
-                } else if (window.parent && window.parent.document) {
-                    let parentUi = window.parent.document.querySelector("ingame-ui#SceneryX_Remote");
-                    if (parentUi && parentUi.close) parentUi.close();
-                }
+        this.ingameUi = this.querySelector("ingame-ui");
+        if (this.ingameUi) {
+            this.ingameUi.addEventListener("panelActive", () => {
+                this.enableStockHeader();
             });
+            this.enableStockHeader();
+            setTimeout(() => { this.enableStockHeader(); }, 250);
         }
-
-        // Start Telemetry Polling Loop
-        this.pollTelemetry();
-        setInterval(() => this.pollTelemetry(), this.POLL_INTERVAL_MS);
     }
 
-    pollTelemetry() {
-        let self = this;
-        let url = this.API_BASE + "/telemetry";
+    enableStockHeader() {
+        if (!this.ingameUi) return;
+        this.ingameUi.setAttribute("title", "SCENERY X");
+        this.ingameUi.setAttribute("collapsible", "true");
+        var header = this.ingameUi.headerElement || this.ingameUi.querySelector("ingame-ui-header");
+        if (!header) return;
+        if (typeof header.setActive === "function") header.setActive(true);
+        if (typeof header.setForcedAttach === "function") header.setForcedAttach(false);
+        if (typeof header.setCollapsible === "function") header.setCollapsible(true);
+        if (typeof header.setCloseable === "function") header.setCloseable(true);
+        var vr = typeof g_externalVariables !== "undefined" && g_externalVariables.vrMode;
+        if (typeof header.setExternalizable === "function") header.setExternalizable(!vr);
+    }
+}
+window.customElements.define("ingamepanel-sceneryx", IngamePanelSceneryX);
+checkAutoload();
 
-        if (typeof fetch !== "undefined") {
-            fetch(url, { cache: "no-store" })
-                .then(function(res) {
-                    if (!res.ok) throw new Error("HTTP " + res.status);
-                    return res.json();
-                })
-                .then(function(data) {
-                    self.setConnectedState(true);
-                    self.updateTelemetryUI(data);
-                })
-                .catch(function() {
-                    self.setConnectedState(false);
-                });
-            return;
-        }
+(function () {
+    const HOSTS = ["http://127.0.0.1:8383", "http://localhost:8383"];
+    let hostIndex = 0;
+    const POLL_INTERVAL_MS = 1000;
+    const MAX_HISTORY_POINTS = 30;
 
-        let xhr = new XMLHttpRequest();
-        xhr.open("GET", url, true);
-        xhr.timeout = 2000;
+    let isConnected = false;
+    let fpsHistory = [];
+    let wasRecording = false;
+    let isSmartLodToggling = false;
+    let isBlackboxToggling = false;
+    let isUserDraggingLod = false;
+    let lodDebounceTimer = null;
+    let lodGraceUntil = 0;
 
-        xhr.onload = function () {
-            if (xhr.status >= 200 && xhr.status < 300) {
-                try {
-                    let data = JSON.parse(xhr.responseText);
-                    self.setConnectedState(true);
-                    self.updateTelemetryUI(data);
-                } catch (e) {
-                    self.setConnectedState(false);
-                }
-            } else {
-                self.setConnectedState(false);
-            }
-        };
+    let currentTlod = 100;
+    let currentOlod = 100;
 
-        xhr.onerror = function () {
-            self.setConnectedState(false);
-        };
-
-        xhr.ontimeout = function () {
-            self.setConnectedState(false);
-        };
-
-        xhr.send();
+    function getApiBase() {
+        return HOSTS[hostIndex % HOSTS.length] + "/api";
     }
 
-    setConnectedState(online) {
-        this.isConnected = online;
-        if (!this.elConnBadge) return;
+    function switchHost() {
+        hostIndex = (hostIndex + 1) % HOSTS.length;
+    }
+
+    function setConnectedState(online) {
+        isConnected = online;
+        let discView = document.getElementById("disconnected-view");
+        let connView = document.getElementById("connected-view");
 
         if (online) {
-            this.elConnBadge.textContent = "ONLINE";
-            this.elConnBadge.className = "badge-online";
-            if (this.elDisconnectedView) this.elDisconnectedView.classList.add("hidden");
-            if (this.elConnectedView) this.elConnectedView.classList.remove("hidden");
+            if (discView) {
+                discView.classList.add("hidden");
+                discView.style.display = "none";
+            }
+            if (connView) {
+                connView.classList.remove("hidden");
+                connView.style.display = "flex";
+            }
         } else {
-            this.elConnBadge.textContent = "OFFLINE";
-            this.elConnBadge.className = "badge-offline";
-            if (this.elDisconnectedView) this.elDisconnectedView.classList.remove("hidden");
-            if (this.elConnectedView) this.elConnectedView.classList.add("hidden");
-        }
-    }
-
-    updateTelemetryUI(data) {
-        if (!data) return;
-
-        // 1. SMART LOD CONTROLLER
-        let lod = data.smart_lod || {};
-        let lodActive = (lod.active !== undefined) ? !!lod.active : (!!data.smart_lod_running && !!data.smart_lod_enabled);
-        let curTlod = (lod.current_tlod !== undefined && lod.current_tlod !== null) ? lod.current_tlod : (data.smart_lod_tlod !== undefined ? data.smart_lod_tlod : "--");
-        let curOlod = (lod.current_olod !== undefined && lod.current_olod !== null) ? lod.current_olod : "--";
-        let targetFps = lod.target_fps || "--";
-
-        if (this.elSmartLodTlodBadge) {
-            if (curTlod !== "--" && curOlod !== "--") {
-                this.elSmartLodTlodBadge.textContent = "TLOD " + Math.round(curTlod) + " / OLOD " + Math.round(curOlod);
-            } else if (curTlod !== "--") {
-                this.elSmartLodTlodBadge.textContent = "TLOD: " + Math.round(curTlod);
-            } else {
-                this.elSmartLodTlodBadge.textContent = "TLOD: --";
+            if (discView) {
+                discView.classList.remove("hidden");
+                discView.style.display = "flex";
             }
-        }
-
-        if (this.elSmartLodBtn && !this.isSmartLodToggling) {
-            if (lodActive) {
-                this.elSmartLodBtn.className = "btn-smart-lod btn-active";
-                if (this.elSmartLodLabel) this.elSmartLodLabel.textContent = "SMART LOD : ACTIF";
-                if (this.elSmartLodDesc) this.elSmartLodDesc.textContent = "Cible: " + targetFps + " FPS • Régulation continue";
-            } else {
-                this.elSmartLodBtn.className = "btn-smart-lod btn-inactive";
-                if (this.elSmartLodLabel) this.elSmartLodLabel.textContent = "SMART LOD : INACTIF";
-                if (this.elSmartLodDesc) this.elSmartLodDesc.textContent = "Cliquez pour engager la régulation dynamique";
-            }
-        }
-
-        // 2. LIVE FPS & PERFORMANCE
-        let perf = data.perf || {};
-        let dispFps = (perf.displayed_fps !== undefined && perf.displayed_fps !== null) ? perf.displayed_fps : (data.displayed_fps || 0);
-        let baseFps = (perf.fps !== undefined && perf.fps !== null) ? perf.fps : (data.base_fps || 0);
-        let mtMs = (perf.main_thread_ms !== undefined && perf.main_thread_ms !== null) ? perf.main_thread_ms : (data.main_thread_ms || 0);
-        let pacing = perf.frame_pacing || "OPTIMAL";
-
-        if (this.elFpsVal) {
-            this.elFpsVal.textContent = dispFps > 0 ? Math.round(dispFps) : "--";
-        }
-        if (this.elFpsBase) {
-            this.elFpsBase.textContent = baseFps > 0 ? "(" + Math.round(baseFps) + " base)" : "(-- base)";
-        }
-        if (this.elMtVal) {
-            this.elMtVal.textContent = mtMs > 0 ? mtMs.toFixed(1) : "--";
-        }
-        if (this.elPacingStatus) {
-            this.elPacingStatus.textContent = pacing;
-            if (pacing === "OPTIMAL" || pacing === "FLUIDE") {
-                this.elPacingStatus.className = "status-pill status-optimum";
-            } else if (pacing === "ACCEPTABLE" || pacing === "CHARGE") {
-                this.elPacingStatus.className = "status-pill status-warning";
-            } else {
-                this.elPacingStatus.className = "status-pill status-danger";
-            }
-        }
-
-        // 3. SPARKLINE & DELTA CALCULATION
-        if (dispFps > 0) {
-            this.fpsHistory.push(dispFps);
-            if (this.fpsHistory.length > this.MAX_HISTORY_POINTS) {
-                this.fpsHistory.shift();
-            }
-            this.drawSparkline();
-        }
-
-        // 4. VRAM & ROLLING CACHE
-        if (this.elVramVal) {
-            let vramUsed = data.vram_used_gb !== undefined ? data.vram_used_gb : (data.msfs_vram_mb ? (data.msfs_vram_mb / 1024).toFixed(1) : 0);
-            let vramTot = data.vram_total_gb !== undefined ? data.vram_total_gb : (data.vram_total_mb ? (data.vram_total_mb / 1024).toFixed(1) : 0);
-            this.elVramVal.textContent = (vramUsed || "--") + " / " + (vramTot || "--") + " Go";
-        }
-        if (this.elCacheVal) {
-            let cacheVal = data.rolling_cache_gb !== undefined ? data.rolling_cache_gb : (data.cache_read_mbps || 0);
-            this.elCacheVal.textContent = cacheVal + " Go";
-        }
-
-        // 5. BLACKBOX RECORDER
-        let isRec = !!data.blackbox_recording;
-        if (this.elBlackboxBtn && !this.isBlackboxToggling) {
-            if (isRec) {
-                this.elBlackboxBtn.className = "btn-rec btn-rec-active";
-                if (this.elRecBtnLabel) this.elRecBtnLabel.textContent = "ENREGISTREMENT EN COURS...";
-            } else {
-                this.elBlackboxBtn.className = "btn-rec btn-rec-inactive";
-                if (this.elRecBtnLabel) this.elRecBtnLabel.textContent = "ENREGISTREMENT FLIGHT RIG";
+            if (connView) {
+                connView.classList.add("hidden");
+                connView.style.display = "none";
             }
         }
     }
 
-    drawSparkline() {
-        if (!this.ctxSparkline || !this.canvasSparkline || this.fpsHistory.length < 2) return;
+    function drawSparkline() {
+        let canvas = document.getElementById("fps-sparkline-canvas");
+        if (!canvas || !canvas.getContext || fpsHistory.length < 2) return;
 
-        let w = this.canvasSparkline.width;
-        let h = this.canvasSparkline.height;
-        let ctx = this.ctxSparkline;
+        let ctx = canvas.getContext("2d");
+        let w = canvas.width;
+        let h = canvas.height;
 
         ctx.clearRect(0, 0, w, h);
 
-        let minVal = Math.min(...this.fpsHistory);
-        let maxVal = Math.max(...this.fpsHistory);
-        if (maxVal - minVal < 5) {
-            maxVal += 3;
-            minVal = Math.max(0, minVal - 3);
+        let minVal = 999999;
+        let maxVal = -999999;
+        for (let i = 0; i < fpsHistory.length; i++) {
+            let val = fpsHistory[i];
+            if (val < minVal) minVal = val;
+            if (val > maxVal) maxVal = val;
+        }
+
+        if (maxVal - minVal < 4) {
+            maxVal += 2;
+            minVal = Math.max(0, minVal - 2);
         }
 
         let range = maxVal - minVal || 1;
-        let stepX = w / (this.MAX_HISTORY_POINTS - 1);
-        let startIdx = this.MAX_HISTORY_POINTS - this.fpsHistory.length;
+        let stepX = w / (MAX_HISTORY_POINTS - 1);
+        let startIdx = MAX_HISTORY_POINTS - fpsHistory.length;
 
-        // Draw gradient fill
+        // Gradient fill
         let grad = ctx.createLinearGradient(0, 0, 0, h);
-        grad.addColorStop(0, "rgba(56, 189, 248, 0.35)");
-        grad.addColorStop(1, "rgba(56, 189, 248, 0.0)");
+        grad.addColorStop(0, "rgba(2, 132, 199, 0.4)");
+        grad.addColorStop(1, "rgba(2, 132, 199, 0.0)");
 
         ctx.beginPath();
-        for (let i = 0; i < this.fpsHistory.length; i++) {
+        for (let i = 0; i < fpsHistory.length; i++) {
             let x = (startIdx + i) * stepX;
-            let norm = (this.fpsHistory[i] - minVal) / range;
+            let norm = (fpsHistory[i] - minVal) / range;
             let y = h - (norm * (h - 6)) - 3;
             if (i === 0) ctx.moveTo(x, y);
             else ctx.lineTo(x, y);
         }
-        ctx.lineTo((startIdx + this.fpsHistory.length - 1) * stepX, h);
+        ctx.lineTo((startIdx + fpsHistory.length - 1) * stepX, h);
         ctx.lineTo(startIdx * stepX, h);
         ctx.closePath();
         ctx.fillStyle = grad;
         ctx.fill();
 
-        // Draw stroke line
+        // Stroke line
         ctx.beginPath();
-        for (let i = 0; i < this.fpsHistory.length; i++) {
+        for (let i = 0; i < fpsHistory.length; i++) {
             let x = (startIdx + i) * stepX;
-            let norm = (this.fpsHistory[i] - minVal) / range;
+            let norm = (fpsHistory[i] - minVal) / range;
             let y = h - (norm * (h - 6)) - 3;
             if (i === 0) ctx.moveTo(x, y);
             else ctx.lineTo(x, y);
@@ -347,87 +148,350 @@ class SceneryXPanel extends TemplateElement {
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // Calculate Delta (last vs first in 30s window)
-        let first = this.fpsHistory[0];
-        let last = this.fpsHistory[this.fpsHistory.length - 1];
+        // Delta
+        let first = fpsHistory[0];
+        let last = fpsHistory[fpsHistory.length - 1];
         let delta = Math.round(last - first);
 
-        if (this.elDeltaLabel) {
+        let elDelta = document.getElementById("fps-delta-label");
+        if (elDelta) {
             if (delta > 0) {
-                this.elDeltaLabel.textContent = "+" + delta + " FPS";
-                this.elDeltaLabel.className = "delta-label delta-up";
+                elDelta.textContent = "+" + delta + " FPS";
+                elDelta.className = "delta-label delta-up";
             } else if (delta < 0) {
-                this.elDeltaLabel.textContent = delta + " FPS";
-                this.elDeltaLabel.className = "delta-label delta-down";
+                elDelta.textContent = delta + " FPS";
+                elDelta.className = "delta-label delta-down";
             } else {
-                this.elDeltaLabel.textContent = "0 FPS";
-                this.elDeltaLabel.className = "delta-label delta-neutral";
+                elDelta.textContent = "0 FPS";
+                elDelta.className = "delta-label delta-neutral";
             }
         }
     }
 
-    onSmartLodClick() {
-        let self = this;
-        this.isSmartLodToggling = true;
-        let url = this.API_BASE + "/smart_lod/toggle";
+    function updateTelemetryUI(data) {
+        if (!data) return;
 
-        if (typeof fetch !== "undefined") {
-            fetch(url, { method: "POST" })
-                .then(function(r) { return r.json(); })
-                .then(function() {
-                    self.isSmartLodToggling = false;
-                    self.pollTelemetry();
-                })
-                .catch(function() {
-                    self.isSmartLodToggling = false;
-                });
-            return;
+        // 1. SMART LOD
+        let lod = data.smart_lod || {};
+        let lodActive = (lod.active !== undefined) ? !!lod.active : (!!data.smart_lod_running && !!data.smart_lod_enabled);
+        let sTlod = (lod.current_tlod !== undefined && lod.current_tlod !== null) ? lod.current_tlod : (data.smart_lod_tlod !== undefined ? data.smart_lod_tlod : 100);
+        let sOlod = (lod.current_olod !== undefined && lod.current_olod !== null) ? lod.current_olod : (data.smart_lod_olod !== undefined ? data.smart_lod_olod : 100);
+
+        let now = Date.now();
+        if (!isUserDraggingLod && now > lodGraceUntil) {
+            currentTlod = Math.round(Number(sTlod) || 100);
+            currentOlod = Math.round(Number(sOlod) || 100);
+
+            let slTlod = document.getElementById("tlod-slider");
+            if (slTlod) slTlod.value = currentTlod;
+            let lblTlod = document.getElementById("tlod-val-label");
+            if (lblTlod) lblTlod.textContent = currentTlod;
+
+            let slOlod = document.getElementById("olod-slider");
+            if (slOlod) slOlod.value = currentOlod;
+            let lblOlod = document.getElementById("olod-val-label");
+            if (lblOlod) lblOlod.textContent = currentOlod;
         }
 
+        let btnLod = document.getElementById("smart-lod-toggle-btn");
+        let lblLod = document.getElementById("smart-lod-btn-label");
+        if (btnLod && !isSmartLodToggling) {
+            if (lodActive) {
+                btnLod.className = "msfs-btn btn-active-green";
+                if (lblLod) lblLod.textContent = "ACTIVE";
+            } else {
+                btnLod.className = "msfs-btn btn-primary";
+                if (lblLod) lblLod.textContent = "ENGAGE";
+            }
+        }
+
+        // 2. LIVE PERFORMANCE (ALWAYS LIVE MONITORED)
+        let perf = data.perf || {};
+        let dispFps = (perf.displayed_fps !== undefined && perf.displayed_fps !== null) ? perf.displayed_fps : (data.displayed_fps || 0);
+        let baseFps = (perf.fps !== undefined && perf.fps !== null) ? perf.fps : (data.base_fps || 0);
+        let mtMs = (perf.main_thread_ms !== undefined && perf.main_thread_ms !== null) ? perf.main_thread_ms : (data.main_thread_ms || 0);
+        let pacing = (perf.frame_pacing || "OPTIMAL").toUpperCase();
+
+        let elFps = document.getElementById("live-fps-val");
+        if (elFps) elFps.textContent = (dispFps && dispFps > 0) ? Math.round(dispFps) : "--";
+
+        let elBase = document.getElementById("live-fps-base");
+        if (elBase) elBase.textContent = (baseFps && baseFps > 0) ? "(" + Math.round(baseFps) + " base)" : "";
+
+        let elMt = document.getElementById("live-mt-val");
+        if (elMt) elMt.textContent = (mtMs && mtMs > 0) ? Number(mtMs).toFixed(1) : "--";
+
+        let elPacing = document.getElementById("live-pacing-status");
+        if (elPacing) {
+            if (pacing === "OPTIMAL" || pacing === "FLUIDE") {
+                elPacing.textContent = "OPTIMAL";
+                elPacing.className = "badge-tag tag-green";
+            } else if (pacing === "ACCEPTABLE" || pacing === "CHARGE" || pacing === "CHARGÉ") {
+                elPacing.textContent = "ACCEPTABLE";
+                elPacing.className = "badge-tag tag-amber";
+            } else {
+                elPacing.textContent = "HEAVY";
+                elPacing.className = "badge-tag tag-red";
+            }
+        }
+
+        // 3. BLACKBOX RECORDER STATUS
+        let isRec = !!data.blackbox_recording;
+        let btnRec = document.getElementById("blackbox-toggle-btn");
+        let lblRec = document.getElementById("rec-btn-label");
+        if (btnRec && !isBlackboxToggling) {
+            if (isRec) {
+                btnRec.className = "msfs-btn btn-active-red";
+                if (lblRec) lblRec.textContent = "STOP RECORDING";
+            } else {
+                btnRec.className = "msfs-btn btn-primary";
+                if (lblRec) lblRec.textContent = "START RECORDING";
+            }
+        }
+
+        // 4. SPARKLINE TREND GRAPH (MONITORS ONLY WHILE RECORDING!)
+        // If recording just started, reset graph history to capture fresh session
+        if (isRec && !wasRecording) {
+            fpsHistory = [];
+        }
+        wasRecording = isRec;
+
+        // When recording is active, push new points and advance the sparkline.
+        // When recording is stopped, do NOT push new points: freeze the graph as requested!
+        if (isRec && dispFps && dispFps > 0) {
+            fpsHistory.push(dispFps);
+            if (fpsHistory.length > MAX_HISTORY_POINTS) {
+                fpsHistory.shift();
+            }
+            drawSparkline();
+        }
+
+        // 5. SYSTEM METRICS
+        let elVram = document.getElementById("live-vram-val");
+        if (elVram) {
+            let vramUsed = data.vram_used_gb !== undefined ? data.vram_used_gb : "--";
+            let vramTot = data.vram_total_gb !== undefined ? data.vram_total_gb : "--";
+            if (vramUsed !== "--" && vramTot !== "--") {
+                elVram.textContent = vramUsed + " / " + vramTot + " GB";
+            } else {
+                elVram.textContent = "-- GB";
+            }
+        }
+
+        let elCache = document.getElementById("live-cache-val");
+        if (elCache) {
+            let cacheVal = data.rolling_cache_gb !== undefined ? data.rolling_cache_gb : 0.0;
+            elCache.textContent = cacheVal + " MB/s";
+        }
+    }
+
+    function pollTelemetry() {
+        let url = getApiBase() + "/telemetry?_=" + Date.now();
+
+        function handleSuccess(data) {
+            setConnectedState(true);
+            try {
+                updateTelemetryUI(data);
+            } catch (e) {
+                console.error("[SceneryX] UI update error:", e);
+            }
+        }
+
+        function handleFailure() {
+            switchHost();
+            setConnectedState(false);
+        }
+
+        if (typeof fetch === "function") {
+            fetch(url, { cache: "no-store" })
+                .then(function (res) {
+                    if (!res.ok) throw new Error("HTTP " + res.status);
+                    return res.json();
+                })
+                .then(handleSuccess)
+                .catch(function () {
+                    tryXhr(url, handleSuccess, handleFailure);
+                });
+        } else {
+            tryXhr(url, handleSuccess, handleFailure);
+        }
+    }
+
+    function tryXhr(url, onSuccess, onError) {
+        try {
+            let xhr = new XMLHttpRequest();
+            xhr.open("GET", url, true);
+            xhr.timeout = 1500;
+            xhr.onload = function () {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    try {
+                        let data = JSON.parse(xhr.responseText);
+                        onSuccess(data);
+                    } catch (e) {
+                        onError();
+                    }
+                } else {
+                    onError();
+                }
+            };
+            xhr.onerror = onError;
+            xhr.ontimeout = onError;
+            xhr.send();
+        } catch (e) {
+            onError();
+        }
+    }
+
+    function sendLodUpdate() {
+        let url = getApiBase() + "/smart_lod/set_lod?tlod=" + currentTlod + "&olod=" + currentOlod + "&_=" + Date.now();
         let xhr = new XMLHttpRequest();
-        xhr.open("POST", url, true);
+        xhr.open("GET", url, true);
         xhr.timeout = 2000;
         xhr.onload = function () {
-            self.isSmartLodToggling = false;
-            self.pollTelemetry();
+            lodGraceUntil = Date.now() + 1200;
+            setTimeout(function () {
+                isUserDraggingLod = false;
+            }, 1200);
         };
         xhr.onerror = function () {
-            self.isSmartLodToggling = false;
+            setTimeout(function () {
+                isUserDraggingLod = false;
+            }, 1200);
         };
         xhr.send();
     }
 
-    onBlackboxClick() {
-        let self = this;
-        this.isBlackboxToggling = true;
-        let url = this.API_BASE + "/blackbox/toggle";
+    function queueLodUpdate() {
+        isUserDraggingLod = true;
+        lodGraceUntil = Date.now() + 2000;
+        if (lodDebounceTimer) clearTimeout(lodDebounceTimer);
+        lodDebounceTimer = setTimeout(sendLodUpdate, 150);
+    }
 
-        if (typeof fetch !== "undefined") {
-            fetch(url, { method: "POST" })
-                .then(function(r) { return r.json(); })
-                .then(function() {
-                    self.isBlackboxToggling = false;
-                    self.pollTelemetry();
-                })
-                .catch(function() {
-                    self.isBlackboxToggling = false;
-                });
+    function onSmartLodClick() {
+        isSmartLodToggling = true;
+        let url = getApiBase() + "/smart_lod/toggle";
+        let xhr = new XMLHttpRequest();
+        xhr.open("POST", url, true);
+        xhr.timeout = 2500;
+        xhr.onload = function () {
+            isSmartLodToggling = false;
+            pollTelemetry();
+        };
+        xhr.onerror = function () { isSmartLodToggling = false; };
+        xhr.ontimeout = function () { isSmartLodToggling = false; };
+        xhr.send();
+    }
+
+    function onBlackboxClick() {
+        isBlackboxToggling = true;
+        let btnRec = document.getElementById("blackbox-toggle-btn");
+        let lblRec = document.getElementById("rec-btn-label");
+        let currentLabel = lblRec ? lblRec.textContent : "";
+        if (currentLabel.indexOf("START") !== -1) {
+            if (btnRec) btnRec.className = "msfs-btn btn-active-red";
+            if (lblRec) lblRec.textContent = "STOP RECORDING";
+        } else {
+            if (btnRec) btnRec.className = "msfs-btn btn-primary";
+            if (lblRec) lblRec.textContent = "START RECORDING";
+        }
+
+        let url = getApiBase() + "/blackbox/toggle";
+        let xhr = new XMLHttpRequest();
+        xhr.open("POST", url, true);
+        xhr.timeout = 3000;
+        xhr.onload = function () {
+            isBlackboxToggling = false;
+            pollTelemetry();
+        };
+        xhr.onerror = function () { isBlackboxToggling = false; };
+        xhr.ontimeout = function () { isBlackboxToggling = false; };
+        xhr.send();
+    }
+
+    function init() {
+        let discView = document.getElementById("disconnected-view");
+        let connView = document.getElementById("connected-view");
+        if (!discView || !connView) {
+            setTimeout(init, 100);
             return;
         }
 
-        let xhr = new XMLHttpRequest();
-        xhr.open("POST", url, true);
-        xhr.timeout = 2000;
-        xhr.onload = function () {
-            self.isBlackboxToggling = false;
-            self.pollTelemetry();
-        };
-        xhr.onerror = function () {
-            self.isBlackboxToggling = false;
-        };
-        xhr.send();
-    }
-}
+        let btnLod = document.getElementById("smart-lod-toggle-btn");
+        if (btnLod) {
+            btnLod.addEventListener("click", onSmartLodClick);
+        }
 
-window.customElements.define("sceneryx-panel", SceneryXPanel);
-checkAutoload();
+        let btnRec = document.getElementById("blackbox-toggle-btn");
+        if (btnRec) {
+            btnRec.addEventListener("click", onBlackboxClick);
+        }
+
+        // Wire TLOD Controls
+        let slTlod = document.getElementById("tlod-slider");
+        let lblTlod = document.getElementById("tlod-val-label");
+        if (slTlod) {
+            slTlod.addEventListener("input", function () {
+                currentTlod = parseInt(slTlod.value, 10) || 100;
+                if (lblTlod) lblTlod.textContent = currentTlod;
+                queueLodUpdate();
+            });
+        }
+        let btnTlodMinus = document.getElementById("tlod-minus-btn");
+        if (btnTlodMinus) {
+            btnTlodMinus.addEventListener("click", function () {
+                currentTlod = Math.max(10, currentTlod - 10);
+                if (slTlod) slTlod.value = currentTlod;
+                if (lblTlod) lblTlod.textContent = currentTlod;
+                queueLodUpdate();
+            });
+        }
+        let btnTlodPlus = document.getElementById("tlod-plus-btn");
+        if (btnTlodPlus) {
+            btnTlodPlus.addEventListener("click", function () {
+                currentTlod = Math.min(400, currentTlod + 10);
+                if (slTlod) slTlod.value = currentTlod;
+                if (lblTlod) lblTlod.textContent = currentTlod;
+                queueLodUpdate();
+            });
+        }
+
+        // Wire OLOD Controls
+        let slOlod = document.getElementById("olod-slider");
+        let lblOlod = document.getElementById("olod-val-label");
+        if (slOlod) {
+            slOlod.addEventListener("input", function () {
+                currentOlod = parseInt(slOlod.value, 10) || 100;
+                if (lblOlod) lblOlod.textContent = currentOlod;
+                queueLodUpdate();
+            });
+        }
+        let btnOlodMinus = document.getElementById("olod-minus-btn");
+        if (btnOlodMinus) {
+            btnOlodMinus.addEventListener("click", function () {
+                currentOlod = Math.max(10, currentOlod - 10);
+                if (slOlod) slOlod.value = currentOlod;
+                if (lblOlod) lblOlod.textContent = currentOlod;
+                queueLodUpdate();
+            });
+        }
+        let btnOlodPlus = document.getElementById("olod-plus-btn");
+        if (btnOlodPlus) {
+            btnOlodPlus.addEventListener("click", function () {
+                currentOlod = Math.min(300, currentOlod + 10);
+                if (slOlod) slOlod.value = currentOlod;
+                if (lblOlod) lblOlod.textContent = currentOlod;
+                queueLodUpdate();
+            });
+        }
+
+        pollTelemetry();
+        setInterval(pollTelemetry, POLL_INTERVAL_MS);
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", init);
+    } else {
+        init();
+    }
+})();
