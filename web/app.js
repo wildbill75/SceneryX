@@ -12777,7 +12777,9 @@ function initDraggableFilterRadial() {
             window.removeEventListener('mouseup', onMouseUp, true);
 
             if (!filterRadialHasMoved && isHub) {
-                handleFilterRadialCenterClick();
+                if (filterRadialContextMode !== 'hub') {
+                    handleFilterRadialCenterClick();
+                }
             }
         };
 
@@ -12858,20 +12860,20 @@ function renderContextualRadialHub() {
     if (filterRadialContextMode === 'hub') {
         hubEl.classList.add('hub-mode-dual');
         hubEl.innerHTML = `
-            <svg width="154" height="154" viewBox="0 0 154 154" class="overflow-visible pointer-events-auto filter drop-shadow-2xl">
+            <svg width="140" height="140" viewBox="0 0 140 140" class="overflow-visible pointer-events-auto filter drop-shadow-2xl">
                 <!-- TOP SEMI-CIRCLE: FILTERS -->
                 <g class="hub-semicircle group cursor-pointer" onclick="selectContextualRadialMode('filters')">
-                    <path class="hub-semicircle-path" d="M 5.03 73.00 A 70 70 0 0 1 144.97 73.00 Z" />
-                    <text x="75" y="47" text-anchor="middle"
+                    <path class="hub-semicircle-path" d="M 2.03 68.00 A 68 68 0 0 1 137.97 68.00 Z" />
+                    <text x="70" y="44" text-anchor="middle"
                           class="fill-slate-200 group-hover:fill-white font-mono font-black text-xs uppercase tracking-wider pointer-events-none select-none">
                         FILTERS
                     </text>
                 </g>
                 <!-- BOTTOM SEMI-CIRCLE: FLIGHT OPTIMIZER -->
                 <g class="hub-semicircle group cursor-pointer" onclick="selectContextualRadialMode('flight_optimizer')">
-                    <path class="hub-semicircle-path" d="M 144.97 77.00 A 70 70 0 0 1 5.03 77.00 Z" />
-                    <text x="75" y="103" text-anchor="middle"
-                          class="fill-slate-200 group-hover:fill-white font-mono font-black text-[10.5px] uppercase tracking-wider pointer-events-none select-none">
+                    <path class="hub-semicircle-path" d="M 137.97 72.00 A 68 68 0 0 1 2.03 72.00 Z" />
+                    <text x="70" y="99" text-anchor="middle"
+                          class="fill-slate-200 group-hover:fill-white font-mono font-black text-[10px] uppercase tracking-wider pointer-events-none select-none">
                         FLIGHT OPTIMIZER
                     </text>
                 </g>
@@ -12880,7 +12882,7 @@ function renderContextualRadialHub() {
     } else if (filterRadialContextMode === 'flight_optimizer') {
         hubEl.classList.remove('hub-mode-dual');
         hubEl.innerHTML = `
-            <div class="flex flex-col items-center justify-center pointer-events-none select-none text-center">
+            <div class="flex flex-col items-center justify-center pointer-events-auto select-none text-center cursor-pointer w-full h-full" onclick="selectContextualRadialMode('hub')">
                 <span class="text-[9.5px] font-bold tracking-widest text-slate-400 uppercase leading-tight">FLIGHT</span>
                 <span class="text-base font-black font-mono text-white leading-none mt-0.5 tracking-tight">OPTIMIZER</span>
                 <span class="text-[8.5px] font-mono font-bold text-sky-400 uppercase mt-1.5">CLICK TO BACK</span>
@@ -12890,7 +12892,7 @@ function renderContextualRadialHub() {
         hubEl.classList.remove('hub-mode-dual');
         const count = currentlyFilteredAirports ? currentlyFilteredAirports.length : (allAirportsData ? allAirportsData.length : 0);
         hubEl.innerHTML = `
-            <div class="flex flex-col items-center justify-center pointer-events-none select-none text-center">
+            <div class="flex flex-col items-center justify-center pointer-events-auto select-none text-center cursor-pointer w-full h-full" onclick="selectContextualRadialMode('hub')">
                 <span class="text-[10px] font-bold tracking-widest text-slate-400 uppercase leading-tight">${t('radial.map_view', 'MAP VIEW')}</span>
                 <span class="text-[10px] font-bold tracking-widest text-slate-400 uppercase leading-tight mt-0.5">${t('radial.filtered_by', 'FILTERED BY')}</span>
                 <span class="text-2xl font-black font-mono text-white leading-none mt-1.5 tracking-tight">${count}</span>
@@ -12983,9 +12985,7 @@ function closeFilterRadialMenu() {
 }
 
 function handleFilterRadialCenterClick() {
-    if (filterRadialContextMode === 'hub') {
-        closeFilterRadialMenu();
-    } else {
+    if (filterRadialContextMode !== 'hub') {
         selectContextualRadialMode('hub');
     }
 }
@@ -15641,7 +15641,10 @@ function getAirportPricingTextColor(ap) {
 
 function isFlightOptimizerModalOpen() {
     const modal = document.getElementById('flight-optimizer-modal');
-    return !!(modal && !modal.classList.contains('hidden'));
+    const isOldOpen = !!(modal && !modal.classList.contains('hidden'));
+    const routeWin = document.getElementById('float-win-route-opt');
+    const isRouteOpen = !!(routeWin && !routeWin.classList.contains('hidden'));
+    return isOldOpen || isRouteOpen;
 }
 
 function handleAirportRouteSelection(ap) {
@@ -15997,6 +16000,7 @@ function openFloatingWindow(winKey, targetAp = null) {
 
     winEl.classList.remove('hidden');
     bringFloatingWindowToFront(winEl);
+    if (typeof renderIcons === 'function') renderIcons(winEl);
 
     if (winKey === 'my_rig' || winKey === 'rig') {
         if (typeof fetchRigHardwareSpecs === 'function') fetchRigHardwareSpecs();
@@ -17663,8 +17667,10 @@ function startBlackboxTelemetryPolling() {
     if (blackboxTelemetryInterval) clearInterval(blackboxTelemetryInterval);
     blackboxTelemetryInterval = setInterval(async () => {
         const modal = document.getElementById('flight-optimizer-modal');
-        if (!modal || modal.classList.contains('hidden')) return;
-        if (currentOptimizerTab !== 'blackbox' && !isBlackboxRunning) return;
+        const floatTelem = document.getElementById('float-win-telemetry');
+        const isTelemOpen = (modal && !modal.classList.contains('hidden') && currentOptimizerTab === 'blackbox') ||
+                            (floatTelem && !floatTelem.classList.contains('hidden'));
+        if (!isTelemOpen && !isBlackboxRunning) return;
         if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.get_live_blackbox_telemetry) return;
 
         try {

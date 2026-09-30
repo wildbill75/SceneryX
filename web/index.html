@@ -465,6 +465,7 @@
             box-shadow: none !important;
             backdrop-filter: none !important;
             -webkit-backdrop-filter: none !important;
+            padding: 0 !important;
         }
         #filter-radial-center-hub:not(.hub-mode-dual) {
             background: rgba(2, 6, 23, 0.85) !important;
@@ -591,12 +592,14 @@
             animation: filterRadialHubBounce 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
         }
 
-        .radial-filter-tier2-sector {
+        .radial-filter-tier2-sector,
+        .radial-flight-sector {
             transform-box: view-box;
             transform-origin: 310px 310px;
         }
 
-        .radial-filter-tier2-sector.animate-sector-bounce {
+        .radial-filter-tier2-sector.animate-sector-bounce,
+        .radial-flight-sector.animate-sector-bounce {
             animation: filterRadialOuterSectorBounce 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) both;
         }
 
@@ -2127,8 +2130,8 @@
                 <span data-icon="grip-vertical" class="w-4 h-4 block text-slate-400 opacity-75 shrink-0"></span>
                 <h2 class="text-sm font-mono font-black text-white uppercase tracking-wider">MY RIG</h2>
             </div>
-            <button onclick="closeFloatingWindow('my_rig')" title="Close" class="w-7 h-7 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition-colors border-0 cursor-pointer shrink-0">
-                <span data-icon="x-square" class="w-3.5 h-3.5 block"></span>
+            <button onclick="closeFloatingWindow('my_rig')" title="Close" class="w-7 h-7 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/70 flex items-center justify-center text-xs transition-colors border-0 cursor-pointer shrink-0">
+                <span data-icon="x" class="w-3.5 h-3.5 block"></span>
             </button>
         </div>
         <div class="space-y-3">
@@ -2180,8 +2183,8 @@
                 <span data-icon="grip-vertical" class="w-4 h-4 block text-slate-400 opacity-75 shrink-0"></span>
                 <h2 class="text-sm font-mono font-black text-white uppercase tracking-wider">MSFS GRAPHIC SETTINGS</h2>
             </div>
-            <button onclick="closeFloatingWindow('graphics')" title="Close" class="w-7 h-7 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition-colors border-0 cursor-pointer shrink-0">
-                <span data-icon="x-square" class="w-3.5 h-3.5 block"></span>
+            <button onclick="closeFloatingWindow('graphics')" title="Close" class="w-7 h-7 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/70 flex items-center justify-center text-xs transition-colors border-0 cursor-pointer shrink-0">
+                <span data-icon="x" class="w-3.5 h-3.5 block"></span>
             </button>
         </div>
 
@@ -2284,8 +2287,8 @@
                 <span data-icon="grip-vertical" class="w-4 h-4 block text-slate-400 opacity-75 shrink-0"></span>
                 <h2 class="text-sm font-mono font-black text-white uppercase tracking-wider">SMART LOD</h2>
             </div>
-            <button onclick="closeFloatingWindow('smart_lod')" title="Close" class="w-7 h-7 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition-colors border-0 cursor-pointer shrink-0">
-                <span data-icon="x-square" class="w-3.5 h-3.5 block"></span>
+            <button onclick="closeFloatingWindow('smart_lod')" title="Close" class="w-7 h-7 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/70 flex items-center justify-center text-xs transition-colors border-0 cursor-pointer shrink-0">
+                <span data-icon="x" class="w-3.5 h-3.5 block"></span>
             </button>
         </div>
 
@@ -2373,8 +2376,8 @@
                 <span data-icon="grip-vertical" class="w-4 h-4 block text-slate-400 opacity-75 shrink-0"></span>
                 <h2 class="text-sm font-mono font-black text-white uppercase tracking-wider">TELEMETRY</h2>
             </div>
-            <button onclick="closeFloatingWindow('telemetry')" title="Close" class="w-7 h-7 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition-colors border-0 cursor-pointer shrink-0">
-                <span data-icon="x-square" class="w-3.5 h-3.5 block"></span>
+            <button onclick="closeFloatingWindow('telemetry')" title="Close" class="w-7 h-7 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/70 flex items-center justify-center text-xs transition-colors border-0 cursor-pointer shrink-0">
+                <span data-icon="x" class="w-3.5 h-3.5 block"></span>
             </button>
         </div>
 
@@ -2478,8 +2481,8 @@
                 <span data-icon="grip-vertical" class="w-4 h-4 block text-slate-400 opacity-75 shrink-0"></span>
                 <h2 class="text-sm font-mono font-black text-white uppercase tracking-wider">PERFORMANCE ASSESSMENT</h2>
             </div>
-            <button onclick="closeFloatingWindow('perf_assessment')" title="Close" class="w-7 h-7 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition-colors border-0 cursor-pointer shrink-0">
-                <span data-icon="x-square" class="w-3.5 h-3.5 block"></span>
+            <button onclick="closeFloatingWindow('perf_assessment')" title="Close" class="w-7 h-7 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/70 flex items-center justify-center text-xs transition-colors border-0 cursor-pointer shrink-0">
+                <span data-icon="x" class="w-3.5 h-3.5 block"></span>
             </button>
         </div>
 
@@ -2525,8 +2528,8 @@
                 <span data-icon="grip-vertical" class="w-4 h-4 block text-slate-400 opacity-75 shrink-0"></span>
                 <h2 class="text-sm font-mono font-black text-white uppercase tracking-wider">ROUTE OPTIMIZATION</h2>
             </div>
-            <button onclick="closeFloatingWindow('route')" title="Close" class="w-7 h-7 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center text-xs transition-colors border-0 cursor-pointer shrink-0">
-                <span data-icon="x-square" class="w-3.5 h-3.5 block"></span>
+            <button onclick="closeFloatingWindow('route')" title="Close" class="w-7 h-7 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/70 flex items-center justify-center text-xs transition-colors border-0 cursor-pointer shrink-0">
+                <span data-icon="x" class="w-3.5 h-3.5 block"></span>
             </button>
         </div>
 
