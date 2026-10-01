@@ -726,10 +726,38 @@ def sync_library_snapshot(airports):
     except Exception as e:
         print("Error syncing library snapshot:", e)
 
+def bring_window_to_front(window_title="SceneryX"):
+    try:
+        import ctypes
+        hwnd = ctypes.windll.user32.FindWindowW(None, window_title)
+        if hwnd:
+            ctypes.windll.user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+            ctypes.windll.user32.SetForegroundWindow(hwnd)
+    except Exception:
+        pass
+
 class Api:
     def __init__(self):
         self._startup_delta = {"added": [], "removed": [], "total_changes": 0}
         self._startup_scanned = False
+
+    def minimize_to_tray(self):
+        if getattr(self, '_window', None):
+            try:
+                self._window.hide()
+            except Exception:
+                pass
+        return json.dumps({"status": "success"})
+
+    def restore_from_tray(self):
+        if getattr(self, '_window', None):
+            try:
+                self._window.show()
+                self._window.restore()
+            except Exception:
+                pass
+            bring_window_to_front("SceneryX")
+        return json.dumps({"status": "success"})
 
     def get_airports(self):
         settings = get_settings()
@@ -1034,6 +1062,11 @@ class Api:
                 self.restore_all_sceneries(full_reset=True)
 
             self._force_closing = True
+            if getattr(self, '_tray_icon', None):
+                try:
+                    self._tray_icon.stop()
+                except Exception:
+                    pass
             import threading, os
             threading.Timer(0.05, lambda: os._exit(0)).start()
             return json.dumps({"status": "ok"})
@@ -3569,6 +3602,13 @@ class Api:
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
 
+    def apply_staged_settings_to_user_cfg(self):
+        try:
+            res = flight_rig_optimizer.apply_staged_user_cfg_to_disk()
+            return json.dumps(res, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
     def start_flight_blackbox(self, flight_name, dep_icao, arr_icao, aircraft):
         try:
             res = flight_perf_tracker.BLACKBOX.start(flight_name=flight_name, dep=dep_icao, arr=arr_icao, aircraft=aircraft)
@@ -3869,6 +3909,11 @@ def main():
         print("Screen resolution detection fallback:", e)
 
     api = Api()
+    base_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+    icon_path = os.path.join(base_dir, 'icon.ico')
+    if not os.path.exists(icon_path):
+        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'icon.ico')
+
     window = webview.create_window(
         title='SceneryX',
         url=html_file,
@@ -3882,20 +3927,42 @@ def main():
     )
     api._window = window
 
+    tray_icon = None
+
     def on_closing():
         if getattr(api, '_force_closing', False):
+            if tray_icon:
+                try:
+                    tray_icon.stop()
+                except Exception:
+                    pass
             try:
                 import flight_remote_server
                 flight_remote_server.stop_remote_server()
             except Exception:
                 pass
             return True
+
         st = get_settings()
+        close_action = st.get('close_action', 'quit')
+        if close_action == 'minimize_to_tray':
+            try:
+                window.hide()
+            except Exception as e:
+                print(f"[Tray] Hide window error: {e}")
+            return False
+
         fm = st.get('flight_mode', {})
         if isinstance(fm, dict) and fm.get('active'):
             import threading
             threading.Timer(0.05, lambda: window.evaluate_js('promptClosingFlightMode()')).start()
             return False
+
+        if tray_icon:
+            try:
+                tray_icon.stop()
+            except Exception:
+                pass
         try:
             import flight_remote_server
             flight_remote_server.stop_remote_server()
@@ -3912,10 +3979,66 @@ def main():
     except Exception as e:
         print(f"[RemoteServer] Startup error: {e}")
 
-    base_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
-    icon_path = os.path.join(base_dir, 'icon.ico')
-    if not os.path.exists(icon_path):
-        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'icon.ico')
+    # Initialize System Tray Icon (pystray)
+    try:
+        import pystray
+        from PIL import Image
+
+        tray_image = None
+        if os.path.exists(icon_path):
+            try:
+                tray_image = Image.open(icon_path)
+            except Exception as e:
+                print(f"[Tray] Image load error: {e}")
+
+        if tray_image:
+            def on_tray_show(icon, item):
+                try:
+                    if window:
+                        window.show()
+                        window.restore()
+                except Exception as e:
+                    print(f"[Tray] Show error: {e}")
+                bring_window_to_front("SceneryX")
+
+            def on_tray_quit(icon, item):
+                try:
+                    api._force_closing = True
+                    if icon:
+                        icon.stop()
+                except Exception:
+                    pass
+                try:
+                    import flight_remote_server
+                    flight_remote_server.stop_remote_server()
+                except Exception:
+                    pass
+                try:
+                    if window:
+                        window.destroy()
+                except Exception:
+                    pass
+                import os
+                os._exit(0)
+
+            tray_menu = pystray.Menu(
+                pystray.MenuItem('Afficher SceneryX', on_tray_show, default=True),
+                pystray.MenuItem('Quitter', on_tray_quit)
+            )
+            tray_icon = pystray.Icon('SceneryX', tray_image, 'SceneryX', tray_menu)
+            api._tray_icon = tray_icon
+
+            import threading
+            def run_tray():
+                try:
+                    tray_icon.run()
+                except Exception as e:
+                    print(f"[Tray] Tray loop error: {e}")
+
+            tray_thread = threading.Thread(target=run_tray, daemon=True)
+            tray_thread.start()
+    except Exception as e:
+        print(f"[Tray] Init error: {e}")
 
     cache_dir = os.path.join(USER_DATA_DIR, 'web_cache')
     os.makedirs(cache_dir, exist_ok=True)

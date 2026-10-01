@@ -23,6 +23,8 @@ pyinstaller_cmd = [
     f"--add-data={os.path.join(BASE_DIR, 'web')};web",
     f"--add-data={os.path.join(BASE_DIR, 'wildbill75-sceneryx')};wildbill75-sceneryx",
     "--collect-all=SimConnect",
+    "--collect-all=pystray",
+    "--collect-all=PIL",
     os.path.join(BASE_DIR, "main.py")
 ]
 

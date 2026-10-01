@@ -12790,9 +12790,9 @@ function initDraggableFilterRadial() {
                     } else {
                         selectContextualRadialMode('flight_optimizer');
                     }
-                } else {
-                    handleFilterRadialCenterClick();
                 }
+                // When in filters or flight_optimizer mode, dragging/clicking the hub background does not trigger back navigation.
+                // Navigation back is handled exclusively by the dedicated back button inside the hub.
             }
         };
 
@@ -12862,7 +12862,7 @@ function selectContextualRadialMode(mode) {
         if (!filterRadialActiveCategory) filterRadialActiveCategory = 'pricing';
         renderFilterRadialWheel(true);
     } else if (mode === 'flight_optimizer') {
-        if (backdropEl) backdropEl.classList.remove('hidden');
+        if (backdropEl) backdropEl.classList.add('hidden'); // Point 13: Hide inner backdrop in flight optimizer!
         renderFlightOptimizerRadialWheel();
     }
 }
@@ -12874,20 +12874,20 @@ function renderContextualRadialHub() {
     if (filterRadialContextMode === 'hub') {
         hubEl.classList.add('hub-mode-dual');
         hubEl.innerHTML = `
-            <svg width="140" height="140" viewBox="0 0 140 140" class="overflow-visible pointer-events-auto filter drop-shadow-2xl">
+            <svg width="216" height="216" viewBox="0 0 216 216" class="overflow-visible pointer-events-auto filter drop-shadow-2xl">
                 <!-- TOP SEMI-CIRCLE: FILTERS -->
                 <g class="hub-semicircle group cursor-pointer" data-mode="filters" onclick="selectContextualRadialMode('filters')">
-                    <path class="hub-semicircle-path" d="M 2.03 68.00 A 68 68 0 0 1 137.97 68.00 Z" />
-                    <text x="70" y="44" text-anchor="middle"
-                          class="fill-slate-200 group-hover:fill-white font-mono font-black text-xs uppercase tracking-wider pointer-events-none select-none">
+                    <path class="hub-semicircle-path" d="M 4 104 A 104 104 0 0 1 212 104 Z" />
+                    <text x="108" y="68" text-anchor="middle"
+                          class="fill-slate-200 group-hover:fill-white font-mono font-black text-sm uppercase tracking-wider pointer-events-none select-none">
                         FILTERS
                     </text>
                 </g>
                 <!-- BOTTOM SEMI-CIRCLE: OPTIMIZER -->
                 <g class="hub-semicircle group cursor-pointer" data-mode="flight_optimizer" onclick="selectContextualRadialMode('flight_optimizer')">
-                    <path class="hub-semicircle-path" d="M 137.97 72.00 A 68 68 0 0 1 2.03 72.00 Z" />
-                    <text x="70" y="101" text-anchor="middle"
-                          class="fill-slate-200 group-hover:fill-white font-mono font-black text-xs uppercase tracking-wider pointer-events-none select-none">
+                    <path class="hub-semicircle-path" d="M 212 112 A 104 104 0 0 1 4 112 Z" />
+                    <text x="108" y="158" text-anchor="middle"
+                          class="fill-slate-200 group-hover:fill-white font-mono font-black text-sm uppercase tracking-wider pointer-events-none select-none">
                         OPTIMIZER
                     </text>
                 </g>
@@ -12896,21 +12896,36 @@ function renderContextualRadialHub() {
     } else if (filterRadialContextMode === 'flight_optimizer') {
         hubEl.classList.remove('hub-mode-dual');
         hubEl.innerHTML = `
-            <div class="flex flex-col items-center justify-center pointer-events-auto select-none text-center cursor-pointer w-full h-full" onclick="selectContextualRadialMode('hub')">
-                <span class="text-base font-black font-mono text-white leading-none tracking-tight">OPTIMIZER</span>
-                <span class="text-[8.5px] font-mono font-bold text-sky-400 uppercase mt-1.5">CLICK TO BACK</span>
+            <div class="flex flex-col items-center justify-center select-none text-center w-full h-full px-4 py-2 pointer-events-none">
+                <span class="text-sm font-black font-mono text-white tracking-widest uppercase">OPTIMIZER</span>
+                <button type="button"
+                        onclick="event.stopPropagation(); selectContextualRadialMode('hub')"
+                        class="mt-2.5 flex items-center justify-center p-1.5 text-white hover:text-slate-300 hover:scale-115 transition-all cursor-pointer pointer-events-auto border-0 bg-transparent shadow-none"
+                        title="Return to selection">
+                    <svg class="w-5 h-5 shrink-0 pointer-events-none text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="7.6 7 2.5 12 7.6 17"></polyline>
+                        <line x1="21.5" x2="4.8" y1="12" y2="12"></line>
+                    </svg>
+                </button>
             </div>
         `;
     } else {
         hubEl.classList.remove('hub-mode-dual');
         const count = currentlyFilteredAirports ? currentlyFilteredAirports.length : (allAirportsData ? allAirportsData.length : 0);
         hubEl.innerHTML = `
-            <div class="flex flex-col items-center justify-center pointer-events-auto select-none text-center cursor-pointer w-full h-full" onclick="selectContextualRadialMode('hub')">
+            <div class="flex flex-col items-center justify-center select-none text-center w-full h-full px-4 py-2 pointer-events-none">
                 <span class="text-[10px] font-bold tracking-widest text-slate-400 uppercase leading-tight">${t('radial.map_view', 'MAP VIEW')}</span>
-                <span class="text-[10px] font-bold tracking-widest text-slate-400 uppercase leading-tight mt-0.5">${t('radial.filtered_by', 'FILTERED BY')}</span>
-                <span class="text-2xl font-black font-mono text-white leading-none mt-1.5 tracking-tight">${count}</span>
+                <span class="text-2xl font-black font-mono text-white leading-none mt-1 tracking-tight">${count}</span>
                 <span class="text-[9.5px] font-normal tracking-wider text-slate-400 uppercase leading-tight mt-0.5">${t('radial.airports_caps', 'AIRPORTS')}</span>
-                <span class="text-[8.5px] font-mono font-bold text-sky-400 uppercase mt-1">CLICK TO BACK</span>
+                <button type="button"
+                        onclick="event.stopPropagation(); selectContextualRadialMode('hub')"
+                        class="mt-2 flex items-center justify-center p-1.5 text-white hover:text-slate-300 hover:scale-115 transition-all cursor-pointer pointer-events-auto border-0 bg-transparent shadow-none"
+                        title="Return to selection">
+                    <svg class="w-5 h-5 shrink-0 pointer-events-none text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="7.6 7 2.5 12 7.6 17"></polyline>
+                        <line x1="21.5" x2="4.8" y1="12" y2="12"></line>
+                    </svg>
+                </button>
             </div>
         `;
     }
@@ -12925,19 +12940,38 @@ const FLIGHT_OPT_SECTORS = [
     { key: 'route', label: 'ROUTE<br>OPTIMIZATION' }
 ];
 
+function isFloatingWindowOpen(winKey) {
+    const elId = (typeof FLOATING_WINDOW_MAP !== 'undefined' && FLOATING_WINDOW_MAP[winKey]) ? FLOATING_WINDOW_MAP[winKey] : winKey;
+    const winEl = document.getElementById(elId);
+    return !!(winEl && !winEl.classList.contains('hidden'));
+}
+
+function updateFlightOptimizerRadialSectors() {
+    FLIGHT_OPT_SECTORS.forEach(item => {
+        const gEl = document.getElementById(`radial-opt-sector-${item.key}`);
+        if (!gEl) return;
+        const isWinOpen = isFloatingWindowOpen(item.key);
+        gEl.classList.toggle('is-sector-disabled', isWinOpen);
+        const spanEl = gEl.querySelector('span');
+        if (spanEl) {
+            spanEl.className = `text-[10.5px] font-mono font-black tracking-wider uppercase ${isWinOpen ? 'text-slate-500' : 'text-slate-200 group-hover:text-white'}`;
+        }
+    });
+}
+
 function renderFlightOptimizerRadialWheel() {
     const hubEl = document.getElementById('filter-radial-center-hub');
     const svgEl = document.getElementById('filter-radial-svg');
     const backdropEl = document.getElementById('filter-radial-inner-backdrop');
     if (!hubEl || !svgEl) return;
 
-    if (backdropEl) backdropEl.classList.remove('hidden');
+    if (backdropEl) backdropEl.classList.add('hidden'); // Point 13: Hide inner backdrop in flight optimizer!
     renderContextualRadialHub();
 
     const cx = 310;
     const cy = 310;
-    const r_in = 80;
-    const r_out = 205;
+    const r_in = 115;  // Point 9: fits around 216px diameter hub (radius 108px + 7px gap)
+    const r_out = 255; // Point 9: fits inside 620px viewBox
     const midR = (r_in + r_out) / 2;
 
     let svgHtml = '';
@@ -12951,15 +12985,20 @@ function renderFlightOptimizerRadialWheel() {
         const tx = cx + midR * Math.cos(rad);
         const ty = cy + midR * Math.sin(rad);
 
+        // Point 11: Check if window is currently open
+        const isWinOpen = isFloatingWindowOpen(item.key);
+        const disabledClass = isWinOpen ? 'is-sector-disabled' : '';
+
         svgHtml += `
-            <g class="radial-flight-sector animate-sector-bounce pointer-events-auto cursor-pointer group"
+            <g class="radial-flight-sector animate-sector-bounce ${disabledClass} pointer-events-auto cursor-pointer group"
+               id="radial-opt-sector-${item.key}"
                style="animation-delay: ${(idx * 0.04).toFixed(2)}s;"
                onclick="handleFlightOptimizerSectorClick('${item.key}')"
                role="button" aria-label="${item.label.replace(/<br>/gi, ' ')}">
                 <path class="radial-flight-sector-path" d="${pathD}" />
-                <foreignObject x="${(tx - 58).toFixed(1)}" y="${(ty - 24).toFixed(1)}" width="116" height="48" class="pointer-events-none">
+                <foreignObject x="${(tx - 65).toFixed(1)}" y="${(ty - 25).toFixed(1)}" width="130" height="50" class="pointer-events-none">
                     <div class="w-full h-full flex flex-col items-center justify-center text-center leading-tight px-1">
-                        <span class="text-[10px] font-mono font-black tracking-wider uppercase text-slate-200 group-hover:text-white">${item.label}</span>
+                        <span class="text-[10.5px] font-mono font-black tracking-wider uppercase ${isWinOpen ? 'text-slate-500' : 'text-slate-200 group-hover:text-white'}">${item.label}</span>
                     </div>
                 </foreignObject>
             </g>
@@ -12970,8 +13009,9 @@ function renderFlightOptimizerRadialWheel() {
 }
 
 function handleFlightOptimizerSectorClick(key) {
-    closeFilterRadialMenu();
+    // Point 11: Keep radial menu open in place, gray out sector, and open floating window
     openFloatingWindow(key);
+    updateFlightOptimizerRadialSectors();
 }
 
 function toggleFilterRadialMenuAtCenter() {
@@ -13214,9 +13254,9 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
 
     const cx = 310;
     const cy = 310;
-    const r1_in = 78;
-    const r1_out = 172;
-    const r2_in = 180;
+    const r1_in = 115;
+    const r1_out = 195;
+    const r2_in = 203;
     const r2_out = 300;
 
     // --- TIER 1: INNER ANNULAR RING (6 MAIN CATEGORIES) ---
@@ -14255,6 +14295,10 @@ async function openSettingsModal() {
     if (chkAutoFpsKill) {
         chkAutoFpsKill.checked = !!currentSettings.autofps_autokill;
     }
+    const closeActionSelect = document.getElementById('cfg-close-action');
+    if (closeActionSelect) {
+        closeActionSelect.value = currentSettings.close_action || 'quit';
+    }
 
     loadSimBriefSettingsUI();
     renderSettingsPathsList();
@@ -14470,6 +14514,10 @@ async function saveSettings() {
     const chkAutoFpsKill = document.getElementById('cfg-autofps-autokill');
     if (chkAutoFpsKill) {
         currentSettings.autofps_autokill = chkAutoFpsKill.checked;
+    }
+    const closeActionSelect = document.getElementById('cfg-close-action');
+    if (closeActionSelect) {
+        currentSettings.close_action = closeActionSelect.value;
     }
     if (window.pywebview && window.pywebview.api && window.pywebview.api.save_smart_lod_config) {
         window.pywebview.api.save_smart_lod_config(JSON.stringify({
@@ -14753,10 +14801,10 @@ function showCustomModal(titleOrObj, messageStr, typeStr = 'info') {
             confirmBtn.classList.remove('hidden');
             if (typeof titleOrObj === 'object' && titleOrObj && titleOrObj.confirmClass) {
                 confirmBtn.className = titleOrObj.confirmClass;
-            } else if (type === 'error') {
-                confirmBtn.className = "px-6 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs transition-colors border-0 cursor-pointer shadow-md shadow-rose-950/40";
+            } else if (type === 'error' || type === 'warning') {
+                confirmBtn.className = "px-4 py-1.5 text-center rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-mono font-bold text-xs uppercase transition-all border-0 cursor-pointer shadow-md";
             } else {
-                confirmBtn.className = "px-6 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs transition-colors border-0 cursor-pointer";
+                confirmBtn.className = "px-4 py-1.5 text-center rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-mono font-bold text-xs uppercase transition-all border-0 cursor-pointer shadow-md";
             }
         }
         if (cancelBtn) {
@@ -14765,7 +14813,7 @@ function showCustomModal(titleOrObj, messageStr, typeStr = 'info') {
             if (typeof titleOrObj === 'object' && titleOrObj && titleOrObj.cancelClass) {
                 cancelBtn.className = titleOrObj.cancelClass;
             } else {
-                cancelBtn.className = "px-4 py-2.5 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 hover:text-white text-xs font-bold transition-all";
+                cancelBtn.className = "px-4 py-1.5 text-center rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 hover:text-white font-mono text-xs font-bold uppercase transition-all cursor-pointer";
             }
         }
     }
@@ -15938,6 +15986,7 @@ function initDraggableFloatingWindow(winEl, headerEl) {
         const origTop = rect.top;
 
         function onMouseMove(ev) {
+            if (typeof closeAllProfileDropdowns === 'function') closeAllProfileDropdowns();
             const dx = ev.clientX - startX;
             const dy = ev.clientY - startY;
             const newLeft = Math.max(10, Math.min(window.innerWidth - 80, origLeft + dx));
@@ -16003,14 +16052,21 @@ function openFloatingWindow(winKey, targetAp = null) {
         winEl.style.top = `${top}px`;
     }
 
+    // Auto-dimension window to content at opening (removes empty bottom void)
+    winEl.style.height = 'auto';
+
     winEl.classList.remove('hidden');
     bringFloatingWindowToFront(winEl);
+    if (typeof updateFlightOptimizerRadialSectors === 'function') {
+        updateFlightOptimizerRadialSectors();
+    }
     if (typeof renderIcons === 'function') renderIcons(winEl);
 
     if (winKey === 'my_rig' || winKey === 'rig') {
-        if (typeof fetchRigHardwareSpecs === 'function') fetchRigHardwareSpecs();
+        if (typeof loadRigDiagnostics === 'function') loadRigDiagnostics();
     } else if (winKey === 'graphics') {
-        if (typeof renderMsfsSettingsMatrix === 'function') renderMsfsSettingsMatrix();
+        if (typeof loadRigDiagnostics === 'function') loadRigDiagnostics();
+        else if (typeof renderMsfsSettingsMatrix === 'function') renderMsfsSettingsMatrix();
         if (typeof fetchAndRenderCustomProfiles === 'function') fetchAndRenderCustomProfiles();
     } else if (winKey === 'smart_lod') {
         if (typeof fetchSmartLodStatus === 'function') fetchSmartLodStatus();
@@ -16028,10 +16084,15 @@ function openFloatingWindow(winKey, targetAp = null) {
 }
 
 function closeFloatingWindow(winKey) {
+    if (typeof closeAllProfileDropdowns === 'function') closeAllProfileDropdowns();
     const elId = FLOATING_WINDOW_MAP[winKey] || winKey;
     const winEl = document.getElementById(elId);
     if (winEl) {
         winEl.classList.add('hidden');
+        winEl.style.height = 'auto';
+    }
+    if (typeof updateFlightOptimizerRadialSectors === 'function') {
+        updateFlightOptimizerRadialSectors();
     }
 }
 
@@ -16500,6 +16561,52 @@ function applyOptimizerRouteSceneries() {
 // RIG & SETTINGS (COMBOBOX HARDWARE & AUTO-CALIBRATION)
 // -------------------------------------------------------------------------
 
+function toSettingTitleCase(str) {
+    if (!str) return '';
+    const acronyms = new Set(['DLSS', 'V-SYNC', 'VSYNC', 'NVIDIA', 'REFLEX', 'FSR', 'XESS', 'TAA', 'TLOD', 'OLOD', 'VR', 'HDR', 'FPS', 'CPU', 'GPU', 'VRAM', 'RAM', 'MSFS', 'AA', 'SSAO', 'SSR', 'DOF', 'DX11', 'DX12', 'HUD', 'FOV', 'LOD', 'AI', 'PC', 'ICAO']);
+    return str.split(/(\s+|-|\/)/).map(part => {
+        const upper = part.toUpperCase();
+        if (acronyms.has(upper)) {
+            if (upper === 'V-SYNC' || upper === 'VSYNC') return 'V-Sync';
+            if (upper === 'NVIDIA') return 'NVIDIA';
+            return upper;
+        }
+        if (/^[a-zA-Z]+$/.test(part)) {
+            return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase();
+        }
+        return part;
+    }).join('');
+}
+
+const MSFS_GRAPHICS_CATEGORIES = {
+    'COMMON': [
+        { name: 'Traffic', index: 0 },
+        { name: 'Airport Services', index: 1 },
+        { name: 'Characters & Fauna', index: 2 }
+    ],
+    'SHARED': [
+        { name: 'Traffic', index: 0 },
+        { name: 'Airport Services', index: 1 },
+        { name: 'Characters & Fauna', index: 2 }
+    ],
+    '2D': [
+        { name: 'Frame Rate & Sync', index: 0 },
+        { name: 'Terrain & Textures', index: 1 },
+        { name: 'Environment', index: 2 },
+        { name: 'Lighting', index: 3 },
+        { name: 'Cockpit', index: 4 },
+        { name: 'Post-Processing', index: 5 }
+    ],
+    'VR': [
+        { name: 'Headset & Sync', index: 0 },
+        { name: 'Optimizations & DLSS', index: 1 },
+        { name: 'Terrain & Textures', index: 2 },
+        { name: 'Environment', index: 3 },
+        { name: 'Lighting', index: 4 },
+        { name: 'Cockpit & Post', index: 5 }
+    ]
+};
+
 let currentMsfsGraphicsMode = '2D';
 let currentFlightMissionProfile = 'LINER';
 let currentVrRefreshRate = 72;
@@ -16507,8 +16614,25 @@ let currentGraphicsSettingsPage = 0;
 let msfsSettingsMatrixData = null;
 let userCfgBackupsList = [];
 
+function renderMsfsCategoryTabs() {
+    const container = document.getElementById('opt-msfs-category-tabs');
+    if (!container) return;
+    const cats = MSFS_GRAPHICS_CATEGORIES[currentMsfsGraphicsMode] || MSFS_GRAPHICS_CATEGORIES['2D'];
+    if (currentGraphicsSettingsPage >= cats.length) {
+        currentGraphicsSettingsPage = 0;
+    }
+    container.innerHTML = cats.map(cat => {
+        const isSel = (cat.index === currentGraphicsSettingsPage);
+        const cls = isSel
+            ? 'px-4 py-2 rounded-xl bg-sky-500 text-white transition-all cursor-pointer font-semibold shadow-md whitespace-nowrap text-xs tracking-normal'
+            : 'px-4 py-2 rounded-xl text-slate-400 hover:text-white transition-all cursor-pointer font-semibold whitespace-nowrap text-xs tracking-normal';
+        return `<button id="opt-page-pill-${cat.index}" onclick="switchGraphicsSettingsPage(${cat.index})" class="${cls}">${cat.name}</button>`;
+    }).join('');
+}
+
 function switchGraphicsSettingsPage(pageIndex) {
-    if (pageIndex < 0 || pageIndex > 6) return;
+    const cats = MSFS_GRAPHICS_CATEGORIES[currentMsfsGraphicsMode] || MSFS_GRAPHICS_CATEGORIES['2D'];
+    if (pageIndex < 0 || pageIndex >= cats.length) return;
     currentGraphicsSettingsPage = pageIndex;
     updateCarouselUI();
 }
@@ -16520,28 +16644,50 @@ function prevGraphicsSettingsPage() {
 }
 
 function nextGraphicsSettingsPage() {
-    if (currentGraphicsSettingsPage < 6) {
+    const cats = MSFS_GRAPHICS_CATEGORIES[currentMsfsGraphicsMode] || MSFS_GRAPHICS_CATEGORIES['2D'];
+    if (currentGraphicsSettingsPage < cats.length - 1) {
         switchGraphicsSettingsPage(currentGraphicsSettingsPage + 1);
     }
 }
 
 function updateCarouselUI() {
+    const cats = MSFS_GRAPHICS_CATEGORIES[currentMsfsGraphicsMode] || MSFS_GRAPHICS_CATEGORIES['2D'];
+    if (currentGraphicsSettingsPage >= cats.length) {
+        currentGraphicsSettingsPage = 0;
+    }
     const track = document.getElementById('opt-msfs-carousel-track');
     if (track) {
         track.style.transform = `translateX(-${currentGraphicsSettingsPage * 100}%)`;
     }
 
-    // Update Tabs
-    for (let i = 0; i < 7; i++) {
-        const pill = document.getElementById(`opt-page-pill-${i}`);
+    // Adapt wrapper height dynamically to active grid height so there is no extra empty void
+    const activeGrid = document.getElementById(`opt-msfs-settings-grid-p${currentGraphicsSettingsPage + 1}`);
+    const wrapper = document.getElementById('opt-msfs-carousel-wrapper');
+    if (activeGrid && wrapper) {
+        requestAnimationFrame(() => {
+            const h = activeGrid.offsetHeight;
+            if (h > 0) {
+                wrapper.style.minHeight = `${h}px`;
+                wrapper.style.maxHeight = `${h}px`;
+            }
+            const winEl = document.getElementById('float-win-graphics');
+            if (winEl && !winEl.classList.contains('hidden')) {
+                winEl.style.height = 'auto';
+            }
+        });
+    }
+
+    // Update dynamic tabs
+    cats.forEach(cat => {
+        const pill = document.getElementById(`opt-page-pill-${cat.index}`);
         if (pill) {
-            if (i === currentGraphicsSettingsPage) {
-                pill.className = 'px-3.5 py-2 rounded-lg bg-cyan-600 text-white transition-all cursor-pointer font-bold shadow-sm whitespace-nowrap text-xs';
+            if (cat.index === currentGraphicsSettingsPage) {
+                pill.className = 'px-4 py-2 rounded-xl bg-sky-500 text-white transition-all cursor-pointer font-semibold shadow-md whitespace-nowrap text-xs tracking-normal';
             } else {
-                pill.className = 'px-3.5 py-2 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold whitespace-nowrap text-xs';
+                pill.className = 'px-4 py-2 rounded-xl text-slate-400 hover:text-white transition-all cursor-pointer font-semibold whitespace-nowrap text-xs tracking-normal';
             }
         }
-    }
+    });
 }
 
 function switchFlightMissionProfile(profile) {
@@ -16609,15 +16755,16 @@ async function loadRigDiagnostics() {
         const det = data.detected;
         if (!det) return;
 
-        // MY RIG - Detected Hardware Fields
+        // MY RIG - Detected Hardware Fields (Enlarged prominent typography & tags)
         const cpuNameEl = document.getElementById('opt-detected-cpu-name');
         const cpuCoresEl = document.getElementById('opt-detected-cpu-cores');
         if (cpuNameEl && det.cpu) {
             cpuNameEl.textContent = (det.cpu.name_simplified || det.cpu.name || 'UNKNOWN CPU').toUpperCase();
+            cpuNameEl.title = det.cpu.name || det.cpu.name_simplified || '';
             if (cpuCoresEl) {
                 cpuCoresEl.innerHTML = `
-                    <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-200 uppercase">${det.cpu.cores || 8} CORES</span>
-                    <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-200 uppercase">${det.cpu.threads || 16} THREADS</span>
+                    <span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-semibold tabular-nums bg-slate-800 text-slate-200 uppercase">${det.cpu.cores || 8} CORES</span>
+                    <span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-semibold tabular-nums bg-slate-800 text-slate-200 uppercase">${det.cpu.threads || 16} THREADS</span>
                 `;
             }
         }
@@ -16626,10 +16773,11 @@ async function loadRigDiagnostics() {
         const gpuVramEl = document.getElementById('opt-detected-gpu-vram');
         if (gpuNameEl && det.gpu) {
             gpuNameEl.textContent = (det.gpu.name_simplified || det.gpu.name || 'UNKNOWN GPU').toUpperCase();
+            gpuNameEl.title = det.gpu.name || det.gpu.name_simplified || '';
             if (gpuVramEl) {
                 gpuVramEl.innerHTML = `
-                    <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-cyan-300 uppercase">${det.gpu.vram_total_gb || 16} GB VRAM</span>
-                    <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-300 uppercase">DRIVER ${det.gpu.driver_version || 'LATEST'}</span>
+                    <span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-semibold tabular-nums bg-slate-800 text-cyan-300 uppercase">${det.gpu.vram_total_gb || 16} GB VRAM</span>
+                    <span class="px-2.5 py-1 rounded-lg typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] bg-slate-800 text-slate-300">DRIVER ${det.gpu.driver_version || 'LATEST'}</span>
                 `;
             }
         }
@@ -16647,12 +16795,12 @@ async function loadRigDiagnostics() {
                         const isSel = (d.id === activeId || String(d.index) === String(activeId));
                         const hz = d.refresh_rate_int || 60;
                         const bgClass = isSel ? 'bg-cyan-600 text-white shadow-sm' : 'bg-slate-800 text-slate-300 hover:bg-slate-700';
-                        return `<button type="button" onclick="selectCadenceDisplay('${d.id}')" class="px-2 py-0.5 rounded text-[10px] font-mono font-bold ${bgClass} transition-colors cursor-pointer" title="${d.formatted || d.id}">${d.id} (${hz} HZ)</button>`;
+                        return `<button type="button" onclick="selectCadenceDisplay('${d.id}')" class="px-2.5 py-1 rounded-lg typo-action-btn text-xs font-semibold tabular-nums uppercase tracking-[0.02em] ${bgClass} transition-colors cursor-pointer" title="${d.formatted || d.id}">${d.id} (${hz} HZ)</button>`;
                     }).join('');
                 } else {
                     displayResEl.innerHTML = `
-                        <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-900/60 text-cyan-300 uppercase">${det.display.refresh_rate_int || 60} HZ</span>
-                        <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-300 uppercase">${det.display.width}x${det.display.height}</span>
+                        <span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-semibold tabular-nums bg-cyan-950 text-cyan-300 uppercase">${det.display.refresh_rate_int || 60} HZ</span>
+                        <span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-semibold tabular-nums bg-slate-800 text-slate-300 uppercase">${det.display.width}x${det.display.height}</span>
                     `;
                 }
             }
@@ -16666,7 +16814,7 @@ async function loadRigDiagnostics() {
             if (vrHeadset && vrHeadset.detected) {
                 vrNameEl.textContent = (vrHeadset.name || 'VR HEADSET').toUpperCase();
                 if (vrHzEl) {
-                    vrHzEl.innerHTML = `<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-900/60 text-cyan-300 uppercase">${vrHeadset.refresh_rate_hz || 72} HZ ACTIVE</span>`;
+                    vrHzEl.innerHTML = `<span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-semibold tabular-nums bg-cyan-950 text-cyan-300 uppercase">${vrHeadset.refresh_rate_hz || 72} HZ ACTIVE</span>`;
                 }
                 if (vrHeadset.refresh_rate_hz) {
                     currentVrRefreshRate = vrHeadset.refresh_rate_hz;
@@ -16674,7 +16822,7 @@ async function loadRigDiagnostics() {
             } else {
                 vrNameEl.textContent = 'NONE DETECTED';
                 if (vrHzEl) {
-                    vrHzEl.innerHTML = `<span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-400 uppercase">DESKTOP MODE</span>`;
+                    vrHzEl.innerHTML = `<span class="px-2.5 py-1 rounded-lg typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] bg-slate-800 text-slate-400">DESKTOP MODE</span>`;
                 }
             }
         }
@@ -16687,8 +16835,8 @@ async function loadRigDiagnostics() {
             if (ramBadgesEl) {
                 const xmpClass = det.ram.is_xmp_active ? 'bg-emerald-950 text-emerald-300' : 'bg-slate-800 text-slate-400';
                 ramBadgesEl.innerHTML = `
-                    <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-200 uppercase">${det.ram.speed_mhz || 3200} MHZ</span>
-                    <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold ${xmpClass} uppercase">${det.ram.is_xmp_active ? 'XMP ON' : 'XMP OFF'}</span>
+                    <span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-semibold tabular-nums bg-slate-800 text-slate-200 uppercase">${det.ram.speed_mhz || 3200} MHZ</span>
+                    <span class="px-2.5 py-1 rounded-lg typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] ${xmpClass}">${det.ram.is_xmp_active ? 'XMP ON' : 'XMP OFF'}</span>
                 `;
             }
         }
@@ -16700,30 +16848,80 @@ async function loadRigDiagnostics() {
             const hagsClass = det.hags_active ? 'bg-emerald-950 text-emerald-300' : 'bg-slate-800 text-slate-400';
             const dlssVer = (det.dlss && det.dlss.version) ? det.dlss.version : '3.10';
             miscBadgesEl.innerHTML = `
-                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold ${rbarClass} uppercase">R-BAR</span>
-                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold ${hagsClass} uppercase">HAGS</span>
-                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-cyan-300 uppercase">DLSS ${dlssVer}</span>
+                <span class="px-2.5 py-1 rounded-lg typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] ${rbarClass}">R-BAR</span>
+                <span class="px-2.5 py-1 rounded-lg typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] ${hagsClass}">HAGS</span>
+                <span class="px-2.5 py-1 rounded-lg typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] bg-slate-800 text-cyan-300">DLSS ${dlssVer}</span>
             `;
         }
 
-        // System Balance Badge & Description
+        // STORAGE / MSFS DRIVE Card in MY RIG
+        const storageBadgeEl = document.getElementById('opt-detected-storage-badge');
+        const storageNameEl = document.getElementById('opt-detected-storage-name');
+        const storageDetailsEl = document.getElementById('opt-detected-storage-details');
+        const storageWarningEl = document.getElementById('opt-detected-storage-warning');
+
+        if (det.storage) {
+            const s = det.storage;
+            if (storageBadgeEl) {
+                storageBadgeEl.textContent = (s.tier || 'NVMe SSD').toUpperCase();
+                if (s.is_hdd) {
+                    storageBadgeEl.className = 'px-2 py-0.5 rounded typo-action-btn text-[10px] font-semibold uppercase tracking-[0.02em] bg-rose-950 text-rose-300 border border-rose-700 animate-pulse';
+                } else if (s.is_nvme) {
+                    storageBadgeEl.className = 'px-2 py-0.5 rounded typo-action-btn text-[10px] font-semibold uppercase tracking-[0.02em] bg-emerald-950 text-emerald-400 border border-emerald-800/80';
+                } else {
+                    storageBadgeEl.className = 'px-2 py-0.5 rounded typo-action-btn text-[10px] font-semibold uppercase tracking-[0.02em] bg-cyan-950 text-cyan-400 border border-cyan-800/80';
+                }
+            }
+            if (storageNameEl) {
+                storageNameEl.textContent = `${s.drive_letter || 'C:'} ${(s.model || 'Solid State Drive').toUpperCase()}`;
+                storageNameEl.title = `MSFS Packages Path: ${s.packages_path || s.drive_letter}`;
+            }
+            if (storageDetailsEl) {
+                storageDetailsEl.innerHTML = `
+                    <span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-semibold tabular-nums bg-slate-800 text-slate-200 uppercase">${s.free_gb || 0} GB FREE</span>
+                    <span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-semibold tabular-nums bg-slate-800 text-slate-400 uppercase">${s.total_gb || 0} GB TOTAL</span>
+                `;
+            }
+            if (storageWarningEl) {
+                if (s.is_hdd) {
+                    storageWarningEl.classList.remove('hidden');
+                } else {
+                    storageWarningEl.classList.add('hidden');
+                }
+            }
+        }
+
+        // System Balance Badge & Description (Colorized according to system performance tier)
         const balanceBadge = document.getElementById('opt-rig-balance-badge');
         const balanceDesc = document.getElementById('opt-rig-summary-desc');
         if (det.system_balance) {
             const b = det.system_balance;
+            let tierColorClass = 'text-emerald-400';
+            if (b.color === 'amber' || b.color === 'yellow') {
+                tierColorClass = 'text-amber-400';
+            } else if (b.color === 'orange') {
+                tierColorClass = 'text-orange-400';
+            } else if (b.color === 'rose' || b.color === 'red') {
+                tierColorClass = 'text-rose-400';
+            }
+
             if (balanceBadge) {
                 balanceBadge.textContent = b.tier;
                 if (b.color === 'emerald') {
-                    balanceBadge.className = 'px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-800/80 uppercase';
-                } else if (b.color === 'amber') {
-                    balanceBadge.className = 'px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-amber-950/80 text-amber-400 border border-amber-800/80 uppercase';
+                    balanceBadge.className = 'px-2.5 py-1 rounded-lg typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] bg-emerald-950/80 text-emerald-400 border border-emerald-800/80';
+                } else if (b.color === 'amber' || b.color === 'yellow') {
+                    balanceBadge.className = 'px-2.5 py-1 rounded-lg typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] bg-amber-950/80 text-amber-400 border border-amber-800/80';
                 } else {
-                    balanceBadge.className = 'px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-rose-950/80 text-rose-400 border border-rose-800/80 uppercase';
+                    balanceBadge.className = 'px-2.5 py-1 rounded-lg typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] bg-rose-950/80 text-rose-400 border border-rose-800/80';
                 }
             }
             if (balanceDesc) {
                 balanceDesc.textContent = b.summary;
                 balanceDesc.title = b.advice || b.summary;
+                balanceDesc.className = `text-sm md:text-base font-semibold ${tierColorClass} block leading-relaxed`;
+                if (balanceDesc.parentElement) {
+                    balanceDesc.parentElement.className = 'pt-0.5 pb-1';
+                }
             }
 
             const debriefHwTier = document.getElementById('opt-debrief-hw-tier');
@@ -16736,9 +16934,9 @@ async function loadRigDiagnostics() {
         const autofpsPill = document.getElementById('opt-autofps-status-pill');
         if (autofpsPill) {
             if (data.settings_matrix && data.settings_matrix.autofps_active) {
-                autofpsPill.className = 'px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-mono font-bold transition-all shadow-sm';
+                autofpsPill.className = 'px-3 py-1.5 rounded-xl bg-emerald-600 text-white typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] transition-all shadow-sm';
             } else {
-                autofpsPill.className = 'px-3 py-1.5 rounded-xl bg-slate-800 text-slate-400 text-xs font-mono font-bold transition-all shadow-sm';
+                autofpsPill.className = 'px-3 py-1.5 rounded-xl bg-slate-800 text-slate-400 typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] transition-all shadow-sm';
             }
             autofpsPill.textContent = 'AUTOFPS';
         }
@@ -16758,20 +16956,50 @@ async function loadRigDiagnostics() {
     }
 }
 
-function switchMsfsGraphicsMode(mode) {
+function switchMsfsGraphicsMode(mode, resetPage = false) {
     currentMsfsGraphicsMode = mode;
     const btnCommon = document.getElementById('opt-msfs-mode-btn-common');
     const btn2d = document.getElementById('opt-msfs-mode-btn-2d');
     const btnVr = document.getElementById('opt-msfs-mode-btn-vr');
 
-    const activeClass = 'px-3.5 py-1.5 rounded-lg bg-cyan-600 text-white transition-all cursor-pointer font-bold shadow-sm';
-    const inactiveClass = 'px-3.5 py-1.5 rounded-lg text-slate-400 hover:text-white transition-all cursor-pointer font-bold';
+    const activeClass = 'px-4 py-1.5 rounded-xl bg-sky-500 text-white transition-all cursor-pointer shadow-md font-semibold text-xs tracking-normal';
+    const inactiveClass = 'px-4 py-1.5 rounded-xl text-slate-400 hover:text-white transition-all cursor-pointer font-semibold text-xs tracking-normal';
 
     if (btnCommon) btnCommon.className = (mode === 'COMMON') ? activeClass : inactiveClass;
     if (btn2d) btn2d.className = (mode === '2D') ? activeClass : inactiveClass;
     if (btnVr) btnVr.className = (mode === 'VR') ? activeClass : inactiveClass;
 
+    const cats = MSFS_GRAPHICS_CATEGORIES[mode] || MSFS_GRAPHICS_CATEGORIES['2D'];
+    if (resetPage || currentGraphicsSettingsPage >= cats.length) {
+        currentGraphicsSettingsPage = 0;
+    }
+
+    renderMsfsCategoryTabs();
     renderMsfsSettingsMatrix();
+}
+
+async function applyCurrentSettingsDirectlyToMsfs() {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.apply_staged_settings_to_user_cfg) return;
+    try {
+        const resStr = await window.pywebview.api.apply_staged_settings_to_user_cfg();
+        const res = typeof resStr === 'string' ? JSON.parse(resStr) : resStr;
+        if (res && res.status === 'success') {
+            if (typeof showToast === 'function') {
+                showToast("All graphics settings applied directly to UserCfg.opt! Ready to test in MSFS.", 'success');
+            }
+            await fetchAndRenderCustomProfiles();
+            await loadRigDiagnostics();
+        } else {
+            if (typeof showToast === 'function') {
+                showToast(`Apply failed: ${res ? res.message : 'Unknown error'}`, 'error');
+            }
+        }
+    } catch (e) {
+        console.error("Error applying settings to MSFS:", e);
+        if (typeof showToast === 'function') {
+            showToast(`Error: ${e}`, 'error');
+        }
+    }
 }
 
 let isManualSettingUpdating = false;
@@ -16783,6 +17011,12 @@ async function onMsfsManualSettingSubmitted(settingKey, value, minVal, maxVal) {
     let cleanVal;
     if (rawStr.toLowerCase() === 'unlocked' || rawStr.toUpperCase() === 'OFF' || rawStr === '0') {
         cleanVal = '0';
+    } else if (settingKey === 'sharpen_amount_vr') {
+        let num = parseFloat(rawStr);
+        if (isNaN(num)) num = 0.20;
+        if (typeof minVal === 'number' && num < minVal) num = minVal;
+        if (typeof maxVal === 'number' && num > maxVal) num = maxVal;
+        cleanVal = num.toFixed(2);
     } else {
         const cleanStr = rawStr.replace('Dynamic', '').replace('(', '').replace(')', '').replace('FPS', '').replace('LOD', '').trim();
         let num = parseFloat(cleanStr);
@@ -16805,18 +17039,55 @@ function toggleComboboxDropdown(key, event) {
         event.stopPropagation();
     }
     const menu = document.getElementById(`opt-combo-menu-${key}`);
-    if (!menu) return;
+    const wrapper = document.getElementById(`opt-combo-wrapper-${key}`);
+    if (!menu || !wrapper) return;
+
     const isHidden = menu.classList.contains('hidden');
     closeAllComboboxes();
     if (isHidden) {
-        menu.classList.remove('bottom-full', 'mb-1');
-        menu.classList.add('top-full', 'mt-1');
+        // Move dropdown to body if not already there, ensuring it breaks out of the carousel/window overflow
+        if (menu.parentElement !== document.body) {
+            document.body.appendChild(menu);
+        }
+
+        const rect = wrapper.getBoundingClientRect();
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const spaceAbove = rect.top;
+
+        menu.style.position = 'fixed';
+        menu.style.left = `${rect.left}px`;
+        menu.style.width = `${rect.width}px`;
+        menu.style.zIndex = '99999';
+
+        // Check if opening downwards would be cramped (less than 220px) and there's more space above
+        if (spaceBelow < 220 && spaceAbove > spaceBelow) {
+            menu.style.top = 'auto';
+            menu.style.bottom = `${window.innerHeight - rect.top + 4}px`;
+            menu.style.maxHeight = `${Math.max(100, Math.min(260, spaceAbove - 20))}px`;
+        } else {
+            menu.style.bottom = 'auto';
+            menu.style.top = `${rect.bottom + 4}px`;
+            menu.style.maxHeight = `${Math.max(100, Math.min(260, spaceBelow - 20))}px`;
+        }
         menu.classList.remove('hidden');
     }
 }
 
 function closeAllComboboxes() {
-    document.querySelectorAll('[id^="opt-combo-menu-"]').forEach(m => m.classList.add('hidden'));
+    document.querySelectorAll('[id^="opt-combo-menu-"]').forEach(m => {
+        m.classList.add('hidden');
+        const key = m.id.replace('opt-combo-menu-', '');
+        const wrapper = document.getElementById(`opt-combo-wrapper-${key}`);
+        if (wrapper && m.parentElement !== wrapper) {
+            wrapper.appendChild(m);
+        }
+    });
+    document.querySelectorAll('[id^="opt-combo-wrapper-"]').forEach(w => {
+        const card = w.closest('.setting-card, [class*="rounded-2xl"]');
+        if (card) {
+            card.style.zIndex = '';
+        }
+    });
 }
 
 function selectComboboxPreset(key, value, minVal, maxVal) {
@@ -16826,15 +17097,658 @@ function selectComboboxPreset(key, value, minVal, maxVal) {
     onMsfsManualSettingSubmitted(key, value, minVal, maxVal);
 }
 
-// Global click outside listener to close comboboxes
+// Global click outside listener to close comboboxes and profile dropdown
 document.addEventListener('click', (e) => {
     if (!e.target.closest('[id^="opt-combo-"]')) {
         closeAllComboboxes();
     }
+    if (!e.target.closest('#opt-profile-universal-combobox') && !e.target.closest('#opt-profile-dropdown-list')) {
+        closeAllProfileDropdowns();
+    }
 });
+
+// Close floating dropdown on scroll or resize outside
+window.addEventListener('scroll', (e) => {
+    if (e && e.target && e.target.closest) {
+        if (e.target.closest('[id^="opt-combo-menu-"]') || e.target.closest('#opt-profile-dropdown-list')) {
+            return; // Allow smooth mouse wheel and scrollbar scrolling inside the dropdown itself!
+        }
+    }
+    if (typeof closeAllProfileDropdowns === 'function') closeAllProfileDropdowns();
+    if (typeof closeAllComboboxes === 'function') closeAllComboboxes();
+}, true);
+window.addEventListener('resize', () => {
+    if (typeof closeAllProfileDropdowns === 'function') closeAllProfileDropdowns();
+    if (typeof closeAllComboboxes === 'function') closeAllComboboxes();
+});
+
+let currentPerformanceMetricMode = 'mainthread';
+
+function setPerformanceMetricMode(mode) {
+    currentPerformanceMetricMode = mode;
+    const cpuBtn = document.getElementById('opt-perf-tab-cpu');
+    const vramBtn = document.getElementById('opt-perf-tab-vram');
+    
+    if (mode === 'mainthread') {
+        if (cpuBtn) {
+            cpuBtn.className = "px-3 py-1 rounded-lg transition-all cursor-pointer font-bold uppercase tracking-wider text-[11px] bg-sky-500 text-white shadow-sm";
+        }
+        if (vramBtn) {
+            vramBtn.className = "px-3 py-1 rounded-lg transition-all cursor-pointer font-bold uppercase tracking-wider text-[11px] bg-transparent text-slate-400 hover:text-white";
+        }
+    } else {
+        if (cpuBtn) {
+            cpuBtn.className = "px-3 py-1 rounded-lg transition-all cursor-pointer font-bold uppercase tracking-wider text-[11px] bg-transparent text-slate-400 hover:text-white";
+        }
+        if (vramBtn) {
+            vramBtn.className = "px-3 py-1 rounded-lg transition-all cursor-pointer font-bold uppercase tracking-wider text-[11px] bg-sky-500 text-white shadow-sm";
+        }
+    }
+    
+    updatePerformanceCockpitGauges();
+}
+
+function updatePerformanceCockpitGauges() {
+    if (!msfsSettingsMatrixData) return;
+
+    const mode = currentPerformanceMetricMode;
+    const commonList = msfsSettingsMatrixData.matrix_common || [];
+    const list2D = msfsSettingsMatrixData.matrix_2d || [];
+    const listVR = msfsSettingsMatrixData.matrix_vr || [];
+
+    const getItemVal = (list, keys, fallback = '') => {
+        const keyArr = Array.isArray(keys) ? keys : [keys];
+        for (const k of keyArr) {
+            const item = (list || []).find(x => x.key === k);
+            if (item) return String(item.value || item.raw_value || '').toUpperCase();
+        }
+        return fallback.toUpperCase();
+    };
+
+    const getItemNum = (list, keys, fallback = 100) => {
+        const keyArr = Array.isArray(keys) ? keys : [keys];
+        for (const k of keyArr) {
+            const item = (list || []).find(x => x.key === k);
+            if (item) {
+                const n = parseFloat(item.value || item.raw_value);
+                if (!isNaN(n)) return n;
+            }
+        }
+        return fallback;
+    };
+
+    const vramTotal = parseFloat(msfsSettingsMatrixData.vram_total_gb) 
+        || parseFloat(rigDiagnosticsData && rigDiagnosticsData.detected && rigDiagnosticsData.detected.gpu && rigDiagnosticsData.detected.gpu.vram_total_gb) 
+        || 16.0;
+
+    if (mode === 'mainthread') {
+        // --- 1. SHARED (Traffic & Airport Ground Simulation) ---
+        let loadShared = 10;
+        const airQty = getItemVal(commonList, ['aircraft_traffic_quantity', 'air_traffic', 'aircraft_traffic'], 'OFF');
+        if (airQty.includes('LOW')) loadShared += 8;
+        else if (airQty.includes('MED')) loadShared += 20;
+        else if (airQty.includes('HIGH') || airQty.includes('REAL')) loadShared += 36;
+        else if (airQty.includes('ULTRA')) loadShared += 46;
+
+        const airVar = getItemVal(commonList, ['aircraft_traffic_variety', 'air_traffic_variety'], 'LOW');
+        if (!airQty.includes('OFF')) {
+            if (airVar.includes('MED')) loadShared += 2;
+            else if (airVar.includes('HIGH')) loadShared += 4;
+            else if (airVar.includes('ULTRA')) loadShared += 6;
+        }
+
+        const parkQty = getItemVal(commonList, ['parked_aircraft_quantity', 'parked_aircraft'], 'OFF');
+        if (parkQty.includes('LOW')) loadShared += 6;
+        else if (parkQty.includes('MED')) loadShared += 14;
+        else if (parkQty.includes('HIGH')) loadShared += 26;
+        else if (parkQty.includes('ULTRA')) loadShared += 38;
+
+        const parkVar = getItemVal(commonList, ['parked_aircraft_variety'], 'LOW');
+        if (!parkQty.includes('OFF')) {
+            if (parkVar.includes('MED')) loadShared += 2;
+            else if (parkVar.includes('HIGH')) loadShared += 4;
+            else if (parkVar.includes('ULTRA')) loadShared += 6;
+        }
+
+        const svcQty = getItemVal(commonList, ['airport_services_quantity', 'airport_services'], 'OFF');
+        if (svcQty.includes('LOW')) loadShared += 5;
+        else if (svcQty.includes('MED')) loadShared += 12;
+        else if (svcQty.includes('HIGH')) loadShared += 20;
+        else if (svcQty.includes('ULTRA')) loadShared += 30;
+
+        const svcVar = getItemVal(commonList, ['airport_services_variety'], 'LOW');
+        if (!svcQty.includes('OFF')) {
+            if (svcVar.includes('MED')) loadShared += 1;
+            else if (svcVar.includes('HIGH')) loadShared += 3;
+            else if (svcVar.includes('ULTRA')) loadShared += 5;
+        }
+
+        const roadVal = getItemVal(commonList, ['road_traffic'], 'OFF');
+        if (roadVal.includes('LOW')) loadShared += 5;
+        else if (roadVal.includes('MED')) loadShared += 10;
+        else if (roadVal.includes('HIGH')) loadShared += 18;
+        else if (roadVal.includes('ULTRA')) loadShared += 28;
+
+        const seaVal = getItemVal(commonList, ['sea_traffic'], 'OFF');
+        if (seaVal.includes('LOW')) loadShared += 1;
+        else if (seaVal.includes('MED')) loadShared += 2;
+        else if (seaVal.includes('HIGH')) loadShared += 3;
+        else if (seaVal.includes('ULTRA')) loadShared += 5;
+
+        const charQty = getItemVal(commonList, ['characters_quantity'], 'OFF');
+        if (charQty.includes('LOW')) loadShared += 2;
+        else if (charQty.includes('MED')) loadShared += 5;
+        else if (charQty.includes('HIGH')) loadShared += 10;
+        else if (charQty.includes('ULTRA')) loadShared += 16;
+
+        const charVar = getItemVal(commonList, ['characters_variety'], 'LOW');
+        if (charVar.includes('MED')) loadShared += 2;
+        else if (charVar.includes('HIGH')) loadShared += 5;
+        else if (charVar.includes('ULTRA')) loadShared += 9;
+
+        const charQlt = getItemVal(commonList, ['characters_quality'], 'LOW');
+        if (charQlt.includes('MED')) loadShared += 2;
+        else if (charQlt.includes('HIGH')) loadShared += 5;
+        else if (charQlt.includes('ULTRA')) loadShared += 10;
+
+        const faunaVal = getItemVal(commonList, ['fauna_density'], 'OFF');
+        if (faunaVal.includes('LOW')) loadShared += 2;
+        else if (faunaVal.includes('MED')) loadShared += 5;
+        else if (faunaVal.includes('HIGH')) loadShared += 10;
+        else if (faunaVal.includes('ULTRA')) loadShared += 18;
+
+        loadShared = Math.min(98, Math.max(10, Math.round(loadShared)));
+
+        // --- 2. 2D DISPLAY (TLOD, OLOD, Buildings, Trees, Clouds, Grass, Waves, Cockpit, Shadows) ---
+        // Baseline 2D draw calls + Shared traffic CPU simulation load
+        const sharedCpuImpact2D = Math.round(loadShared * 0.22);
+        let load2D = 6 + sharedCpuImpact2D;
+        const tlod2D = getItemNum(list2D, ['tlod', 'TerrainLoD'], 100);
+        const olod2D = getItemNum(list2D, ['olod', 'ObjectsLoD'], 100);
+        const glass2D = getItemVal(list2D, ['glass_cockpits', 'GlassCockpitsRefreshRate'], 'MEDIUM');
+        const bld2D = getItemVal(list2D, ['buildings', 'Buildings'], 'HIGH');
+        const tree2D = getItemVal(list2D, ['trees', 'TreesQuality'], 'HIGH');
+        const grass2D = getItemVal(list2D, ['grass', 'GrassQuality'], 'LOW');
+        const cld2D = getItemVal(list2D, ['volumetric_clouds', 'VolumetricClouds', 'clouds'], 'HIGH');
+        const wave2D = getItemVal(list2D, ['water_waves', 'Water'], '512');
+        const shd2D = getItemVal(list2D, ['shadow_maps', 'Shadows'], '1536');
+        const tshd2D = getItemVal(list2D, ['terrain_shadows', 'HeightFieldShadows'], '512');
+        const rt2D = getItemVal(list2D, ['raytraced_shadows', 'RaytracedShadows'], 'OFF');
+        const aa2D = getItemVal(list2D, ['anti_aliasing', 'AntiAliasing'], 'TAA');
+        const fg2D = getItemVal(list2D, ['frame_generation', 'FrameGeneration'], 'OFF');
+        const fps2DVal = getItemVal(list2D, ['max_frame_rate', 'TargetFrameRate', 'FrameLimiter'], '82');
+        const fpsCap2D = parseFloat(fps2DVal);
+        const isFpsOff2D = fps2DVal.includes('OFF') || isNaN(fpsCap2D) || fpsCap2D <= 0;
+
+        if (tlod2D <= 60) load2D += 4;
+        else if (tlod2D <= 100) load2D += 10;
+        else if (tlod2D <= 150) load2D += 18;
+        else if (tlod2D <= 200) load2D += 28;
+        else if (tlod2D <= 300) load2D += 40;
+        else load2D += 55;
+
+        if (olod2D <= 80) load2D += 3;
+        else if (olod2D <= 120) load2D += 6;
+        else if (olod2D <= 180) load2D += 12;
+        else load2D += 18;
+
+        if (glass2D.includes('HIGH') || glass2D.includes('FULL')) load2D += 16;
+        else if (glass2D.includes('MED') || glass2D.includes('HALF')) load2D += 6;
+        else load2D += 2;
+
+        if (bld2D.includes('ULTRA')) load2D += 18;
+        else if (bld2D.includes('HIGH')) load2D += 10;
+        else if (bld2D.includes('MED')) load2D += 5;
+        else load2D += 2;
+
+        if (tree2D.includes('ULTRA')) load2D += 16;
+        else if (tree2D.includes('HIGH')) load2D += 8;
+        else if (tree2D.includes('MED')) load2D += 4;
+        else load2D += 2;
+
+        if (grass2D.includes('ULTRA')) load2D += 12;
+        else if (grass2D.includes('HIGH')) load2D += 6;
+        else if (grass2D.includes('MED')) load2D += 3;
+        else if (grass2D.includes('LOW')) load2D += 1;
+
+        if (cld2D.includes('ULTRA')) load2D += 20;
+        else if (cld2D.includes('HIGH')) load2D += 10;
+        else if (cld2D.includes('MED')) load2D += 5;
+        else load2D += 2;
+
+        if (wave2D.includes('1024') || wave2D.includes('ULTRA')) load2D += 8;
+        else if (wave2D.includes('512') || wave2D.includes('HIGH')) load2D += 4;
+        else if (wave2D.includes('256') || wave2D.includes('MED')) load2D += 2;
+
+        if (shd2D.includes('2048') || shd2D.includes('ULTRA')) load2D += 10;
+        else if (shd2D.includes('1536') || shd2D.includes('HIGH')) load2D += 5;
+        else if (shd2D.includes('1024') || shd2D.includes('MED')) load2D += 2;
+
+        if (tshd2D.includes('1024') || tshd2D.includes('ULTRA')) load2D += 10;
+        else if (tshd2D.includes('512') || tshd2D.includes('HIGH')) load2D += 5;
+        else if (tshd2D.includes('256') || tshd2D.includes('MED')) load2D += 2;
+
+        if (rt2D === 'ON' || rt2D === '1') load2D += 22;
+
+        if (aa2D.includes('PERFORMANCE')) load2D -= 12;
+        else if (aa2D.includes('BALANCED')) load2D -= 8;
+        else if (aa2D.includes('QUALITY')) load2D -= 5;
+        else if (aa2D.includes('DLAA')) load2D += 4;
+
+        if (fg2D.includes('DLSSG')) load2D -= 16;
+        else if (fg2D.includes('FSR3')) load2D -= 12;
+        else load2D += 8;
+
+        if (isFpsOff2D) {
+            load2D += 12; // Uncapped engine runs at maximum unconstrained CPU dispatch
+        } else if (fpsCap2D <= 35) {
+            load2D -= 18; // 30 FPS cap provides massive 33.3ms frame budget
+        } else if (fpsCap2D <= 50) {
+            load2D -= 12; // 40-45 FPS cap provides 22-25ms budget
+        } else if (fpsCap2D <= 65) {
+            load2D -= 6;  // 60 FPS cap
+        } else if (fpsCap2D <= 90) {
+            load2D += 0;  // 72-82 FPS standard refresh rate divisor
+        } else if (fpsCap2D <= 125) {
+            load2D += 8;  // 120 FPS high refresh pacing
+        } else {
+            load2D += 14; // 144+ FPS extreme CPU dispatch pressure
+        }
+
+        if (window.smartLodActive || (msfsSettingsMatrixData && msfsSettingsMatrixData.autofps_active)) {
+            load2D = Math.max(14, load2D - 12);
+        }
+
+        load2D = Math.min(98, Math.max(12, Math.round(load2D)));
+
+        let fpsTag = isFpsOff2D ? 'Uncapped' : `${Math.round(fpsCap2D)} FPS`;
+        let fgDesc = fg2D.includes('DLSSG') ? 'DLSS 3 FG (2X)' : (fg2D.includes('FSR3') ? 'FSR 3 FG (2X)' : 'Native (FG OFF)');
+        let badge2D = 'OPTIMUM';
+        let color2D = 'emerald';
+        let desc2D = `${fgDesc} • ${fpsTag} • TLOD ${tlod2D}`;
+        if (load2D > 78) {
+            badge2D = 'HAZARD';
+            color2D = 'rose';
+            desc2D = `Heavy draw calls • ${fpsTag}`;
+        } else if (load2D >= 48) {
+            badge2D = 'BALANCED';
+            color2D = 'amber';
+            desc2D = `Controlled workload • ${fpsTag}`;
+        }
+
+        updatePerfCard('2d', 'MainThread Load', `${load2D}% (${badge2D === 'OPTIMUM' ? 'Smooth' : (badge2D === 'BALANCED' ? 'Moderate' : 'Heavy')})`, load2D, color2D, badge2D, desc2D);
+
+        // --- 3. VR HEADSET (Stereo OpenXR loop & Headset Pacing) ---
+        // Baseline stereo VR compositor thread + Shared traffic CPU simulation load
+        const sharedCpuImpactVR = Math.round(loadShared * 0.40);
+        let loadVR = 8 + sharedCpuImpactVR;
+        const tlodVR = getItemNum(listVR, ['tlod', 'TerrainLoD'], 100);
+        const olodVR = getItemNum(listVR, ['olod', 'ObjectsLoD'], 100);
+        const glassVR = getItemVal(listVR, ['glass_cockpits', 'GlassCockpitsRefreshRate'], 'MEDIUM');
+        const bldVR = getItemVal(listVR, ['buildings', 'Buildings'], 'MEDIUM');
+        const treeVR = getItemVal(listVR, ['trees', 'TreesQuality'], 'MEDIUM');
+        const grassVR = getItemVal(listVR, ['grass', 'GrassQuality'], 'LOW');
+        const cldVR = getItemVal(listVR, ['volumetric_clouds', 'VolumetricClouds', 'clouds'], 'HIGH');
+        const dynVR = getItemVal(listVR, ['dynamic_settings', 'DynamicSettings'], 'OFF');
+        const fovVR = getItemVal(listVR, ['foveated_rendering', 'FoveatedRendering'], 'ON');
+        const rtVR = getItemVal(listVR, ['raytraced_shadows', 'RaytracedShadows'], 'OFF');
+        const aaVR = getItemVal(listVR, ['anti_aliasing', 'AntiAliasing'], 'DLSS');
+        const reprojVR = getItemVal(listVR, ['reprojection_mode', 'ReprojectionMode'], '1/2 REPROJECTION');
+        const fpsVRVal = getItemVal(listVR, ['max_frame_rate', 'TargetFrameRateVR', 'FrameLimiterVR'], '45');
+        const fpsCapVR = parseFloat(fpsVRVal);
+        const isFpsOffVR = fpsVRVal.includes('OFF') || isNaN(fpsCapVR) || fpsCapVR <= 0;
+
+        if (tlodVR <= 60) loadVR += 8;
+        else if (tlodVR <= 100) loadVR += 20;
+        else if (tlodVR <= 140) loadVR += 36;
+        else if (tlodVR <= 180) loadVR += 52;
+        else loadVR += 70;
+
+        if (olodVR <= 80) loadVR += 4;
+        else if (olodVR <= 120) loadVR += 10;
+        else loadVR += 20;
+
+        if (glassVR.includes('HIGH') || glassVR.includes('FULL')) loadVR += 26;
+        else if (glassVR.includes('MED') || glassVR.includes('HALF')) loadVR += 10;
+        else loadVR += 3;
+
+        if (bldVR.includes('ULTRA')) loadVR += 32;
+        else if (bldVR.includes('HIGH')) loadVR += 18;
+        else if (bldVR.includes('MED')) loadVR += 8;
+        else loadVR += 3;
+
+        if (treeVR.includes('ULTRA')) loadVR += 28;
+        else if (treeVR.includes('HIGH')) loadVR += 16;
+        else if (treeVR.includes('MED')) loadVR += 7;
+        else loadVR += 3;
+
+        if (grassVR.includes('ULTRA')) loadVR += 20;
+        else if (grassVR.includes('HIGH')) loadVR += 10;
+        else if (grassVR.includes('MED')) loadVR += 5;
+        else if (grassVR.includes('LOW')) loadVR += 2;
+
+        if (cldVR.includes('ULTRA')) loadVR += 34;
+        else if (cldVR.includes('HIGH')) loadVR += 18;
+        else if (cldVR.includes('MED')) loadVR += 8;
+        else loadVR += 3;
+
+        if (dynVR === 'ON' || dynVR === '1') loadVR += 12;
+        if (fovVR === 'ON' || fovVR === '1') loadVR -= 10;
+        if (rtVR === 'ON' || rtVR === '1') loadVR += 35;
+
+        if (aaVR.includes('PERFORMANCE')) loadVR -= 16;
+        else if (aaVR.includes('BALANCED')) loadVR -= 10;
+        else if (aaVR.includes('QUALITY')) loadVR -= 6;
+        else if (aaVR.includes('TAA')) loadVR += 6;
+        else if (aaVR.includes('DLAA')) loadVR += 16;
+
+        if (reprojVR.includes('1/2') || reprojVR.includes('AUTO') || reprojVR.includes('HALF')) loadVR -= 8;
+        else if (reprojVR.includes('OFF') || reprojVR.includes('NONE')) loadVR += 10;
+
+        if (isFpsOffVR) {
+            loadVR += 15; // Uncapped VR causes extreme stereo pacing stutter
+        } else if (fpsCapVR <= 36) {
+            loadVR -= 12; // 1/3 reprojection / 36 FPS
+        } else if (fpsCapVR <= 45) {
+            loadVR -= 6;  // 1/2 sync at 45 FPS
+        } else if (fpsCapVR <= 60) {
+            loadVR += 2;
+        } else if (fpsCapVR <= 80) {
+            loadVR += 10;
+        } else {
+            loadVR += 18; // 90+ FPS native stereo without reprojection
+        }
+
+        if (window.smartLodActive || (msfsSettingsMatrixData && msfsSettingsMatrixData.autofps_active)) {
+            loadVR = Math.max(16, loadVR - 10);
+        }
+
+        loadVR = Math.min(99, Math.max(16, Math.round(loadVR)));
+
+        let fpsVRTag = isFpsOffVR ? 'Uncapped' : `${Math.round(fpsCapVR)} FPS`;
+        let reprojDesc = reprojVR.includes('1/2') ? '1/2 Reprojection' : (reprojVR.includes('OFF') ? 'Reproj OFF' : reprojVR);
+        let badgeVR = 'OPTIMUM';
+        let colorVR = 'emerald';
+        let descVR = `Stereo sync (${reprojDesc} • ${fpsVRTag}) • TLOD ${tlodVR}`;
+        if (loadVR > 74) {
+            badgeVR = 'HAZARD';
+            colorVR = 'rose';
+            descVR = `Judder risk • ${fpsVRTag}`;
+        } else if (loadVR >= 48) {
+            badgeVR = 'BALANCED';
+            colorVR = 'amber';
+            descVR = `Tight stereo cadence • ${fpsVRTag}`;
+        }
+
+        updatePerfCard('vr', 'MainThread Load', `${loadVR}% (${badgeVR === 'OPTIMUM' ? 'Solid' : (badgeVR === 'BALANCED' ? 'Tight' : 'Judder Risk')})`, loadVR, colorVR, badgeVR, descVR);
+
+    } else {
+        // --- PERSPECTIVE B: VRAM & GPU ---
+
+        // 1. SHARED VRAM (AI Traffic, Ground Vehicles & Liveries)
+        let vramShared = 1.4;
+        const airQty = getItemVal(commonList, ['aircraft_traffic_quantity', 'air_traffic', 'aircraft_traffic'], 'OFF');
+        const airVar = getItemVal(commonList, ['aircraft_traffic_variety', 'air_traffic_variety'], 'LOW');
+        if (!airQty.includes('OFF')) {
+            if (airQty.includes('LOW')) vramShared += 0.5;
+            else if (airQty.includes('MED')) vramShared += 1.4;
+            else if (airQty.includes('HIGH') || airQty.includes('REAL')) vramShared += 2.8;
+            else if (airQty.includes('ULTRA')) vramShared += 4.2;
+
+            if (airVar.includes('MED')) vramShared += 0.5;
+            else if (airVar.includes('HIGH')) vramShared += 1.2;
+            else if (airVar.includes('ULTRA')) vramShared += 2.0;
+        } else {
+            if (airVar.includes('ULTRA')) vramShared += 0.2;
+            else if (airVar.includes('HIGH')) vramShared += 0.1;
+        }
+
+        const parkQty = getItemVal(commonList, ['parked_aircraft_quantity', 'parked_aircraft'], 'OFF');
+        const parkVar = getItemVal(commonList, ['parked_aircraft_variety'], 'LOW');
+        if (!parkQty.includes('OFF')) {
+            if (parkQty.includes('LOW')) vramShared += 0.4;
+            else if (parkQty.includes('MED')) vramShared += 1.0;
+            else if (parkQty.includes('HIGH')) vramShared += 2.0;
+            else if (parkQty.includes('ULTRA')) vramShared += 3.0;
+
+            if (parkVar.includes('MED')) vramShared += 0.4;
+            else if (parkVar.includes('HIGH')) vramShared += 1.0;
+            else if (parkVar.includes('ULTRA')) vramShared += 1.8;
+        } else {
+            if (parkVar.includes('ULTRA')) vramShared += 0.2;
+            else if (parkVar.includes('HIGH')) vramShared += 0.1;
+        }
+
+        const svcQty = getItemVal(commonList, ['airport_services_quantity', 'airport_services'], 'OFF');
+        const svcVar = getItemVal(commonList, ['airport_services_variety'], 'LOW');
+        if (!svcQty.includes('OFF')) {
+            if (svcQty.includes('LOW')) vramShared += 0.3;
+            else if (svcQty.includes('MED')) vramShared += 0.8;
+            else if (svcQty.includes('HIGH')) vramShared += 1.5;
+            else if (svcQty.includes('ULTRA')) vramShared += 2.4;
+
+            if (svcVar.includes('MED')) vramShared += 0.3;
+            else if (svcVar.includes('HIGH')) vramShared += 0.8;
+            else if (svcVar.includes('ULTRA')) vramShared += 1.4;
+        } else {
+            if (svcVar.includes('ULTRA')) vramShared += 0.2;
+            else if (svcVar.includes('HIGH')) vramShared += 0.1;
+        }
+
+        const roadVram = getItemVal(commonList, ['road_traffic'], 'OFF');
+        if (roadVram.includes('LOW')) vramShared += 0.2;
+        else if (roadVram.includes('MED')) vramShared += 0.6;
+        else if (roadVram.includes('HIGH')) vramShared += 1.2;
+        else if (roadVram.includes('ULTRA')) vramShared += 2.0;
+
+        const seaVram = getItemVal(commonList, ['sea_traffic'], 'OFF');
+        if (seaVram.includes('LOW')) vramShared += 0.05;
+        else if (seaVram.includes('MED')) vramShared += 0.1;
+        else if (seaVram.includes('HIGH')) vramShared += 0.2;
+        else if (seaVram.includes('ULTRA')) vramShared += 0.3;
+
+        const charQtyVram = getItemVal(commonList, ['characters_quantity'], 'OFF');
+        if (charQtyVram.includes('LOW')) vramShared += 0.2;
+        else if (charQtyVram.includes('MED')) vramShared += 0.5;
+        else if (charQtyVram.includes('HIGH')) vramShared += 1.0;
+        else if (charQtyVram.includes('ULTRA')) vramShared += 1.6;
+
+        const charVarVram = getItemVal(commonList, ['characters_variety'], 'LOW');
+        if (charVarVram.includes('MED')) vramShared += 0.3;
+        else if (charVarVram.includes('HIGH')) vramShared += 0.8;
+        else if (charVarVram.includes('ULTRA')) vramShared += 1.6;
+
+        const charQltVram = getItemVal(commonList, ['characters_quality'], 'LOW');
+        if (charQltVram.includes('MED')) vramShared += 0.2;
+        else if (charQltVram.includes('HIGH')) vramShared += 0.6;
+        else if (charQltVram.includes('ULTRA')) vramShared += 1.2;
+
+        vramShared = Math.min(vramTotal, Math.max(1.6, parseFloat(vramShared.toFixed(1))));
+        const pctShared = Math.min(100, Math.round((vramShared / vramTotal) * 100));
+
+        // 2. 2D DISPLAY VRAM
+        // Baseline 2D graphics engine & framebuffer + Shared traffic assets VRAM
+        let vram2D = 1.8 + vramShared;
+        const tex2D = getItemVal(list2D, ['texture_resolution', 'Texture'], 'MEDIUM');
+        if (tex2D.includes('ULTRA')) vram2D += 10.2;
+        else if (tex2D.includes('HIGH')) vram2D += 5.8;
+        else if (tex2D.includes('MED')) vram2D += 3.0;
+        else vram2D += 1.4;
+
+        const cld2D = getItemVal(list2D, ['volumetric_clouds', 'VolumetricClouds', 'clouds'], 'HIGH');
+        if (cld2D.includes('ULTRA')) vram2D += 3.4;
+        else if (cld2D.includes('HIGH')) vram2D += 1.8;
+        else if (cld2D.includes('MED')) vram2D += 0.9;
+        else vram2D += 0.4;
+
+        const bld2D = getItemVal(list2D, ['buildings', 'Buildings'], 'HIGH');
+        if (bld2D.includes('ULTRA')) vram2D += 2.6;
+        else if (bld2D.includes('HIGH')) vram2D += 1.4;
+        else if (bld2D.includes('MED')) vram2D += 0.7;
+        else vram2D += 0.3;
+
+        const tree2D = getItemVal(list2D, ['trees', 'TreesQuality'], 'HIGH');
+        if (tree2D.includes('ULTRA')) vram2D += 1.8;
+        else if (tree2D.includes('HIGH')) vram2D += 1.0;
+        else if (tree2D.includes('MED')) vram2D += 0.5;
+        else vram2D += 0.2;
+
+        const shd2D = getItemVal(list2D, ['shadow_maps', 'Shadows'], '1536');
+        if (shd2D.includes('2048') || shd2D.includes('ULTRA')) vram2D += 2.0;
+        else if (shd2D.includes('1536') || shd2D.includes('HIGH')) vram2D += 1.1;
+        else if (shd2D.includes('1024') || shd2D.includes('MED')) vram2D += 0.5;
+
+        const aa2D = getItemVal(list2D, ['anti_aliasing', 'AntiAliasing'], 'TAA');
+        if (aa2D.includes('PERFORMANCE')) vram2D -= 2.2;
+        else if (aa2D.includes('BALANCED')) vram2D -= 1.4;
+        else if (aa2D.includes('QUALITY')) vram2D -= 0.8;
+        else if (aa2D.includes('DLAA')) vram2D += 0.8;
+
+        const fg2D = getItemVal(list2D, ['frame_generation', 'FrameGeneration'], 'OFF');
+        const isFgActive2D = fg2D.includes('DLSSG') || fg2D.includes('FSR3') || fg2D.includes('2X');
+        if (isFgActive2D) vram2D += 1.8;
+
+        const rt2D = getItemVal(list2D, ['raytraced_shadows', 'RaytracedShadows'], 'OFF');
+        if (rt2D === 'ON' || rt2D === '1') vram2D += 2.5;
+
+        vram2D = Math.min(vramTotal * 1.25, Math.max(3.8, parseFloat(vram2D.toFixed(1))));
+        const pct2D = Math.min(100, Math.round((vram2D / vramTotal) * 100));
+        const free2D = Math.max(0, (vramTotal - vram2D)).toFixed(1);
+
+        const fgVramNote = isFgActive2D ? ' (incl. FG Buffer)' : '';
+        let badge2D = 'OPTIMUM';
+        let color2D = 'emerald';
+        let desc2D = `+${free2D} GB Free VRAM headroom${fgVramNote}`;
+        if (pct2D > 88) {
+            badge2D = 'HAZARD';
+            color2D = 'rose';
+            desc2D = `VRAM saturation hazard (${pct2D}% used)`;
+        } else if (pct2D >= 68) {
+            badge2D = 'ACCEPTABLE';
+            color2D = 'amber';
+            desc2D = `High VRAM allocation (+${free2D} GB free)`;
+        }
+
+        updatePerfCard(
+            '2d',
+            'Estimated VRAM',
+            `~${vram2D.toFixed(1)} / ${vramTotal.toFixed(0)} GB (${pct2D}%)`,
+            pct2D,
+            color2D,
+            badge2D,
+            desc2D
+        );
+
+        // 3. VR HEADSET VRAM (Stereo framebuffers & VR assets)
+        // Baseline stereo VR framebuffers & compositor + Shared traffic assets VRAM
+        let vramVR = 3.6 + vramShared;
+        const texVR = getItemVal(listVR, ['texture_resolution', 'Texture'], 'LOW');
+        if (texVR.includes('ULTRA')) vramVR += 11.8;
+        else if (texVR.includes('HIGH')) vramVR += 6.8;
+        else if (texVR.includes('MED')) vramVR += 3.8;
+        else vramVR += 1.8;
+
+        const cldVR = getItemVal(listVR, ['volumetric_clouds', 'VolumetricClouds', 'clouds'], 'HIGH');
+        if (cldVR.includes('ULTRA')) vramVR += 4.6;
+        else if (cldVR.includes('HIGH')) vramVR += 2.6;
+        else if (cldVR.includes('MED')) vramVR += 1.4;
+        else vramVR += 0.6;
+
+        const bldVR = getItemVal(listVR, ['buildings', 'Buildings'], 'MEDIUM');
+        if (bldVR.includes('ULTRA')) vramVR += 3.6;
+        else if (bldVR.includes('HIGH')) vramVR += 2.0;
+        else if (bldVR.includes('MED')) vramVR += 1.0;
+        else vramVR += 0.4;
+
+        const treeVR = getItemVal(listVR, ['trees', 'TreesQuality'], 'MEDIUM');
+        if (treeVR.includes('ULTRA')) vramVR += 2.8;
+        else if (treeVR.includes('HIGH')) vramVR += 1.6;
+        else if (treeVR.includes('MED')) vramVR += 0.8;
+        else vramVR += 0.3;
+
+        const aaVR = getItemVal(listVR, ['anti_aliasing', 'AntiAliasing'], 'DLSS');
+        if (aaVR.includes('PERFORMANCE')) vramVR -= 2.8;
+        else if (aaVR.includes('BALANCED')) vramVR -= 1.8;
+        else if (aaVR.includes('QUALITY')) vramVR -= 1.0;
+        else if (aaVR.includes('DLAA')) vramVR += 1.2;
+
+        const fovVR = getItemVal(listVR, ['foveated_rendering', 'FoveatedRendering'], 'ON');
+        if (fovVR === 'ON' || fovVR === '1') vramVR -= 1.0;
+
+        const rtVR = getItemVal(listVR, ['raytraced_shadows', 'RaytracedShadows'], 'OFF');
+        if (rtVR === 'ON' || rtVR === '1') vramVR += 3.2;
+
+        vramVR = Math.min(vramTotal * 1.3, Math.max(5.8, parseFloat(vramVR.toFixed(1))));
+        const pctVR = Math.min(100, Math.round((vramVR / vramTotal) * 100));
+        const freeVR = Math.max(0, (vramTotal - vramVR)).toFixed(1);
+
+        let badgeVR = 'OPTIMUM';
+        let colorVR = 'emerald';
+        let descVR = `+${freeVR} GB Free VR headroom`;
+        if (pctVR > 86) {
+            badgeVR = 'HAZARD';
+            colorVR = 'rose';
+            descVR = `Critical: Stereo VRAM overflow risks CTD`;
+        } else if (pctVR >= 68) {
+            badgeVR = 'ACCEPTABLE';
+            colorVR = 'amber';
+            descVR = `Heavy VR stereo buffer (+${freeVR} GB free)`;
+        }
+
+        updatePerfCard(
+            'vr',
+            'Estimated VR VRAM',
+            `~${vramVR.toFixed(1)} / ${vramTotal.toFixed(0)} GB (${pctVR}%)`,
+            pctVR,
+            colorVR,
+            badgeVR,
+            descVR
+        );
+    }
+}
+
+function updatePerfCard(section, labelText, valueText, barPct, color, badgeText, subText) {
+    const labelEl = document.getElementById(`opt-perf-label-${section}`);
+    const valEl = document.getElementById(`opt-perf-val-${section}`);
+    const barEl = document.getElementById(`opt-perf-bar-${section}`);
+    const badgeEl = document.getElementById(`opt-perf-badge-${section}`);
+    const subEl = document.getElementById(`opt-perf-sub-${section}`);
+
+    const colorHexMap = {
+        'emerald': '#10b981',
+        'amber': '#f59e0b',
+        'orange': '#f97316',
+        'rose': '#f43f5e',
+        'sky': '#0ea5e9'
+    };
+    const hex = colorHexMap[color] || '#10b981';
+
+    if (labelEl) labelEl.textContent = labelText;
+    if (valEl) {
+        valEl.textContent = valueText;
+        valEl.style.color = hex;
+        valEl.className = 'typo-metric font-semibold text-xs tabular-nums';
+    }
+    if (barEl) {
+        barEl.style.width = `${Math.min(100, Math.max(0, barPct))}%`;
+        barEl.style.backgroundColor = hex;
+    }
+    if (badgeEl) {
+        badgeEl.textContent = badgeText;
+        badgeEl.style.backgroundColor = hex;
+        badgeEl.className = 'px-2 py-0.5 rounded typo-action-btn text-[10px] font-semibold uppercase tracking-[0.02em] text-white shadow-sm';
+    }
+    if (subEl) {
+        subEl.textContent = subText;
+        subEl.title = subText;
+    }
+}
 
 function renderMsfsSettingsMatrix() {
     if (!msfsSettingsMatrixData) return;
+
+    // Clean up any detached combobox menus currently in body
+    document.querySelectorAll('body > [id^="opt-combo-menu-"]').forEach(el => el.remove());
 
     let list = [];
     if (currentMsfsGraphicsMode === 'COMMON') {
@@ -16945,23 +17859,36 @@ function renderMsfsSettingsMatrix() {
 
         // Solid background colors without stroke or glass effects
         let badgeColorClass = 'bg-emerald-600 text-white font-bold';
-        if (item.rating_color === 'amber' || cleanTag === 'ACCEPTABLE') badgeColorClass = 'bg-amber-600 text-white font-bold';
-        else if (item.rating_color === 'orange' || cleanTag === 'SUBOPTIMAL') badgeColorClass = 'bg-orange-600 text-white font-bold';
-        else if (item.rating_color === 'rose' || cleanTag === 'HAZARD') badgeColorClass = 'bg-rose-600 text-white font-bold';
+        let valColorClass = 'text-emerald-400';
+        if (item.rating_color === 'yellow' || item.rating_color === 'amber' || cleanTag === 'ACCEPTABLE') {
+            badgeColorClass = 'bg-amber-600 text-white font-bold';
+            valColorClass = 'text-amber-400';
+        } else if (item.rating_color === 'orange' || cleanTag === 'SUBOPTIMAL') {
+            badgeColorClass = 'bg-orange-600 text-white font-bold';
+            valColorClass = 'text-orange-400';
+        } else if (item.rating_color === 'rose' || cleanTag === 'HAZARD') {
+            badgeColorClass = 'bg-rose-600 text-white font-bold';
+            valColorClass = 'text-rose-400';
+        }
 
         const tagTooltip = (item.tag_reason || item.rating_reason || item.tooltip || cleanTag).replace(/"/g, '&quot;');
         
-        // Exact identical height, font and typography for SHARED tag, placed immediately to the left of OPTIMUM tag
-        const sharedBadge = item.shared ? '<span class="px-2 py-0.5 rounded text-xs font-mono font-bold bg-slate-800 text-slate-300 uppercase tracking-wider shrink-0" title="This setting is globally shared in MSFS between 2D and VR modes.">SHARED</span>' : '';
-        const ratingBadge = `<span class="px-2.5 py-0.5 rounded text-xs font-mono font-bold uppercase tracking-wider shrink-0 shadow-sm cursor-help ${badgeColorClass}" title="${tagTooltip}">${cleanTag}</span>`;
-        const infoButton = `<button type="button" onclick="openSettingInfoModal('${item.key}')" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-mono text-xs font-bold transition-colors cursor-pointer shrink-0 select-none" title="Detailed Technical Information">i</button>`;
+        // Removed SHARED badge on setting cards per user request
+        const sharedBadge = '';
+        const ratingBadge = `<span id="opt-badge-${item.key}" class="px-2.5 py-0.5 rounded typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] shrink-0 shadow-sm cursor-help ${badgeColorClass}" title="${tagTooltip}">${cleanTag}</span>`;
+        const infoButton = `<button type="button" onclick="openSettingInfoModal('${item.key}')" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white typo-action-btn text-xs font-semibold transition-colors cursor-pointer shrink-0 select-none" title="Detailed Technical Information">i</button>`;
+
+        // Headset Software Scale badge (e.g. [PIMAX PLAY: 0.80]) - Solid color, no glass effect, white typography
+        const headsetSwBadge = (item.key === 'primary_scaling_vr' && item.software_name && item.software_render_scale)
+            ? `<span class="px-2.5 py-0.5 rounded typo-action-btn text-xs font-semibold bg-indigo-600 text-white uppercase tracking-[0.02em] shrink-0 shadow-sm" title="Detected resolution in ${item.software_name}: ${item.software_render_scale} (${item.software_render_scale_pct}%)">${item.software_name}: ${item.software_render_scale.toFixed(2)}</span>`
+            : '';
 
         // AutoFPS & Smart LOD dynamic regulation check
         const isSmartLodManaged = (item.key === 'tlod' || item.key === 'olod') && window.smartLodActive;
         const isAutoFpsManaged = (item.key === 'tlod' || item.key === 'olod') && !isSmartLodManaged && (msfsSettingsMatrixData && msfsSettingsMatrixData.autofps_active);
         const autoFpsBadge = isSmartLodManaged 
-            ? '<span class="px-2 py-0.5 rounded text-xs font-mono font-bold bg-cyan-900 text-cyan-300 uppercase tracking-wider shrink-0" title="Dynamically regulated in real-time by Smart LOD">SMART LOD</span>' 
-            : (isAutoFpsManaged ? '<span class="px-2 py-0.5 rounded text-xs font-mono font-bold bg-cyan-900 text-cyan-300 uppercase tracking-wider shrink-0" title="Dynamically regulated in real-time by AutoFPS">AUTOFPS</span>' : '');
+            ? '<span class="px-2 py-0.5 rounded typo-action-btn text-xs font-semibold bg-cyan-900 text-cyan-300 uppercase tracking-[0.02em] shrink-0" title="Dynamically regulated in real-time by Smart LOD">SMART LOD</span>' 
+            : (isAutoFpsManaged ? '<span class="px-2 py-0.5 rounded typo-action-btn text-xs font-semibold bg-cyan-900 text-cyan-300 uppercase tracking-[0.02em] shrink-0" title="Dynamically regulated in real-time by AutoFPS">AUTOFPS</span>' : '');
 
         // Unified SVG down arrow chevron identical on both text/numeric inputs and select dropdowns
         const chevronSvg = `
@@ -16979,7 +17906,7 @@ function renderMsfsSettingsMatrix() {
                     <input type="text"
                            value="HANDLED BY SMART LOD"
                            disabled
-                           class="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-2 text-xs text-cyan-400 font-mono font-bold cursor-not-allowed opacity-80"
+                           class="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-2 typo-input-val text-xs text-cyan-400 font-medium cursor-not-allowed opacity-80"
                            title="This setting is dynamically regulated in real-time by SceneryX Smart LOD according to your target frame rate.">
                 </div>
             `;
@@ -16989,7 +17916,7 @@ function renderMsfsSettingsMatrix() {
                     <input type="text"
                            value="HANDLED BY AUTOFPS"
                            disabled
-                           class="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-2 text-xs text-cyan-400 font-mono font-bold cursor-not-allowed opacity-80"
+                           class="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-2 typo-input-val text-xs text-cyan-400 font-medium cursor-not-allowed opacity-80"
                            title="This setting is dynamically regulated in real-time by AutoFPS according to your target frame rate.">
                 </div>
             `;
@@ -16997,6 +17924,9 @@ function renderMsfsSettingsMatrix() {
             let displayVal = item.raw_value;
             if (item.key === 'max_frame_rate') {
                 displayVal = (item.raw_value === '0' || item.value === '0' || String(item.value).toUpperCase() === 'OFF' || String(item.value).toLowerCase().includes('unlocked')) ? 'OFF' : item.raw_value;
+            } else if (item.key === 'sharpen_amount_vr') {
+                const flt = parseFloat(item.value !== undefined ? item.value : (item.raw_value || 0));
+                displayVal = isNaN(flt) ? '0.20' : flt.toFixed(2);
             } else {
                 displayVal = item.raw_value || String(item.value).replace(/[^0-9]/g, '') || '100';
             }
@@ -17006,17 +17936,19 @@ function renderMsfsSettingsMatrix() {
                 presetListItems = item.options.map(opt => {
                     const isCur = String(opt).toUpperCase() === String(displayVal).toUpperCase();
                     const optRating = (item.option_ratings && item.option_ratings[opt]) ? item.option_ratings[opt].rating : 'acceptable';
-                    let textClass = 'text-amber-200';
+                    let textClass = 'text-amber-400 font-semibold';
                     if (optRating === 'optimum') {
-                        textClass = 'text-emerald-300 font-bold';
+                        textClass = 'text-emerald-300 font-semibold';
+                    } else if (optRating === 'suboptimal') {
+                        textClass = 'text-orange-400 font-semibold';
                     } else if (optRating === 'hazard') {
-                        textClass = 'text-rose-400 font-bold';
+                        textClass = 'text-rose-400 font-semibold';
                     }
                     return `
-                        <div class="px-3 py-1.5 hover:bg-slate-800 ${isCur ? 'bg-slate-800/90 text-white font-bold' : textClass} cursor-pointer transition-colors flex items-center justify-between text-xs font-mono"
+                        <div class="px-3 py-1.5 hover:bg-slate-800 ${isCur ? 'bg-slate-800/90 text-white font-semibold' : textClass} cursor-pointer transition-colors flex items-center justify-between typo-input-val text-xs font-semibold tabular-nums"
                              onmousedown="selectComboboxPreset('${item.key}', '${opt}', ${item.min_val ?? 0}, ${item.max_val ?? 400})">
-                            <span class="font-bold">${opt}</span>
-                            ${isCur ? '<span class="text-[9px] font-bold bg-slate-700 text-slate-200 px-1.5 py-0.2 rounded">CURRENT</span>' : ''}
+                            <span class="font-semibold tabular-nums">${opt}</span>
+                            ${isCur ? '<span class="text-[9px] font-semibold bg-slate-700 text-slate-200 px-1.5 py-0.5 rounded typo-action-btn uppercase">CURRENT</span>' : ''}
                         </div>
                     `;
                 }).join('');
@@ -17032,7 +17964,7 @@ function renderMsfsSettingsMatrix() {
                            onfocus="this.select();"
                            onkeydown="if(event.key==='Enter'){this.blur();}"
                            onchange="onMsfsManualSettingSubmitted('${item.key}', this.value, ${item.min_val ?? 0}, ${item.max_val ?? 400})"
-                           class="w-full bg-slate-950 border border-slate-700/80 focus:border-cyan-400 rounded-xl pl-3 pr-10 py-2 text-sm text-white font-mono font-bold focus:outline-none cursor-pointer"
+                           class="w-full bg-slate-950 border border-slate-700/80 focus:border-cyan-400 rounded-xl pl-3 pr-10 py-2 typo-input-val text-xs ${valColorClass} font-semibold tabular-nums focus:outline-none cursor-pointer"
                            placeholder="Select or enter value..."
                            title="Select a preset from dropdown or enter custom value">
                     <div class="cursor-pointer absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-white"
@@ -17042,7 +17974,9 @@ function renderMsfsSettingsMatrix() {
                         </svg>
                     </div>
                     <div id="opt-combo-menu-${item.key}"
-                         class="hidden absolute z-50 left-0 right-0 max-h-56 overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-700 rounded-xl shadow-2xl py-1 divide-y divide-slate-800">
+                         onwheel="event.stopPropagation();"
+                         style="overscroll-behavior: contain;"
+                         class="hidden fixed z-[99999] max-h-56 overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-700 rounded-xl shadow-2xl py-1 divide-y divide-slate-800">
                         ${presetListItems}
                     </div>
                 </div>
@@ -17053,15 +17987,16 @@ function renderMsfsSettingsMatrix() {
                 optionsHtml = item.options.map(opt => {
                     const isSelected = String(item.value).toUpperCase() === String(opt).toUpperCase() || String(item.raw_value).toUpperCase() === String(opt).toUpperCase();
                     const optRating = (item.option_ratings && item.option_ratings[opt]) ? item.option_ratings[opt].rating : 'acceptable';
-                    let optClass = 'text-amber-300 font-bold bg-slate-900';
-                    if (optRating === 'optimum') optClass = 'text-emerald-400 font-bold bg-slate-900';
-                    else if (optRating === 'hazard') optClass = 'text-rose-400 font-bold bg-slate-900';
+                    let optClass = 'text-amber-400 font-medium bg-slate-900';
+                    if (optRating === 'optimum') optClass = 'text-emerald-400 font-medium bg-slate-900';
+                    else if (optRating === 'suboptimal') optClass = 'text-orange-400 font-medium bg-slate-900';
+                    else if (optRating === 'hazard') optClass = 'text-rose-400 font-medium bg-slate-900';
                     return `<option value="${opt}" class="${optClass}" ${isSelected ? 'selected' : ''}>${opt}</option>`;
                 }).join('');
             }
             inputHtml = `
                 <div class="relative w-full pt-0.5">
-                    <select onchange="onMsfsSettingChanged('${item.key}', this.value)" class="w-full appearance-none bg-slate-950 border border-slate-700/80 focus:border-cyan-400 rounded-xl pl-3 pr-10 py-2 text-sm text-white font-mono font-bold focus:outline-none cursor-pointer">
+                    <select id="opt-select-${item.key}" onchange="onMsfsSettingChanged('${item.key}', this.value)" class="w-full appearance-none bg-slate-950 border border-slate-700/80 focus:border-cyan-400 rounded-xl pl-3 pr-10 py-2 typo-input-val text-xs ${valColorClass} font-medium focus:outline-none cursor-pointer">
                         ${optionsHtml}
                     </select>
                     ${chevronSvg}
@@ -17070,11 +18005,12 @@ function renderMsfsSettingsMatrix() {
         }
 
         return `
-            <div class="p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-slate-700 transition-all flex flex-col justify-between space-y-2.5" title="${(item.tooltip || '').replace(/"/g, '&quot;')}">
+            <div class="setting-card relative p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-slate-700 transition-all flex flex-col justify-between space-y-2.5" title="${(item.tooltip || '').replace(/"/g, '&quot;')}">
                 <div class="flex items-center justify-between gap-2">
-                    <span class="text-sm font-mono font-bold text-slate-100 uppercase tracking-wide truncate" title="${item.name}">${(item.name || '').toUpperCase()}</span>
+                    <span class="typo-setting-label text-slate-200 leading-tight break-words" title="${item.name}">${toSettingTitleCase(item.name || '')}</span>
                     <div class="flex items-center gap-1.5 shrink-0">
                         ${autoFpsBadge}
+                        ${headsetSwBadge}
                         ${sharedBadge}
                         ${ratingBadge}
                         ${infoButton}
@@ -17095,12 +18031,112 @@ function renderMsfsSettingsMatrix() {
     }
 
     updateCarouselUI();
+    updatePerformanceCockpitGauges();
 }
 
 async function onMsfsSettingChanged(settingKey, newValue) {
+    // Immediate 0-latency live performance telemetry update
+    if (msfsSettingsMatrixData) {
+        const modeNorm = String(currentMsfsGraphicsMode || '2D').toUpperCase();
+        let targetList = (modeNorm === 'VR') ? (msfsSettingsMatrixData.matrix_vr || []) :
+                         (modeNorm === 'COMMON') ? (msfsSettingsMatrixData.matrix_common || []) :
+                         (msfsSettingsMatrixData.matrix_2d || []);
+        let found = targetList.find(x => x.key === settingKey);
+        if (!found && msfsSettingsMatrixData.matrix_common) {
+            found = msfsSettingsMatrixData.matrix_common.find(x => x.key === settingKey);
+        }
+        if (!found) {
+            const fallbackList = (modeNorm === 'VR') ? (msfsSettingsMatrixData.matrix_2d || []) : (msfsSettingsMatrixData.matrix_vr || []);
+            found = fallbackList.find(x => x.key === settingKey);
+        }
+        if (found) {
+            let lookupKey = newValue;
+            if (settingKey === 'max_frame_rate' && (String(newValue) === '0' || String(newValue).toUpperCase() === 'OFF')) {
+                lookupKey = 'OFF';
+                found.value = 'OFF';
+                found.raw_value = '0';
+            } else {
+                found.value = newValue;
+                found.raw_value = newValue;
+            }
+
+            let optInfo = null;
+            if (found.option_ratings) {
+                if (found.option_ratings[lookupKey]) {
+                    optInfo = found.option_ratings[lookupKey];
+                } else if (found.option_ratings[newValue]) {
+                    optInfo = found.option_ratings[newValue];
+                } else {
+                    const valLower = String(lookupKey).trim().toLowerCase();
+                    for (const [k, v] of Object.entries(found.option_ratings)) {
+                        if (String(k).trim().toLowerCase() === valLower) {
+                            optInfo = v;
+                            break;
+                        }
+                    }
+                }
+            }
+            if (optInfo) {
+                found.rating = optInfo.rating;
+                found.tag_badge = optInfo.rating.toUpperCase();
+                found.rating_label = optInfo.rating.toUpperCase();
+                found.rating_reason = optInfo.reason;
+                found.tag_reason = optInfo.reason;
+                if (optInfo.rating === 'optimum') found.rating_color = 'emerald';
+                else if (optInfo.rating === 'acceptable') found.rating_color = 'amber';
+                else if (optInfo.rating === 'suboptimal') found.rating_color = 'orange';
+                else if (optInfo.rating === 'hazard') found.rating_color = 'rose';
+            }
+
+            // Immediately update card badge and select styling in the DOM
+            const badgeEl = document.getElementById(`opt-badge-${settingKey}`);
+            const selectEl = document.getElementById(`opt-select-${settingKey}`);
+            const inputEl = document.getElementById(`opt-combo-input-${settingKey}`);
+            if (badgeEl) {
+                let cleanTag = (found.tag_badge || found.rating_label || found.rating || 'OPTIMUM').toUpperCase();
+                if (cleanTag.includes('HAZARD') || cleanTag.includes('NOGO') || cleanTag.includes('RISK') || cleanTag.includes('ALERT')) {
+                    cleanTag = 'HAZARD';
+                } else if (cleanTag.includes('SUB') || cleanTag.includes('MISMATCH')) {
+                    cleanTag = 'SUBOPTIMAL';
+                } else if (cleanTag.includes('ACCEPT') || cleanTag.includes('WATCH') || cleanTag.includes('PRESSURE')) {
+                    cleanTag = 'ACCEPTABLE';
+                } else {
+                    cleanTag = 'OPTIMUM';
+                }
+                badgeEl.textContent = cleanTag;
+                let badgeClass = 'bg-emerald-600 text-white font-bold';
+                let textClass = 'text-emerald-400';
+                if (found.rating_color === 'yellow' || found.rating_color === 'amber' || cleanTag === 'ACCEPTABLE') {
+                    badgeClass = 'bg-amber-600 text-white font-bold';
+                    textClass = 'text-amber-400';
+                } else if (found.rating_color === 'orange' || cleanTag === 'SUBOPTIMAL') {
+                    badgeClass = 'bg-orange-600 text-white font-bold';
+                    textClass = 'text-orange-400';
+                } else if (found.rating_color === 'rose' || cleanTag === 'HAZARD') {
+                    badgeClass = 'bg-rose-600 text-white font-bold';
+                    textClass = 'text-rose-400';
+                }
+                badgeEl.className = `px-2.5 py-0.5 rounded typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] shrink-0 shadow-sm cursor-help ${badgeClass}`;
+                if (found.tag_reason || found.rating_reason) {
+                    badgeEl.title = found.tag_reason || found.rating_reason;
+                }
+                if (selectEl) {
+                    selectEl.classList.remove('text-emerald-400', 'text-amber-400', 'text-orange-400', 'text-rose-400');
+                    selectEl.classList.add(textClass);
+                }
+                if (inputEl) {
+                    inputEl.classList.remove('text-emerald-400', 'text-amber-400', 'text-orange-400', 'text-rose-400');
+                    inputEl.classList.add(textClass);
+                }
+            }
+        }
+        updatePerformanceCockpitGauges();
+    }
+
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.update_msfs_setting) return;
     try {
-        const resStr = await window.pywebview.api.update_msfs_setting(currentMsfsGraphicsMode, settingKey, newValue);
+        const modeNorm = String(currentMsfsGraphicsMode || '2D').toUpperCase();
+        const resStr = await window.pywebview.api.update_msfs_setting(modeNorm, settingKey, newValue);
         const res = JSON.parse(resStr);
         if (res.status === 'success') {
             await loadRigDiagnostics();
@@ -17315,28 +18351,76 @@ async function selectCadenceDisplay(displayId) {
     }
 }
 
+function renderImpactGauge(type, score, defaultNote) {
+    const gaugeEl = document.getElementById(`opt-info-${type}-gauge`);
+    const cardEl = document.getElementById(`opt-info-${type}-card`);
+    if (!gaugeEl) return;
+
+    const clampedScore = Math.max(1, Math.min(12, parseInt(score, 10) || (type === 'cpu' ? 3 : 4)));
+    const note = defaultNote || (type === 'cpu' ? 'Standard MainThread workload.' : 'Standard GPU rasterization workload.');
+
+    // Set informative tooltip directly on the gauge and card container
+    gaugeEl.title = note;
+    if (cardEl) cardEl.title = note;
+
+    let bricksHtml = '';
+    for (let i = 1; i <= 12; i++) {
+        const isLit = i <= clampedScore;
+        let litColor = 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]';
+        if (i >= 10) {
+            litColor = 'bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.5)]';
+        } else if (i >= 7) {
+            litColor = 'bg-orange-500 shadow-[0_0_6px_rgba(249,115,22,0.5)]';
+        } else if (i >= 4) {
+            litColor = 'bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.5)]';
+        }
+
+        const brickClass = isLit 
+            ? `${litColor} border border-white/20`
+            : 'bg-slate-800 border border-slate-700/40 opacity-30';
+
+        bricksHtml += `
+            <div class="flex-1 h-3 rounded-sm transition-all duration-150 cursor-help ${brickClass} hover:brightness-125" 
+                 title="${note}"></div>
+        `;
+    }
+    gaugeEl.innerHTML = bricksHtml;
+}
+
 function openSettingInfoModal(settingKey) {
     const modal = document.getElementById('opt-setting-info-modal');
     if (!modal || !msfsSettingsMatrixData) return;
 
-    const matrix = currentMsfsGraphicsMode === 'VR' 
-        ? (msfsSettingsMatrixData.matrix_vr || []) 
-        : (msfsSettingsMatrixData.matrix_2d || []);
+    let item = null;
+    const mode = (currentMsfsGraphicsMode || '2D').toUpperCase();
+    if (mode === 'COMMON' || mode === 'SHARED') {
+        item = (msfsSettingsMatrixData.matrix_common || []).find(x => x.key === settingKey);
+    } else if (mode === 'VR') {
+        item = (msfsSettingsMatrixData.matrix_vr || []).find(x => x.key === settingKey);
+    } else {
+        item = (msfsSettingsMatrixData.matrix_2d || []).find(x => x.key === settingKey);
+    }
 
-    const item = matrix.find(x => x.key === settingKey);
+    // Universal fallback if not found in active category matrix
+    if (!item) {
+        const allItems = [
+            ...(msfsSettingsMatrixData.matrix_common || []),
+            ...(msfsSettingsMatrixData.matrix_vr || []),
+            ...(msfsSettingsMatrixData.matrix_2d || [])
+        ];
+        item = allItems.find(x => x.key === settingKey);
+    }
+
     if (!item) return;
 
     const titleEl = document.getElementById('opt-info-title');
     const sharedEl = document.getElementById('opt-info-shared');
     const ratingEl = document.getElementById('opt-info-rating');
     const descEl = document.getElementById('opt-info-desc');
-    const cpuEl = document.getElementById('opt-info-cpu');
-    const gpuEl = document.getElementById('opt-info-gpu');
     const linerEl = document.getElementById('opt-info-liner');
     const gaEl = document.getElementById('opt-info-ga');
-    const optionsListEl = document.getElementById('opt-info-options-list');
 
-    if (titleEl) titleEl.textContent = item.name || settingKey.toUpperCase();
+    if (titleEl) titleEl.textContent = toSettingTitleCase(item.name || settingKey);
     
     if (sharedEl) {
         if (item.shared) sharedEl.classList.remove('hidden');
@@ -17356,51 +18440,32 @@ function openSettingInfoModal(settingKey) {
 
     if (ratingEl) {
         ratingEl.textContent = cleanTag;
-        ratingEl.className = `px-2.5 py-0.5 rounded text-xs font-mono font-bold uppercase ${badgeClass}`;
+        ratingEl.className = `px-2.5 py-0.5 rounded typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] ${badgeClass}`;
     }
 
     if (descEl) descEl.textContent = item.info_desc || item.tooltip || 'MSFS graphics engine configuration setting.';
-    if (cpuEl) cpuEl.textContent = item.info_cpu || 'Moderate impact on CPU MainThread.';
-    if (gpuEl) gpuEl.textContent = item.info_gpu || 'Standard impact on GPU and VRAM.';
     if (linerEl) linerEl.textContent = item.info_liner || 'Recommended to preserve MainThread and VRAM during IFR operations.';
     if (gaEl) gaEl.textContent = item.info_ga || 'Ideal for VFR flight and scenery visual sharpness.';
 
-    if (optionsListEl && Array.isArray(item.options)) {
-        optionsListEl.innerHTML = item.options.map(opt => {
-            const isCur = String(item.value).toUpperCase() === String(opt).toUpperCase() || String(item.raw_value).toUpperCase() === String(opt).toUpperCase();
-            const optRating = (item.option_ratings && item.option_ratings[opt]) ? item.option_ratings[opt].rating : 'acceptable';
-            
-            let tagText = 'ACCEPTABLE';
-            let tagBg = 'bg-amber-600 text-white font-bold';
-            if (optRating === 'optimum') {
-                tagText = 'OPTIMUM';
-                tagBg = 'bg-emerald-600 text-white font-bold';
-            } else if (optRating === 'hazard') {
-                tagText = 'HAZARD';
-                tagBg = 'bg-rose-600 text-white font-bold';
-            } else if (optRating === 'suboptimal') {
-                tagText = 'SUBOPTIMAL';
-                tagBg = 'bg-orange-600 text-white font-bold';
-            }
+    renderImpactGauge('cpu', item.cpu_score, item.cpu_note || item.info_cpu);
+    renderImpactGauge('gpu', item.gpu_score, item.gpu_note || item.info_gpu);
 
-            return `
-                <div class="p-2.5 rounded-xl bg-slate-950 border ${isCur ? 'border-cyan-500 bg-cyan-950/20' : 'border-slate-800'} flex items-center justify-between text-xs">
-                    <div class="flex items-center gap-2">
-                        <span class="font-mono font-bold text-slate-200">${opt}</span>
-                        ${isCur ? '<span class="text-[9px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-slate-300 font-bold ml-1">CURRENT</span>' : ''}
-                    </div>
-                    <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${tagBg}">${tagText}</span>
-                </div>
-            `;
-        }).join('');
+    const rigImpEl = document.getElementById('opt-info-rig-implications');
+    if (rigImpEl) {
+        rigImpEl.innerHTML = item.rig_implications || `<p class="text-slate-300">Technical analysis calibrated for your detected hardware configuration.</p>`;
     }
 
+    modal.style.zIndex = '99999';
     modal.style.display = 'flex';
+    modal.classList.remove('hidden');
 }
 
 function closeSettingInfoModal() {
     const modal = document.getElementById('opt-setting-info-modal');
-    if (modal) modal.style.display = 'none';
+    if (modal) {
+        modal.style.display = 'none';
+        modal.classList.add('hidden');
+    }
 }
 
 let currentUnifiedModalView = 'feedback';
@@ -17438,47 +18503,328 @@ function switchUnifiedModalView(view, fromFeedback = false) {
     modal.classList.remove('hidden');
 }
 
+function openOptFeedbackModal(res) {
+    const modeEl = document.getElementById('opt-feedback-mode');
+    const profileEl = document.getElementById('opt-feedback-profile');
+    const backupEl = document.getElementById('opt-feedback-backup');
+    const detailsEl = document.getElementById('opt-feedback-details');
+
+    if (modeEl) modeEl.textContent = `${currentMsfsGraphicsMode} DISPLAY${currentMsfsGraphicsMode === 'VR' ? ` (${currentVrRefreshRate} Hz)` : ''}`;
+    if (profileEl) profileEl.textContent = currentFlightMissionProfile === 'LINER' ? 'IFR AIRLINER (Axel LFBO Trick)' : 'VFR GENERAL AVIATION (High Detail)';
+    if (backupEl) backupEl.textContent = (res && res.backup_created) || 'UserCfg.opt.backup_...';
+
+    if (detailsEl) {
+        let detailsHtml = '';
+        if (currentMsfsGraphicsMode === '2D') {
+            detailsHtml += `
+                <div class="flex items-center gap-2 text-emerald-400 font-mono text-xs"><span class="px-1.5 py-0.5 typo-action-btn text-[9px] font-semibold bg-emerald-600 text-white rounded">OK</span><span>Texture Resolution: ${currentFlightMissionProfile === 'LINER' ? 'LOW (Axel LFBO - Frees 6-8 GB VRAM)' : 'HIGH (Full Detail)'}</span></div>
+                <div class="flex items-center gap-2 text-emerald-400 font-mono text-xs"><span class="px-1.5 py-0.5 typo-action-btn text-[9px] font-semibold bg-emerald-600 text-white rounded">OK</span><span>Glass Cockpit Refresh: ${currentFlightMissionProfile === 'LINER' ? 'MEDIUM (Saves 5-8 ms MainThread frame time)' : 'HIGH (Full Synthetic Vision)'}</span></div>
+                <div class="flex items-center gap-2 text-emerald-400 font-mono text-xs"><span class="px-1.5 py-0.5 typo-action-btn text-[9px] font-semibold bg-emerald-600 text-white rounded">OK</span><span>Terrain LOD (TLOD): ${currentFlightMissionProfile === 'LINER' ? '100 (Protects MainThread from WASM avionics)' : '150 (Smooth for VFR)'}</span></div>
+                <div class="flex items-center gap-2 text-emerald-400 font-mono text-xs"><span class="px-1.5 py-0.5 typo-action-btn text-[9px] font-semibold bg-emerald-600 text-white rounded">OK</span><span>Anti-Aliasing & Pacing: DLSS (Quality) + Frame Generation DLSSG (2X)</span></div>
+                <div class="flex items-center gap-2 text-emerald-400 font-mono text-xs"><span class="px-1.5 py-0.5 typo-action-btn text-[9px] font-semibold bg-emerald-600 text-white rounded">OK</span><span>Environment & Shadows: 27 Settings Calibrated across 7 Rubriques</span></div>
+            `;
+        } else {
+            const targetVrFps = Math.max(30, Math.floor(currentVrRefreshRate / 2));
+            detailsHtml += `
+                <div class="flex items-center gap-2 text-emerald-400 font-mono text-xs"><span class="px-1.5 py-0.5 typo-action-btn text-[9px] font-semibold bg-emerald-600 text-white rounded">OK</span><span>Max Frame Rate: ${targetVrFps} FPS (Exact 1/2 sync divisor for ${currentVrRefreshRate} Hz headset)</span></div>
+                <div class="flex items-center gap-2 text-emerald-400 font-mono text-xs"><span class="px-1.5 py-0.5 typo-action-btn text-[9px] font-semibold bg-emerald-600 text-white rounded">OK</span><span>Frame Generation: OFF (Mandatory to prevent VR latency and artifacting)</span></div>
+                <div class="flex items-center gap-2 text-emerald-400 font-mono text-xs"><span class="px-1.5 py-0.5 typo-action-btn text-[9px] font-semibold bg-emerald-600 text-white rounded">OK</span><span>Texture Resolution: ${currentFlightMissionProfile === 'LINER' ? 'LOW (Frees 6-8 GB VRAM, avoids compositor crashes)' : 'MEDIUM (Balanced for VFR)'}</span></div>
+                <div class="flex items-center gap-2 text-emerald-400 font-mono text-xs"><span class="px-1.5 py-0.5 typo-action-btn text-[9px] font-semibold bg-emerald-600 text-white rounded">OK</span><span>Glass Cockpit Refresh: LOW (Quarter rate frees stereo MainThread budget)</span></div>
+                <div class="flex items-center gap-2 text-emerald-400 font-mono text-xs"><span class="px-1.5 py-0.5 typo-action-btn text-[9px] font-semibold bg-emerald-600 text-white rounded">OK</span><span>VR Environment & Terrain: 27 Settings Calibrated for Zero Judder</span></div>
+            `;
+        }
+        detailsEl.innerHTML = detailsHtml;
+    }
+
+    unifiedModalOpenedFromFeedback = false;
+    switchUnifiedModalView('feedback');
+}
+
+function openUserCfgBackupModal() {
+    unifiedModalOpenedFromFeedback = false;
+    switchUnifiedModalView('backups');
+}
+
+function closeUnifiedUserCfgModal() {
+    const modal = document.getElementById('unified-user-cfg-modal');
+    if (modal) {
+        modal.style.display = 'none';
+        modal.classList.add('hidden');
+    }
+}
+
+function closeOptFeedbackModal() {
+    closeUnifiedUserCfgModal();
+}
+
+function closeUserCfgBackupModal() {
+    closeUnifiedUserCfgModal();
+}
+
+async function fetchAndRenderUserCfgBackups() {
+    const listEl = document.getElementById('user-cfg-backup-list');
+    if (!listEl) return;
+
+    let userCfgBackupsList = [];
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.get_user_cfg_backups) {
+        try {
+            const resStr = await window.pywebview.api.get_user_cfg_backups();
+            userCfgBackupsList = JSON.parse(resStr);
+        } catch (e) {
+            console.error("Error fetching backups:", e);
+        }
+    }
+
+    if (!userCfgBackupsList || userCfgBackupsList.length === 0) {
+        listEl.innerHTML = '<div class="p-6 text-center text-slate-500 font-mono text-xs">No backups found yet. Backups are created automatically when applying profile changes.</div>';
+    } else {
+        let html = '';
+        userCfgBackupsList.slice(0, 20).forEach((b, index) => {
+            const isLatest = (index === 0);
+            html += `
+                <div class="p-3 rounded-2xl bg-slate-950 border ${isLatest ? 'border-amber-500/60' : 'border-slate-800'} flex items-center justify-between gap-3">
+                    <div class="flex items-center gap-2.5">
+                        <div class="w-8 h-8 rounded-xl ${isLatest ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-800 text-slate-400'} flex items-center justify-center shrink-0">
+                            <span class="font-mono text-[9px] font-black">BAK</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="typo-input-val font-medium text-xs text-white tracking-wide tabular-nums">${b.timestamp}</span>
+                            ${isLatest ? '<span class="px-2 py-0.5 rounded text-[9px] typo-action-btn font-semibold bg-amber-500 text-slate-950 uppercase shadow-sm">MOST RECENT</span>' : ''}
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <button onclick="restoreUserCfgBackupTarget('${b.filename}')" class="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 typo-action-btn font-semibold text-xs transition-all cursor-pointer active:scale-95 uppercase tracking-[0.02em]">
+                            Restore
+                        </button>
+                        <button onclick="deleteUserCfgBackupTarget('${b.filename}')" class="px-2.5 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 hover:border-transparent typo-action-btn font-semibold text-xs transition-all cursor-pointer active:scale-95" title="Delete backup">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+        listEl.innerHTML = html;
+    }
+}
+
+async function restoreUserCfgBackupTarget(filename) {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.restore_user_cfg_backup) return;
+    try {
+        const resStr = await window.pywebview.api.restore_user_cfg_backup(filename);
+        const res = JSON.parse(resStr);
+        if (res.status === 'success') {
+            closeUnifiedUserCfgModal();
+            if (typeof showToast === 'function') {
+                showToast(`UserCfg.opt restored from ${filename}!`, 'success');
+            }
+            await loadRigDiagnostics();
+        } else {
+            if (typeof showToast === 'function') {
+                showToast(`Rollback failed: ${res.message}`, 'error');
+            }
+        }
+    } catch (e) {
+        console.error("Error restoring backup:", e);
+    }
+}
+
 // -------------------------------------------------------------------------
-// CUSTOM PROFILES MANAGEMENT (SAVE, ACTIVATE, DELETE, RESTORE ORIGINAL)
+// CUSTOM PROFILES MANAGEMENT (UNIVERSAL FIELD, SAVE, ACTIVATE, DELETE, RESTORE)
 // -------------------------------------------------------------------------
 
 let currentCustomProfiles = [];
+let selectedProfileId = '';
+
+function formatProfileDate(dateStr) {
+    if (!dateStr) return '';
+    try {
+        const safeStr = dateStr.includes(' ') && !dateStr.includes('T') ? dateStr.replace(' ', 'T') : dateStr;
+        const d = new Date(safeStr);
+        if (isNaN(d.getTime())) {
+            const parts = dateStr.split(' ');
+            const datePart = (parts[0] || '').replace(/-/g, '/');
+            const timeParts = (parts[1] || '').split(':');
+            const timePart = timeParts.slice(0, 2).join(':');
+            return `${datePart} ${timePart}`.trim();
+        }
+        const formatter = new Intl.DateTimeFormat(undefined, {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        return formatter.format(d).replace(/-/g, '/').replace(/\./g, '/');
+    } catch (e) {
+        return dateStr;
+    }
+}
 
 async function fetchAndRenderCustomProfiles() {
     const dropdown = document.getElementById('opt-profiles-dropdown');
-    const indicator = document.getElementById('active-profile-indicator');
-    if (!dropdown || !window.pywebview || !window.pywebview.api || !window.pywebview.api.get_custom_profiles) return;
+    const input = document.getElementById('opt-profile-universal-input');
+    const listEl = document.getElementById('opt-profile-dropdown-list');
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.get_custom_profiles) return;
 
     try {
         const resStr = await window.pywebview.api.get_custom_profiles();
         currentCustomProfiles = JSON.parse(resStr) || [];
         
+        // Sort newest first (order of creation from newest to oldest)
+        currentCustomProfiles.sort((a, b) => {
+            const timeA = a.created_at ? new Date(a.created_at.replace(' ', 'T')).getTime() : 0;
+            const timeB = b.created_at ? new Date(b.created_at.replace(' ', 'T')).getTime() : 0;
+            return timeB - timeA;
+        });
+
+        // Find active profile or default to newest
         let activeProfile = currentCustomProfiles.find(p => p.is_active);
-        
-        if (indicator) {
-            if (activeProfile) {
-                indicator.textContent = `${activeProfile.name.toUpperCase()} ACTIVE`;
-                indicator.className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 font-bold border border-cyan-800/80 uppercase';
+        if (!activeProfile && currentCustomProfiles.length > 0) {
+            activeProfile = currentCustomProfiles[0];
+        }
+
+        // Hidden select synchronization
+        if (dropdown) {
+            if (currentCustomProfiles.length === 0) {
+                dropdown.innerHTML = '<option value="">No saved profiles yet</option>';
             } else {
-                indicator.textContent = 'USERCFG.OPT ACTIVE';
-                indicator.className = 'text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 font-bold border border-emerald-800/80 uppercase';
+                dropdown.innerHTML = currentCustomProfiles.map(p => `
+                    <option value="${p.id}" ${p.id === (activeProfile ? activeProfile.id : '') ? 'selected' : ''}>${escapeHtml(p.name)}</option>
+                `).join('');
             }
         }
 
-        if (currentCustomProfiles.length === 0) {
-            dropdown.innerHTML = '<option value="">No saved profiles yet</option>';
-        } else {
-            dropdown.innerHTML = currentCustomProfiles.map(p => `
-                <option value="${p.id}" ${p.is_active ? 'selected' : ''}>${p.name} (${p.created_at}) ${p.is_active ? '★ ACTIVE' : ''}</option>
-            `).join('');
+        // Universal Input handling: show active/newest profile name or empty placeholder
+        if (input) {
+            if (currentCustomProfiles.length > 0 && activeProfile) {
+                input.value = activeProfile.name;
+                selectedProfileId = activeProfile.id;
+                if (dropdown) dropdown.value = activeProfile.id;
+            } else {
+                input.value = '';
+                selectedProfileId = '';
+                if (dropdown) dropdown.value = '';
+            }
+        }
+
+        // Dropdown List rendering
+        if (listEl) {
+            if (currentCustomProfiles.length === 0) {
+                listEl.innerHTML = '<div class="p-3 text-slate-500 text-center italic">No saved profiles yet</div>';
+            } else {
+                listEl.innerHTML = currentCustomProfiles.map(p => {
+                    const isSelected = p.id === (activeProfile ? activeProfile.id : '');
+                    const dateFormatted = formatProfileDate(p.created_at);
+                    const activeBadge = p.is_active 
+                        ? `<span class="px-2 py-0.5 rounded typo-action-btn text-[10px] font-semibold bg-emerald-600 text-white shadow-sm uppercase tracking-[0.02em]">ACTIVE</span>`
+                        : '';
+                    return `
+                        <div onclick="selectCustomProfileItem('${p.id}')"
+                             class="px-3.5 py-2.5 flex items-center justify-between hover:bg-slate-800 cursor-pointer transition-colors ${isSelected ? 'bg-slate-800/60' : ''}">
+                            <div class="flex flex-col min-w-0 pr-2">
+                                <span class="typo-input-val font-semibold text-xs text-slate-100 truncate">${escapeHtml(p.name)}</span>
+                                <span class="typo-metadata tabular-nums">${dateFormatted}</span>
+                            </div>
+                            <div class="shrink-0 flex items-center gap-1.5">
+                                ${activeBadge}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+            }
         }
     } catch (e) {
         console.error("Error fetching custom profiles:", e);
     }
 }
 
+function toggleProfileDropdown(event) {
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
+    const listEl = document.getElementById('opt-profile-dropdown-list');
+    const combobox = document.getElementById('opt-profile-universal-combobox');
+    if (!listEl || !combobox) return;
+    const isHidden = listEl.classList.contains('hidden');
+    closeAllProfileDropdowns();
+    if (isHidden) {
+        // Move dropdown to body if not already there, ensuring it breaks out of the floating window overflow
+        if (listEl.parentElement !== document.body) {
+            document.body.appendChild(listEl);
+        }
+        const rect = combobox.getBoundingClientRect();
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const spaceAbove = rect.top;
+
+        listEl.style.position = 'fixed';
+        listEl.style.left = `${rect.left}px`;
+        listEl.style.width = `${rect.width}px`;
+        listEl.style.zIndex = '99999';
+
+        // Check if opening downwards would be cramped (less than 220px) and there's more space above
+        if (spaceBelow < 220 && spaceAbove > spaceBelow) {
+            listEl.style.top = 'auto';
+            listEl.style.bottom = `${window.innerHeight - rect.top + 6}px`;
+            listEl.style.maxHeight = `${Math.max(100, Math.min(260, spaceAbove - 20))}px`;
+        } else {
+            listEl.style.bottom = 'auto';
+            listEl.style.top = `${rect.bottom + 6}px`;
+            listEl.style.maxHeight = `${Math.max(100, Math.min(260, spaceBelow - 20))}px`;
+        }
+        listEl.classList.remove('hidden');
+    }
+}
+
+function closeAllProfileDropdowns() {
+    const listEl = document.getElementById('opt-profile-dropdown-list');
+    if (listEl) {
+        listEl.classList.add('hidden');
+        const combobox = document.getElementById('opt-profile-universal-combobox');
+        if (combobox && listEl.parentElement !== combobox) {
+            combobox.appendChild(listEl);
+        }
+    }
+}
+
+function selectCustomProfileItem(profileId) {
+    const profile = currentCustomProfiles.find(p => p.id === profileId);
+    if (!profile) return;
+
+    selectedProfileId = profile.id;
+    const input = document.getElementById('opt-profile-universal-input');
+    if (input) {
+        input.value = profile.name;
+    }
+    const dropdown = document.getElementById('opt-profiles-dropdown');
+    if (dropdown) {
+        dropdown.value = profile.id;
+    }
+    closeAllProfileDropdowns();
+}
+
+function handleProfileInputFocus() {
+    const input = document.getElementById('opt-profile-universal-input');
+    if (!input) return;
+    // When clicking into the field to enter a new profile, clear the input so user can type immediately
+    input.value = '';
+    closeAllProfileDropdowns();
+}
+
+function handleProfileInputBlur() {
+    const input = document.getElementById('opt-profile-universal-input');
+    if (!input) return;
+    // If left empty and a profile was previously selected, restore its display name
+    if (!input.value.trim() && selectedProfileId) {
+        const prof = currentCustomProfiles.find(p => p.id === selectedProfileId);
+        if (prof) {
+            input.value = prof.name;
+        }
+    }
+}
+
 async function saveCurrentCustomProfile() {
-    const input = document.getElementById('opt-profile-name-input');
+    const input = document.getElementById('opt-profile-universal-input');
     let name = input ? input.value.trim() : '';
     if (!name) {
         const now = new Date();
@@ -17490,9 +18836,12 @@ async function saveCurrentCustomProfile() {
         const resStr = await window.pywebview.api.save_custom_profile(name);
         const res = JSON.parse(resStr);
         if (res.status === 'success') {
-            if (input) input.value = '';
             if (typeof showToast === 'function') showToast(`Profile "${name}" saved!`, 'success');
             await fetchAndRenderCustomProfiles();
+            if (res.profile && res.profile.id) {
+                selectedProfileId = res.profile.id;
+                if (input) input.value = res.profile.name || name;
+            }
         } else {
             if (typeof showToast === 'function') showToast(`Save error: ${res.message}`, 'error');
         }
@@ -17503,8 +18852,20 @@ async function saveCurrentCustomProfile() {
 }
 
 async function activateSelectedCustomProfile() {
-    const dropdown = document.getElementById('opt-profiles-dropdown');
-    const profileId = dropdown ? dropdown.value : '';
+    let profileId = selectedProfileId;
+    if (!profileId) {
+        const dropdown = document.getElementById('opt-profiles-dropdown');
+        profileId = dropdown ? dropdown.value : '';
+    }
+    if (!profileId) {
+        const input = document.getElementById('opt-profile-universal-input');
+        const typedName = input ? input.value.trim().toLowerCase() : '';
+        if (typedName && currentCustomProfiles.length > 0) {
+            const found = currentCustomProfiles.find(p => (p.name || '').toLowerCase() === typedName);
+            if (found) profileId = found.id;
+        }
+    }
+
     if (!profileId) {
         if (typeof showToast === 'function') showToast("Please select a profile to activate.", "warning");
         return;
@@ -17527,9 +18888,52 @@ async function activateSelectedCustomProfile() {
     }
 }
 
-async function deleteSelectedCustomProfile() {
-    const dropdown = document.getElementById('opt-profiles-dropdown');
-    const profileId = dropdown ? dropdown.value : '';
+function confirmDeleteCustomProfile() {
+    let profileId = selectedProfileId;
+    if (!profileId) {
+        const dropdown = document.getElementById('opt-profiles-dropdown');
+        profileId = dropdown ? dropdown.value : '';
+    }
+    if (!profileId) {
+        const input = document.getElementById('opt-profile-universal-input');
+        const typedName = input ? input.value.trim().toLowerCase() : '';
+        if (typedName && currentCustomProfiles.length > 0) {
+            const found = currentCustomProfiles.find(p => (p.name || '').toLowerCase() === typedName);
+            if (found) profileId = found.id;
+        }
+    }
+
+    if (!profileId) {
+        if (typeof showToast === 'function') showToast("Please select a profile to delete.", "warning");
+        return;
+    }
+
+    const profile = currentCustomProfiles.find(p => p.id === profileId);
+    const profileName = profile ? profile.name : profileId;
+
+    if (typeof showCustomModal === 'function') {
+        showCustomModal({
+            title: 'DELETE PROFILE',
+            message: `Are you sure you want to delete "${profileName}"?`,
+            type: 'warning',
+            showCancel: true,
+            confirmText: 'YES',
+            cancelText: 'NO',
+            confirmClass: 'px-4 py-1.5 text-center rounded-xl bg-rose-600 hover:bg-rose-500 text-white typo-action-btn font-semibold text-xs uppercase transition-all border-0 cursor-pointer shadow-md',
+            cancelClass: 'px-4 py-1.5 text-center rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 hover:text-white typo-action-btn text-xs font-semibold uppercase transition-all cursor-pointer',
+            onConfirm: async () => {
+                await deleteSelectedCustomProfile(profileId);
+            }
+        });
+    } else {
+        if (confirm(`Are you sure you want to delete "${profileName}"?`)) {
+            deleteSelectedCustomProfile(profileId);
+        }
+    }
+}
+
+async function deleteSelectedCustomProfile(profileIdToDelete) {
+    const profileId = profileIdToDelete || selectedProfileId;
     if (!profileId) return;
 
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.delete_custom_profile) return;
@@ -17538,6 +18942,7 @@ async function deleteSelectedCustomProfile() {
         const res = JSON.parse(resStr);
         if (res.status === 'success') {
             if (typeof showToast === 'function') showToast("Profile deleted", 'info');
+            selectedProfileId = '';
             await fetchAndRenderCustomProfiles();
         } else {
             if (typeof showToast === 'function') showToast(`Delete failed: ${res.message}`, 'error');
@@ -17631,12 +19036,12 @@ async function toggleBlackboxRecording() {
             const resStr = await window.pywebview.api.start_flight_blackbox(flightName, dep, arr, studio);
             isBlackboxRunning = true;
             if (btnText) btnText.textContent = "Stop Flight & Debrief";
-            if (btn) btn.className = "px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-extrabold text-xs transition-all cursor-pointer active:scale-95 flex items-center gap-2 shadow-lg shadow-amber-600/30";
+            if (btn) btn.className = "px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white typo-action-btn font-semibold text-xs transition-all cursor-pointer active:scale-95 flex items-center gap-2 shadow-lg shadow-amber-600/30";
             if (recDot) recDot.classList.remove('hidden');
             const statusLbl = document.getElementById('opt-blackbox-status-label');
             if (statusLbl) {
                 statusLbl.textContent = "Recording flight...";
-                statusLbl.className = "text-[10px] text-emerald-400 font-bold block animate-pulse";
+                statusLbl.className = "typo-metadata text-[10px] text-emerald-400 font-semibold block animate-pulse";
             }
             if (typeof showToast === 'function') showToast("Blackbox started! Recording flight telemetry...", "success");
         } catch (e) {
@@ -17648,13 +19053,13 @@ async function toggleBlackboxRecording() {
             const res = JSON.parse(resStr);
             isBlackboxRunning = false;
             if (btnText) btnText.textContent = "Start Flight (Blackbox)";
-            if (btn) btn.className = "px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-extrabold text-xs transition-all cursor-pointer active:scale-95 flex items-center gap-2 shadow-lg shadow-red-600/30";
+            if (btn) btn.className = "px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white typo-action-btn font-semibold text-xs transition-all cursor-pointer active:scale-95 flex items-center gap-2 shadow-lg shadow-red-600/30";
             if (recDot) recDot.classList.add('hidden');
             if (lastReportBtn) lastReportBtn.classList.remove('hidden');
             const statusLbl = document.getElementById('opt-blackbox-status-label');
             if (statusLbl) {
                 statusLbl.textContent = "Ready to record";
-                statusLbl.className = "text-[10px] text-slate-400 block";
+                statusLbl.className = "typo-metadata text-[10px] text-slate-400 block";
             }
 
             if (typeof showToast === 'function') showToast("Flight recorded! Performance benchmark generated successfully.", "success");
@@ -17695,10 +19100,10 @@ function startBlackboxTelemetryPolling() {
             if (statusLbl) {
                 if (telem.is_tracking) {
                     statusLbl.textContent = "Recording flight...";
-                    statusLbl.className = "text-[10px] text-emerald-400 font-bold block animate-pulse";
+                    statusLbl.className = "typo-metadata text-[10px] text-emerald-400 font-semibold block animate-pulse";
                 } else if (!isBlackboxRunning) {
                     statusLbl.textContent = "Ready to record";
-                    statusLbl.className = "text-[10px] text-slate-400 block";
+                    statusLbl.className = "typo-metadata text-[10px] text-slate-400 block";
                 }
             }
 
@@ -17711,7 +19116,7 @@ function startBlackboxTelemetryPolling() {
             if (mtVal) {
                 if (telem.main_thread_ms !== null) {
                     mtVal.textContent = `${telem.main_thread_ms}`;
-                    mtVal.className = telem.main_thread_ms > 22.5 ? 'text-2xl font-black text-amber-400' : 'text-2xl font-black text-emerald-400';
+                    mtVal.className = telem.main_thread_ms > 22.5 ? 'typo-metric text-2xl font-semibold text-amber-400 tabular-nums' : 'typo-metric text-2xl font-semibold text-emerald-400 tabular-nums';
                 } else {
                     mtVal.textContent = '--';
                 }
@@ -17812,11 +19217,11 @@ async function refreshBenchmarksList() {
                 <div class="flex items-center gap-2.5 truncate pr-2">
                     <i class="fa-solid fa-file-chart-column text-cyan-400 text-sm"></i>
                     <div class="truncate">
-                        <span class="font-mono font-bold text-white block truncate">${item.filename}</span>
-                        <span class="text-[10px] text-slate-400">${item.mtime} • ${item.size_kb} KB</span>
+                        <span class="typo-input-val font-semibold text-xs text-white block truncate">${item.filename}</span>
+                        <span class="typo-metadata tabular-nums">${item.mtime} • ${item.size_kb} KB</span>
                     </div>
                 </div>
-                <button onclick="openBenchmarkFile('${item.filename}')" class="px-3 py-1 rounded-lg bg-cyan-600/80 hover:bg-cyan-500 text-white font-bold text-xs transition-all cursor-pointer shrink-0 flex items-center gap-1.5">
+                <button onclick="openBenchmarkFile('${item.filename}')" class="px-3 py-1 rounded-lg bg-cyan-600/80 hover:bg-cyan-500 text-white typo-action-btn font-semibold text-xs transition-all cursor-pointer shrink-0 flex items-center gap-1.5">
                     <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
                     <span>Open</span>
                 </button>
@@ -17899,10 +19304,10 @@ function updateSmartLodUIFromStatus(status) {
     if (liveTlod) {
         if (window.smartLodActive && status.current_tlod_setpoint) {
             liveTlod.textContent = Math.round(status.current_tlod_setpoint);
-            liveTlod.className = 'text-cyan-400 font-bold';
+            liveTlod.className = 'typo-metric text-cyan-400 font-semibold tabular-nums';
         } else {
             liveTlod.textContent = '--';
-            liveTlod.className = 'text-slate-500 font-bold';
+            liveTlod.className = 'typo-metric text-slate-500 font-semibold tabular-nums';
         }
     }
 
@@ -17910,10 +19315,10 @@ function updateSmartLodUIFromStatus(status) {
     const activeBadge = document.getElementById('smart-lod-active-badge');
     if (activeBadge) {
         if (window.smartLodActive) {
-            activeBadge.className = 'px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30';
+            activeBadge.className = 'px-2 py-0.5 rounded typo-action-btn text-[10px] font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 uppercase tracking-[0.02em]';
             activeBadge.textContent = 'ACTIF';
         } else {
-            activeBadge.className = 'px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-400';
+            activeBadge.className = 'px-2 py-0.5 rounded typo-action-btn text-[10px] font-semibold bg-slate-800 text-slate-400 uppercase tracking-[0.02em]';
             activeBadge.textContent = 'INACTIF';
         }
     }
@@ -17924,11 +19329,11 @@ function updateSmartLodUIFromStatus(status) {
     const mainToggle = document.getElementById('smart-lod-main-toggle');
     if (mainToggle && toggleDot && toggleText) {
         if (window.smartLodActive) {
-            mainToggle.className = 'px-4 py-1.5 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-200 font-mono text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border border-emerald-500/50';
+            mainToggle.className = 'px-4 py-1.5 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-200 typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] transition-all cursor-pointer flex items-center gap-2 border border-emerald-500/50';
             toggleDot.className = 'w-2 h-2 rounded-full bg-emerald-400';
             toggleText.textContent = 'DÉSACTIVER';
         } else {
-            mainToggle.className = 'px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-mono text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border border-slate-700';
+            mainToggle.className = 'px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] transition-all cursor-pointer flex items-center gap-2 border border-slate-700';
             toggleDot.className = 'w-2 h-2 rounded-full bg-slate-500';
             toggleText.textContent = 'ACTIVER';
         }

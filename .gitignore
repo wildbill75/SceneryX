@@ -10,3 +10,7 @@ settings.json
 sceneryx_settings.json
 benchmarks/
 scratch_*
+*.log
+sceneryx_err.txt
+sceneryx_out.txt
+scratch/
