@@ -789,6 +789,7 @@ async function ensureAppLoaded() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    if (window.windowManager) window.windowManager.init();
     initMap();
     initSidebarResize();
     initDrawerResize();
@@ -5347,6 +5348,7 @@ function getCustomIconKey(ap) {
     const isApDisabled = cat !== 'DEFAULT' && (ap.is_disabled || (nonDefaultSources.length > 0 && nonDefaultSources.every(s => s.is_disabled)));
     const hasActiveFix = !!(ap.all_sources && ap.all_sources.some(s => isFixOrOverlay(s) && !s.is_disabled));
     const hasConflict = !!ap.has_conflict;
+    const isSelected = !!((selectedAirport && ap.icao === selectedAirport.icao) || (currentRadialAirport && ap.icao === currentRadialAirport.icao));
 
     const showIcao = !currentSettings || currentSettings.show_label_icao !== false;
     const showName = !currentSettings || currentSettings.show_label_name !== false;
@@ -5357,9 +5359,9 @@ function getCustomIconKey(ap) {
     const isSimBriefAlt = (flightCorridorProfile === 'SIMBRIEF' && typeof currentSimBriefAlternates !== 'undefined' && Array.isArray(currentSimBriefAlternates) && currentSimBriefAlternates.some(a => a && a.icao === ap.icao));
 
     if (hasAnyLabel) {
-        return `${ap.icao}_${cat}_${isApDisabled ? 1 : 0}_${hasActiveFix ? 1 : 0}_${hasConflict ? 1 : 0}_${isSimBriefAlt ? 1 : 0}_${labelKey}`;
+        return `${ap.icao}_${cat}_${isApDisabled ? 1 : 0}_${hasActiveFix ? 1 : 0}_${hasConflict ? 1 : 0}_${isSimBriefAlt ? 1 : 0}_${isSelected ? 1 : 0}_${labelKey}`;
     }
-    return `${cat}_${isApDisabled ? 1 : 0}_${hasActiveFix ? 1 : 0}_${hasConflict ? 1 : 0}_${isSimBriefAlt ? 1 : 0}_000`;
+    return `${cat}_${isApDisabled ? 1 : 0}_${hasActiveFix ? 1 : 0}_${hasConflict ? 1 : 0}_${isSimBriefAlt ? 1 : 0}_${isSelected ? 1 : 0}_000`;
 }
 
 function createCustomIcon(ap) {
@@ -5372,10 +5374,24 @@ function createCustomIcon(ap) {
     const nonDefaultSources = ap.all_sources ? ap.all_sources.filter(s => !(s.pricing_type === 'Default' || (s.folder_name && s.folder_name.startsWith('msfs-default-')))) : [];
     let isApDisabled = cat !== 'DEFAULT' && (ap.is_disabled || (nonDefaultSources.length > 0 && nonDefaultSources.every(s => s.is_disabled)));
 
-    let color = '#06b6d4'; // Freeware = Neon Cyan
-    if (cat === 'ASOBO') color = '#f59e0b'; // Asobo Handcrafted = Amber/Gold
-    else if (cat === 'PAYWARE') color = '#a855f7'; // Payware = Neon Purple
-    else if (cat === 'DEFAULT') color = '#3b82f6'; // Default MSFS = Soft Royal Blue
+    // Standard Section 1.B Fixed Airport Categories Palette:
+    // Airports: #38bdf8 (sky-400) / Active pin: #0284c7 (sky-600)
+    // Payware: #c084fc (purple-400) / Active pin: #9333ea (purple-600)
+    // Freeware: #22d3ee (cyan-400) / Active pin: #0891b2 (cyan-600)
+    // Asobo: #fbbf24 (amber-400) / Active pin: #f59e0b (amber-600)
+    // Default MSFS: #60a5fa (blue-400) / Base pin: #475569 (slate-600)
+    let color = '#22d3ee'; // Freeware = cyan-400
+    if (cat === 'ASOBO') color = '#fbbf24'; // Asobo Handcrafted = amber-400
+    else if (cat === 'PAYWARE') color = '#c084fc'; // Payware = purple-400
+    else if (cat === 'DEFAULT') color = '#60a5fa'; // Default MSFS = blue-400
+
+    const isSelected = (selectedAirport && ap.icao === selectedAirport.icao) || (currentRadialAirport && ap.icao === currentRadialAirport.icao);
+    if (isSelected) {
+        if (cat === 'PAYWARE') color = '#9333ea'; // purple-600 active pin
+        else if (cat === 'ASOBO') color = '#f59e0b'; // amber-600 active pin
+        else if (cat === 'DEFAULT') color = '#475569'; // slate-600 base pin
+        else color = '#0891b2'; // cyan-600 active pin
+    }
 
     // Check if airport has at least one active Fix/Patch!
     const hasActiveFix = ap.all_sources && ap.all_sources.some(s => isFixOrOverlay(s) && !s.is_disabled);
@@ -7900,6 +7916,12 @@ function renderRadialAirportDetails(ap) {
     const modal = document.getElementById('radial-details-modal');
     if (modal) modal.dataset.icao = ap.icao;
     currentRadialAirport = ap;
+
+    const titleEl = document.getElementById('radial-details-modal-title');
+    if (titleEl) {
+        const idCode = ap.iata ? `${ap.icao} / ${ap.iata}` : ap.icao;
+        titleEl.textContent = `AIRPORT INSPECTOR // ${idCode}`;
+    }
 
     // Trigger seamless background GSX status check
     if (typeof refreshAirportGsxStatus === 'function') {
@@ -15964,51 +15986,280 @@ function triggerRadialFlightOptimizer() {
     }
 }
 
-let topFloatingZIndex = 1200;
+/* =========================================================================
+   SCENERY X - UNIFIED WINDOW MANAGER ARCHITECTURE
+   Standardized Draggable, Resizable, and Focus-Layered Window Manager
+   ========================================================================= */
+
+class WindowManager {
+    constructor() {
+        this.topZIndex = 2500;
+        this.sessionState = {};
+        this.activeModals = new Set();
+        this._dragState = null;
+        this._resizeState = null;
+    }
+
+    init() {
+        // Register all current .sceneryx-modal elements
+        document.querySelectorAll('.sceneryx-modal').forEach(el => this.register(el));
+
+        // Global mousemove and mouseup listeners to guarantee smooth drag/resize even if cursor leaves window
+        window.addEventListener('mousemove', (e) => this._onGlobalMouseMove(e), { passive: false });
+        window.addEventListener('mouseup', (e) => this._onGlobalMouseUp(e), { passive: false });
+
+        // MutationObserver to auto-register any modal added dynamically
+        const observer = new MutationObserver((mutations) => {
+            for (const mutation of mutations) {
+                if (mutation.type === 'childList') {
+                    mutation.addedNodes.forEach(node => {
+                        if (node.nodeType === 1) {
+                            if (node.classList && node.classList.contains('sceneryx-modal')) {
+                                this.register(node);
+                            }
+                            if (node.querySelectorAll) {
+                                node.querySelectorAll('.sceneryx-modal').forEach(m => this.register(m));
+                            }
+                        }
+                    });
+                }
+            }
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+
+        // Observe class and style changes on all modals to detect opening
+        this._setupVisibilityObservers();
+    }
+
+    _setupVisibilityObservers() {
+        const visObserver = new MutationObserver((mutations) => {
+            for (const mutation of mutations) {
+                const target = mutation.target;
+                if (!target || !target.classList || !target.classList.contains('sceneryx-modal')) continue;
+                const isVisible = !target.classList.contains('hidden') && target.style.display !== 'none';
+                if (isVisible && !target._wmIsVisible) {
+                    target._wmIsVisible = true;
+                    this.onModalOpened(target);
+                } else if (!isVisible && target._wmIsVisible) {
+                    target._wmIsVisible = false;
+                    this.activeModals.delete(target);
+                }
+            }
+        });
+
+        document.querySelectorAll('.sceneryx-modal').forEach(el => {
+            visObserver.observe(el, { attributes: true, attributeFilter: ['class', 'style'] });
+        });
+    }
+
+    register(modalEl) {
+        if (!modalEl || modalEl._wmRegistered) return;
+        modalEl._wmRegistered = true;
+
+        // Bring to front on click anywhere inside modal
+        modalEl.addEventListener('mousedown', () => {
+            this.bringToFront(modalEl);
+        });
+
+        // Bind drag handle on .modal-header or .floating-win-header
+        const headerEl = modalEl.querySelector('.modal-header') || modalEl.querySelector('.floating-win-header');
+        if (headerEl) {
+            this.bindDrag(modalEl, headerEl);
+        }
+
+        // Bind resize handle on .modal-resize-handle
+        const resizeHandle = modalEl.querySelector('.modal-resize-handle');
+        if (resizeHandle) {
+            this.bindResize(modalEl, resizeHandle);
+        }
+
+        // Bind close button on .modal-close-btn
+        const closeBtn = modalEl.querySelector('.modal-close-btn');
+        if (closeBtn && !closeBtn.getAttribute('onclick')) {
+            closeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.closeModal(modalEl);
+            });
+        }
+    }
+
+    onModalOpened(modalEl) {
+        this.bringToFront(modalEl);
+        this.activeModals.add(modalEl);
+
+        const modalId = modalEl.dataset.modalId || modalEl.id;
+        const saved = modalId ? this.sessionState[modalId] : null;
+
+        if (saved) {
+            if (saved.left !== undefined) modalEl.style.left = `${saved.left}px`;
+            if (saved.top !== undefined) modalEl.style.top = `${saved.top}px`;
+            if (saved.width !== undefined) modalEl.style.width = `${saved.width}px`;
+            if (saved.height !== undefined) modalEl.style.height = `${saved.height}px`;
+            modalEl.style.transform = 'none';
+        } else {
+            // Check if element has an inline position or is a radial-anchored modal
+            const isRadial = modalEl.id === 'radial-details-modal' || modalEl.id === 'radial-airlines-modal';
+            const hasExplicitPos = modalEl._hasBeenDragged || (modalEl.style.left && modalEl.style.left !== 'auto' && modalEl.style.left !== '50%');
+            if (!isRadial && !hasExplicitPos) {
+                this.centerModal(modalEl);
+            }
+        }
+    }
+
+    centerModal(modalEl) {
+        if (!modalEl) return;
+        const rect = modalEl.getBoundingClientRect();
+        const w = rect.width || parseInt(modalEl.style.width) || 500;
+        const h = rect.height || parseInt(modalEl.style.height) || 400;
+        const left = Math.max(16, Math.floor((window.innerWidth - w) / 2));
+        const top = Math.max(16, Math.floor((window.innerHeight - h) / 2));
+        modalEl.style.left = `${left}px`;
+        modalEl.style.top = `${top}px`;
+        modalEl.style.transform = 'none';
+    }
+
+    bringToFront(modalEl) {
+        if (!modalEl) return;
+        this.topZIndex += 2;
+        modalEl.style.zIndex = this.topZIndex;
+    }
+
+    bindDrag(modalEl, headerEl) {
+        if (headerEl._dragInitialized) return;
+        headerEl._dragInitialized = true;
+
+        headerEl.addEventListener('mousedown', (e) => {
+            if (e.target.closest('button') || e.target.closest('input') || e.target.closest('select') || e.target.closest('textarea')) return;
+            this.bringToFront(modalEl);
+
+            const rect = modalEl.getBoundingClientRect();
+            this._dragState = {
+                modalEl,
+                startX: e.clientX,
+                startY: e.clientY,
+                origLeft: rect.left,
+                origTop: rect.top
+            };
+            modalEl.style.transform = 'none';
+            modalEl._hasBeenDragged = true;
+            if (typeof closeAllProfileDropdowns === 'function') closeAllProfileDropdowns();
+        });
+    }
+
+    bindResize(modalEl, resizeHandle) {
+        if (resizeHandle._resizeInitialized) return;
+        resizeHandle._resizeInitialized = true;
+
+        resizeHandle.addEventListener('mousedown', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            this.bringToFront(modalEl);
+
+            const rect = modalEl.getBoundingClientRect();
+            const computed = window.getComputedStyle(modalEl);
+            const minW = parseInt(computed.minWidth) || 360;
+            const minH = parseInt(computed.minHeight) || 200;
+
+            this._resizeState = {
+                modalEl,
+                startX: e.clientX,
+                startY: e.clientY,
+                origWidth: rect.width,
+                origHeight: rect.height,
+                origLeft: rect.left,
+                origTop: rect.top,
+                minW,
+                minH
+            };
+        });
+    }
+
+    _onGlobalMouseMove(e) {
+        if (this._dragState) {
+            const { modalEl, startX, startY, origLeft, origTop } = this._dragState;
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+            const newLeft = Math.max(10, Math.min(window.innerWidth - 80, origLeft + dx));
+            const newTop = Math.max(10, Math.min(window.innerHeight - 80, origTop + dy));
+            modalEl.style.left = `${newLeft}px`;
+            modalEl.style.top = `${newTop}px`;
+
+            const modalId = modalEl.dataset.modalId || modalEl.id;
+            if (modalId) {
+                this.sessionState[modalId] = {
+                    ...(this.sessionState[modalId] || {}),
+                    left: newLeft,
+                    top: newTop
+                };
+            }
+        }
+
+        if (this._resizeState) {
+            const { modalEl, startX, startY, origWidth, origHeight, origLeft, origTop, minW, minH } = this._resizeState;
+            const dw = e.clientX - startX;
+            const dh = e.clientY - startY;
+            const maxW = window.innerWidth - origLeft - 10;
+            const maxH = window.innerHeight - origTop - 10;
+            const newW = Math.max(minW, Math.min(maxW, origWidth + dw));
+            const newH = Math.max(minH, Math.min(maxH, origHeight + dh));
+            modalEl.style.width = `${newW}px`;
+            modalEl.style.height = `${newH}px`;
+
+            const modalId = modalEl.dataset.modalId || modalEl.id;
+            if (modalId) {
+                this.sessionState[modalId] = {
+                    ...(this.sessionState[modalId] || {}),
+                    width: newW,
+                    height: newH
+                };
+            }
+        }
+    }
+
+    _onGlobalMouseUp() {
+        this._dragState = null;
+        this._resizeState = null;
+    }
+
+    openModal(modalEl) {
+        if (typeof modalEl === 'string') modalEl = document.getElementById(modalEl);
+        if (!modalEl) return;
+        this.register(modalEl);
+        modalEl.classList.remove('hidden');
+        modalEl.style.display = 'flex';
+        this.onModalOpened(modalEl);
+    }
+
+    closeModal(modalEl) {
+        if (typeof modalEl === 'string') modalEl = document.getElementById(modalEl);
+        if (!modalEl) return;
+        modalEl.classList.add('hidden');
+        modalEl.style.display = 'none';
+        this.activeModals.delete(modalEl);
+    }
+}
+
+// Global instance
+const windowManager = new WindowManager();
+window.windowManager = windowManager;
+
+let topFloatingZIndex = 2500;
 
 function bringFloatingWindowToFront(winEl) {
     if (!winEl) return;
-    topFloatingZIndex += 2;
-    winEl.style.zIndex = topFloatingZIndex;
+    if (window.windowManager) {
+        window.windowManager.bringToFront(winEl);
+    } else {
+        topFloatingZIndex += 2;
+        winEl.style.zIndex = topFloatingZIndex;
+    }
 }
 
 function initDraggableFloatingWindow(winEl, headerEl) {
-    if (!winEl || !headerEl || headerEl._dragInitialized) return;
-    headerEl._dragInitialized = true;
-
-    headerEl.addEventListener('mousedown', (e) => {
-        if (e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) return;
-        bringFloatingWindowToFront(winEl);
-        const startX = e.clientX;
-        const startY = e.clientY;
-        const rect = winEl.getBoundingClientRect();
-        const origLeft = rect.left;
-        const origTop = rect.top;
-
-        function onMouseMove(ev) {
-            if (typeof closeAllProfileDropdowns === 'function') closeAllProfileDropdowns();
-            const dx = ev.clientX - startX;
-            const dy = ev.clientY - startY;
-            const newLeft = Math.max(10, Math.min(window.innerWidth - 80, origLeft + dx));
-            const newTop = Math.max(10, Math.min(window.innerHeight - 80, origTop + dy));
-            winEl.style.left = `${newLeft}px`;
-            winEl.style.top = `${newTop}px`;
-            winEl.style.transform = 'none';
-            winEl._hasBeenDragged = true;
-        }
-
-        function onMouseUp() {
-            window.removeEventListener('mousemove', onMouseMove, true);
-            window.removeEventListener('mouseup', onMouseUp, true);
-        }
-
-        window.addEventListener('mousemove', onMouseMove, true);
-        window.addEventListener('mouseup', onMouseUp, true);
-    });
-
-    winEl.addEventListener('mousedown', () => {
-        bringFloatingWindowToFront(winEl);
-    });
+    if (!winEl) return;
+    if (window.windowManager) {
+        window.windowManager.register(winEl);
+    }
 }
 
 const FLOATING_WINDOW_MAP = {
@@ -18497,6 +18748,11 @@ function switchUnifiedModalView(view, fromFeedback = false) {
             }
         }
         fetchAndRenderUserCfgBackups();
+    }
+
+    const modalTitle = document.getElementById('unified-modal-title');
+    if (modalTitle) {
+        modalTitle.textContent = (view === 'feedback') ? 'CONFIGURATION // GRAPHICS PROFILE OPTIMIZED' : 'CONFIGURATION // RESTORE USERCFG.OPT';
     }
 
     modal.style.display = 'flex';
