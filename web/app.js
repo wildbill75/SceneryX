@@ -5897,11 +5897,17 @@ function updateRadialAirlinesModalPosition(force = false) {
     if (!modal || (!force && modal.classList.contains('hidden'))) return;
 
     if (!modal._hasBeenDragged && !hasUserDraggedAirlinesModal) {
+        const headerEl = document.querySelector('header');
+        const headerBottom = headerEl ? headerEl.getBoundingClientRect().bottom : 118;
+        const topPos = Math.round(headerBottom + 16);
+        const maxH = Math.max(300, window.innerHeight - topPos - 20);
+
         modal.style.left = '20px';
-        modal.style.top = '16px';
-        modal.style.bottom = '16px';
+        modal.style.top = `${topPos}px`;
+        modal.style.bottom = 'auto';
         modal.style.right = 'auto';
-        modal.style.height = 'calc(100% - 32px)';
+        modal.style.height = 'auto';
+        modal.style.maxHeight = `${maxH}px`;
         modal.style.transform = 'none';
     }
 }
@@ -6451,7 +6457,7 @@ function renderRadialOperatingAirlines(ap, autoSelectFirst = false) {
     }
 
     listEl.style.gridTemplateColumns = `repeat(${cols}, minmax(0, 1fr))`;
-    listEl.style.maxHeight = '45%';
+    listEl.style.maxHeight = '180px';
     listEl.style.height = 'auto';
 
     if (countEl) {

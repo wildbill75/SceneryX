@@ -1272,12 +1272,12 @@
 
                     <!-- SVG Ring with 3 Annular Sectors (Mercedes Star orientation: Sceneries, Details, Airlines) -->
                     <svg id="radial-sectors-svg" class="absolute inset-0 w-full h-full filter drop-shadow-2xl overflow-visible pointer-events-none transition-all duration-300" viewBox="0 0 540 540" style="transform-origin: 270px 270px;">
-                        <!-- TOP-RIGHT SECTOR: SCENERIES -->
-                        <g id="radial-sector-scenery" onclick="triggerRadialScenerySelector()" class="radial-sector radial-sector-scenery group cursor-pointer pointer-events-auto" role="button" aria-label="Sceneries">
+                        <!-- TOP-RIGHT SECTOR: AVAILABLE ADDONS -->
+                        <g id="radial-sector-scenery" onclick="triggerRadialScenerySelector()" class="radial-sector radial-sector-scenery group cursor-pointer pointer-events-auto" role="button" aria-label="Available Addons">
                             <path class="radial-sector-path" d="M 273.00 5.02 A 265 265 0 0 1 500.98 399.89 L 384.05 332.38 A 130 130 0 0 0 273.00 140.03 Z" />
-                            <foreignObject x="375" y="195" width="160" height="40" class="pointer-events-none">
-                                <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; text-align: center;">
-                                    <span data-i18n="radial.sceneries" class="text-xs font-black tracking-widest text-slate-200 group-hover:text-white uppercase leading-none filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">Sceneries</span>
+                            <foreignObject x="361" y="147" width="160" height="48" class="pointer-events-none">
+                                <div style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+                                    <span data-i18n="radial.sceneries" class="text-xs font-black tracking-wider text-slate-200 group-hover:text-white uppercase leading-tight text-center filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">Available<br>Addons</span>
                                 </div>
                             </foreignObject>
                         </g>
@@ -1295,7 +1295,7 @@
                         <!-- TOP-LEFT SECTOR: OPERATING AIRLINES -->
                         <g id="radial-sector-airlines" onclick="triggerRadialOperatingAirlines()" class="radial-sector radial-sector-airlines group cursor-pointer pointer-events-auto" role="button" aria-label="Operating Airlines">
                             <path class="radial-sector-path" d="M 39.02 399.89 A 265 265 0 0 1 267.00 5.02 L 267.00 140.03 A 130 130 0 0 0 155.95 332.38 Z" />
-                            <foreignObject x="12" y="190" width="140" height="48" class="pointer-events-none">
+                            <foreignObject x="19" y="147" width="160" height="48" class="pointer-events-none">
                                 <div style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
                                     <span data-i18n="radial.operating_airlines" class="text-xs font-black tracking-wider text-slate-200 group-hover:text-white uppercase leading-tight text-center filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">Operating<br>Airlines</span>
                                 </div>
@@ -1332,7 +1332,7 @@
                 <!-- Drag Handle & Modal Header -->
                 <div id="radial-sceneries-extension-header" class="modal-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none shrink-0">
                     <div class="flex items-center gap-2">
-                        <h3 id="radial-sceneries-extension-title" class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">SCENERY MANAGER // AVAILABLE ADDONS</h3>
+                        <h3 id="radial-sceneries-extension-title" class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">AVAILABLE ADDONS</h3>
                     </div>
                     <div class="flex items-center gap-1">
                         <button onclick="triggerRadialScenerySelector()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity">
@@ -1360,7 +1360,7 @@
             <div id="radial-airlines-modal"
                  data-modal-id="radial-airlines-modal"
                  class="sceneryx-modal absolute hidden flex-col bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden select-none pointer-events-auto z-[1550]"
-                 style="min-width: 440px; min-height: 360px; width: 580px; height: calc(100% - 32px); top: 16px; left: 20px;">
+                 style="min-width: 440px; width: 580px; height: auto; max-width: 95vw; max-height: calc(100vh - 150px); top: 134px; left: 20px;">
                 
                 <!-- Drag Handle & Modal Header -->
                 <div id="radial-airlines-modal-header" class="modal-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
@@ -1380,23 +1380,23 @@
                     <div class="h-8 flex items-center justify-between px-0.5 shrink-0">
                         <span id="radial-airlines-count" class="text-sm font-black font-mono tracking-wider text-cyan-400 uppercase truncate pr-2">0 AIRLINES</span>
                         <div class="flex items-center gap-2 text-xs font-mono shrink-0">
-                            <button id="radial-airlines-clear-btn" onclick="clearRadialAirlineFilter(event)" class="hidden text-slate-300 hover:text-white transition-colors cursor-pointer flex items-center gap-1.5 bg-transparent border-0 p-0 text-[11px]">
-                                <i class="fa-solid fa-rotate-left text-[10px]"></i>
-                                <span class="underline">Clear selection</span>
+                            <button id="radial-airlines-clear-btn" onclick="clearRadialAirlineFilter(event)" class="hidden px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/70 transition-all cursor-pointer flex items-center gap-1.5 text-[11px] font-semibold active:scale-95 shadow-sm" title="Clear selection">
+                                <i class="fa-solid fa-rotate-left text-[10px] text-cyan-400"></i>
+                                <span>Clear selection</span>
                             </button>
                             <span id="radial-airlines-hint" class="text-[11px] text-slate-300">Click to filter routes</span>
                         </div>
                     </div>
 
-                    <!-- Horizontal Multi-Column Grid (5 columns per row, max-h-[44%] for 50/50 split) -->
-                    <div id="radial-airlines-list" class="grid gap-2 overflow-y-auto custom-scrollbar pr-1 max-h-[44%] shrink-0 py-1">
+                    <!-- Horizontal Multi-Column Grid (5 columns per row, max-h-[180px]) -->
+                    <div id="radial-airlines-list" class="grid gap-2 overflow-y-auto custom-scrollbar pr-1 max-h-[180px] shrink-0 py-1">
                         <!-- Dynamic airline cards rendered here -->
                     </div>
 
-                    <!-- DESTINATIONS NETWORK SECTION (Always visible as bottom 50% pane) -->
-                    <div id="radial-airlines-destinations-section" class="flex-1 min-h-0 flex flex-col pt-3 border-t border-slate-700/40 space-y-2.5 overflow-hidden">
+                    <!-- DESTINATIONS NETWORK SECTION -->
+                    <div id="radial-airlines-destinations-section" class="flex flex-col pt-3 border-t border-slate-700/40 space-y-2.5 overflow-hidden">
                         <!-- Placeholder card when no airline is selected -->
-                        <div id="radial-airlines-destinations-placeholder" class="hidden flex-1 flex flex-col items-center justify-center p-6 rounded-lg bg-slate-950/40 border border-slate-800/80 text-center my-auto">
+                        <div id="radial-airlines-destinations-placeholder" class="hidden flex flex-col items-center justify-center p-6 rounded-lg bg-slate-950/40 border border-slate-800/80 text-center my-auto">
                             <div class="w-12 h-12 rounded-lg bg-slate-800/60 border border-slate-700/60 flex items-center justify-center text-cyan-400 mb-3 text-lg shadow-inner">
                                 <i class="fa-solid fa-plane-departure"></i>
                             </div>
@@ -1458,7 +1458,7 @@
                         </div>
 
                         <!-- Scrollable Destination Cards Container -->
-                        <div id="radial-airlines-destinations-list" class="flex-1 min-h-0 space-y-2 overflow-y-auto custom-scrollbar pr-1">
+                        <div id="radial-airlines-destinations-list" class="max-h-[380px] space-y-2 overflow-y-auto custom-scrollbar pr-1">
                             <!-- Destination items rendered here -->
                         </div>
                     </div>
