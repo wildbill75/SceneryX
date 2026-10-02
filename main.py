@@ -3591,9 +3591,23 @@ class Api:
         except Exception as e:
             return json.dumps([], ensure_ascii=False)
 
-    def save_custom_profile(self, profile_name):
+    def save_custom_profile(self, profile_name, overwrite_id=None):
         try:
-            res = flight_rig_optimizer.save_custom_profile(profile_name)
+            res = flight_rig_optimizer.save_custom_profile(profile_name, overwrite_id=overwrite_id)
+            return json.dumps(res, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    def check_profile_changes(self, profile_id):
+        try:
+            res = flight_rig_optimizer.check_profile_changes(profile_id)
+            return json.dumps(res, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    def rename_custom_profile(self, profile_id, new_name):
+        try:
+            res = flight_rig_optimizer.rename_custom_profile(profile_id, new_name)
             return json.dumps(res, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)

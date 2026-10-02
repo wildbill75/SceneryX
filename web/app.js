@@ -14796,6 +14796,7 @@ async function triggerExportCollection(format) {
 
 let customModalConfirmCallback = null;
 let customModalCancelCallback = null;
+let customModalSecondaryCallback = null;
 
 function showCustomModal(titleOrObj, messageStr, typeStr = 'info') {
     const modal = document.getElementById('custom-modal');
@@ -14805,7 +14806,9 @@ function showCustomModal(titleOrObj, messageStr, typeStr = 'info') {
     let type = 'info';
     let confirmText = 'OK';
     let cancelText = 'Cancel';
+    let secondaryText = '';
     let showCancel = false;
+    let showSecondary = false;
 
     if (typeof titleOrObj === 'object' && titleOrObj !== null) {
         title = titleOrObj.title !== undefined ? titleOrObj.title : '';
@@ -14813,15 +14816,19 @@ function showCustomModal(titleOrObj, messageStr, typeStr = 'info') {
         type = titleOrObj.type || 'info';
         confirmText = titleOrObj.confirmText || 'OK';
         cancelText = titleOrObj.cancelText || 'Cancel';
+        secondaryText = titleOrObj.secondaryText || '';
         showCancel = titleOrObj.showCancel !== undefined ? !!titleOrObj.showCancel : (!!titleOrObj.cancelText || !!titleOrObj.onCancel);
+        showSecondary = !!secondaryText;
         customModalConfirmCallback = titleOrObj.onConfirm || null;
         customModalCancelCallback = titleOrObj.onCancel || null;
+        customModalSecondaryCallback = titleOrObj.onSecondary || null;
     } else {
         title = titleOrObj !== undefined && titleOrObj !== null ? titleOrObj : '';
         message = messageStr || '';
         type = typeStr || 'info';
         customModalConfirmCallback = null;
         customModalCancelCallback = null;
+        customModalSecondaryCallback = null;
     }
 
     if (!modal) {
@@ -14838,6 +14845,7 @@ function showCustomModal(titleOrObj, messageStr, typeStr = 'info') {
     const titleEl = document.getElementById('custom-modal-title');
     const msgEl = document.getElementById('custom-modal-message');
     const cancelBtn = document.getElementById('custom-modal-cancel-btn');
+    const secondaryBtn = document.getElementById('custom-modal-secondary-btn');
     const confirmBtn = document.getElementById('custom-modal-confirm-btn');
 
     if (titleEl) {
@@ -14869,6 +14877,7 @@ function showCustomModal(titleOrObj, messageStr, typeStr = 'info') {
 
     if (type === 'loading') {
         if (confirmBtn) confirmBtn.classList.add('hidden');
+        if (secondaryBtn) secondaryBtn.classList.add('hidden');
         if (cancelBtn) cancelBtn.classList.add('hidden');
     } else {
         if (confirmBtn) {
@@ -14878,6 +14887,19 @@ function showCustomModal(titleOrObj, messageStr, typeStr = 'info') {
                 confirmBtn.className = titleOrObj.confirmClass;
             } else {
                 confirmBtn.className = "px-5 py-1.5 text-center rounded-xl bg-blue-600 hover:bg-blue-500 text-white typo-action-btn font-semibold text-xs uppercase transition-all border-0 cursor-pointer shadow-md";
+            }
+        }
+        if (secondaryBtn) {
+            if (showSecondary) {
+                secondaryBtn.innerText = secondaryText;
+                secondaryBtn.classList.remove('hidden');
+                if (typeof titleOrObj === 'object' && titleOrObj && titleOrObj.secondaryClass) {
+                    secondaryBtn.className = titleOrObj.secondaryClass;
+                } else {
+                    secondaryBtn.className = "px-4 py-1.5 text-center rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 hover:text-white typo-action-btn font-semibold uppercase transition-all cursor-pointer text-xs";
+                }
+            } else {
+                secondaryBtn.classList.add('hidden');
             }
         }
         if (cancelBtn) {
@@ -14931,10 +14953,19 @@ function closeCustomModal() {
     }
     customModalConfirmCallback = null;
     customModalCancelCallback = null;
+    customModalSecondaryCallback = null;
 }
 
 function confirmCustomModal() {
     const cb = customModalConfirmCallback;
+    closeCustomModal();
+    if (cb && typeof cb === 'function') {
+        cb();
+    }
+}
+
+function secondaryCustomModal() {
+    const cb = customModalSecondaryCallback;
     closeCustomModal();
     if (cb && typeof cb === 'function') {
         cb();
@@ -19642,6 +19673,8 @@ async function restoreUserCfgBackupTarget(filename) {
 
 let currentCustomProfiles = [];
 let selectedProfileId = '';
+let multiSelectedProfileIds = new Set();
+let lastClickedProfileIndex = -1;
 
 function formatProfileDate(dateStr) {
     if (!dateStr) return '';
@@ -19671,7 +19704,6 @@ function formatProfileDate(dateStr) {
 async function fetchAndRenderCustomProfiles() {
     const dropdown = document.getElementById('opt-profiles-dropdown');
     const input = document.getElementById('opt-profile-universal-input');
-    const listEl = document.getElementById('opt-profile-dropdown-list');
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.get_custom_profiles) return;
 
     try {
@@ -19715,40 +19747,142 @@ async function fetchAndRenderCustomProfiles() {
             }
         }
 
-        // Dropdown List rendering
-        if (listEl) {
-            if (currentCustomProfiles.length === 0) {
-                listEl.innerHTML = '<div class="p-3 text-slate-500 text-center italic">No saved profiles yet</div>';
-            } else {
-                listEl.innerHTML = currentCustomProfiles.map(p => {
-                    const isSelected = p.id === (activeProfile ? activeProfile.id : '');
-                    const dateFormatted = formatProfileDate(p.created_at);
-                    const activeBadge = p.is_active 
-                        ? `<span class="px-2 py-0.5 rounded typo-action-btn text-[10px] font-semibold bg-emerald-600 text-white shadow-sm uppercase tracking-[0.02em]">ACTIVE</span>`
-                        : '';
-                    return `
-                        <div onclick="selectCustomProfileItem('${p.id}')"
-                             class="px-3.5 py-2.5 flex items-center justify-between hover:bg-slate-800 cursor-pointer transition-colors group ${isSelected ? 'bg-slate-800/60' : ''}">
-                            <div class="flex flex-col min-w-0 pr-2">
-                                <span class="typo-input-val font-semibold text-xs text-slate-100 truncate">${escapeHtml(p.name)}</span>
-                                <span class="typo-metadata tabular-nums">${dateFormatted}</span>
-                            </div>
-                            <div class="shrink-0 flex items-center gap-2">
-                                ${activeBadge}
-                                <button onclick="event.stopPropagation(); requestDeleteCustomProfileById('${p.id}')"
-                                        title="Delete '${escapeHtml(p.name)}' (${dateFormatted})"
-                                        class="w-6 h-6 flex items-center justify-center rounded-md hover:bg-blue-500/20 text-slate-400 hover:text-blue-400 transition-colors cursor-pointer border-0 bg-transparent">
-                                    <i class="fa-solid fa-trash-can text-xs pointer-events-none"></i>
-                                </button>
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-            }
-        }
+        // Render dropdown list
+        renderCustomProfilesDropdownList();
     } catch (e) {
         console.error("Error fetching custom profiles:", e);
     }
+}
+
+function clearProfileMultiSelection() {
+    multiSelectedProfileIds.clear();
+    lastClickedProfileIndex = -1;
+    renderCustomProfilesDropdownList();
+}
+
+function renderCustomProfilesDropdownList() {
+    const listEl = document.getElementById('opt-profile-dropdown-list');
+    if (!listEl) return;
+
+    if (currentCustomProfiles.length === 0) {
+        listEl.innerHTML = '<div class="p-3 text-slate-500 text-center italic text-xs">No saved profiles yet</div>';
+        return;
+    }
+
+    let activeProfile = currentCustomProfiles.find(p => p.is_active);
+    if (!activeProfile && currentCustomProfiles.length > 0) {
+        activeProfile = currentCustomProfiles[0];
+    }
+
+    const hasMultiSelection = multiSelectedProfileIds.size > 0;
+
+    let toolbarHtml = '';
+    if (hasMultiSelection) {
+        toolbarHtml = `
+            <div class="sticky top-0 z-20 px-3 py-1.5 bg-slate-900 border-b border-slate-700/80 flex items-center justify-between text-xs backdrop-blur-md">
+                <div class="flex items-center gap-2">
+                    <span class="text-blue-400 font-semibold text-[11px]">${multiSelectedProfileIds.size} selected</span>
+                    <button onclick="event.stopPropagation(); clearProfileMultiSelection();" class="text-slate-400 hover:text-white underline text-[10px] cursor-pointer">Clear</button>
+                </div>
+                <button onclick="event.stopPropagation(); requestDeleteMultiSelectedProfiles();"
+                        title="Delete selected profiles"
+                        class="px-2.5 py-1 rounded-md bg-blue-600 hover:bg-blue-500 text-white font-semibold text-[11px] flex items-center gap-1.5 cursor-pointer shadow-sm uppercase tracking-wider transition-all">
+                    <i class="fa-solid fa-trash-can text-[10px]"></i>
+                    <span>Delete (${multiSelectedProfileIds.size})</span>
+                </button>
+            </div>
+        `;
+    }
+
+    const itemsHtml = currentCustomProfiles.map((p, index) => {
+        const isMultiSelected = multiSelectedProfileIds.has(p.id);
+        const isCurrentActive = p.id === (activeProfile ? activeProfile.id : '');
+        const dateFormatted = formatProfileDate(p.created_at);
+        const activeBadge = p.is_active 
+            ? `<span class="px-2 py-0.5 rounded typo-action-btn text-[10px] font-semibold bg-emerald-600 text-white shadow-sm uppercase tracking-[0.02em]">ACTIVE</span>`
+            : '';
+
+        let rowBgClass = 'hover:bg-slate-800';
+        if (isMultiSelected) {
+            rowBgClass = 'bg-blue-600/25 border-l-2 border-blue-400 hover:bg-blue-600/30';
+        } else if (isCurrentActive) {
+            rowBgClass = 'bg-slate-800/60 hover:bg-slate-800';
+        }
+
+        const checkboxIcon = hasMultiSelection
+            ? (isMultiSelected
+                ? `<i class="fa-solid fa-square-check text-blue-400 text-sm shrink-0 mr-2"></i>`
+                : `<i class="fa-regular fa-square text-slate-500 text-sm shrink-0 mr-2"></i>`)
+            : '';
+
+        return `
+            <div onclick="handleProfileRowClick(event, '${p.id}', ${index})"
+                 class="px-3.5 py-2 flex items-center justify-between cursor-pointer transition-colors group select-none ${rowBgClass}">
+                <div class="flex items-center min-w-0 pr-2">
+                    ${checkboxIcon}
+                    <div class="flex flex-col min-w-0">
+                        <span class="typo-input-val font-semibold text-xs text-slate-100 truncate">${escapeHtml(p.name)}</span>
+                        <span class="typo-metadata tabular-nums text-[10px] text-slate-400">${dateFormatted}</span>
+                    </div>
+                </div>
+                <div class="shrink-0 flex items-center gap-1.5">
+                    ${activeBadge}
+                    <button onclick="event.stopPropagation(); requestRenameCustomProfile('${p.id}')"
+                            title="Rename '${escapeHtml(p.name)}'"
+                            class="w-6 h-6 flex items-center justify-center rounded-md hover:bg-slate-700 text-slate-400 hover:text-blue-400 transition-colors cursor-pointer border-0 bg-transparent">
+                        <i class="fa-solid fa-pen text-[10px] pointer-events-none"></i>
+                    </button>
+                    <button onclick="event.stopPropagation(); requestDeleteCustomProfileById('${p.id}')"
+                            title="Delete '${escapeHtml(p.name)}' (${dateFormatted})"
+                            class="w-6 h-6 flex items-center justify-center rounded-md hover:bg-blue-500/20 text-slate-400 hover:text-blue-400 transition-colors cursor-pointer border-0 bg-transparent">
+                        <i class="fa-solid fa-trash-can text-xs pointer-events-none"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    listEl.innerHTML = toolbarHtml + itemsHtml;
+}
+
+function handleProfileRowClick(event, profileId, index) {
+    if (event.shiftKey) {
+        event.preventDefault();
+        event.stopPropagation();
+        const start = lastClickedProfileIndex >= 0 ? lastClickedProfileIndex : index;
+        const end = index;
+        const min = Math.min(start, end);
+        const max = Math.max(start, end);
+        for (let i = min; i <= max; i++) {
+            if (currentCustomProfiles[i]) {
+                multiSelectedProfileIds.add(currentCustomProfiles[i].id);
+            }
+        }
+        lastClickedProfileIndex = index;
+        renderCustomProfilesDropdownList();
+        return;
+    }
+
+    if (event.altKey || event.ctrlKey || event.metaKey) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (multiSelectedProfileIds.has(profileId)) {
+            multiSelectedProfileIds.delete(profileId);
+        } else {
+            multiSelectedProfileIds.add(profileId);
+        }
+        lastClickedProfileIndex = index;
+        renderCustomProfilesDropdownList();
+        return;
+    }
+
+    // Normal click: clear any multi-selection and select single profile item
+    if (multiSelectedProfileIds.size > 0) {
+        multiSelectedProfileIds.clear();
+        renderCustomProfilesDropdownList();
+    }
+    lastClickedProfileIndex = index;
+    selectCustomProfileItem(profileId);
 }
 
 function toggleProfileDropdown(event) {
@@ -19785,6 +19919,7 @@ function toggleProfileDropdown(event) {
             listEl.style.top = `${rect.bottom + 6}px`;
             listEl.style.maxHeight = `${Math.max(100, Math.min(260, spaceBelow - 20))}px`;
         }
+        renderCustomProfilesDropdownList();
         listEl.classList.remove('hidden');
     }
 }
@@ -19798,6 +19933,8 @@ function closeAllProfileDropdowns() {
             combobox.appendChild(listEl);
         }
     }
+    multiSelectedProfileIds.clear();
+    lastClickedProfileIndex = -1;
 }
 
 function selectCustomProfileItem(profileId) {
@@ -19932,6 +20069,81 @@ async function resolveFrameLimiterConflict(choice) {
     await loadRigDiagnostics();
 }
 
+function requestRenameCustomProfile(profileId) {
+    const profile = currentCustomProfiles.find(p => p.id === profileId);
+    if (!profile) return;
+
+    showCustomModal({
+        title: 'RENAME PROFILE',
+        message: `
+            <div class="flex flex-col items-center gap-2">
+                <span class="text-slate-300">Enter a new name for this profile:</span>
+                <input id="custom-modal-rename-input" type="text" value="${escapeHtml(profile.name)}"
+                       class="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-700 text-slate-100 text-xs text-center focus:outline-none focus:border-blue-500 font-sans tracking-wide">
+            </div>
+        `,
+        type: 'info',
+        showCancel: true,
+        confirmText: 'RENAME',
+        cancelText: 'CANCEL',
+        confirmClass: 'px-5 py-1.5 text-center rounded-xl bg-blue-600 hover:bg-blue-500 text-white typo-action-btn font-semibold text-xs uppercase transition-all border-0 cursor-pointer shadow-md',
+        cancelClass: 'px-5 py-1.5 text-center rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 hover:text-white typo-action-btn text-xs font-semibold uppercase transition-all cursor-pointer',
+        onConfirm: async () => {
+            const inputEl = document.getElementById('custom-modal-rename-input');
+            const newName = inputEl ? inputEl.value.trim() : '';
+            if (!newName) {
+                if (typeof showToast === 'function') showToast("Profile name cannot be empty", "warning");
+                return;
+            }
+            if (newName.toLowerCase() === profile.name.trim().toLowerCase()) {
+                return;
+            }
+            await executeRenameCustomProfile(profileId, newName);
+        }
+    });
+
+    setTimeout(() => {
+        const inputEl = document.getElementById('custom-modal-rename-input');
+        if (inputEl) {
+            inputEl.focus();
+            inputEl.select();
+            inputEl.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    confirmCustomModal();
+                }
+            });
+        }
+    }, 50);
+}
+
+async function executeRenameCustomProfile(profileId, newName) {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.rename_custom_profile) return;
+    try {
+        const resStr = await window.pywebview.api.rename_custom_profile(profileId, newName);
+        const res = JSON.parse(resStr);
+        if (res.status === 'success') {
+            if (typeof showToast === 'function') showToast(`Profile renamed to "${newName}"!`, 'success');
+            await fetchAndRenderCustomProfiles();
+            const input = document.getElementById('opt-profile-universal-input');
+            if (selectedProfileId === profileId && input) {
+                input.value = newName;
+            }
+        } else {
+            showCustomModal({
+                title: 'CANNOT RENAME PROFILE',
+                message: res.message || 'A profile with this name already exists. Please choose another name.',
+                type: 'info',
+                showCancel: false,
+                confirmText: 'OK',
+                confirmClass: 'px-5 py-1.5 text-center rounded-xl bg-blue-600 hover:bg-blue-500 text-white typo-action-btn font-semibold text-xs uppercase transition-all border-0 cursor-pointer shadow-md'
+            });
+        }
+    } catch (e) {
+        console.error("Error renaming profile:", e);
+        if (typeof showToast === 'function') showToast(`Error renaming profile: ${e}`, 'error');
+    }
+}
+
 async function saveCurrentCustomProfile() {
     const input = document.getElementById('opt-profile-universal-input');
     let name = input ? input.value.trim() : '';
@@ -19940,37 +20152,93 @@ async function saveCurrentCustomProfile() {
         name = `Profile_${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}h${String(now.getMinutes()).padStart(2,'0')}`;
     }
 
-    // Check if a profile with the exact same name already exists
-    const isDuplicate = currentCustomProfiles.some(p => (p.name || '').trim().toLowerCase() === name.toLowerCase());
-    if (isDuplicate) {
-        showCustomModal({
-            title: 'PROFILE ALREADY EXISTS',
-            message: 'Profile already exists. Please choose another name.',
-            type: 'info',
-            showCancel: false,
-            confirmText: 'OK',
-            confirmClass: 'px-5 py-1.5 text-center rounded-xl bg-blue-600 hover:bg-blue-500 text-white typo-action-btn font-semibold text-xs uppercase transition-all border-0 cursor-pointer shadow-md',
-            onConfirm: () => {
-                if (input) {
-                    input.focus();
-                    input.select();
+    // 1. Check if name matches an EXISTING saved profile
+    const matchingProfile = currentCustomProfiles.find(p => (p.name || '').trim().toLowerCase() === name.toLowerCase());
+
+    if (matchingProfile) {
+        // Name matches an existing profile.
+        // User has the right to keep the same name if modifications were made.
+        // Check if there is a change between current staged settings and the saved profile file!
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.check_profile_changes) {
+            try {
+                const chkStr = await window.pywebview.api.check_profile_changes(matchingProfile.id);
+                const chk = JSON.parse(chkStr);
+                if (chk.status === 'success') {
+                    if (chk.has_changes) {
+                        // Changes detected! Propose to replace/overwrite the existing file.
+                        showCustomModal({
+                            title: 'REPLACE PROFILE',
+                            message: `Changes detected in your settings.<br><br>Do you want to replace "<b>${escapeHtml(matchingProfile.name)}</b>" with current settings?`,
+                            type: 'info',
+                            showCancel: true,
+                            confirmText: 'YES',
+                            cancelText: 'NO',
+                            confirmClass: 'px-5 py-1.5 text-center rounded-xl bg-blue-600 hover:bg-blue-500 text-white typo-action-btn font-semibold text-xs uppercase transition-all border-0 cursor-pointer shadow-md',
+                            cancelClass: 'px-5 py-1.5 text-center rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 hover:text-white typo-action-btn text-xs font-semibold uppercase transition-all cursor-pointer',
+                            onConfirm: async () => {
+                                await executeSaveCurrentCustomProfile(matchingProfile.name, matchingProfile.id);
+                            }
+                        });
+                        return;
+                    } else {
+                        // No changes detected!
+                        showCustomModal({
+                            title: 'PROFILE UP TO DATE',
+                            message: `No changes detected.<br><br>Profile "<b>${escapeHtml(matchingProfile.name)}</b>" is already up to date with your current settings.`,
+                            type: 'info',
+                            showCancel: false,
+                            confirmText: 'OK',
+                            confirmClass: 'px-5 py-1.5 text-center rounded-xl bg-blue-600 hover:bg-blue-500 text-white typo-action-btn font-semibold text-xs uppercase transition-all border-0 cursor-pointer shadow-md'
+                        });
+                        return;
+                    }
                 }
+            } catch (e) {
+                console.error("Error checking profile changes:", e);
+            }
+        }
+        await executeSaveCurrentCustomProfile(matchingProfile.name, matchingProfile.id);
+        return;
+    }
+
+    // 2. Name does NOT match any existing profile.
+    // Check if the user previously had a profile selected, and modified its name in the input.
+    const currSelected = currentCustomProfiles.find(p => p.id === selectedProfileId);
+    if (currSelected && currSelected.name.trim().toLowerCase() !== name.toLowerCase()) {
+        showCustomModal({
+            title: 'PROFILE SAVE / RENAME',
+            message: `Profile name changed from "<b>${escapeHtml(currSelected.name)}</b>" to "<b>${escapeHtml(name)}</b>".<br><br>Would you like to rename the existing profile or save current settings as a new profile?`,
+            type: 'info',
+            showCancel: true,
+            confirmText: 'RENAME',
+            secondaryText: 'SAVE AS NEW',
+            cancelText: 'CANCEL',
+            confirmClass: 'px-4 py-1.5 text-center rounded-xl bg-blue-600 hover:bg-blue-500 text-white typo-action-btn font-semibold text-xs uppercase transition-all border-0 cursor-pointer shadow-md',
+            secondaryClass: 'px-4 py-1.5 text-center rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white typo-action-btn font-semibold uppercase transition-all cursor-pointer text-xs shadow-md',
+            cancelClass: 'px-4 py-1.5 text-center rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 hover:text-white typo-action-btn text-xs font-semibold uppercase transition-all cursor-pointer',
+            onConfirm: async () => {
+                await executeRenameCustomProfile(currSelected.id, name);
+            },
+            onSecondary: async () => {
+                await executeSaveCurrentCustomProfile(name, null);
             }
         });
         return;
     }
 
-    await executeSaveCurrentCustomProfile(name);
+    // 3. Normal save as new profile
+    await executeSaveCurrentCustomProfile(name, null);
 }
 
-async function executeSaveCurrentCustomProfile(name) {
+async function executeSaveCurrentCustomProfile(name, overwriteId = null) {
     const input = document.getElementById('opt-profile-universal-input');
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.save_custom_profile) return;
     try {
-        const resStr = await window.pywebview.api.save_custom_profile(name);
+        const resStr = await window.pywebview.api.save_custom_profile(name, overwriteId);
         const res = JSON.parse(resStr);
         if (res.status === 'success') {
-            if (typeof showToast === 'function') showToast(`Profile "${name}" saved!`, 'success');
+            const actionText = overwriteId ? 'updated' : 'saved';
+            if (typeof showToast === 'function') showToast(`Profile "${name}" ${actionText}!`, 'success');
             await fetchAndRenderCustomProfiles();
             if (res.profile && res.profile.id) {
                 selectedProfileId = res.profile.id;
@@ -19978,7 +20246,7 @@ async function executeSaveCurrentCustomProfile(name) {
             }
         } else {
             showCustomModal({
-                title: 'PROFILE ALREADY EXISTS',
+                title: 'CANNOT SAVE PROFILE',
                 message: res.message || 'Profile already exists. Please choose another name.',
                 type: 'info',
                 showCancel: false,
@@ -20041,75 +20309,50 @@ function requestDeleteCustomProfileById(profileId) {
     const dateFormatted = formatProfileDate(profile.created_at);
     const label = `${profile.name}${dateFormatted ? ' (' + dateFormatted + ')' : ''}`;
 
-    if (typeof showCustomModal === 'function') {
-        showCustomModal({
-            title: 'DELETE PROFILE',
-            message: `Are you sure you want to delete "${label}"?`,
-            type: 'warning',
-            showCancel: true,
-            confirmText: 'YES',
-            cancelText: 'NO',
-            confirmClass: 'px-5 py-1.5 text-center rounded-xl bg-blue-600 hover:bg-blue-500 text-white typo-action-btn font-semibold text-xs uppercase transition-all border-0 cursor-pointer shadow-md',
-            cancelClass: 'px-5 py-1.5 text-center rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 hover:text-white typo-action-btn text-xs font-semibold uppercase transition-all cursor-pointer',
-            onConfirm: async () => {
-                await deleteSelectedCustomProfile(profileId);
-            }
-        });
-    } else {
-        if (confirm(`Are you sure you want to delete "${label}"?`)) {
-            deleteSelectedCustomProfile(profileId);
+    showCustomModal({
+        title: 'DELETE PROFILE',
+        message: `Do you want to delete "${label}"?`,
+        type: 'warning',
+        showCancel: true,
+        confirmText: 'YES',
+        cancelText: 'NO',
+        confirmClass: 'px-5 py-1.5 text-center rounded-xl bg-blue-600 hover:bg-blue-500 text-white typo-action-btn font-semibold text-xs uppercase transition-all border-0 cursor-pointer shadow-md',
+        cancelClass: 'px-5 py-1.5 text-center rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 hover:text-white typo-action-btn text-xs font-semibold uppercase transition-all cursor-pointer',
+        onConfirm: async () => {
+            await deleteSelectedCustomProfile(profileId);
+            multiSelectedProfileIds.delete(profileId);
         }
-    }
+    });
+}
+
+function requestDeleteMultiSelectedProfiles() {
+    const count = multiSelectedProfileIds.size;
+    if (count === 0) return;
+    const ids = Array.from(multiSelectedProfileIds);
+
+    showCustomModal({
+        title: 'DELETE PROFILES',
+        message: `Do you want to delete the "${count}" files selected ?`,
+        type: 'warning',
+        showCancel: true,
+        confirmText: 'YES',
+        cancelText: 'NO',
+        confirmClass: 'px-5 py-1.5 text-center rounded-xl bg-blue-600 hover:bg-blue-500 text-white typo-action-btn font-semibold text-xs uppercase transition-all border-0 cursor-pointer shadow-md',
+        cancelClass: 'px-5 py-1.5 text-center rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 hover:text-white typo-action-btn text-xs font-semibold uppercase transition-all cursor-pointer',
+        onConfirm: async () => {
+            await deleteSelectedCustomProfile(ids.join(','));
+            multiSelectedProfileIds.clear();
+        }
+    });
 }
 
 function confirmDeleteCustomProfile() {
-    let profileId = selectedProfileId;
-    const input = document.getElementById('opt-profile-universal-input');
-    const typedName = input ? input.value.trim() : '';
-
-    // If input is non-empty, prioritize matching profiles by typed name
-    let matchingProfiles = [];
-    if (typedName) {
-        matchingProfiles = currentCustomProfiles.filter(p => (p.name || '').trim().toLowerCase() === typedName.toLowerCase());
-    }
-
-    if (matchingProfiles.length === 0 && profileId) {
-        const found = currentCustomProfiles.find(p => p.id === profileId);
-        if (found) {
-            matchingProfiles = currentCustomProfiles.filter(p => (p.name || '').trim().toLowerCase() === (found.name || '').trim().toLowerCase());
-        }
-    }
-
-    if (matchingProfiles.length === 0) {
-        if (typeof showToast === 'function') showToast("Please select a profile to delete.", "warning");
-        return;
-    }
-
-    const profileName = matchingProfiles[0].name;
-    const idsToDelete = matchingProfiles.map(p => p.id).join(',');
-
-    const messageText = matchingProfiles.length > 1
-        ? `Are you sure you want to delete "${profileName}"? (${matchingProfiles.length} duplicate entries will be removed)`
-        : `Are you sure you want to delete "${profileName}"?`;
-
-    if (typeof showCustomModal === 'function') {
-        showCustomModal({
-            title: 'DELETE PROFILE',
-            message: messageText,
-            type: 'warning',
-            showCancel: true,
-            confirmText: 'YES',
-            cancelText: 'NO',
-            confirmClass: 'px-5 py-1.5 text-center rounded-xl bg-blue-600 hover:bg-blue-500 text-white typo-action-btn font-semibold text-xs uppercase transition-all border-0 cursor-pointer shadow-md',
-            cancelClass: 'px-5 py-1.5 text-center rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 hover:text-white typo-action-btn text-xs font-semibold uppercase transition-all cursor-pointer',
-            onConfirm: async () => {
-                await deleteSelectedCustomProfile(idsToDelete);
-            }
-        });
+    if (multiSelectedProfileIds.size > 0) {
+        requestDeleteMultiSelectedProfiles();
+    } else if (selectedProfileId) {
+        requestDeleteCustomProfileById(selectedProfileId);
     } else {
-        if (confirm(messageText)) {
-            deleteSelectedCustomProfile(idsToDelete);
-        }
+        if (typeof showToast === 'function') showToast("Please select a profile to delete.", "warning");
     }
 }
 
@@ -20124,6 +20367,7 @@ async function deleteSelectedCustomProfile(profileIdsToDelete) {
         if (res.status === 'success') {
             if (typeof showToast === 'function') showToast("Profile(s) deleted successfully", 'info');
             selectedProfileId = '';
+            multiSelectedProfileIds.clear();
             closeAllProfileDropdowns();
             await fetchAndRenderCustomProfiles();
         } else {
@@ -20133,6 +20377,18 @@ async function deleteSelectedCustomProfile(profileIdsToDelete) {
         console.error("Error deleting profile:", e);
     }
 }
+
+// Global key listener to trigger delete confirmation when Delete key is pressed with items multi-selected
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Delete' || e.key === 'Del') {
+        const listEl = document.getElementById('opt-profile-dropdown-list');
+        const isDropdownOpen = listEl && !listEl.classList.contains('hidden');
+        if (isDropdownOpen && multiSelectedProfileIds.size > 0) {
+            e.preventDefault();
+            requestDeleteMultiSelectedProfiles();
+        }
+    }
+});
 
 async function restoreOriginalUserCfgTarget() {
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.restore_original_user_cfg) return;

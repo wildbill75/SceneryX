@@ -1283,47 +1283,155 @@ def get_custom_profiles() -> List[Dict[str, Any]]:
     return profiles
 
 
-def save_custom_profile(profile_name: str, user_cfg_path: Optional[str] = None) -> Dict[str, Any]:
-    """Saves current settings (with any staged UI edits) as a reusable custom profile."""
+def get_current_staged_content(user_cfg_path: Optional[str] = None) -> str:
+    """Returns current UserCfg.opt content overlayed with all in-memory staged tweaks."""
+    path = user_cfg_path or get_user_cfg_path()
+    if not path or not os.path.exists(path):
+        return ""
+    try:
+        with open(path, "r", encoding="utf-8", errors="ignore") as f:
+            content = f.read()
+        global _staged_user_cfg_settings
+        for m, staged in _staged_user_cfg_settings.items():
+            for k, v in staged.items():
+                content = apply_setting_to_content(content, m, k, v)
+        return content
+    except Exception:
+        return ""
+
+
+def check_profile_changes(profile_id: str, user_cfg_path: Optional[str] = None) -> Dict[str, Any]:
+    """Compares the current staged/disk settings with the content of a saved profile."""
+    profiles_dir = get_custom_profiles_dir()
+    profile_file = os.path.join(profiles_dir, f"{profile_id}.profile.json")
+    if not os.path.exists(profile_file):
+        ws_file = os.path.join(r"D:\SceneryX\custom_profiles", f"{profile_id}.profile.json")
+        if os.path.exists(ws_file):
+            profile_file = ws_file
+        else:
+            return {"status": "error", "message": "Profile not found."}
+
+    try:
+        with open(profile_file, "r", encoding="utf-8", errors="ignore") as f:
+            pdata = json.load(f)
+        prof_content = (pdata.get("content") or "").strip().replace("\r\n", "\n")
+        curr_content = get_current_staged_content(user_cfg_path).strip().replace("\r\n", "\n")
+        has_changes = (prof_content != curr_content)
+        return {
+            "status": "success",
+            "has_changes": has_changes,
+            "profile_id": profile_id,
+            "profile_name": pdata.get("name", "")
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+def rename_custom_profile(profile_id: str, new_name: str) -> Dict[str, Any]:
+    """Renames an existing profile in place without duplicating it."""
+    clean_name = str(new_name).strip()
+    if not clean_name:
+        return {"status": "error", "message": "Profile name cannot be empty."}
+
+    # Ensure no other profile has this name
+    existing_profiles = get_custom_profiles()
+    for p in existing_profiles:
+        if p.get("id") != profile_id and str(p.get("name", "")).strip().lower() == clean_name.lower():
+            return {
+                "status": "error",
+                "code": "DUPLICATE_NAME",
+                "message": f"A profile named '{clean_name}' already exists. Please choose another name."
+            }
+
+    profiles_dir = get_custom_profiles_dir()
+    profile_file = os.path.join(profiles_dir, f"{profile_id}.profile.json")
+    if not os.path.exists(profile_file):
+        ws_file = os.path.join(r"D:\SceneryX\custom_profiles", f"{profile_id}.profile.json")
+        if os.path.exists(ws_file):
+            profile_file = ws_file
+        else:
+            return {"status": "error", "message": "Profile not found."}
+
+    try:
+        with open(profile_file, "r", encoding="utf-8") as f:
+            pdata = json.load(f)
+        pdata["name"] = clean_name
+        pdata["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        with open(profile_file, "w", encoding="utf-8") as f:
+            json.dump(pdata, f, indent=2, ensure_ascii=False)
+
+        ws_file = os.path.join(r"D:\SceneryX\custom_profiles", f"{profile_id}.profile.json")
+        if os.path.exists(ws_file) and os.path.abspath(ws_file) != os.path.abspath(profile_file):
+            try:
+                with open(ws_file, "w", encoding="utf-8") as f_ws:
+                    json.dump(pdata, f_ws, indent=2, ensure_ascii=False)
+            except Exception:
+                pass
+
+        return {
+            "status": "success",
+            "message": f"Profile renamed to '{clean_name}'.",
+            "profile": pdata,
+            "profiles": get_custom_profiles()
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+def save_custom_profile(profile_name: str, overwrite_id: Optional[str] = None, user_cfg_path: Optional[str] = None) -> Dict[str, Any]:
+    """Saves current settings as a profile, or overwrites an existing profile if overwrite_id is provided."""
     path = user_cfg_path or get_user_cfg_path()
     if not path or not os.path.exists(path):
         return {"status": "error", "message": "UserCfg.opt not found."}
 
     try:
-        with open(path, "r", encoding="utf-8", errors="ignore") as f:
-            content = f.read()
-
-        # Overlay staged settings so current UI tweaks are captured
-        global _staged_user_cfg_settings
-        for m, staged in _staged_user_cfg_settings.items():
-            for k, v in staged.items():
-                content = apply_setting_to_content(content, m, k, v)
-
+        content = get_current_staged_content(path)
         name = str(profile_name).strip() if profile_name else ""
         if not name:
             name = f"Profile {datetime.now().strftime('%Y-%m-%d %H:%M')}"
 
-        # Prevent duplicate profile names
-        existing_profiles = list_custom_profiles()
-        for p in existing_profiles:
-            if str(p.get("name", "")).strip().lower() == name.lower():
-                return {
-                    "status": "error",
-                    "code": "DUPLICATE_NAME",
-                    "message": "Profile already exists. Please choose another name."
-                }
-
-        profile_id = f"profile_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         profiles_dir = get_custom_profiles_dir()
-        profile_file = os.path.join(profiles_dir, f"{profile_id}.profile.json")
 
-        profile_data = {
-            "id": profile_id,
-            "name": name,
-            "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "content": content,
-            "is_active": True
-        }
+        if overwrite_id:
+            profile_id = overwrite_id
+            profile_file = os.path.join(profiles_dir, f"{profile_id}.profile.json")
+            created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            if os.path.exists(profile_file):
+                try:
+                    with open(profile_file, "r", encoding="utf-8") as f_old:
+                        old_data = json.load(f_old)
+                        created_at = old_data.get("created_at", created_at)
+                except Exception:
+                    pass
+
+            profile_data = {
+                "id": profile_id,
+                "name": name,
+                "created_at": created_at,
+                "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "content": content,
+                "is_active": True
+            }
+        else:
+            # Prevent duplicate profile names when creating a brand new profile
+            existing_profiles = get_custom_profiles()
+            for p in existing_profiles:
+                if str(p.get("name", "")).strip().lower() == name.lower():
+                    return {
+                        "status": "error",
+                        "code": "DUPLICATE_NAME",
+                        "message": f"A profile named '{name}' already exists. Please choose another name."
+                    }
+            profile_id = f"profile_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+            profile_file = os.path.join(profiles_dir, f"{profile_id}.profile.json")
+            profile_data = {
+                "id": profile_id,
+                "name": name,
+                "created_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "content": content,
+                "is_active": True
+            }
 
         with open(profile_file, "w", encoding="utf-8") as pf:
             json.dump(profile_data, pf, indent=2, ensure_ascii=False)
