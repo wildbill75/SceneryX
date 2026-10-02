@@ -18324,7 +18324,13 @@ function renderMsfsSettingsMatrix() {
             let optionsHtml = '';
             if (Array.isArray(item.options)) {
                 optionsHtml = item.options.map(opt => {
-                    const isSelected = String(item.value).toUpperCase() === String(opt).toUpperCase() || String(item.raw_value).toUpperCase() === String(opt).toUpperCase();
+                    const optUpper = String(opt).toUpperCase();
+                    const valUpper = String(item.value || '').toUpperCase();
+                    const rawUpper = String(item.raw_value || '').toUpperCase();
+                    const isSelected = valUpper === optUpper 
+                        || rawUpper === optUpper 
+                        || (valUpper.length >= 3 && (optUpper.startsWith(valUpper + ' ') || optUpper.startsWith(valUpper + '(')))
+                        || (rawUpper.length >= 3 && (optUpper.startsWith(rawUpper + ' ') || optUpper.startsWith(rawUpper + '(')));
                     const optRating = (item.option_ratings && item.option_ratings[opt]) ? item.option_ratings[opt].rating : 'acceptable';
                     let optClass = 'text-amber-400 font-medium bg-slate-900';
                     if (optRating === 'optimum') optClass = 'text-emerald-400 font-medium bg-slate-900';
@@ -18408,7 +18414,8 @@ async function onMsfsSettingChanged(settingKey, newValue) {
                 } else {
                     const valLower = String(lookupKey).trim().toLowerCase();
                     for (const [k, v] of Object.entries(found.option_ratings)) {
-                        if (String(k).trim().toLowerCase() === valLower) {
+                        const kLower = String(k).trim().toLowerCase();
+                        if (kLower === valLower || (valLower.length >= 3 && (kLower.startsWith(valLower) || valLower.startsWith(kLower)))) {
                             optInfo = v;
                             break;
                         }

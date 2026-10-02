@@ -1774,7 +1774,8 @@ def apply_setting_to_content(content: str, mode: str, setting_key: str, new_valu
 
     # 11. Texture Resolution
     elif setting_key in ['texture_resolution', 'Texture']:
-        clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
+        v_clean = str(new_value).lower()
+        clean_q = '3' if 'ultra' in v_clean else ('2' if 'high' in v_clean else ('1' if 'medium' in v_clean or 'med' in v_clean else '0'))
         content = update_sub_block_setting(content, mode, '{Texture', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}', f"Quality {clean_q}")
 
     # 12. Volumetric Clouds
@@ -2621,22 +2622,44 @@ def calculate_option_ratings(key: str, options: List[str], is_liner: bool, is_vr
         elif key == "texture_resolution":
             if is_vr:
                 if "ULTRA" in o_up:
-                    r, c = "suboptimal", "orange"
+                    r, c = "hazard", "rose"
+                    reason = "Ultra textures in VR cause severe VRAM overflow and headset compositor tracking freezes."
                 elif "HIGH" in o_up:
+                    r, c = ("acceptable", "amber") if is_flagship_gpu else ("suboptimal", "orange")
+                    reason = "High textures in VR stereo demand extreme VRAM, risking frame drops on airliners."
+                elif "MEDIUM" in o_up:
                     r, c = ("optimum", "emerald") if is_flagship_gpu else ("acceptable", "amber")
-                elif "MEDIUM" in o_up:
-                    r, c = ("acceptable", "amber") if is_flagship_gpu else ("optimum", "emerald")
+                    reason = "Medium textures provide balanced fidelity in VR stereo rendering."
                 else: # LOW
-                    r, c = "acceptable", "amber"
-            else: # 2D Desktop
-                if "HIGH" in o_up:
                     r, c = "optimum", "emerald"
-                elif "ULTRA" in o_up:
-                    r, c = "acceptable", "amber"
-                elif "MEDIUM" in o_up:
-                    r, c = "acceptable", "amber"
-                else: # LOW
-                    r, c = "suboptimal", "orange"
+                    reason = "Low textures in VR save 6-8 GB VRAM, preventing compositor crashes on heavy airliners."
+            else: # 2D Desktop
+                if is_liner:
+                    if "LOW" in o_up:
+                        r, c = "optimum", "emerald"
+                        reason = "VRAM Optimization: saves 6-8 GB VRAM, preventing D3D12 paging freezes at dense hubs."
+                    elif "MEDIUM" in o_up:
+                        r, c = ("optimum", "emerald") if vram_gb >= 16.0 else ("acceptable", "amber")
+                        reason = "Balanced texture resolution with adequate VRAM headroom for airliners."
+                    elif "HIGH" in o_up:
+                        r, c = ("acceptable", "amber") if vram_gb >= 16.0 else ("suboptimal", "orange")
+                        reason = f"High textures approach VRAM budget limits with airliners on {vram_gb:.0f} GB VRAM."
+                    else: # ULTRA
+                        r, c = ("acceptable", "amber") if vram_gb >= 24.0 else ("hazard", "rose")
+                        reason = "Ultra textures cause severe VRAM overflow and heavy stuttering on complex airliners at heavy hubs."
+                else: # GA / VFR
+                    if "ULTRA" in o_up:
+                        r, c = ("optimum", "emerald") if vram_gb >= 16.0 else ("acceptable", "amber")
+                        reason = "Maximum visual fidelity for low-altitude VFR sightseeing. GA aircraft consume minimal VRAM."
+                    elif "HIGH" in o_up:
+                        r, c = "optimum", "emerald"
+                        reason = "Crisp ground terrain, runway markings, and cockpit placards with ample headroom."
+                    elif "MEDIUM" in o_up:
+                        r, c = "acceptable", "amber"
+                        reason = "Good performance, but slight ground texture softness at low altitude."
+                    else: # LOW
+                        r, c = "acceptable", "amber"
+                        reason = "Unnecessarily blurry for VFR sightseeing flights when VRAM headroom is plentiful."
 
         elif key == "glass_cockpits":
             if is_liner:
@@ -5783,6 +5806,22 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
     fps_options = ["OFF", "30", "36", "40", "45", "60", "72", "80", "82", "90", "120", "144", "165", "180", "240"]
     lod_options = ["50", "80", "100", "120", "150", "180", "200", "250", "300", "350", "400"]
     q_options = ["Ultra", "High", "Medium", "Low"]
+    tex_options = [
+        "Ultra (VFR Realism • 24GB+ GPUs)",
+        "High (GA & Crisp Cockpits • 16GB+)",
+        "Medium (Balanced • 12-16GB VRAM)",
+        "Low (IFR Liners & VR • Max Headroom)"
+    ]
+
+    def format_tex_display(val: str) -> str:
+        v = str(val).lower()
+        if "ultra" in v:
+            return "Ultra (VFR Realism • 24GB+ GPUs)"
+        if "high" in v:
+            return "High (GA & Crisp Cockpits • 16GB+)"
+        if "medium" in v or "med" in v:
+            return "Medium (Balanced • 12-16GB VRAM)"
+        return "Low (IFR Liners & VR • Max Headroom)"
     glass_options = ["High (Full)", "Medium (Half)", "Low (Quarter)"]
     water_options = ["Ultra (1024)", "High (512)", "Medium (256)", "Low (128)"]
     shadow_options = ["Ultra (2048)", "High (1536)", "Medium (1024)", "Low (512)"]
@@ -6028,7 +6067,7 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
         make_setting_item("framerate_multiplier", "Framerate Multiplier", "1 (2X Interpolation)" if not fg_2d.startswith("OFF") else "OFF (Inactive)", mult_2d, False, "optimum" if not fg_2d.startswith("OFF") else "acceptable", "emerald" if not fg_2d.startswith("OFF") else "amber", "OPTIMUM" if not fg_2d.startswith("OFF") else "INACTIVE", f"Description: Number of interpolated frames generated per native frame via Optical Flow Accelerator (OFA).\nCurrent: {'1 (2X Interpolation)' if not fg_2d.startswith('OFF') else 'OFF (Inactive)'}.\nRecommendation: Set to 1 (2X interpolation) when Frame Generation is active. Generates 1 AI frame per native frame with zero CPU MainThread cost.", ["1 (2X Interpolation)"] if not fg_2d.startswith("OFF") else ["OFF (Inactive)"], page=1, tag_reason="Standard 2X optical flow interpolation factor (1 generated frame per native frame)." if not fg_2d.startswith("OFF") else "Frame Generation is inactive; optical flow multiplier is idle.", is_vr=False),
 
         # PAGE 2: TERRAIN & TEXTURES (6)
-        make_setting_item("texture_resolution", "Texture Resolution", tex_2d_val, tex_2d_raw, True, tex_2d_rating, tex_2d_color, tex_2d_label, tex_2d_tip, q_options, page=2, tag_reason=tex_2d_reason, is_vr=False),
+        make_setting_item("texture_resolution", "Texture Resolution", format_tex_display(tex_2d_val), tex_2d_raw, True, tex_2d_rating, tex_2d_color, tex_2d_label, tex_2d_tip, tex_options, page=2, tag_reason=tex_2d_reason, is_vr=False),
         make_setting_item("anisotropic_filtering", "Anisotropic Filtering", aniso_2d_val, aniso_2d_raw, True, "optimum" if aniso_2d_val == "16X" else "acceptable", "emerald" if aniso_2d_val == "16X" else "amber", "OPTIMUM" if aniso_2d_val == "16X" else "ACCEPTABLE", "Description: Global texture sampling filter. Prevents runway markings and taxiway lines from blurring at acute angles.\nRecommendation: 16X.", aniso_options, page=2, tag_reason="16X keeps markings sharp at glancing angles.", is_vr=False),
         make_setting_item("tlod", "Terrain LOD (TLOD)", f"{tlod_2d_val}" if not autofps else f"Dynamic ({tlod_2d_val})", str(tlod_2d_val), False, tlod_2d_rating, tlod_2d_color, tlod_2d_label, f"Description: Terrain mesh geometric complexity and photogrammetry draw distance. Major driver of CPU MainThread frame time! Direct numeric input supported up to 400.\nCurrent: {tlod_2d_val}{' (Managed by AutoFPS)' if autofps else ''}.\nRecommendation: {'Airliners: Keep 100-120 (or dynamic with AutoFPS) to ensure CPU MainThread stays under 25ms during landing flare.' if is_liner else 'GA: 150-200 provides rich ground relief and mountain detail.'}", lod_options, page=2, is_numeric=True, min_val=10, max_val=400, step=5, tag_reason=tlod_2d_reason, is_vr=False),
         make_setting_item("olod", "Objects LOD (OLOD)", f"{olod_2d_val}" if not autofps else f"Dynamic ({olod_2d_val})", str(olod_2d_val), False, "optimum" if olod_2d_val <= 120 else "acceptable", "emerald" if olod_2d_val <= 120 else "amber", "OPTIMUM" if olod_2d_val <= 120 else "ACCEPTABLE", f"Description: Geometric draw distance for 3D airport buildings, hangars, and autogen. Direct numeric input supported up to 400.\nCurrent: {olod_2d_val}.\nRecommendation: 100-120 for airliners; 120-150 for GA. Values above 200 severely increase CPU draw calls at busy airports.", lod_options, page=2, is_numeric=True, min_val=10, max_val=400, step=5, tag_reason="Balanced 3D building draw distance with controlled draw call count." if olod_2d_val <= 120 else "Elevated draw distance increases CPU draw call overhead at dense hubs.", is_vr=False),
@@ -6132,7 +6171,7 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
         make_setting_item("foveated_scale", "Foveated Scale", fov_scale_pct, fov_scale_raw, False, "optimum" if "40%" in fov_scale_pct else "acceptable", "emerald" if "40%" in fov_scale_pct else "amber", "OPTIMUM" if "40%" in fov_scale_pct else "ACCEPTABLE", f"Description: Inner foveal resolution radius.\nCurrent: {fov_scale_pct}.\nRecommendation: 40% offers the best balance between peripheral performance gain and central sharpness.", fov_scale_options, page=2, tag_reason="Optimal foveal radius for wide-FOV headsets.", is_vr=True),
 
         # PAGE 3: TERRAIN & TEXTURES VR (5)
-        make_setting_item("texture_resolution", "Texture Resolution (VR)", tex_vr_val, tex_vr_raw, True, tex_vr_rating, tex_vr_color, tex_vr_label, tex_vr_tip, q_options, page=3, tag_reason=tex_vr_reason, is_vr=True),
+        make_setting_item("texture_resolution", "Texture Resolution (VR)", format_tex_display(tex_vr_val), tex_vr_raw, True, tex_vr_rating, tex_vr_color, tex_vr_label, tex_vr_tip, tex_options, page=3, tag_reason=tex_vr_reason, is_vr=True),
         make_setting_item("tlod", "Terrain LOD (TLOD)", f"{tlod_vr_val}" if not autofps else f"Dynamic ({tlod_vr_val})", str(tlod_vr_val), False, "optimum" if tlod_vr_val <= 100 else ("acceptable" if tlod_vr_val <= 120 else "hazard"), "emerald" if tlod_vr_val <= 100 else ("amber" if tlod_vr_val <= 120 else "rose"), "OPTIMUM" if tlod_vr_val <= 100 else ("ACCEPTABLE" if tlod_vr_val <= 120 else "HAZARD"), f"Description: Terrain mesh and photogrammetry draw distance in VR stereo. Direct numeric input supported up to 400.\nCurrent: {tlod_vr_val}{' (Managed by AutoFPS)' if autofps else ''}.\nRecommendation: Keep TLOD <= 100 in VR on ground to protect stereo frame time budget and prevent motion reprojection drops.", lod_options, page=3, is_numeric=True, min_val=10, max_val=400, step=5, tag_reason="Dynamic AutoFPS management active." if autofps else ("Within safe VR stereo MainThread latency budget." if tlod_vr_val <= 100 else "High TLOD in VR triggers severe stereo reprojection judder."), is_vr=True),
         make_setting_item("olod", "Objects LOD (OLOD)", f"{olod_vr_val}" if not autofps else f"Dynamic ({olod_vr_val})", str(olod_vr_val), False, "optimum" if olod_vr_val <= 100 else "acceptable", "emerald" if olod_vr_val <= 100 else "amber", "OPTIMUM" if olod_vr_val <= 100 else "ACCEPTABLE", f"Description: 3D objects distance in VR up to 400.\nCurrent: {olod_vr_val}.\nRecommendation: Keep OLOD <= 100 in VR.", lod_options, page=3, is_numeric=True, min_val=10, max_val=400, step=5, tag_reason="Controlled 3D objects draw distance for VR stereo.", is_vr=True),
         make_setting_item("offscreen_precaching", "Off Screen Pre-Caching", pre_vr_val, pre_vr_raw, False, "optimum" if pre_vr_val == "High" else "acceptable", "emerald" if pre_vr_val == "High" else "amber", "OPTIMUM" if pre_vr_val == "High" else "ACCEPTABLE", f"Description: Scenery pre-caching in VR.\nCurrent: {pre_vr_val}.\nRecommendation: HIGH is essential for smooth head rotation in VR without stutter.", q_options, page=3, tag_reason="Essential for smooth head rotation without border popping in VR.", is_vr=True),
