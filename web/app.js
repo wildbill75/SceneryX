@@ -18274,20 +18274,29 @@ function renderMsfsSettingsMatrix() {
             if (Array.isArray(item.options)) {
                 presetListItems = item.options.map(opt => {
                     const isCur = String(opt).toUpperCase() === String(displayVal).toUpperCase();
-                    const optRating = (item.option_ratings && item.option_ratings[opt]) ? item.option_ratings[opt].rating : 'acceptable';
+                    const optData = (item.option_ratings && item.option_ratings[opt]) ? item.option_ratings[opt] : null;
+                    const optRating = optData ? optData.rating : 'acceptable';
+                    const optTag = optData ? optData.tag : null;
                     let textClass = 'text-amber-400 font-semibold';
+                    let tagBadgeClass = 'bg-amber-950/80 text-amber-300 border border-amber-700/60';
                     if (optRating === 'optimum') {
                         textClass = 'text-emerald-300 font-semibold';
+                        tagBadgeClass = 'bg-emerald-950/80 text-emerald-300 border border-emerald-700/60';
                     } else if (optRating === 'suboptimal') {
                         textClass = 'text-orange-400 font-semibold';
+                        tagBadgeClass = 'bg-orange-950/80 text-orange-300 border border-orange-700/60';
                     } else if (optRating === 'hazard') {
                         textClass = 'text-rose-400 font-semibold';
+                        tagBadgeClass = 'bg-rose-950/80 text-rose-300 border border-rose-700/60';
                     }
                     return `
                         <div class="px-3 py-1.5 hover:bg-slate-800 ${isCur ? 'bg-slate-800/90 text-white font-semibold' : textClass} cursor-pointer transition-colors flex items-center justify-between typo-input-val text-xs font-semibold tabular-nums"
                              onmousedown="selectComboboxPreset('${item.key}', '${opt}', ${item.min_val ?? 0}, ${item.max_val ?? 400})">
                             <span class="font-semibold tabular-nums">${opt}</span>
-                            ${isCur ? '<span class="text-[9px] font-semibold bg-slate-700 text-slate-200 px-1.5 py-0.5 rounded typo-action-btn uppercase">CURRENT</span>' : ''}
+                            <div class="flex items-center gap-1.5 shrink-0">
+                                ${optTag ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded tracking-wide ${tagBadgeClass}">${optTag}</span>` : ''}
+                                ${isCur ? '<span class="text-[9px] font-semibold bg-slate-700 text-slate-200 px-1.5 py-0.5 rounded typo-action-btn uppercase">CURRENT</span>' : ''}
+                            </div>
                         </div>
                     `;
                 }).join('');
@@ -18362,6 +18371,12 @@ function renderMsfsSettingsMatrix() {
                     </div>
                 </div>
                 ${inputHtml}
+                ${item.rec_guidance ? `
+                    <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950/70 border border-slate-800/80 text-[10px] leading-tight text-slate-300 font-medium">
+                        <span class="text-cyan-400 font-bold shrink-0">🎯 Conseil :</span>
+                        <span class="truncate" title="${item.rec_guidance.replace(/"/g, '&quot;')}">${item.rec_guidance}</span>
+                    </div>
+                ` : ''}
             </div>
         `;
     };
