@@ -2579,6 +2579,146 @@ SETTING_INFO_DATABASE = {
 }
 
 
+def get_lod_thresholds(
+    key: str,
+    is_liner: bool,
+    is_vr: bool,
+    is_x3d: bool,
+    is_flagship_cpu: bool,
+    is_legacy_cpu: bool,
+    is_flagship_gpu: bool,
+    is_high_tier_gpu: bool,
+    is_entry_gpu: bool,
+    vram_gb: float
+) -> Tuple[int, int, int]:
+    """
+    Returns (green_max, amber_max, orange_max) calibrated for CPU/GPU tier and flight scenario.
+    - val <= green_max: OPTIMUM (emerald) - ALWAYS >= 100 for all systems.
+    - green_max < val <= amber_max: ACCEPTABLE (amber)
+    - amber_max < val <= orange_max: SUBOPTIMAL (orange)
+    - val > orange_max: HAZARD (rose)
+    """
+    is_entry_rig = is_legacy_cpu or is_entry_gpu or (vram_gb <= 8.5)
+    is_x3d_flagship = is_x3d and (is_flagship_gpu or is_high_tier_gpu)
+    is_flagship = (is_flagship_cpu or is_x3d or (is_flagship_gpu and not is_legacy_cpu))
+    is_mid_tier = not is_legacy_cpu and not is_entry_gpu and (vram_gb >= 10.0)
+
+    if key in ["tlod", "terrain_lod"]:
+        if is_vr:
+            if is_x3d_flagship:
+                # 9800X3D + 5090/4090 in VR
+                return (100, 130, 170) if is_liner else (130, 170, 220)
+            elif is_flagship:
+                # 14900K / 7800X3D in VR
+                return (100, 120, 150) if is_liner else (120, 150, 190)
+            elif is_entry_rig:
+                # i5 + 1060 in VR
+                return (100, 110, 120) if is_liner else (100, 120, 140)
+            else: # Mid-tier in VR
+                return (100, 110, 130) if is_liner else (100, 130, 160)
+        else: # 2D Desktop
+            if is_x3d_flagship:
+                # 9800X3D + 5090 in 2D
+                return (150, 200, 260) if is_liner else (200, 260, 320)
+            elif is_flagship:
+                # 14900K / 285K / 7950X in 2D
+                return (130, 180, 240) if is_liner else (180, 240, 300)
+            elif is_high_tier_gpu and not is_legacy_cpu:
+                # Modern fast CPU + 4070/3080
+                return (120, 160, 220) if is_liner else (150, 220, 280)
+            elif is_entry_rig:
+                # i5 + 1060 / 8GB VRAM
+                return (100, 120, 150) if is_liner else (100, 130, 170)
+            else: # Mid-tier (13600K / 5600X + 3060/4060)
+                return (100, 140, 180) if is_liner else (120, 170, 220)
+    else: # OLOD
+        if is_vr:
+            if is_x3d_flagship:
+                return 110, 140, 180
+            elif is_flagship:
+                return 100, 130, 160
+            elif is_entry_rig:
+                return 100, 110, 130
+            else:
+                return 100, 120, 150
+        else: # 2D Desktop
+            if is_x3d_flagship:
+                return 140, 190, 250
+            elif is_flagship:
+                return 130, 180, 240
+            elif is_high_tier_gpu and not is_legacy_cpu:
+                return 120, 160, 220
+            elif is_entry_rig:
+                return 100, 120, 150
+            else:
+                return 100, 140, 180
+
+
+def get_lod_rating_info(
+    val: Any,
+    key: str,
+    is_liner: bool,
+    is_vr: bool,
+    is_x3d: bool,
+    is_flagship_cpu: bool,
+    is_legacy_cpu: bool,
+    is_flagship_gpu: bool,
+    is_high_tier_gpu: bool,
+    is_entry_gpu: bool,
+    vram_gb: float,
+    autofps: bool = False
+) -> Tuple[str, str, str, str]:
+    """
+    Returns (rating, color, label, reason) for a given TLOD or OLOD value.
+    """
+    try:
+        clean_str = str(val).replace('Dynamic', '').replace('(', '').replace(')', '').strip()
+        num = int(''.join(filter(str.isdigit, clean_str)) or 100)
+    except Exception:
+        num = 100
+
+    is_tlod = key in ["tlod", "terrain_lod"]
+
+    if autofps and is_tlod:
+        return "optimum", "emerald", "OPTIMUM", f"AutoFPS dynamic calibration active (Target base: {num})."
+
+    green_max, amber_max, orange_max = get_lod_thresholds(
+        key, is_liner, is_vr, is_x3d, is_flagship_cpu, is_legacy_cpu,
+        is_flagship_gpu, is_high_tier_gpu, is_entry_gpu, vram_gb
+    )
+
+    if num <= green_max:
+        r, c = "optimum", "emerald"
+        lbl = "OPTIMUM"
+        if is_tlod:
+            reason = f"TLOD {num} is fully within safe MainThread frame budget (<= {green_max}). Fluid approach and flare."
+        else:
+            reason = f"OLOD {num} keeps terminal and autogen draw calls well within single-core dispatch budget (<= {green_max})."
+    elif num <= amber_max:
+        r, c = "acceptable", "amber"
+        lbl = "ACCEPTABLE"
+        if is_tlod:
+            reason = f"TLOD {num} imposes moderate CPU MainThread load ({green_max+1}-{amber_max}). Stable in cruise, slight latency variance possible at major hubs."
+        else:
+            reason = f"OLOD {num} increases 3D object draw calls ({green_max+1}-{amber_max}). Sustainable on this hardware."
+    elif num <= orange_max:
+        r, c = "suboptimal", "orange"
+        lbl = "SUBOPTIMAL"
+        if is_tlod:
+            reason = f"TLOD {num} pushes CPU MainThread near limits ({amber_max+1}-{orange_max}). Risk of micro-stutters during landing flare at dense airports."
+        else:
+            reason = f"OLOD {num} generates high 3D draw call density ({amber_max+1}-{orange_max}). May cause frame drops at large international hubs."
+    else:
+        r, c = "hazard", "rose"
+        lbl = "HAZARD"
+        if is_tlod:
+            reason = f"TLOD {num} severely exceeds hardware MainThread capacity (> {orange_max})! High risk of landing freezes and audio crackling."
+        else:
+            reason = f"OLOD {num} severely overloads draw call dispatch (> {orange_max})! Significant CPU frame time penalty at airports."
+
+    return r, c, lbl, reason
+
+
 def calculate_option_ratings(key: str, options: List[str], is_liner: bool, is_vr: bool, vram_gb: float = 16.0, target_fps: int = 60, native_w: int = 2560, native_h: int = 1440, gpu: Optional[Dict[str, Any]] = None, cpu: Optional[Dict[str, Any]] = None) -> Dict[str, Dict[str, str]]:
     """Retourne pour chaque option sa classification ('optimum', 'acceptable', 'suboptimal', 'hazard') et sa couleur ('emerald', 'amber', 'orange', 'rose')."""
     gpu_full = str((gpu or {}).get("name") or "").upper()
@@ -3053,52 +3193,11 @@ def calculate_option_ratings(key: str, options: List[str], is_liner: bool, is_vr
                 else: # LOW
                     r, c = "suboptimal", "orange"
 
-        elif key in ["tlod", "olod"]:
-            try:
-                num = int(''.join(filter(str.isdigit, opt_str)) or 100)
-                if key == "tlod":
-                    if is_vr:
-                        if is_liner:
-                            opt_val = 100 if is_x3d else 80
-                            if num == opt_val: r, c = "optimum", "emerald"
-                            elif num <= 120: r, c = "acceptable", "amber"
-                            else: r, c = "hazard", "rose"
-                        else: # GA VR
-                            opt_val = 150 if is_x3d else 120
-                            if num == opt_val: r, c = "optimum", "emerald"
-                            elif num <= 180: r, c = "acceptable", "amber"
-                            else: r, c = "hazard", "rose"
-                    else: # 2D Desktop
-                        if is_liner:
-                            if is_x3d: opt_val = 120
-                            elif is_flagship_cpu: opt_val = 100
-                            elif is_legacy_cpu: opt_val = 80
-                            else: opt_val = 100
-
-                            if num == opt_val: r, c = "optimum", "emerald"
-                            elif num <= 150: r, c = "acceptable", "amber"
-                            else: r, c = "hazard", "rose"
-                        else: # GA 2D
-                            if is_x3d: opt_val = 200
-                            elif is_flagship_cpu: opt_val = 150
-                            elif is_legacy_cpu: opt_val = 100
-                            else: opt_val = 120
-
-                            if num == opt_val: r, c = "optimum", "emerald"
-                            elif num <= 220: r, c = "acceptable", "amber"
-                            else: r, c = "hazard", "rose"
-                else: # olod
-                    if is_vr:
-                        if num == 100: r, c = "optimum", "emerald"
-                        elif num <= 130: r, c = "acceptable", "amber"
-                        else: r, c = "suboptimal", "orange"
-                    else: # 2D
-                        opt_val = 120 if (is_flagship_cpu or is_x3d) else 100
-                        if num == opt_val: r, c = "optimum", "emerald"
-                        elif num <= 160: r, c = "acceptable", "amber"
-                        else: r, c = "suboptimal", "orange"
-            except Exception:
-                pass
+        elif key in ["tlod", "olod", "terrain_lod", "objects_lod"]:
+            r, c, _, reason = get_lod_rating_info(
+                opt_str, key, is_liner, is_vr, is_x3d, is_flagship_cpu, is_legacy_cpu,
+                is_flagship_gpu, is_high_tier_gpu, is_entry_gpu, vram_gb, autofps=False
+            )
 
         elif key in ["reprojection_mode"]:
             if o_up in ["OFF", "AUTO", "1/2 REPROJECTION"]:
@@ -5419,6 +5518,21 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
             rating = matched_opt["rating"]
             color = matched_opt["color"]
             clean_lbl = rating.upper()
+            if matched_opt.get("reason"):
+                tag_reason = matched_opt["reason"]
+        elif key in ["tlod", "olod", "terrain_lod", "objects_lod"]:
+            is_af = autofps and key in ["tlod", "terrain_lod"]
+            r_c, c_c, lbl_c, rsn_c = get_lod_rating_info(
+                val, key, is_liner, is_vr, is_x3d, is_flagship_cpu, is_legacy_cpu,
+                is_flagship_gpu, is_high_tier_gpu, is_entry_gpu, vram_gb, autofps=is_af
+            )
+            rating = r_c
+            color = c_c
+            clean_lbl = lbl_c
+            tag_reason = rsn_c
+            clean_digits = ''.join(filter(str.isdigit, str(val)))
+            if clean_digits:
+                opt_ratings[clean_digits] = {"rating": r_c, "color": c_c, "reason": rsn_c}
 
         # Dynamic Hardware Impact Scores (1-12) based on active val, GPU, CPU, VR
         c_score, g_score, c_dyn_note, g_dyn_note = calculate_dynamic_hardware_impact(
@@ -5686,23 +5800,31 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
     tlod_vr_raw = get_block_val(r'LoDFactor\s+([\d\.]+)', extract_block(gvr, '{Terrain'), '1.0')
     tlod_vr_val = round(float(tlod_vr_raw) * 100)
 
-    # TLOD 2D Rating
-    if is_liner:
-        tlod_2d_rating = "optimum" if autofps or tlod_2d_val <= 120 else ("acceptable" if tlod_2d_val <= 150 else "hazard")
-        tlod_2d_color = "emerald" if autofps or tlod_2d_val <= 120 else ("amber" if tlod_2d_val <= 150 else "rose")
-        tlod_2d_label = "OPTIMUM" if autofps or tlod_2d_val <= 120 else ("ACCEPTABLE" if tlod_2d_val <= 150 else "HAZARD")
-        tlod_2d_reason = "AutoFPS dynamic calibration active." if autofps else ("Within safe CPU MainThread budget for airliners." if tlod_2d_val <= 120 else ("MainThread pressure: possible micro-stutters during landing." if tlod_2d_val <= 150 else "High stutter risk: CPU MainThread saturation on approach."))
-    else:
-        tlod_2d_rating = "optimum" if autofps or tlod_2d_val <= 160 else "acceptable"
-        tlod_2d_color = "emerald" if autofps or tlod_2d_val <= 160 else "amber"
-        tlod_2d_label = "OPTIMUM" if autofps or tlod_2d_val <= 160 else "ACCEPTABLE"
-        tlod_2d_reason = "AutoFPS dynamic calibration active." if autofps else ("Optimum draw distance for VFR terrain fidelity." if tlod_2d_val <= 160 else "Acceptable draw distance for GA flights.")
+    # TLOD Ratings (Calibrated via get_lod_rating_info)
+    tlod_2d_rating, tlod_2d_color, tlod_2d_label, tlod_2d_reason = get_lod_rating_info(
+        tlod_2d_val, "tlod", is_liner, False, is_x3d, is_flagship_cpu, is_legacy_cpu,
+        is_flagship_gpu, is_high_tier_gpu, is_entry_gpu, vram_gb, autofps=autofps
+    )
+    tlod_vr_rating, tlod_vr_color, tlod_vr_label, tlod_vr_reason = get_lod_rating_info(
+        tlod_vr_val, "tlod", is_liner, True, is_x3d, is_flagship_cpu, is_legacy_cpu,
+        is_flagship_gpu, is_high_tier_gpu, is_entry_gpu, vram_gb, autofps=autofps
+    )
 
     # 11. OLOD (Manual input up to 400 + Presets)
     olod_2d_raw = get_block_val(r'LoDFactor\s+([\d\.]+)', extract_block(g2d, '{ObjectsLoD'), '1.0')
     olod_2d_val = round(float(olod_2d_raw) * 100)
     olod_vr_raw = get_block_val(r'LoDFactor\s+([\d\.]+)', extract_block(gvr, '{ObjectsLoD'), '1.0')
     olod_vr_val = round(float(olod_vr_raw) * 100)
+
+    # OLOD Ratings (Calibrated via get_lod_rating_info)
+    olod_2d_rating, olod_2d_color, olod_2d_label, olod_2d_reason = get_lod_rating_info(
+        olod_2d_val, "olod", is_liner, False, is_x3d, is_flagship_cpu, is_legacy_cpu,
+        is_flagship_gpu, is_high_tier_gpu, is_entry_gpu, vram_gb, autofps=False
+    )
+    olod_vr_rating, olod_vr_color, olod_vr_label, olod_vr_reason = get_lod_rating_info(
+        olod_vr_val, "olod", is_liner, True, is_x3d, is_flagship_cpu, is_legacy_cpu,
+        is_flagship_gpu, is_high_tier_gpu, is_entry_gpu, vram_gb, autofps=False
+    )
 
     # 12. Offscreen Pre-Caching
     pre_2d_raw = get_block_val(r'Quality\s+(\d+)', extract_block(g2d, '{OffscreenTerrainPreCaching'), '2')
@@ -6070,7 +6192,7 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
         make_setting_item("texture_resolution", "Texture Resolution", format_tex_display(tex_2d_val), tex_2d_raw, True, tex_2d_rating, tex_2d_color, tex_2d_label, tex_2d_tip, tex_options, page=2, tag_reason=tex_2d_reason, is_vr=False),
         make_setting_item("anisotropic_filtering", "Anisotropic Filtering", aniso_2d_val, aniso_2d_raw, True, "optimum" if aniso_2d_val == "16X" else "acceptable", "emerald" if aniso_2d_val == "16X" else "amber", "OPTIMUM" if aniso_2d_val == "16X" else "ACCEPTABLE", "Description: Global texture sampling filter. Prevents runway markings and taxiway lines from blurring at acute angles.\nRecommendation: 16X.", aniso_options, page=2, tag_reason="16X keeps markings sharp at glancing angles.", is_vr=False),
         make_setting_item("tlod", "Terrain LOD (TLOD)", f"{tlod_2d_val}" if not autofps else f"Dynamic ({tlod_2d_val})", str(tlod_2d_val), False, tlod_2d_rating, tlod_2d_color, tlod_2d_label, f"Description: Terrain mesh geometric complexity and photogrammetry draw distance. Major driver of CPU MainThread frame time! Direct numeric input supported up to 400.\nCurrent: {tlod_2d_val}{' (Managed by AutoFPS)' if autofps else ''}.\nRecommendation: {'Airliners: Keep 100-120 (or dynamic with AutoFPS) to ensure CPU MainThread stays under 25ms during landing flare.' if is_liner else 'GA: 150-200 provides rich ground relief and mountain detail.'}", lod_options, page=2, is_numeric=True, min_val=10, max_val=400, step=5, tag_reason=tlod_2d_reason, is_vr=False),
-        make_setting_item("olod", "Objects LOD (OLOD)", f"{olod_2d_val}" if not autofps else f"Dynamic ({olod_2d_val})", str(olod_2d_val), False, "optimum" if olod_2d_val <= 120 else "acceptable", "emerald" if olod_2d_val <= 120 else "amber", "OPTIMUM" if olod_2d_val <= 120 else "ACCEPTABLE", f"Description: Geometric draw distance for 3D airport buildings, hangars, and autogen. Direct numeric input supported up to 400.\nCurrent: {olod_2d_val}.\nRecommendation: 100-120 for airliners; 120-150 for GA. Values above 200 severely increase CPU draw calls at busy airports.", lod_options, page=2, is_numeric=True, min_val=10, max_val=400, step=5, tag_reason="Balanced 3D building draw distance with controlled draw call count." if olod_2d_val <= 120 else "Elevated draw distance increases CPU draw call overhead at dense hubs.", is_vr=False),
+        make_setting_item("olod", "Objects LOD (OLOD)", f"{olod_2d_val}" if not autofps else f"Dynamic ({olod_2d_val})", str(olod_2d_val), False, olod_2d_rating, olod_2d_color, olod_2d_label, f"Description: Geometric draw distance for 3D airport buildings, hangars, and autogen. Direct numeric input supported up to 400.\nCurrent: {olod_2d_val}.\nRecommendation: 100-120 for airliners; 120-150 for GA. Values above 200 severely increase CPU draw calls at busy airports.", lod_options, page=2, is_numeric=True, min_val=10, max_val=400, step=5, tag_reason=olod_2d_reason, is_vr=False),
         make_setting_item("offscreen_precaching", "Off Screen Pre-Caching", pre_2d_val, pre_2d_raw, False, "optimum" if pre_2d_val == "High" else "acceptable", "emerald" if pre_2d_val == "High" else "amber", "OPTIMUM" if pre_2d_val == "High" else "ACCEPTABLE", f"Description: Scenery pre-caching outside the immediate camera field of view.\nCurrent: {pre_2d_val}.\nRecommendation: HIGH is the optimal balance to eliminate camera panning stutters without excess memory caching.", q_options, page=2, tag_reason="Sufficient scenery pre-cached to prevent panning freezes." if pre_2d_val in ["High", "Ultra"] else "Low pre-caching causes stutter whenever camera view rotates.", is_vr=False),
         make_setting_item("displacement_mapping", "Displacement Mapping", disp_2d, "1" if disp_2d == "ON" else "0", False, "optimum" if disp_2d == "OFF" else "suboptimal", "emerald" if disp_2d == "OFF" else "orange", "OPTIMUM" if disp_2d == "OFF" else "SUBOPTIMAL", f"Description: Tessellated micro-surface height displacements on runway pavement and terrain.\nCurrent: {disp_2d}.\nRecommendation: Keep OFF to save VRAM and GPU compute. Visual difference from flight altitude is imperceptible.", ["OFF", "ON"], page=2, tag_reason="Displacement mapping disabled to conserve VRAM and GPU compute." if disp_2d == "OFF" else "Enables surface tessellation at the expense of extra VRAM and draw calls.", is_vr=False),
 
@@ -6172,8 +6294,8 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
 
         # PAGE 3: TERRAIN & TEXTURES VR (5)
         make_setting_item("texture_resolution", "Texture Resolution (VR)", format_tex_display(tex_vr_val), tex_vr_raw, True, tex_vr_rating, tex_vr_color, tex_vr_label, tex_vr_tip, tex_options, page=3, tag_reason=tex_vr_reason, is_vr=True),
-        make_setting_item("tlod", "Terrain LOD (TLOD)", f"{tlod_vr_val}" if not autofps else f"Dynamic ({tlod_vr_val})", str(tlod_vr_val), False, "optimum" if tlod_vr_val <= 100 else ("acceptable" if tlod_vr_val <= 120 else "hazard"), "emerald" if tlod_vr_val <= 100 else ("amber" if tlod_vr_val <= 120 else "rose"), "OPTIMUM" if tlod_vr_val <= 100 else ("ACCEPTABLE" if tlod_vr_val <= 120 else "HAZARD"), f"Description: Terrain mesh and photogrammetry draw distance in VR stereo. Direct numeric input supported up to 400.\nCurrent: {tlod_vr_val}{' (Managed by AutoFPS)' if autofps else ''}.\nRecommendation: Keep TLOD <= 100 in VR on ground to protect stereo frame time budget and prevent motion reprojection drops.", lod_options, page=3, is_numeric=True, min_val=10, max_val=400, step=5, tag_reason="Dynamic AutoFPS management active." if autofps else ("Within safe VR stereo MainThread latency budget." if tlod_vr_val <= 100 else "High TLOD in VR triggers severe stereo reprojection judder."), is_vr=True),
-        make_setting_item("olod", "Objects LOD (OLOD)", f"{olod_vr_val}" if not autofps else f"Dynamic ({olod_vr_val})", str(olod_vr_val), False, "optimum" if olod_vr_val <= 100 else "acceptable", "emerald" if olod_vr_val <= 100 else "amber", "OPTIMUM" if olod_vr_val <= 100 else "ACCEPTABLE", f"Description: 3D objects distance in VR up to 400.\nCurrent: {olod_vr_val}.\nRecommendation: Keep OLOD <= 100 in VR.", lod_options, page=3, is_numeric=True, min_val=10, max_val=400, step=5, tag_reason="Controlled 3D objects draw distance for VR stereo.", is_vr=True),
+        make_setting_item("tlod", "Terrain LOD (TLOD)", f"{tlod_vr_val}" if not autofps else f"Dynamic ({tlod_vr_val})", str(tlod_vr_val), False, tlod_vr_rating, tlod_vr_color, tlod_vr_label, f"Description: Terrain mesh and photogrammetry draw distance in VR stereo. Direct numeric input supported up to 400.\nCurrent: {tlod_vr_val}{' (Managed by AutoFPS)' if autofps else ''}.\nRecommendation: Keep TLOD <= 100 in VR on ground to protect stereo frame time budget and prevent motion reprojection drops.", lod_options, page=3, is_numeric=True, min_val=10, max_val=400, step=5, tag_reason=tlod_vr_reason, is_vr=True),
+        make_setting_item("olod", "Objects LOD (OLOD)", f"{olod_vr_val}" if not autofps else f"Dynamic ({olod_vr_val})", str(olod_vr_val), False, olod_vr_rating, olod_vr_color, olod_vr_label, f"Description: 3D objects distance in VR up to 400.\nCurrent: {olod_vr_val}.\nRecommendation: Keep OLOD <= 100 in VR.", lod_options, page=3, is_numeric=True, min_val=10, max_val=400, step=5, tag_reason=olod_vr_reason, is_vr=True),
         make_setting_item("offscreen_precaching", "Off Screen Pre-Caching", pre_vr_val, pre_vr_raw, False, "optimum" if pre_vr_val == "High" else "acceptable", "emerald" if pre_vr_val == "High" else "amber", "OPTIMUM" if pre_vr_val == "High" else "ACCEPTABLE", f"Description: Scenery pre-caching in VR.\nCurrent: {pre_vr_val}.\nRecommendation: HIGH is essential for smooth head rotation in VR without stutter.", q_options, page=3, tag_reason="Essential for smooth head rotation without border popping in VR.", is_vr=True),
         make_setting_item("displacement_mapping", "Displacement Mapping", disp_vr, "1" if disp_vr == "ON" else "0", False, "optimum" if disp_vr == "OFF" else "hazard", "emerald" if disp_vr == "OFF" else "rose", "OPTIMUM" if disp_vr == "OFF" else "HAZARD", f"Description: Displacement micro-tessellation in VR.\nCurrent: {disp_vr}.\nRecommendation: Keep OFF in VR. In VR, displacement mapping severely overloads MainThread and VRAM without visible benefit!", ["OFF", "ON"], page=3, tag_reason="Disabled displacement mapping saves GPU compute and prevents VR stutters." if disp_vr == "OFF" else "HAZARD: Displacement mapping in VR causes severe frame drops and MainThread hitches.", is_vr=True),
 

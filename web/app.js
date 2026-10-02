@@ -18421,6 +18421,19 @@ async function onMsfsSettingChanged(settingKey, newValue) {
                         }
                     }
                 }
+                if (!optInfo && (settingKey === 'tlod' || settingKey === 'olod' || settingKey === 'terrain_lod' || settingKey === 'objects_lod')) {
+                    const num = parseInt(String(lookupKey).replace(/[^0-9]/g, ''));
+                    if (!isNaN(num)) {
+                        const sortedPresets = Object.keys(found.option_ratings)
+                            .map(k => ({ val: parseInt(k), info: found.option_ratings[k] }))
+                            .filter(x => !isNaN(x.val))
+                            .sort((a, b) => a.val - b.val);
+                        if (sortedPresets.length > 0) {
+                            const match = sortedPresets.find(p => p.val >= num);
+                            optInfo = match ? match.info : sortedPresets[sortedPresets.length - 1].info;
+                        }
+                    }
+                }
             }
             if (optInfo) {
                 found.rating = optInfo.rating;
