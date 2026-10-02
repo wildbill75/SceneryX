@@ -1597,7 +1597,7 @@ def stage_msfs_setting(mode: str, setting_key: str, new_value: Any) -> Dict[str,
 
     # Synchronize globally shared settings across both 2D and VR modes
     common_sync_keys = [
-        'vsync', 'resolution', 'fullscreenresolution', 'texture_resolution', 'texture', 'anisotropic_filtering', 'maxanisotropy',
+        'vsync', 'vsync_interval', 'resolution', 'fullscreenresolution', 'texture_resolution', 'texture', 'anisotropic_filtering', 'maxanisotropy',
         'aircraft_traffic_quantity', 'aircraft_traffic_variety', 'parked_aircraft_quantity', 'parked_aircraft_variety',
         'airport_services_quantity', 'airport_services_variety', 'road_traffic', 'sea_traffic',
         'characters_quantity', 'characters_variety', 'characters_quality', 'fauna_density', 'seatbelt_visibility'
@@ -1688,6 +1688,44 @@ def apply_setting_to_content(content: str, mode: str, setting_key: str, new_valu
                 v_end = content.find('}', v_start)
                 if v_end != -1:
                     content = content[:v_end] + f"\tVSync {clean_val}\n" + content[v_end:]
+
+    # 4b. V-Sync Interval (Shared)
+    elif str(setting_key).lower() in ['vsync_interval', 'vsyncinterval']:
+        v_str = str(new_value).upper()
+        if '100' in v_str or '1/1' in v_str or v_str == '1':
+            interval_val = '1'
+        elif '50' in v_str or '1/2' in v_str or 'HALF' in v_str or v_str == '2':
+            interval_val = '2'
+        elif '33' in v_str or '1/3' in v_str or v_str == '3':
+            interval_val = '3'
+        elif '25' in v_str or '1/4' in v_str or v_str == '4':
+            interval_val = '4'
+        else:
+            interval_val = '2'
+
+        try:
+            disp_info = detect_display_info()
+            screen_hz = int(disp_info.get("refresh_rate_int", 60))
+        except Exception:
+            screen_hz = 60
+        target_fps = max(15, screen_hz // int(interval_val))
+
+        if re.search(r'(VSyncInterval\s+)[^\r\n]+', content, flags=re.IGNORECASE):
+            content = re.sub(r'(VSyncInterval\s+)[^\r\n]+', rf'\g<1>{interval_val}', content, flags=re.IGNORECASE)
+        else:
+            v_start = content.find('{Video')
+            if v_start != -1:
+                v_end = content.find('}', v_start)
+                if v_end != -1:
+                    content = content[:v_end] + f"\tVSyncInterval {interval_val}\n" + content[v_end:]
+
+        # When V-Sync is ON, synchronize TargetFrameRate & FrameLimiter
+        m_vsync = re.search(r'VSync\s+(\d+)', content, re.IGNORECASE)
+        if m_vsync and m_vsync.group(1) == '1':
+            if re.search(r'(TargetFrameRate\s+)[^\r\n]+', content, flags=re.IGNORECASE):
+                content = re.sub(r'(TargetFrameRate\s+)[^\r\n]+', rf'\g<1>{target_fps}', content, flags=re.IGNORECASE)
+            if re.search(r'(FrameLimiter\s+)[^\r\n]+', content, flags=re.IGNORECASE):
+                content = re.sub(r'(FrameLimiter\s+)[^\r\n]+', rf'\g<1>{target_fps}', content, flags=re.IGNORECASE)
 
     # 5. Dynamic Settings
     elif setting_key in ['dynamic_settings', 'DynamicSettings']:
@@ -1801,10 +1839,19 @@ def apply_setting_to_content(content: str, mode: str, setting_key: str, new_valu
             clean_q = q_map_rev.get(v_clean.strip(), '2')
         content = update_sub_block_setting(content, mode, '{OffscreenTerrainPreCaching', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}', f"Quality {clean_q}")
 
-    # 11. Texture Resolution
+    # 11. Texture Resolution (MSFS uses inverted mipmap drop level: 0=Ultra, 1=High, 2=Medium, 3=Low)
     elif setting_key in ['texture_resolution', 'Texture']:
-        v_clean = str(new_value).lower()
-        clean_q = '3' if 'ultra' in v_clean else ('2' if 'high' in v_clean else ('1' if 'medium' in v_clean or 'med' in v_clean else '0'))
+        v_clean = str(new_value).lower().strip()
+        if 'ultra' in v_clean or v_clean == '0':
+            clean_q = '0'
+        elif 'high' in v_clean or v_clean == '1':
+            clean_q = '1'
+        elif 'medium' in v_clean or 'med' in v_clean or v_clean == '2':
+            clean_q = '2'
+        elif 'low' in v_clean or v_clean == '3':
+            clean_q = '3'
+        else:
+            clean_q = '2'
         content = update_sub_block_setting(content, mode, '{Texture', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}', f"Quality {clean_q}")
 
     # 12. Volumetric Clouds
@@ -2043,6 +2090,19 @@ SETTING_INFO_DATABASE = {
         "tradeoffs": [
             ("ON", "Completely eliminates horizontal screen tearing", "Buffer swaps locked to monitor refresh cadence"),
             ("OFF", "Immediate frame presentation without waiting for v-blank interval", "Distracting tear lines across cockpit dials during rapid camera pans")
+        ]
+    },
+    "vsync_interval": {
+        "title": "V-Sync Interval",
+        "desc": "Defines the Direct3D 12 swap chain presentation cadence relative to your monitor's physical refresh rate. When V-Sync is ON, setting 50% (1/2 rate) presents 1 frame every 2 monitor refresh blanks, locking frame delivery to an exact harmonic divisor of the display.",
+        "cpu_impact": "Zero computational load; significantly stabilizes CPU MainThread pacing by eliminating frame delivery erratic bursts.",
+        "gpu_impact": "Regulates DirectX 12 flip queue presentation frequency. Prevents GPU overheating and unneeded power draw.",
+        "liner_advice": "50% (Half Refresh Rate) is the golden standard. On a 165Hz monitor, locking to 82 FPS (or 60 FPS on 120Hz) guarantees perfectly fluid runway tracking without stressing the D3D12 pipeline.",
+        "ga_advice": "50% on 120Hz/144Hz/165Hz+ monitors; 100% on 60Hz monitors if hardware permits.",
+        "tradeoffs": [
+            ("50% (Half Rate)", "Flawless frame pacing, zero camera judder, stabilized GPU thermals", "Framerate capped at half monitor refresh rate"),
+            ("100% (Full Rate)", "Max native framerate matching monitor refresh rate", "High GPU workload, increased frame variance near complex airports"),
+            ("33% (1/3 Rate)", "Ultra-stable cadence for extreme 4K loads or heavy airliner hubs", "Lower motion fluidity (e.g. 55 FPS on 165Hz, 48 FPS on 144Hz)")
         ]
     },
     "frame_generation": {
@@ -2988,6 +3048,20 @@ def calculate_option_ratings(key: str, options: List[str], is_liner: bool, is_vr
             else:
                 r, c = "acceptable", "amber"
                 reason = "Unsynchronized presentation: delivers newest buffer immediately; causes tearing unless using external VRR."
+
+        elif key == "vsync_interval":
+            if "50%" in o_up or "1/2" in o_up:
+                r, c = "optimum", "emerald"
+                reason = "1/2 sync cadence: Golden standard for flight sim pacing. Perfect motion smoothness without thermal saturation."
+            elif "100%" in o_up or "1/1" in o_up:
+                r, c = "acceptable", "amber"
+                reason = "1:1 full refresh presentation: Peak framerate; higher GPU power draw and potential stutter if MainThread drops."
+            elif "33%" in o_up or "1/3" in o_up:
+                r, c = "acceptable", "amber"
+                reason = "1/3 sync cadence: Rock-solid pacing for ultra-heavy airliners (Fenix/PMDG) at dense photogrammetry hubs."
+            else:
+                r, c = "suboptimal", "orange"
+                reason = "1/4 sync cadence: Aggressive framerate throttling; noticeable motion latency."
 
         elif key == "anti_aliasing":
             if is_vr:
@@ -4172,7 +4246,7 @@ def generate_rig_setting_implications(
         cpu_note = f"On your {cpu_name}: Crucial governor for MainThread pacing. Eliminates micro-stutter spikes by locking frame intervals."
         gpu_note = f"On your {gpu_name}: Prevents GPU thermal saturation and eliminates erratic frame queue backlog."
 
-    elif key in ["vsync", "reflex"]:
+    elif key in ["vsync", "vsync_interval", "reflex"]:
         pipe_text = "Coordinates frame buffer presentation with physical display vertical refresh cycles (V-Sync) and trims the driver render queue to reduce system latency (NVIDIA Reflex)."
         cpu_detail = f"On your <strong>{cpu_name}</strong>: Reflex prevents the CPU render queue from getting backlogged behind the GPU, maintaining instantaneous yoke and flight control response."
         gpu_detail = f"On your <strong>{gpu_name}</strong>: Eliminates horizontal screen tearing without introducing frame buffer latency."
@@ -5344,6 +5418,17 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
                 return ("+ DIRECT BUFFER", "Immediate buffer presentation without waiting for refresh cycle.",
                         "- SCREEN TEARING", "Noticeable horizontal visual tears across runway lines during camera movement.")
 
+        if key == "vsync_interval":
+            if "50%" in v_upper or "1/2" in v_upper:
+                return ("+ PERFECT 1/2 CADENCE", "Stable frame times without GPU overheating or erratic queue spikes.",
+                        "- 1/2 FPS CEILING", f"Caps framerate to {screen_hz // 2} FPS.")
+            elif "100%" in v_upper or "1/1" in v_upper:
+                return ("+ FULL REFRESH", f"Maximum motion smoothness up to {screen_hz} FPS.",
+                        "- HIGH GPU LOAD", "Increased GPU thermals and higher risk of MainThread drop hitches.")
+            else:
+                return ("+ ROCK-SOLID STABILITY", "Ultra-safe frametime headroom for complex airliner operations.",
+                        "- REDUCED FLUIDITY", "Noticeably lower display refresh cadence.")
+
         if key == "dynamic_settings":
             if "OFF" in v_upper or v_upper == "0":
                 return ("+ CRISP COCKPIT", "Guaranteed 100% render scale; instruments and labels remain razor-sharp.",
@@ -5766,6 +5851,7 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
         "anti_aliasing": (2, 8, "Reduces driver overhead via DLSS.", "AI tensor reconstruction or native supersampling."),
         "max_frame_rate": (3, 4, "Key governor for CPU MainThread pacing.", "Reduces GPU thermal dissipation and latency."),
         "vsync": (1, 2, "Zero CPU computation.", "Regulates frame buffer swaps without shading penalty."),
+        "vsync_interval": (1, 2, "Zero CPU computation; stabilizes MainThread pacing.", "Regulates D3D12 swap chain presentation cadence."),
         "reflex": (3, 3, "Optimizes CPU render queue dispatch.", "Reduces GPU queue backlog for lower system latency."),
         "frame_generation": (1, 7, "Zero extra compute cycles on CPU MainThread.", "Optical flow accelerator compute pass on GPU."),
         "multiplier": (1, 5, "Zero CPU compute.", "Temporal interpolation buffer management on GPU."),
@@ -6042,6 +6128,56 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
     vsync_raw = get_block_val(r'VSync\s+(\d+)', video, '1')
     vsync_val = "ON" if vsync_raw == '1' else "OFF"
 
+    # 6b. V-Sync Interval
+    vsync_interval_raw = get_block_val(r'VSyncInterval\s+(\d+)', video, '')
+    if vsync_interval_raw in ['1', '2', '3', '4']:
+        interval_idx = int(vsync_interval_raw)
+    else:
+        fps_num = int(fps_2d) if (fps_2d and fps_2d.isdigit()) else 0
+        if fps_num > 0 and screen_hz > 0:
+            ratio = round(screen_hz / float(fps_num))
+            interval_idx = min(4, max(1, ratio))
+        else:
+            interval_idx = 2 if screen_hz >= 120 else 1
+
+    fps_100 = screen_hz
+    fps_50 = screen_hz // 2
+    fps_33 = screen_hz // 3
+    fps_25 = screen_hz // 4
+
+    vsync_interval_options = [
+        f"100% ({fps_100} FPS)",
+        f"50% ({fps_50} FPS)",
+        f"33% ({fps_33} FPS)",
+        f"25% ({fps_25} FPS)"
+    ]
+
+    interval_labels = {
+        1: f"100% ({fps_100} FPS)",
+        2: f"50% ({fps_50} FPS)",
+        3: f"33% ({fps_33} FPS)",
+        4: f"25% ({fps_25} FPS)"
+    }
+    vsync_interval_val = interval_labels.get(interval_idx, f"50% ({fps_50} FPS)")
+    vsync_interval_raw_str = str(interval_idx)
+
+    if interval_idx == 2:
+        vsi_rating, vsi_color, vsi_label = "optimum", "emerald", "OPTIMUM"
+        vsi_reason = f"50% refresh rate ({fps_50} FPS): Golden standard for flight sim pacing without GPU saturation."
+        vsi_guidance = f"50% ({fps_50} FPS) • Ideal 1:2 monitor cadence preventing frame pacing judder"
+    elif interval_idx == 1:
+        vsi_rating, vsi_color, vsi_label = "acceptable", "amber", "ACCEPTABLE"
+        vsi_reason = f"100% refresh rate ({fps_100} FPS): High GPU workload; higher risk of stutter if CPU MainThread drops."
+        vsi_guidance = f"100% ({fps_100} FPS) • Full monitor refresh rate (demands high GPU headroom)"
+    elif interval_idx == 3:
+        vsi_rating, vsi_color, vsi_label = "acceptable", "amber", "ACCEPTABLE"
+        vsi_reason = f"33% refresh rate ({fps_33} FPS): Rock solid pacing for ultra-heavy airliners or 4K ultra graphics."
+        vsi_guidance = f"33% ({fps_33} FPS) • 1:3 divisor for complex airliners at ultra-dense hubs"
+    else:
+        vsi_rating, vsi_color, vsi_label = "suboptimal", "orange", "SUBOPTIMAL"
+        vsi_reason = f"25% refresh rate ({fps_25} FPS): Aggressive throttling; noticeable motion latency."
+        vsi_guidance = f"25% ({fps_25} FPS) • Heavy throttle (emergency low-power mode)"
+
     # 7. Dynamic Settings
     dyn_2d = "ON" if get_block_val(r'DynamicSettings\s+(\d+)', video, '0') == '1' else "OFF"
     dyn_vr = "ON" if get_block_val(r'DynamicSettingsVR\s+(\d+)', video, '0') == '1' else "OFF"
@@ -6052,11 +6188,12 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
     reflex_vr_raw = get_block_val(r'ReflexVR\s+([^\r\n]+)', video, 'ON').upper().replace(' ', '')
     reflex_vr = "ON+BOOST" if "BOOST" in reflex_vr_raw else ("ON" if reflex_vr_raw in ["ON", "1"] else "OFF")
 
-    # 9. Texture Quality
-    tex_2d_raw = get_block_val(r'Quality\s+(\d+)', extract_block(g2d, '{Texture'), '2')
-    tex_2d_val = q_map.get(tex_2d_raw, 'High')
-    tex_vr_raw = get_block_val(r'Quality\s+(\d+)', extract_block(gvr, '{Texture'), '1')
-    tex_vr_val = q_map.get(tex_vr_raw, 'Medium')
+    # 9. Texture Quality (MSFS inverted mip-drop scale: 0=Ultra, 1=High, 2=Medium, 3=Low)
+    tex_q_map = {'0': 'Ultra', '1': 'High', '2': 'Medium', '3': 'Low'}
+    tex_2d_raw = get_block_val(r'Quality\s+(\d+)', extract_block(g2d, '{Texture'), '1')
+    tex_2d_val = tex_q_map.get(tex_2d_raw, 'High')
+    tex_vr_raw = get_block_val(r'Quality\s+(\d+)', extract_block(gvr, '{Texture'), '2')
+    tex_vr_val = tex_q_map.get(tex_vr_raw, 'Medium')
 
     # Texture 2D Rating
     if is_liner:
@@ -6613,6 +6750,7 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
         make_setting_item("resolution", "Full Screen Resolution", res_formatted, res_raw, True, res_rating, res_color, res_label, f"Description: Native screen rendering resolution for MSFS.\nCurrent: {res_formatted}.\nRecommendation: Match physical monitor native resolution and leverage DLSS for optimal sharpness.", res_options, page=1, tag_reason=res_tag_reason, rec_guidance=f"Native resolution {native_w}x{native_h} recommended", is_vr=False),
         make_setting_item("max_frame_rate", "Max Frame Rate", f"{fps_2d} FPS" if not is_2d_fps_off else "OFF", fps_2d, False, fps_2d_rating, fps_2d_color, fps_2d_label, f"Description: Frame rate limiter to synchronize frame delivery with monitor refresh intervals. Direct numeric input supported.\nCurrent: {'OFF (Uncapped)' if is_2d_fps_off else f'{fps_2d} FPS'} ({'Synchronized' if is_2d_fps_opt else ('OFF / Uncapped' if is_2d_fps_off else 'Custom')}).\nRecommendation: Lock to an exact sync divisor of your monitor (e.g. 60, 72, 80, 82, 90 FPS) to eliminate frame pacing jitter, or OFF if using external limiter.", fps_options, page=1, is_numeric=True, min_val=0, max_val=240, step=1, tag_reason=fps_2d_reason, rec_guidance=f"{target_2d_fps} FPS • Display refresh rate divided by 2 ({screen_hz}Hz / 2)", is_vr=False),
         make_setting_item("vsync", "V-Sync", vsync_val, vsync_raw, True, "optimum" if vsync_val == "ON" else "acceptable", "emerald" if vsync_val == "ON" else "amber", "OPTIMUM" if vsync_val == "ON" else "ACCEPTABLE", f"Description: Vertical synchronization with physical monitor refresh cycle.\nCurrent: {vsync_val}.\nRecommendation: Keep ON with G-Sync/FreeSync and frame rate limiter to eliminate screen tearing.", ["ON", "OFF"], page=1, tag_reason="V-Sync locks buffer presentation to refresh boundaries, eliminating tearing." if vsync_val == "ON" else "V-Sync OFF may cause horizontal tearing lines during fast camera pans.", rec_guidance="ON • Eliminates screen tearing with G-Sync / FreeSync", is_vr=False),
+        make_setting_item("vsync_interval", "V-Sync Interval", vsync_interval_val, vsync_interval_raw_str, True, vsi_rating, vsi_color, vsi_label, f"Description: Swap chain presentation interval relative to physical display refresh rate ({screen_hz} Hz).\nCurrent: {vsync_interval_val}.\nRecommendation: 50% (1/2 divisor) provides the smoothest frame pacing for flight simulation.", vsync_interval_options, page=1, tag_reason=vsi_reason, rec_guidance=vsi_guidance, is_vr=False),
         make_setting_item("reflex", "NVIDIA Reflex", reflex_2d, reflex_2d, False, reflex_2d_rating, reflex_2d_color, reflex_2d_label, f"Description: NVIDIA Reflex low-latency GPU queue pacing technology. Synchronizes CPU/GPU frame submission to eliminate input lag. Has 0 GB impact on VRAM allocation (acts purely on MainThread CPU latency and GPU clock pacing).\nCurrent: {reflex_2d}.\nRecommendation: Set to ON for optimal flight control responsiveness and efficiency (or ON+BOOST if GPU downclocking occurs).", ["ON", "ON+BOOST", "OFF"], page=1, tag_reason=reflex_2d_reason, rec_guidance="ON • Drains GPU queue and minimizes input latency", is_vr=False),
         make_setting_item("frame_generation", "Frame Generation", fg_2d, fg_2d_raw, False, "optimum" if fg_2d.startswith("DLSSG") else "acceptable", "emerald" if fg_2d.startswith("DLSSG") else "amber", "OPTIMUM" if fg_2d.startswith("DLSSG") else "ACCEPTABLE", f"Description: AI optical flow frame interpolation (DLSS 3 Frame Generation / FSR 3).\nCurrent: {fg_2d}.\nRecommendation: Keep ON (DLSSG 2X) in 2D mode for doubled motion smoothness without increasing CPU MainThread load.", ["DLSSG (2X)", "FSR3 (2X)", "OFF"], page=1, tag_reason="Doubles motion smoothness via optical flow without CPU overhead." if fg_2d.startswith("DLSSG") else "Frame generation is inactive; native rendering requires more CPU/GPU pacing.", rec_guidance="DLSSG (2X) • Doubles motion smoothness with zero CPU cost", is_vr=False),
         make_setting_item("framerate_multiplier", "Framerate Multiplier", "1 (2X Interpolation)" if not fg_2d.startswith("OFF") else "OFF (Inactive)", mult_2d, False, "optimum" if not fg_2d.startswith("OFF") else "acceptable", "emerald" if not fg_2d.startswith("OFF") else "amber", "OPTIMUM" if not fg_2d.startswith("OFF") else "INACTIVE", f"Description: Number of interpolated frames generated per native frame via Optical Flow Accelerator (OFA).\nCurrent: {'1 (2X Interpolation)' if not fg_2d.startswith('OFF') else 'OFF (Inactive)'}.\nRecommendation: Set to 1 (2X interpolation) when Frame Generation is active. Generates 1 AI frame per native frame with zero CPU MainThread cost.", ["1 (2X Interpolation)"] if not fg_2d.startswith("OFF") else ["OFF (Inactive)"], page=1, tag_reason="Standard 2X optical flow interpolation factor (1 generated frame per native frame)." if not fg_2d.startswith("OFF") else "Frame Generation is inactive; optical flow multiplier is idle.", rec_guidance="1 (2X) • Standard Optical Flow DLSS 3 multiplier", is_vr=False),

@@ -19737,7 +19737,7 @@ function openFrameLimiterConflictModal(fps2D, fpsVR, profileName) {
 
     const textEl = document.getElementById('opt-conflict-modal-text');
     if (textEl) {
-        textEl.innerHTML = `<b>Scenery X has detected that</b> both your 2D Display (<b>${fps2D} FPS</b>) and VR Headset (<b>${fpsVR} FPS</b>) Max Frame Rates are active. MSFS 2024 uses a single global <code>FrameLimiter</code> in its rendering pipeline and cannot enforce two different caps simultaneously.`;
+        textEl.innerHTML = `Scenery X has detected that both your 2D Display (${fps2D} FPS) and VR Headset (${fpsVR} FPS) Max Frame Rates are active. MSFS 2024 uses a single global <code>FrameLimiter</code> in its rendering pipeline and cannot enforce two different caps simultaneously. We recommend maintaining dedicated profiles (e.g. "2D Desktop" and "VR Headset") rather than a shared configuration.`;
     }
 
     const lbl2D = document.getElementById('opt-conflict-lbl-2d');
