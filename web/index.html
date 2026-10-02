@@ -3762,6 +3762,95 @@
         </div>
     </div>
 
+    <!-- MSFS FRAME LIMITER CONFLICT MODAL -->
+    <div id="opt-framelimiter-conflict-modal"
+         data-modal-id="opt-framelimiter-conflict-modal"
+         class="sceneryx-modal absolute hidden flex-col bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden z-[2600] select-none font-sans"
+         style="min-width: 440px; width: 560px; max-width: 95vw; height: auto; max-height: 90vh;">
+        <!-- Drag Handle Header -->
+        <div class="modal-header h-[42px] px-4 bg-slate-900/80 border-b border-slate-800 flex items-center justify-between cursor-move select-none shrink-0 gap-3">
+            <div class="flex items-center gap-2 min-w-0 flex-1">
+                <span class="typo-window-header text-amber-400 text-xs font-semibold tracking-wide uppercase shrink-0">ENGINE PIPELINE NOTICE //</span>
+                <span class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase truncate">MSFS Frame Limiter</span>
+            </div>
+            <button onclick="closeFrameLimiterConflictModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity">
+                <i class="fa-solid fa-xmark text-sm"></i>
+            </button>
+        </div>
+
+        <!-- Modal Body -->
+        <div class="modal-body flex-1 p-5 overflow-y-auto custom-scrollbar space-y-4 text-xs text-slate-200">
+            <!-- Alert Message: Starts strictly with "Scenery X has detected that..." -->
+            <div class="p-4 rounded-xl bg-amber-950/40 border border-amber-500/40 space-y-2">
+                <div class="flex items-center gap-2 text-amber-400 font-bold uppercase tracking-wide text-xs">
+                    <i class="fa-solid fa-triangle-exclamation text-sm"></i>
+                    <span>Shared Pipeline Conflict</span>
+                </div>
+                <p id="opt-conflict-modal-text" class="text-slate-200 leading-relaxed font-normal">
+                    Scenery X has detected that both your 2D Display and VR Headset Max Frame Rates are active. MSFS 2024 uses a single global FrameLimiter in its rendering pipeline and cannot enforce two different caps simultaneously.
+                </p>
+            </div>
+
+            <div class="p-3.5 rounded-xl bg-slate-950/80 border border-slate-800 space-y-1.5">
+                <div class="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Flight Rig Recommendation</div>
+                <p class="text-slate-300 leading-relaxed text-[11.5px]">
+                    Because the MSFS engine cannot dissociate 2D and VR frame rate caps at runtime, we strongly recommend maintaining dedicated profiles (e.g. <b>"2D Desktop"</b> and <b>"VR Headset"</b>) rather than a shared configuration.
+                </p>
+            </div>
+
+            <div class="space-y-2">
+                <div class="text-[11px] font-bold text-cyan-400 uppercase tracking-wider">Select the target to enforce for this profile:</div>
+                <div class="grid grid-cols-1 gap-2.5">
+                    <!-- Option 1: 2D Target -->
+                    <button id="opt-conflict-btn-2d" onclick="resolveFrameLimiterConflict('2D')" class="p-3.5 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 hover:border-cyan-500/60 text-left transition-all cursor-pointer group flex items-center justify-between">
+                        <div class="space-y-1">
+                            <div class="flex items-center gap-2">
+                                <span class="text-sm">🖥️</span>
+                                <span id="opt-conflict-lbl-2d" class="font-bold text-white group-hover:text-cyan-300">Enforce 2D Target</span>
+                                <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-cyan-900/80 text-cyan-300 uppercase">2D Mode</span>
+                            </div>
+                            <p class="text-[11px] text-slate-400">Sets engine FrameLimiter to the 2D sync target; turns OFF VR limiter for this profile.</p>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-slate-500 group-hover:text-cyan-400 transition-colors pl-2"></i>
+                    </button>
+
+                    <!-- Option 2: VR Target -->
+                    <button id="opt-conflict-btn-vr" onclick="resolveFrameLimiterConflict('VR')" class="p-3.5 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 hover:border-emerald-500/60 text-left transition-all cursor-pointer group flex items-center justify-between">
+                        <div class="space-y-1">
+                            <div class="flex items-center gap-2">
+                                <span class="text-sm">🥽</span>
+                                <span id="opt-conflict-lbl-vr" class="font-bold text-white group-hover:text-emerald-300">Enforce VR Target</span>
+                                <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-900/80 text-emerald-300 uppercase">VR Mode</span>
+                            </div>
+                            <p class="text-[11px] text-slate-400">Sets engine FrameLimiter to the VR sync target; turns OFF 2D limiter for this profile.</p>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-slate-500 group-hover:text-emerald-400 transition-colors pl-2"></i>
+                    </button>
+
+                    <!-- Option 3: Uncapped -->
+                    <button id="opt-conflict-btn-off" onclick="resolveFrameLimiterConflict('OFF')" class="p-3.5 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 hover:border-amber-500/60 text-left transition-all cursor-pointer group flex items-center justify-between">
+                        <div class="space-y-1">
+                            <div class="flex items-center gap-2">
+                                <span class="text-sm">⚡</span>
+                                <span class="font-bold text-white group-hover:text-amber-300">Run Uncapped (OFF)</span>
+                                <span class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-900/80 text-amber-300 uppercase">External Limiter</span>
+                            </div>
+                            <p class="text-[11px] text-slate-400">Disables MSFS internal limiter; ideal if pacing is governed by RivaTuner or NVIDIA CP.</p>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-slate-500 group-hover:text-amber-400 transition-colors pl-2"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="px-5 py-3 bg-slate-900/80 border-t border-slate-800 flex items-center justify-end gap-3 shrink-0">
+            <button onclick="closeFrameLimiterConflictModal()" class="px-4 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white typo-action-btn text-xs font-semibold uppercase transition-all cursor-pointer">
+                Cancel
+            </button>
+        </div>
+    </div>
+
     <!-- GLOBAL TOAST NOTIFICATION CONTAINER (CENTERED AT BOTTOM OF MAIN WINDOW) -->
     <div id="toast-container" class="fixed bottom-8 left-1/2 -translate-x-1/2 z-[99999] pointer-events-none flex flex-col items-center gap-2 max-w-[92vw] px-4 transition-all duration-200">
         <div id="sceneryx-toast" class="opacity-0 pointer-events-none transition-all duration-300 transform scale-95 px-5 py-3 rounded-xl flex items-center gap-3 text-xs font-semibold shadow-2xl border backdrop-blur-md max-w-full text-center"></div>

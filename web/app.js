@@ -17338,6 +17338,54 @@ async function onMsfsManualSettingSubmitted(settingKey, value, minVal, maxVal) {
     }
 }
 
+async function toggleBinaryMsfsSetting(key) {
+    if (!msfsSettingsMatrixData) return;
+    const modeNorm = String(currentMsfsGraphicsMode || '2D').toUpperCase();
+    let targetList = (modeNorm === 'VR') ? (msfsSettingsMatrixData.matrix_vr || []) :
+                     (modeNorm === 'COMMON') ? (msfsSettingsMatrixData.matrix_common || []) :
+                     (msfsSettingsMatrixData.matrix_2d || []);
+    let item = targetList.find(x => x.key === key);
+    if (!item && msfsSettingsMatrixData.matrix_common) {
+        item = msfsSettingsMatrixData.matrix_common.find(x => x.key === key);
+    }
+    if (!item) {
+        const fallbackList = (modeNorm === 'VR') ? (msfsSettingsMatrixData.matrix_2d || []) : (msfsSettingsMatrixData.matrix_vr || []);
+        item = fallbackList.find(x => x.key === key);
+    }
+    if (!item || !Array.isArray(item.options)) return;
+
+    const curValUpper = String(item.value || item.raw_value || '').trim().toUpperCase();
+    const isCurOn = curValUpper === 'ON' || curValUpper.startsWith('ON ') || curValUpper.startsWith('ON(') || String(item.raw_value) === '1' || curValUpper === 'TRUE';
+
+    const targetOpt = isCurOn 
+        ? (item.options.find(o => { const u = String(o).trim().toUpperCase(); return u === 'OFF' || u.startsWith('OFF ') || u.startsWith('OFF('); }) || 'OFF')
+        : (item.options.find(o => { const u = String(o).trim().toUpperCase(); return u === 'ON' || u.startsWith('ON ') || u.startsWith('ON('); }) || 'ON');
+
+    await onMsfsSettingChanged(key, targetOpt);
+}
+
+async function toggleMaxFrameRateSwitch(key) {
+    if (!msfsSettingsMatrixData) return;
+    const modeNorm = String(currentMsfsGraphicsMode || '2D').toUpperCase();
+    const targetList = (modeNorm === 'VR') ? (msfsSettingsMatrixData.matrix_vr || []) : (msfsSettingsMatrixData.matrix_2d || []);
+    const item = targetList.find(x => x.key === key);
+    if (!item) return;
+
+    const curNum = parseInt(String(item.raw_value || item.value).replace(/[^0-9]/g, '')) || 0;
+    const isCurActive = curNum > 0 && !String(item.value || '').toUpperCase().includes('OFF');
+
+    if (isCurActive) {
+        item._lastActiveFps = curNum;
+        await onMsfsManualSettingSubmitted(key, 'OFF', 0, 240);
+    } else {
+        let restoreVal = item._lastActiveFps;
+        if (!restoreVal || restoreVal <= 0) {
+            restoreVal = (modeNorm === 'VR') ? 45 : 82;
+        }
+        await onMsfsManualSettingSubmitted(key, String(restoreVal), 0, 240);
+    }
+}
+
 function toggleComboboxDropdown(key, event) {
     if (event) {
         event.stopPropagation();
@@ -18519,44 +18567,120 @@ function renderMsfsSettingsMatrix() {
                 <span class="text-slate-300 text-[10.5px] leading-tight" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${currentComboReason || 'Hover over a preset to preview its impact...'}</span>
             `;
 
-            inputHtml = `
-                <div class="relative w-full pt-0.5" id="opt-combo-wrapper-${item.key}">
-                    <input type="text"
-                           id="opt-combo-input-${item.key}"
-                           value="${displayVal}"
-                           style="color-scheme: dark;"
-                           onclick="toggleComboboxDropdown('${item.key}', event)"
-                           onfocus="this.select();"
-                           onkeydown="if(event.key==='Enter'){this.blur();}"
-                           onchange="onMsfsManualSettingSubmitted('${item.key}', this.value, ${item.min_val ?? 0}, ${item.max_val ?? 400})"
-                           class="w-full bg-slate-950 border border-slate-700/80 focus:border-cyan-400 rounded-xl pl-3 pr-10 py-2 typo-input-val text-xs ${valColorClass} font-semibold tabular-nums focus:outline-none cursor-pointer"
-                           placeholder="Select or enter value..."
-                           title="Select a preset from dropdown or enter custom value">
-                    <div class="cursor-pointer absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-white"
-                         onclick="toggleComboboxDropdown('${item.key}', event)">
-                        <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
-                        </svg>
-                    </div>
-                    <div id="opt-combo-menu-${item.key}"
-                         onwheel="event.stopPropagation();"
-                         style="overscroll-behavior: contain;"
-                         class="hidden fixed z-[99999] max-h-80 overflow-hidden bg-slate-900 border border-slate-700 rounded-xl shadow-2xl flex flex-col">
-                        <div class="py-1 divide-y divide-slate-800 overflow-y-auto max-h-56 custom-scrollbar flex-1">
-                            ${presetListItems}
+            if (item.key === 'max_frame_rate') {
+                const isFpsActive = !(displayVal === '0' || String(displayVal).toUpperCase() === 'OFF');
+                inputHtml = `
+                    <div class="flex items-center gap-2 w-full pt-0.5">
+                        <div class="relative flex-1" id="opt-combo-wrapper-${item.key}">
+                            <input type="text"
+                                   id="opt-combo-input-${item.key}"
+                                   value="${displayVal}"
+                                   style="color-scheme: dark;"
+                                   onclick="toggleComboboxDropdown('${item.key}', event)"
+                                   onfocus="this.select();"
+                                   onkeydown="if(event.key==='Enter'){this.blur();}"
+                                   onchange="onMsfsManualSettingSubmitted('${item.key}', this.value, ${item.min_val ?? 0}, ${item.max_val ?? 400})"
+                                   class="w-full bg-slate-950 border border-slate-700/80 focus:border-cyan-400 rounded-xl pl-3 pr-10 py-2 typo-input-val text-xs ${valColorClass} font-semibold tabular-nums focus:outline-none cursor-pointer"
+                                   placeholder="Select or enter value..."
+                                   title="Select a preset from dropdown or enter custom value">
+                            <div class="cursor-pointer absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-white"
+                                 onclick="toggleComboboxDropdown('${item.key}', event)">
+                                <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                </svg>
+                            </div>
+                            <div id="opt-combo-menu-${item.key}"
+                                 onwheel="event.stopPropagation();"
+                                 style="overscroll-behavior: contain;"
+                                 class="hidden fixed z-[99999] max-h-80 overflow-hidden bg-slate-900 border border-slate-700 rounded-xl shadow-2xl flex flex-col">
+                                <div class="py-1 divide-y divide-slate-800 overflow-y-auto max-h-56 custom-scrollbar flex-1">
+                                    ${presetListItems}
+                                </div>
+                                <div id="opt-combo-preview-${item.key}"
+                                     class="px-3 py-2 text-[10.5px] leading-tight bg-slate-950/95 border-t border-slate-800 text-slate-300 min-h-[38px] flex items-center gap-1.5 shrink-0 rounded-b-xl">
+                                    ${defaultComboPreviewHtml}
+                                </div>
+                            </div>
                         </div>
-                        <div id="opt-combo-preview-${item.key}"
-                             class="px-3 py-2 text-[10.5px] leading-tight bg-slate-950/95 border-t border-slate-800 text-slate-300 min-h-[38px] flex items-center gap-1.5 shrink-0 rounded-b-xl">
-                            ${defaultComboPreviewHtml}
+                        <div id="opt-switch-container-${item.key}"
+                             onclick="toggleMaxFrameRateSwitch('${item.key}')" 
+                             class="relative inline-flex items-center shrink-0 cursor-pointer p-1 rounded-xl hover:bg-slate-800 transition-colors"
+                             title="${isFpsActive ? 'Click to disable frame limiter (OFF)' : 'Click to enable frame limiter'}">
+                            <div id="opt-switch-track-${item.key}" class="w-10 h-5 rounded-full transition-colors duration-200 ease-in-out p-0.5 ${isFpsActive ? 'bg-emerald-600 shadow-sm' : 'bg-slate-700'}">
+                                <div id="opt-switch-thumb-${item.key}" class="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out ${isFpsActive ? 'translate-x-5' : 'translate-x-0'}"></div>
+                            </div>
                         </div>
                     </div>
-                </div>
-            `;
+                `;
+            } else {
+                inputHtml = `
+                    <div class="relative w-full pt-0.5" id="opt-combo-wrapper-${item.key}">
+                        <input type="text"
+                               id="opt-combo-input-${item.key}"
+                               value="${displayVal}"
+                               style="color-scheme: dark;"
+                               onclick="toggleComboboxDropdown('${item.key}', event)"
+                               onfocus="this.select();"
+                               onkeydown="if(event.key==='Enter'){this.blur();}"
+                               onchange="onMsfsManualSettingSubmitted('${item.key}', this.value, ${item.min_val ?? 0}, ${item.max_val ?? 400})"
+                               class="w-full bg-slate-950 border border-slate-700/80 focus:border-cyan-400 rounded-xl pl-3 pr-10 py-2 typo-input-val text-xs ${valColorClass} font-semibold tabular-nums focus:outline-none cursor-pointer"
+                               placeholder="Select or enter value..."
+                               title="Select a preset from dropdown or enter custom value">
+                        <div class="cursor-pointer absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-white"
+                             onclick="toggleComboboxDropdown('${item.key}', event)">
+                            <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                        <div id="opt-combo-menu-${item.key}"
+                             onwheel="event.stopPropagation();"
+                             style="overscroll-behavior: contain;"
+                             class="hidden fixed z-[99999] max-h-80 overflow-hidden bg-slate-900 border border-slate-700 rounded-xl shadow-2xl flex flex-col">
+                            <div class="py-1 divide-y divide-slate-800 overflow-y-auto max-h-56 custom-scrollbar flex-1">
+                                ${presetListItems}
+                            </div>
+                            <div id="opt-combo-preview-${item.key}"
+                                 class="px-3 py-2 text-[10.5px] leading-tight bg-slate-950/95 border-t border-slate-800 text-slate-300 min-h-[38px] flex items-center gap-1.5 shrink-0 rounded-b-xl">
+                                ${defaultComboPreviewHtml}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
         } else {
-            let displayVal = item.value || item.raw_value || '';
-            let currentReason = item.tag_reason || item.rating_reason || '';
-            let currentRating = item.rating || 'acceptable';
-            let currentTag = (item.tag_badge || item.rating_label || cleanTag).toUpperCase();
+            const isBinary = Array.isArray(item.options) && item.options.length === 2 &&
+                item.options.some(o => {
+                    const u = String(o).trim().toUpperCase();
+                    return u === 'ON' || u.startsWith('ON ') || u.startsWith('ON(');
+                }) &&
+                item.options.some(o => {
+                    const u = String(o).trim().toUpperCase();
+                    return u === 'OFF' || u.startsWith('OFF ') || u.startsWith('OFF(');
+                });
+
+            if (isBinary) {
+                const curValUpper = String(item.value || item.raw_value || '').trim().toUpperCase();
+                const isCurOn = curValUpper === 'ON' || curValUpper.startsWith('ON ') || curValUpper.startsWith('ON(') || String(item.raw_value) === '1' || curValUpper === 'TRUE';
+                inputHtml = `
+                    <div class="relative w-full pt-0.5">
+                        <div id="opt-switch-container-${item.key}"
+                             onclick="toggleBinaryMsfsSetting('${item.key}')"
+                             class="w-full bg-slate-950 border border-slate-700/80 hover:border-slate-600 rounded-xl px-3 py-2 cursor-pointer flex items-center justify-between select-none transition-colors group"
+                             title="${isCurOn ? 'Click to turn OFF' : 'Click to turn ON'}">
+                            <span id="opt-switch-label-${item.key}" class="typo-input-val text-xs font-semibold ${isCurOn ? 'text-emerald-400' : 'text-slate-400'}">${isCurOn ? 'ON' : 'OFF'}</span>
+                            <div class="relative inline-flex items-center shrink-0">
+                                <div id="opt-switch-track-${item.key}" class="w-10 h-5 rounded-full transition-colors duration-200 ease-in-out p-0.5 ${isCurOn ? 'bg-emerald-600 shadow-sm' : 'bg-slate-700'}">
+                                    <div id="opt-switch-thumb-${item.key}" class="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out ${isCurOn ? 'translate-x-5' : 'translate-x-0'}"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                let displayVal = item.value || item.raw_value || '';
+                let currentReason = item.tag_reason || item.rating_reason || '';
+                let currentRating = item.rating || 'acceptable';
+                let currentTag = (item.tag_badge || item.rating_label || cleanTag).toUpperCase();
 
             let optionsHtml = '';
             if (Array.isArray(item.options)) {
@@ -18651,6 +18775,7 @@ function renderMsfsSettingsMatrix() {
                     </div>
                 </div>
             `;
+            }
         }
 
         return `
@@ -18824,6 +18949,30 @@ async function onMsfsSettingChanged(settingKey, newValue) {
                         <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${badgeClass} shrink-0">${cleanTag}</span>
                         <span class="text-slate-300 text-[10.5px] leading-tight" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${found.tag_reason || found.rating_reason || ''}</span>
                     `;
+                }
+
+                // Immediately synchronize Toggle Switch state in the DOM if this setting has a switch
+                const switchLabel = document.getElementById(`opt-switch-label-${settingKey}`);
+                const switchTrack = document.getElementById(`opt-switch-track-${settingKey}`);
+                const switchThumb = document.getElementById(`opt-switch-thumb-${settingKey}`);
+                const switchCont = document.getElementById(`opt-switch-container-${settingKey}`);
+
+                const isNewActive = (settingKey === 'max_frame_rate')
+                    ? (String(newValue) !== '0' && String(newValue).toUpperCase() !== 'OFF')
+                    : (String(newValue).trim().toUpperCase().startsWith('ON') || String(newValue) === '1' || String(newValue).trim().toUpperCase() === 'TRUE');
+
+                if (switchLabel) {
+                    switchLabel.textContent = (settingKey === 'max_frame_rate') ? (isNewActive ? `${newValue} FPS` : 'OFF') : (isNewActive ? 'ON' : 'OFF');
+                    switchLabel.className = `typo-input-val text-xs font-semibold ${isNewActive ? 'text-emerald-400' : 'text-slate-400'}`;
+                }
+                if (switchTrack) {
+                    switchTrack.className = `w-10 h-5 rounded-full transition-colors duration-200 ease-in-out p-0.5 ${isNewActive ? 'bg-emerald-600 shadow-sm' : 'bg-slate-700'}`;
+                }
+                if (switchThumb) {
+                    switchThumb.className = `w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out ${isNewActive ? 'translate-x-5' : 'translate-x-0'}`;
+                }
+                if (switchCont) {
+                    switchCont.title = isNewActive ? 'Click to disable (OFF)' : 'Click to enable (ON)';
                 }
             }
 
@@ -19579,6 +19728,82 @@ function handleProfileInputBlur() {
     }
 }
 
+let pendingConflictProfileName = null;
+
+function openFrameLimiterConflictModal(fps2D, fpsVR, profileName) {
+    pendingConflictProfileName = profileName;
+    const modal = document.getElementById('opt-framelimiter-conflict-modal');
+    if (!modal) return;
+
+    const textEl = document.getElementById('opt-conflict-modal-text');
+    if (textEl) {
+        textEl.innerHTML = `<b>Scenery X has detected that</b> both your 2D Display (<b>${fps2D} FPS</b>) and VR Headset (<b>${fpsVR} FPS</b>) Max Frame Rates are active. MSFS 2024 uses a single global <code>FrameLimiter</code> in its rendering pipeline and cannot enforce two different caps simultaneously.`;
+    }
+
+    const lbl2D = document.getElementById('opt-conflict-lbl-2d');
+    if (lbl2D) lbl2D.textContent = `Enforce 2D Target (${fps2D} FPS)`;
+
+    const lblVR = document.getElementById('opt-conflict-lbl-vr');
+    if (lblVR) lblVR.textContent = `Enforce VR Target (${fpsVR} FPS)`;
+
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+    if (window.windowManager) {
+        windowManager.bringToFront(modal);
+        windowManager.centerModal(modal);
+    }
+}
+
+function closeFrameLimiterConflictModal() {
+    const modal = document.getElementById('opt-framelimiter-conflict-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+    pendingConflictProfileName = null;
+}
+
+async function resolveFrameLimiterConflict(choice) {
+    const profName = pendingConflictProfileName;
+    closeFrameLimiterConflictModal();
+    if (!profName) return;
+
+    if (choice === '2D') {
+        // Enforce 2D target: Turn off VR limiter
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.update_msfs_setting) {
+            await window.pywebview.api.update_msfs_setting('VR', 'max_frame_rate', 'OFF');
+        }
+        if (msfsSettingsMatrixData && msfsSettingsMatrixData.matrix_vr) {
+            const itVR = msfsSettingsMatrixData.matrix_vr.find(x => x.key === 'max_frame_rate');
+            if (itVR) { itVR.value = 'OFF'; itVR.raw_value = '0'; }
+        }
+    } else if (choice === 'VR') {
+        // Enforce VR target: Turn off 2D limiter
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.update_msfs_setting) {
+            await window.pywebview.api.update_msfs_setting('2D', 'max_frame_rate', 'OFF');
+        }
+        if (msfsSettingsMatrixData && msfsSettingsMatrixData.matrix_2d) {
+            const it2D = msfsSettingsMatrixData.matrix_2d.find(x => x.key === 'max_frame_rate');
+            if (it2D) { it2D.value = 'OFF'; it2D.raw_value = '0'; }
+        }
+    } else if (choice === 'OFF') {
+        // Run Uncapped: Turn off both
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.update_msfs_setting) {
+            await window.pywebview.api.update_msfs_setting('2D', 'max_frame_rate', 'OFF');
+            await window.pywebview.api.update_msfs_setting('VR', 'max_frame_rate', 'OFF');
+        }
+        if (msfsSettingsMatrixData) {
+            const it2D = (msfsSettingsMatrixData.matrix_2d || []).find(x => x.key === 'max_frame_rate');
+            if (it2D) { it2D.value = 'OFF'; it2D.raw_value = '0'; }
+            const itVR = (msfsSettingsMatrixData.matrix_vr || []).find(x => x.key === 'max_frame_rate');
+            if (itVR) { itVR.value = 'OFF'; itVR.raw_value = '0'; }
+        }
+    }
+
+    await executeSaveCurrentCustomProfile(profName);
+    await loadRigDiagnostics();
+}
+
 async function saveCurrentCustomProfile() {
     const input = document.getElementById('opt-profile-universal-input');
     let name = input ? input.value.trim() : '';
@@ -19587,6 +19812,28 @@ async function saveCurrentCustomProfile() {
         name = `Profile_${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}h${String(now.getMinutes()).padStart(2,'0')}`;
     }
 
+    // Check for 2D vs VR Max Frame Rate collision
+    if (msfsSettingsMatrixData) {
+        const item2D = (msfsSettingsMatrixData.matrix_2d || []).find(x => x.key === 'max_frame_rate');
+        const itemVR = (msfsSettingsMatrixData.matrix_vr || []).find(x => x.key === 'max_frame_rate');
+
+        const num2D = item2D ? (parseInt(String(item2D.raw_value || item2D.value).replace(/[^0-9]/g, '')) || 0) : 0;
+        const is2DOn = num2D > 0 && !String(item2D?.value || '').toUpperCase().includes('OFF');
+
+        const numVR = itemVR ? (parseInt(String(itemVR.raw_value || itemVR.value).replace(/[^0-9]/g, '')) || 0) : 0;
+        const isVROn = numVR > 0 && !String(itemVR?.value || '').toUpperCase().includes('OFF');
+
+        if (is2DOn && isVROn && num2D !== numVR) {
+            openFrameLimiterConflictModal(num2D, numVR, name);
+            return;
+        }
+    }
+
+    await executeSaveCurrentCustomProfile(name);
+}
+
+async function executeSaveCurrentCustomProfile(name) {
+    const input = document.getElementById('opt-profile-universal-input');
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.save_custom_profile) return;
     try {
         const resStr = await window.pywebview.api.save_custom_profile(name);

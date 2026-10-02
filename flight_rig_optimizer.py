@@ -1653,7 +1653,17 @@ def apply_setting_to_content(content: str, mode: str, setting_key: str, new_valu
         clean_val = str(new_value).replace('FPS', '').replace('Unlocked', '0').replace('OFF', '0').replace('off', '0').strip()
         content = re.sub(rf'({k}\s+)[^\r\n]+', rf'\g<1>{clean_val}', content, flags=re.IGNORECASE)
         # Always synchronize engine-level FrameLimiter in UserCfg.opt with active mode's target (2D or VR)
-        content = re.sub(r'(FrameLimiter\s+)[^\r\n]+', rf'\g<1>{clean_val}', content, flags=re.IGNORECASE)
+        limiter_val = clean_val
+        if limiter_val == '0':
+            other_k = 'TargetFrameRateVR' if mode == '2D' else 'TargetFrameRate'
+            m_other = re.search(rf'{other_k}\s+([-\d]+)', content, flags=re.IGNORECASE)
+            other_val = m_other.group(1) if m_other else '0'
+            if other_val != '0':
+                limiter_val = other_val
+        if re.search(r'(FrameLimiter\s+)[^\r\n]+', content, flags=re.IGNORECASE):
+            content = re.sub(r'(FrameLimiter\s+)[^\r\n]+', rf'\g<1>{limiter_val}', content, flags=re.IGNORECASE)
+        else:
+            content = re.sub(r'(\}\s*\{Graphics)', rf'\tFrameLimiter {limiter_val}\n\1', content, count=1)
 
     # 3. Frame Generation
     elif setting_key in ['frame_generation', 'FrameGeneration']:
