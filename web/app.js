@@ -17330,6 +17330,20 @@ async function onMsfsManualSettingSubmitted(settingKey, value, minVal, maxVal) {
         cleanVal = String(Math.round(num));
     }
 
+    if (settingKey === 'max_frame_rate') {
+        const modeNorm = String(currentMsfsGraphicsMode || '2D').toUpperCase();
+        const targetList = (modeNorm === 'VR') ? (msfsSettingsMatrixData?.matrix_vr || []) : (msfsSettingsMatrixData?.matrix_2d || []);
+        const item = targetList ? targetList.find(x => x.key === settingKey) : null;
+        if (item) {
+            if (cleanVal !== '0') {
+                item.is_active = true;
+                item._lastActiveFps = parseInt(cleanVal) || 82;
+            } else {
+                item.is_active = false;
+            }
+        }
+    }
+
     isManualSettingUpdating = true;
     try {
         await onMsfsSettingChanged(settingKey, cleanVal);
@@ -17371,16 +17385,32 @@ async function toggleMaxFrameRateSwitch(key) {
     const item = targetList.find(x => x.key === key);
     if (!item) return;
 
-    const curNum = parseInt(String(item.raw_value || item.value).replace(/[^0-9]/g, '')) || 0;
-    const isCurActive = curNum > 0 && !String(item.value || '').toUpperCase().includes('OFF');
+    const inputElem = document.getElementById(`opt-combo-input-${key}`);
+    const inputVal = inputElem ? parseInt(inputElem.value.replace(/[^0-9]/g, '')) : 0;
+    const curNum = inputVal || parseInt(String(item.raw_value || item.value).replace(/[^0-9]/g, '')) || item._lastActiveFps || (item.target_fps ? parseInt(item.target_fps) : 0) || (modeNorm === 'VR' ? 45 : 82);
+    const isCurActive = (item.is_active !== undefined) ? item.is_active : (curNum > 0 && item.raw_value !== '0' && !String(item.value || '').toUpperCase().includes('OFF'));
 
     if (isCurActive) {
         item._lastActiveFps = curNum;
+        item.is_active = false;
+        if (inputElem) {
+            inputElem.value = String(curNum);
+            inputElem.classList.remove('text-emerald-400', 'text-amber-400', 'text-orange-400', 'text-rose-400');
+            inputElem.classList.add('text-slate-500', 'opacity-60');
+            inputElem.title = 'Frame limiter is disabled (OFF) - Target preserved';
+        }
         await onMsfsManualSettingSubmitted(key, 'OFF', 0, 240);
     } else {
-        let restoreVal = item._lastActiveFps;
+        item.is_active = true;
+        let restoreVal = item._lastActiveFps || curNum;
         if (!restoreVal || restoreVal <= 0) {
             restoreVal = (modeNorm === 'VR') ? 45 : 82;
+        }
+        if (inputElem) {
+            inputElem.value = String(restoreVal);
+            inputElem.classList.remove('text-slate-500', 'opacity-60');
+            inputElem.classList.add('text-emerald-400');
+            inputElem.title = 'Target frame rate active';
         }
         await onMsfsManualSettingSubmitted(key, String(restoreVal), 0, 240);
     }
@@ -17444,8 +17474,24 @@ function closeAllComboboxes() {
 
 function selectComboboxPreset(key, value, minVal, maxVal) {
     const input = document.getElementById(`opt-combo-input-${key}`);
-    if (input) input.value = value;
+    if (input) {
+        input.value = value;
+        if (key === 'max_frame_rate') {
+            input.classList.remove('text-slate-500', 'opacity-60');
+            input.classList.add('text-emerald-400');
+            input.title = 'Target frame rate active';
+        }
+    }
     closeAllComboboxes();
+    if (key === 'max_frame_rate') {
+        const modeNorm = String(currentMsfsGraphicsMode || '2D').toUpperCase();
+        const targetList = (modeNorm === 'VR') ? (msfsSettingsMatrixData?.matrix_vr || []) : (msfsSettingsMatrixData?.matrix_2d || []);
+        const item = targetList ? targetList.find(x => x.key === key) : null;
+        if (item) {
+            item.is_active = true;
+            item._lastActiveFps = parseInt(String(value).replace(/[^0-9]/g, '')) || 82;
+        }
+    }
     onMsfsManualSettingSubmitted(key, value, minVal, maxVal);
 }
 
@@ -18425,7 +18471,9 @@ function renderMsfsSettingsMatrix() {
     const renderCard = (item) => {
         // Enforce clean, single-word uppercase tag without any parentheses
         let cleanTag = (item.rating_label || 'OPTIMUM').toUpperCase().replace(/\(.*?\)/g, '').replace(/[^A-Z]/g, '').trim();
-        if (cleanTag.includes('HAZARD') || cleanTag.includes('NOGO') || cleanTag.includes('RISK') || cleanTag.includes('ALERT')) {
+        if (cleanTag.includes('OFF') || item.is_active === false || ((item.key === 'max_frame_rate') && (item.value === 'OFF' || item.raw_value === '0'))) {
+            cleanTag = 'OFF';
+        } else if (cleanTag.includes('HAZARD') || cleanTag.includes('NOGO') || cleanTag.includes('RISK') || cleanTag.includes('ALERT')) {
             cleanTag = 'HAZARD';
         } else if (cleanTag.includes('SUB') || cleanTag.includes('MISMATCH')) {
             cleanTag = 'SUBOPTIMAL';
@@ -18438,7 +18486,10 @@ function renderMsfsSettingsMatrix() {
         // Solid background colors without stroke or glass effects
         let badgeColorClass = 'bg-emerald-600 text-white font-bold';
         let valColorClass = 'text-emerald-400';
-        if (item.rating_color === 'yellow' || item.rating_color === 'amber' || cleanTag === 'ACCEPTABLE') {
+        if (cleanTag === 'OFF') {
+            badgeColorClass = 'bg-slate-700 text-slate-300 font-bold';
+            valColorClass = 'text-slate-500 opacity-60';
+        } else if (item.rating_color === 'yellow' || item.rating_color === 'amber' || cleanTag === 'ACCEPTABLE') {
             badgeColorClass = 'bg-amber-600 text-white font-bold';
             valColorClass = 'text-amber-400';
         } else if (item.rating_color === 'orange' || cleanTag === 'SUBOPTIMAL') {
@@ -18501,7 +18552,15 @@ function renderMsfsSettingsMatrix() {
         } else if (item.is_numeric) {
             let displayVal = item.raw_value;
             if (item.key === 'max_frame_rate') {
-                displayVal = (item.raw_value === '0' || item.value === '0' || String(item.value).toUpperCase() === 'OFF' || String(item.value).toLowerCase().includes('unlocked')) ? 'OFF' : item.raw_value;
+                const isOff = (item.is_active === false) || item.raw_value === '0' || item.value === '0' || String(item.value).toUpperCase() === 'OFF' || String(item.value).toLowerCase().includes('unlocked');
+                const defaultTargetFps = (String(currentMsfsGraphicsMode || '2D').toUpperCase() === 'VR') ? '45' : '82';
+                if (isOff) {
+                    displayVal = item._lastActiveFps || (item.target_fps ? String(item.target_fps) : '') || (item.raw_value && item.raw_value !== '0' ? item.raw_value : defaultTargetFps);
+                    if (!item._lastActiveFps) item._lastActiveFps = displayVal;
+                } else {
+                    displayVal = item.raw_value || String(item.value).replace(/[^0-9]/g, '') || defaultTargetFps;
+                    item._lastActiveFps = displayVal;
+                }
             } else if (item.key === 'sharpen_amount_vr') {
                 const flt = parseFloat(item.value !== undefined ? item.value : (item.raw_value || 0));
                 displayVal = isNaN(flt) ? '0.20' : flt.toFixed(2);
@@ -18515,7 +18574,12 @@ function renderMsfsSettingsMatrix() {
             let currentComboTag = (item.tag_badge || item.rating_label || cleanTag).toUpperCase();
 
             if (Array.isArray(item.options)) {
-                presetListItems = item.options.map(opt => {
+                // Filter out 'OFF' from choices when the setting has an ON/OFF toggle switch (e.g. max_frame_rate)
+                const filteredOptions = (item.key === 'max_frame_rate')
+                    ? item.options.filter(opt => String(opt).trim().toUpperCase() !== 'OFF')
+                    : item.options;
+
+                presetListItems = filteredOptions.map(opt => {
                     const isCur = String(opt).toUpperCase() === String(displayVal).toUpperCase();
                     const optData = (item.option_ratings && item.option_ratings[opt]) ? item.option_ratings[opt] : null;
                     const optRating = optData ? optData.rating : 'acceptable';
@@ -18568,7 +18632,8 @@ function renderMsfsSettingsMatrix() {
             `;
 
             if (item.key === 'max_frame_rate') {
-                const isFpsActive = !(displayVal === '0' || String(displayVal).toUpperCase() === 'OFF');
+                const isFpsActive = !(item.is_active === false || item.raw_value === '0' || item.value === '0' || String(item.value).toUpperCase() === 'OFF' || String(item.value).toLowerCase().includes('unlocked'));
+                const fpsInputColor = isFpsActive ? 'text-emerald-400' : 'text-slate-500 opacity-60';
                 inputHtml = `
                     <div class="flex items-center gap-2 w-full pt-0.5">
                         <div class="relative flex-1" id="opt-combo-wrapper-${item.key}">
@@ -18580,9 +18645,9 @@ function renderMsfsSettingsMatrix() {
                                    onfocus="this.select();"
                                    onkeydown="if(event.key==='Enter'){this.blur();}"
                                    onchange="onMsfsManualSettingSubmitted('${item.key}', this.value, ${item.min_val ?? 0}, ${item.max_val ?? 400})"
-                                   class="w-full bg-slate-950 border border-slate-700/80 focus:border-cyan-400 rounded-xl pl-3 pr-10 py-2 typo-input-val text-xs ${valColorClass} font-semibold tabular-nums focus:outline-none cursor-pointer"
+                                   class="w-full bg-slate-950 border border-slate-700/80 focus:border-cyan-400 rounded-xl pl-3 pr-10 py-2 typo-input-val text-xs ${fpsInputColor} font-semibold tabular-nums focus:outline-none cursor-pointer transition-colors"
                                    placeholder="Select or enter value..."
-                                   title="Select a preset from dropdown or enter custom value">
+                                   title="${isFpsActive ? 'Target frame rate active' : 'Frame limiter is disabled (OFF) - Target preserved'}">
                             <div class="cursor-pointer absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-white"
                                  onclick="toggleComboboxDropdown('${item.key}', event)">
                                 <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
@@ -18835,7 +18900,17 @@ async function onMsfsSettingChanged(settingKey, newValue) {
                 lookupKey = 'OFF';
                 found.value = 'OFF';
                 found.raw_value = '0';
+                found.is_active = false;
+                found.rating_label = 'OFF';
+                found.tag_badge = 'OFF';
+                found.rating = 'acceptable';
+                found.rating_color = 'slate';
+                found.tag_reason = 'Max frame rate limiter is OFF (uncapped).';
             } else {
+                if (settingKey === 'max_frame_rate') {
+                    found.is_active = true;
+                    found._lastActiveFps = parseInt(String(newValue).replace(/[^0-9]/g, '')) || 82;
+                }
                 found.value = newValue;
                 found.raw_value = newValue;
             }
@@ -18891,9 +18966,15 @@ async function onMsfsSettingChanged(settingKey, newValue) {
             const customPreview = document.getElementById(`opt-custom-preview-${settingKey}`);
             const comboPreview = document.getElementById(`opt-combo-preview-${settingKey}`);
 
+            const isNewActive = (settingKey === 'max_frame_rate')
+                ? (String(newValue) !== '0' && String(newValue).toUpperCase() !== 'OFF')
+                : (String(newValue).trim().toUpperCase().startsWith('ON') || String(newValue) === '1' || String(newValue).trim().toUpperCase() === 'TRUE');
+
             if (badgeEl) {
                 let cleanTag = (found.tag_badge || found.rating_label || found.rating || 'OPTIMUM').toUpperCase();
-                if (cleanTag.includes('HAZARD') || cleanTag.includes('NOGO') || cleanTag.includes('RISK') || cleanTag.includes('ALERT')) {
+                if (cleanTag.includes('OFF') || (settingKey === 'max_frame_rate' && !isNewActive)) {
+                    cleanTag = 'OFF';
+                } else if (cleanTag.includes('HAZARD') || cleanTag.includes('NOGO') || cleanTag.includes('RISK') || cleanTag.includes('ALERT')) {
                     cleanTag = 'HAZARD';
                 } else if (cleanTag.includes('SUB') || cleanTag.includes('MISMATCH')) {
                     cleanTag = 'SUBOPTIMAL';
@@ -18905,7 +18986,10 @@ async function onMsfsSettingChanged(settingKey, newValue) {
                 badgeEl.textContent = cleanTag;
                 let badgeClass = 'bg-emerald-600 text-white font-bold';
                 let textClass = 'text-emerald-400';
-                if (found.rating_color === 'yellow' || found.rating_color === 'amber' || cleanTag === 'ACCEPTABLE') {
+                if (cleanTag === 'OFF') {
+                    badgeClass = 'bg-slate-700 text-slate-300 font-bold';
+                    textClass = 'text-slate-500 opacity-60';
+                } else if (found.rating_color === 'yellow' || found.rating_color === 'amber' || cleanTag === 'ACCEPTABLE') {
                     badgeClass = 'bg-amber-600 text-white font-bold';
                     textClass = 'text-amber-400';
                 } else if (found.rating_color === 'orange' || cleanTag === 'SUBOPTIMAL') {
@@ -18920,16 +19004,31 @@ async function onMsfsSettingChanged(settingKey, newValue) {
                     badgeEl.title = found.tag_reason || found.rating_reason;
                 }
                 if (selectEl) {
-                    selectEl.classList.remove('text-emerald-400', 'text-amber-400', 'text-orange-400', 'text-rose-400');
+                    selectEl.classList.remove('text-emerald-400', 'text-amber-400', 'text-orange-400', 'text-rose-400', 'text-slate-500', 'opacity-60');
                     selectEl.classList.add(textClass);
                 }
                 if (inputEl) {
-                    inputEl.value = newValue;
-                    inputEl.classList.remove('text-emerald-400', 'text-amber-400', 'text-orange-400', 'text-rose-400');
-                    inputEl.classList.add(textClass);
+                    if (settingKey === 'max_frame_rate') {
+                        if (isNewActive) {
+                            inputEl.value = String(newValue).replace(/[^0-9]/g, '') || inputEl.value;
+                            inputEl.classList.remove('text-slate-500', 'opacity-60', 'text-amber-400', 'text-orange-400', 'text-rose-400');
+                            inputEl.classList.add('text-emerald-400');
+                            inputEl.title = 'Target frame rate active';
+                        } else {
+                            const fallbackVal = found._lastActiveFps || inputEl.value.replace(/[^0-9]/g, '') || (String(currentMsfsGraphicsMode || '2D').toUpperCase() === 'VR' ? '45' : '82');
+                            inputEl.value = fallbackVal;
+                            inputEl.classList.remove('text-emerald-400', 'text-amber-400', 'text-orange-400', 'text-rose-400');
+                            inputEl.classList.add('text-slate-500', 'opacity-60');
+                            inputEl.title = 'Frame limiter is disabled (OFF) - Target preserved';
+                        }
+                    } else {
+                        inputEl.value = newValue;
+                        inputEl.classList.remove('text-emerald-400', 'text-amber-400', 'text-orange-400', 'text-rose-400', 'text-slate-500', 'opacity-60');
+                        inputEl.classList.add(textClass);
+                    }
                 }
                 if (customBtn) {
-                    customBtn.classList.remove('text-emerald-400', 'text-amber-400', 'text-orange-400', 'text-rose-400');
+                    customBtn.classList.remove('text-emerald-400', 'text-amber-400', 'text-orange-400', 'text-rose-400', 'text-slate-500', 'opacity-60');
                     customBtn.classList.add(textClass);
                     if (found.tag_reason || found.rating_reason) {
                         customBtn.title = found.tag_reason || found.rating_reason;
@@ -18957,10 +19056,6 @@ async function onMsfsSettingChanged(settingKey, newValue) {
                 const switchThumb = document.getElementById(`opt-switch-thumb-${settingKey}`);
                 const switchCont = document.getElementById(`opt-switch-container-${settingKey}`);
 
-                const isNewActive = (settingKey === 'max_frame_rate')
-                    ? (String(newValue) !== '0' && String(newValue).toUpperCase() !== 'OFF')
-                    : (String(newValue).trim().toUpperCase().startsWith('ON') || String(newValue) === '1' || String(newValue).trim().toUpperCase() === 'TRUE');
-
                 if (switchLabel) {
                     switchLabel.textContent = (settingKey === 'max_frame_rate') ? (isNewActive ? `${newValue} FPS` : 'OFF') : (isNewActive ? 'ON' : 'OFF');
                     switchLabel.className = `typo-input-val text-xs font-semibold ${isNewActive ? 'text-emerald-400' : 'text-slate-400'}`;
@@ -18972,7 +19067,7 @@ async function onMsfsSettingChanged(settingKey, newValue) {
                     switchThumb.className = `w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out ${isNewActive ? 'translate-x-5' : 'translate-x-0'}`;
                 }
                 if (switchCont) {
-                    switchCont.title = isNewActive ? 'Click to disable (OFF)' : 'Click to enable (ON)';
+                    switchCont.title = isNewActive ? 'Click to disable frame limiter (OFF)' : 'Click to enable frame limiter';
                 }
             }
 
@@ -19775,7 +19870,12 @@ async function resolveFrameLimiterConflict(choice) {
         }
         if (msfsSettingsMatrixData && msfsSettingsMatrixData.matrix_vr) {
             const itVR = msfsSettingsMatrixData.matrix_vr.find(x => x.key === 'max_frame_rate');
-            if (itVR) { itVR.value = 'OFF'; itVR.raw_value = '0'; }
+            if (itVR) {
+                if (!itVR._lastActiveFps) itVR._lastActiveFps = parseInt(String(itVR.raw_value || itVR.value).replace(/[^0-9]/g, '')) || 45;
+                itVR.value = 'OFF';
+                itVR.raw_value = '0';
+                itVR.is_active = false;
+            }
         }
     } else if (choice === 'VR') {
         // Enforce VR target: Turn off 2D limiter
@@ -19784,7 +19884,12 @@ async function resolveFrameLimiterConflict(choice) {
         }
         if (msfsSettingsMatrixData && msfsSettingsMatrixData.matrix_2d) {
             const it2D = msfsSettingsMatrixData.matrix_2d.find(x => x.key === 'max_frame_rate');
-            if (it2D) { it2D.value = 'OFF'; it2D.raw_value = '0'; }
+            if (it2D) {
+                if (!it2D._lastActiveFps) it2D._lastActiveFps = parseInt(String(it2D.raw_value || it2D.value).replace(/[^0-9]/g, '')) || 82;
+                it2D.value = 'OFF';
+                it2D.raw_value = '0';
+                it2D.is_active = false;
+            }
         }
     } else if (choice === 'OFF') {
         // Run Uncapped: Turn off both
@@ -19794,9 +19899,19 @@ async function resolveFrameLimiterConflict(choice) {
         }
         if (msfsSettingsMatrixData) {
             const it2D = (msfsSettingsMatrixData.matrix_2d || []).find(x => x.key === 'max_frame_rate');
-            if (it2D) { it2D.value = 'OFF'; it2D.raw_value = '0'; }
+            if (it2D) {
+                if (!it2D._lastActiveFps) it2D._lastActiveFps = parseInt(String(it2D.raw_value || it2D.value).replace(/[^0-9]/g, '')) || 82;
+                it2D.value = 'OFF';
+                it2D.raw_value = '0';
+                it2D.is_active = false;
+            }
             const itVR = (msfsSettingsMatrixData.matrix_vr || []).find(x => x.key === 'max_frame_rate');
-            if (itVR) { itVR.value = 'OFF'; itVR.raw_value = '0'; }
+            if (itVR) {
+                if (!itVR._lastActiveFps) itVR._lastActiveFps = parseInt(String(itVR.raw_value || itVR.value).replace(/[^0-9]/g, '')) || 45;
+                itVR.value = 'OFF';
+                itVR.raw_value = '0';
+                itVR.is_active = false;
+            }
         }
     }
 
