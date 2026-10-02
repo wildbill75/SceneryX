@@ -4587,6 +4587,20 @@ def calculate_dynamic_hardware_impact(
             g_score = 4 if is_flagship_gpu else 6
             g_note = f"On your {gpu_name}: Severe downscale ({val_str}) on a {gpu_name} ({vram_gb:.0f} GB VRAM). Compounds with headset software scale, creating heavy blur."
 
+    elif key == "reflex":
+        if "BOOST" in v_up:
+            c_score, g_score = 1, 3
+            c_note = f"On your {cpu_name}: Just-in-time draw call submission ({c_score}/12 load). Eliminates render queue lag."
+            g_note = f"On your {gpu_name}: Forces GPU Core/Memory clocks to maximum boost frequency ({g_score}/12 load). Elevated power consumption with negligible latency gain over standard ON."
+        elif "ON" in v_up or v_up == "1":
+            c_score, g_score = 1, 1
+            c_note = f"On your {cpu_name}: Optimal render queue pacing ({c_score}/12 load). Drains driver queue for zero input lag on flight controls."
+            g_note = f"On your {gpu_name}: Standard dynamic clock scaling ({g_score}/12 load). Low power draw and zero shading penalty."
+        else: # OFF
+            c_score, g_score = 4, 2
+            c_note = f"On your {cpu_name}: Unconstrained render queue buildup ({c_score}/12 load). CPU may queue 2-3 frames ahead, causing sluggish yoke and control response."
+            g_note = f"On your {gpu_name}: Unsynchronized swapchain presentation ({g_score}/12 load). Higher input-to-display latency."
+
     return c_score, g_score, c_note, g_note
 
 
@@ -5207,11 +5221,18 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
         # Synchronize active rating, color, clean_lbl with opt_ratings if matched
         val_norm = str(val).strip().upper()
         matched_opt = None
+        # Pass 1: Prioritize exact option match
         for opt_name, r_data in opt_ratings.items():
-            o_norm = str(opt_name).strip().upper()
-            if val_norm == o_norm or (len(val_norm) > 2 and (val_norm in o_norm or o_norm in val_norm)):
+            if val_norm == str(opt_name).strip().upper():
                 matched_opt = r_data
                 break
+        # Pass 2: Fallback to substring matching only if no exact match found
+        if not matched_opt:
+            for opt_name, r_data in opt_ratings.items():
+                o_norm = str(opt_name).strip().upper()
+                if len(val_norm) > 2 and (val_norm in o_norm or o_norm in val_norm):
+                    matched_opt = r_data
+                    break
         
         if matched_opt:
             rating = matched_opt["rating"]
@@ -5834,12 +5855,17 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
     # BUILD 2D MATRIX (30 Items across 6 Categories in 2x2 Grid)
     # =========================================================================
     part_2d_is_opt = (part_2d_val == "Low") if is_entry_rig else (part_2d_val in ["Low", "Medium"])
+    reflex_2d_rating = "optimum" if reflex_2d == "ON" else ("acceptable" if "BOOST" in reflex_2d else "suboptimal")
+    reflex_2d_color = "emerald" if reflex_2d == "ON" else ("amber" if "BOOST" in reflex_2d else "orange")
+    reflex_2d_label = "OPTIMUM" if reflex_2d == "ON" else ("ACCEPTABLE" if "BOOST" in reflex_2d else "SUBOPTIMAL")
+    reflex_2d_reason = "Drains GPU render queue to minimize input latency." if reflex_2d == "ON" else ("Locks GPU core and memory clocks to maximum boost frequency; higher power draw with negligible latency gain." if "BOOST" in reflex_2d else "Reflex OFF increases input-to-display latency during flight maneuvers.")
+
     matrix_2d = [
         # PAGE 1: FRAME RATE & SYNC (6)
         make_setting_item("resolution", "Full Screen Resolution", res_formatted, res_raw, True, res_rating, res_color, res_label, f"Description: Native screen rendering resolution for MSFS.\nCurrent: {res_formatted}.\nRecommendation: Match physical monitor native resolution and leverage DLSS for optimal sharpness.", res_options, page=1, tag_reason=res_tag_reason, is_vr=False),
         make_setting_item("max_frame_rate", "Max Frame Rate", f"{fps_2d} FPS" if not is_2d_fps_off else "OFF", fps_2d, False, fps_2d_rating, fps_2d_color, fps_2d_label, f"Description: Frame rate limiter to synchronize frame delivery with monitor refresh intervals. Direct numeric input supported.\nCurrent: {'OFF (Uncapped)' if is_2d_fps_off else f'{fps_2d} FPS'} ({'Synchronized' if is_2d_fps_opt else ('OFF / Uncapped' if is_2d_fps_off else 'Custom')}).\nRecommendation: Lock to an exact sync divisor of your monitor (e.g. 60, 72, 80, 82, 90 FPS) to eliminate frame pacing jitter, or OFF if using external limiter.", fps_options, page=1, is_numeric=True, min_val=0, max_val=240, step=1, tag_reason=fps_2d_reason, is_vr=False),
         make_setting_item("vsync", "V-Sync", vsync_val, vsync_raw, True, "optimum" if vsync_val == "ON" else "acceptable", "emerald" if vsync_val == "ON" else "amber", "OPTIMUM" if vsync_val == "ON" else "ACCEPTABLE", f"Description: Vertical synchronization with physical monitor refresh cycle.\nCurrent: {vsync_val}.\nRecommendation: Keep ON with G-Sync/FreeSync and frame rate limiter to eliminate screen tearing.", ["ON", "OFF"], page=1, tag_reason="V-Sync locks buffer presentation to refresh boundaries, eliminating tearing." if vsync_val == "ON" else "V-Sync OFF may cause horizontal tearing lines during fast camera pans.", is_vr=False),
-        make_setting_item("reflex", "NVIDIA Reflex", reflex_2d, reflex_2d, False, "optimum" if reflex_2d in ["ON", "ON+BOOST"] else "suboptimal", "emerald" if reflex_2d in ["ON", "ON+BOOST"] else "orange", "OPTIMUM" if reflex_2d in ["ON", "ON+BOOST"] else "SUBOPTIMAL", f"Description: NVIDIA Reflex low-latency GPU queue pacing technology.\nCurrent: {reflex_2d}.\nRecommendation: Set to ON or ON+BOOST for responsive flight controls and minimum render queue latency.", ["ON", "ON+BOOST", "OFF"], page=1, tag_reason="Drains GPU render queue to minimize input latency." if reflex_2d in ["ON", "ON+BOOST"] else "Reflex OFF increases input-to-display latency during flight maneuvers.", is_vr=False),
+        make_setting_item("reflex", "NVIDIA Reflex", reflex_2d, reflex_2d, False, reflex_2d_rating, reflex_2d_color, reflex_2d_label, f"Description: NVIDIA Reflex low-latency GPU queue pacing technology.\nCurrent: {reflex_2d}.\nRecommendation: Set to ON for optimal flight control responsiveness and efficiency (or ON+BOOST if GPU downclocking occurs).", ["ON", "ON+BOOST", "OFF"], page=1, tag_reason=reflex_2d_reason, is_vr=False),
         make_setting_item("frame_generation", "Frame Generation", fg_2d, fg_2d_raw, False, "optimum" if fg_2d.startswith("DLSSG") else "acceptable", "emerald" if fg_2d.startswith("DLSSG") else "amber", "OPTIMUM" if fg_2d.startswith("DLSSG") else "ACCEPTABLE", f"Description: AI optical flow frame interpolation (DLSS 3 Frame Generation / FSR 3).\nCurrent: {fg_2d}.\nRecommendation: Keep ON (DLSSG 2X) in 2D mode for doubled motion smoothness without increasing CPU MainThread load.", ["DLSSG (2X)", "FSR3 (2X)", "OFF"], page=1, tag_reason="Doubles motion smoothness via optical flow without CPU overhead." if fg_2d.startswith("DLSSG") else "Frame generation is inactive; native rendering requires more CPU/GPU pacing.", is_vr=False),
         make_setting_item("framerate_multiplier", "Framerate Multiplier", f"{mult_2d}X", mult_2d, False, "optimum", "emerald", "OPTIMUM", f"Description: Number of interpolated frames generated per native frame.\nCurrent: {mult_2d}X.\nRecommendation: Set to 1 (2X interpolation) when Frame Generation is active.", ["1 (2X Interpolation)"], page=1, tag_reason="Standard 2X optical flow interpolation factor.", is_vr=False),
 
@@ -5920,12 +5946,17 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
 
     scale_vr_tooltip = f"Description: Primary rendering scale in VR before DLSS upscaling.\nCurrent: {scale_vr_pct} (In-game MSFS).\nRecommendation: Set strictly to 100% in MSFS! Use your headset software ({sw_name}) to adjust resolution scale without causing double-downscaling blur."
 
+    reflex_vr_rating = "optimum" if reflex_vr == "ON" else ("acceptable" if "BOOST" in reflex_vr else "suboptimal")
+    reflex_vr_color = "emerald" if reflex_vr == "ON" else ("amber" if "BOOST" in reflex_vr else "orange")
+    reflex_vr_label = "OPTIMUM" if reflex_vr == "ON" else ("ACCEPTABLE" if "BOOST" in reflex_vr else "SUBOPTIMAL")
+    reflex_vr_reason = "Minimizes VR motion-to-photon latency without GPU thermal penalty." if reflex_vr == "ON" else ("Keeps GPU boost clocks pinned; extra heat in VR headset without motion-to-photon gain." if "BOOST" in reflex_vr else "Reflex OFF increases VR motion-to-photon latency and judder risk.")
+
     matrix_vr = [
         # PAGE 1: VR HEADSET & SYNC (5)
         make_setting_item("primary_scaling_vr", "VR Render Scale", scale_vr_pct, scale_vr_raw, False, scale_vr_rating, scale_vr_color, scale_vr_lbl, scale_vr_tooltip, scale_vr_options, page=1, tag_reason=scale_vr_reason, is_vr=True),
         make_setting_item("max_frame_rate", "Max Frame Rate (VR)", f"{fps_vr} FPS" if not is_vr_fps_off else "OFF", fps_vr, False, vr_fps_rating, vr_fps_color, vr_fps_label, vr_fps_tooltip, fps_options, page=1, is_numeric=True, min_val=0, max_val=240, step=1, tag_reason=vr_fps_reason, is_vr=True),
         make_setting_item("reprojection_mode", "Reprojection Mode", reproj_vr_val, reproj_vr_raw, False, "optimum" if reproj_vr_val == "1/2 REPROJECTION" else "acceptable", "emerald" if reproj_vr_val == "1/2 REPROJECTION" else "amber", "OPTIMUM" if reproj_vr_val == "1/2 REPROJECTION" else "ACCEPTABLE", f"Description: Motion reprojection mode for VR headset.\nCurrent: {reproj_vr_val}.\nRecommendation: 1/2 REPROJECTION or AUTO to synchronize smoothly with locked framerate.", reproj_options, page=1, tag_reason="Stereo motion reprojection configured.", is_vr=True),
-        make_setting_item("reflex", "NVIDIA Reflex (VR)", reflex_vr, reflex_vr, False, "optimum" if reflex_vr in ["ON", "ON+BOOST"] else "suboptimal", "emerald" if reflex_vr in ["ON", "ON+BOOST"] else "orange", "OPTIMUM" if reflex_vr in ["ON", "ON+BOOST"] else "SUBOPTIMAL", f"Description: NVIDIA Reflex in VR.\nCurrent: {reflex_vr}.\nRecommendation: ON reduces VR motion-to-photon latency.", ["ON", "ON+BOOST", "OFF"], page=1, tag_reason="Reduces VR motion-to-photon latency.", is_vr=True),
+        make_setting_item("reflex", "NVIDIA Reflex (VR)", reflex_vr, reflex_vr, False, reflex_vr_rating, reflex_vr_color, reflex_vr_label, f"Description: NVIDIA Reflex in VR.\nCurrent: {reflex_vr}.\nRecommendation: Set to ON to minimize VR motion-to-photon latency and eliminate control lag.", ["ON", "ON+BOOST", "OFF"], page=1, tag_reason=reflex_vr_reason, is_vr=True),
         make_setting_item("sharpen_amount_vr", "VR Sharpening", sharpen_vr_val, sharpen_vr_raw, False, "optimum" if abs(float(sharpen_vr_val) - 0.20) < 0.05 else "acceptable", "emerald" if abs(float(sharpen_vr_val) - 0.20) < 0.05 else "amber", "OPTIMUM" if abs(float(sharpen_vr_val) - 0.20) < 0.05 else "ACCEPTABLE", f"Description: Post-processing sharpening filter in VR headset.\nCurrent: {sharpen_vr_val}.\nRecommendation: Set to 0.20 when using DLSS. Excessive values (>1.0) cause harsh shimmering on runway lines and horizon.", sharpen_vr_options, page=1, is_numeric=True, min_val=0.0, max_val=2.0, step=0.1, tag_reason="Subtle sharpening without shimmering." if abs(float(sharpen_vr_val) - 0.20) < 0.05 else "High sharpening causes noise and shimmering in VR.", is_vr=True),
 
         # PAGE 2: VR OPTIMIZATIONS & DLSS (4)

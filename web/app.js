@@ -17643,6 +17643,11 @@ function updatePerformanceCockpitGauges() {
         else if (fg2D.includes('FSR3')) load2D -= 12;
         else load2D += 8;
 
+        const reflex2D = getItemVal(list2D, ['reflex', 'Reflex'], 'ON');
+        if (reflex2D.includes('OFF')) {
+            load2D += 5; // Unregulated render queue backlog & latency penalty
+        }
+
         if (isFpsOff2D) {
             load2D += 12; // Uncapped engine runs at maximum unconstrained CPU dispatch
         } else if (fpsCap2D <= 35) {
@@ -17748,6 +17753,11 @@ function updatePerformanceCockpitGauges() {
 
         if (reprojVR.includes('1/2') || reprojVR.includes('AUTO') || reprojVR.includes('HALF')) loadVR -= 8;
         else if (reprojVR.includes('OFF') || reprojVR.includes('NONE')) loadVR += 10;
+
+        const reflexVR = getItemVal(listVR, ['reflex', 'ReflexVR', 'Reflex'], 'ON');
+        if (reflexVR.includes('OFF')) {
+            loadVR += 6; // Severe motion-to-photon latency penalty in stereo VR
+        }
 
         if (isFpsOffVR) {
             loadVR += 15; // Uncapped VR causes extreme stereo pacing stutter
