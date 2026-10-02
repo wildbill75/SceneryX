@@ -1629,7 +1629,13 @@ def apply_setting_to_content(content: str, mode: str, setting_key: str, new_valu
     hf_map_rev = {'ultra (1024)': '1024', 'high (512)': '512', 'medium (256)': '256', 'low (128)': '128', '1024': '1024', '512': '512', '256': '256', '128': '128'}
     traffic_qty_map_rev = {'off': '-1', 'low': '0', 'medium': '1', 'high': '2', 'ultra': '3', '-1': '-1', '0': '0', '1': '1', '2': '2', '3': '3'}
     traffic_var_map_rev = {'low': '0', 'medium': '1', 'high': '2', 'ultra': '3', '0': '0', '1': '1', '2': '2', '3': '3'}
-    reproj_map_rev = {'off': '0', 'depth': '1', 'auto': '2', '0': '0', '1': '1', '2': '2'}
+    reproj_map_rev = {
+        'off': '0', '0': '0',
+        'auto': '1', '1': '1',
+        '1/2 reprojection': '2', '1/2': '2', '2': '2',
+        '1/3 reprojection': '3', '1/3': '3', '3': '3',
+        'depth & motion': '4', 'depth': '4', 'motion': '4', '4': '4'
+    }
 
     # 1. Full Screen Resolution (Shared)
     if setting_key in ['resolution', 'FullScreenResolution']:
@@ -2347,13 +2353,14 @@ SETTING_INFO_DATABASE = {
     "reprojection_mode": {
         "title": "VR Reprojection Mode",
         "desc": "Motion vector reprojection engine synthesizing intermediate stereo frames to match headset panel refresh rate.",
-        "cpu_impact": "Minimal compositor pacing overhead.",
+        "cpu_impact": "Zero MainThread load. Pacing managed in OpenXR / headset compositor runtime.",
         "gpu_impact": "Optical flow or depth reprojection pass in headset compositor runtime.",
-        "liner_advice": "AUTO or 1/2 REPROJECTION. Synchronizes flawlessly with 1/2 sync FPS locks.",
-        "ga_advice": "AUTO.",
+        "liner_advice": "OFF for pure native frames (essential with OFXR Bridge or high-end rigs) or AUTO / 1/2 REPROJECTION for fixed pacing.",
+        "ga_advice": "OFF or AUTO.",
         "tradeoffs": [
-            ("AUTO / 1/2 SYNC", "Smooth head tracking even when simulator renders at half the refresh rate", "Minor motion edge warping around propeller or wingtips"),
-            ("OFF", "Zero reprojection warping", "Severe head-tracking judder if native framerate drops below panel Hz")
+            ("OFF (Recommended Native)", "Zero warping, razor-sharp cockpit dials and propeller blades, pure 1:1 motion-to-photon latency (mandatory with OFXR Bridge)", "Requires solid hardware to sustain native framerate"),
+            ("AUTO", "Dynamic reprojection: engages smoothly only when framerate drops below headset refresh rate", "Occasional edge shimmering during rapid head turns"),
+            ("1/2 REPROJECTION", "Locks sim to 1/2 headset refresh rate for consistent cinematic pacing on heavy airliners", "Slight motion warping around propeller and canopy frames")
         ]
     },
     "cubemap_reflections": {
@@ -3071,9 +3078,9 @@ def calculate_option_ratings(key: str, options: List[str], is_liner: bool, is_vr
                 pass
 
         elif key in ["reprojection_mode"]:
-            if o_up == "1/2 REPROJECTION":
+            if o_up in ["OFF", "AUTO", "1/2 REPROJECTION"]:
                 r, c = "optimum", "emerald"
-            elif o_up in ["AUTO", "OFF", "DEPTH & MOTION", "1/3 REPROJECTION"]:
+            elif o_up in ["1/3 REPROJECTION", "DEPTH & MOTION"]:
                 r, c = "acceptable", "amber"
             else:
                 r, c = "acceptable", "amber"
@@ -4855,6 +4862,20 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
             return ("+ STABLE CADENCE", "Even 1:1 interpolated frame cadence.",
                     "- FIXED RATIO", "Single interpolation pass per rendered frame.")
 
+        if key == "reprojection_mode":
+            if "OFF" in v_upper or v_upper == "0":
+                return ("+ ZERO WARPING", "Pure native rendering: razor-sharp cockpit dials, zero propeller distortion, and zero conflict with OFXR Bridge.",
+                        "- RAW FPS REQUIRED", "Demands consistent native framerate from GPU/CPU.")
+            elif "AUTO" in v_upper:
+                return ("+ DYNAMIC SMOOTHING", "Engages reprojection only when framerate drops below headset refresh rate.",
+                        "- OCCASIONAL WARP", "Minor edge warping during dynamic transitions.")
+            elif "1/2" in v_upper:
+                return ("+ LOCKED 1/2 CADENCE", "Divides framerate target by 2 for predictable airliner smoothness on high-refresh headsets.",
+                        "- CANOPY WOBBLE", "Noticeable heat-haze style warping along canopy frames and propeller arcs.")
+            else:
+                return ("+ REPROJECTION ACTIVE", "Motion vector synthesis enabled.",
+                        "- HIGH COMPOSITOR LOAD", "Increased compositor overhead in headset runtime.")
+
         if key == "vsync":
             if "ON" in v_upper:
                 return ("+ ZERO TEARING", "Eliminates horizontal screen tears during rapid camera pans.",
@@ -6092,7 +6113,14 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
         # PAGE 1: VR HEADSET & SYNC (5)
         make_setting_item("primary_scaling_vr", "VR Render Scale", scale_vr_pct, scale_vr_raw, False, scale_vr_rating, scale_vr_color, scale_vr_lbl, scale_vr_tooltip, scale_vr_options, page=1, tag_reason=scale_vr_reason, is_vr=True),
         make_setting_item("max_frame_rate", "Max Frame Rate (VR)", f"{fps_vr} FPS" if not is_vr_fps_off else "OFF", fps_vr, False, vr_fps_rating, vr_fps_color, vr_fps_label, vr_fps_tooltip, fps_options, page=1, is_numeric=True, min_val=0, max_val=240, step=1, tag_reason=vr_fps_reason, is_vr=True),
-        make_setting_item("reprojection_mode", "Reprojection Mode", reproj_vr_val, reproj_vr_raw, False, "optimum" if reproj_vr_val == "1/2 REPROJECTION" else "acceptable", "emerald" if reproj_vr_val == "1/2 REPROJECTION" else "amber", "OPTIMUM" if reproj_vr_val == "1/2 REPROJECTION" else "ACCEPTABLE", f"Description: Motion reprojection mode for VR headset.\nCurrent: {reproj_vr_val}.\nRecommendation: 1/2 REPROJECTION or AUTO to synchronize smoothly with locked framerate.", reproj_options, page=1, tag_reason="Stereo motion reprojection configured.", is_vr=True),
+        reproj_is_opt = reproj_vr_val in ["OFF", "AUTO", "1/2 REPROJECTION"]
+        reproj_reason_desc = (
+            "Pure native frame presentation: zero reprojection wobble or ghosting (essential for OFXR Bridge)." if reproj_vr_val == "OFF"
+            else ("Dynamic OpenXR reprojection: engages smoothly only during framerate dips." if reproj_vr_val == "AUTO"
+            else ("Locked 1/2 cadence reprojection for smooth airliner flight." if reproj_vr_val == "1/2 REPROJECTION"
+            else "Stereo motion reprojection configured."))
+        )
+        make_setting_item("reprojection_mode", "Reprojection Mode", reproj_vr_val, reproj_vr_raw, False, "optimum" if reproj_is_opt else "acceptable", "emerald" if reproj_is_opt else "amber", "OPTIMUM" if reproj_is_opt else "ACCEPTABLE", f"Description: Motion reprojection mode for VR headset.\nCurrent: {reproj_vr_val}.\nRecommendation: OFF (zero warping & pure latency, mandatory with OFXR Bridge) or AUTO / 1/2 REPROJECTION (cadence smoothing).", reproj_options, page=1, tag_reason=reproj_reason_desc, is_vr=True),
         make_setting_item("reflex", "NVIDIA Reflex (VR)", reflex_vr, reflex_vr, False, reflex_vr_rating, reflex_vr_color, reflex_vr_label, f"Description: NVIDIA Reflex low-latency GPU queue pacing in VR. Synchronizes headset frame pacing and eliminates control lag. Has 0 GB impact on VRAM allocation (acts purely on MainThread and motion-to-photon latency).\nCurrent: {reflex_vr}.\nRecommendation: Set to ON to minimize VR motion-to-photon latency and eliminate control lag.", ["ON", "ON+BOOST", "OFF"], page=1, tag_reason=reflex_vr_reason, is_vr=True),
         make_setting_item("sharpen_amount_vr", "VR Sharpening", sharpen_vr_val, sharpen_vr_raw, False, "optimum" if abs(float(sharpen_vr_val) - 0.20) < 0.05 else "acceptable", "emerald" if abs(float(sharpen_vr_val) - 0.20) < 0.05 else "amber", "OPTIMUM" if abs(float(sharpen_vr_val) - 0.20) < 0.05 else "ACCEPTABLE", f"Description: Post-processing sharpening filter in VR headset.\nCurrent: {sharpen_vr_val}.\nRecommendation: Set to 0.20 when using DLSS. Excessive values (>1.0) cause harsh shimmering on runway lines and horizon.", sharpen_vr_options, page=1, is_numeric=True, min_val=0.0, max_val=2.0, step=0.1, tag_reason="Subtle sharpening without shimmering." if abs(float(sharpen_vr_val) - 0.20) < 0.05 else "High sharpening causes noise and shimmering in VR.", is_vr=True),
 
@@ -6212,7 +6240,9 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
         synergies_vr.append("AutoFPS Linked: Dynamic VR LODs prevent stereo stutter on final approach.")
 
     # 5. VR Headset Sync Divisor
-    if fps_vr == str(target_vr_fps):
+    if reproj_vr_val == "OFF":
+        synergies_vr.append("Reprojection OFF: Pure native frame presentation without compositor warping or OFXR conflict.")
+    elif fps_vr == str(target_vr_fps):
         synergies_vr.append(f"VR {vr_hz} Hz Headset locked to exact 1/2 sync ({target_vr_fps} FPS): Maximum reprojection fluidity.")
     else:
         conflicts_vr.append(f"VR {vr_hz} Hz frame cap ({fps_vr} FPS) differs from 1/2 target ({target_vr_fps} FPS): Reprojection judder hazard.")
@@ -6248,8 +6278,8 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
             "target_fps": f"{fps_vr} FPS" if fps_vr != '0' else f"{target_vr_fps} FPS",
             "calculated_target_fps": target_vr_fps,
             "vr_hz": vr_hz,
-            "frame_gen_label": f"1/2 REPROJECTION ({target_vr_fps} FPS)",
-            "frame_gen_color": "cyan",
+            "frame_gen_label": f"NATIVE 1:1 ({vr_hz} Hz)" if reproj_vr_val == "OFF" else f"1/2 REPROJECTION ({target_vr_fps} FPS)",
+            "frame_gen_color": "emerald" if reproj_vr_val == "OFF" else "cyan",
             "target_mainthread": f"{target_vr_ms} ms",
             "mainthread_color": "emerald",
             "vram_headroom": vram_headroom_vr,

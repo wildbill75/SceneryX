@@ -17769,7 +17769,15 @@ function updatePerformanceCockpitGauges() {
             loadVR += 8; // Severe motion-to-photon latency penalty in stereo VR
         }
 
-        if (isFpsOffVR) {
+        if (reprojVR.includes('OFF')) {
+            if (isFpsOffVR) {
+                loadVR += 6; // Uncapped native stereo presentation
+            } else if (fpsCapVR <= 45) {
+                loadVR -= 8; // Stable pacing target (ideal for OFXR Bridge or fixed half-rate native)
+            } else {
+                loadVR += 4;
+            }
+        } else if (isFpsOffVR) {
             loadVR += 14; // Uncapped VR causes extreme stereo pacing stutter
         } else if (fpsCapVR <= 36) {
             loadVR -= 10; // 1/3 reprojection / 36 FPS
@@ -17780,7 +17788,7 @@ function updatePerformanceCockpitGauges() {
         } else if (fpsCapVR <= 80) {
             loadVR += 8;
         } else {
-            loadVR += 14; // 90+ FPS native stereo without reprojection
+            loadVR += 14; // 90+ FPS stereo without reprojection
         }
 
         if (window.smartLodActive || (msfsSettingsMatrixData && msfsSettingsMatrixData.autofps_active)) {
@@ -17790,7 +17798,7 @@ function updatePerformanceCockpitGauges() {
         loadVR = Math.min(99, Math.max(14, Math.round(loadVR)));
 
         let fpsVRTag = isFpsOffVR ? 'Uncapped' : `${Math.round(fpsCapVR)} FPS`;
-        let reprojDesc = reprojVR.includes('1/2') ? '1/2 Reprojection' : (reprojVR.includes('OFF') ? 'Reproj OFF' : reprojVR);
+        let reprojDesc = reprojVR.includes('OFF') ? 'Native (Reproj OFF)' : (reprojVR.includes('AUTO') ? 'Auto Reprojection' : (reprojVR.includes('1/2') ? '1/2 Reprojection' : reprojVR));
         let badgeVR = 'OPTIMUM';
         let colorVR = 'emerald';
         let descVR = `Stereo sync (${reprojDesc} • ${fpsVRTag}) • TLOD ${tlodVR}`;
