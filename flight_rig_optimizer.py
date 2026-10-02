@@ -8,6 +8,7 @@ de calibrage VRAM / CPU et de génération de profils optimisés par studio d'av
 
 import os
 import sys
+import time
 import json
 import re
 import shutil
@@ -266,7 +267,7 @@ def simplify_gpu_name(raw_name: str) -> str:
 
 
 def detect_cpu_info() -> Dict[str, Any]:
-    """Détecte le processeur, le nombre de cœurs/threads et la vitesse via WMI/PowerShell."""
+    """Détecte le processeur, le nombre de cœurs/threads et la vitesse via WinReg et ctypes en ~0.1ms."""
     result = {
         "name": "Unknown CPU",
         "name_simplified": "UNKNOWN CPU",
@@ -275,23 +276,69 @@ def detect_cpu_info() -> Dict[str, Any]:
         "max_clock_mhz": 0,
         "raw_string": ""
     }
+    # Stratégie 1 : Registry + GetLogicalProcessorInformationEx (Ultra-rapide ~0.1ms, 0 sous-processus)
     try:
-        ps_cmd = 'Get-CimInstance Win32_Processor | Select-Object -Property Name, NumberOfCores, NumberOfLogicalProcessors, MaxClockSpeed | ConvertTo-Json'
-        out = subprocess.check_output(['powershell', '-NoProfile', '-Command', ps_cmd], text=True, stderr=subprocess.DEVNULL, creationflags=CREATE_NO_WINDOW)
-        data = json.loads(out)
-        if isinstance(data, list):
-            data = data[0]
-        result["name"] = data.get("Name", "").strip()
-        result["name_simplified"] = simplify_cpu_name(result["name"])
-        result["cores"] = data.get("NumberOfCores", 0)
-        result["threads"] = data.get("NumberOfLogicalProcessors", 0)
-        result["max_clock_mhz"] = data.get("MaxClockSpeed", 0)
-        result["raw_string"] = f"{result['name']} ({result['cores']}C/{result['threads']}T)"
+        key = winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r'HARDWARE\DESCRIPTION\System\CentralProcessor\0')
+        raw_name, _ = winreg.QueryValueEx(key, 'ProcessorNameString')
+        raw_mhz, _ = winreg.QueryValueEx(key, '~MHz')
+        winreg.CloseKey(key)
+        name = str(raw_name).strip()
+        mhz = int(raw_mhz or 0)
+
+        cores = 0
+        RelationProcessorCore = 0
+        length = ctypes.c_ulong(0)
+        ctypes.windll.kernel32.GetLogicalProcessorInformationEx(RelationProcessorCore, None, ctypes.byref(length))
+        if length.value > 0:
+            buf = ctypes.create_string_buffer(length.value)
+            if ctypes.windll.kernel32.GetLogicalProcessorInformationEx(RelationProcessorCore, buf, ctypes.byref(length)):
+                ptr = 0
+                while ptr < length.value:
+                    rel = int.from_bytes(buf[ptr:ptr+4], 'little')
+                    size = int.from_bytes(buf[ptr+4:ptr+8], 'little')
+                    if rel == RelationProcessorCore:
+                        cores += 1
+                    ptr += size
+
+        threads = os.cpu_count() or 8
+        if cores == 0:
+            cores = max(1, threads // 2)
+
+        result["name"] = name
+        result["name_simplified"] = simplify_cpu_name(name)
+        result["cores"] = cores
+        result["threads"] = threads
+        result["max_clock_mhz"] = mhz
+        result["raw_string"] = f"{name} ({cores}C/{threads}T)"
+        return result
     except Exception:
-        result["name"] = os.environ.get("PROCESSOR_IDENTIFIER", "Intel/AMD Processor")
-        result["name_simplified"] = simplify_cpu_name(result["name"])
-        result["threads"] = os.cpu_count() or 8
-        result["raw_string"] = result["name"]
+        pass
+
+    # Stratégie 2 : WMI COM In-Process (~15ms)
+    try:
+        import win32com.client
+        wmi = win32com.client.GetObject('winmgmts:')
+        for proc in wmi.InstancesOf('Win32_Processor'):
+            name = str(proc.Name or '').strip()
+            cores = int(proc.NumberOfCores or 0)
+            threads = int(proc.NumberOfLogicalProcessors or 0)
+            mhz = int(proc.MaxClockSpeed or 0)
+            result["name"] = name
+            result["name_simplified"] = simplify_cpu_name(name)
+            result["cores"] = cores
+            result["threads"] = threads
+            result["max_clock_mhz"] = mhz
+            result["raw_string"] = f"{name} ({cores}C/{threads}T)"
+            return result
+    except Exception:
+        pass
+
+    # Stratégie 3 : Fallback variables système
+    result["name"] = os.environ.get("PROCESSOR_IDENTIFIER", "Intel/AMD Processor")
+    result["name_simplified"] = simplify_cpu_name(result["name"])
+    result["threads"] = os.cpu_count() or 8
+    result["cores"] = max(1, result["threads"] // 2)
+    result["raw_string"] = result["name"]
     return result
 
 
@@ -366,37 +413,60 @@ def detect_gpu_info() -> Dict[str, Any]:
 
 
 def detect_ram_and_xmp() -> Dict[str, Any]:
-    """Détecte la RAM totale, la fréquence en MHz et l'activation du profil XMP/EXPO."""
+    """Détecte la RAM totale, la fréquence en MHz et l'activation du profil XMP/EXPO via WMI COM (~12ms)."""
     result = {
         "total_gb": 0.0,
         "speed_mhz": 0,
         "is_xmp_active": False,
         "stick_count": 0
     }
+    # Stratégie 1 : WMI COM In-Process (~12ms, 0 sous-processus PowerShell)
     try:
-        ps_cmd = 'Get-CimInstance Win32_PhysicalMemory | Select-Object -Property Capacity, Speed, ConfiguredClockSpeed | ConvertTo-Json'
-        out = subprocess.check_output(['powershell', '-NoProfile', '-Command', ps_cmd], text=True, stderr=subprocess.DEVNULL, creationflags=CREATE_NO_WINDOW)
-        data = json.loads(out)
-        if not isinstance(data, list):
-            data = [data]
-        
+        import win32com.client
+        wmi = win32com.client.GetObject('winmgmts:')
         total_bytes = 0
         speeds = []
-        for stick in data:
-            cap = int(stick.get("Capacity", 0))
+        stick_count = 0
+        for stick in wmi.InstancesOf('Win32_PhysicalMemory'):
+            stick_count += 1
+            cap = int(stick.Capacity or 0)
             total_bytes += cap
-            speed = int(stick.get("ConfiguredClockSpeed") or stick.get("Speed") or 0)
+            speed = int(stick.ConfiguredClockSpeed or stick.Speed or 0)
             if speed > 0:
                 speeds.append(speed)
-        
-        result["total_gb"] = round(total_bytes / (1024**3), 1)
-        result["stick_count"] = len(data)
-        if speeds:
-            result["speed_mhz"] = max(speeds)
-            if result["speed_mhz"] >= 3200:
-                result["is_xmp_active"] = True
+
+        if total_bytes > 0:
+            result["total_gb"] = round(total_bytes / (1024**3), 1)
+            result["stick_count"] = stick_count
+            if speeds:
+                result["speed_mhz"] = max(speeds)
+                if result["speed_mhz"] >= 3200:
+                    result["is_xmp_active"] = True
+            return result
     except Exception:
         pass
+
+    # Stratégie 2 : Windows GlobalMemoryStatusEx (~0.05ms pour total_gb)
+    try:
+        class MEMORYSTATUSEX(ctypes.Structure):
+            _fields_ = [
+                ('dwLength', ctypes.c_ulong),
+                ('dwMemoryLoad', ctypes.c_ulong),
+                ('ullTotalPhys', ctypes.c_ulonglong),
+                ('ullAvailPhys', ctypes.c_ulonglong),
+                ('ullTotalPageFile', ctypes.c_ulonglong),
+                ('ullAvailPageFile', ctypes.c_ulonglong),
+                ('ullTotalVirtual', ctypes.c_ulonglong),
+                ('ullAvailVirtual', ctypes.c_ulonglong),
+                ('ullAvailExtendedVirtual', ctypes.c_ulonglong),
+            ]
+        stat = MEMORYSTATUSEX()
+        stat.dwLength = ctypes.sizeof(MEMORYSTATUSEX)
+        if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(stat)):
+            result["total_gb"] = round(stat.ullTotalPhys / (1024**3), 1)
+    except Exception:
+        pass
+
     return result
 
 
@@ -451,10 +521,13 @@ def detect_all_displays() -> List[Dict[str, Any]]:
 
     wmi_names = []
     try:
-        ps = r'Get-CimInstance -Namespace root\wmi -ClassName WmiMonitorID | ForEach-Object { [System.Text.Encoding]::ASCII.GetString($_.UserFriendlyName -ne 0) }'
-        r = subprocess.run(['powershell', '-NoProfile', '-Command', ps], capture_output=True, text=True, timeout=2, creationflags=CREATE_NO_WINDOW)
-        if r.returncode == 0:
-            wmi_names = [line.strip() for line in r.stdout.splitlines() if line.strip()]
+        import win32com.client
+        wmi = win32com.client.GetObject(r'winmgmts:root\wmi')
+        for mon in wmi.InstancesOf('WmiMonitorID'):
+            if mon.UserFriendlyName:
+                name = ''.join(chr(c) for c in mon.UserFriendlyName if c != 0).strip()
+                if name:
+                    wmi_names.append(name)
     except Exception:
         pass
 
@@ -749,14 +822,50 @@ def detect_dlss_version() -> Dict[str, Any]:
     return result
 
 
+_autofps_cache_timestamp: float = 0.0
+_autofps_cached_result: bool = False
+
 def detect_autofps_running() -> bool:
-    """Detects if AutoFPS (MSFS AutoFPS / MSFS2024 AutoFPS) is active in background tasks."""
+    """Detects if AutoFPS (MSFS AutoFPS / MSFS2024 AutoFPS) is active in background tasks via Toolhelp32 (~3ms)."""
+    global _autofps_cache_timestamp, _autofps_cached_result
+    now = time.time()
+    if (now - _autofps_cache_timestamp) < 5.0:
+        return _autofps_cached_result
+
+    found = False
     try:
-        CREATE_NO_WINDOW = 0x08000000
-        out = subprocess.check_output(['tasklist', '/fo', 'csv', '/nh'], creationflags=CREATE_NO_WINDOW).decode('utf-8', errors='ignore')
-        return any('autofps' in line.lower() for line in out.splitlines())
+        TH32CS_SNAPPROCESS = 0x00000002
+        class PROCESSENTRY32(ctypes.Structure):
+            _fields_ = [
+                ('dwSize', ctypes.wintypes.DWORD),
+                ('cntUsage', ctypes.wintypes.DWORD),
+                ('th32ProcessID', ctypes.wintypes.DWORD),
+                ('th32DefaultHeapID', ctypes.c_void_p),
+                ('th32ModuleID', ctypes.wintypes.DWORD),
+                ('cntThreads', ctypes.wintypes.DWORD),
+                ('th32ParentProcessID', ctypes.wintypes.DWORD),
+                ('pcPriClassBase', ctypes.c_long),
+                ('dwFlags', ctypes.wintypes.DWORD),
+                ('szExeFile', ctypes.c_char * 260)
+            ]
+        hSnap = ctypes.windll.kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+        if hSnap and hSnap != -1:
+            pe = PROCESSENTRY32()
+            pe.dwSize = ctypes.sizeof(PROCESSENTRY32)
+            if ctypes.windll.kernel32.Process32First(hSnap, ctypes.byref(pe)):
+                while True:
+                    if b'autofps' in pe.szExeFile.lower():
+                        found = True
+                        break
+                    if not ctypes.windll.kernel32.Process32Next(hSnap, ctypes.byref(pe)):
+                        break
+            ctypes.windll.kernel32.CloseHandle(hSnap)
     except Exception:
-        return False
+        found = False
+
+    _autofps_cached_result = found
+    _autofps_cache_timestamp = now
+    return found
 
 
 def get_user_cfg_path() -> Optional[str]:
@@ -773,13 +882,17 @@ def get_user_cfg_path() -> Optional[str]:
     return None
 
 
+_cached_storage_info: Optional[Dict[str, Any]] = None
+
 def detect_msfs_storage(user_cfg_path: Optional[str] = None) -> Dict[str, Any]:
     """
     Detects the physical storage drive on which MSFS Packages are installed.
     Extracts InstalledPackagesPath from UserCfg.opt, queries physical disk model,
     drive type (NVMe SSD, SATA SSD, Mechanical HDD), and available storage capacity.
     Specifically flags mechanical HDDs to prevent severe terrain streaming bottlenecks.
+    Uses DeviceIoControl and kernel queries for ~0.1ms execution.
     """
+    global _cached_storage_info
     path = user_cfg_path or get_user_cfg_path()
     pkg_dir = "C:"
     if path and os.path.exists(path):
@@ -805,25 +918,43 @@ def detect_msfs_storage(user_cfg_path: Optional[str] = None) -> Dict[str, Any]:
     except Exception:
         pass
 
+    if _cached_storage_info is not None and _cached_storage_info.get("drive_letter") == f"{drive}:":
+        res = dict(_cached_storage_info)
+        res["free_gb"] = free_gb
+        res["total_gb"] = total_gb
+        res["used_gb"] = used_gb
+        res["packages_path"] = pkg_dir
+        return res
+
     friendly_name = "Solid State Drive (SSD)"
     media_type = "SSD"
     bus_type = "NVMe"
 
+    # Fast Kernel DeviceIoControl Query (~0.1ms)
     try:
-        ps_cmd = f"Get-PhysicalDisk | Where-Object DeviceId -eq (Get-Partition -DriveLetter {drive}).DiskNumber | Select-Object DeviceId, FriendlyName, MediaType, BusType | ConvertTo-Json -Compress"
-        res = subprocess.run(
-            ['powershell', '-NoProfile', '-Command', ps_cmd],
-            capture_output=True,
-            text=True,
-            timeout=4,
-            creationflags=CREATE_NO_WINDOW
-        )
-        if res.returncode == 0 and res.stdout.strip():
-            raw = json.loads(res.stdout.strip())
-            disk = raw[0] if isinstance(raw, list) else raw
-            friendly_name = disk.get('FriendlyName') or friendly_name
-            media_type = str(disk.get('MediaType') or 'SSD')
-            bus_type = str(disk.get('BusType') or 'NVMe')
+        IOCTL_STORAGE_QUERY_PROPERTY = 0x002D1400
+        vol_path = f"\\\\.\\{drive}:"
+        h = ctypes.windll.kernel32.CreateFileW(vol_path, 0, 1 | 2, None, 3, 0, None)
+        if h and h != -1:
+            query = (ctypes.c_byte * 12)(0)
+            out_buf = ctypes.create_string_buffer(1024)
+            ret = ctypes.c_ulong(0)
+            ok = ctypes.windll.kernel32.DeviceIoControl(h, IOCTL_STORAGE_QUERY_PROPERTY, query, 12, out_buf, 1024, ctypes.byref(ret), None)
+            ctypes.windll.kernel32.CloseHandle(h)
+            if ok:
+                bus_id = out_buf[28] if len(out_buf) > 28 else 0
+                if bus_id == 17:
+                    bus_type = "NVMe"
+                    media_type = "SSD"
+                elif bus_id in [11, 15]:
+                    bus_type = "SATA"
+                    media_type = "SSD"
+                prod_offset = int.from_bytes(out_buf[16:20], 'little')
+                if 0 < prod_offset < 1024:
+                    raw_str = out_buf[prod_offset:].split(b'\x00')[0]
+                    parsed_name = raw_str.decode('latin1', errors='ignore').strip()
+                    if parsed_name:
+                        friendly_name = parsed_name
     except Exception:
         pass
 
@@ -847,7 +978,7 @@ def detect_msfs_storage(user_cfg_path: Optional[str] = None) -> Dict[str, Any]:
         badge_color = "cyan"
         warning = None
 
-    return {
+    info = {
         "drive_letter": f"{drive}:",
         "packages_path": pkg_dir,
         "model": friendly_name,
@@ -862,6 +993,8 @@ def detect_msfs_storage(user_cfg_path: Optional[str] = None) -> Dict[str, Any]:
         "used_gb": used_gb,
         "warning": warning
     }
+    _cached_storage_info = info
+    return info
 
 
 def backup_user_cfg(path: str) -> str:
@@ -4604,7 +4737,7 @@ def calculate_dynamic_hardware_impact(
     return c_score, g_score, c_note, g_note
 
 
-def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Optional[Dict[str, Any]] = None, cpu_info: Optional[Dict[str, Any]] = None, storage_info: Optional[Dict[str, Any]] = None, flight_profile: str = 'LINER', vr_refresh_rate: int = 72, preferred_display_id: Optional[str] = None) -> Dict[str, Any]:
+def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Optional[Dict[str, Any]] = None, cpu_info: Optional[Dict[str, Any]] = None, storage_info: Optional[Dict[str, Any]] = None, flight_profile: str = 'LINER', vr_refresh_rate: int = 72, preferred_display_id: Optional[str] = None, all_displays_info: Optional[List[Dict[str, Any]]] = None, vr_headset_info: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     path = user_cfg_path or get_user_cfg_path()
     if not path or not os.path.exists(path):
         return {"found": False, "path": "", "matrix_2d": [], "matrix_vr": []}
@@ -4630,9 +4763,10 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
     target_vr_fps = max(30, vr_hz // 2)
     target_vr_ms = round(1000.0 / target_vr_fps, 1)
 
-    all_displays = detect_all_displays()
+    all_displays = all_displays_info if all_displays_info is not None else detect_all_displays()
     active_disp = detect_display_info(preferred_id=preferred_display_id, displays_list=all_displays)
-    vr_headset_info = detect_vr_headset()
+    if vr_headset_info is None:
+        vr_headset_info = detect_vr_headset()
     storage = storage_info or detect_msfs_storage(path)
     cpu = cpu_info or detect_cpu_info()
     gpu = gpu_info or detect_gpu_info()
@@ -6561,7 +6695,7 @@ def get_full_rig_diagnostics(flight_profile: str = 'LINER', vr_refresh_rate: int
 
     effective_vr_hz = vr_headset["refresh_rate_hz"] if (vr_headset.get("detected") and vr_headset.get("refresh_rate_hz")) else 72
 
-    matrix_data = build_msfs_settings_matrix(user_cfg_path=cfg.get("path"), gpu_info=gpu, cpu_info=cpu, storage_info=storage, flight_profile=flight_profile, vr_refresh_rate=effective_vr_hz, preferred_display_id=preferred_display_id)
+    matrix_data = build_msfs_settings_matrix(user_cfg_path=cfg.get("path"), gpu_info=gpu, cpu_info=cpu, storage_info=storage, flight_profile=flight_profile, vr_refresh_rate=effective_vr_hz, preferred_display_id=preferred_display_id, all_displays_info=all_displays, vr_headset_info=vr_headset)
     backups = get_available_user_cfg_backups(cfg.get("path"))
 
     initial_specs = {

@@ -17644,8 +17644,12 @@ function updatePerformanceCockpitGauges() {
         else load2D += 8;
 
         const reflex2D = getItemVal(list2D, ['reflex', 'Reflex'], 'ON');
-        if (reflex2D.includes('OFF')) {
-            load2D += 5; // Unregulated render queue backlog & latency penalty
+        if (reflex2D === 'ON') {
+            load2D -= 6; // Optimal GPU render queue pacing eliminates input lag and CPU backlog
+        } else if (reflex2D.includes('BOOST')) {
+            load2D -= 3; // Maximum GPU boost frequency maintained with slight driver polling
+        } else {
+            load2D += 8; // Unregulated render queue backlog & latency penalty
         }
 
         if (isFpsOff2D) {
@@ -17679,7 +17683,7 @@ function updatePerformanceCockpitGauges() {
             badge2D = 'HAZARD';
             color2D = 'rose';
             desc2D = `Heavy draw calls • ${fpsTag}`;
-        } else if (load2D >= 48) {
+        } else if (load2D >= 58) {
             badge2D = 'BALANCED';
             color2D = 'amber';
             desc2D = `Controlled workload • ${fpsTag}`;
@@ -17689,8 +17693,8 @@ function updatePerformanceCockpitGauges() {
 
         // --- 3. VR HEADSET (Stereo OpenXR loop & Headset Pacing) ---
         // Baseline stereo VR compositor thread + Shared traffic CPU simulation load
-        const sharedCpuImpactVR = Math.round(loadShared * 0.40);
-        let loadVR = 8 + sharedCpuImpactVR;
+        const sharedCpuImpactVR = Math.round(loadShared * 0.20);
+        let loadVR = 6 + sharedCpuImpactVR;
         const tlodVR = getItemNum(listVR, ['tlod', 'TerrainLoD'], 100);
         const olodVR = getItemNum(listVR, ['olod', 'ObjectsLoD'], 100);
         const glassVR = getItemVal(listVR, ['glass_cockpits', 'GlassCockpitsRefreshRate'], 'MEDIUM');
@@ -17707,88 +17711,92 @@ function updatePerformanceCockpitGauges() {
         const fpsCapVR = parseFloat(fpsVRVal);
         const isFpsOffVR = fpsVRVal.includes('OFF') || isNaN(fpsCapVR) || fpsCapVR <= 0;
 
-        if (tlodVR <= 60) loadVR += 8;
-        else if (tlodVR <= 100) loadVR += 20;
-        else if (tlodVR <= 140) loadVR += 36;
-        else if (tlodVR <= 180) loadVR += 52;
-        else loadVR += 70;
+        if (tlodVR <= 60) loadVR += 4;
+        else if (tlodVR <= 100) loadVR += 10;
+        else if (tlodVR <= 140) loadVR += 22;
+        else if (tlodVR <= 180) loadVR += 36;
+        else loadVR += 54;
 
-        if (olodVR <= 80) loadVR += 4;
-        else if (olodVR <= 120) loadVR += 10;
-        else loadVR += 20;
+        if (olodVR <= 80) loadVR += 3;
+        else if (olodVR <= 120) loadVR += 7;
+        else loadVR += 15;
 
-        if (glassVR.includes('HIGH') || glassVR.includes('FULL')) loadVR += 26;
-        else if (glassVR.includes('MED') || glassVR.includes('HALF')) loadVR += 10;
-        else loadVR += 3;
+        if (glassVR.includes('HIGH') || glassVR.includes('FULL')) loadVR += 18;
+        else if (glassVR.includes('MED') || glassVR.includes('HALF')) loadVR += 7;
+        else loadVR += 2;
 
-        if (bldVR.includes('ULTRA')) loadVR += 32;
-        else if (bldVR.includes('HIGH')) loadVR += 18;
-        else if (bldVR.includes('MED')) loadVR += 8;
-        else loadVR += 3;
+        if (bldVR.includes('ULTRA')) loadVR += 20;
+        else if (bldVR.includes('HIGH')) loadVR += 12;
+        else if (bldVR.includes('MED')) loadVR += 5;
+        else loadVR += 2;
 
-        if (treeVR.includes('ULTRA')) loadVR += 28;
-        else if (treeVR.includes('HIGH')) loadVR += 16;
-        else if (treeVR.includes('MED')) loadVR += 7;
-        else loadVR += 3;
+        if (treeVR.includes('ULTRA')) loadVR += 18;
+        else if (treeVR.includes('HIGH')) loadVR += 10;
+        else if (treeVR.includes('MED')) loadVR += 5;
+        else loadVR += 2;
 
-        if (grassVR.includes('ULTRA')) loadVR += 20;
-        else if (grassVR.includes('HIGH')) loadVR += 10;
-        else if (grassVR.includes('MED')) loadVR += 5;
-        else if (grassVR.includes('LOW')) loadVR += 2;
+        if (grassVR.includes('ULTRA')) loadVR += 12;
+        else if (grassVR.includes('HIGH')) loadVR += 6;
+        else if (grassVR.includes('MED')) loadVR += 3;
+        else if (grassVR.includes('LOW')) loadVR += 1;
 
-        if (cldVR.includes('ULTRA')) loadVR += 34;
-        else if (cldVR.includes('HIGH')) loadVR += 18;
-        else if (cldVR.includes('MED')) loadVR += 8;
-        else loadVR += 3;
+        if (cldVR.includes('ULTRA')) loadVR += 22;
+        else if (cldVR.includes('HIGH')) loadVR += 12;
+        else if (cldVR.includes('MED')) loadVR += 5;
+        else loadVR += 2;
 
-        if (dynVR === 'ON' || dynVR === '1') loadVR += 12;
-        if (fovVR === 'ON' || fovVR === '1') loadVR -= 10;
-        if (rtVR === 'ON' || rtVR === '1') loadVR += 35;
+        if (dynVR === 'ON' || dynVR === '1') loadVR += 8;
+        if (fovVR === 'ON' || fovVR === '1') loadVR -= 8;
+        if (rtVR === 'ON' || rtVR === '1') loadVR += 25;
 
-        if (aaVR.includes('PERFORMANCE')) loadVR -= 16;
-        else if (aaVR.includes('BALANCED')) loadVR -= 10;
-        else if (aaVR.includes('QUALITY')) loadVR -= 6;
-        else if (aaVR.includes('TAA')) loadVR += 6;
-        else if (aaVR.includes('DLAA')) loadVR += 16;
+        if (aaVR.includes('PERFORMANCE')) loadVR -= 12;
+        else if (aaVR.includes('BALANCED')) loadVR -= 8;
+        else if (aaVR.includes('QUALITY')) loadVR -= 5;
+        else if (aaVR.includes('TAA')) loadVR += 4;
+        else if (aaVR.includes('DLAA')) loadVR += 12;
 
         if (reprojVR.includes('1/2') || reprojVR.includes('AUTO') || reprojVR.includes('HALF')) loadVR -= 8;
-        else if (reprojVR.includes('OFF') || reprojVR.includes('NONE')) loadVR += 10;
+        else if (reprojVR.includes('OFF') || reprojVR.includes('NONE')) loadVR += 6;
 
         const reflexVR = getItemVal(listVR, ['reflex', 'ReflexVR', 'Reflex'], 'ON');
-        if (reflexVR.includes('OFF')) {
-            loadVR += 6; // Severe motion-to-photon latency penalty in stereo VR
+        if (reflexVR === 'ON') {
+            loadVR -= 8; // Optimal motion-to-photon latency and frame pacing
+        } else if (reflexVR.includes('BOOST')) {
+            loadVR -= 4; // GPU clocks pinned, slight CPU polling
+        } else {
+            loadVR += 8; // Severe motion-to-photon latency penalty in stereo VR
         }
 
         if (isFpsOffVR) {
-            loadVR += 15; // Uncapped VR causes extreme stereo pacing stutter
+            loadVR += 14; // Uncapped VR causes extreme stereo pacing stutter
         } else if (fpsCapVR <= 36) {
-            loadVR -= 12; // 1/3 reprojection / 36 FPS
+            loadVR -= 10; // 1/3 reprojection / 36 FPS
         } else if (fpsCapVR <= 45) {
             loadVR -= 6;  // 1/2 sync at 45 FPS
         } else if (fpsCapVR <= 60) {
             loadVR += 2;
         } else if (fpsCapVR <= 80) {
-            loadVR += 10;
+            loadVR += 8;
         } else {
-            loadVR += 18; // 90+ FPS native stereo without reprojection
+            loadVR += 14; // 90+ FPS native stereo without reprojection
         }
 
         if (window.smartLodActive || (msfsSettingsMatrixData && msfsSettingsMatrixData.autofps_active)) {
-            loadVR = Math.max(16, loadVR - 10);
+            loadVR = Math.max(14, loadVR - 10);
         }
 
-        loadVR = Math.min(99, Math.max(16, Math.round(loadVR)));
+        loadVR = Math.min(99, Math.max(14, Math.round(loadVR)));
 
         let fpsVRTag = isFpsOffVR ? 'Uncapped' : `${Math.round(fpsCapVR)} FPS`;
         let reprojDesc = reprojVR.includes('1/2') ? '1/2 Reprojection' : (reprojVR.includes('OFF') ? 'Reproj OFF' : reprojVR);
         let badgeVR = 'OPTIMUM';
         let colorVR = 'emerald';
         let descVR = `Stereo sync (${reprojDesc} • ${fpsVRTag}) • TLOD ${tlodVR}`;
-        if (loadVR > 74) {
+        if (loadVR > 78) {
             badgeVR = 'HAZARD';
             colorVR = 'rose';
             descVR = `Judder risk • ${fpsVRTag}`;
-        } else if (loadVR >= 48) {
+        } else if (loadVR >= 56) {
             badgeVR = 'BALANCED';
             colorVR = 'amber';
             descVR = `Tight stereo cadence • ${fpsVRTag}`;
