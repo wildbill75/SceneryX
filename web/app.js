@@ -75,13 +75,31 @@ function rebuildAirportsByIcaoIndex() {
     lastIndexedAirportsRef = allAirportsData;
 }
 
+const HISTORIC_AIRPORTS = {
+    'EDDT': { lat: 52.5597, lon: 13.2877, name: 'Berlin Tegel Airport', city: 'Berlin', country: 'Germany' }
+};
+
 function getAirportByIcao(icao) {
     if (!icao) return null;
     if (isAirportsIndexDirty || lastIndexedAirportsRef !== allAirportsData || airportsByIcao.size === 0) {
         rebuildAirportsByIcaoIndex();
     }
     const clean = String(icao).toUpperCase().trim();
-    return airportsByIcao.get(clean) || null;
+    if (airportsByIcao.has(clean)) return airportsByIcao.get(clean);
+    if (HISTORIC_AIRPORTS[clean]) {
+        const h = HISTORIC_AIRPORTS[clean];
+        return {
+            icao: clean,
+            lat: h.lat,
+            lon: h.lon,
+            name: h.name,
+            city: h.city,
+            country: h.country,
+            pricing_type: 'Default',
+            is_default: true
+        };
+    }
+    return null;
 }
 
 function getCleanCityName(rawCity) {
@@ -473,6 +491,28 @@ function getAirlineIata(al) {
     if (AIRLINE_TO_IATA_LOWER[lower]) return AIRLINE_TO_IATA_LOWER[lower];
     if (clean.length === 2 && clean === clean.toUpperCase()) return clean;
     return null;
+}
+
+function getAirlineLogoUrls(al) {
+    if (!al) return { logoUrl: '', fallbackLogoUrl: '' };
+    const clean = al.trim();
+    const lower = clean.toLowerCase();
+
+    // Specific overrides for airlines with reassigned/legacy IATA codes (e.g. Air Berlin vs Bonza)
+    if (lower === 'air berlin' || lower === 'airberlin') {
+        return {
+            logoUrl: 'assets/logos/airberlin.svg',
+            fallbackLogoUrl: 'assets/logos/airberlin.svg'
+        };
+    }
+
+    const iata = getAirlineIata(al);
+    if (!iata) return { logoUrl: '', fallbackLogoUrl: '' };
+
+    return {
+        logoUrl: `https://pics.avs.io/300/100/${iata}.png`,
+        fallbackLogoUrl: `https://images.kiwi.com/airlines/128x128/${iata}.png`
+    };
 }
 
 function updateAirlinePillsUI(ap) {
@@ -5902,7 +5942,7 @@ function updateRadialAirlinesModalPosition(force = false) {
         const topPos = Math.round(headerBottom + 16);
         const maxH = Math.max(300, window.innerHeight - topPos - 20);
 
-        modal.style.left = '20px';
+        modal.style.left = '120px';
         modal.style.top = `${topPos}px`;
         modal.style.bottom = 'auto';
         modal.style.right = 'auto';
@@ -6513,9 +6553,7 @@ function renderRadialOperatingAirlines(ap, autoSelectFirst = false) {
 
     listEl.innerHTML = airlines.map(al => {
         const isActive = selectedAirlines.has(al) && (activeRouteOrigin && activeRouteOrigin.icao === ap.icao);
-        const iata = getAirlineIata(al);
-        const logoUrl = iata ? `https://pics.avs.io/300/100/${iata}.png` : '';
-        const fallbackLogoUrl = iata ? `https://images.kiwi.com/airlines/128x128/${iata}.png` : '';
+        const { logoUrl, fallbackLogoUrl } = getAirlineLogoUrls(al);
         const safeAl = al.replace(/'/g, "\\'");
         const safeAttrAl = al.replace(/"/g, '&quot;');
         const dests = getFlightCount(al);
@@ -10667,9 +10705,7 @@ function showAirportDetails(ap, calledFromCountryMode = false) {
             airlinesCountEl.innerText = `${airlines.length} ${t('drawer.airlines_count', 'Airlines')}`;
             airlinesListEl.innerHTML = airlines.map(al => {
                 const isActive = selectedAirlines.has(al) && (activeRouteOrigin && activeRouteOrigin.icao === ap.icao);
-                const iata = getAirlineIata(al);
-                const logoUrl = iata ? `https://pics.avs.io/300/100/${iata}.png` : '';
-                const fallbackLogoUrl = iata ? `https://images.kiwi.com/airlines/128x128/${iata}.png` : '';
+                const { logoUrl, fallbackLogoUrl } = getAirlineLogoUrls(al);
                 const safeAl = al.replace(/'/g, "\\'");
                 const safeAttrAl = al.replace(/"/g, '&quot;');
                 const dests = getFlightCount(al);
