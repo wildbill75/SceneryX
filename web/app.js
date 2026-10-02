@@ -16410,7 +16410,7 @@ function openFloatingWindow(winKey, targetAp = null) {
     } else if (winKey === 'graphics') {
         if (typeof loadRigDiagnostics === 'function') loadRigDiagnostics();
         else if (typeof renderMsfsSettingsMatrix === 'function') renderMsfsSettingsMatrix();
-        if (typeof fetchAndRenderCustomProfiles === 'function') fetchAndRenderCustomProfiles();
+        if (typeof fetchAndRenderCustomProfiles === 'function') fetchAndRenderCustomProfiles(true);
     } else if (winKey === 'smart_lod') {
         if (typeof fetchSmartLodStatus === 'function') fetchSmartLodStatus();
     } else if (winKey === 'telemetry' || winKey === 'blackbox') {
@@ -19701,7 +19701,17 @@ function formatProfileDate(dateStr) {
     }
 }
 
-async function fetchAndRenderCustomProfiles() {
+function detectProfileCategoryMode(profile) {
+    if (!profile) return '2D';
+    const name = String(profile.name || '').toLowerCase();
+    const id = String(profile.id || '').toLowerCase();
+    if (/\b(?:vr|3d)\b/i.test(name) || id.includes('vr') || id.includes('3d') || name.includes('vr') || name.includes('3d')) {
+        return 'VR';
+    }
+    return '2D';
+}
+
+async function fetchAndRenderCustomProfiles(autoSwitchMode = false) {
     const dropdown = document.getElementById('opt-profiles-dropdown');
     const input = document.getElementById('opt-profile-universal-input');
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.get_custom_profiles) return;
@@ -19721,6 +19731,13 @@ async function fetchAndRenderCustomProfiles() {
         let activeProfile = currentCustomProfiles.find(p => p.is_active);
         if (!activeProfile && currentCustomProfiles.length > 0) {
             activeProfile = currentCustomProfiles[0];
+        }
+
+        if (autoSwitchMode && activeProfile) {
+            const targetMode = detectProfileCategoryMode(activeProfile);
+            if (typeof switchMsfsGraphicsMode === 'function') {
+                switchMsfsGraphicsMode(targetMode, false);
+            }
         }
 
         // Hidden select synchronization
@@ -19952,6 +19969,12 @@ async function selectCustomProfileItem(profileId) {
     }
     closeAllProfileDropdowns();
 
+    // Automatically switch to the matching category (2D or VR)
+    const targetMode = detectProfileCategoryMode(profile);
+    if (typeof switchMsfsGraphicsMode === 'function') {
+        switchMsfsGraphicsMode(targetMode, false);
+    }
+
     // Immediately load the selected profile into the main window and active session
     if (window.pywebview && window.pywebview.api && window.pywebview.api.activate_custom_profile) {
         try {
@@ -19961,7 +19984,7 @@ async function selectCustomProfileItem(profileId) {
                 if (typeof showToast === 'function') {
                     showToast(`Profile "${profile.name}" loaded into editor!`, 'info');
                 }
-                await fetchAndRenderCustomProfiles();
+                await fetchAndRenderCustomProfiles(false);
                 await loadRigDiagnostics();
             } else {
                 if (typeof showToast === 'function') {
@@ -20307,13 +20330,21 @@ async function activateSelectedCustomProfile() {
         return;
     }
 
+    const profile = currentCustomProfiles.find(p => p.id === profileId);
+    if (profile) {
+        const targetMode = detectProfileCategoryMode(profile);
+        if (typeof switchMsfsGraphicsMode === 'function') {
+            switchMsfsGraphicsMode(targetMode, false);
+        }
+    }
+
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.activate_custom_profile) return;
     try {
         const resStr = await window.pywebview.api.activate_custom_profile(profileId);
         const res = JSON.parse(resStr);
         if (res.status === 'success') {
             if (typeof showToast === 'function') showToast(`Profile "${res.profile_name}" activated into MSFS!`, 'success');
-            await fetchAndRenderCustomProfiles();
+            await fetchAndRenderCustomProfiles(false);
             await loadRigDiagnostics();
         } else {
             if (typeof showToast === 'function') showToast(`Activation failed: ${res.message}`, 'error');
@@ -20390,7 +20421,7 @@ async function deleteSelectedCustomProfile(profileIdsToDelete) {
             selectedProfileId = '';
             multiSelectedProfileIds.clear();
             closeAllProfileDropdowns();
-            await fetchAndRenderCustomProfiles();
+            await fetchAndRenderCustomProfiles(true);
             await loadRigDiagnostics();
         } else {
             if (typeof showToast === 'function') showToast(`Delete failed: ${res.message}`, 'error');

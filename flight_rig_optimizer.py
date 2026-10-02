@@ -2381,49 +2381,46 @@ def generate_default_rig_profiles(user_cfg_path: Optional[str] = None) -> List[D
     content_2d = calibrated_content
     content_2d = apply_setting_to_content(content_2d, "2D", "max_frame_rate", str(target_2d_fps))
 
-    # 3D Profile Content: FrameLimiter = target_vr_fps, TargetFrameRateVR = target_vr_fps
-    content_3d = calibrated_content
-    content_3d = apply_setting_to_content(content_3d, "VR", "max_frame_rate", str(target_vr_fps))
-
-    # Shared Profile Content
-    content_shared = calibrated_content
+    # VR Profile Content: FrameLimiter = target_vr_fps, TargetFrameRateVR = target_vr_fps
+    content_vr = calibrated_content
+    content_vr = apply_setting_to_content(content_vr, "VR", "max_frame_rate", str(target_vr_fps))
 
     now = datetime.now()
-    t_shared = (now - timedelta(seconds=2)).strftime("%Y-%m-%d %H:%M:%S")
-    t_3d = (now - timedelta(seconds=1)).strftime("%Y-%m-%d %H:%M:%S")
+    t_vr = (now - timedelta(seconds=1)).strftime("%Y-%m-%d %H:%M:%S")
     t_2d = now.strftime("%Y-%m-%d %H:%M:%S")
 
-    id_shared = "profile_default_shared"
-    id_3d = "profile_default_3d"
+    id_vr = "profile_default_vr"
     id_2d = "profile_default_2d"
 
     prof_2d = {
         "id": id_2d,
-        "name": "2D Profile",
+        "name": "Default 2D Profile",
         "created_at": t_2d,
         "updated_at": t_2d,
         "content": content_2d,
         "is_active": True
     }
-    prof_3d = {
-        "id": id_3d,
-        "name": "3D Profile",
-        "created_at": t_3d,
-        "updated_at": t_3d,
-        "content": content_3d,
-        "is_active": False
-    }
-    prof_shared = {
-        "id": id_shared,
-        "name": "Shared Profile",
-        "created_at": t_shared,
-        "updated_at": t_shared,
-        "content": content_shared,
+    prof_vr = {
+        "id": id_vr,
+        "name": "Default VR Profile",
+        "created_at": t_vr,
+        "updated_at": t_vr,
+        "content": content_vr,
         "is_active": False
     }
 
-    # Save all 3 profiles to profiles_dir and mirror to workspace
-    for pdata in [prof_2d, prof_3d, prof_shared]:
+    # Clean up obsolete default profile files if present
+    for obsolete_id in ["profile_default_shared", "profile_default_3d"]:
+        for d in [profiles_dir, ws_dir]:
+            fpath = os.path.join(d, f"{obsolete_id}.profile.json")
+            if os.path.exists(fpath):
+                try:
+                    os.remove(fpath)
+                except Exception:
+                    pass
+
+    # Save both profiles to profiles_dir and mirror to workspace
+    for pdata in [prof_2d, prof_vr]:
         pfile = os.path.join(profiles_dir, f"{pdata['id']}.profile.json")
         try:
             with open(pfile, "w", encoding="utf-8") as pf:
@@ -2437,10 +2434,10 @@ def generate_default_rig_profiles(user_cfg_path: Optional[str] = None) -> List[D
             except Exception:
                 pass
 
-    # Set 2D Profile as the active profile
+    # Set Default 2D Profile as the active profile
     set_active_profile_id(id_2d)
 
-    # Immediately activate 2D Profile in MSFS UserCfg.opt on disk
+    # Immediately activate Default 2D Profile in MSFS UserCfg.opt on disk
     if path and os.path.exists(path):
         try:
             ensure_original_user_cfg_backup(path)
@@ -2450,7 +2447,7 @@ def generate_default_rig_profiles(user_cfg_path: Optional[str] = None) -> List[D
             pass
 
     clear_staged_settings()
-    return [prof_2d, prof_3d, prof_shared]
+    return [prof_2d, prof_vr]
 
 
 
