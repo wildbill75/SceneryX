@@ -18372,9 +18372,9 @@ function renderMsfsSettingsMatrix() {
                 </div>
                 ${inputHtml}
                 ${item.rec_guidance ? `
-                    <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-950/70 border border-slate-800/80 text-[10px] leading-tight text-slate-300 font-medium">
-                        <span class="text-cyan-400 font-bold shrink-0">🎯 Conseil :</span>
-                        <span class="truncate" title="${item.rec_guidance.replace(/"/g, '&quot;')}">${item.rec_guidance}</span>
+                    <div class="flex items-center gap-1.5 pt-0.5 px-0.5 text-[11px] leading-tight text-slate-400 font-normal">
+                        <span class="font-bold text-slate-200 tracking-wide uppercase shrink-0">TIP:</span>
+                        <span class="truncate text-slate-400" title="${item.rec_guidance.replace(/"/g, '&quot;')}">${item.rec_guidance}</span>
                     </div>
                 ` : ''}
             </div>
