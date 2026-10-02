@@ -18483,16 +18483,16 @@ function renderMsfsSettingsMatrix() {
                     }
 
                     let textClass = 'text-amber-400 font-semibold';
-                    let tagBadgeClass = 'bg-amber-950/80 text-amber-300 border border-amber-700/60';
+                    let tagBadgeClass = 'bg-amber-600 text-white font-bold';
                     if (optRating === 'optimum') {
                         textClass = 'text-emerald-300 font-semibold';
-                        tagBadgeClass = 'bg-emerald-950/80 text-emerald-300 border border-emerald-700/60';
+                        tagBadgeClass = 'bg-emerald-600 text-white font-bold';
                     } else if (optRating === 'suboptimal') {
                         textClass = 'text-orange-400 font-semibold';
-                        tagBadgeClass = 'bg-orange-950/80 text-orange-300 border border-orange-700/60';
+                        tagBadgeClass = 'bg-orange-600 text-white font-bold';
                     } else if (optRating === 'hazard') {
                         textClass = 'text-rose-400 font-semibold';
-                        tagBadgeClass = 'bg-rose-950/80 text-rose-300 border border-rose-700/60';
+                        tagBadgeClass = 'bg-rose-600 text-white font-bold';
                     }
                     return `
                         <div class="px-3 py-1.5 hover:bg-slate-800 ${isCur ? 'bg-slate-800/90 text-white font-semibold' : textClass} cursor-pointer transition-colors flex items-center justify-between typo-input-val text-xs font-semibold tabular-nums select-none"
@@ -18502,8 +18502,8 @@ function renderMsfsSettingsMatrix() {
                              onmousedown="selectComboboxPreset('${item.key}', '${optEscaped}', ${item.min_val ?? 0}, ${item.max_val ?? 400})">
                             <span class="font-semibold tabular-nums">${opt}</span>
                             <div class="flex items-center gap-1.5 shrink-0">
-                                ${optTag ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded tracking-wide ${tagBadgeClass}">${optTag}</span>` : ''}
-                                ${isCur ? '<span class="text-[9px] font-semibold bg-slate-700 text-slate-200 px-1.5 py-0.5 rounded typo-action-btn uppercase">CURRENT</span>' : ''}
+                                ${optTag ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded tracking-wide uppercase shadow-sm ${tagBadgeClass}">${optTag}</span>` : ''}
+                                ${isCur ? '<span class="text-[9px] font-semibold bg-slate-700 text-white px-1.5 py-0.5 rounded typo-action-btn uppercase shadow-sm">CURRENT</span>' : ''}
                             </div>
                         </div>
                     `;
@@ -18588,16 +18588,16 @@ function renderMsfsSettingsMatrix() {
                     }
 
                     let textClass = 'text-amber-400 font-semibold';
-                    let tagBadgeClass = 'bg-amber-950/80 text-amber-300 border border-amber-700/60';
+                    let tagBadgeClass = 'bg-amber-600 text-white font-bold';
                     if (optRating === 'optimum') {
                         textClass = 'text-emerald-400 font-semibold';
-                        tagBadgeClass = 'bg-emerald-950/80 text-emerald-300 border border-emerald-700/60';
+                        tagBadgeClass = 'bg-emerald-600 text-white font-bold';
                     } else if (optRating === 'suboptimal') {
                         textClass = 'text-orange-400 font-semibold';
-                        tagBadgeClass = 'bg-orange-950/80 text-orange-300 border border-orange-700/60';
+                        tagBadgeClass = 'bg-orange-600 text-white font-bold';
                     } else if (optRating === 'hazard') {
                         textClass = 'text-rose-400 font-semibold';
-                        tagBadgeClass = 'bg-rose-950/80 text-rose-300 border border-rose-700/60';
+                        tagBadgeClass = 'bg-rose-600 text-white font-bold';
                     }
 
                     return `
@@ -18608,8 +18608,8 @@ function renderMsfsSettingsMatrix() {
                              onmousedown="selectCustomOption('${item.key}', '${optEscaped}')">
                             <span class="${textClass} truncate">${opt}</span>
                             <div class="flex items-center gap-1.5 shrink-0">
-                                <span class="text-[9px] font-bold px-1.5 py-0.5 rounded tracking-wide ${tagBadgeClass}">${optTag}</span>
-                                ${isSelected ? '<span class="text-[9px] font-semibold bg-slate-700 text-slate-200 px-1.5 py-0.5 rounded typo-action-btn uppercase">CURRENT</span>' : ''}
+                                <span class="text-[9px] font-bold px-1.5 py-0.5 rounded tracking-wide uppercase shadow-sm ${tagBadgeClass}">${optTag}</span>
+                                ${isSelected ? '<span class="text-[9px] font-semibold bg-slate-700 text-white px-1.5 py-0.5 rounded typo-action-btn uppercase shadow-sm">CURRENT</span>' : ''}
                             </div>
                         </div>
                     `;
