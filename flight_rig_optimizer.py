@@ -3021,34 +3021,34 @@ def calculate_option_ratings(key: str, options: List[str], is_liner: bool, is_vr
 
         elif key == "grass":
             opt_lead = o_up.split("(")[0].strip()
-            if is_liner:
+            if is_vr:
                 if "LOW" in opt_lead:
                     r, c = "optimum", "emerald"
-                    reason = "Minimal 3D turf: eliminates unneeded 3D grass triangles on concrete runways, saving apron draw calls."
+                    reason = "Minimal 3D turf: saves critical stereo alpha fill rate and apron draw calls in VR."
                 elif "MEDIUM" in opt_lead:
                     r, c = "acceptable", "amber"
-                    reason = "Moderate turf density: subtle grass along taxiway borders with low alpha-testing cost."
+                    reason = "Balanced grass density: realistic grass strips with controlled VR stereo fill-rate overhead."
                 elif "HIGH" in opt_lead:
-                    r, c = "acceptable", "amber"
-                    reason = "Dense 3D grass: adds unnecessary vertex overhead during airline operations on concrete pavements."
-                else: # ULTRA
                     r, c = "suboptimal", "orange"
-                    reason = "Maximum blade density + wild flowers: heavy alpha-blending and vertex passes around airfield perimeters."
-            else: # GA / Bush
-                if is_vr:
+                    reason = "Heavy grass density: noticeable stereo reprojection load when taxiing on runways and grass strips in VR."
+                else: # ULTRA in VR
+                    r, c = "hazard", "rose"
+                    reason = "HAZARD in VR: dense grass geometry overtaxes stereo rasterization and causes headset judder."
+            else: # 2D Desktop
+                if is_liner:
                     if "LOW" in opt_lead:
                         r, c = "optimum", "emerald"
-                        reason = "Lightweight turf: saves critical stereo alpha fill rate on VR flight decks."
+                        reason = "Minimal 3D turf: eliminates unneeded 3D grass triangles on concrete runways, saving apron draw calls."
                     elif "MEDIUM" in opt_lead:
                         r, c = "acceptable", "amber"
-                        reason = "Balanced grass density: realistic grass strips with controlled VR fill-rate overhead."
+                        reason = "Moderate turf density: subtle grass along taxiway borders with low alpha-testing cost."
                     elif "HIGH" in opt_lead:
-                        r, c = "suboptimal", "orange"
-                        reason = "Heavy grass density: noticeable stereo reprojection load when taxiing on grass strips in VR."
+                        r, c = "acceptable", "amber"
+                        reason = "Dense 3D grass: adds unnecessary vertex overhead during airline operations on concrete pavements."
                     else: # ULTRA
-                        r, c = "hazard", "rose"
-                        reason = "HAZARD in VR: dense grass geometry overtaxes stereo rasterization and causes headset judder."
-                else: # 2D GA
+                        r, c = "suboptimal", "orange"
+                        reason = "Maximum blade density + wild flowers: heavy alpha-blending and vertex passes around airfield perimeters."
+                else: # 2D GA / Bush
                     if "HIGH" in opt_lead:
                         r, c = "optimum", "emerald"
                         reason = "Rich 3D turf and wild flowers: authentic grass strip immersion for low-altitude bush flying."
@@ -3082,8 +3082,8 @@ def calculate_option_ratings(key: str, options: List[str], is_liner: bool, is_vr
                     r, c = "optimum", "emerald"
                     reason = "12 Raymarching Samples / 48 steps: excellent volumetric light scattering with 15-20% faster frame times than Ultra."
                 elif "ULTRA" in opt_lead:
-                    r, c = ("optimum", "emerald") if is_flagship_gpu else ("acceptable", "amber")
-                    reason = "16 Raymarching Samples / 64 steps: full volumetric density, costs 3-4ms extra GPU rasterization time in dense overcast."
+                    r, c = ("suboptimal", "orange") if is_entry_gpu else ("acceptable", "amber")
+                    reason = "16 Raymarching Samples / 64 steps: full volumetric density, but costs 3-4ms extra GPU frame time in dense overcast and storms."
                 elif "MEDIUM" in opt_lead:
                     r, c = "acceptable", "amber"
                     reason = "8 Raymarching Samples / 32 steps: solid cloud density with fast compute, subtle pixelation on cloud edges."
@@ -3125,8 +3125,8 @@ def calculate_option_ratings(key: str, options: List[str], is_liner: bool, is_vr
                     r, c = "optimum", "emerald"
                     reason = "Standard extrusion + 2K facade atlases: sharp urban skylines with ~25% lower draw calls and stable VRAM headroom."
                 elif "ULTRA" in opt_lead:
-                    r, c = ("optimum", "emerald") if is_flagship_gpu else ("acceptable", "amber")
-                    reason = "Full footprint extrusion + 4K facade atlases: maximum building LOD distance, high draw call volume at large metropolitan centers."
+                    r, c = ("suboptimal", "orange") if is_entry_gpu else ("acceptable", "amber")
+                    reason = "Full footprint extrusion + 4K facade atlases: maximum building LOD distance, but adds ~25% extra autogen draw calls at major hubs."
                 elif "MEDIUM" in opt_lead:
                     r, c = "acceptable", "amber"
                     reason = "Simplified building meshes + 1K atlases: good performance on mid-tier hardware with minor rooftop detail loss."
@@ -3154,8 +3154,8 @@ def calculate_option_ratings(key: str, options: List[str], is_liner: bool, is_vr
                     r, c = "optimum", "emerald"
                     reason = "Dense 3D tree canopies with optimized LOD falloff: realistic forests with negligible GPU/CPU overhead."
                 elif "ULTRA" in opt_lead:
-                    r, c = ("optimum", "emerald") if is_flagship_gpu else ("acceptable", "amber")
-                    reason = "Highest 3D canopy density + extended draw distance: maximum foliage richness, heavy vertex workload over dense forests."
+                    r, c = ("suboptimal", "orange") if is_entry_gpu else ("acceptable", "amber")
+                    reason = "Highest 3D canopy density + extended draw distance: maximum foliage richness, but heavy vertex and shadow cascade passes over dense forests."
                 elif "MEDIUM" in opt_lead:
                     r, c = "acceptable", "amber"
                     reason = "Balanced canopy density: reduces foliage triangle count by ~30%, good for entry-level GPUs."
@@ -3238,8 +3238,8 @@ def calculate_option_ratings(key: str, options: List[str], is_liner: bool, is_vr
                     r, c = "optimum", "emerald"
                     reason = "512x512 FFT simulation grid: realistic wave swells and shoreline ripples with negligible compute overhead."
                 elif any(k in o_up for k in ["1024", "ULTRA"]):
-                    r, c = ("optimum", "emerald") if is_flagship_gpu else ("acceptable", "amber")
-                    reason = "1024x1024 FFT simulation grid: fine wave cresting and dynamic foam, requires high compute shader passes."
+                    r, c = ("suboptimal", "orange") if is_entry_gpu else ("acceptable", "amber")
+                    reason = "1024x1024 FFT simulation grid: fine wave cresting and dynamic foam, requires heavy compute shader passes with minor visual difference from altitude."
                 elif any(k in o_up for k in ["256", "MEDIUM"]):
                     r, c = "acceptable", "amber"
                     reason = "256x256 FFT simulation grid: clean ocean swell patterns with low compute overhead."
@@ -4028,22 +4028,22 @@ def generate_rig_setting_implications(
     elif key == "volumetric_clouds":
         pipe_text = "Raymarches through 3D density voxel fields to simulate realistic cloud formations, light scattering, multiple phase functions, and atmospheric transmittance in real time."
         cpu_detail = f"Negligible computational load on your <strong>{cpu_name}</strong>. Cloud field positions and weather transitions are passed directly to GPU compute shaders."
-        if is_flagship_gpu:
-            gpu_detail = f"On your <strong>{gpu_name}</strong> ({vram_gb:.0f} GB VRAM - Flagship Monster): Massive compute array powers through volumetric raymarching effortlessly (~1.8ms GPU frame time). Even inside heavy multi-layered overcast decks, your GPU maintains high framerates without thermal or fill-rate throttling."
-            verdict_text = "Recommended: <strong>ULTRA</strong> for maximum meteorological realism and cloud edge definition."
-            gpu_note = f"On your {gpu_name}: Volumetric 3D density raymarching effortlessly handled (~4-5/12 load)."
+        if is_vr:
+            gpu_detail = f"On your <strong>{gpu_name}</strong> (VR Stereo): Volumetric raymarching is rendered per eye. Ultra (16 samples) overtaxes stereo frame times, triggering severe reprojection judder in overcast skies. Medium (8 samples) preserves stereo fill rate and maintains steady frame pacing."
+            verdict_text = "Recommended in VR: <strong>MEDIUM</strong> to protect stereo fill rate and maintain steady frame pacing during overcast weather."
+            gpu_note = f"On your {gpu_name} (VR): 8-sample raymarching preserves stereo fill rate (~3-4/12 load)."
+        elif is_flagship_gpu:
+            gpu_detail = f"On your <strong>{gpu_name}</strong> ({vram_gb:.0f} GB VRAM - Flagship Monster): Massive compute array powers through volumetric raymarching effortlessly (~1.8ms GPU frame time). High provides 12-sample raymarching with 15-20% faster frame times than Ultra for virtually identical fidelity."
+            verdict_text = "Recommended: <strong>HIGH</strong>. Near-identical photorealism to Ultra (+15% FPS) with rock-solid framerate margin in storms."
+            gpu_note = f"On your {gpu_name}: 12-sample volumetric raymarching smoothly handled (~4/12 load)."
         elif is_vram_constrained or is_entry_gpu:
             gpu_detail = f"On your <strong>{gpu_name}</strong> ({vram_gb:.0f} GB VRAM): High arithmetic shader and texture filtering workload. Inside thick thunderstorm cells, Ultra clouds can cause GPU frame time to increase noticeably (~8-10ms), causing frame drops."
             verdict_text = "Recommended: <strong>HIGH or MEDIUM</strong> to maintain smooth framerates in heavy overcast weather."
             gpu_note = f"On your {gpu_name}: High shader load in dense clouds (~8-11/12 load). High or Medium recommended."
-        elif is_high_tier_gpu:
-            gpu_detail = f"On your <strong>{gpu_name}</strong>: The advanced compute architecture chews through volumetric raymarching effortlessly (~2.5ms GPU frame time). Even inside heavy multi-layered overcast decks, your GPU maintains high framerates."
-            verdict_text = "Recommended: <strong>ULTRA</strong> for maximum meteorological realism, or <strong>HIGH</strong> if maximizing framerate in stormy weather."
-            gpu_note = f"On your {gpu_name}: Raymarching compute pass. High arithmetic load inside overcast layers (~6-8/12 load)."
         else:
-            gpu_detail = f"On your <strong>{gpu_name}</strong> ({vram_gb:.0f} GB): High arithmetic shader workload. Inside thick clouds, Ultra can increase frame times."
-            verdict_text = "Recommended: <strong>HIGH</strong>."
-            gpu_note = f"On your {gpu_name}: Volumetric raymarching (~7/12 load)."
+            gpu_detail = f"On your <strong>{gpu_name}</strong>: The advanced compute architecture handles volumetric raymarching smoothly (~2.5ms GPU frame time). High provides optimal boundary scattering with 15-20% headroom over Ultra."
+            verdict_text = "Recommended: <strong>HIGH</strong>. Near-identical photorealism to Ultra with stable frame delivery."
+            gpu_note = f"On your {gpu_name}: Volumetric raymarching (~5-6/12 load)."
         cpu_note = f"On your {cpu_name}: Zero compute overhead; cloud simulation is offloaded entirely to GPU shaders."
 
     elif key in ["glass_cockpit_refresh", "glass_cockpits"]:
@@ -4221,26 +4221,12 @@ def generate_rig_setting_implications(
         cpu_detail = f"On your <strong>{cpu_name}</strong>: Evaluates spatial quadtree queries and submits instanced building draw calls. High/Ultra increases draw calls over dense metropolitan areas (e.g. London, New York)."
         if is_vr:
             gpu_detail = f"On your <strong>{gpu_name}</strong> in VR: Autogen building geometry and facade textures must be rasterized twice per frame in stereo. High/Ultra increases vertex overhead and texture memory streaming against tight reprojection budgets."
-            verdict_text = "Recommended in VR: <strong>MEDIUM or LOW</strong>. Protects stereo frame pacing, eliminates draw-call spikes, and preserves critical VRAM for smooth head tracking."
+            verdict_text = "Recommended in VR: <strong>MEDIUM</strong>. Protects stereo frame pacing, eliminates draw-call spikes, and preserves critical VRAM for smooth head tracking."
             cpu_note = f"On your {cpu_name}: Autogen building spatial queries and draw-call dispatch."
             gpu_note = f"On your {gpu_name}: Lightweight building geometry protects VR stereo reprojection and frees VRAM."
         else:
-            if is_flagship_gpu:
-                gpu_detail = f"On your <strong>{gpu_name}</strong> (Flagship Monster): Procedural building meshes and high-resolution facade texture atlases are effortlessly rasterized with zero measurable framerate penalty in your {vram_gb:.0f} GB buffer."
-                verdict_text = "Recommended: <strong>HIGH or ULTRA</strong> for rich urban density and realistic cityscapes."
-            elif is_vram_constrained:
-                gpu_detail = f"On your <strong>{gpu_name}</strong> ({vram_gb:.0f} GB VRAM): High/Ultra building facade texture atlases allocate valuable video memory. At dense payware airports, this risks pushing total VRAM past physical limits."
-                verdict_text = "Recommended: <strong>MEDIUM or LOW</strong> to protect VRAM margin on your 8GB GPU."
-            elif is_high_tier_gpu:
-                if is_liner:
-                    gpu_detail = f"On your <strong>{gpu_name}</strong> ({vram_gb:.0f} GB VRAM): High provides crisp autogen buildings with safe VRAM headroom for payware airliners and complex airport scenery."
-                    verdict_text = "Recommended: <strong>HIGH (or MEDIUM)</strong> for airliners to balance urban visual fidelity with safe VRAM headroom."
-                else:
-                    gpu_detail = f"On your <strong>{gpu_name}</strong>: Detailed urban building meshes and facade reflections rendered cleanly."
-                    verdict_text = "Recommended: <strong>HIGH or ULTRA</strong> for general aviation sightseeing."
-            else:
-                gpu_detail = f"On your <strong>{gpu_name}</strong>: Building geometry and facade textures."
-                verdict_text = "Recommended: <strong>MEDIUM or HIGH</strong> for balanced performance."
+            gpu_detail = f"On your <strong>{gpu_name}</strong>: High provides standard extrusion and 2K facade atlases with ~25% lower draw calls than Ultra and stable VRAM headroom, eliminating city stutters above 500ft."
+            verdict_text = "Recommended: <strong>HIGH</strong>. Crisp urban autogen and controlled draw calls across major metropolitan centers."
             cpu_note = f"On your {cpu_name}: Autogen building spatial queries and draw-call dispatch."
             gpu_note = f"On your {gpu_name} ({vram_gb:.0f} GB): Building geometry and texture streaming."
 
@@ -4249,27 +4235,33 @@ def generate_rig_setting_implications(
         cpu_detail = f"On your <strong>{cpu_name}</strong>: Generates instanced tree coordinate buffers across terrain tiles with minimal MainThread impact."
         if is_vr:
             gpu_detail = f"On your <strong>{gpu_name}</strong> in VR: Dense forest canopies require heavy alpha-tested quad rasterization rendered independently per eye. High/Ultra can degrade stereo frametime over continuous forest approaches."
-            verdict_text = "Recommended in VR: <strong>MEDIUM or LOW</strong> to relieve stereo foliage fill rate and secure locked reprojection."
+            verdict_text = "Recommended in VR: <strong>MEDIUM</strong> to relieve stereo foliage fill rate and secure locked reprojection."
             cpu_note = f"On your {cpu_name}: Instanced foliage positioning."
             gpu_note = f"On your {gpu_name}: Balanced tree canopy preserves stereo fill rate in VR."
         else:
-            gpu_detail = f"On your <strong>{gpu_name}</strong>: Alpha-tested foliage rasterization and shadow self-occlusion. Easily handled by your GPU core count."
-            verdict_text = f"Recommended: <strong>HIGH</strong> (or <strong>ULTRA</strong> for VFR bush flying)."
+            gpu_detail = f"On your <strong>{gpu_name}</strong>: High provides dense 3D tree canopies with optimized LOD falloff; realistic forests with negligible GPU/CPU overhead."
+            verdict_text = "Recommended: <strong>HIGH</strong>. Dense 3D canopies with minimal FPS impact."
             cpu_note = f"On your {cpu_name}: Instanced tree coordinate buffers."
             gpu_note = f"On your {gpu_name}: Foliage rasterization and self-shadowing."
 
     elif key == "grass":
         pipe_text = "Procedural 3D ground vegetation blades, wild meadow flowers, and airfield perimeter shrubs."
-        if is_liner:
+        if is_vr:
+            cpu_detail = f"On your <strong>{cpu_name}</strong>: Procedural meadow vegetation geometry dispatch."
+            gpu_detail = f"On your <strong>{gpu_name}</strong> in VR: Grass blades require dual-eye transparent alpha passes. High/Ultra grass induces severe reprojection judder during landing flare."
+            verdict_text = "Recommended in VR: <strong>LOW</strong>. Eliminates stereo alpha overdraw and prevents headset reprojection judder on airport taxiways."
+            cpu_note = f"On your {cpu_name}: Low grass saves critical draw calls on airfield perimeters."
+            gpu_note = f"On your {gpu_name}: Saves critical stereo alpha fill rate in VR."
+        elif is_liner:
             cpu_detail = f"On your <strong>{cpu_name}</strong>: On paved commercial runways, High/Ultra generates millions of redundant 3D vegetation triangles completely invisible from an airliner flight deck, wasting valuable CPU draw calls during landing flare."
-            gpu_detail = f"On your <strong>{gpu_name}</strong>: Low/Medium eliminates unnecessary ground-level alpha overdraw on concrete aprons and runways."
-            verdict_text = "Recommended for Airliners: <strong>LOW or MEDIUM</strong>. Eliminates millions of useless draw calls on paved runways, preserving critical landing flare framerates."
+            gpu_detail = f"On your <strong>{gpu_name}</strong>: Low eliminates unnecessary ground-level alpha overdraw on concrete aprons and runways."
+            verdict_text = "Recommended for Airliners: <strong>LOW</strong>. Eliminates millions of useless draw calls on paved runways, preserving critical landing flare framerates."
             cpu_note = f"On your {cpu_name}: Saves millions of useless draw calls on concrete runways."
             gpu_note = f"On your {gpu_name}: Eliminates ground-level alpha overdraw during landing."
         else:
             cpu_detail = f"On your <strong>{cpu_name}</strong>: Procedural meadow vegetation geometry."
             gpu_detail = f"On your <strong>{gpu_name}</strong>: 3D grass blades and turf for unpaved grass runways and backcountry strips."
-            verdict_text = f"Recommended for GA: <strong>{'HIGH or ULTRA' if not is_vr else 'MEDIUM or HIGH'}</strong> for immersive grass airstrips."
+            verdict_text = "Recommended for GA: <strong>HIGH</strong> for immersive grass airstrips and backcountry strips."
             cpu_note = f"On your {cpu_name}: Procedural ground vegetation geometry."
             gpu_note = f"On your {gpu_name}: 3D grass and flower rasterization."
 
@@ -4284,10 +4276,16 @@ def generate_rig_setting_implications(
     elif key == "water_waves":
         pipe_text = "Computes Fast Fourier Transform (FFT) grid displacement for ocean, lake, and river wave dynamics with screen-space Fresnel reflection shaders."
         cpu_detail = f"On your <strong>{cpu_name}</strong>: Dispatches water simulation tasks to worker threads with virtually zero impact on the MainThread flight loop."
-        gpu_detail = f"On your <strong>{gpu_name}</strong>: Wave vertex displacement and water surface normal mapping shaders."
-        verdict_text = "Recommended: <strong>HIGH</strong>. Outstanding maritime realism along coastal approaches."
-        cpu_note = f"On your {cpu_name}: Wave displacement simulation dispatch. Negligible impact on your CPU."
-        gpu_note = f"On your {gpu_name}: FFT wave simulation and real-time water shader reflection passes."
+        if is_vr:
+            gpu_detail = f"On your <strong>{gpu_name}</strong> in VR: Medium (256) FFT wave simulation provides clean ocean swell patterns while conserving compute shader throughput for stereo presentation."
+            verdict_text = "Recommended in VR: <strong>MEDIUM (256)</strong>. Preserves stereo compute shader budget in VR without noticeable loss in open-water swell animation."
+            cpu_note = f"On your {cpu_name}: Water FFT simulation dispatch."
+            gpu_note = f"On your {gpu_name}: Lightweight FFT wave grid preserves stereo frame budget in VR."
+        else:
+            gpu_detail = f"On your <strong>{gpu_name}</strong>: High (512) FFT wave simulation delivers realistic wave swells and shoreline ripples with negligible compute overhead."
+            verdict_text = "Recommended: <strong>HIGH (512)</strong>. Outstanding maritime realism without GPU compute penalty."
+            cpu_note = f"On your {cpu_name}: Wave displacement simulation dispatch. Negligible impact on your CPU."
+            gpu_note = f"On your {gpu_name}: 512x512 FFT wave simulation with negligible compute overhead."
 
     elif key in ["windshield_effects", "particles"]:
         pipe_text = "Simulates procedural rain droplet physics, condensation, engine contrails, smoke plumes, and touchdown tire smoke."
@@ -6616,19 +6614,59 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
         # PAGE 3: ENVIRONMENT (5)
         make_setting_item(
             "buildings", "Buildings Quality", bld_2d_val, bld_2d_raw, False,
-            "optimum" if bld_2d_val == "High" else "acceptable",
-            "emerald" if bld_2d_val == "High" else "amber",
-            "OPTIMUM" if bld_2d_val == "High" else "ACCEPTABLE",
+            "optimum" if bld_2d_val == "High" else ("suboptimal" if bld_2d_val == "Low" else "acceptable"),
+            "emerald" if bld_2d_val == "High" else ("orange" if bld_2d_val == "Low" else "amber"),
+            "OPTIMUM" if bld_2d_val == "High" else ("SUBOPTIMAL" if bld_2d_val == "Low" else "ACCEPTABLE"),
             f"Description: Blackshark AI procedural 3D building footprint extrusion, roof geometry, and facade texture atlases for autogen cities.\nCurrent: {bld_2d_val}.\nRecommendation: HIGH for crisp city structures while keeping safe VRAM headroom at busy hubs.",
             q_options, page=3,
-            tag_reason="Balanced autogen building geometry and facade textures with safe VRAM headroom." if bld_2d_val == "High" else "Autogen building geometry evaluated.",
-            rec_guidance="HIGH • Crisp urban autogen and controlled geometry",
+            tag_reason="Standard extrusion + 2K facade atlases: sharp urban skylines with ~25% lower draw calls and stable VRAM headroom." if bld_2d_val == "High" else ("Full footprint extrusion + 4K facade atlases: maximum building LOD distance, but adds ~25% extra autogen draw calls at major hubs." if bld_2d_val == "Ultra" else ("Simplified building meshes + 1K atlases: good performance on mid-tier hardware with minor rooftop detail loss." if bld_2d_val == "Medium" else "Flat rooftops + low-res textures: minimal geometry dispatch, but noticeable suburban pop-in.")),
+            rec_guidance="HIGH • Crisp urban autogen and controlled draw calls",
             is_vr=False
         ),
-        make_setting_item("trees", "Trees Quality", tree_2d_val, tree_2d_raw, False, "optimum" if tree_2d_val == "High" else "acceptable", "emerald" if tree_2d_val == "High" else "amber", "OPTIMUM" if tree_2d_val == "High" else "ACCEPTABLE", f"Description: 3D tree canopy geometry density, draw distance, and foliage shadowing.\nCurrent: {tree_2d_val}.\nRecommendation: HIGH offers rich forests and realistic canopy cover with negligible performance cost.", q_options, page=3, tag_reason="High density 3D foliage with smooth LOD transitions.", rec_guidance="HIGH • Dense 3D canopy with minimal FPS impact", is_vr=False),
-        make_setting_item("grass", "Grass & Bushes", grass_2d_val, grass_2d_raw, False, "optimum" if (grass_2d_val == "Low" if is_liner else grass_2d_val == "High") else "acceptable", "emerald" if (grass_2d_val == "Low" if is_liner else grass_2d_val == "High") else "amber", "OPTIMUM" if (grass_2d_val == "Low" if is_liner else grass_2d_val == "High") else "ACCEPTABLE", f"Description: Ground procedural turf, 3D grass, and wild flowers around airfields.\nCurrent: {grass_2d_val}.\nRecommendation: {'Airliners: LOW eliminates useless 3D grass triangles on concrete runways, saving CPU draw calls.' if is_liner else 'GA: HIGH for realistic grass airfields.'}", q_options, page=3, tag_reason="Airliner concrete operations: Low grass eliminates useless 3D turf draw calls." if is_liner and grass_2d_val == "Low" else "Vegetation density calibrated for flight profile.", rec_guidance="LOW (Liners / Runway pavement) or HIGH (GA / Turf fields)", is_vr=False),
-        make_setting_item("water_waves", "Water Waves Simulation", water_2d_val, water_2d_raw, False, "optimum" if "512" in water_2d_val else "acceptable", "emerald" if "512" in water_2d_val else "amber", "OPTIMUM" if "512" in water_2d_val else "ACCEPTABLE", f"Description: Fast Fourier Transform (FFT) ocean and lake wave simulation resolution grid.\nCurrent: {water_2d_val}.\nRecommendation: HIGH (512) for realistic open water swells without GPU compute penalty.", water_options, page=3, tag_reason="High FFT wave resolution provides realistic ocean swells and reflections.", rec_guidance="HIGH (512) • Realistic ocean swells without GPU compute penalty", is_vr=False),
-        make_setting_item("volumetric_clouds", "Volumetric Clouds", cld_2d_val, cld_2d_raw, False, "optimum" if cld_2d_val == "High" else "acceptable", "emerald" if cld_2d_val == "High" else "amber", "OPTIMUM" if cld_2d_val == "High" else "ACCEPTABLE", f"Description: Raymarched volumetric cloud rendering quality and boundary scattering.\nCurrent: {cld_2d_val}.\nRecommendation: HIGH delivers near-identical visual fidelity to Ultra with 15% better GPU performance in overcast weather.", q_options, page=3, tag_reason="Optimal volumetric raymarching quality without GPU fill-rate drop." if cld_2d_val == "High" else "Cloud quality may impact GPU frame rate during heavy overcast.", rec_guidance="HIGH • Near-identical photorealism to Ultra (+15% FPS)", is_vr=False),
+        make_setting_item(
+            "trees", "Trees Quality", tree_2d_val, tree_2d_raw, False,
+            "optimum" if tree_2d_val == "High" else ("suboptimal" if tree_2d_val == "Low" else "acceptable"),
+            "emerald" if tree_2d_val == "High" else ("orange" if tree_2d_val == "Low" else "amber"),
+            "OPTIMUM" if tree_2d_val == "High" else ("SUBOPTIMAL" if tree_2d_val == "Low" else "ACCEPTABLE"),
+            f"Description: 3D tree canopy geometry density, draw distance, and foliage shadowing.\nCurrent: {tree_2d_val}.\nRecommendation: HIGH offers rich forests and realistic canopy cover with negligible performance cost.",
+            q_options, page=3,
+            tag_reason="Dense 3D tree canopies with optimized LOD falloff: realistic forests with negligible GPU/CPU overhead." if tree_2d_val == "High" else ("Highest 3D canopy density + extended draw distance: maximum foliage richness, but heavy vertex and shadow cascade passes over dense forests." if tree_2d_val == "Ultra" else ("Balanced canopy density: reduces foliage triangle count by ~30%, good for entry-level GPUs." if tree_2d_val == "Medium" else "Sparse tree clustering and aggressive LOD culling: noticeable canopy pop-in during low-altitude flight.")),
+            rec_guidance="HIGH • Dense 3D canopy with minimal FPS impact",
+            is_vr=False
+        ),
+        make_setting_item(
+            "grass", "Grass & Bushes", grass_2d_val, grass_2d_raw, False,
+            "optimum" if (grass_2d_val == "Low" if is_liner else grass_2d_val == "High") else ("suboptimal" if grass_2d_val == "Ultra" else "acceptable"),
+            "emerald" if (grass_2d_val == "Low" if is_liner else grass_2d_val == "High") else ("orange" if grass_2d_val == "Ultra" else "amber"),
+            "OPTIMUM" if (grass_2d_val == "Low" if is_liner else grass_2d_val == "High") else ("SUBOPTIMAL" if grass_2d_val == "Ultra" else "ACCEPTABLE"),
+            f"Description: Ground procedural turf, 3D grass, and wild flowers around airfields.\nCurrent: {grass_2d_val}.\nRecommendation: {'Airliners: LOW eliminates useless 3D grass triangles on concrete runways, saving CPU draw calls.' if is_liner else 'GA: HIGH for realistic grass airfields.'}",
+            q_options, page=3,
+            tag_reason="Minimal 3D turf: eliminates unneeded 3D grass triangles on concrete runways, saving apron draw calls." if is_liner and grass_2d_val == "Low" else ("Rich 3D turf and wild flowers: authentic grass strip immersion for low-altitude bush flying." if not is_liner and grass_2d_val == "High" else ("Maximum blade density + wild flowers: heavy alpha-blending and vertex passes around airfield perimeters." if grass_2d_val == "Ultra" else "Moderate turf density: subtle grass along taxiway borders with low alpha-testing cost.")),
+            rec_guidance="LOW (Liners / Runway pavement) or HIGH (GA / Turf fields)",
+            is_vr=False
+        ),
+        make_setting_item(
+            "water_waves", "Water Waves Simulation", water_2d_val, water_2d_raw, False,
+            "optimum" if "512" in water_2d_val else ("suboptimal" if "128" in water_2d_val else "acceptable"),
+            "emerald" if "512" in water_2d_val else ("orange" if "128" in water_2d_val else "amber"),
+            "OPTIMUM" if "512" in water_2d_val else ("SUBOPTIMAL" if "128" in water_2d_val else "ACCEPTABLE"),
+            f"Description: Fast Fourier Transform (FFT) ocean and lake wave simulation resolution grid.\nCurrent: {water_2d_val}.\nRecommendation: HIGH (512) for realistic open water swells without GPU compute penalty.",
+            water_options, page=3,
+            tag_reason="512x512 FFT simulation grid: realistic wave swells and shoreline ripples with negligible compute overhead." if "512" in water_2d_val else ("1024x1024 FFT simulation grid: fine wave cresting and dynamic foam, requires heavy compute shader passes with minor visual difference from altitude." if "1024" in water_2d_val else ("256x256 FFT simulation grid: clean ocean swell patterns with low compute overhead." if "256" in water_2d_val else "128x128 FFT simulation grid: simplified wave animation, minimal GPU compute.")),
+            rec_guidance="HIGH (512) • Realistic ocean swells without GPU compute penalty",
+            is_vr=False
+        ),
+        make_setting_item(
+            "volumetric_clouds", "Volumetric Clouds", cld_2d_val, cld_2d_raw, False,
+            "optimum" if cld_2d_val == "High" else ("suboptimal" if cld_2d_val == "Low" else "acceptable"),
+            "emerald" if cld_2d_val == "High" else ("orange" if cld_2d_val == "Low" else "amber"),
+            "OPTIMUM" if cld_2d_val == "High" else ("SUBOPTIMAL" if cld_2d_val == "Low" else "ACCEPTABLE"),
+            f"Description: Raymarched volumetric cloud rendering quality and boundary scattering.\nCurrent: {cld_2d_val}.\nRecommendation: HIGH delivers near-identical visual fidelity to Ultra with 15% better GPU performance in overcast weather.",
+            q_options, page=3,
+            tag_reason="12 Raymarching Samples / 48 steps: excellent volumetric light scattering with 15-20% faster frame times than Ultra." if cld_2d_val == "High" else ("16 Raymarching Samples / 64 steps: full volumetric density, but costs 3-4ms extra GPU frame time in dense overcast and storms." if cld_2d_val == "Ultra" else ("8 Raymarching Samples / 32 steps: solid cloud density with fast compute, subtle pixelation on cloud edges." if cld_2d_val == "Medium" else "4 Raymarching Samples / 16 steps: coarse voxel sampling with visible edge dithering.")),
+            rec_guidance="HIGH • Near-identical photorealism to Ultra (+15% FPS)",
+            is_vr=False
+        ),
 
         # PAGE 4: LIGHTING (5)
         make_setting_item("shadow_maps", "Shadow Maps Resolution", shd_2d_val, shd_2d_raw, False, "optimum" if "1536" in shd_2d_val else "acceptable", "emerald" if "1536" in shd_2d_val else "amber", "OPTIMUM" if "1536" in shd_2d_val else "ACCEPTABLE", f"Description: Direct sunlight shadow map buffer resolution for airframe and structures.\nCurrent: {shd_2d_val}.\nRecommendation: HIGH (1536) for clean shadow lines without shimmering.", shadow_options, page=4, tag_reason="High shadow map resolution delivers sharp cockpit and airframe shadows.", rec_guidance="HIGH (1536) • Crisp cockpit and airframe shadows", is_vr=False),
@@ -6731,38 +6769,59 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
         make_setting_item("offscreen_precaching", "Off Screen Pre-Caching", format_precaching_display(pre_vr_val), pre_vr_raw, False, "optimum" if pre_vr_val == "High" else "acceptable", "emerald" if pre_vr_val == "High" else "amber", "OPTIMUM" if pre_vr_val == "High" else "ACCEPTABLE", f"Description: Scenery pre-caching in VR.\nCurrent: {pre_vr_val}.\nRecommendation: HIGH is essential for smooth head rotation in VR without stutter.", precaching_options, page=3, tag_reason="Essential for smooth head rotation without border popping in VR.", rec_guidance="HIGH • Mandatory in VR to eliminate head-turning micro-stutters", is_vr=True),
         make_setting_item("displacement_mapping", "Displacement Mapping", format_disp_display(disp_vr), "1" if disp_vr == "ON" else "0", False, "optimum" if disp_vr == "OFF" else "hazard", "emerald" if disp_vr == "OFF" else "rose", "OPTIMUM" if disp_vr == "OFF" else "HAZARD", f"Description: Displacement micro-tessellation in VR.\nCurrent: {disp_vr}.\nRecommendation: Keep OFF in VR. In VR, displacement mapping severely overloads MainThread and VRAM without visible benefit!", disp_options, page=3, tag_reason="Disabled displacement mapping saves GPU compute and prevents VR stutters." if disp_vr == "OFF" else "HAZARD: Displacement mapping in VR causes severe frame drops and MainThread hitches.", rec_guidance="OFF • Mandatory in VR: eliminates judder and saves MainThread", is_vr=True),
 
-        # PAGE 4: ENVIRONMENT VR (4)
+        # PAGE 4: ENVIRONMENT VR (5)
         make_setting_item(
             "buildings", "Buildings Quality", bld_vr_val, bld_vr_raw, False,
-            "optimum" if bld_vr_val == "Medium" else "acceptable",
-            "emerald" if bld_vr_val == "Medium" else "amber",
-            "OPTIMUM" if bld_vr_val == "Medium" else "ACCEPTABLE",
+            "optimum" if bld_vr_val == "Medium" else ("suboptimal" if bld_vr_val == "Ultra" else "acceptable"),
+            "emerald" if bld_vr_val == "Medium" else ("orange" if bld_vr_val == "Ultra" else "amber"),
+            "OPTIMUM" if bld_vr_val == "Medium" else ("SUBOPTIMAL" if bld_vr_val == "Ultra" else "ACCEPTABLE"),
             f"Description: 3D autogen building fidelity in VR.\nCurrent: {bld_vr_val}.\nRecommendation: MEDIUM in VR to ensure lightweight autogen geometry, save VRAM, and maintain strict stereo reprojection frame budget.",
             q_options, page=4,
-            tag_reason="Lightweight building geometry protects VR stereo reprojection and frees VRAM." if bld_vr_val == "Medium" else "Autogen building geometry evaluated.",
+            tag_reason="Simplified building meshes + 1K atlases: lightweight autogen geometry, optimal for VR stereo frame budgets." if bld_vr_val == "Medium" else ("Standard extrusion + 2K facade atlases: crisp urban skylines with ~25% higher draw calls in VR." if bld_vr_val == "High" else ("Full footprint extrusion + 4K facade atlases: heavy draw call volume and VRAM pressure in VR headset." if bld_vr_val == "Ultra" else "Flat rooftops + low-res textures: minimal geometry dispatch, but noticeable suburban pop-in.")),
             rec_guidance="MEDIUM • Lightweight geometry for stereo frame time budget",
             is_vr=True
         ),
         make_setting_item(
             "trees", "Trees Quality", tree_vr_val, tree_vr_raw, False,
-            "optimum" if tree_vr_val == "Medium" else "acceptable",
-            "emerald" if tree_vr_val == "Medium" else "amber",
-            "OPTIMUM" if tree_vr_val == "Medium" else "ACCEPTABLE",
+            "optimum" if tree_vr_val == "Medium" else ("suboptimal" if tree_vr_val == "Ultra" else "acceptable"),
+            "emerald" if tree_vr_val == "Medium" else ("orange" if tree_vr_val == "Ultra" else "amber"),
+            "OPTIMUM" if tree_vr_val == "Medium" else ("SUBOPTIMAL" if tree_vr_val == "Ultra" else "ACCEPTABLE"),
             f"Description: Trees foliage geometry in VR.\nCurrent: {tree_vr_val}.\nRecommendation: MEDIUM in VR to preserve double-eye foliage rasterization budget.",
             q_options, page=4,
-            tag_reason="Balanced foliage density preserves stereo fill rate in VR headset." if tree_vr_val == "Medium" else "Tree density evaluated for VR stereo.",
+            tag_reason="Balanced canopy density: reduces foliage triangle count by ~30%, ideal for maintaining stable frame pacing in VR stereo." if tree_vr_val == "Medium" else ("Dense 3D tree canopies: realistic forests with slightly elevated stereo rasterization load." if tree_vr_val == "High" else ("Highest 3D canopy density: heavy vertex and alpha-testing workload over dense forest terrain in VR." if tree_vr_val == "Ultra" else "Sparse tree clustering: noticeable canopy pop-in during low-altitude flight.")),
             rec_guidance="MEDIUM • Optimized foliage density for VR stereo fill rate",
             is_vr=True
         ),
-        make_setting_item("grass", "Grass & Bushes", grass_vr_val, grass_vr_raw, False, "optimum" if grass_vr_val == "Low" else "acceptable", "emerald" if grass_vr_val == "Low" else "amber", "OPTIMUM" if grass_vr_val == "Low" else "ACCEPTABLE", f"Description: Ground procedural vegetation in VR.\nCurrent: {grass_vr_val}.\nRecommendation: LOW saves GPU fill rate in VR stereo.", q_options, page=4, tag_reason="Low grass saves critical VR stereo fill rate and draw calls on airliner approaches." if grass_vr_val == "Low" else "Vegetation density evaluated for VR stereo.", rec_guidance="LOW • Saves critical stereo fill rate on airport taxiways", is_vr=True),
+        make_setting_item(
+            "grass", "Grass & Bushes", grass_vr_val, grass_vr_raw, False,
+            "optimum" if grass_vr_val == "Low" else ("hazard" if grass_vr_val == "Ultra" else ("suboptimal" if grass_vr_val == "High" else "acceptable")),
+            "emerald" if grass_vr_val == "Low" else ("rose" if grass_vr_val == "Ultra" else ("orange" if grass_vr_val == "High" else "amber")),
+            "OPTIMUM" if grass_vr_val == "Low" else ("HAZARD" if grass_vr_val == "Ultra" else ("SUBOPTIMAL" if grass_vr_val == "High" else "ACCEPTABLE")),
+            f"Description: Ground procedural vegetation in VR.\nCurrent: {grass_vr_val}.\nRecommendation: LOW saves GPU fill rate in VR stereo.",
+            q_options, page=4,
+            tag_reason="Minimal 3D turf: saves critical stereo alpha fill rate and apron draw calls in VR." if grass_vr_val == "Low" else ("Balanced grass density: realistic grass strips with controlled VR stereo fill-rate overhead." if grass_vr_val == "Medium" else ("Heavy grass density: noticeable stereo reprojection load when taxiing on runways and grass strips in VR." if grass_vr_val == "High" else "HAZARD in VR: dense grass geometry overtaxes stereo rasterization and causes headset judder.")),
+            rec_guidance="LOW • Saves critical stereo fill rate on airport taxiways",
+            is_vr=True
+        ),
+        make_setting_item(
+            "water_waves", "Water Waves Simulation", water_vr_val, water_vr_raw, False,
+            "optimum" if "256" in water_vr_val else ("suboptimal" if "1024" in water_vr_val else "acceptable"),
+            "emerald" if "256" in water_vr_val else ("orange" if "1024" in water_vr_val else "amber"),
+            "OPTIMUM" if "256" in water_vr_val else ("SUBOPTIMAL" if "1024" in water_vr_val else "ACCEPTABLE"),
+            f"Description: Fast Fourier Transform (FFT) ocean and lake wave simulation grid in VR stereo.\nCurrent: {water_vr_val}.\nRecommendation: MEDIUM (256) preserves stereo compute shader budget in VR without noticeable loss in open-water swell animation.",
+            water_options, page=4,
+            tag_reason="256x256 FFT simulation grid: basic ocean swell patterns, lightweight for VR stereo pipelines." if "256" in water_vr_val else ("512x512 FFT simulation grid: realistic wave swells with moderate compute shader load in VR." if "512" in water_vr_val else ("1024x1024 FFT simulation grid: fine wave cresting and dynamic foam, heavy compute shader load for VR." if "1024" in water_vr_val else "128x128 FFT simulation grid: simplified wave animation, minimal GPU compute.")),
+            rec_guidance="MEDIUM (256) • Lightweight ocean swell simulation for VR stereo",
+            is_vr=True
+        ),
         make_setting_item(
             "volumetric_clouds", "Volumetric Clouds", cld_vr_val, cld_vr_raw, False,
-            "optimum" if cld_vr_val == "Medium" else "acceptable",
-            "emerald" if cld_vr_val == "Medium" else "amber",
-            "OPTIMUM" if cld_vr_val == "Medium" else "ACCEPTABLE",
+            "optimum" if cld_vr_val == "Medium" else ("hazard" if cld_vr_val == "Ultra" else "acceptable"),
+            "emerald" if cld_vr_val == "Medium" else ("rose" if cld_vr_val == "Ultra" else "amber"),
+            "OPTIMUM" if cld_vr_val == "Medium" else ("HAZARD" if cld_vr_val == "Ultra" else "ACCEPTABLE"),
             f"Description: Volumetric clouds in VR stereo.\nCurrent: {cld_vr_val}.\nRecommendation: MEDIUM provides smooth frame pacing without severe cloud penetration drops in VR.",
             q_options, page=4,
-            tag_reason="Smooth frame pacing during cloudy flights in VR." if cld_vr_val == "Medium" else "Cloud quality evaluated for VR stereo.",
+            tag_reason="8 Raymarching Samples / 32 steps: lightweight raymarching, saves substantial stereo fill-rate in VR." if cld_vr_val == "Medium" else ("12 Raymarching Samples / 48 steps: crisp cloud boundaries, but taxes stereo frame times in dense overcast." if cld_vr_val == "High" else ("HAZARD in VR: 16 Raymarching Samples overtaxes stereo frame times, triggering reprojection drops in weather." if cld_vr_val == "Ultra" else "4 Raymarching Samples / 16 steps: coarse voxel sampling with visible edge dithering and reduced atmospheric depth.")),
             rec_guidance="MEDIUM • Protects stereo fill rate during heavy overcast",
             is_vr=True
         ),
@@ -7034,7 +7093,7 @@ def apply_recommended_msfs_settings(mode: str, flight_profile: str = 'LINER', vr
             update_msfs_user_cfg_setting('VR', 'tlod', '100', path, create_backup=False)
             update_msfs_user_cfg_setting('VR', 'olod', '100', path, create_backup=False)
             update_msfs_user_cfg_setting('VR', 'offscreen_precaching', 'High', path, create_backup=False)
-            update_msfs_user_cfg_setting('VR', 'volumetric_clouds', 'High', path, create_backup=False)
+            update_msfs_user_cfg_setting('VR', 'volumetric_clouds', 'Medium', path, create_backup=False)
             update_msfs_user_cfg_setting('VR', 'buildings', 'Medium', path, create_backup=False)
             update_msfs_user_cfg_setting('VR', 'trees', 'Medium', path, create_backup=False)
             update_msfs_user_cfg_setting('VR', 'grass', grass_val_vr, path, create_backup=False)

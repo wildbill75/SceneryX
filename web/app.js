@@ -17894,7 +17894,7 @@ function updatePerformanceCockpitGauges() {
         const bldVR = getItemVal(listVR, ['buildings', 'Buildings'], 'MEDIUM');
         const treeVR = getItemVal(listVR, ['trees', 'TreesQuality'], 'MEDIUM');
         const grassVR = getItemVal(listVR, ['grass', 'GrassQuality'], 'LOW');
-        const cldVR = getItemVal(listVR, ['volumetric_clouds', 'VolumetricClouds', 'clouds'], 'HIGH');
+        const cldVR = getItemVal(listVR, ['volumetric_clouds', 'VolumetricClouds', 'clouds'], 'MEDIUM');
         const dynVR = getItemVal(listVR, ['dynamic_settings', 'DynamicSettings'], 'OFF');
         const fovVR = getItemVal(listVR, ['foveated_rendering', 'FoveatedRendering'], 'ON');
         const rtVR = getItemVal(listVR, ['raytraced_shadows', 'RaytracedShadows'], 'OFF');
@@ -18175,7 +18175,7 @@ function updatePerformanceCockpitGauges() {
         else if (texVR.includes('MED')) vramVR += 3.8;
         else vramVR += 1.8;
 
-        const cldVR = getItemVal(listVR, ['volumetric_clouds', 'VolumetricClouds', 'clouds'], 'HIGH');
+        const cldVR = getItemVal(listVR, ['volumetric_clouds', 'VolumetricClouds', 'clouds'], 'MEDIUM');
         if (cldVR.includes('ULTRA')) vramVR += 4.6;
         else if (cldVR.includes('HIGH')) vramVR += 2.6;
         else if (cldVR.includes('MED')) vramVR += 1.4;
