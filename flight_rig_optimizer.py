@@ -6109,17 +6109,18 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
     reflex_vr_label = "OPTIMUM" if reflex_vr == "ON" else ("ACCEPTABLE" if "BOOST" in reflex_vr else "SUBOPTIMAL")
     reflex_vr_reason = "Minimizes VR motion-to-photon latency without GPU thermal penalty." if reflex_vr == "ON" else ("Keeps GPU boost clocks pinned; extra heat in VR headset without motion-to-photon gain." if "BOOST" in reflex_vr else "Reflex OFF increases VR motion-to-photon latency and judder risk.")
 
+    reproj_is_opt = reproj_vr_val in ["OFF", "AUTO", "1/2 REPROJECTION"]
+    reproj_reason_desc = (
+        "Pure native frame presentation: zero reprojection wobble or ghosting (essential for OFXR Bridge)." if reproj_vr_val == "OFF"
+        else ("Dynamic OpenXR reprojection: engages smoothly only during framerate dips." if reproj_vr_val == "AUTO"
+        else ("Locked 1/2 cadence reprojection for smooth airliner flight." if reproj_vr_val == "1/2 REPROJECTION"
+        else "Stereo motion reprojection configured."))
+    )
+
     matrix_vr = [
         # PAGE 1: VR HEADSET & SYNC (5)
         make_setting_item("primary_scaling_vr", "VR Render Scale", scale_vr_pct, scale_vr_raw, False, scale_vr_rating, scale_vr_color, scale_vr_lbl, scale_vr_tooltip, scale_vr_options, page=1, tag_reason=scale_vr_reason, is_vr=True),
         make_setting_item("max_frame_rate", "Max Frame Rate (VR)", f"{fps_vr} FPS" if not is_vr_fps_off else "OFF", fps_vr, False, vr_fps_rating, vr_fps_color, vr_fps_label, vr_fps_tooltip, fps_options, page=1, is_numeric=True, min_val=0, max_val=240, step=1, tag_reason=vr_fps_reason, is_vr=True),
-        reproj_is_opt = reproj_vr_val in ["OFF", "AUTO", "1/2 REPROJECTION"]
-        reproj_reason_desc = (
-            "Pure native frame presentation: zero reprojection wobble or ghosting (essential for OFXR Bridge)." if reproj_vr_val == "OFF"
-            else ("Dynamic OpenXR reprojection: engages smoothly only during framerate dips." if reproj_vr_val == "AUTO"
-            else ("Locked 1/2 cadence reprojection for smooth airliner flight." if reproj_vr_val == "1/2 REPROJECTION"
-            else "Stereo motion reprojection configured."))
-        )
         make_setting_item("reprojection_mode", "Reprojection Mode", reproj_vr_val, reproj_vr_raw, False, "optimum" if reproj_is_opt else "acceptable", "emerald" if reproj_is_opt else "amber", "OPTIMUM" if reproj_is_opt else "ACCEPTABLE", f"Description: Motion reprojection mode for VR headset.\nCurrent: {reproj_vr_val}.\nRecommendation: OFF (zero warping & pure latency, mandatory with OFXR Bridge) or AUTO / 1/2 REPROJECTION (cadence smoothing).", reproj_options, page=1, tag_reason=reproj_reason_desc, is_vr=True),
         make_setting_item("reflex", "NVIDIA Reflex (VR)", reflex_vr, reflex_vr, False, reflex_vr_rating, reflex_vr_color, reflex_vr_label, f"Description: NVIDIA Reflex low-latency GPU queue pacing in VR. Synchronizes headset frame pacing and eliminates control lag. Has 0 GB impact on VRAM allocation (acts purely on MainThread and motion-to-photon latency).\nCurrent: {reflex_vr}.\nRecommendation: Set to ON to minimize VR motion-to-photon latency and eliminate control lag.", ["ON", "ON+BOOST", "OFF"], page=1, tag_reason=reflex_vr_reason, is_vr=True),
         make_setting_item("sharpen_amount_vr", "VR Sharpening", sharpen_vr_val, sharpen_vr_raw, False, "optimum" if abs(float(sharpen_vr_val) - 0.20) < 0.05 else "acceptable", "emerald" if abs(float(sharpen_vr_val) - 0.20) < 0.05 else "amber", "OPTIMUM" if abs(float(sharpen_vr_val) - 0.20) < 0.05 else "ACCEPTABLE", f"Description: Post-processing sharpening filter in VR headset.\nCurrent: {sharpen_vr_val}.\nRecommendation: Set to 0.20 when using DLSS. Excessive values (>1.0) cause harsh shimmering on runway lines and horizon.", sharpen_vr_options, page=1, is_numeric=True, min_val=0.0, max_val=2.0, step=0.1, tag_reason="Subtle sharpening without shimmering." if abs(float(sharpen_vr_val) - 0.20) < 0.05 else "High sharpening causes noise and shimmering in VR.", is_vr=True),
