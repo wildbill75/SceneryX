@@ -17933,6 +17933,9 @@ function updatePerformanceCockpitGauges() {
         const rt2D = getItemVal(list2D, ['raytraced_shadows', 'RaytracedShadows'], 'OFF');
         if (rt2D === 'ON' || rt2D === '1') vram2D += 2.5;
 
+        const reflex2DVram = getItemVal(list2D, ['reflex', 'Reflex'], 'ON');
+        if (reflex2DVram.includes('OFF')) vram2D += 0.2; // Unregulated swapchain pre-rendered queue buffers
+
         vram2D = Math.min(vramTotal * 1.25, Math.max(3.8, parseFloat(vram2D.toFixed(1))));
         const pct2D = Math.min(100, Math.round((vram2D / vramTotal) * 100));
         const free2D = Math.max(0, (vramTotal - vram2D)).toFixed(1);
@@ -17999,6 +18002,9 @@ function updatePerformanceCockpitGauges() {
 
         const rtVR = getItemVal(listVR, ['raytraced_shadows', 'RaytracedShadows'], 'OFF');
         if (rtVR === 'ON' || rtVR === '1') vramVR += 3.2;
+
+        const reflexVRVram = getItemVal(listVR, ['reflex', 'ReflexVR', 'Reflex'], 'ON');
+        if (reflexVRVram.includes('OFF')) vramVR += 0.2; // Unregulated stereo frame queue buffers
 
         vramVR = Math.min(vramTotal * 1.3, Math.max(5.8, parseFloat(vramVR.toFixed(1))));
         const pctVR = Math.min(100, Math.round((vramVR / vramTotal) * 100));
