@@ -1648,8 +1648,8 @@ def apply_setting_to_content(content: str, mode: str, setting_key: str, new_valu
         k = 'TargetFrameRate' if mode == '2D' else 'TargetFrameRateVR'
         clean_val = str(new_value).replace('FPS', '').replace('Unlocked', '0').replace('OFF', '0').replace('off', '0').strip()
         content = re.sub(rf'({k}\s+)[^\r\n]+', rf'\g<1>{clean_val}', content, flags=re.IGNORECASE)
-        if mode == '2D':
-            content = re.sub(r'(FrameLimiter\s+)[^\r\n]+', rf'\g<1>{clean_val}', content, flags=re.IGNORECASE)
+        # Always synchronize engine-level FrameLimiter in UserCfg.opt with active mode's target (2D or VR)
+        content = re.sub(r'(FrameLimiter\s+)[^\r\n]+', rf'\g<1>{clean_val}', content, flags=re.IGNORECASE)
 
     # 3. Frame Generation
     elif setting_key in ['frame_generation', 'FrameGeneration']:
