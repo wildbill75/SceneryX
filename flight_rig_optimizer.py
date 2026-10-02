@@ -1182,7 +1182,11 @@ def get_custom_profiles_dir() -> str:
 
 
 def _sync_and_recover_custom_profiles(profiles_dir: str):
-    """Recovers custom profiles from repo dir or temporary PyInstaller MEI folders if any."""
+    """Initializes custom profiles only if user directory is completely empty."""
+    existing = glob.glob(os.path.join(profiles_dir, "*.profile.json"))
+    if existing:
+        return
+
     candidates = []
     ws_dir = r"D:\SceneryX\custom_profiles"
     if os.path.exists(ws_dir) and os.path.abspath(ws_dir) != os.path.abspath(profiles_dir):
@@ -1190,12 +1194,6 @@ def _sync_and_recover_custom_profiles(profiles_dir: str):
     base_cp = os.path.join(os.path.dirname(os.path.abspath(__file__)), "custom_profiles")
     if os.path.exists(base_cp) and os.path.abspath(base_cp) != os.path.abspath(profiles_dir):
         candidates.append(base_cp)
-    temp_dir = os.environ.get("TEMP", "")
-    if temp_dir and os.path.exists(temp_dir):
-        for mei in glob.glob(os.path.join(temp_dir, "_MEI*")):
-            mei_cp = os.path.join(mei, "custom_profiles")
-            if os.path.exists(mei_cp):
-                candidates.append(mei_cp)
 
     for src_dir in candidates:
         try:
@@ -1399,29 +1397,45 @@ def activate_custom_profile(profile_id: str, user_cfg_path: Optional[str] = None
 
 
 def delete_custom_profile(profile_id: str) -> Dict[str, Any]:
-    """Deletes a custom profile."""
+    """Deletes one or multiple custom profiles."""
     profiles_dir = get_custom_profiles_dir()
-    profile_file = os.path.join(profiles_dir, f"{profile_id}.profile.json")
-    if not os.path.exists(profile_file):
-        return {"status": "error", "message": "Profile file not found."}
+    ids = [x.strip() for x in str(profile_id).split(",") if x.strip()]
+    if not ids:
+        return {"status": "error", "message": "No profile ID provided."}
 
-    try:
-        os.remove(profile_file)
-        ws_file = os.path.join(r"D:\SceneryX\custom_profiles", f"{profile_id}.profile.json")
-        if os.path.exists(ws_file):
-            try:
-                os.remove(ws_file)
-            except Exception:
-                pass
-        if get_active_profile_id() == profile_id:
-            set_active_profile_id("")
-        return {
-            "status": "success",
-            "message": "Profile deleted.",
-            "profiles": get_custom_profiles()
-        }
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+    deleted_count = 0
+    errors = []
+    active_id = get_active_profile_id()
+    active_was_deleted = False
+
+    for pid in ids:
+        profile_file = os.path.join(profiles_dir, f"{pid}.profile.json")
+        try:
+            if os.path.exists(profile_file):
+                os.remove(profile_file)
+                deleted_count += 1
+            ws_file = os.path.join(r"D:\SceneryX\custom_profiles", f"{pid}.profile.json")
+            if os.path.exists(ws_file):
+                try:
+                    os.remove(ws_file)
+                except Exception:
+                    pass
+            if active_id == pid:
+                active_was_deleted = True
+        except Exception as e:
+            errors.append(str(e))
+
+    if active_was_deleted:
+        set_active_profile_id("")
+
+    if deleted_count == 0 and errors:
+        return {"status": "error", "message": "; ".join(errors)}
+
+    return {
+        "status": "success",
+        "message": f"{deleted_count} profile(s) deleted.",
+        "profiles": get_custom_profiles()
+    }
 
 
 def apply_staged_user_cfg_to_disk(user_cfg_path: Optional[str] = None) -> Dict[str, Any]:

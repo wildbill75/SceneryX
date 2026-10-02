@@ -19728,13 +19728,18 @@ async function fetchAndRenderCustomProfiles() {
                         : '';
                     return `
                         <div onclick="selectCustomProfileItem('${p.id}')"
-                             class="px-3.5 py-2.5 flex items-center justify-between hover:bg-slate-800 cursor-pointer transition-colors ${isSelected ? 'bg-slate-800/60' : ''}">
+                             class="px-3.5 py-2.5 flex items-center justify-between hover:bg-slate-800 cursor-pointer transition-colors group ${isSelected ? 'bg-slate-800/60' : ''}">
                             <div class="flex flex-col min-w-0 pr-2">
                                 <span class="typo-input-val font-semibold text-xs text-slate-100 truncate">${escapeHtml(p.name)}</span>
                                 <span class="typo-metadata tabular-nums">${dateFormatted}</span>
                             </div>
-                            <div class="shrink-0 flex items-center gap-1.5">
+                            <div class="shrink-0 flex items-center gap-2">
                                 ${activeBadge}
+                                <button onclick="event.stopPropagation(); requestDeleteCustomProfileById('${p.id}')"
+                                        title="Delete '${escapeHtml(p.name)}' (${dateFormatted})"
+                                        class="w-6 h-6 flex items-center justify-center rounded-md hover:bg-blue-500/20 text-slate-400 hover:text-blue-400 transition-colors cursor-pointer border-0 bg-transparent">
+                                    <i class="fa-solid fa-trash-can text-xs pointer-events-none"></i>
+                                </button>
                             </div>
                         </div>
                     `;
@@ -20030,33 +20035,16 @@ async function activateSelectedCustomProfile() {
     }
 }
 
-function confirmDeleteCustomProfile() {
-    let profileId = selectedProfileId;
-    if (!profileId) {
-        const dropdown = document.getElementById('opt-profiles-dropdown');
-        profileId = dropdown ? dropdown.value : '';
-    }
-    if (!profileId) {
-        const input = document.getElementById('opt-profile-universal-input');
-        const typedName = input ? input.value.trim().toLowerCase() : '';
-        if (typedName && currentCustomProfiles.length > 0) {
-            const found = currentCustomProfiles.find(p => (p.name || '').toLowerCase() === typedName);
-            if (found) profileId = found.id;
-        }
-    }
-
-    if (!profileId) {
-        if (typeof showToast === 'function') showToast("Please select a profile to delete.", "warning");
-        return;
-    }
-
+function requestDeleteCustomProfileById(profileId) {
     const profile = currentCustomProfiles.find(p => p.id === profileId);
-    const profileName = profile ? profile.name : profileId;
+    if (!profile) return;
+    const dateFormatted = formatProfileDate(profile.created_at);
+    const label = `${profile.name}${dateFormatted ? ' (' + dateFormatted + ')' : ''}`;
 
     if (typeof showCustomModal === 'function') {
         showCustomModal({
             title: 'DELETE PROFILE',
-            message: `Are you sure you want to delete "${profileName}"?`,
+            message: `Are you sure you want to delete "${label}"?`,
             type: 'warning',
             showCancel: true,
             confirmText: 'YES',
@@ -20068,23 +20056,75 @@ function confirmDeleteCustomProfile() {
             }
         });
     } else {
-        if (confirm(`Are you sure you want to delete "${profileName}"?`)) {
+        if (confirm(`Are you sure you want to delete "${label}"?`)) {
             deleteSelectedCustomProfile(profileId);
         }
     }
 }
 
-async function deleteSelectedCustomProfile(profileIdToDelete) {
-    const profileId = profileIdToDelete || selectedProfileId;
-    if (!profileId) return;
+function confirmDeleteCustomProfile() {
+    let profileId = selectedProfileId;
+    const input = document.getElementById('opt-profile-universal-input');
+    const typedName = input ? input.value.trim() : '';
+
+    // If input is non-empty, prioritize matching profiles by typed name
+    let matchingProfiles = [];
+    if (typedName) {
+        matchingProfiles = currentCustomProfiles.filter(p => (p.name || '').trim().toLowerCase() === typedName.toLowerCase());
+    }
+
+    if (matchingProfiles.length === 0 && profileId) {
+        const found = currentCustomProfiles.find(p => p.id === profileId);
+        if (found) {
+            matchingProfiles = currentCustomProfiles.filter(p => (p.name || '').trim().toLowerCase() === (found.name || '').trim().toLowerCase());
+        }
+    }
+
+    if (matchingProfiles.length === 0) {
+        if (typeof showToast === 'function') showToast("Please select a profile to delete.", "warning");
+        return;
+    }
+
+    const profileName = matchingProfiles[0].name;
+    const idsToDelete = matchingProfiles.map(p => p.id).join(',');
+
+    const messageText = matchingProfiles.length > 1
+        ? `Are you sure you want to delete "${profileName}"? (${matchingProfiles.length} duplicate entries will be removed)`
+        : `Are you sure you want to delete "${profileName}"?`;
+
+    if (typeof showCustomModal === 'function') {
+        showCustomModal({
+            title: 'DELETE PROFILE',
+            message: messageText,
+            type: 'warning',
+            showCancel: true,
+            confirmText: 'YES',
+            cancelText: 'NO',
+            confirmClass: 'px-5 py-1.5 text-center rounded-xl bg-blue-600 hover:bg-blue-500 text-white typo-action-btn font-semibold text-xs uppercase transition-all border-0 cursor-pointer shadow-md',
+            cancelClass: 'px-5 py-1.5 text-center rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 hover:text-white typo-action-btn text-xs font-semibold uppercase transition-all cursor-pointer',
+            onConfirm: async () => {
+                await deleteSelectedCustomProfile(idsToDelete);
+            }
+        });
+    } else {
+        if (confirm(messageText)) {
+            deleteSelectedCustomProfile(idsToDelete);
+        }
+    }
+}
+
+async function deleteSelectedCustomProfile(profileIdsToDelete) {
+    const profileIds = profileIdsToDelete || selectedProfileId;
+    if (!profileIds) return;
 
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.delete_custom_profile) return;
     try {
-        const resStr = await window.pywebview.api.delete_custom_profile(profileId);
+        const resStr = await window.pywebview.api.delete_custom_profile(profileIds);
         const res = JSON.parse(resStr);
         if (res.status === 'success') {
-            if (typeof showToast === 'function') showToast("Profile deleted", 'info');
+            if (typeof showToast === 'function') showToast("Profile(s) deleted successfully", 'info');
             selectedProfileId = '';
+            closeAllProfileDropdowns();
             await fetchAndRenderCustomProfiles();
         } else {
             if (typeof showToast === 'function') showToast(`Delete failed: ${res.message}`, 'error');
