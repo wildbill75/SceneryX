@@ -1654,7 +1654,7 @@ def apply_setting_to_content(content: str, mode: str, setting_key: str, new_valu
     # 3b. Framerate Multiplier
     elif setting_key in ['framerate_multiplier', 'NBFramesToGenerate']:
         k = 'NBFramesToGenerate' if mode == '2D' else 'NBFramesToGenerateVR'
-        clean_val = '1' if '1' in str(new_value) else '1'
+        clean_val = '0' if any(x in str(new_value).upper() for x in ['OFF', 'INACTIVE', '0']) else '1'
         content = re.sub(rf'({k}\s+)[^\r\n]+', rf'\g<1>{clean_val}', content, flags=re.IGNORECASE)
 
     # 4. V-Sync (Shared)
@@ -2698,7 +2698,10 @@ def calculate_option_ratings(key: str, options: List[str], is_liner: bool, is_vr
                         r, c = "acceptable", "amber"
 
         elif key == "framerate_multiplier":
-            r, c = "optimum", "emerald"
+            if any(x in o_up for x in ["OFF", "INACTIVE", "0"]):
+                r, c = "acceptable", "amber"
+            else:
+                r, c = "optimum", "emerald"
 
         elif key == "offscreen_precaching":
             if "HIGH" in o_up:
@@ -6001,7 +6004,7 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
         make_setting_item("vsync", "V-Sync", vsync_val, vsync_raw, True, "optimum" if vsync_val == "ON" else "acceptable", "emerald" if vsync_val == "ON" else "amber", "OPTIMUM" if vsync_val == "ON" else "ACCEPTABLE", f"Description: Vertical synchronization with physical monitor refresh cycle.\nCurrent: {vsync_val}.\nRecommendation: Keep ON with G-Sync/FreeSync and frame rate limiter to eliminate screen tearing.", ["ON", "OFF"], page=1, tag_reason="V-Sync locks buffer presentation to refresh boundaries, eliminating tearing." if vsync_val == "ON" else "V-Sync OFF may cause horizontal tearing lines during fast camera pans.", is_vr=False),
         make_setting_item("reflex", "NVIDIA Reflex", reflex_2d, reflex_2d, False, reflex_2d_rating, reflex_2d_color, reflex_2d_label, f"Description: NVIDIA Reflex low-latency GPU queue pacing technology. Synchronizes CPU/GPU frame submission to eliminate input lag. Has 0 GB impact on VRAM allocation (acts purely on MainThread CPU latency and GPU clock pacing).\nCurrent: {reflex_2d}.\nRecommendation: Set to ON for optimal flight control responsiveness and efficiency (or ON+BOOST if GPU downclocking occurs).", ["ON", "ON+BOOST", "OFF"], page=1, tag_reason=reflex_2d_reason, is_vr=False),
         make_setting_item("frame_generation", "Frame Generation", fg_2d, fg_2d_raw, False, "optimum" if fg_2d.startswith("DLSSG") else "acceptable", "emerald" if fg_2d.startswith("DLSSG") else "amber", "OPTIMUM" if fg_2d.startswith("DLSSG") else "ACCEPTABLE", f"Description: AI optical flow frame interpolation (DLSS 3 Frame Generation / FSR 3).\nCurrent: {fg_2d}.\nRecommendation: Keep ON (DLSSG 2X) in 2D mode for doubled motion smoothness without increasing CPU MainThread load.", ["DLSSG (2X)", "FSR3 (2X)", "OFF"], page=1, tag_reason="Doubles motion smoothness via optical flow without CPU overhead." if fg_2d.startswith("DLSSG") else "Frame generation is inactive; native rendering requires more CPU/GPU pacing.", is_vr=False),
-        make_setting_item("framerate_multiplier", "Framerate Multiplier", f"{mult_2d}X", mult_2d, False, "optimum", "emerald", "OPTIMUM", f"Description: Number of interpolated frames generated per native frame.\nCurrent: {mult_2d}X.\nRecommendation: Set to 1 (2X interpolation) when Frame Generation is active.", ["1 (2X Interpolation)"], page=1, tag_reason="Standard 2X optical flow interpolation factor.", is_vr=False),
+        make_setting_item("framerate_multiplier", "Framerate Multiplier", "1 (2X Interpolation)" if not fg_2d.startswith("OFF") else "OFF (Inactive)", mult_2d, False, "optimum" if not fg_2d.startswith("OFF") else "acceptable", "emerald" if not fg_2d.startswith("OFF") else "amber", "OPTIMUM" if not fg_2d.startswith("OFF") else "INACTIVE", f"Description: Number of interpolated frames generated per native frame via Optical Flow Accelerator (OFA).\nCurrent: {'1 (2X Interpolation)' if not fg_2d.startswith('OFF') else 'OFF (Inactive)'}.\nRecommendation: Set to 1 (2X interpolation) when Frame Generation is active. Generates 1 AI frame per native frame with zero CPU MainThread cost.", ["1 (2X Interpolation)"] if not fg_2d.startswith("OFF") else ["OFF (Inactive)"], page=1, tag_reason="Standard 2X optical flow interpolation factor (1 generated frame per native frame)." if not fg_2d.startswith("OFF") else "Frame Generation is inactive; optical flow multiplier is idle.", is_vr=False),
 
         # PAGE 2: TERRAIN & TEXTURES (6)
         make_setting_item("texture_resolution", "Texture Resolution", tex_2d_val, tex_2d_raw, True, tex_2d_rating, tex_2d_color, tex_2d_label, tex_2d_tip, q_options, page=2, tag_reason=tex_2d_reason, is_vr=False),

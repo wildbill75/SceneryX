@@ -17580,6 +17580,8 @@ function updatePerformanceCockpitGauges() {
         const rt2D = getItemVal(list2D, ['raytraced_shadows', 'RaytracedShadows'], 'OFF');
         const aa2D = getItemVal(list2D, ['anti_aliasing', 'AntiAliasing'], 'TAA');
         const fg2D = getItemVal(list2D, ['frame_generation', 'FrameGeneration'], 'OFF');
+        const mult2D = getItemVal(list2D, ['framerate_multiplier', 'NBFramesToGenerate'], '1');
+        const isFgActive2D = (fg2D.includes('DLSSG') || fg2D.includes('FSR3') || fg2D.includes('2X')) && !mult2D.includes('OFF') && !mult2D.includes('INACTIVE') && mult2D !== '0';
         const fps2DVal = getItemVal(list2D, ['max_frame_rate', 'TargetFrameRate', 'FrameLimiter'], '82');
         const fpsCap2D = parseFloat(fps2DVal);
         const isFpsOff2D = fps2DVal.includes('OFF') || isNaN(fpsCap2D) || fpsCap2D <= 0;
@@ -17639,8 +17641,8 @@ function updatePerformanceCockpitGauges() {
         else if (aa2D.includes('QUALITY')) load2D -= 5;
         else if (aa2D.includes('DLAA')) load2D += 4;
 
-        if (fg2D.includes('DLSSG')) load2D -= 16;
-        else if (fg2D.includes('FSR3')) load2D -= 12;
+        if (fg2D.includes('DLSSG') && isFgActive2D) load2D -= 16;
+        else if (fg2D.includes('FSR3') && isFgActive2D) load2D -= 12;
         else load2D += 8;
 
         const reflex2D = getItemVal(list2D, ['reflex', 'Reflex'], 'ON');
@@ -17675,7 +17677,7 @@ function updatePerformanceCockpitGauges() {
         load2D = Math.min(98, Math.max(12, Math.round(load2D)));
 
         let fpsTag = isFpsOff2D ? 'Uncapped' : `${Math.round(fpsCap2D)} FPS`;
-        let fgDesc = fg2D.includes('DLSSG') ? 'DLSS 3 FG (2X)' : (fg2D.includes('FSR3') ? 'FSR 3 FG (2X)' : 'Native (FG OFF)');
+        let fgDesc = (isFgActive2D && fg2D.includes('DLSSG')) ? 'DLSS 3 FG (2X)' : ((isFgActive2D && fg2D.includes('FSR3')) ? 'FSR 3 FG (2X)' : 'Native (FG OFF)');
         let badge2D = 'OPTIMUM';
         let color2D = 'emerald';
         let desc2D = `${fgDesc} • ${fpsTag} • TLOD ${tlod2D}`;
@@ -17927,7 +17929,8 @@ function updatePerformanceCockpitGauges() {
         else if (aa2D.includes('DLAA')) vram2D += 0.8;
 
         const fg2D = getItemVal(list2D, ['frame_generation', 'FrameGeneration'], 'OFF');
-        const isFgActive2D = fg2D.includes('DLSSG') || fg2D.includes('FSR3') || fg2D.includes('2X');
+        const mult2DVram = getItemVal(list2D, ['framerate_multiplier', 'NBFramesToGenerate'], '1');
+        const isFgActive2D = (fg2D.includes('DLSSG') || fg2D.includes('FSR3') || fg2D.includes('2X')) && !mult2DVram.includes('OFF') && !mult2DVram.includes('INACTIVE') && mult2DVram !== '0';
         if (isFgActive2D) vram2D += 1.8;
 
         const rt2D = getItemVal(list2D, ['raytraced_shadows', 'RaytracedShadows'], 'OFF');
@@ -18455,6 +18458,42 @@ async function onMsfsSettingChanged(settingKey, newValue) {
                 if (inputEl) {
                     inputEl.classList.remove('text-emerald-400', 'text-amber-400', 'text-orange-400', 'text-rose-400');
                     inputEl.classList.add(textClass);
+                }
+            }
+
+            // Immediately synchronize Framerate Multiplier card when Frame Generation is toggled
+            if (settingKey === 'frame_generation') {
+                const isOff = String(newValue).toUpperCase().includes('OFF');
+                const multItem = targetList.find(x => x.key === 'framerate_multiplier');
+                if (multItem) {
+                    multItem.value = isOff ? 'OFF (Inactive)' : '1 (2X Interpolation)';
+                    multItem.raw_value = isOff ? '0' : '1';
+                    multItem.rating = isOff ? 'acceptable' : 'optimum';
+                    multItem.tag_badge = isOff ? 'INACTIVE' : 'OPTIMUM';
+                    multItem.rating_label = isOff ? 'INACTIVE' : 'OPTIMUM';
+                    multItem.rating_color = isOff ? 'amber' : 'emerald';
+                    multItem.tag_reason = isOff ? 'Frame Generation is inactive; optical flow multiplier is idle.' : 'Standard 2X optical flow interpolation factor (1 generated frame per native frame).';
+                    multItem.options = isOff ? ['OFF (Inactive)'] : ['1 (2X Interpolation)'];
+
+                    const multBadge = document.getElementById('opt-badge-framerate_multiplier');
+                    const multSelect = document.getElementById('opt-select-framerate_multiplier');
+                    const multInput = document.getElementById('opt-combo-input-framerate_multiplier');
+                    if (multBadge) {
+                        multBadge.textContent = multItem.tag_badge;
+                        multBadge.className = `px-2.5 py-0.5 rounded typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] shrink-0 shadow-sm cursor-help ${isOff ? 'bg-amber-600 text-white font-bold' : 'bg-emerald-600 text-white font-bold'}`;
+                        multBadge.title = multItem.tag_reason;
+                    }
+                    if (multSelect) {
+                        multSelect.innerHTML = `<option value="${multItem.value}">${multItem.value}</option>`;
+                        multSelect.value = multItem.value;
+                        multSelect.classList.remove('text-emerald-400', 'text-amber-400', 'text-orange-400', 'text-rose-400');
+                        multSelect.classList.add(isOff ? 'text-amber-400' : 'text-emerald-400');
+                    }
+                    if (multInput) {
+                        multInput.value = multItem.value;
+                        multInput.classList.remove('text-emerald-400', 'text-amber-400', 'text-orange-400', 'text-rose-400');
+                        multInput.classList.add(isOff ? 'text-amber-400' : 'text-emerald-400');
+                    }
                 }
             }
         }
