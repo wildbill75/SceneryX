@@ -20386,11 +20386,12 @@ async function deleteSelectedCustomProfile(profileIdsToDelete) {
         const resStr = await window.pywebview.api.delete_custom_profile(profileIds);
         const res = JSON.parse(resStr);
         if (res.status === 'success') {
-            if (typeof showToast === 'function') showToast("Profile(s) deleted successfully", 'info');
+            if (typeof showToast === 'function') showToast(res.message || "Profile(s) deleted successfully", 'info');
             selectedProfileId = '';
             multiSelectedProfileIds.clear();
             closeAllProfileDropdowns();
             await fetchAndRenderCustomProfiles();
+            await loadRigDiagnostics();
         } else {
             if (typeof showToast === 'function') showToast(`Delete failed: ${res.message}`, 'error');
         }

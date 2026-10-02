@@ -13,7 +13,7 @@ import json
 import re
 import shutil
 import glob
-from datetime import datetime
+from datetime import datetime, timedelta
 import ctypes
 import ctypes.wintypes
 import subprocess
@@ -1277,6 +1277,9 @@ def get_custom_profiles() -> List[Dict[str, Any]]:
             pass
 
     profiles.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    if not profiles:
+        return generate_default_rig_profiles()
+
     if profiles and not any(p.get("is_active") for p in profiles):
         profiles[0]["is_active"] = True
         set_active_profile_id(profiles[0].get("id", ""))
@@ -1545,10 +1548,26 @@ def delete_custom_profile(profile_id: str) -> Dict[str, Any]:
     if deleted_count == 0 and errors:
         return {"status": "error", "message": "; ".join(errors)}
 
+    # Check remaining profiles in directory
+    remaining_files = glob.glob(os.path.join(profiles_dir, "*.profile.json"))
+    if not remaining_files:
+        regenerated_profiles = generate_default_rig_profiles()
+        return {
+            "status": "success",
+            "message": f"{deleted_count} profile(s) deleted. Default rig profiles calibrated and regenerated.",
+            "profiles": regenerated_profiles
+        }
+
+    current_profiles = get_custom_profiles()
+    if active_was_deleted and current_profiles:
+        new_active = current_profiles[0]
+        activate_custom_profile(new_active.get("id", ""))
+        current_profiles = get_custom_profiles()
+
     return {
         "status": "success",
         "message": f"{deleted_count} profile(s) deleted.",
-        "profiles": get_custom_profiles()
+        "profiles": current_profiles
     }
 
 
@@ -2172,7 +2191,266 @@ def apply_setting_to_content(content: str, mode: str, setting_key: str, new_valu
 
     return content
 
-    return content
+
+def generate_default_rig_profiles(user_cfg_path: Optional[str] = None) -> List[Dict[str, Any]]:
+    """
+    Generates, saves, and activates calibrated default profiles for each of the 3 MSFS categories
+    (Shared, 2D Display, and 3D / VR Headset) based on detected rig hardware specifications.
+    This ensures that when all profiles are deleted, or upon first startup, the user immediately
+    has optimal configurations across all 3 modes.
+    """
+    path = user_cfg_path or get_user_cfg_path()
+    profiles_dir = get_custom_profiles_dir()
+    os.makedirs(profiles_dir, exist_ok=True)
+    ws_dir = r"D:\SceneryX\custom_profiles"
+    if os.path.exists(os.path.dirname(ws_dir)):
+        try:
+            os.makedirs(ws_dir, exist_ok=True)
+        except Exception:
+            pass
+
+    # Read base UserCfg.opt content if available
+    base_content = ""
+    if path and os.path.exists(path):
+        try:
+            with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                base_content = f.read()
+        except Exception:
+            base_content = ""
+
+    # Hardware detection
+    cpu = detect_cpu_info()
+    gpu = detect_gpu_info()
+    disp = detect_display_info()
+    vr = detect_vr_headset()
+
+    gpu_name = str(gpu.get("name", "")).upper()
+    cpu_name = str(cpu.get("name", "")).upper()
+
+    has_dlssg = any(k in gpu_name for k in ["RTX 40", "RTX 50", "4060", "4070", "4080", "4090", "5060", "5070", "5080", "5090"])
+    is_nvidia = "NVIDIA" in gpu_name or "GEFORCE" in gpu_name or "RTX" in gpu_name or "GTX" in gpu_name
+    has_dlss = is_nvidia and any(k in gpu_name for k in ["RTX", "20", "30", "40", "50"])
+
+    screen_hz = int(disp.get("refresh_rate_int", 60))
+    native_w = int(disp.get("width", 2560))
+    native_h = int(disp.get("height", 1440))
+
+    if screen_hz >= 240:
+        target_2d_fps = 120
+    elif screen_hz >= 180:
+        target_2d_fps = 90
+    elif screen_hz >= 165:
+        target_2d_fps = 82
+    elif screen_hz >= 144:
+        target_2d_fps = 72
+    elif screen_hz >= 120:
+        target_2d_fps = 60
+    elif screen_hz >= 75:
+        target_2d_fps = screen_hz // 2
+    else:
+        target_2d_fps = 60
+
+    vr_hz = int(vr.get("refresh_rate_hz") or 72) if (vr.get("detected") and vr.get("refresh_rate_hz")) else 72
+    target_vr_fps = max(30, vr_hz // 2)
+
+    if not base_content:
+        base_content = (
+            "Version 66\n"
+            "{\tVideo\n"
+            f"\tAdapter \"{gpu.get('name') or 'NVIDIA GeForce RTX 4080'}\"\n"
+            "\tMonitor 1\n"
+            "\tWindowed 1\n"
+            "\tFullscreenBorderless 1\n"
+            "\tWindowActive 0\n"
+            f"\tResolution {native_w} {native_h}\n"
+            f"\tFullScreenResolution {native_w} {native_h}\n"
+            "\tVSync 1\n"
+            "\tVSyncInterval 2\n"
+            "}\n"
+            "{\tGraphics\n"
+            "\tVersion 2.1.0\n"
+            "\tPreset Custom\n"
+            "}\n"
+            "{\tGraphicsVR\n"
+            "\tVersion 2.1.0\n"
+            "\tPreset Custom\n"
+            "}\n"
+            "InstalledPackagesPath \"\"\n"
+        )
+
+    # 1. Optimal Shared (COMMON) Settings
+    common_settings = {
+        "resolution": f"{native_w} {native_h}",
+        "vsync": "ON",
+        "vsync_interval": "2",
+        "aircraft_traffic_quantity": "OFF",
+        "aircraft_traffic_variety": "LOW",
+        "parked_aircraft_quantity": "OFF",
+        "parked_aircraft_variety": "LOW",
+        "road_traffic": "OFF",
+        "sea_traffic": "LOW",
+        "airport_services_quantity": "OFF",
+        "airport_services_variety": "LOW",
+        "characters_quantity": "OFF",
+        "characters_variety": "LOW",
+        "characters_quality": "LOW",
+        "fauna_density": "OFF",
+        "seatbelt_visibility": "OFF",
+        "texture_resolution": "Low",
+        "anisotropic_filtering": "16X"
+    }
+
+    # 2. Optimal 2D Display Settings
+    m2d_settings = {
+        "anti_aliasing": "DLSS (Quality)" if has_dlss else "TAA",
+        "frame_generation": "DLSSG (2X)" if has_dlssg else "OFF",
+        "framerate_multiplier": "1" if has_dlssg else "0",
+        "max_frame_rate": str(target_2d_fps),
+        "reflex": "ON",
+        "dynamic_settings": "OFF",
+        "tlod": "100",
+        "olod": "100",
+        "offscreen_precaching": "High",
+        "displacement_mapping": "OFF",
+        "buildings": "High",
+        "trees": "High",
+        "grass": "Low",
+        "water_waves": "High (512)",
+        "volumetric_clouds": "High",
+        "shadow_maps": "High (1536)",
+        "terrain_shadows": "High (512)",
+        "contact_shadows": "High",
+        "raytraced_shadows": "OFF",
+        "volumetric_lights": "High",
+        "glass_cockpits": "Medium (Half)",
+        "ambient_occlusion": "High",
+        "windshield_effects": "High",
+        "reflections_ssr": "High",
+        "cubemap_reflections": "192",
+        "dof": "OFF",
+        "motion_blur": "OFF",
+        "particles": "Medium"
+    }
+
+    # 3. Optimal 3D (VR) Settings
+    mvr_settings = {
+        "primary_scaling_vr": "100%",
+        "max_frame_rate": str(target_vr_fps),
+        "sharpen_amount_vr": "0.20",
+        "reprojection_mode": "OFF",
+        "foveated_rendering": "ON",
+        "foveated_scale": "40%",
+        "anti_aliasing": "DLSS (Quality)" if has_dlss else "TAA",
+        "frame_generation": "OFF",
+        "reflex": "ON",
+        "dynamic_settings": "OFF",
+        "tlod": "100",
+        "olod": "100",
+        "offscreen_precaching": "High",
+        "displacement_mapping": "OFF",
+        "buildings": "Medium",
+        "trees": "Medium",
+        "grass": "Low",
+        "water_waves": "Medium (256)",
+        "volumetric_clouds": "Medium",
+        "shadow_maps": "Medium (1024)",
+        "terrain_shadows": "Medium (256)",
+        "contact_shadows": "Medium",
+        "raytraced_shadows": "OFF",
+        "volumetric_lights": "Low",
+        "glass_cockpits": "Low (Quarter)",
+        "ambient_occlusion": "Low",
+        "windshield_effects": "High",
+        "reflections_ssr": "Low",
+        "cubemap_reflections": "128",
+        "dof": "OFF",
+        "motion_blur": "OFF",
+        "particles": "Low"
+    }
+
+    # Apply all settings to content
+    calibrated_content = base_content
+    for k, v in common_settings.items():
+        calibrated_content = apply_setting_to_content(calibrated_content, "COMMON", k, v)
+    for k, v in m2d_settings.items():
+        calibrated_content = apply_setting_to_content(calibrated_content, "2D", k, v)
+    for k, v in mvr_settings.items():
+        calibrated_content = apply_setting_to_content(calibrated_content, "VR", k, v)
+
+    # 2D Profile Content: FrameLimiter = target_2d_fps, TargetFrameRate = target_2d_fps
+    content_2d = calibrated_content
+    content_2d = apply_setting_to_content(content_2d, "2D", "max_frame_rate", str(target_2d_fps))
+
+    # 3D Profile Content: FrameLimiter = target_vr_fps, TargetFrameRateVR = target_vr_fps
+    content_3d = calibrated_content
+    content_3d = apply_setting_to_content(content_3d, "VR", "max_frame_rate", str(target_vr_fps))
+
+    # Shared Profile Content
+    content_shared = calibrated_content
+
+    now = datetime.now()
+    t_shared = (now - timedelta(seconds=2)).strftime("%Y-%m-%d %H:%M:%S")
+    t_3d = (now - timedelta(seconds=1)).strftime("%Y-%m-%d %H:%M:%S")
+    t_2d = now.strftime("%Y-%m-%d %H:%M:%S")
+
+    id_shared = "profile_default_shared"
+    id_3d = "profile_default_3d"
+    id_2d = "profile_default_2d"
+
+    prof_2d = {
+        "id": id_2d,
+        "name": "2D Profile",
+        "created_at": t_2d,
+        "updated_at": t_2d,
+        "content": content_2d,
+        "is_active": True
+    }
+    prof_3d = {
+        "id": id_3d,
+        "name": "3D Profile",
+        "created_at": t_3d,
+        "updated_at": t_3d,
+        "content": content_3d,
+        "is_active": False
+    }
+    prof_shared = {
+        "id": id_shared,
+        "name": "Shared Profile",
+        "created_at": t_shared,
+        "updated_at": t_shared,
+        "content": content_shared,
+        "is_active": False
+    }
+
+    # Save all 3 profiles to profiles_dir and mirror to workspace
+    for pdata in [prof_2d, prof_3d, prof_shared]:
+        pfile = os.path.join(profiles_dir, f"{pdata['id']}.profile.json")
+        try:
+            with open(pfile, "w", encoding="utf-8") as pf:
+                json.dump(pdata, pf, indent=2, ensure_ascii=False)
+        except Exception:
+            pass
+        if os.path.exists(ws_dir) and os.path.abspath(ws_dir) != os.path.abspath(profiles_dir):
+            try:
+                with open(os.path.join(ws_dir, f"{pdata['id']}.profile.json"), "w", encoding="utf-8") as pf:
+                    json.dump(pdata, pf, indent=2, ensure_ascii=False)
+            except Exception:
+                pass
+
+    # Set 2D Profile as the active profile
+    set_active_profile_id(id_2d)
+
+    # Immediately activate 2D Profile in MSFS UserCfg.opt on disk
+    if path and os.path.exists(path):
+        try:
+            ensure_original_user_cfg_backup(path)
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(content_2d)
+        except Exception:
+            pass
+
+    clear_staged_settings()
+    return [prof_2d, prof_3d, prof_shared]
 
 
 
