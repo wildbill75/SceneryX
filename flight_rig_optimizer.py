@@ -1795,27 +1795,28 @@ def apply_setting_to_content(content: str, mode: str, setting_key: str, new_valu
 
     # 12. Volumetric Clouds
     elif setting_key in ['volumetric_clouds', 'VolumetricClouds']:
-        clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
+        clean_q = q_map_rev.get(str(new_value).split("(")[0].strip().lower(), '2')
         content = update_sub_block_setting(content, mode, '{VolumetricClouds', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}', f"Quality {clean_q}")
 
     # 13. Buildings Quality
     elif setting_key in ['buildings', 'Buildings']:
-        clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
+        clean_q = q_map_rev.get(str(new_value).split("(")[0].strip().lower(), '2')
         content = update_sub_block_setting(content, mode, '{Buildings', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}', f"Quality {clean_q}")
 
     # 14. Trees Quality
     elif setting_key in ['trees', 'TreesQuality']:
-        clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
+        clean_q = q_map_rev.get(str(new_value).split("(")[0].strip().lower(), '2')
         content = update_sub_block_setting(content, mode, '{Procedural', r'(TreesQuality\s+)[^\r\n]+', rf'\g<1>{clean_q}', f"TreesQuality {clean_q}")
 
     # 15. Grass Quality
     elif setting_key in ['grass', 'GrassQuality']:
-        clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
+        clean_q = q_map_rev.get(str(new_value).split("(")[0].strip().lower(), '2')
         content = update_sub_block_setting(content, mode, '{Procedural', r'(GrassQuality\s+)[^\r\n]+', rf'\g<1>{clean_q}', f"GrassQuality {clean_q}")
 
     # 16. Water Waves Simulation
     elif setting_key in ['water_waves', 'Water']:
-        clean_val = fft_map_rev.get(str(new_value).lower().strip(), '512')
+        v_low = str(new_value).lower().strip()
+        clean_val = fft_map_rev.get(v_low, fft_map_rev.get(v_low.split("(")[0].strip(), '512'))
         content = update_sub_block_setting(content, mode, '{Water', r'(FFTSize\s+)[^\r\n]+', rf'\g<1>{clean_val}', f"FFTSize {clean_val}")
 
     # 17. Displacement Mapping
@@ -1826,57 +1827,60 @@ def apply_setting_to_content(content: str, mode: str, setting_key: str, new_valu
 
     # 18. Glass Cockpits Refresh Rate
     elif setting_key in ['glass_cockpits', 'GlassCockpitsRefreshRate']:
-        clean_val = glass_map_rev.get(str(new_value).lower().strip(), '1')
+        v_low = str(new_value).lower().strip()
+        clean_val = glass_map_rev.get(v_low, glass_map_rev.get(v_low.split("(")[0].strip(), '1'))
         content = update_sub_block_setting(content, mode, '{GlassCockpitsRefreshRate', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_val}', f"Quality {clean_val}")
 
     # 19. Shadow Maps Resolution
     elif setting_key in ['shadow_maps', 'Shadows']:
-        clean_val = shadow_map_rev.get(str(new_value).lower().strip(), '1536')
+        v_low = str(new_value).lower().strip()
+        clean_val = shadow_map_rev.get(v_low, shadow_map_rev.get(v_low.split("(")[0].strip(), '1536'))
         content = update_sub_block_setting(content, mode, '{Shadows', r'(Size\s+)[^\r\n]+', rf'\g<1>{clean_val}', f"Size {clean_val}")
 
     # 20. Terrain Shadows
     elif setting_key in ['terrain_shadows', 'HeightFieldShadows']:
-        clean_val = hf_map_rev.get(str(new_value).lower().strip(), '512')
+        v_low = str(new_value).lower().strip()
+        clean_val = hf_map_rev.get(v_low, hf_map_rev.get(v_low.split("(")[0].strip(), '512'))
         content = update_sub_block_setting(content, mode, '{HeightFieldShadows', r'(Size\s+)[^\r\n]+', rf'\g<1>{clean_val}', f"Size {clean_val}")
 
     # 21. Contact Shadows
     elif setting_key in ['contact_shadows', 'ContactShadows']:
-        clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
+        clean_q = q_map_rev.get(str(new_value).split("(")[0].strip().lower(), '2')
         content = update_sub_block_setting(content, mode, '{ContactShadows', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}', f"Quality {clean_q}")
 
     # 22. Ambient Occlusion (SSAO)
     elif setting_key in ['ambient_occlusion', 'SSAO']:
-        clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
+        clean_q = q_map_rev.get(str(new_value).split("(")[0].strip().lower(), '2')
         content = update_sub_block_setting(content, mode, '{SSAO', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}', f"Quality {clean_q}")
 
     # 23. Screen Space Reflections (SSR)
     elif setting_key in ['reflections_ssr', 'SSR']:
-        clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
+        clean_q = q_map_rev.get(str(new_value).split("(")[0].strip().lower(), '2')
         content = update_sub_block_setting(content, mode, '{SSR', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}', f"Quality {clean_q}")
 
     # 24. Volumetric Lights
     elif setting_key in ['volumetric_lights', 'VolumetricLights']:
-        clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
+        clean_q = q_map_rev.get(str(new_value).split("(")[0].strip().lower(), '2')
         content = update_sub_block_setting(content, mode, '{VolumetricLights', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}', f"Quality {clean_q}")
 
     # 25. Anisotropic Filtering
     elif setting_key in ['anisotropic_filtering', 'MaxAnisotropy']:
-        clean_val = str(new_value).upper().replace('X', '').replace('OFF', '0').strip()
+        clean_val = str(new_value).upper().split("(")[0].replace('X', '').replace('OFF', '0').strip()
         content = update_sub_block_setting(content, mode, '{Texture', r'(MaxAnisotropy\s+)[^\r\n]+', rf'\g<1>{clean_val}', f"MaxAnisotropy {clean_val}")
 
     # 26. Windshield Effects
     elif setting_key in ['windshield_effects', 'WindShield']:
-        clean_q = q_map_rev.get(str(new_value).lower().strip(), '2')
+        clean_q = q_map_rev.get(str(new_value).split("(")[0].strip().lower(), '2')
         content = update_sub_block_setting(content, mode, '{WindShield', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}', f"Quality {clean_q}")
 
     # 27. Cubemap Reflections (ReflectionProbe)
     elif setting_key in ['cubemap_reflections', 'ReflectionProbe']:
-        clean_val = str(new_value).replace('X', '').strip()
+        clean_val = str(new_value).split("(")[0].replace('X', '').strip()
         content = update_sub_block_setting(content, mode, '{ReflectionProbe', r'(Size\s+)[^\r\n]+', rf'\g<1>{clean_val}', f"Size {clean_val}")
 
     # 28. Depth Of Field (DOF)
     elif setting_key in ['dof', 'DOF']:
-        val_str = str(new_value).strip().lower()
+        val_str = str(new_value).split("(")[0].strip().lower()
         if val_str in ['off', '0', 'false']:
             content = update_sub_block_setting(content, mode, '{DOF', r'(Enabled\s+)[^\r\n]+', r'\g<1>0', "Enabled 0")
             content = update_sub_block_setting(content, mode, '{DOF', r'(Quality\s+)[^\r\n]+', r'\g<1>0', "Quality 0")
@@ -1887,7 +1891,7 @@ def apply_setting_to_content(content: str, mode: str, setting_key: str, new_valu
 
     # 29. Motion Blur
     elif setting_key in ['motion_blur', 'MotionBlur']:
-        val_str = str(new_value).strip().lower()
+        val_str = str(new_value).split("(")[0].strip().lower()
         if val_str in ['off', '0', 'false']:
             content = update_sub_block_setting(content, mode, '{MotionBlur', r'(Enabled\s+)[^\r\n]+', r'\g<1>0', "Enabled 0")
             content = update_sub_block_setting(content, mode, '{MotionBlur', r'(Quality\s+)[^\r\n]+', r'\g<1>0', "Quality 0")
@@ -1898,72 +1902,73 @@ def apply_setting_to_content(content: str, mode: str, setting_key: str, new_valu
 
     # 30. Visual Effects Particles
     elif setting_key in ['particles', 'Particles']:
-        clean_q = q_map_rev.get(str(new_value).lower().strip(), '0')
+        clean_q = q_map_rev.get(str(new_value).split("(")[0].strip().lower(), '0')
         content = update_sub_block_setting(content, mode, '{Particles', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_q}', f"Quality {clean_q}")
 
     # 31. Aircraft Traffic Quantity
     elif setting_key in ['aircraft_traffic_quantity', 'AircraftTrafficQuantity']:
-        clean_val = traffic_qty_map_rev.get(str(new_value).lower().strip(), '-1')
+        clean_val = traffic_qty_map_rev.get(str(new_value).split("(")[0].strip().lower(), '-1')
         content = update_sub_block_setting(content, mode, '{Traffic', r'(AircraftTrafficQuantity\s+)[^\r\n]+', rf'\g<1>{clean_val}', f"AircraftTrafficQuantity {clean_val}")
 
     # 32. Aircraft Traffic Variety
     elif setting_key in ['aircraft_traffic_variety', 'AircraftTrafficVariety']:
-        clean_val = traffic_var_map_rev.get(str(new_value).lower().strip(), '3')
+        clean_val = traffic_var_map_rev.get(str(new_value).split("(")[0].strip().lower(), '3')
         content = update_sub_block_setting(content, mode, '{Traffic', r'(AircraftTrafficVariety\s+)[^\r\n]+', rf'\g<1>{clean_val}', f"AircraftTrafficVariety {clean_val}")
 
     # 33. Parked Aircraft Quantity
     elif setting_key in ['parked_aircraft_quantity', 'ParkedAircraftQuantity']:
-        clean_val = traffic_qty_map_rev.get(str(new_value).lower().strip(), '-1')
+        clean_val = traffic_qty_map_rev.get(str(new_value).split("(")[0].strip().lower(), '-1')
         content = update_sub_block_setting(content, mode, '{Traffic', r'(ParkedAircraftQuantity\s+)[^\r\n]+', rf'\g<1>{clean_val}', f"ParkedAircraftQuantity {clean_val}")
 
     # 34. Parked Aircraft Variety
     elif setting_key in ['parked_aircraft_variety', 'ParkedAircraftVariety']:
-        clean_val = traffic_var_map_rev.get(str(new_value).lower().strip(), '3')
+        clean_val = traffic_var_map_rev.get(str(new_value).split("(")[0].strip().lower(), '3')
         content = update_sub_block_setting(content, mode, '{Traffic', r'(ParkedAircraftVariety\s+)[^\r\n]+', rf'\g<1>{clean_val}', f"ParkedAircraftVariety {clean_val}")
 
     # 35. Airport Services Quantity
     elif setting_key in ['airport_services_quantity', 'AirportsServicesQuantity']:
-        clean_val = traffic_qty_map_rev.get(str(new_value).lower().strip(), '-1')
+        clean_val = traffic_qty_map_rev.get(str(new_value).split("(")[0].strip().lower(), '-1')
         content = update_sub_block_setting(content, mode, '{Traffic', r'(AirportsServicesQuantity\s+)[^\r\n]+', rf'\g<1>{clean_val}', f"AirportsServicesQuantity {clean_val}")
 
     # 36. Airport Services Variety
     elif setting_key in ['airport_services_variety', 'AirportsServicesVariety']:
-        clean_val = traffic_var_map_rev.get(str(new_value).lower().strip(), '1')
+        clean_val = traffic_var_map_rev.get(str(new_value).split("(")[0].strip().lower(), '1')
         content = update_sub_block_setting(content, mode, '{Traffic', r'(AirportsServicesVariety\s+)[^\r\n]+', rf'\g<1>{clean_val}', f"AirportsServicesVariety {clean_val}")
 
     # 37. Road Traffic
     elif setting_key in ['road_traffic', 'RoadQuality']:
-        clean_val = traffic_qty_map_rev.get(str(new_value).lower().strip(), '1')
+        clean_val = traffic_qty_map_rev.get(str(new_value).split("(")[0].strip().lower(), '1')
         content = update_sub_block_setting(content, mode, '{Traffic', r'(RoadQuality\s+)[^\r\n]+', rf'\g<1>{clean_val}', f"RoadQuality {clean_val}")
 
     # 38. Sea Traffic
     elif setting_key in ['sea_traffic', 'SeaQuality']:
-        clean_val = traffic_qty_map_rev.get(str(new_value).lower().strip(), '3')
+        clean_val = traffic_qty_map_rev.get(str(new_value).split("(")[0].strip().lower(), '3')
         content = update_sub_block_setting(content, mode, '{Traffic', r'(SeaQuality\s+)[^\r\n]+', rf'\g<1>{clean_val}', f"SeaQuality {clean_val}")
 
     # 39. Characters Quantity
     elif setting_key in ['characters_quantity']:
-        clean_val = traffic_qty_map_rev.get(str(new_value).lower().strip(), '1')
+        clean_val = traffic_qty_map_rev.get(str(new_value).split("(")[0].strip().lower(), '1')
         content = update_sub_block_setting(content, mode, '{Characters', r'(Quantity\s+)[^\r\n]+', rf'\g<1>{clean_val}', f"Quantity {clean_val}")
 
     # 40. Characters Variety
     elif setting_key in ['characters_variety']:
-        clean_val = traffic_var_map_rev.get(str(new_value).lower().strip(), '1')
+        clean_val = traffic_var_map_rev.get(str(new_value).split("(")[0].strip().lower(), '1')
         content = update_sub_block_setting(content, mode, '{Characters', r'(Variety\s+)[^\r\n]+', rf'\g<1>{clean_val}', f"Variety {clean_val}")
 
     # 41. Characters Quality
     elif setting_key in ['characters_quality']:
-        clean_val = traffic_var_map_rev.get(str(new_value).lower().strip(), '1')
+        clean_val = traffic_var_map_rev.get(str(new_value).split("(")[0].strip().lower(), '1')
         content = update_sub_block_setting(content, mode, '{Characters', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_val}', f"Quality {clean_val}")
 
     # 42. Fauna Density
     elif setting_key in ['fauna_density']:
-        clean_val = traffic_qty_map_rev.get(str(new_value).lower().strip(), '-1')
+        clean_val = traffic_qty_map_rev.get(str(new_value).split("(")[0].strip().lower(), '-1')
         content = update_sub_block_setting(content, mode, '{Fauna', r'(Quantity\s+)[^\r\n]+', rf'\g<1>{clean_val}', f"Quantity {clean_val}")
 
     # 43. Seatbelt Visibility
     elif setting_key in ['seatbelt_visibility', 'Seatbelts']:
-        clean_val = '1' if str(new_value).upper() in ['1', 'ON', 'TRUE'] else '0'
+        v_up = str(new_value).upper()
+        clean_val = '1' if ('ON' in v_up and 'OFF' not in v_up) or str(new_value).strip() in ['1', 'TRUE'] else '0'
         content = update_sub_block_setting(content, mode, '{Seatbelts', r'(Enabled\s+)[^\r\n]+', rf'\g<1>{clean_val}', f"Enabled {clean_val}")
 
     return content
@@ -2768,14 +2773,19 @@ def calculate_option_ratings(key: str, options: List[str], is_liner: bool, is_vr
                     w, h = int(tokens[0]), int(tokens[1])
                     if w == native_w and h == native_h:
                         r, c = "optimum", "emerald"
+                        reason = f"Native display resolution ({w}x{h}): perfect 1:1 pixel grid mapping, crystal clear avionics and runway lights."
                     elif w > native_w or h > native_h:
                         r, c = "hazard", "rose"
+                        reason = f"DSR / Super-sampling ({w}x{h}): exceeds physical display panel ({native_w}x{native_h}), wasting massive GPU fillrate."
                     else:
                         r, c = "suboptimal", "orange"
+                        reason = f"Sub-native display resolution ({w}x{h}): causes display scaling blur across cockpit avionics and runway markings."
                 else:
                     r, c = "acceptable", "amber"
+                    reason = f"Display resolution {opt_str}."
             except Exception:
                 r, c = "acceptable", "amber"
+                reason = "Display resolution setting."
 
         elif key == "texture_resolution":
             opt_lead = o_up.split("(")[0].strip()
@@ -2821,36 +2831,49 @@ def calculate_option_ratings(key: str, options: List[str], is_liner: bool, is_vr
                         reason = "512px Optimized Textures (3-4 GB Alloc): unnecessarily blurry for VFR sightseeing flights when VRAM headroom is plentiful."
 
         elif key == "glass_cockpits":
+            opt_lead = o_up.split("(")[0].strip()
             if is_liner:
                 if is_vr:
-                    if "LOW" in o_up or "QUARTER" in o_up:
+                    if "LOW" in opt_lead or "QUARTER" in opt_lead:
                         r, c = "optimum", "emerald"
-                    elif "MEDIUM" in o_up or "HALF" in o_up:
+                        reason = "Quarter-rate display update: avionics update every 4th frame, freeing maximum CPU MainThread cycles in VR."
+                    elif "MEDIUM" in opt_lead or "HALF" in opt_lead:
                         r, c = "acceptable", "amber"
+                        reason = "Half-rate display update: avionics update every 2nd frame (~30-45 FPS), balanced for VR headsets."
                     else: # HIGH / FULL
                         r, c = "suboptimal", "orange"
+                        reason = "Full rate display update: adds 2-4ms MainThread CoherentGT UI load, risking VR reprojection stutters."
                 else: # 2D
-                    if "MEDIUM" in o_up or "HALF" in o_up:
+                    if "MEDIUM" in opt_lead or "HALF" in opt_lead:
                         r, c = "optimum", "emerald"
-                    elif "LOW" in o_up or "QUARTER" in o_up:
+                        reason = "Half-rate display update: avionics update every 2nd frame (~30-45 FPS), delivering smooth dials while halving CPU UI load."
+                    elif "LOW" in opt_lead or "QUARTER" in opt_lead:
                         r, c = "acceptable", "amber"
+                        reason = "Quarter-rate display update: avionics update every 4th frame, freeing maximum CPU MainThread cycles on complex airliners."
                     else: # HIGH / FULL
-                        r, c = "acceptable", "amber"
+                        r, c = ("optimum", "emerald") if is_flagship_cpu else ("acceptable", "amber")
+                        reason = "Full rate display update: avionics instruments render every frame, adding 2-4ms MainThread CoherentGT UI load."
             else: # GA
                 if is_vr:
-                    if "LOW" in o_up or "QUARTER" in o_up:
+                    if "LOW" in opt_lead or "QUARTER" in opt_lead:
                         r, c = "optimum", "emerald"
-                    elif "MEDIUM" in o_up or "HALF" in o_up:
+                        reason = "Quarter-rate display update: preserves CPU frame times for stereo tracking in VR."
+                    elif "MEDIUM" in opt_lead or "HALF" in opt_lead:
                         r, c = "acceptable", "amber"
+                        reason = "Half-rate display update: smooth analog and digital gauges with low UI thread overhead in VR."
                     else:
                         r, c = "suboptimal", "orange"
-                else:
-                    if "HIGH" in o_up or "FULL" in o_up:
+                        reason = "Full rate display update in VR: higher UI thread dispatch time."
+                else: # 2D GA
+                    if "HIGH" in opt_lead or "FULL" in opt_lead:
                         r, c = "optimum", "emerald"
-                    elif "MEDIUM" in o_up or "HALF" in o_up:
+                        reason = "Full rate display update: silky smooth needle movements on G1000 and steam gauges with negligible GA UI overhead."
+                    elif "MEDIUM" in opt_lead or "HALF" in opt_lead:
                         r, c = "acceptable", "amber"
+                        reason = "Half-rate display update: clean needle animations with reduced CPU overhead."
                     else:
                         r, c = "acceptable", "amber"
+                        reason = "Quarter-rate display update: slight stepping visible on fast-moving altitude and airspeed needles."
 
         elif key == "max_frame_rate":
             clean_num = ''.join(filter(str.isdigit, opt_str))
@@ -2871,30 +2894,29 @@ def calculate_option_ratings(key: str, options: List[str], is_liner: bool, is_vr
             if is_vr:
                 if o_up in ["OFF", "NONE", "0"]:
                     r, c = "optimum", "emerald"
+                    reason = "Direct stereo presentation: zero headset compositor latency or motion vector warping."
                 else:
                     r, c = "hazard", "rose"
+                    reason = "HAZARD in VR: optical flow frame interpolation induces severe headset motion disorientation and edge tearing."
             else:
                 is_nvidia = any(x in gpu_full for x in ["NVIDIA", "RTX", "GTX"])
-                if is_nvidia:
-                    if "DLSSG" in o_up:
-                        r, c = "optimum", "emerald"
-                    elif "FSR3" in o_up:
-                        r, c = "acceptable", "amber"
-                    else:
-                        r, c = "acceptable", "amber"
-                else:
-                    if "FSR3" in o_up:
-                        r, c = "optimum", "emerald"
-                    elif "DLSSG" in o_up:
-                        r, c = "hazard", "rose"
-                    else:
-                        r, c = "acceptable", "amber"
+                if "DLSSG" in o_up:
+                    r, c = ("optimum", "emerald") if is_nvidia else ("hazard", "rose")
+                    reason = "Optical Flow Frame Generation: generates 1 AI frame per native frame, doubling smoothness with zero CPU cost." if is_nvidia else "Requires NVIDIA RTX 40/50 series GPU with Optical Flow Accelerator."
+                elif "FSR3" in o_up:
+                    r, c = ("optimum", "emerald") if not is_nvidia else ("acceptable", "amber")
+                    reason = "AMD FSR 3 Frame Generation: open driver/engine interpolation alternative for non-RTX 40 hardware."
+                else: # OFF
+                    r, c = "acceptable", "amber"
+                    reason = "Native frame rendering: requires higher raw GPU and CPU framerate to achieve high refresh rates."
 
         elif key == "framerate_multiplier":
             if any(x in o_up for x in ["OFF", "INACTIVE", "0"]):
                 r, c = "acceptable", "amber"
+                reason = "Optical Flow Accelerator is idle; all displayed frames are rasterized natively."
             else:
                 r, c = "optimum", "emerald"
+                reason = "Standard 2X cadence: delivers 1 AI interpolated frame between consecutive native frames."
 
         elif key == "offscreen_precaching":
             opt_lead = o_up.split("(")[0].strip()
@@ -2929,34 +2951,41 @@ def calculate_option_ratings(key: str, options: List[str], is_liner: bool, is_vr
         elif key == "dynamic_settings":
             if o_up in ["OFF", "0"]:
                 r, c = "optimum", "emerald"
+                reason = "Fixed native resolution: ensures steady cockpit gauge sharpness and predictable frame pacing."
             else:
-                r, c = "hazard", "rose"
+                r, c = "hazard" if is_vr else "suboptimal", "rose" if is_vr else "orange"
+                reason = "HAZARD in VR: dynamic resolution scaling causes sudden stereo blur and gauge illegibility." if is_vr else "Dynamic resolution scaling triggers fluctuating cockpit blur and gauge softening."
 
         elif key == "reflex":
             if o_up == "ON":
                 r, c = "optimum", "emerald"
+                reason = "Low-latency queue pacing: clears GPU render queue ahead of CPU MainThread submission, minimizing flight control lag."
             elif "BOOST" in o_up:
                 r, c = "acceptable", "amber"
-            else:
+                reason = "Pinned GPU boost clocks: prevents core downclocking with slightly higher thermal/power draw."
+            else: # OFF
                 r, c = "suboptimal", "orange"
+                reason = "Standard GPU buffer queue: adds 1-2 frames of display latency during pitch and roll maneuvers."
 
         elif key == "vsync":
             if o_up in ["ON", "1"]:
                 r, c = "optimum", "emerald"
+                reason = "Vertical synchronization: locks frame presentation to display refresh cycles, eliminating horizontal tearing."
             else:
                 r, c = "acceptable", "amber"
+                reason = "Unsynchronized presentation: delivers newest buffer immediately; causes tearing unless using external VRR."
 
         elif key == "anti_aliasing":
             if is_vr:
-                if "PERFORMANCE" in o_up:
+                if "QUALITY" in o_up or (o_up == "DLSS" and not any(k in o_up for k in ["PERFORMANCE", "BALANCED"])):
                     r, c = "optimum", "emerald"
-                    reason = "50% internal render: least taxing mode for the GPU, securing maximum framerate headroom in VR."
+                    reason = "67% internal render: crisp cockpit avionics, runway markings, and clean HUD lines with DLSS AI reconstruction."
                 elif "BALANCED" in o_up:
-                    r, c = "optimum", "emerald"
-                    reason = "58% internal render: strong balance between high framerate pacing and sharp cockpit readability."
-                elif "QUALITY" in o_up or o_up == "DLSS":
-                    r, c = "acceptable", "amber"
-                    reason = "67% internal render: enhanced cockpit sharpness, but taxes GPU stereo frame times more heavily."
+                    r, c = ("optimum", "emerald") if not is_flagship_gpu else ("acceptable", "amber")
+                    reason = "58% internal render: steady 90Hz frame pacing with slight softening on distant taxiway signs."
+                elif "PERFORMANCE" in o_up:
+                    r, c = "acceptable" if is_entry_rig else "suboptimal", "amber" if is_entry_rig else "orange"
+                    reason = "50% internal render: frees GPU fillrate, but induces noticeable blur and ghosting on EFIS dials."
                 elif "DLAA" in o_up:
                     r, c = "hazard", "rose"
                     reason = "HAZARD in VR: 100% native stereo AI workload severely overburdens GPU frametimes, causing motion reprojection collapse."
@@ -2965,6 +2994,7 @@ def calculate_option_ratings(key: str, options: List[str], is_liner: bool, is_vr
                     reason = "100% native stereo rasterization: heavy fill-rate workload, risks reprojection drops without AI acceleration."
                 else:
                     r, c = "acceptable", "amber"
+                    reason = "Anti-aliasing mode evaluated for VR stereo pipeline."
             else: # 2D Desktop
                 if "QUALITY" in o_up:
                     r, c = "optimum", "emerald"
@@ -2987,266 +3017,375 @@ def calculate_option_ratings(key: str, options: List[str], is_liner: bool, is_vr
                     reason = "Standard native rasterization: reliable clarity without temporal AI reconstruction."
                 else:
                     r, c = "suboptimal", "orange"
+                    reason = "Legacy anti-aliasing mode with suboptimal edge reconstruction."
 
         elif key == "grass":
+            opt_lead = o_up.split("(")[0].strip()
             if is_liner:
-                if "LOW" in o_up:
+                if "LOW" in opt_lead:
                     r, c = "optimum", "emerald"
-                elif "MEDIUM" in o_up:
+                    reason = "Minimal 3D turf: eliminates unneeded 3D grass triangles on concrete runways, saving apron draw calls."
+                elif "MEDIUM" in opt_lead:
                     r, c = "acceptable", "amber"
-                elif "HIGH" in o_up:
+                    reason = "Moderate turf density: subtle grass along taxiway borders with low alpha-testing cost."
+                elif "HIGH" in opt_lead:
                     r, c = "acceptable", "amber"
+                    reason = "Dense 3D grass: adds unnecessary vertex overhead during airline operations on concrete pavements."
                 else: # ULTRA
                     r, c = "suboptimal", "orange"
-            else: # GA
+                    reason = "Maximum blade density + wild flowers: heavy alpha-blending and vertex passes around airfield perimeters."
+            else: # GA / Bush
                 if is_vr:
-                    if "LOW" in o_up:
+                    if "LOW" in opt_lead:
                         r, c = "optimum", "emerald"
-                    elif "MEDIUM" in o_up:
+                        reason = "Lightweight turf: saves critical stereo alpha fill rate on VR flight decks."
+                    elif "MEDIUM" in opt_lead:
                         r, c = "acceptable", "amber"
-                    elif "HIGH" in o_up:
+                        reason = "Balanced grass density: realistic grass strips with controlled VR fill-rate overhead."
+                    elif "HIGH" in opt_lead:
                         r, c = "suboptimal", "orange"
-                    else:
+                        reason = "Heavy grass density: noticeable stereo reprojection load when taxiing on grass strips in VR."
+                    else: # ULTRA
                         r, c = "hazard", "rose"
-                else:
-                    if "HIGH" in o_up:
+                        reason = "HAZARD in VR: dense grass geometry overtaxes stereo rasterization and causes headset judder."
+                else: # 2D GA
+                    if "HIGH" in opt_lead:
                         r, c = "optimum", "emerald"
-                    elif "MEDIUM" in o_up:
+                        reason = "Rich 3D turf and wild flowers: authentic grass strip immersion for low-altitude bush flying."
+                    elif "MEDIUM" in opt_lead:
                         r, c = "acceptable", "amber"
-                    elif "LOW" in o_up:
+                        reason = "Balanced turf density: clean grassy airfield appearance with lower alpha cost."
+                    elif "LOW" in opt_lead:
                         r, c = "acceptable", "amber"
+                        reason = "Sparse grass: uninspiring flat green textures on grass airfields."
                     else: # ULTRA
                         r, c = "suboptimal", "orange"
+                        reason = "Ultra-dense grass blades: unnecessary GPU overhead for minor visual difference over High."
 
         elif key == "volumetric_clouds":
+            opt_lead = o_up.split("(")[0].strip()
             if is_vr:
-                if "MEDIUM" in o_up:
+                if "MEDIUM" in opt_lead:
                     r, c = "optimum", "emerald"
-                elif "HIGH" in o_up:
+                    reason = "8 Raymarching Samples / 32 steps: lightweight raymarching, saves substantial stereo fill-rate in VR."
+                elif "HIGH" in opt_lead:
                     r, c = "acceptable", "amber"
-                elif "LOW" in o_up:
+                    reason = "12 Raymarching Samples / 48 steps: crisp cloud boundaries, but taxes stereo frame times in dense overcast."
+                elif "LOW" in opt_lead:
                     r, c = "acceptable", "amber"
+                    reason = "4 Raymarching Samples / 16 steps: coarse voxel sampling with visible edge dithering and reduced atmospheric depth."
                 else: # ULTRA in VR
                     r, c = "hazard", "rose"
+                    reason = "HAZARD in VR: 16 Raymarching Samples overtaxes stereo frame times, triggering reprojection drops in weather."
             else: # 2D Desktop
-                if "HIGH" in o_up:
+                if "HIGH" in opt_lead:
                     r, c = "optimum", "emerald"
-                elif "MEDIUM" in o_up:
+                    reason = "12 Raymarching Samples / 48 steps: excellent volumetric light scattering with 15-20% faster frame times than Ultra."
+                elif "ULTRA" in opt_lead:
+                    r, c = ("optimum", "emerald") if is_flagship_gpu else ("acceptable", "amber")
+                    reason = "16 Raymarching Samples / 64 steps: full volumetric density, costs 3-4ms extra GPU rasterization time in dense overcast."
+                elif "MEDIUM" in opt_lead:
                     r, c = "acceptable", "amber"
-                elif "ULTRA" in o_up:
-                    r, c = "acceptable", "amber"
+                    reason = "8 Raymarching Samples / 32 steps: solid cloud density with fast compute, subtle pixelation on cloud edges."
                 else: # LOW
                     r, c = "suboptimal", "orange"
+                    reason = "4 Raymarching Samples / 16 steps: coarse voxel sampling with visible edge dithering."
 
         elif key == "anisotropic_filtering":
             if "16X" in o_up:
                 r, c = "optimum", "emerald"
+                reason = "16-sample oblique filtering: keeps runway centerline, touchdown markers, and taxi lines razor-sharp at shallow angles."
             elif "8X" in o_up:
                 r, c = "acceptable", "amber"
-            else:
+                reason = "8-sample texture filtering: clean markings with slight softening on distant runway thresholds."
+            elif "4X" in o_up:
                 r, c = "suboptimal", "orange"
+                reason = "4-sample texture filtering: noticeable texture blurring on runway surfaces beyond 200 meters."
+            else: # 2X / OFF
+                r, c = "suboptimal", "orange"
+                reason = "Low/No anisotropic sampling: runway and taxiway lines blur into muddy streaks at glancing cockpit angles."
 
         elif key in ["buildings", "vector_data_buildings"]:
+            opt_lead = o_up.split("(")[0].strip()
             if is_vr:
-                if "MEDIUM" in o_up:
+                if "MEDIUM" in opt_lead:
                     r, c = "optimum", "emerald"
-                elif "HIGH" in o_up:
+                    reason = "Simplified building meshes + 1K atlases: lightweight autogen geometry, optimal for VR stereo frame budgets."
+                elif "HIGH" in opt_lead:
                     r, c = "acceptable", "amber"
-                elif "LOW" in o_up:
+                    reason = "Standard extrusion + 2K facade atlases: crisp urban skylines with ~25% higher draw calls in VR."
+                elif "LOW" in opt_lead:
                     r, c = "acceptable", "amber"
+                    reason = "Flat rooftops + low-res textures: minimal geometry dispatch, but noticeable suburban pop-in."
                 else: # ULTRA in VR
                     r, c = "suboptimal", "orange"
+                    reason = "Full footprint extrusion + 4K facade atlases: heavy draw call volume and VRAM pressure in VR headset."
             else: # 2D Desktop
-                if "HIGH" in o_up:
+                if "HIGH" in opt_lead:
                     r, c = "optimum", "emerald"
-                elif "MEDIUM" in o_up:
+                    reason = "Standard extrusion + 2K facade atlases: sharp urban skylines with ~25% lower draw calls and stable VRAM headroom."
+                elif "ULTRA" in opt_lead:
+                    r, c = ("optimum", "emerald") if is_flagship_gpu else ("acceptable", "amber")
+                    reason = "Full footprint extrusion + 4K facade atlases: maximum building LOD distance, high draw call volume at large metropolitan centers."
+                elif "MEDIUM" in opt_lead:
                     r, c = "acceptable", "amber"
-                elif "ULTRA" in o_up:
-                    r, c = "acceptable", "amber"
+                    reason = "Simplified building meshes + 1K atlases: good performance on mid-tier hardware with minor rooftop detail loss."
                 else: # LOW
                     r, c = "suboptimal", "orange"
+                    reason = "Flat rooftops + low-res textures: minimal geometry dispatch, but noticeable suburban pop-in."
 
         elif key == "trees":
+            opt_lead = o_up.split("(")[0].strip()
             if is_vr:
-                if "MEDIUM" in o_up:
+                if "MEDIUM" in opt_lead:
                     r, c = "optimum", "emerald"
-                elif "HIGH" in o_up:
+                    reason = "Balanced canopy density: reduces foliage triangle count by ~30%, ideal for maintaining 60+ FPS in VR stereo."
+                elif "HIGH" in opt_lead:
                     r, c = "acceptable", "amber"
-                elif "LOW" in o_up:
+                    reason = "Dense 3D tree canopies: realistic forests with slightly elevated stereo rasterization load."
+                elif "LOW" in opt_lead:
                     r, c = "acceptable", "amber"
+                    reason = "Sparse tree clustering: noticeable canopy pop-in during low-altitude flight."
                 else: # ULTRA in VR
                     r, c = "suboptimal", "orange"
+                    reason = "Highest 3D canopy density: heavy vertex and alpha-testing workload over dense forest terrain in VR."
             else: # 2D Desktop
-                if "HIGH" in o_up:
+                if "HIGH" in opt_lead:
                     r, c = "optimum", "emerald"
-                elif "MEDIUM" in o_up:
+                    reason = "Dense 3D tree canopies with optimized LOD falloff: realistic forests with negligible GPU/CPU overhead."
+                elif "ULTRA" in opt_lead:
+                    r, c = ("optimum", "emerald") if is_flagship_gpu else ("acceptable", "amber")
+                    reason = "Highest 3D canopy density + extended draw distance: maximum foliage richness, heavy vertex workload over dense forests."
+                elif "MEDIUM" in opt_lead:
                     r, c = "acceptable", "amber"
-                elif "ULTRA" in o_up:
-                    r, c = "acceptable", "amber"
+                    reason = "Balanced canopy density: reduces foliage triangle count by ~30%, good for entry-level GPUs."
                 else: # LOW
                     r, c = "suboptimal", "orange"
+                    reason = "Sparse tree clustering and aggressive LOD culling: noticeable canopy pop-in during low-altitude flight."
 
         elif key == "shadow_maps":
             if is_vr:
                 if any(k in o_up for k in ["1024", "MEDIUM"]):
                     r, c = "optimum", "emerald"
+                    reason = "1024x1024 shadow cascade buffer: soft cockpit shadows, optimal memory and rasterization balance for VR stereo."
                 elif any(k in o_up for k in ["1536", "HIGH"]):
                     r, c = "acceptable", "amber"
+                    reason = "1536x1536 shadow cascade buffer: crisp shadow lines, slightly higher stereo depth-pass cost in headset."
                 elif any(k in o_up for k in ["512", "LOW"]):
                     r, c = "acceptable", "amber"
+                    reason = "512x512 shadow cascade buffer: pixelated shadow boundaries and visible staircase artifacts across the panel."
                 else: # 2048 / ULTRA in VR
                     r, c = "suboptimal", "orange"
+                    reason = "2048x2048 shadow cascade buffer: razor-sharp shadow edges, but demands ~400 MB extra VRAM and heavy raster pass."
             else: # 2D Desktop
                 if any(k in o_up for k in ["1536", "HIGH"]):
                     r, c = "optimum", "emerald"
+                    reason = "1536x1536 shadow cascade buffer: crisp cockpit switch shadows and airframe lines with zero shimmering."
+                elif any(k in o_up for k in ["2048", "ULTRA"]):
+                    r, c = ("optimum", "emerald") if is_flagship_gpu else ("acceptable", "amber")
+                    reason = "2048x2048 shadow cascade buffer: razor-sharp shadow edges, but demands ~400 MB extra VRAM and heavy raster pass."
                 elif any(k in o_up for k in ["1024", "MEDIUM"]):
                     r, c = "acceptable", "amber"
-                elif any(k in o_up for k in ["2048", "ULTRA"]):
-                    r, c = "acceptable", "amber"
+                    reason = "1024x1024 shadow cascade buffer: soft cockpit shadows, low memory and rasterization cost."
                 else: # 512 / LOW
                     r, c = "suboptimal", "orange"
+                    reason = "512x512 shadow cascade buffer: pixelated shadow boundaries and visible staircase artifacts across the panel."
 
         elif key == "terrain_shadows":
             if is_vr:
                 if any(k in o_up for k in ["256", "MEDIUM"]):
                     r, c = "optimum", "emerald"
+                    reason = "256px DEM shadow heightfield: lightweight terrain self-shadowing, protects stereo frame budgets in VR."
                 elif any(k in o_up for k in ["512", "HIGH"]):
                     r, c = "acceptable", "amber"
+                    reason = "512px DEM shadow heightfield: realistic mountain relief, slight depth-pass cost in VR stereo."
                 elif any(k in o_up for k in ["128", "LOW"]):
                     r, c = "acceptable", "amber"
+                    reason = "128px DEM shadow heightfield: coarse mountain shadows with visible banding on distant ridges."
                 else: # 1024 / ULTRA in VR
                     r, c = "suboptimal", "orange"
+                    reason = "1024px DEM shadow heightfield: heavy compute pass across horizon, risk of VR stereo frame hitching."
             else: # 2D Desktop
                 if any(k in o_up for k in ["512", "HIGH"]):
                     r, c = "optimum", "emerald"
+                    reason = "512px DEM shadow heightfield: realistic mountain relief and valley shadowing during golden hour approaches."
+                elif any(k in o_up for k in ["1024", "ULTRA"]):
+                    r, c = ("optimum", "emerald") if is_flagship_gpu else ("acceptable", "amber")
+                    reason = "1024px DEM shadow heightfield: sharp mountain ridge shadows at low sun angles, heavy compute pass across horizon."
                 elif any(k in o_up for k in ["256", "MEDIUM"]):
                     r, c = "acceptable", "amber"
-                elif any(k in o_up for k in ["1024", "ULTRA"]):
-                    r, c = "acceptable", "amber"
+                    reason = "256px DEM shadow heightfield: basic mountain relief shadowing with low compute impact."
                 else: # 128 / LOW
                     r, c = "suboptimal", "orange"
+                    reason = "128px DEM shadow heightfield: coarse mountain shadows with visible banding on distant ridges."
 
         elif key == "water_waves":
             if is_vr:
                 if any(k in o_up for k in ["256", "MEDIUM"]):
                     r, c = "optimum", "emerald"
+                    reason = "256x256 FFT simulation grid: basic ocean swell patterns, lightweight for VR stereo pipelines."
                 elif any(k in o_up for k in ["512", "HIGH"]):
                     r, c = "acceptable", "amber"
+                    reason = "512x512 FFT simulation grid: realistic wave swells with moderate compute shader load in VR."
                 elif any(k in o_up for k in ["128", "LOW"]):
                     r, c = "acceptable", "amber"
+                    reason = "128x128 FFT simulation grid: simplified wave animation, minimal GPU compute."
                 else: # 1024 / ULTRA in VR
                     r, c = "suboptimal", "orange"
+                    reason = "1024x1024 FFT simulation grid: fine wave cresting and dynamic foam, heavy compute shader load for VR."
             else: # 2D Desktop
                 if any(k in o_up for k in ["512", "HIGH"]):
                     r, c = "optimum", "emerald"
+                    reason = "512x512 FFT simulation grid: realistic wave swells and shoreline ripples with negligible compute overhead."
+                elif any(k in o_up for k in ["1024", "ULTRA"]):
+                    r, c = ("optimum", "emerald") if is_flagship_gpu else ("acceptable", "amber")
+                    reason = "1024x1024 FFT simulation grid: fine wave cresting and dynamic foam, requires high compute shader passes."
                 elif any(k in o_up for k in ["256", "MEDIUM"]):
                     r, c = "acceptable", "amber"
-                elif any(k in o_up for k in ["1024", "ULTRA"]):
-                    r, c = "acceptable", "amber"
-                else:
+                    reason = "256x256 FFT simulation grid: clean ocean swell patterns with low compute overhead."
+                else: # 128 / LOW
                     r, c = "suboptimal", "orange"
+                    reason = "128x128 FFT simulation grid: simplified wave animation, minimal GPU compute."
 
         elif key == "reflections_ssr":
+            opt_lead = o_up.split("(")[0].strip()
             if is_vr:
-                if "LOW" in o_up:
+                if "LOW" in opt_lead:
                     r, c = "optimum", "emerald"
-                elif "OFF" in o_up:
+                    reason = "Minimal ray step: lightweight reflection pass; saves critical stereo fill rate in VR."
+                elif "OFF" in opt_lead:
                     r, c = "acceptable", "amber"
-                elif "MEDIUM" in o_up:
+                    reason = "Disabled SSR: wet surfaces use static cubemap reflection lookups, saving maximum GPU fill rate."
+                elif "MEDIUM" in opt_lead:
                     r, c = "acceptable", "amber"
+                    reason = "Coarse screen-space ray step: basic water puddle reflections with minor reflection edge dithering in VR."
                 else: # HIGH / ULTRA in VR
                     r, c = "hazard", "rose"
+                    reason = "HAZARD in VR: multi-sample screen-space ray tracing overburdens stereo fill rate, inducing severe frame drops."
             else: # 2D Desktop
-                if "HIGH" in o_up:
+                if "HIGH" in opt_lead:
                     r, c = "optimum", "emerald"
-                elif "MEDIUM" in o_up:
+                    reason = "Half-resolution SSR with temporal filtering: realistic wet runway and apron reflections without severe frame hits."
+                elif "ULTRA" in opt_lead:
+                    r, c = ("optimum", "emerald") if is_flagship_gpu else ("acceptable", "amber")
+                    reason = "Full-resolution screen-space ray tracing: crisp wet runway puddles, but high memory bandwidth and GPU fill cost."
+                elif "MEDIUM" in opt_lead:
                     r, c = "acceptable", "amber"
-                elif "ULTRA" in o_up:
-                    r, c = "acceptable", "amber"
-                else: # LOW / OFF
+                    reason = "Coarse screen-space ray step: basic water puddle reflections with minor reflection edge dithering."
+                elif "LOW" in opt_lead:
                     r, c = "suboptimal", "orange"
+                    reason = "Minimal ray step: low fidelity reflections with noticeable screen-edge cutoff artifacts."
+                else: # OFF
+                    r, c = "suboptimal", "orange"
+                    reason = "Disabled SSR: wet runway surfaces look flat and lack real-time lighting reflection."
 
         elif key == "contact_shadows":
+            opt_lead = o_up.split("(")[0].strip()
             if is_vr:
-                if "MEDIUM" in o_up:
+                if "MEDIUM" in opt_lead:
                     r, c = "optimum", "emerald"
-                elif "HIGH" in o_up:
+                    reason = "Short-range depth buffer sampling: tactile cockpit depth with virtually zero GPU frame time impact in VR."
+                elif "HIGH" in opt_lead:
                     r, c = "acceptable", "amber"
-                elif any(k in o_up for k in ["LOW", "OFF"]):
+                    reason = "Screen-space directional ray sampling: crisp tactile depth under switches and levers in VR."
+                elif any(k in opt_lead for k in ["LOW", "OFF"]):
                     r, c = "acceptable", "amber"
+                    reason = "Disabled / coarse sampling: cockpit controls appear slightly flat against the panel."
                 else: # ULTRA
                     r, c = "suboptimal", "orange"
+                    reason = "Multi-sample screen-space ray tracing: deep micro-shadows, but adds needless pixel shader cost in VR."
             else: # 2D Desktop
-                if "HIGH" in o_up:
+                if "HIGH" in opt_lead:
                     r, c = "optimum", "emerald"
-                elif "MEDIUM" in o_up:
+                    reason = "Screen-space directional ray sampling: crisp tactile depth under switches, levers, and avionics bezels."
+                elif "ULTRA" in opt_lead:
+                    r, c = ("optimum", "emerald") if is_flagship_gpu else ("acceptable", "amber")
+                    reason = "Multi-sample screen-space ray tracing: deep ambient micro-shadows under cockpit dials, highest pixel shader cost."
+                elif "MEDIUM" in opt_lead:
                     r, c = "acceptable", "amber"
-                elif "ULTRA" in o_up:
-                    r, c = "acceptable", "amber"
+                    reason = "Short-range depth buffer sampling: tactile cockpit depth with virtually zero GPU frame time impact."
                 else: # LOW / OFF
                     r, c = "suboptimal", "orange"
+                    reason = "Disabled / coarse sampling: dials and levers appear slightly detached or floating against panels."
 
         elif key in ["ambient_occlusion", "ssao"]:
+            opt_lead = o_up.split("(")[0].strip()
             if is_vr:
-                if "LOW" in o_up:
+                if "LOW" in opt_lead:
                     r, c = "optimum", "emerald"
-                elif "MEDIUM" in o_up:
+                    reason = "Quarter-resolution SSAO: subtle crevice shadowing, very lightweight for VR stereo viewports."
+                elif "MEDIUM" in opt_lead:
                     r, c = "acceptable", "amber"
-                elif "OFF" in o_up:
+                    reason = "Balanced SSAO radius: natural contact shadowing with moderate shader cost in VR."
+                elif "OFF" in opt_lead:
                     r, c = "acceptable", "amber"
-                elif "HIGH" in o_up:
+                    reason = "Disabled SSAO: flight deck corners and recesses appear flatly lit without ambient depth."
+                elif "HIGH" in opt_lead:
                     r, c = "suboptimal", "orange"
+                    reason = "Half-resolution SSAO: natural contact shadowing, but taxes stereo fragment shaders in VR."
                 else: # ULTRA in VR
                     r, c = "hazard", "rose"
+                    reason = "HAZARD in VR: full-resolution SSAO pass overburdens stereo frame times and risks reprojection drops."
             else: # 2D Desktop
-                if "HIGH" in o_up:
+                if "HIGH" in opt_lead:
                     r, c = "optimum", "emerald"
-                elif "MEDIUM" in o_up:
+                    reason = "Half-resolution SSAO with bilateral blur filter: natural cockpit contact shadowing with safe GPU overhead."
+                elif "ULTRA" in opt_lead:
+                    r, c = ("optimum", "emerald") if is_flagship_gpu else ("acceptable", "amber")
+                    reason = "Full-resolution SSAO with wide sample radius: deep corner shadowing, but taxes GPU fragment shaders."
+                elif "MEDIUM" in opt_lead:
                     r, c = "acceptable", "amber"
-                elif "ULTRA" in o_up:
-                    r, c = "acceptable", "amber"
-                else: # LOW / OFF
+                    reason = "Quarter-resolution SSAO: clean contact shading with minimal performance overhead."
+                elif "LOW" in opt_lead:
                     r, c = "suboptimal", "orange"
+                    reason = "Coarse SSAO sampling: faint crevice shadows with visible grain in cockpit recesses."
+                else: # OFF
+                    r, c = "suboptimal", "orange"
+                    reason = "Disabled SSAO: flight deck corners and recesses appear flatly lit without ambient depth."
 
         elif key == "volumetric_lights":
+            opt_lead = o_up.split("(")[0].strip()
             if is_vr:
-                if "MEDIUM" in o_up:
+                if "MEDIUM" in opt_lead:
                     r, c = "optimum", "emerald"
-                elif "HIGH" in o_up:
+                    reason = "Quarter-res raymarching: authentic light scattering shafts with minimal GPU fill-rate overhead in VR."
+                elif "HIGH" in opt_lead:
                     r, c = "acceptable", "amber"
-                elif any(k in o_up for k in ["LOW", "OFF"]):
+                    reason = "Half-res raymarching: dramatic landing light beams, moderate stereo fill load in fog."
+                elif any(k in opt_lead for k in ["LOW", "OFF"]):
                     r, c = "acceptable", "amber"
+                    reason = "Disabled / minimal shafts: light cones appear flat without atmospheric volumetric depth."
                 else: # ULTRA
                     r, c = "suboptimal", "orange"
+                    reason = "Full resolution light shaft raymarching: heavy fill-rate load in dense fog during VR flight."
             else: # 2D Desktop
-                if "HIGH" in o_up:
+                if "HIGH" in opt_lead:
                     r, c = "optimum", "emerald"
-                elif "MEDIUM" in o_up:
+                    reason = "Half-res raymarching with temporal reconstruction: dramatic landing light beams and runway strobes in fog/clouds."
+                elif "ULTRA" in opt_lead:
+                    r, c = ("optimum", "emerald") if is_flagship_gpu else ("acceptable", "amber")
+                    reason = "Full resolution light shaft raymarching: maximum atmospheric beam scattering, heavy fill-rate load in dense fog."
+                elif "MEDIUM" in opt_lead:
                     r, c = "acceptable", "amber"
-                elif "ULTRA" in o_up:
-                    r, c = "acceptable", "amber"
+                    reason = "Quarter-res raymarching: authentic light scattering shafts with minimal GPU fill-rate overhead."
                 else: # LOW / OFF
                     r, c = "suboptimal", "orange"
+                    reason = "Disabled / minimal shafts: light cones appear flat without atmospheric volumetric depth."
 
         elif key == "windshield_effects":
-            if is_vr:
-                if "HIGH" in o_up:
-                    r, c = "optimum", "emerald"
-                elif "MEDIUM" in o_up:
-                    r, c = "acceptable", "amber"
-                elif "ULTRA" in o_up:
-                    r, c = "acceptable", "amber"
-                else: # LOW
-                    r, c = "suboptimal", "orange"
-            else: # 2D Desktop
-                if "HIGH" in o_up:
-                    r, c = "optimum", "emerald"
-                elif "MEDIUM" in o_up:
-                    r, c = "acceptable", "amber"
-                elif "ULTRA" in o_up:
-                    r, c = "acceptable", "amber"
-                else: # LOW
-                    r, c = "suboptimal", "orange"
+            opt_lead = o_up.split("(")[0].strip()
+            if "HIGH" in opt_lead:
+                r, c = "optimum", "emerald"
+                reason = "Dynamic raindrop physics, wiper sweep clearing, and frost accretion: full flight deck weather immersion with negligible GPU load."
+            elif "ULTRA" in opt_lead:
+                r, c = ("optimum", "emerald") if is_flagship_gpu else ("acceptable", "amber")
+                reason = "Full resolution dynamic fluid simulation: hundreds of interacting rain droplets and dual wiper paths."
+            elif "MEDIUM" in opt_lead:
+                r, c = "acceptable", "amber"
+                reason = "Simplified rain particle beads and wiper motion with reduced droplet count."
+            else: # LOW
+                r, c = "suboptimal", "orange"
+                reason = "Static precipitation texture overlay without dynamic droplet physics."
 
         elif key in ["tlod", "olod", "terrain_lod", "objects_lod"]:
             r, c, _, reason = get_lod_rating_info(
@@ -3274,318 +3413,426 @@ def calculate_option_ratings(key: str, options: List[str], is_liner: bool, is_vr
                 tag = None
 
         elif key in ["reprojection_mode"]:
-            if o_up in ["OFF", "AUTO", "1/2 REPROJECTION"]:
+            if o_up in ["OFF", "0"]:
                 r, c = "optimum", "emerald"
-            elif o_up in ["1/3 REPROJECTION", "DEPTH & MOTION"]:
+                reason = "Native frame presentation: zero reprojection wobble or warping artifacts; lowest motion-to-photon latency."
+            elif "1/2" in o_up:
+                r, c = "optimum", "emerald"
+                reason = "Locked 1/2 refresh cadence (e.g. 45 -> 90 Hz): silky smooth frame pacing for airliners with motion vector extrapolation."
+            elif "AUTO" in o_up:
+                r, c = "optimum", "emerald"
+                reason = "Dynamic compositor reprojection: automatically engages only during localized framerate dips over dense scenery."
+            elif "1/3" in o_up:
                 r, c = "acceptable", "amber"
+                reason = "Locked 1/3 refresh cadence (e.g. 30 -> 90 Hz): high stability for heavy airliner hubs, with visible propeller wobble."
+            elif "DEPTH" in o_up or "MOTION" in o_up:
+                r, c = "acceptable", "amber"
+                reason = "OpenXR depth-guided reprojection: reduces edge shimmering around cockpit frames with slight compositor GPU overhead."
             else:
                 r, c = "acceptable", "amber"
+                reason = "OpenXR motion reprojection active."
 
         elif key in ["foveated_rendering"]:
             if o_up in ["ON", "1", "TRUE"]:
                 r, c = "optimum", "emerald"
+                reason = "Fixed Foveated Shading active: saves 15-20% GPU raster time by reducing shading rate in outer peripheral lens zones."
             else:
                 r, c = "acceptable", "amber"
+                reason = "Uniform 100% peripheral shading: renders outer lens edges at full resolution where headset optics naturally blur."
 
         elif key in ["foveated_scale"]:
             if "40%" in o_up:
                 r, c = "optimum", "emerald"
+                reason = "40% inner foveal radius: ideal sweet spot between sharp central cockpit instruments and peripheral GPU savings."
             elif any(k in o_up for k in ["30%", "50%", "60%", "70%"]):
                 r, c = "acceptable", "amber"
+                if "30%" in o_up:
+                    reason = "30% aggressive inner radius: maximum GPU shading reduction, but inner ring boundary may be visible during saccades."
+                else:
+                    reason = "Wide inner radius (50-70%): imperceptible foveation boundary with modest (5-10%) peripheral GPU savings."
             else:
                 r, c = "acceptable", "amber"
+                reason = "Foveal resolution radius calibrated for headset optical sweet spot."
 
         elif key in ["primary_scaling_vr"]:
             if "100%" in o_up:
                 r, c = "optimum", "emerald"
+                reason = "100% Native 1:1 render scale: crystal-clear cockpit avionics and runway distance cues; avoids compound blur."
             elif any(k in o_up for k in ["95%", "90%"]):
                 r, c = "acceptable", "amber"
+                reason = "Sub-native render scale (90-95%): frees 10-15% GPU fillrate with minimal degradation to cockpit readability."
             elif any(k in o_up for k in ["85%", "80%"]):
                 r, c = "suboptimal", "orange"
+                reason = "Sub-native render scale (80-85%): softens small EFIS digital readouts and distant runway threshold markings."
             else: # 75%, 70%
                 r, c = "hazard", "rose"
+                reason = "HAZARD: excessive downsampling (<80%) severely degrades glass cockpit fonts and runway identification to unreadable levels."
 
         elif key in ["sharpen_amount_vr"]:
             try:
                 num = float(opt_str)
                 if abs(num - 0.20) < 0.05:
                     r, c = "optimum", "emerald"
+                    reason = "CAS 20% sharpening: subtle edge contrast enhancement resolving runway markings without halo ringing."
                 elif num < 0.60:
                     r, c = "acceptable", "amber"
+                    reason = f"CAS {int(num*100)}% sharpening: readable cockpit text, but slight white fringe noise on high-contrast horizon edges."
                 else:
                     r, c = "suboptimal", "orange"
+                    reason = f"Over-sharpening ({int(num*100)}%): severe pixel halos, shimmering runway thresholds, and noisy cloud boundaries."
             except Exception:
                 r, c = "acceptable", "amber"
+                reason = "Post-process contrast adaptive sharpening in headset."
 
         elif key in ["cubemap_reflections"]:
             if is_vr:
                 if o_up == "128":
                     r, c = "optimum", "emerald"
+                    reason = "128px cubemap: balanced reflections on cockpit canopy glass and chrome dials with minimal stereo VRAM bandwidth."
                 elif o_up in ["64", "192"]:
                     r, c = "acceptable", "amber"
+                    reason = "64/192px cubemap: 64px saves VRAM while 192px offers crisper gauge glass reflections with minor stereo compute cost."
                 else: # 256, 512
                     r, c = "suboptimal", "orange"
+                    reason = "256/512px ultra cubemap: heavy dynamic multi-face rasterization passes for subtle reflections rarely noticed in VR."
             else:
                 if o_up == "192":
                     r, c = "optimum", "emerald"
+                    reason = "192px cubemap: sweet spot for glossy airframe surfaces and windshield reflections without frame rate penalty."
                 elif o_up in ["128", "256", "64"]:
                     r, c = "acceptable", "amber"
+                    reason = "Standard cubemap probe: 128px saves VRAM while 256px delivers sharp liveries with moderate memory footprint."
                 else: # 512
                     r, c = "suboptimal", "orange"
+                    reason = "512px ultra cubemap: high multi-face rasterization load for negligible visual gain over 192/256."
 
         elif key == "motion_blur":
             if o_up in ["OFF", "0"]:
                 r, c = "optimum", "emerald"
+                reason = "Disabled camera velocity smearing: crisp cockpit instruments during turbulent flight and sharp runway view during flare."
             else:
                 r, c = "hazard" if is_vr else "suboptimal", "rose" if is_vr else "orange"
+                reason = "HAZARD in VR: artificial motion blur induces severe vestibular disorientation and motion sickness." if is_vr else "SUBOPTIMAL: directional blur smears vital PFD/ND readouts and runway centerline during pitch and roll maneuvers."
 
         elif key == "dof":
             if o_up in ["OFF", "0"]:
                 r, c = "optimum", "emerald"
+                reason = "Full focal plane depth: guarantees both cockpit avionics and distant runway threshold remain in sharp focus."
             elif o_up == "LOW":
                 r, c = "acceptable", "amber"
+                reason = "Subtle cinematic defocus: minimal post-processing cost, but can occasionally soften wingtip and runway views."
             else:
                 r, c = "suboptimal", "orange"
+                reason = "Cinematic depth of field: artificially blurs out-of-cockpit horizon when focusing on instruments, wasting GPU compute."
 
         elif key in ["particles"]:
             if is_vr:
                 if "LOW" in o_up:
                     r, c = "optimum", "emerald"
+                    reason = "Optimized particle system: protects stereo compute buffers during heavy reverse thrust, tire smoke, and rain spray."
                 elif "MEDIUM" in o_up:
                     r, c = "acceptable", "amber"
+                    reason = "Balanced particle simulation: good spray effects on wet runways with moderate GPU fillrate impact."
                 else: # HIGH / ULTRA
                     r, c = "suboptimal", "orange"
+                    reason = "High particle density: dense smoke and cloud condensation compute triggers stereo frame drops on touchdown."
             else:
                 if is_entry_rig:
                     if "LOW" in o_up:
                         r, c = "optimum", "emerald"
+                        reason = "Lightweight particles: prevents alpha-blending stalls on budget GPUs during heavy rain and engine contrails."
                     elif "MEDIUM" in o_up:
                         r, c = "acceptable", "amber"
+                        reason = "Balanced particle budget: realistic engine contrails and touchdown smoke without GPU thermal throttle."
                     elif "HIGH" in o_up:
                         r, c = "suboptimal", "orange"
+                        reason = "High particle density: detailed spray and wingtip vortices with measurable compute overhead in storm conditions."
                     else: # ULTRA
                         r, c = "hazard", "rose"
+                        reason = "HAZARD: maximum particle emitter count causes severe alpha overdraw and frametime spikes on this GPU."
                 else:
                     if any(k in o_up for k in ["LOW", "MEDIUM"]):
                         r, c = "optimum", "emerald"
+                        reason = "Balanced particle budget: realistic engine contrails and touchdown smoke without GPU frame drops."
                     elif "HIGH" in o_up:
                         r, c = "acceptable", "amber"
+                        reason = "High particle density: authentic spray and wingtip vortices with minor GPU compute impact."
                     else: # ULTRA
                         r, c = "suboptimal", "orange"
+                        reason = "Ultra particle density: maximum emitter count with minor visual gain over High during storm landings."
 
         elif key == "aircraft_traffic_quantity":
             if is_liner:
                 if is_entry_rig:
-                    if o_up == "OFF": r, c = "optimum", "emerald"
-                    elif o_up == "LOW": r, c = "acceptable", "amber"
-                    else: r, c = "hazard", "rose"
+                    if o_up == "OFF":
+                        r, c = "optimum", "emerald"
+                        reason = "Zero AI airliner injection: eliminates SimConnect/CPU dispatch stalls at mega-hub airports (ideal for vPilot/VATSIM/IVAO)."
+                    elif o_up == "LOW":
+                        r, c = "acceptable", "amber"
+                        reason = "5-10 AI aircraft: light regional traffic with low MainThread flight-plan pathfinding cost."
+                    else:
+                        r, c = "hazard", "rose"
+                        reason = "HAZARD: 15+ AI aircraft choke single-core CPU MainThread with continuous pathfinding and TCAS calculations."
                 else:
-                    if o_up in ["OFF", "LOW"]: r, c = "optimum", "emerald"
-                    elif o_up == "MEDIUM": r, c = "acceptable", "amber"
-                    else: r, c = "hazard", "rose"
+                    if o_up in ["OFF", "LOW"]:
+                        r, c = "optimum", "emerald"
+                        reason = "Zero or light AI traffic: optimal MainThread frame pacing at major payware hubs (mandatory for VATSIM/IVAO/vPilot)." if o_up == "OFF" else "5-10 AI aircraft: authentic traffic density with minimal CPU flight-plan pathfinding overhead."
+                    elif o_up == "MEDIUM":
+                        r, c = "acceptable", "amber"
+                        reason = "15-25 AI aircraft: moderate traffic density; adds 2-3ms MainThread route evaluation overhead."
+                    else:
+                        r, c = "hazard", "rose"
+                        reason = "HAZARD: dense AI airliner fleet generates heavy SimConnect position updates and apron traffic conflicts."
             else: # GA
                 if is_entry_rig:
-                    if o_up == "LOW": r, c = "optimum", "emerald"
-                    elif o_up in ["OFF", "MEDIUM"]: r, c = "acceptable", "amber"
-                    else: r, c = "suboptimal", "orange"
+                    if o_up == "LOW":
+                        r, c = "optimum", "emerald"
+                        reason = "Light GA traffic: authentic rural circuit aircraft with minimal CPU pathfinding impact."
+                    elif o_up in ["OFF", "MEDIUM"]:
+                        r, c = "acceptable", "amber"
+                        reason = "Zero traffic (OFF) or moderate activity (MEDIUM): acceptable balance between CPU load and airspace immersion."
+                    else:
+                        r, c = "suboptimal", "orange"
+                        reason = "High AI density: multiple simultaneous ground taxi path calculations reduce framerate stability."
                 else:
-                    if o_up in ["LOW", "MEDIUM"]: r, c = "optimum", "emerald"
-                    elif o_up == "OFF": r, c = "acceptable", "amber"
-                    else: r, c = "suboptimal", "orange"
+                    if o_up in ["LOW", "MEDIUM"]:
+                        r, c = "optimum", "emerald"
+                        reason = "Balanced GA airspace activity: lively uncontrolled airfields with low MainThread simulation impact."
+                    elif o_up == "OFF":
+                        r, c = "acceptable", "amber"
+                        reason = "No ambient AI traffic: cleanest frame pacing for low-spec CPU rigs."
+                    else:
+                        r, c = "suboptimal", "orange"
+                        reason = "High AI density: multiple simultaneous ground taxi path calculations reduce framerate stability."
 
         elif key == "parked_aircraft_quantity":
             if is_entry_rig:
                 if o_up == "OFF":
                     r, c = "optimum", "emerald"
+                    reason = "Clean tarmac: frees 1-2 GB VRAM and eliminates static aircraft polygon batches at airport gates."
                 elif o_up == "LOW":
                     r, c = "acceptable", "amber"
+                    reason = "Light gate occupancy (~15%): realistic empty/busy gate balance with low Draw Call count."
                 elif o_up == "MEDIUM":
                     r, c = "suboptimal", "orange"
+                    reason = "Moderate gate occupancy (~30%): lively ramps, but introduces noticeable Draw Calls on large payware airports."
                 else:
                     r, c = "hazard", "rose"
+                    reason = "HAZARD: saturates GPU Draw Call queue with high-poly static airliner 3D models and liveries."
             else:
                 if o_up in ["OFF", "LOW"]:
                     r, c = "optimum", "emerald"
+                    reason = "Eliminates duplicate static airframes and frees critical apron CPU draw calls at terminal gates." if o_up == "OFF" else "Light gate occupancy (~15%): realistic empty/busy gate balance with low Draw Call count."
                 elif o_up == "MEDIUM":
                     r, c = "acceptable", "amber"
+                    reason = "Moderate gate occupancy (~30%): lively ramps, but introduces noticeable Draw Calls on large payware airports."
                 else:
                     r, c = "hazard", "rose"
+                    reason = "HAZARD: saturates GPU Draw Call queue with high-poly static airliner 3D models and liveries."
 
         elif key == "airport_services_quantity":
             if is_entry_rig:
                 if o_up == "OFF":
                     r, c = "optimum", "emerald"
+                    reason = "Official GSX Pro standard (OFF): eliminates vehicle clipping and frees apron CPU cycles."
                 elif o_up == "LOW":
                     r, c = "acceptable", "amber"
+                    reason = "Minimal apron service vehicles: essential pushback and catering without cluttering apron Draw Calls."
                 elif o_up == "MEDIUM":
                     r, c = "suboptimal", "orange"
+                    reason = "Standard apron traffic: realistic tugs and stairs with minor CPU physics simulation overhead."
                 else:
                     r, c = "hazard", "rose"
+                    reason = "HAZARD: continuous ground vehicle pathfinding across apron nodes induces CPU spikes."
             else:
                 if o_up in ["OFF", "LOW"]:
                     r, c = "optimum", "emerald"
+                    reason = "Official GSX Pro standard (OFF): eliminates vehicle clipping and frees apron CPU cycles." if o_up == "OFF" else "Minimal apron service vehicles: essential pushback and catering without cluttering apron Draw Calls."
                 elif o_up == "MEDIUM":
                     r, c = "acceptable", "amber"
+                    reason = "Standard apron traffic: realistic tugs and stairs with minor CPU physics simulation overhead."
                 elif o_up == "HIGH":
                     r, c = "suboptimal", "orange"
+                    reason = "Dense apron traffic: continuous pathfinding queries across apron nodes induce CPU spikes."
                 else:
                     r, c = "hazard", "rose"
+                    reason = "HAZARD: continuous ground vehicle pathfinding across apron nodes induces CPU spikes."
 
         elif key in ["aircraft_traffic_variety", "parked_aircraft_variety", "airport_services_variety", "characters_variety"]:
             if o_up == "LOW":
                 r, c = "optimum", "emerald"
+                reason = "Shared texture atlases: reuses common 3D liveries/models, saving up to 2 GB VRAM at major hubs."
             elif o_up == "MEDIUM":
                 r, c = "acceptable", "amber"
+                reason = "Moderate livery variety: good aesthetic distribution without excessive texture memory thrashing."
             elif o_up == "HIGH":
                 if is_flagship_gpu or is_high_tier_gpu:
                     r, c = "acceptable", "amber"
+                    reason = "Expanded model library: diverse airline liveries requiring high VRAM (≥ 12 GB) to avoid texture paging."
                 else:
                     r, c = "suboptimal", "orange"
+                    reason = "Expanded model library: high VRAM allocation risks texture paging and hitching on mid-range GPUs."
             else: # ULTRA
                 if is_flagship_gpu:
                     r, c = "acceptable", "amber"
+                    reason = "Maximum livery diversity: loads hundreds of unique liveries, requiring 16-24 GB VRAM."
                 elif is_high_tier_gpu:
                     r, c = "suboptimal", "orange"
+                    reason = "Full uncompressed variety: loads hundreds of unique liveries, risking VRAM overflow and hitching."
                 else:
                     r, c = "hazard", "rose"
+                    reason = "HAZARD: severe VRAM paging stalls when loading dozens of unique high-res liveries."
 
         elif key == "sea_traffic":
             if is_entry_rig:
                 if o_up == "OFF":
                     r, c = "optimum", "emerald"
+                    reason = "Maximum performance: maritime simulation disabled on background threads."
                 elif o_up == "LOW":
                     r, c = "acceptable", "amber"
+                    reason = "Official GAIST/Seafront standard (5-10%): complete AI shipping fleet without ship collisions."
                 elif o_up == "MEDIUM":
                     r, c = "suboptimal", "orange"
+                    reason = "Moderate maritime traffic: background wake physics and vessel tracking on coastal approaches."
                 else: # HIGH / ULTRA
                     r, c = "suboptimal", "orange"
+                    reason = "Dense coastal vessel fleets: continuous wake simulations tax CPU on coastal approaches."
             else:
                 if o_up in ["OFF", "LOW"]:
                     r, c = "optimum", "emerald"
+                    reason = "Maximum performance: maritime simulation disabled on background threads." if o_up == "OFF" else "Official GAIST/Seafront standard (5-10%): complete AI shipping fleet without ship collisions."
                 elif o_up in ["MEDIUM", "HIGH", "ULTRA"]:
                     r, c = "acceptable", "amber"
+                    reason = "Active maritime shipping: realistic coastal and harbor traffic with negligible inland CPU impact."
 
         elif key == "road_traffic":
             if is_entry_rig:
                 if o_up == "OFF":
                     r, c = "optimum", "emerald"
+                    reason = "Eliminates procedural vehicle thread dispatch, freeing CPU cycles."
                 elif o_up == "LOW":
                     r, c = "acceptable", "amber"
+                    reason = "Light highway traffic: visible vehicle flow on motorways with minimal CPU pathing impact."
                 elif o_up == "MEDIUM":
                     r, c = "suboptimal", "orange"
+                    reason = "Standard highway traffic: believable suburban road networks with moderate CPU vehicle dispatch."
                 else:
                     r, c = "hazard", "rose"
+                    reason = "HAZARD: thousands of simultaneous vehicle nodes tax CPU MainThread near urban airports."
             else:
                 if o_up in ["OFF", "LOW"]:
                     r, c = "optimum", "emerald"
+                    reason = "Eliminates procedural vehicle thread dispatch, freeing CPU cycles." if o_up == "OFF" else "Light highway traffic: visible vehicle flow on motorways with minimal CPU pathing impact."
                 elif o_up == "MEDIUM":
                     r, c = "acceptable", "amber"
+                    reason = "Standard highway traffic: believable suburban road networks with moderate CPU vehicle dispatch."
                 elif o_up == "HIGH":
                     r, c = "suboptimal", "orange"
+                    reason = "Dense highway networks: continuous vehicle updates tax CPU MainThread near city centers."
                 else:
                     r, c = "hazard", "rose"
+                    reason = "HAZARD: thousands of simultaneous vehicle nodes tax CPU MainThread near urban airports."
 
         elif key == "characters_quantity":
             if is_entry_rig:
                 if o_up == "OFF":
                     r, c = "optimum", "emerald"
+                    reason = "Maximum performance: zero ground personnel animation overhead on CPU."
                 elif o_up == "LOW":
                     r, c = "acceptable", "amber"
-                elif o_up == "MEDIUM":
+                    reason = "Official standard (LOW): guarantees gate marshallers without CPU penalty on this system."
+                elif o_up in ["MEDIUM", "HIGH"]:
                     r, c = "suboptimal", "orange"
-                elif o_up == "HIGH":
-                    r, c = "suboptimal", "orange"
+                    reason = "Standard apron personnel: lively terminal gates with modest CPU skeletal animation overhead."
                 else: # ULTRA
                     r, c = "hazard", "rose"
+                    reason = "HAZARD: heavy skeletal animation and pathfinding node calculations overload CPU MainThread."
             else:
                 if o_up in ["OFF", "LOW"]:
                     r, c = "optimum", "emerald"
+                    reason = "Maximum performance: zero ground personnel animation overhead on CPU." if o_up == "OFF" else "Official standard (LOW): guarantees gate marshallers without CPU penalty on this system."
                 elif o_up == "MEDIUM":
                     r, c = "acceptable", "amber"
+                    reason = "Standard apron personnel: lively terminal gates with modest CPU skeletal animation overhead."
                 elif o_up == "HIGH":
                     r, c = "suboptimal", "orange"
+                    reason = "Dense apron personnel: multiple animated avatars tax CPU MainThread at terminal gates."
                 else: # ULTRA
                     r, c = "hazard", "rose"
+                    reason = "HAZARD: heavy skeletal animation and pathfinding node calculations overload CPU MainThread."
 
         elif key == "characters_quality":
             if is_entry_rig:
                 if o_up == "LOW":
                     r, c = "optimum", "emerald"
+                    reason = "Minimal polygon and vertex geometry workload for ground personnel."
                 elif o_up == "MEDIUM":
                     r, c = "acceptable", "amber"
+                    reason = "Balanced polygon fidelity for airport workers within 20m of aircraft."
                 elif o_up == "HIGH":
                     r, c = "suboptimal", "orange"
+                    reason = "High-poly character models: detailed uniforms and faces with higher vertex buffer allocations."
                 else: # ULTRA
                     r, c = "hazard", "rose"
+                    reason = "HAZARD: excessive polygon density for personnel viewed from the flight deck."
             else:
                 if o_up in ["LOW", "MEDIUM"]:
                     r, c = "optimum", "emerald"
+                    reason = "Minimal polygon and vertex geometry workload." if o_up == "LOW" else "Balanced polygon fidelity for airport workers."
                 elif o_up == "HIGH":
                     r, c = "acceptable", "amber"
+                    reason = "High-poly character models: detailed uniforms and faces with higher vertex buffer allocations."
                 else: # ULTRA
                     r, c = "suboptimal", "orange"
+                    reason = "Excessive polygon density for personnel viewed from the flight deck."
 
         elif key == "fauna_density":
             if is_entry_rig:
                 if o_up == "OFF":
                     r, c = "optimum", "emerald"
+                    reason = "Fauna disabled: zero bird strike or animal spawn queries in CPU background worker threads."
                 elif o_up == "LOW":
                     r, c = "acceptable", "amber"
+                    reason = "Occasional wildlife: subtle immersion over nature reserves with negligible CPU overhead."
                 elif o_up == "MEDIUM":
                     r, c = "suboptimal", "orange"
+                    reason = "Standard wildlife: natural animal spawns with light background navigation mesh queries."
                 else:
                     r, c = "hazard", "rose"
+                    reason = "HAZARD: unneeded animal navigation mesh queries for airliner and IFR flying."
             else:
                 if o_up in ["OFF", "LOW"]:
                     r, c = "optimum", "emerald"
+                    reason = "Controlled wildlife spawning: zero CPU overhead for airliner operations." if o_up == "OFF" else "Occasional wildlife: subtle immersion over nature reserves with negligible CPU overhead."
                 elif o_up == "MEDIUM":
                     r, c = "acceptable", "amber"
+                    reason = "Standard wildlife: natural animal spawns with light background navigation mesh queries."
                 else:
                     r, c = "suboptimal", "orange"
+                    reason = "Dense animal herds: unneeded navigation mesh queries for airliner and IFR flying."
 
         elif key in ["seatbelt_visibility", "seatbelts"]:
             if o_up in ["OFF", "0"]:
                 r, c = "optimum", "emerald"
+                reason = "Hidden cockpit seatbelts: frees small cockpit mesh hierarchy and camera collision calculations."
             else:
                 r, c = "acceptable", "amber"
+                reason = "Visible cockpit harness: aesthetic 3D seatbelts with minimal polygon overhead."
 
         elif key == "raytraced_shadows":
             if o_up in ["OFF", "0"]:
                 r, c = "optimum", "emerald"
+                reason = "Rasterized shadow cascades: uses standard depth maps, delivering 15-30% higher framerate."
             else:
-                r, c = "hazard" if is_vr else ("acceptable" if is_flagship_gpu else "hazard"), "rose" if is_vr else ("amber" if is_flagship_gpu else "rose")
-
-        elif key == "primary_scaling_vr":
-            if "100%" in o_up:
-                r, c = "optimum", "emerald"
-            elif any(k in o_up for k in ["95%", "90%"]):
-                r, c = "acceptable", "amber"
-            elif any(k in o_up for k in ["80%", "85%"]):
-                r, c = "suboptimal", "orange"
-            else:
-                r, c = "hazard", "rose"
-
-        elif key == "sharpen_amount_vr":
-            try:
-                val_flt = float(opt_str)
-                if val_flt <= 0.50:
-                    r, c = "optimum", "emerald"
+                if is_vr:
+                    r, c = "hazard", "rose"
+                    reason = "HAZARD in VR: BVH ray traversal cripples stereo frame times and introduces severe motion reprojection stutter."
+                elif is_flagship_gpu:
+                    r, c = "acceptable", "amber"
+                    reason = "Hardware RT Shadows: BVH acceleration structure traversal yields photorealistic cockpit shadows on high-tier RTX GPUs."
                 else:
-                    r, c = "suboptimal", "orange"
-            except Exception:
-                r, c = "optimum", "emerald"
-
-        elif key in ["foveated_rendering"]:
-            if o_up in ["ON", "1"]:
-                r, c = "optimum", "emerald"
-            else:
-                r, c = "acceptable", "amber"
-
-        elif key in ["foveated_scale"]:
-            if any(k in o_up for k in ["30%", "40%", "50%"]):
-                r, c = "optimum", "emerald"
-            else:
-                r, c = "acceptable", "amber"
+                    r, c = "hazard", "rose"
+                    reason = "HAZARD: raytracing hardware BVH traversal severely degrades GPU frametimes on mid-tier GPUs."
 
         entry = {"rating": r, "color": c}
         if reason:
@@ -6450,10 +6697,12 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
     )
 
     val_aa_vr_up = val_aa_vr.upper()
-    if "PERFORMANCE" in val_aa_vr_up or "BALANCED" in val_aa_vr_up:
+    if "QUALITY" in val_aa_vr_up or (val_aa_vr_up == "DLSS" and not any(k in val_aa_vr_up for k in ["PERFORMANCE", "BALANCED"])):
         aa_vr_rating, aa_vr_color, aa_vr_lbl = "optimum", "emerald", "OPTIMUM"
-    elif "QUALITY" in val_aa_vr_up or val_aa_vr_up == "DLSS":
+    elif "BALANCED" in val_aa_vr_up:
         aa_vr_rating, aa_vr_color, aa_vr_lbl = "acceptable", "amber", "ACCEPTABLE"
+    elif "PERFORMANCE" in val_aa_vr_up:
+        aa_vr_rating, aa_vr_color, aa_vr_lbl = "suboptimal", "orange", "SUBOPTIMAL"
     elif "DLAA" in val_aa_vr_up:
         aa_vr_rating, aa_vr_color, aa_vr_lbl = "hazard", "rose", "HAZARD"
     elif "TAA" in val_aa_vr_up:
@@ -6470,7 +6719,7 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
         make_setting_item("sharpen_amount_vr", "VR Sharpening", sharpen_vr_val, sharpen_vr_raw, False, "optimum" if abs(float(sharpen_vr_val) - 0.20) < 0.05 else "acceptable", "emerald" if abs(float(sharpen_vr_val) - 0.20) < 0.05 else "amber", "OPTIMUM" if abs(float(sharpen_vr_val) - 0.20) < 0.05 else "ACCEPTABLE", f"Description: Post-processing sharpening filter in VR headset.\nCurrent: {sharpen_vr_val}.\nRecommendation: Set to 0.20 when using DLSS. Excessive values (>1.0) cause harsh shimmering on runway lines and horizon.", sharpen_vr_options, page=1, is_numeric=True, min_val=0.0, max_val=2.0, step=0.1, tag_reason="Subtle sharpening without shimmering." if abs(float(sharpen_vr_val) - 0.20) < 0.05 else "High sharpening causes noise and shimmering in VR.", rec_guidance="0.20 • Clean clarity without noise or horizon shimmering", is_vr=True),
 
         # PAGE 2: VR OPTIMIZATIONS & DLSS (4)
-        make_setting_item("anti_aliasing", "Anti-Aliasing & Upscaling (VR)", format_aa_display(val_aa_vr, True), aa_vr, False, aa_vr_rating, aa_vr_color, aa_vr_lbl, f"Description: Anti-aliasing and upscaling mode in VR stereo.\nCurrent: {val_aa_vr}.\nRecommendation: DLSS Performance or Balanced yields maximum FPS headroom in VR stereo.", aa_options_vr, page=2, rec_guidance="Performance yields maximum FPS • Quality enhances clarity but taxes GPU heavier", is_vr=True),
+        make_setting_item("anti_aliasing", "Anti-Aliasing & Upscaling (VR)", format_aa_display(val_aa_vr, True), aa_vr, False, aa_vr_rating, aa_vr_color, aa_vr_lbl, f"Description: Anti-aliasing and upscaling mode in VR stereo.\nCurrent: {val_aa_vr}.\nRecommendation: DLSS Quality balances sharp flight decks with high framerate in VR stereo.", aa_options_vr, page=2, rec_guidance="DLSS (Quality) • Crisp cockpit gauges and runway lines • Balanced for lower tier GPUs", is_vr=True),
         make_setting_item("foveated_rendering", "Foveated Rendering", fov_vr_val, fov_vr_raw, False, "optimum" if fov_vr_val == "ON" else "acceptable", "emerald" if fov_vr_val == "ON" else "amber", "OPTIMUM" if fov_vr_val == "ON" else "ACCEPTABLE", f"Description: Variable rate shading reducing GPU load in peripheral vision.\nCurrent: {fov_vr_val}.\nRecommendation: ON for 10-15% GPU frame time reduction in VR headsets.", ["ON", "OFF"], page=2, tag_reason="Reduces GPU peripheral shading workload in headset.", rec_guidance="ON • 10-15% GPU frame time savings in peripheral vision", is_vr=True),
         make_setting_item("dynamic_settings", "Dynamic Settings (VR)", dyn_vr, "0" if dyn_vr == "OFF" else "1", False, "optimum" if dyn_vr == "OFF" else "suboptimal", "emerald" if dyn_vr == "OFF" else "orange", "OPTIMUM" if dyn_vr == "OFF" else "SUBOPTIMAL", f"Description: Dynamic resolution in VR.\nCurrent: {dyn_vr}.\nRecommendation: Keep OFF in VR to avoid sudden stereo blurriness.", ["OFF", "ON"], page=2, tag_reason="Disabled dynamic scaling prevents sudden VR stereo resolution drops.", rec_guidance="OFF • Prevents abrupt stereo resolution drops in headset", is_vr=True),
         make_setting_item("foveated_scale", "Foveated Scale", fov_scale_pct, fov_scale_raw, False, "optimum" if "40%" in fov_scale_pct else "acceptable", "emerald" if "40%" in fov_scale_pct else "amber", "OPTIMUM" if "40%" in fov_scale_pct else "ACCEPTABLE", f"Description: Inner foveal resolution radius.\nCurrent: {fov_scale_pct}.\nRecommendation: 40% offers the best balance between peripheral performance gain and central sharpness.", fov_scale_options, page=2, tag_reason="Optimal foveal radius for wide-FOV headsets.", rec_guidance="40% • Optimal balance of central clarity and GPU savings", is_vr=True),

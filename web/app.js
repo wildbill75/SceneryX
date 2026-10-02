@@ -17401,10 +17401,199 @@ function selectComboboxPreset(key, value, minVal, maxVal) {
     onMsfsManualSettingSubmitted(key, value, minVal, maxVal);
 }
 
-// Global click outside listener to close comboboxes and profile dropdown
+function getSettingItemAndOptionData(key, optValue) {
+    if (!msfsSettingsMatrixData) return { item: null, optData: null };
+    const modeNorm = String(currentMsfsGraphicsMode || '2D').toUpperCase();
+    let targetList = (modeNorm === 'VR') ? (msfsSettingsMatrixData.matrix_vr || []) :
+                     (modeNorm === 'COMMON') ? (msfsSettingsMatrixData.matrix_common || []) :
+                     (msfsSettingsMatrixData.matrix_2d || []);
+    let item = targetList.find(x => x.key === key);
+    if (!item && msfsSettingsMatrixData.matrix_common) {
+        item = msfsSettingsMatrixData.matrix_common.find(x => x.key === key);
+    }
+    if (!item) {
+        const fallbackList = (modeNorm === 'VR') ? (msfsSettingsMatrixData.matrix_2d || []) : (msfsSettingsMatrixData.matrix_vr || []);
+        item = fallbackList.find(x => x.key === key);
+    }
+    if (!item || !item.option_ratings) return { item, optData: null };
+
+    let optData = item.option_ratings[optValue] || null;
+    if (!optData) {
+        const valLower = String(optValue).trim().toLowerCase();
+        for (const [k, v] of Object.entries(item.option_ratings)) {
+            const kLower = String(k).trim().toLowerCase();
+            if (kLower === valLower || (valLower.length >= 3 && (kLower.startsWith(valLower) || valLower.startsWith(kLower)))) {
+                optData = v;
+                break;
+            }
+        }
+    }
+    if (!optData && (key === 'tlod' || key === 'olod' || key === 'terrain_lod' || key === 'objects_lod')) {
+        const num = parseInt(String(optValue).replace(/[^0-9]/g, ''));
+        if (!isNaN(num)) {
+            const sortedPresets = Object.keys(item.option_ratings)
+                .map(k => ({ val: parseInt(k), info: item.option_ratings[k] }))
+                .filter(x => !isNaN(x.val))
+                .sort((a, b) => a.val - b.val);
+            if (sortedPresets.length > 0) {
+                const match = sortedPresets.find(p => p.val >= num);
+                optData = match ? match.info : sortedPresets[sortedPresets.length - 1].info;
+            }
+        }
+    }
+    return { item, optData };
+}
+
+function onCustomOptionHover(key, optValue) {
+    const { optData } = getSettingItemAndOptionData(key, optValue);
+    const previewEl = document.getElementById(`opt-custom-preview-${key}`);
+    if (!previewEl) return;
+
+    if (optData) {
+        const rating = optData.rating || 'acceptable';
+        const tag = optData.tag || rating.toUpperCase();
+        const reason = optData.reason || '';
+        let badgeClass = 'bg-amber-600 text-white';
+        if (rating === 'optimum') badgeClass = 'bg-emerald-600 text-white';
+        else if (rating === 'suboptimal') badgeClass = 'bg-orange-600 text-white';
+        else if (rating === 'hazard') badgeClass = 'bg-rose-600 text-white';
+
+        previewEl.innerHTML = `
+            <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${badgeClass} shrink-0">${tag}</span>
+            <span class="text-slate-200 text-[10.5px] leading-tight" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${reason || optValue}</span>
+        `;
+    }
+}
+
+function onCustomOptionLeave(key) {
+    const { item } = getSettingItemAndOptionData(key, '');
+    const previewEl = document.getElementById(`opt-custom-preview-${key}`);
+    if (!previewEl || !item) return;
+
+    const curVal = item.value || item.raw_value || '';
+    const { optData } = getSettingItemAndOptionData(key, curVal);
+    const rating = optData ? optData.rating : (item.rating || 'acceptable');
+    const tag = optData ? (optData.tag || rating.toUpperCase()) : (item.tag_badge || item.rating_label || 'OPTIMUM').toUpperCase();
+    const reason = (optData && optData.reason) ? optData.reason : (item.tag_reason || item.rating_reason || 'Hover over an option to preview its technical impact...');
+
+    let badgeClass = 'bg-amber-600 text-white';
+    if (rating === 'optimum') badgeClass = 'bg-emerald-600 text-white';
+    else if (rating === 'suboptimal') badgeClass = 'bg-orange-600 text-white';
+    else if (rating === 'hazard') badgeClass = 'bg-rose-600 text-white';
+
+    previewEl.innerHTML = `
+        <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${badgeClass} shrink-0">${tag}</span>
+        <span class="text-slate-300 text-[10.5px] leading-tight" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${reason}</span>
+    `;
+}
+
+function onComboboxOptionHover(key, optValue) {
+    const { optData } = getSettingItemAndOptionData(key, optValue);
+    const previewEl = document.getElementById(`opt-combo-preview-${key}`);
+    if (!previewEl) return;
+
+    if (optData) {
+        const rating = optData.rating || 'acceptable';
+        const tag = optData.tag || rating.toUpperCase();
+        const reason = optData.reason || '';
+        let badgeClass = 'bg-amber-600 text-white';
+        if (rating === 'optimum') badgeClass = 'bg-emerald-600 text-white';
+        else if (rating === 'suboptimal') badgeClass = 'bg-orange-600 text-white';
+        else if (rating === 'hazard') badgeClass = 'bg-rose-600 text-white';
+
+        previewEl.innerHTML = `
+            <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${badgeClass} shrink-0">${tag}</span>
+            <span class="text-slate-200 text-[10.5px] leading-tight" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${reason || optValue}</span>
+        `;
+    }
+}
+
+function onComboboxOptionLeave(key) {
+    const { item } = getSettingItemAndOptionData(key, '');
+    const previewEl = document.getElementById(`opt-combo-preview-${key}`);
+    if (!previewEl || !item) return;
+
+    const input = document.getElementById(`opt-combo-input-${key}`);
+    const curVal = input ? input.value : (item.value || item.raw_value || '');
+    const { optData } = getSettingItemAndOptionData(key, curVal);
+    const rating = optData ? optData.rating : (item.rating || 'acceptable');
+    const tag = optData ? (optData.tag || rating.toUpperCase()) : (item.tag_badge || item.rating_label || 'OPTIMUM').toUpperCase();
+    const reason = (optData && optData.reason) ? optData.reason : (item.tag_reason || item.rating_reason || 'Hover over a preset to preview its impact...');
+
+    let badgeClass = 'bg-amber-600 text-white';
+    if (rating === 'optimum') badgeClass = 'bg-emerald-600 text-white';
+    else if (rating === 'suboptimal') badgeClass = 'bg-orange-600 text-white';
+    else if (rating === 'hazard') badgeClass = 'bg-rose-600 text-white';
+
+    previewEl.innerHTML = `
+        <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${badgeClass} shrink-0">${tag}</span>
+        <span class="text-slate-300 text-[10.5px] leading-tight" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${reason}</span>
+    `;
+}
+
+function toggleCustomSelectDropdown(key, event) {
+    if (event) {
+        event.stopPropagation();
+    }
+    const menu = document.getElementById(`opt-custom-menu-${key}`);
+    const wrapper = document.getElementById(`opt-custom-wrapper-${key}`);
+    if (!menu || !wrapper) return;
+
+    const isHidden = menu.classList.contains('hidden');
+    closeAllComboboxes();
+    closeAllCustomSelects();
+    if (isHidden) {
+        if (menu.parentElement !== document.body) {
+            document.body.appendChild(menu);
+        }
+
+        const rect = wrapper.getBoundingClientRect();
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const spaceAbove = rect.top;
+
+        menu.style.position = 'fixed';
+        menu.style.left = `${rect.left}px`;
+        menu.style.width = `${Math.max(rect.width, 240)}px`;
+        menu.style.zIndex = '99999';
+
+        if (spaceBelow < 240 && spaceAbove > spaceBelow) {
+            menu.style.top = 'auto';
+            menu.style.bottom = `${window.innerHeight - rect.top + 4}px`;
+            menu.style.maxHeight = `${Math.max(120, Math.min(320, spaceAbove - 20))}px`;
+        } else {
+            menu.style.bottom = 'auto';
+            menu.style.top = `${rect.bottom + 4}px`;
+            menu.style.maxHeight = `${Math.max(120, Math.min(320, spaceBelow - 20))}px`;
+        }
+        menu.classList.remove('hidden');
+    }
+}
+
+function closeAllCustomSelects() {
+    document.querySelectorAll('[id^="opt-custom-menu-"]').forEach(m => {
+        m.classList.add('hidden');
+        const key = m.id.replace('opt-custom-menu-', '');
+        const wrapper = document.getElementById(`opt-custom-wrapper-${key}`);
+        if (wrapper && m.parentElement !== wrapper) {
+            wrapper.appendChild(m);
+        }
+    });
+}
+
+function selectCustomOption(key, value) {
+    const label = document.getElementById(`opt-custom-label-${key}`);
+    if (label) label.textContent = value;
+    closeAllCustomSelects();
+    onMsfsSettingChanged(key, value);
+}
+
+// Global click outside listener to close comboboxes, custom selects, and profile dropdown
 document.addEventListener('click', (e) => {
     if (!e.target.closest('[id^="opt-combo-"]')) {
         closeAllComboboxes();
+    }
+    if (!e.target.closest('[id^="opt-custom-"]')) {
+        closeAllCustomSelects();
     }
     if (!e.target.closest('#opt-profile-universal-combobox') && !e.target.closest('#opt-profile-dropdown-list')) {
         closeAllProfileDropdowns();
@@ -17414,16 +17603,18 @@ document.addEventListener('click', (e) => {
 // Close floating dropdown on scroll or resize outside
 window.addEventListener('scroll', (e) => {
     if (e && e.target && e.target.closest) {
-        if (e.target.closest('[id^="opt-combo-menu-"]') || e.target.closest('#opt-profile-dropdown-list')) {
+        if (e.target.closest('[id^="opt-combo-menu-"]') || e.target.closest('[id^="opt-custom-menu-"]') || e.target.closest('#opt-profile-dropdown-list')) {
             return; // Allow smooth mouse wheel and scrollbar scrolling inside the dropdown itself!
         }
     }
     if (typeof closeAllProfileDropdowns === 'function') closeAllProfileDropdowns();
     if (typeof closeAllComboboxes === 'function') closeAllComboboxes();
+    if (typeof closeAllCustomSelects === 'function') closeAllCustomSelects();
 }, true);
 window.addEventListener('resize', () => {
     if (typeof closeAllProfileDropdowns === 'function') closeAllProfileDropdowns();
     if (typeof closeAllComboboxes === 'function') closeAllComboboxes();
+    if (typeof closeAllCustomSelects === 'function') closeAllCustomSelects();
 });
 
 let currentPerformanceMetricMode = 'mainthread';
@@ -18271,12 +18462,26 @@ function renderMsfsSettingsMatrix() {
             }
 
             let presetListItems = '';
+            let currentComboReason = item.tag_reason || item.rating_reason || '';
+            let currentComboRating = item.rating || 'acceptable';
+            let currentComboTag = (item.tag_badge || item.rating_label || cleanTag).toUpperCase();
+
             if (Array.isArray(item.options)) {
                 presetListItems = item.options.map(opt => {
                     const isCur = String(opt).toUpperCase() === String(displayVal).toUpperCase();
                     const optData = (item.option_ratings && item.option_ratings[opt]) ? item.option_ratings[opt] : null;
                     const optRating = optData ? optData.rating : 'acceptable';
-                    const optTag = optData ? optData.tag : null;
+                    const optTag = optData ? (optData.tag || optRating.toUpperCase()) : optRating.toUpperCase();
+                    const optReason = optData ? (optData.reason || '') : '';
+                    const optReasonEscaped = optReason.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    const optEscaped = String(opt).replace(/'/g, "\\'");
+
+                    if (isCur && optReason) {
+                        currentComboReason = optReason;
+                        currentComboRating = optRating;
+                        currentComboTag = optTag;
+                    }
+
                     let textClass = 'text-amber-400 font-semibold';
                     let tagBadgeClass = 'bg-amber-950/80 text-amber-300 border border-amber-700/60';
                     if (optRating === 'optimum') {
@@ -18290,8 +18495,11 @@ function renderMsfsSettingsMatrix() {
                         tagBadgeClass = 'bg-rose-950/80 text-rose-300 border border-rose-700/60';
                     }
                     return `
-                        <div class="px-3 py-1.5 hover:bg-slate-800 ${isCur ? 'bg-slate-800/90 text-white font-semibold' : textClass} cursor-pointer transition-colors flex items-center justify-between typo-input-val text-xs font-semibold tabular-nums"
-                             onmousedown="selectComboboxPreset('${item.key}', '${opt}', ${item.min_val ?? 0}, ${item.max_val ?? 400})">
+                        <div class="px-3 py-1.5 hover:bg-slate-800 ${isCur ? 'bg-slate-800/90 text-white font-semibold' : textClass} cursor-pointer transition-colors flex items-center justify-between typo-input-val text-xs font-semibold tabular-nums select-none"
+                             title="${optReasonEscaped}"
+                             onmouseenter="onComboboxOptionHover('${item.key}', '${optEscaped}')"
+                             onmouseleave="onComboboxOptionLeave('${item.key}')"
+                             onmousedown="selectComboboxPreset('${item.key}', '${optEscaped}', ${item.min_val ?? 0}, ${item.max_val ?? 400})">
                             <span class="font-semibold tabular-nums">${opt}</span>
                             <div class="flex items-center gap-1.5 shrink-0">
                                 ${optTag ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded tracking-wide ${tagBadgeClass}">${optTag}</span>` : ''}
@@ -18301,6 +18509,16 @@ function renderMsfsSettingsMatrix() {
                     `;
                 }).join('');
             }
+
+            let comboBadgeClass = 'bg-amber-600 text-white';
+            if (currentComboRating === 'optimum') comboBadgeClass = 'bg-emerald-600 text-white';
+            else if (currentComboRating === 'suboptimal') comboBadgeClass = 'bg-orange-600 text-white';
+            else if (currentComboRating === 'hazard') comboBadgeClass = 'bg-rose-600 text-white';
+
+            const defaultComboPreviewHtml = `
+                <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${comboBadgeClass} shrink-0">${currentComboTag}</span>
+                <span class="text-slate-300 text-[10.5px] leading-tight" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${currentComboReason || 'Hover over a preset to preview its impact...'}</span>
+            `;
 
             inputHtml = `
                 <div class="relative w-full pt-0.5" id="opt-combo-wrapper-${item.key}">
@@ -18324,12 +18542,23 @@ function renderMsfsSettingsMatrix() {
                     <div id="opt-combo-menu-${item.key}"
                          onwheel="event.stopPropagation();"
                          style="overscroll-behavior: contain;"
-                         class="hidden fixed z-[99999] max-h-56 overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-700 rounded-xl shadow-2xl py-1 divide-y divide-slate-800">
-                        ${presetListItems}
+                         class="hidden fixed z-[99999] max-h-80 overflow-hidden bg-slate-900 border border-slate-700 rounded-xl shadow-2xl flex flex-col">
+                        <div class="py-1 divide-y divide-slate-800 overflow-y-auto max-h-56 custom-scrollbar flex-1">
+                            ${presetListItems}
+                        </div>
+                        <div id="opt-combo-preview-${item.key}"
+                             class="px-3 py-2 text-[10.5px] leading-tight bg-slate-950/95 border-t border-slate-800 text-slate-300 min-h-[38px] flex items-center gap-1.5 shrink-0 rounded-b-xl">
+                            ${defaultComboPreviewHtml}
+                        </div>
                     </div>
                 </div>
             `;
         } else {
+            let displayVal = item.value || item.raw_value || '';
+            let currentReason = item.tag_reason || item.rating_reason || '';
+            let currentRating = item.rating || 'acceptable';
+            let currentTag = (item.tag_badge || item.rating_label || cleanTag).toUpperCase();
+
             let optionsHtml = '';
             if (Array.isArray(item.options)) {
                 optionsHtml = item.options.map(opt => {
@@ -18340,20 +18569,88 @@ function renderMsfsSettingsMatrix() {
                         || rawUpper === optUpper 
                         || (valUpper.length >= 3 && (optUpper.startsWith(valUpper + ' ') || optUpper.startsWith(valUpper + '(')))
                         || (rawUpper.length >= 3 && (optUpper.startsWith(rawUpper + ' ') || optUpper.startsWith(rawUpper + '(')));
-                    const optRating = (item.option_ratings && item.option_ratings[opt]) ? item.option_ratings[opt].rating : 'acceptable';
-                    let optClass = 'text-amber-400 font-medium bg-slate-900';
-                    if (optRating === 'optimum') optClass = 'text-emerald-400 font-medium bg-slate-900';
-                    else if (optRating === 'suboptimal') optClass = 'text-orange-400 font-medium bg-slate-900';
-                    else if (optRating === 'hazard') optClass = 'text-rose-400 font-medium bg-slate-900';
-                    return `<option value="${opt}" class="${optClass}" ${isSelected ? 'selected' : ''}>${opt}</option>`;
+
+                    if (isSelected) {
+                        displayVal = opt;
+                    }
+
+                    const optData = (item.option_ratings && item.option_ratings[opt]) ? item.option_ratings[opt] : null;
+                    const optRating = optData ? optData.rating : 'acceptable';
+                    const optTag = optData ? (optData.tag || optRating.toUpperCase()) : optRating.toUpperCase();
+                    const optReason = optData ? (optData.reason || '') : '';
+                    const optReasonEscaped = optReason.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+                    const optEscaped = String(opt).replace(/'/g, "\\'");
+
+                    if (isSelected && optReason) {
+                        currentReason = optReason;
+                        currentRating = optRating;
+                        currentTag = optTag;
+                    }
+
+                    let textClass = 'text-amber-400 font-semibold';
+                    let tagBadgeClass = 'bg-amber-950/80 text-amber-300 border border-amber-700/60';
+                    if (optRating === 'optimum') {
+                        textClass = 'text-emerald-400 font-semibold';
+                        tagBadgeClass = 'bg-emerald-950/80 text-emerald-300 border border-emerald-700/60';
+                    } else if (optRating === 'suboptimal') {
+                        textClass = 'text-orange-400 font-semibold';
+                        tagBadgeClass = 'bg-orange-950/80 text-orange-300 border border-orange-700/60';
+                    } else if (optRating === 'hazard') {
+                        textClass = 'text-rose-400 font-semibold';
+                        tagBadgeClass = 'bg-rose-950/80 text-rose-300 border border-rose-700/60';
+                    }
+
+                    return `
+                        <div class="px-3 py-2 hover:bg-slate-800 ${isSelected ? 'bg-slate-800/80' : ''} cursor-pointer transition-colors flex items-center justify-between typo-input-val text-xs gap-2 select-none"
+                             title="${optReasonEscaped}"
+                             onmouseenter="onCustomOptionHover('${item.key}', '${optEscaped}')"
+                             onmouseleave="onCustomOptionLeave('${item.key}')"
+                             onmousedown="selectCustomOption('${item.key}', '${optEscaped}')">
+                            <span class="${textClass} truncate">${opt}</span>
+                            <div class="flex items-center gap-1.5 shrink-0">
+                                <span class="text-[9px] font-bold px-1.5 py-0.5 rounded tracking-wide ${tagBadgeClass}">${optTag}</span>
+                                ${isSelected ? '<span class="text-[9px] font-semibold bg-slate-700 text-slate-200 px-1.5 py-0.5 rounded typo-action-btn uppercase">CURRENT</span>' : ''}
+                            </div>
+                        </div>
+                    `;
                 }).join('');
             }
+
+            let badgeClass = 'bg-amber-600 text-white';
+            if (currentRating === 'optimum') badgeClass = 'bg-emerald-600 text-white';
+            else if (currentRating === 'suboptimal') badgeClass = 'bg-orange-600 text-white';
+            else if (currentRating === 'hazard') badgeClass = 'bg-rose-600 text-white';
+
+            const defaultCustomPreviewHtml = `
+                <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${badgeClass} shrink-0">${currentTag}</span>
+                <span class="text-slate-300 text-[10.5px] leading-tight" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${currentReason || 'Hover over an option to preview its technical impact...'}</span>
+            `;
+
             inputHtml = `
-                <div class="relative w-full pt-0.5">
-                    <select id="opt-select-${item.key}" onchange="onMsfsSettingChanged('${item.key}', this.value)" class="w-full appearance-none bg-slate-950 border border-slate-700/80 focus:border-cyan-400 rounded-xl pl-3 pr-10 py-2 typo-input-val text-xs ${valColorClass} font-medium focus:outline-none cursor-pointer">
-                        ${optionsHtml}
-                    </select>
-                    ${chevronSvg}
+                <div class="relative w-full pt-0.5" id="opt-custom-wrapper-${item.key}">
+                    <div id="opt-custom-btn-${item.key}"
+                         onclick="toggleCustomSelectDropdown('${item.key}', event)"
+                         class="w-full bg-slate-950 border border-slate-700/80 hover:border-slate-600 focus:border-cyan-400 rounded-xl pl-3 pr-10 py-2 typo-input-val text-xs ${valColorClass} font-semibold cursor-pointer flex items-center justify-between select-none transition-colors"
+                         title="${(currentReason || '').replace(/"/g, '&quot;')}">
+                        <span id="opt-custom-label-${item.key}" class="truncate">${displayVal}</span>
+                    </div>
+                    <div class="cursor-pointer pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400">
+                        <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                    </div>
+                    <div id="opt-custom-menu-${item.key}"
+                         onwheel="event.stopPropagation();"
+                         style="overscroll-behavior: contain;"
+                         class="hidden fixed z-[99999] max-h-80 overflow-hidden bg-slate-900 border border-slate-700 rounded-xl shadow-2xl flex flex-col">
+                        <div class="py-1 divide-y divide-slate-800/60 overflow-y-auto max-h-56 custom-scrollbar flex-1">
+                            ${optionsHtml}
+                        </div>
+                        <div id="opt-custom-preview-${item.key}"
+                             class="px-3 py-2 text-[10.5px] leading-tight bg-slate-950/95 border-t border-slate-800 text-slate-300 min-h-[38px] flex items-center gap-1.5 shrink-0 rounded-b-xl">
+                            ${defaultCustomPreviewHtml}
+                        </div>
+                    </div>
                 </div>
             `;
         }
@@ -18466,6 +18763,11 @@ async function onMsfsSettingChanged(settingKey, newValue) {
             const badgeEl = document.getElementById(`opt-badge-${settingKey}`);
             const selectEl = document.getElementById(`opt-select-${settingKey}`);
             const inputEl = document.getElementById(`opt-combo-input-${settingKey}`);
+            const customBtn = document.getElementById(`opt-custom-btn-${settingKey}`);
+            const customLabel = document.getElementById(`opt-custom-label-${settingKey}`);
+            const customPreview = document.getElementById(`opt-custom-preview-${settingKey}`);
+            const comboPreview = document.getElementById(`opt-combo-preview-${settingKey}`);
+
             if (badgeEl) {
                 let cleanTag = (found.tag_badge || found.rating_label || found.rating || 'OPTIMUM').toUpperCase();
                 if (cleanTag.includes('HAZARD') || cleanTag.includes('NOGO') || cleanTag.includes('RISK') || cleanTag.includes('ALERT')) {
@@ -18502,6 +18804,28 @@ async function onMsfsSettingChanged(settingKey, newValue) {
                     inputEl.classList.remove('text-emerald-400', 'text-amber-400', 'text-orange-400', 'text-rose-400');
                     inputEl.classList.add(textClass);
                 }
+                if (customBtn) {
+                    customBtn.classList.remove('text-emerald-400', 'text-amber-400', 'text-orange-400', 'text-rose-400');
+                    customBtn.classList.add(textClass);
+                    if (found.tag_reason || found.rating_reason) {
+                        customBtn.title = found.tag_reason || found.rating_reason;
+                    }
+                }
+                if (customLabel) {
+                    customLabel.textContent = newValue;
+                }
+                if (customPreview) {
+                    customPreview.innerHTML = `
+                        <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${badgeClass} shrink-0">${cleanTag}</span>
+                        <span class="text-slate-300 text-[10.5px] leading-tight" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${found.tag_reason || found.rating_reason || ''}</span>
+                    `;
+                }
+                if (comboPreview) {
+                    comboPreview.innerHTML = `
+                        <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${badgeClass} shrink-0">${cleanTag}</span>
+                        <span class="text-slate-300 text-[10.5px] leading-tight" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${found.tag_reason || found.rating_reason || ''}</span>
+                    `;
+                }
             }
 
             // Immediately synchronize Framerate Multiplier card when Frame Generation is toggled
@@ -18521,6 +18845,10 @@ async function onMsfsSettingChanged(settingKey, newValue) {
                     const multBadge = document.getElementById('opt-badge-framerate_multiplier');
                     const multSelect = document.getElementById('opt-select-framerate_multiplier');
                     const multInput = document.getElementById('opt-combo-input-framerate_multiplier');
+                    const multCustomBtn = document.getElementById('opt-custom-btn-framerate_multiplier');
+                    const multCustomLabel = document.getElementById('opt-custom-label-framerate_multiplier');
+                    const multCustomPreview = document.getElementById('opt-custom-preview-framerate_multiplier');
+
                     if (multBadge) {
                         multBadge.textContent = multItem.tag_badge;
                         multBadge.className = `px-2.5 py-0.5 rounded typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] shrink-0 shadow-sm cursor-help ${isOff ? 'bg-amber-600 text-white font-bold' : 'bg-emerald-600 text-white font-bold'}`;
@@ -18536,6 +18864,20 @@ async function onMsfsSettingChanged(settingKey, newValue) {
                         multInput.value = multItem.value;
                         multInput.classList.remove('text-emerald-400', 'text-amber-400', 'text-orange-400', 'text-rose-400');
                         multInput.classList.add(isOff ? 'text-amber-400' : 'text-emerald-400');
+                    }
+                    if (multCustomLabel) {
+                        multCustomLabel.textContent = multItem.value;
+                    }
+                    if (multCustomBtn) {
+                        multCustomBtn.classList.remove('text-emerald-400', 'text-amber-400', 'text-orange-400', 'text-rose-400');
+                        multCustomBtn.classList.add(isOff ? 'text-amber-400' : 'text-emerald-400');
+                        multCustomBtn.title = multItem.tag_reason;
+                    }
+                    if (multCustomPreview) {
+                        multCustomPreview.innerHTML = `
+                            <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${isOff ? 'bg-amber-600 text-white' : 'bg-emerald-600 text-white'} shrink-0">${multItem.tag_badge}</span>
+                            <span class="text-slate-300 text-[10.5px] leading-tight" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${multItem.tag_reason}</span>
+                        `;
                     }
                 }
             }
