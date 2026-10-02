@@ -1694,7 +1694,12 @@ def apply_setting_to_content(content: str, mode: str, setting_key: str, new_valu
         val_upper = str(new_value).upper()
         if 'DLSS' in val_upper:
             aa_mode = 'DLSS'
-            dlss_mode = 'QUALITY' if 'QUALITY' in val_upper else ('BALANCED' if 'BALANCED' in val_upper else ('PERFORMANCE' if 'PERFORMANCE' in val_upper else 'QUALITY'))
+            if 'PERFORMANCE' in val_upper:
+                dlss_mode = 'PERFORMANCE'
+            elif 'BALANCED' in val_upper:
+                dlss_mode = 'BALANCED'
+            else:
+                dlss_mode = 'QUALITY'
             content = re.sub(rf'({k_aa}\s+)[^\r\n]+', rf'\g<1>{aa_mode}', content, flags=re.IGNORECASE)
             if re.search(rf'({k_dlss}\s+)[^\r\n]+', content, flags=re.IGNORECASE):
                 content = re.sub(rf'({k_dlss}\s+)[^\r\n]+', rf'\g<1>{dlss_mode}', content, flags=re.IGNORECASE)
@@ -2773,46 +2778,47 @@ def calculate_option_ratings(key: str, options: List[str], is_liner: bool, is_vr
                 r, c = "acceptable", "amber"
 
         elif key == "texture_resolution":
+            opt_lead = o_up.split("(")[0].strip()
             if is_vr:
-                if "ULTRA" in o_up:
+                if "ULTRA" in opt_lead:
                     r, c = "hazard", "rose"
-                    reason = "Ultra textures in VR cause severe VRAM overflow and headset compositor tracking freezes."
-                elif "HIGH" in o_up:
+                    reason = "Full 4K Texture Atlases (14-16 GB Alloc): extreme VRAM footprint saturates stereo buffers and induces headset compositor tracking freezes."
+                elif "HIGH" in opt_lead:
                     r, c = ("acceptable", "amber") if is_flagship_gpu else ("suboptimal", "orange")
-                    reason = "High textures in VR stereo demand extreme VRAM, risking frame drops on airliners."
-                elif "MEDIUM" in o_up:
+                    reason = "2K High-Res Textures (9-11 GB Alloc): heavy VRAM footprint, high risk of stereo paging stutters during final approach."
+                elif "MEDIUM" in opt_lead:
                     r, c = ("optimum", "emerald") if is_flagship_gpu else ("acceptable", "amber")
-                    reason = "Medium textures provide balanced fidelity in VR stereo rendering."
+                    reason = "1K Compressed Textures (6-8 GB Alloc): balanced memory allocation, viable with 16 GB+ VRAM."
                 else: # LOW
                     r, c = "optimum", "emerald"
-                    reason = "Low textures in VR save 6-8 GB VRAM, preventing compositor crashes on heavy airliners."
+                    reason = "512px Optimized Textures (3-4 GB Alloc): minimal memory footprint, frees 6-8 GB VRAM to guarantee zero compositor drops."
             else: # 2D Desktop
                 if is_liner:
-                    if "LOW" in o_up:
+                    if "LOW" in opt_lead:
                         r, c = "optimum", "emerald"
-                        reason = "VRAM Optimization: saves 6-8 GB VRAM, preventing D3D12 paging freezes at dense hubs."
-                    elif "MEDIUM" in o_up:
+                        reason = "512px Optimized Textures (3-4 GB Alloc): ultra-safe VRAM footprint, prevents D3D12 paging freezes at dense hubs."
+                    elif "MEDIUM" in opt_lead:
                         r, c = ("optimum", "emerald") if vram_gb >= 16.0 else ("acceptable", "amber")
-                        reason = "Balanced texture resolution with adequate VRAM headroom for airliners."
-                    elif "HIGH" in o_up:
+                        reason = "1K Compressed Textures (6-8 GB Alloc): balanced memory footprint with safe headroom on complex airliners."
+                    elif "HIGH" in opt_lead:
                         r, c = ("acceptable", "amber") if vram_gb >= 16.0 else ("suboptimal", "orange")
-                        reason = f"High textures approach VRAM budget limits with airliners on {vram_gb:.0f} GB VRAM."
+                        reason = f"2K High-Res Textures (9-11 GB Alloc): approaches VRAM budget limits with airliners on {vram_gb:.0f} GB VRAM."
                     else: # ULTRA
                         r, c = ("acceptable", "amber") if vram_gb >= 24.0 else ("hazard", "rose")
-                        reason = "Ultra textures cause severe VRAM overflow and heavy stuttering on complex airliners at heavy hubs."
+                        reason = "Full 4K Texture Atlases (14-16 GB Alloc): severe VRAM overflow and heavy stuttering on complex airliners at heavy hubs."
                 else: # GA / VFR
-                    if "ULTRA" in o_up:
+                    if "ULTRA" in opt_lead:
                         r, c = ("optimum", "emerald") if vram_gb >= 16.0 else ("acceptable", "amber")
-                        reason = "Maximum visual fidelity for low-altitude VFR sightseeing. GA aircraft consume minimal VRAM."
-                    elif "HIGH" in o_up:
+                        reason = "Full 4K Texture Atlases (14-16 GB Alloc): maximum photorealism for low-altitude VFR sightseeing on 24 GB+ GPUs."
+                    elif "HIGH" in opt_lead:
                         r, c = "optimum", "emerald"
-                        reason = "Crisp ground terrain, runway markings, and cockpit placards with ample headroom."
-                    elif "MEDIUM" in o_up:
+                        reason = "2K High-Res Textures (9-11 GB Alloc): crisp ground terrain, runway markings, and cockpit placards with ample headroom."
+                    elif "MEDIUM" in opt_lead:
                         r, c = "acceptable", "amber"
-                        reason = "Good performance, but slight ground texture softness at low altitude."
+                        reason = "1K Compressed Textures (6-8 GB Alloc): good performance, but slight ground texture softness at low altitude."
                     else: # LOW
                         r, c = "acceptable", "amber"
-                        reason = "Unnecessarily blurry for VFR sightseeing flights when VRAM headroom is plentiful."
+                        reason = "512px Optimized Textures (3-4 GB Alloc): unnecessarily blurry for VFR sightseeing flights when VRAM headroom is plentiful."
 
         elif key == "glass_cockpits":
             if is_liner:
@@ -2850,12 +2856,16 @@ def calculate_option_ratings(key: str, options: List[str], is_liner: bool, is_vr
             clean_num = ''.join(filter(str.isdigit, opt_str))
             if clean_num and int(clean_num) == target_fps:
                 r, c = "optimum", "emerald"
+                reason = f"Exact 1/2 sync divisor ({target_fps} FPS): delivers perfect 1:2 monitor frame cadence without micro-stutter."
             elif o_up == "OFF" or opt_str == "0":
                 r, c = "acceptable", "amber"
+                reason = "Uncapped FPS: relies on external frame limiters (RTSS / NVCP) or G-Sync/FreeSync VRR."
             elif clean_num and int(clean_num) in [30, 36, 40, 45, 60, 72, 80, 82, 90, 120, 144, 165, 180, 240]:
                 r, c = "acceptable", "amber"
+                reason = f"Manual cap ({clean_num} FPS): functional limiter, but misaligned with the ideal 1/2 refresh divisor ({target_fps} FPS)."
             else:
                 r, c = "suboptimal", "orange"
+                reason = "Non-standard frame limit: may introduce uneven frame delivery intervals."
 
         elif key == "frame_generation":
             if is_vr:
@@ -2887,33 +2897,34 @@ def calculate_option_ratings(key: str, options: List[str], is_liner: bool, is_vr
                 r, c = "optimum", "emerald"
 
         elif key == "offscreen_precaching":
-            if "HIGH" in o_up:
+            opt_lead = o_up.split("(")[0].strip()
+            if "HIGH" in opt_lead:
                 r, c = "optimum", "emerald"
-                reason = "HIGH eliminates 100% of camera panning stutters without buffer overload."
-            elif "ULTRA" in o_up:
+                reason = "Pre-loads a 90° peripheral arc: eliminates camera rotation stutter without overflowing VRAM buffer."
+            elif "ULTRA" in opt_lead:
                 if vram_gb >= 20.0 or is_flagship_gpu:
                     r, c = "optimum", "emerald"
-                    reason = "ULTRA pre-caches full 360° scenery: instant panning without pop-in for high-VRAM GPUs (≥ 20 GB)."
+                    reason = "Pre-loads full 360° environment: instantaneous camera panning for high-VRAM rigs (≥ 20 GB)."
                 else:
                     r, c = "acceptable", "amber"
-                    reason = "ULTRA pre-caches full 360° environment but increases VRAM and system RAM allocation."
-            elif "MEDIUM" in o_up:
+                    reason = "Pre-loads full 360° environment, but demands heavy system RAM and VRAM capacity."
+            elif "MEDIUM" in opt_lead:
                 r, c = "acceptable", "amber"
-                reason = "MEDIUM fits 16 GB RAM rigs, with moderate risk of pop-in during aggressive camera pans."
+                reason = "Narrow buffer pre-caching: suitable for 16 GB RAM rigs, with minor pop-in during fast pans."
             else: # LOW
                 r, c = "hazard", "rose"
-                reason = "HAZARD: LOW induces severe micro-freezes and stutters whenever panning camera view."
+                reason = "HAZARD: zero background scenery pre-caching induces severe stutter whenever panning view."
 
         elif key == "displacement_mapping":
             if o_up.startswith("OFF") or o_up in ["0", "FALSE"] or ("OFF" in o_up and "ON" not in o_up.split("(")[0]):
                 r, c = "optimum", "emerald"
-                reason = "OFF eliminates runway texture shimmering and saves valuable tessellation compute and VRAM."
+                reason = "Standard flat tarmac mesh: eliminates runway texture shimmering and saves GPU tessellation compute."
             else:
                 r, c = "hazard" if is_vr else "suboptimal", "rose" if is_vr else "orange"
                 if is_vr:
-                    reason = "HAZARD in VR: micro-surface tessellation overloads stereo draw pipeline and induces cockpit judder."
+                    reason = "HAZARD in VR: micro-surface 3D tessellation severely taxes stereo vertex pipeline and triggers cockpit judder."
                 else:
-                    reason = "SUBOPTIMAL: tarmac 3D relief is imperceptible from cockpit height (~3m) while needlessly taxing GPU."
+                    reason = "SUBOPTIMAL: tarmac 3D displacement is imperceptible from cockpit height (~3m) while needlessly taxing GPU."
 
         elif key == "dynamic_settings":
             if o_up in ["OFF", "0"]:
@@ -2937,25 +2948,43 @@ def calculate_option_ratings(key: str, options: List[str], is_liner: bool, is_vr
 
         elif key == "anti_aliasing":
             if is_vr:
-                if "DLSS (QUALITY)" in o_up or o_up == "DLSS":
+                if "PERFORMANCE" in o_up:
                     r, c = "optimum", "emerald"
-                elif any(k in o_up for k in ["DLSS (BALANCED)", "DLSS (PERFORMANCE)"]):
+                    reason = "50% internal render: least taxing mode for the GPU, securing maximum framerate headroom in VR."
+                elif "BALANCED" in o_up:
+                    r, c = "optimum", "emerald"
+                    reason = "58% internal render: strong balance between high framerate pacing and sharp cockpit readability."
+                elif "QUALITY" in o_up or o_up == "DLSS":
                     r, c = "acceptable", "amber"
-                elif "TAA" in o_up:
-                    r, c = "acceptable", "amber"
+                    reason = "67% internal render: enhanced cockpit sharpness, but taxes GPU stereo frame times more heavily."
                 elif "DLAA" in o_up:
+                    r, c = "hazard", "rose"
+                    reason = "HAZARD in VR: 100% native stereo AI workload severely overburdens GPU frametimes, causing motion reprojection collapse."
+                elif "TAA" in o_up:
                     r, c = "suboptimal", "orange"
+                    reason = "100% native stereo rasterization: heavy fill-rate workload, risks reprojection drops without AI acceleration."
                 else:
                     r, c = "acceptable", "amber"
             else: # 2D Desktop
-                if "DLSS (QUALITY)" in o_up:
+                if "QUALITY" in o_up:
                     r, c = "optimum", "emerald"
+                    reason = "67% render scale + DLSS 3 optical flow: pristine cockpit clarity with high framerate."
                 elif "DLAA" in o_up:
+                    if is_flagship_gpu:
+                        r, c = "optimum", "emerald"
+                        reason = "100% native AI anti-aliasing: absolute peak edge sharpness on flagship GPUs."
+                    else:
+                        r, c = "acceptable", "amber"
+                        reason = "100% native AI anti-aliasing: pristine edges with full GPU rasterization workload."
+                elif "BALANCED" in o_up:
                     r, c = "acceptable", "amber"
-                elif any(k in o_up for k in ["DLSS (BALANCED)", "DLSS (PERFORMANCE)"]):
+                    reason = "58% render scale: low GPU load with subtle softening on distant ground detail."
+                elif "PERFORMANCE" in o_up:
                     r, c = "acceptable", "amber"
+                    reason = "50% render scale: maximum framerate boost, ideal for GPU-bound scenarios."
                 elif "TAA" in o_up:
                     r, c = "acceptable", "amber"
+                    reason = "Standard native rasterization: reliable clarity without temporal AI reconstruction."
                 else:
                     r, c = "suboptimal", "orange"
 
@@ -5611,16 +5640,30 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
 
         # Specific explanatory tooltips for badge mouseover
         if key == "anti_aliasing":
-            if "DLAA" in val_norm:
-                tag_reason = "100% native AI anti-aliasing via Tensor Cores: razor-sharp EFIS instruments with abundant GPU margin."
-            elif "QUALITY" in val_norm:
-                tag_reason = "Tensor AI reconstruction frees 25-35% GPU shading time while keeping cockpit displays sharp."
-            elif "BALANCED" in val_norm:
-                tag_reason = "Tensor AI upscaling balances high visual clarity with strong GPU framerate relief."
-            elif "PERFORMANCE" in val_norm:
-                tag_reason = "Ultra-light 50% internal rasterization: maximum GPU framerate relief, securing locked cadence in VR and heavy weather."
+            if is_vr:
+                if "PERFORMANCE" in val_norm:
+                    tag_reason = "50% internal render: least taxing mode for the GPU, securing maximum framerate headroom in VR."
+                elif "BALANCED" in val_norm:
+                    tag_reason = "58% internal render: strong balance between high framerate pacing and sharp cockpit readability."
+                elif "QUALITY" in val_norm:
+                    tag_reason = "67% internal render: enhanced cockpit sharpness, but taxes GPU stereo frame times more heavily."
+                elif "DLAA" in val_norm:
+                    tag_reason = "HAZARD in VR: 100% native stereo AI workload severely overburdens GPU frametimes, causing motion reprojection collapse."
+                elif "TAA" in val_norm:
+                    tag_reason = "100% native stereo rasterization: heavy fill-rate workload, risks reprojection drops without AI acceleration."
+                else:
+                    tag_reason = "Stereo anti-aliasing evaluated for VR frame pacing."
             else:
-                tag_reason = "Native raster anti-aliasing: sharp presentation with standard GPU shading workload."
+                if "DLAA" in val_norm:
+                    tag_reason = "100% native AI anti-aliasing via Tensor Cores: razor-sharp EFIS instruments with abundant GPU margin."
+                elif "QUALITY" in val_norm:
+                    tag_reason = "Tensor AI reconstruction frees 25-35% GPU shading time while keeping cockpit displays sharp."
+                elif "BALANCED" in val_norm:
+                    tag_reason = "Tensor AI upscaling balances high visual clarity with strong GPU framerate relief."
+                elif "PERFORMANCE" in val_norm:
+                    tag_reason = "Ultra-light 50% internal rasterization: maximum GPU framerate relief, securing locked cadence in heavy weather."
+                else:
+                    tag_reason = "Native raster anti-aliasing: sharp presentation with standard GPU shading workload."
         elif key == "reflections_ssr":
             if is_vr:
                 if any(k in val_norm for k in ["LOW", "OFF"]):
@@ -5980,55 +6023,95 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
     lod_options = ["50", "80", "100", "120", "150", "180", "200", "250", "300", "350", "400"]
     q_options = ["Ultra", "High", "Medium", "Low"]
     tex_options = [
-        "Ultra (VFR Realism • 24GB+ GPUs)",
-        "High (GA & Crisp Cockpits • 16GB+)",
-        "Medium (Balanced • 12-16GB VRAM)",
-        "Low (IFR Liners & VR • Max Headroom)"
+        "Ultra (Full 4K Texture Atlases • 14-16 GB Alloc)",
+        "High (2K High-Res Textures • 9-11 GB Alloc)",
+        "Medium (1K Compressed Textures • 6-8 GB Alloc)",
+        "Low (512px Optimized Textures • 3-4 GB Alloc)"
     ]
 
     def format_tex_display(val: str) -> str:
         v = str(val).lower()
         if "ultra" in v:
-            return "Ultra (VFR Realism • 24GB+ GPUs)"
+            return "Ultra (Full 4K Texture Atlases • 14-16 GB Alloc)"
         if "high" in v:
-            return "High (GA & Crisp Cockpits • 16GB+)"
+            return "High (2K High-Res Textures • 9-11 GB Alloc)"
         if "medium" in v or "med" in v:
-            return "Medium (Balanced • 12-16GB VRAM)"
-        return "Low (IFR Liners & VR • Max Headroom)"
+            return "Medium (1K Compressed Textures • 6-8 GB Alloc)"
+        return "Low (512px Optimized Textures • 3-4 GB Alloc)"
 
     precaching_options = [
-        "Ultra (360° Panning • 24GB+ GPUs / 32GB RAM)",
-        "High (Recommended • Zero Pan Stutters)",
-        "Medium (Balanced • 16GB RAM / 8GB VRAM)",
-        "Low (Hazard • Heavy Camera Stutters)"
+        "Ultra (Full 360° Scene Pre-Load • 32GB RAM & 24GB VRAM)",
+        "High (90° Peripheral Arc • Balanced Memory Cache)",
+        "Medium (Narrow Front Buffer • 16GB RAM Target)",
+        "Low (Zero Pre-Caching • High Disk Streaming)"
     ]
 
     def format_precaching_display(val: str) -> str:
         v = str(val).lower()
         if "ultra" in v:
-            return "Ultra (360° Panning • 24GB+ GPUs / 32GB RAM)"
+            return "Ultra (Full 360° Scene Pre-Load • 32GB RAM & 24GB VRAM)"
         if "high" in v:
-            return "High (Recommended • Zero Pan Stutters)"
+            return "High (90° Peripheral Arc • Balanced Memory Cache)"
         if "medium" in v or "med" in v:
-            return "Medium (Balanced • 16GB RAM / 8GB VRAM)"
-        return "Low (Hazard • Heavy Camera Stutters)"
+            return "Medium (Narrow Front Buffer • 16GB RAM Target)"
+        return "Low (Zero Pre-Caching • High Disk Streaming)"
 
     disp_options = [
-        "OFF (Recommended • Max Stability & Zero Shimmer)",
-        "ON (Bush Flying Only • 3D Ground Tarmac Relief)"
+        "OFF (Flat Tarmac Mesh • Zero Tessellation Overhead)",
+        "ON (3D Surface Tessellation • Heavy Vertex Shading)"
     ]
 
     def format_disp_display(val: str) -> str:
         v = str(val).upper()
         if "ON" in v and "OFF" not in v:
-            return "ON (Bush Flying Only • 3D Ground Tarmac Relief)"
-        return "OFF (Recommended • Max Stability & Zero Shimmer)"
+            return "ON (3D Surface Tessellation • Heavy Vertex Shading)"
+        return "OFF (Flat Tarmac Mesh • Zero Tessellation Overhead)"
     glass_options = ["High (Full)", "Medium (Half)", "Low (Quarter)"]
     water_options = ["Ultra (1024)", "High (512)", "Medium (256)", "Low (128)"]
     shadow_options = ["Ultra (2048)", "High (1536)", "Medium (1024)", "Low (512)"]
     hf_options = ["Ultra (1024)", "High (512)", "Medium (256)", "Low (128)"]
     aniso_options = ["16X", "8X", "4X", "2X", "OFF"]
-    aa_options = ["DLAA", "DLSS (Quality)", "DLSS (Balanced)", "DLSS (Performance)", "TAA"]
+    aa_options_vr = [
+        "DLSS (Performance • 50% Render • Maximum FPS)",
+        "DLSS (Balanced • 58% Render • Stable 90Hz)",
+        "DLSS (Quality • 67% Render • Sharp Cockpits)",
+        "TAA (100% Native Raster • High Fill-Rate)",
+        "DLAA (100% Native AI • Extreme GPU Load)"
+    ]
+    aa_options_2d = [
+        "DLSS (Quality • 67% Render • Sweet Spot)",
+        "DLAA (100% Native AI • Ultra Sharp)",
+        "DLSS (Balanced • 58% Render • Low GPU Load)",
+        "DLSS (Performance • 50% Render • Max FPS)",
+        "TAA (100% Native Raster • Standard)"
+    ]
+
+    def format_aa_display(val: str, is_vr_mode: bool) -> str:
+        v = str(val).upper()
+        if is_vr_mode:
+            if "PERFORMANCE" in v:
+                return "DLSS (Performance • 50% Render • Maximum FPS)"
+            if "BALANCED" in v:
+                return "DLSS (Balanced • 58% Render • Stable 90Hz)"
+            if "QUALITY" in v:
+                return "DLSS (Quality • 67% Render • Sharp Cockpits)"
+            if "DLAA" in v:
+                return "DLAA (100% Native AI • Extreme GPU Load)"
+            if "TAA" in v:
+                return "TAA (100% Native Raster • High Fill-Rate)"
+            return "DLSS (Performance • 50% Render • Maximum FPS)"
+        else:
+            if "QUALITY" in v:
+                return "DLSS (Quality • 67% Render • Sweet Spot)"
+            if "DLAA" in v:
+                return "DLAA (100% Native AI • Ultra Sharp)"
+            if "BALANCED" in v:
+                return "DLSS (Balanced • 58% Render • Low GPU Load)"
+            if "PERFORMANCE" in v:
+                return "DLSS (Performance • 50% Render • Max FPS)"
+            if "TAA" in v:
+                return "TAA (100% Native Raster • Standard)"
+            return "DLSS (Quality • 67% Render • Sweet Spot)"
 
     # Glass Cockpit Ratings
     glass_2d_opt = (glass_2d_val != 'High (Full)') if is_liner else True
@@ -6258,6 +6341,14 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
     reflex_2d_label = "OPTIMUM" if reflex_2d == "ON" else ("ACCEPTABLE" if "BOOST" in reflex_2d else "SUBOPTIMAL")
     reflex_2d_reason = "Drains GPU render queue to minimize input latency." if reflex_2d == "ON" else ("Locks GPU core and memory clocks to maximum boost frequency; higher power draw with negligible latency gain." if "BOOST" in reflex_2d else "Reflex OFF increases input-to-display latency during flight maneuvers.")
 
+    val_aa_2d_up = val_aa_2d.upper()
+    if "QUALITY" in val_aa_2d_up:
+        aa_2d_rating, aa_2d_color, aa_2d_lbl = "optimum", "emerald", "OPTIMUM"
+    elif "DLAA" in val_aa_2d_up:
+        aa_2d_rating, aa_2d_color, aa_2d_lbl = ("optimum", "emerald", "OPTIMUM") if is_flagship_gpu else ("acceptable", "amber", "ACCEPTABLE")
+    else:
+        aa_2d_rating, aa_2d_color, aa_2d_lbl = "acceptable", "amber", "ACCEPTABLE"
+
     matrix_2d = [
         # PAGE 1: FRAME RATE & SYNC (6)
         make_setting_item("resolution", "Full Screen Resolution", res_formatted, res_raw, True, res_rating, res_color, res_label, f"Description: Native screen rendering resolution for MSFS.\nCurrent: {res_formatted}.\nRecommendation: Match physical monitor native resolution and leverage DLSS for optimal sharpness.", res_options, page=1, tag_reason=res_tag_reason, rec_guidance=f"Native resolution {native_w}x{native_h} recommended", is_vr=False),
@@ -6305,7 +6396,7 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
         make_setting_item("windshield_effects", "Windshield Effects", wind_2d_val, wind_2d_raw, False, "optimum" if wind_2d_val == "High" else "acceptable", "emerald" if wind_2d_val == "High" else "amber", "OPTIMUM" if wind_2d_val == "High" else "ACCEPTABLE", f"Description: Dynamic raindrops, icing accretion, wiper blade sweeps, and glass reflection effects on windshield.\nCurrent: {wind_2d_val}.\nRecommendation: HIGH for full weather immersion on the flight deck.", q_options, page=5, tag_reason="Realistic dynamic rain, icing, and wiper sweep effects.", rec_guidance="HIGH • Dynamic rain and icing immersion on flight deck", is_vr=False),
 
         # PAGE 6: POST-PROCESSING (7)
-        make_setting_item("anti_aliasing", "Anti-Aliasing & Upscaling", val_aa_2d, aa_2d, False, "optimum" if "QUALITY" in val_aa_2d.upper() else "acceptable", "emerald" if "QUALITY" in val_aa_2d.upper() else "amber", "OPTIMUM" if "QUALITY" in val_aa_2d.upper() else "ACCEPTABLE", f"Description: Anti-aliasing method and AI upscaling mode (DLSS/TAA/DLAA).\nCurrent: {val_aa_2d}.\nRecommendation: DLSS Quality on high-tier RTX GPUs for pristine cockpit clarity.", aa_options, page=6, rec_guidance="DLSS Quality (or DLAA with ample GPU headroom)", is_vr=False),
+        make_setting_item("anti_aliasing", "Anti-Aliasing & Upscaling", format_aa_display(val_aa_2d, False), aa_2d, False, aa_2d_rating, aa_2d_color, aa_2d_lbl, f"Description: Anti-aliasing method and AI upscaling mode (DLSS/TAA/DLAA).\nCurrent: {val_aa_2d}.\nRecommendation: DLSS Quality balances sharp flight decks with DLSS 3 FG; DLAA for maximum native edge clarity.", aa_options_2d, page=6, rec_guidance="Quality balances sharp flight decks with DLSS 3 FG • DLAA for maximum native edge clarity", is_vr=False),
         make_setting_item("dynamic_settings", "Dynamic Settings", dyn_2d, "0" if dyn_2d == "OFF" else "1", False, "optimum" if dyn_2d == "OFF" else "suboptimal", "emerald" if dyn_2d == "OFF" else "orange", "OPTIMUM" if dyn_2d == "OFF" else "SUBOPTIMAL", f"Description: Dynamic internal resolution scaling during heavy scenes.\nCurrent: {dyn_2d}.\nRecommendation: Keep OFF. Dynamic resolution triggers fluctuating cockpit blur and inconsistent image clarity.", ["OFF", "ON"], page=6, tag_reason="Disabled dynamic scaling guarantees consistent render sharpness in all phases." if dyn_2d == "OFF" else "Dynamic scaling lowers resolution unpredictably, blurring cockpit screens.", rec_guidance="OFF • Guarantees consistent cockpit gauge clarity", is_vr=False),
         make_setting_item("reflections_ssr", "Screen Reflections (SSR)", ssr_2d_val, ssr_2d_raw, False, "optimum" if ssr_2d_val == "High" else "acceptable", "emerald" if ssr_2d_val == "High" else "amber", "OPTIMUM" if ssr_2d_val == "High" else "ACCEPTABLE", f"Description: Screen space reflections on wet runways, water puddles, and cockpit windshields.\nCurrent: {ssr_2d_val}.\nRecommendation: HIGH in 2D mode for realistic rainy runway reflections; LOW in VR mode to save GPU fill rate.", q_options, page=6, rec_guidance="HIGH • Realistic runway reflections in wet conditions", is_vr=False),
         make_setting_item("cubemap_reflections", "Cubemap Reflections", cube_2d_val, cube_2d_raw, False, "optimum" if cube_2d_val == "192" else "acceptable", "emerald" if cube_2d_val == "192" else "amber", "OPTIMUM" if cube_2d_val == "192" else "ACCEPTABLE", f"Description: Resolution of cubemap reflection probes used for cockpit dials, canopy gloss, and shiny metal surfaces.\nCurrent: {cube_2d_val}.\nRecommendation: 192 for crisp reflections without excessive probe rendering cost.", cube_options, page=6, tag_reason="Balanced reflection probe resolution.", rec_guidance="192 • Sharp reflections on instruments and canopy glass", is_vr=False),
@@ -6358,6 +6449,18 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
         else "Stereo motion reprojection configured."))
     )
 
+    val_aa_vr_up = val_aa_vr.upper()
+    if "PERFORMANCE" in val_aa_vr_up or "BALANCED" in val_aa_vr_up:
+        aa_vr_rating, aa_vr_color, aa_vr_lbl = "optimum", "emerald", "OPTIMUM"
+    elif "QUALITY" in val_aa_vr_up or val_aa_vr_up == "DLSS":
+        aa_vr_rating, aa_vr_color, aa_vr_lbl = "acceptable", "amber", "ACCEPTABLE"
+    elif "DLAA" in val_aa_vr_up:
+        aa_vr_rating, aa_vr_color, aa_vr_lbl = "hazard", "rose", "HAZARD"
+    elif "TAA" in val_aa_vr_up:
+        aa_vr_rating, aa_vr_color, aa_vr_lbl = "suboptimal", "orange", "SUBOPTIMAL"
+    else:
+        aa_vr_rating, aa_vr_color, aa_vr_lbl = "acceptable", "amber", "ACCEPTABLE"
+
     matrix_vr = [
         # PAGE 1: VR HEADSET & SYNC (5)
         make_setting_item("primary_scaling_vr", "VR Render Scale", scale_vr_pct, scale_vr_raw, False, scale_vr_rating, scale_vr_color, scale_vr_lbl, scale_vr_tooltip, scale_vr_options, page=1, tag_reason=scale_vr_reason, rec_guidance="100% • Native 1:1 render scale for crystal clear gauges", is_vr=True),
@@ -6367,7 +6470,7 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
         make_setting_item("sharpen_amount_vr", "VR Sharpening", sharpen_vr_val, sharpen_vr_raw, False, "optimum" if abs(float(sharpen_vr_val) - 0.20) < 0.05 else "acceptable", "emerald" if abs(float(sharpen_vr_val) - 0.20) < 0.05 else "amber", "OPTIMUM" if abs(float(sharpen_vr_val) - 0.20) < 0.05 else "ACCEPTABLE", f"Description: Post-processing sharpening filter in VR headset.\nCurrent: {sharpen_vr_val}.\nRecommendation: Set to 0.20 when using DLSS. Excessive values (>1.0) cause harsh shimmering on runway lines and horizon.", sharpen_vr_options, page=1, is_numeric=True, min_val=0.0, max_val=2.0, step=0.1, tag_reason="Subtle sharpening without shimmering." if abs(float(sharpen_vr_val) - 0.20) < 0.05 else "High sharpening causes noise and shimmering in VR.", rec_guidance="0.20 • Clean clarity without noise or horizon shimmering", is_vr=True),
 
         # PAGE 2: VR OPTIMIZATIONS & DLSS (4)
-        make_setting_item("anti_aliasing", "Anti-Aliasing & Upscaling (VR)", val_aa_vr, aa_vr, False, "optimum" if "QUALITY" in val_aa_vr else "acceptable", "emerald" if "QUALITY" in val_aa_vr else "amber", "OPTIMUM" if "QUALITY" in val_aa_vr else "ACCEPTABLE", f"Description: Anti-aliasing and upscaling mode in VR stereo.\nCurrent: {val_aa_vr}.\nRecommendation: DLSS Quality is essential in VR to reduce stereo rendering load.", aa_options, page=2, rec_guidance="DLSS Quality • Essential for VR stereo rendering workload", is_vr=True),
+        make_setting_item("anti_aliasing", "Anti-Aliasing & Upscaling (VR)", format_aa_display(val_aa_vr, True), aa_vr, False, aa_vr_rating, aa_vr_color, aa_vr_lbl, f"Description: Anti-aliasing and upscaling mode in VR stereo.\nCurrent: {val_aa_vr}.\nRecommendation: DLSS Performance or Balanced yields maximum FPS headroom in VR stereo.", aa_options_vr, page=2, rec_guidance="Performance yields maximum FPS • Quality enhances clarity but taxes GPU heavier", is_vr=True),
         make_setting_item("foveated_rendering", "Foveated Rendering", fov_vr_val, fov_vr_raw, False, "optimum" if fov_vr_val == "ON" else "acceptable", "emerald" if fov_vr_val == "ON" else "amber", "OPTIMUM" if fov_vr_val == "ON" else "ACCEPTABLE", f"Description: Variable rate shading reducing GPU load in peripheral vision.\nCurrent: {fov_vr_val}.\nRecommendation: ON for 10-15% GPU frame time reduction in VR headsets.", ["ON", "OFF"], page=2, tag_reason="Reduces GPU peripheral shading workload in headset.", rec_guidance="ON • 10-15% GPU frame time savings in peripheral vision", is_vr=True),
         make_setting_item("dynamic_settings", "Dynamic Settings (VR)", dyn_vr, "0" if dyn_vr == "OFF" else "1", False, "optimum" if dyn_vr == "OFF" else "suboptimal", "emerald" if dyn_vr == "OFF" else "orange", "OPTIMUM" if dyn_vr == "OFF" else "SUBOPTIMAL", f"Description: Dynamic resolution in VR.\nCurrent: {dyn_vr}.\nRecommendation: Keep OFF in VR to avoid sudden stereo blurriness.", ["OFF", "ON"], page=2, tag_reason="Disabled dynamic scaling prevents sudden VR stereo resolution drops.", rec_guidance="OFF • Prevents abrupt stereo resolution drops in headset", is_vr=True),
         make_setting_item("foveated_scale", "Foveated Scale", fov_scale_pct, fov_scale_raw, False, "optimum" if "40%" in fov_scale_pct else "acceptable", "emerald" if "40%" in fov_scale_pct else "amber", "OPTIMUM" if "40%" in fov_scale_pct else "ACCEPTABLE", f"Description: Inner foveal resolution radius.\nCurrent: {fov_scale_pct}.\nRecommendation: 40% offers the best balance between peripheral performance gain and central sharpness.", fov_scale_options, page=2, tag_reason="Optimal foveal radius for wide-FOV headsets.", rec_guidance="40% • Optimal balance of central clarity and GPU savings", is_vr=True),
