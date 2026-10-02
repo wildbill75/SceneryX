@@ -1300,6 +1300,12 @@ def get_current_staged_content(user_cfg_path: Optional[str] = None) -> str:
         return ""
 
 
+def _normalize_cfg_lines(content: str) -> str:
+    """Normalizes UserCfg.opt content by trimming line whitespace and discarding blank lines."""
+    lines = [line.strip() for line in (content or "").replace("\r\n", "\n").split("\n")]
+    return "\n".join(line for line in lines if line)
+
+
 def check_profile_changes(profile_id: str, user_cfg_path: Optional[str] = None) -> Dict[str, Any]:
     """Compares the current staged/disk settings with the content of a saved profile."""
     profiles_dir = get_custom_profiles_dir()
@@ -1314,8 +1320,8 @@ def check_profile_changes(profile_id: str, user_cfg_path: Optional[str] = None) 
     try:
         with open(profile_file, "r", encoding="utf-8", errors="ignore") as f:
             pdata = json.load(f)
-        prof_content = (pdata.get("content") or "").strip().replace("\r\n", "\n")
-        curr_content = get_current_staged_content(user_cfg_path).strip().replace("\r\n", "\n")
+        prof_content = _normalize_cfg_lines(pdata.get("content") or "")
+        curr_content = _normalize_cfg_lines(get_current_staged_content(user_cfg_path))
         has_changes = (prof_content != curr_content)
         return {
             "status": "success",
@@ -1759,10 +1765,10 @@ def apply_setting_to_content(content: str, mode: str, setting_key: str, new_valu
         return content
 
     q_map_rev = {'ultra': '3', 'high': '2', 'medium': '1', 'low': '0', '3': '3', '2': '2', '1': '1', '0': '0'}
-    fft_map_rev = {'ultra (1024)': '1024', 'high (512)': '512', 'medium (256)': '256', 'low (128)': '128', '1024': '1024', '512': '512', '256': '256', '128': '128'}
-    glass_map_rev = {'high (full)': '2', 'medium (half)': '1', 'low (quarter)': '0', 'full': '2', 'half': '1', 'quarter': '0', 'high': '2', 'medium': '1', 'low': '0'}
-    shadow_map_rev = {'ultra (2048)': '2048', 'high (1536)': '1536', 'medium (1024)': '1024', 'low (512)': '512', '2048': '2048', '1536': '1536', '1024': '1024', '512': '512'}
-    hf_map_rev = {'ultra (1024)': '1024', 'high (512)': '512', 'medium (256)': '256', 'low (128)': '128', '1024': '1024', '512': '512', '256': '256', '128': '128'}
+    fft_map_rev = {'ultra': '1024', 'high': '512', 'medium': '256', 'low': '128', 'ultra (1024)': '1024', 'high (512)': '512', 'medium (256)': '256', 'low (128)': '128', '1024': '1024', '512': '512', '256': '256', '128': '128'}
+    glass_map_rev = {'ultra': '2', 'high': '2', 'medium': '1', 'low': '0', 'high (full)': '2', 'medium (half)': '1', 'low (quarter)': '0', 'full': '2', 'half': '1', 'quarter': '0', '2': '2', '1': '1', '0': '0'}
+    shadow_map_rev = {'ultra': '2048', 'high': '1536', 'medium': '1024', 'low': '512', 'ultra (2048)': '2048', 'high (1536)': '1536', 'medium (1024)': '1024', 'low (512)': '512', '2048': '2048', '1536': '1536', '1024': '1024', '512': '512'}
+    hf_map_rev = {'ultra': '1024', 'high': '512', 'medium': '256', 'low': '128', 'ultra (1024)': '1024', 'high (512)': '512', 'medium (256)': '256', 'low (128)': '128', '1024': '1024', '512': '512', '256': '256', '128': '128'}
     traffic_qty_map_rev = {'off': '-1', 'low': '0', 'medium': '1', 'high': '2', 'ultra': '3', '-1': '-1', '0': '0', '1': '1', '2': '2', '3': '3'}
     traffic_var_map_rev = {'low': '0', 'medium': '1', 'high': '2', 'ultra': '3', '0': '0', '1': '1', '2': '2', '3': '3'}
     reproj_map_rev = {
@@ -1943,14 +1949,14 @@ def apply_setting_to_content(content: str, mode: str, setting_key: str, new_valu
         content = update_sub_block_setting(content, mode, '{RaytracedShadows', r'(Enabled\s+)[^\r\n]+', rf'\g<1>{clean_val}', f"Enabled {clean_val}")
 
     # 8. TLOD (Supports up to 400 manual input)
-    elif setting_key in ['tlod', 'TerrainLoD', 'LoDFactor']:
+    elif setting_key in ['tlod', 'TerrainLoD', 'LoDFactor', 'terrain_lod']:
         clean_str = str(new_value).replace('Dynamic', '').replace('(', '').replace(')', '').replace('LOD', '').strip()
         num_val = max(10, min(400, float(clean_str)))
         val_f = f"{num_val / 100.0:.6f}"
         content = update_sub_block_setting(content, mode, '{Terrain', r'(LoDFactor\s+)[^\r\n]+', rf'\g<1>{val_f}', f"LoDFactor {val_f}")
 
     # 9. OLOD (Supports up to 400 manual input)
-    elif setting_key in ['olod', 'ObjectsLoD']:
+    elif setting_key in ['olod', 'ObjectsLoD', 'objects_lod']:
         clean_str = str(new_value).replace('Dynamic', '').replace('(', '').replace(')', '').replace('LOD', '').strip()
         num_val = max(10, min(400, float(clean_str)))
         val_f = f"{num_val / 100.0:.6f}"
@@ -2025,7 +2031,7 @@ def apply_setting_to_content(content: str, mode: str, setting_key: str, new_valu
         content = update_sub_block_setting(content, mode, '{GlassCockpitsRefreshRate', r'(Quality\s+)[^\r\n]+', rf'\g<1>{clean_val}', f"Quality {clean_val}")
 
     # 19. Shadow Maps Resolution
-    elif setting_key in ['shadow_maps', 'Shadows']:
+    elif setting_key in ['shadow_maps', 'Shadows', 'shadows']:
         v_low = str(new_value).lower().strip()
         clean_val = shadow_map_rev.get(v_low, shadow_map_rev.get(v_low.split("(")[0].strip(), '1536'))
         content = update_sub_block_setting(content, mode, '{Shadows', r'(Size\s+)[^\r\n]+', rf'\g<1>{clean_val}', f"Size {clean_val}")

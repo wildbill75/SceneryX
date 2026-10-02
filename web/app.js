@@ -19937,7 +19937,7 @@ function closeAllProfileDropdowns() {
     lastClickedProfileIndex = -1;
 }
 
-function selectCustomProfileItem(profileId) {
+async function selectCustomProfileItem(profileId) {
     const profile = currentCustomProfiles.find(p => p.id === profileId);
     if (!profile) return;
 
@@ -19951,6 +19951,27 @@ function selectCustomProfileItem(profileId) {
         dropdown.value = profile.id;
     }
     closeAllProfileDropdowns();
+
+    // Immediately load the selected profile into the main window and active session
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.activate_custom_profile) {
+        try {
+            const resStr = await window.pywebview.api.activate_custom_profile(profileId);
+            const res = JSON.parse(resStr);
+            if (res.status === 'success') {
+                if (typeof showToast === 'function') {
+                    showToast(`Profile "${profile.name}" loaded into editor!`, 'info');
+                }
+                await fetchAndRenderCustomProfiles();
+                await loadRigDiagnostics();
+            } else {
+                if (typeof showToast === 'function') {
+                    showToast(`Failed to load profile: ${res.message}`, 'error');
+                }
+            }
+        } catch (e) {
+            console.error("Error loading profile into main window:", e);
+        }
+    }
 }
 
 function handleProfileInputFocus() {
