@@ -841,6 +841,15 @@ class Api:
                     'country': ap.get('country', ''),
                     'type': ap.get('type', 'airport')
                 }
+            if "EDDT" not in coords:
+                coords["EDDT"] = {
+                    'lat': 52.5597,
+                    'lon': 13.2877,
+                    'name': 'Berlin Tegel Airport',
+                    'city': 'Berlin',
+                    'country': 'Germany',
+                    'type': 'large_airport'
+                }
             return json.dumps(coords, ensure_ascii=False)
         except Exception as e:
             print("Error returning world_airport_coords:", e)

@@ -76,7 +76,17 @@ function rebuildAirportsByIcaoIndex() {
 }
 
 const HISTORIC_AIRPORTS = {
-    'EDDT': { lat: 52.5597, lon: 13.2877, name: 'Berlin Tegel Airport', city: 'Berlin', country: 'Germany' }
+    'EDDT': {
+        lat: 52.5597,
+        lon: 13.2877,
+        name: 'Berlin Tegel Airport',
+        city: 'Berlin',
+        country: 'DE',
+        iata: 'TXL',
+        elevation: 122,
+        type: 'large_airport',
+        english_type: 'International'
+    }
 };
 
 function getAirportByIcao(icao) {
@@ -90,13 +100,38 @@ function getAirportByIcao(icao) {
         const h = HISTORIC_AIRPORTS[clean];
         return {
             icao: clean,
+            ident: clean,
             lat: h.lat,
             lon: h.lon,
             name: h.name,
             city: h.city,
-            country: h.country,
+            country: h.country || 'DE',
+            elevation: h.elevation || 122,
+            type: h.type || 'large_airport',
+            english_type: h.english_type || 'International',
+            iata: h.iata || '',
             pricing_type: 'Default',
-            is_default: true
+            is_default: true,
+            vendor: 'Microsoft Flight Simulator (Default)',
+            package_name: `msfs-default-${clean.toLowerCase()}`,
+            source_folder: 'MSFS - Default Procedural',
+            match_source: 'Default MSFS Procedural',
+            all_sources: [{
+                folder_name: `msfs-default-${clean.toLowerCase()}`,
+                package_path: '',
+                source_folder: 'MSFS - Default Procedural',
+                match_source: 'Default MSFS Procedural',
+                vendor: 'Microsoft Flight Simulator (Default)',
+                pricing_type: 'Default',
+                is_payware: false,
+                is_asobo_official: false,
+                is_default: true,
+                is_disabled: false,
+                is_addon: false,
+                is_fix_patch: false,
+                version: '',
+                size_str: 'Default'
+            }]
         };
     }
     return null;
@@ -2257,6 +2292,60 @@ async function loadAirportsData() {
                 response = await fetch('installed_airports.json');
             }
             allAirportsData = await response.json();
+        }
+
+        // Guarantee historic airports (such as Berlin-Tegel EDDT) exist natively in allAirportsData
+        if (typeof HISTORIC_AIRPORTS !== 'undefined' && Array.isArray(allAirportsData)) {
+            for (const [hIcao, h] of Object.entries(HISTORIC_AIRPORTS)) {
+                if (!allAirportsData.some(a => a.icao === hIcao)) {
+                    allAirportsData.push({
+                        icao: hIcao,
+                        ident: hIcao,
+                        name: h.name,
+                        city: h.city,
+                        country: h.country || 'DE',
+                        lat: h.lat,
+                        lon: h.lon,
+                        elevation: h.elevation || 122,
+                        type: h.type || 'large_airport',
+                        english_type: h.english_type || 'International',
+                        iata: h.iata || '',
+                        pricing_type: 'Default',
+                        is_default: true,
+                        vendor: 'Microsoft Flight Simulator (Default)',
+                        package_name: `msfs-default-${hIcao.toLowerCase()}`,
+                        source_folder: 'MSFS - Default Procedural',
+                        match_source: 'Default MSFS Procedural',
+                        all_sources: [{
+                            folder_name: `msfs-default-${hIcao.toLowerCase()}`,
+                            package_path: '',
+                            source_folder: 'MSFS - Default Procedural',
+                            match_source: 'Default MSFS Procedural',
+                            vendor: 'Microsoft Flight Simulator (Default)',
+                            pricing_type: 'Default',
+                            is_payware: false,
+                            is_asobo_official: false,
+                            is_default: true,
+                            is_disabled: false,
+                            is_addon: false,
+                            is_fix_patch: false,
+                            version: '',
+                            size_str: 'Default'
+                        }],
+                        is_disabled: false,
+                        has_conflict: false,
+                        conflict_count: 1,
+                        rating: 0.0,
+                        operating_airlines: ['Air Berlin', 'Lufthansa', 'Eurowings', 'Germania', 'EasyJet'],
+                        routes: {},
+                        runways: [
+                            { id: '08L/26R', length_ft: 7966, length_m: 2428, width_ft: 151, width_m: 46, surface: 'Asphalt', lighted: true, closed: false },
+                            { id: '08R/26L', length_ft: 9918, length_m: 3023, width_ft: 151, width_m: 46, surface: 'Asphalt', lighted: true, closed: false }
+                        ]
+                    });
+                }
+            }
+            isAirportsIndexDirty = true;
         }
 
         // Apply loaded user ratings to allAirportsData
@@ -12202,11 +12291,16 @@ function filterAirports() {
         return true;
     });
 
-    if (activeRouteDestIcaos && window.worldAirportCoords) {
+    if (activeRouteDestIcaos) {
         activeRouteDestIcaos.forEach(dIcao => {
             if (dIcao !== activeRouteOrigin.icao && !currentlyFilteredAirports.some(a => a.icao === dIcao)) {
-                const wInfo = window.worldAirportCoords[dIcao];
-                if (wInfo) {
+                let ap = (allAirportsData && allAirportsData.find(a => a.icao === dIcao)) ||
+                         (typeof getAirportByIcao === 'function' && getAirportByIcao(dIcao));
+                const wInfo = (window.worldAirportCoords && window.worldAirportCoords[dIcao]) ||
+                              (typeof HISTORIC_AIRPORTS !== 'undefined' && HISTORIC_AIRPORTS[dIcao]);
+                if (ap) {
+                    currentlyFilteredAirports.push(ap);
+                } else if (wInfo) {
                     currentlyFilteredAirports.push({
                         icao: dIcao,
                         ident: dIcao,
@@ -12215,11 +12309,27 @@ function filterAirports() {
                         name: wInfo.name,
                         city: wInfo.city || '',
                         country: wInfo.country || '',
-                        type: wInfo.type || 'airport',
-                        english_type: 'General Aviation',
+                        type: wInfo.type || 'large_airport',
+                        english_type: wInfo.english_type || 'International',
                         vendor: 'Microsoft Flight Simulator (Default)',
                         pricing_type: 'Default',
-                        is_default: true
+                        is_default: true,
+                        all_sources: [{
+                            folder_name: `msfs-default-${dIcao.toLowerCase()}`,
+                            package_path: '',
+                            source_folder: 'MSFS - Default Procedural',
+                            match_source: 'Default MSFS Procedural',
+                            vendor: 'Microsoft Flight Simulator (Default)',
+                            pricing_type: 'Default',
+                            is_payware: false,
+                            is_asobo_official: false,
+                            is_default: true,
+                            is_disabled: false,
+                            is_addon: false,
+                            is_fix_patch: false,
+                            version: '',
+                            size_str: 'Default'
+                        }]
                     });
                 }
             }

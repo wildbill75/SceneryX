@@ -1861,6 +1861,19 @@ def load_airport_database():
             'iata': ''
         }
 
+    if 'EDDT' not in airports:
+        airports['EDDT'] = {
+            'ident': 'EDDT',
+            'name': 'Berlin Tegel Airport',
+            'city': 'Berlin',
+            'country': 'DE',
+            'lat': 52.5597,
+            'lon': 13.2877,
+            'elevation': 122,
+            'type': 'large_airport',
+            'iata': 'TXL'
+        }
+
     for icao, ap in airports.items():
         city = ap.get('city')
         if city:
