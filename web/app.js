@@ -18496,7 +18496,6 @@ function renderMsfsSettingsMatrix() {
                     }
                     return `
                         <div class="px-3 py-1.5 hover:bg-slate-800 ${isCur ? 'bg-slate-800/90 text-white font-semibold' : textClass} cursor-pointer transition-colors flex items-center justify-between typo-input-val text-xs font-semibold tabular-nums select-none"
-                             title="${optReasonEscaped}"
                              onmouseenter="onComboboxOptionHover('${item.key}', '${optEscaped}')"
                              onmouseleave="onComboboxOptionLeave('${item.key}')"
                              onmousedown="selectComboboxPreset('${item.key}', '${optEscaped}', ${item.min_val ?? 0}, ${item.max_val ?? 400})">
@@ -18602,7 +18601,6 @@ function renderMsfsSettingsMatrix() {
 
                     return `
                         <div class="px-3 py-2 hover:bg-slate-800 ${isSelected ? 'bg-slate-800/80' : ''} cursor-pointer transition-colors flex items-center justify-between typo-input-val text-xs gap-2 select-none"
-                             title="${optReasonEscaped}"
                              onmouseenter="onCustomOptionHover('${item.key}', '${optEscaped}')"
                              onmouseleave="onCustomOptionLeave('${item.key}')"
                              onmousedown="selectCustomOption('${item.key}', '${optEscaped}')">
