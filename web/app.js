@@ -6109,7 +6109,9 @@ function openAirportRadialMenu(ap, marker, e) {
     } else {
         if (extEl) {
             extEl.classList.add('hidden');
-            extEl.innerHTML = '';
+            extEl._hasBeenDragged = false;
+            const bodyEl = document.getElementById('radial-sceneries-extension-body');
+            if (bodyEl) bodyEl.innerHTML = '';
         }
         if (sectorScenery) {
             sectorScenery.classList.remove('active-radial-sector');
@@ -7296,8 +7298,10 @@ function renderRadialSceneriesExtension(ap, animate = false) {
         </div>
     `;
 
-    const bodyEl = document.getElementById('radial-sceneries-extension-body') || extEl;
-    bodyEl.innerHTML = html;
+    const bodyEl = document.getElementById('radial-sceneries-extension-body');
+    if (bodyEl) {
+        bodyEl.innerHTML = html;
+    }
     if (window.windowManager) window.windowManager.register(extEl);
 
     // Populate or query available store downloads
@@ -15896,8 +15900,8 @@ class WindowManager {
         document.querySelectorAll('.sceneryx-modal').forEach(el => this.register(el));
 
         // Global mousemove and mouseup listeners to guarantee smooth drag/resize even if cursor leaves window
-        window.addEventListener('mousemove', (e) => this._onGlobalMouseMove(e), { passive: false });
-        window.addEventListener('mouseup', (e) => this._onGlobalMouseUp(e), { passive: false });
+        window.addEventListener('mousemove', (e) => this._onGlobalMouseMove(e), { passive: false, capture: true });
+        window.addEventListener('mouseup', (e) => this._onGlobalMouseUp(e), { passive: false, capture: true });
 
         // MutationObserver to auto-register any modal added dynamically
         const observer = new MutationObserver((mutations) => {

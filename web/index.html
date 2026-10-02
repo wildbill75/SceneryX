@@ -286,16 +286,23 @@
             display: flex !important;
             align-items: center !important;
             justify-content: center !important;
-            border-radius: 6px !important; /* rounded-md */
+            border-radius: 6px !important;
             color: #94a3b8 !important; /* slate-400 */
             background: transparent !important;
+            background-color: transparent !important;
             border: none !important;
+            box-shadow: none !important;
+            opacity: 0.65 !important;
             cursor: pointer !important;
-            transition: background-color 0.15s ease, color 0.15s ease !important;
+            transition: opacity 0.15s ease, color 0.15s ease !important;
         }
         .modal-close-btn:hover {
-            color: #f87171 !important; /* red-400 */
-            background-color: rgba(239, 68, 68, 0.20) !important; /* bg-red-500/20 */
+            color: #ffffff !important;
+            background: transparent !important;
+            background-color: transparent !important;
+            border: none !important;
+            box-shadow: none !important;
+            opacity: 1 !important;
         }
 
         .modal-body {
@@ -1268,7 +1275,7 @@
                         <!-- TOP-RIGHT SECTOR: SCENERIES -->
                         <g id="radial-sector-scenery" onclick="triggerRadialScenerySelector()" class="radial-sector radial-sector-scenery group cursor-pointer pointer-events-auto" role="button" aria-label="Sceneries">
                             <path class="radial-sector-path" d="M 273.00 5.02 A 265 265 0 0 1 500.98 399.89 L 384.05 332.38 A 130 130 0 0 0 273.00 140.03 Z" />
-                            <foreignObject x="365" y="152" width="150" height="40" class="pointer-events-none">
+                            <foreignObject x="375" y="195" width="160" height="40" class="pointer-events-none">
                                 <div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; text-align: center;">
                                     <span data-i18n="radial.sceneries" class="text-xs font-black tracking-widest text-slate-200 group-hover:text-white uppercase leading-none filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">Sceneries</span>
                                 </div>
@@ -1288,7 +1295,7 @@
                         <!-- TOP-LEFT SECTOR: OPERATING AIRLINES -->
                         <g id="radial-sector-airlines" onclick="triggerRadialOperatingAirlines()" class="radial-sector radial-sector-airlines group cursor-pointer pointer-events-auto" role="button" aria-label="Operating Airlines">
                             <path class="radial-sector-path" d="M 39.02 399.89 A 265 265 0 0 1 267.00 5.02 L 267.00 140.03 A 130 130 0 0 0 155.95 332.38 Z" />
-                            <foreignObject x="25" y="152" width="150" height="40" class="pointer-events-none">
+                            <foreignObject x="12" y="190" width="140" height="48" class="pointer-events-none">
                                 <div style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
                                     <span data-i18n="radial.operating_airlines" class="text-xs font-black tracking-wider text-slate-200 group-hover:text-white uppercase leading-tight text-center filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.9)]">Operating<br>Airlines</span>
                                 </div>
@@ -1320,7 +1327,7 @@
             <div id="radial-sceneries-extension"
                  data-modal-id="radial-sceneries-extension"
                  class="sceneryx-modal absolute hidden flex-col bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden select-none pointer-events-auto z-[1550]"
-                 style="min-width: 440px; min-height: 400px; width: 520px; height: 560px; max-width: 95vw; max-height: calc(100vh - 120px);">
+                 style="min-width: 480px; width: 560px; height: auto; max-width: 95vw; max-height: calc(100vh - 120px);">
                 
                 <!-- Drag Handle & Modal Header -->
                 <div id="radial-sceneries-extension-header" class="modal-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none shrink-0">
@@ -1328,7 +1335,7 @@
                         <h3 id="radial-sceneries-extension-title" class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">SCENERY MANAGER // AVAILABLE ADDONS</h3>
                     </div>
                     <div class="flex items-center gap-1">
-                        <button onclick="triggerRadialScenerySelector()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+                        <button onclick="triggerRadialScenerySelector()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity">
                             <i class="fa-solid fa-xmark text-sm"></i>
                         </button>
                     </div>
@@ -1361,7 +1368,7 @@
                         <h3 class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase" data-i18n="drawer.operating_airlines">AIRPORT INSPECTOR // OPERATING AIRLINES</h3>
                     </div>
                     <div class="flex items-center gap-1">
-                        <button onclick="closeRadialAirlinesModal(event)" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+                        <button onclick="closeRadialAirlinesModal(event)" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity">
                             <i class="fa-solid fa-xmark text-sm"></i>
                         </button>
                     </div>
@@ -1471,7 +1478,7 @@
             <div id="radial-details-modal"
                  data-modal-id="radial-details-modal"
                  class="sceneryx-modal absolute hidden flex-col bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden select-none pointer-events-auto z-[1550]"
-                 style="min-width: 560px; min-height: 380px; width: 940px; height: 640px;">
+                 style="min-width: 560px; width: 940px; height: auto; max-width: 95vw; max-height: calc(100vh - 100px);">
                 
                 <!-- Drag Handle & Modal Header -->
                 <div id="radial-details-modal-header" class="modal-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
@@ -1479,7 +1486,7 @@
                         <h3 id="radial-details-modal-title" class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase" data-i18n="radial.details">AIRPORT INSPECTOR // DETAILS</h3>
                     </div>
                     <div class="flex items-center gap-1">
-                        <button onclick="closeRadialDetailsModal(event)" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+                        <button onclick="closeRadialDetailsModal(event)" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity">
                             <i class="fa-solid fa-xmark text-sm"></i>
                         </button>
                     </div>
@@ -2069,14 +2076,14 @@
     <div id="settings-modal"
          data-modal-id="settings-modal"
          class="sceneryx-modal absolute hidden flex-col bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden z-[2000] select-none"
-         style="min-width: 480px; min-height: 360px; width: 680px; height: 600px;">
+         style="min-width: 480px; width: 680px; height: auto; max-width: 95vw; max-height: 85vh;">
         <!-- Drag Handle Header -->
         <div class="modal-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2">
                 <h3 class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase" data-i18n="settings.title">SETTINGS // FOLDER LOCATIONS &amp; GSX</h3>
             </div>
             <div class="flex items-center gap-1">
-                <button onclick="closeSettingsModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+                <button onclick="closeSettingsModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity">
                     <i class="fa-solid fa-xmark text-sm"></i>
                 </button>
             </div>
@@ -2329,14 +2336,14 @@
     <div id="rescan-modal"
          data-modal-id="rescan-modal"
          class="sceneryx-modal absolute hidden flex-col bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden z-[2050] select-none"
-         style="min-width: 440px; min-height: 280px; width: 540px; height: 380px;">
+         style="min-width: 440px; width: 540px; height: auto; max-width: 95vw; max-height: 85vh;">
         <!-- Drag Handle Header -->
         <div class="modal-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2">
                 <h3 class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">SCANNER // MSFS PACKAGES &amp; PROFILES</h3>
             </div>
             <div class="flex items-center gap-1">
-                <button onclick="closeRescanModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+                <button onclick="closeRescanModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity">
                     <i class="fa-solid fa-xmark text-sm"></i>
                 </button>
             </div>
@@ -2416,7 +2423,7 @@
     <div id="conflict-resolution-modal"
          data-modal-id="conflict-resolution-modal"
          class="sceneryx-modal absolute hidden flex-col bg-slate-900/90 backdrop-blur-md border border-amber-500/50 rounded-xl shadow-2xl overflow-hidden z-[2050] select-none"
-         style="min-width: 440px; min-height: 400px; width: 560px; height: 520px;">
+         style="min-width: 440px; width: 560px; height: auto; max-width: 95vw; max-height: 85vh;">
         <!-- Drag Handle Header -->
         <div class="modal-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2">
@@ -2435,7 +2442,7 @@
                         <span data-icon="chevron-right" class="w-3 h-3 block"></span>
                     </button>
                 </div>
-                <button onclick="closeConflictModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+                <button onclick="closeConflictModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity">
                     <i class="fa-solid fa-xmark text-sm"></i>
                 </button>
             </div>
@@ -2487,7 +2494,7 @@
     <div id="gsx-audit-modal"
          data-modal-id="gsx-audit-modal"
          class="sceneryx-modal glass-modal absolute hidden flex-col bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden z-[2060] select-none"
-         style="min-width: 460px; min-height: 400px; width: 560px; height: 720px; max-height: calc(100vh - 80px);">
+         style="min-width: 500px; width: 680px; height: 580px; max-width: 95vw; max-height: calc(100vh - 80px);">
         <!-- Drag Handle Header -->
         <div id="gsx-audit-modal-header" class="modal-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2">
@@ -2497,7 +2504,7 @@
                 </h3>
             </div>
             <div class="flex items-center gap-1">
-                <button onclick="closeGsxAuditModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+                <button onclick="closeGsxAuditModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity">
                     <i class="fa-solid fa-xmark text-sm"></i>
                 </button>
             </div>
@@ -2581,13 +2588,13 @@
     <div id="float-win-my-rig"
          data-modal-id="float-win-my-rig"
          class="sceneryx-modal floating-window absolute hidden flex-col bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden z-[1200] select-none"
-         style="min-width: 480px; min-height: 320px; width: 920px; height: 580px; max-width: 96vw; max-height: 90vh;">
+         style="min-width: 480px; width: 920px; height: auto; max-width: 96vw; max-height: 90vh;">
         <!-- Drag Handle Header -->
         <div class="modal-header floating-win-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2">
                 <h3 class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">DIAGNOSTICS // MY RIG HARDWARE</h3>
             </div>
-            <button onclick="closeFloatingWindow('my_rig')" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+            <button onclick="closeFloatingWindow('my_rig')" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity">
                 <i class="fa-solid fa-xmark text-sm"></i>
             </button>
         </div>
@@ -2670,7 +2677,7 @@
             <div class="flex items-center gap-2">
                 <h3 class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">CONFIGURATION // MSFS GRAPHIC SETTINGS</h3>
             </div>
-            <button onclick="closeFloatingWindow('graphics')" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+            <button onclick="closeFloatingWindow('graphics')" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity">
                 <i class="fa-solid fa-xmark text-sm"></i>
             </button>
         </div>
@@ -2850,13 +2857,13 @@
     <div id="float-win-smart-lod"
          data-modal-id="float-win-smart-lod"
          class="sceneryx-modal floating-window absolute hidden flex-col bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden z-[1200] select-none"
-         style="min-width: 440px; min-height: 320px; width: 760px; height: 560px; max-width: 95vw; max-height: 90vh;">
+         style="min-width: 440px; width: 760px; height: auto; max-width: 95vw; max-height: 90vh;">
         <!-- Drag Handle Header -->
         <div class="modal-header floating-win-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2">
                 <h3 class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">PERFORMANCE // SMART LOD DYNAMIC ENGINE</h3>
             </div>
-            <button onclick="closeFloatingWindow('smart_lod')" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+            <button onclick="closeFloatingWindow('smart_lod')" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity">
                 <i class="fa-solid fa-xmark text-sm"></i>
             </button>
         </div>
@@ -2967,7 +2974,7 @@
             <div class="flex items-center gap-2">
                 <h3 class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">TELEMETRY // LIVE FLIGHT BLACKBOX</h3>
             </div>
-            <button onclick="closeFloatingWindow('telemetry')" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+            <button onclick="closeFloatingWindow('telemetry')" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity">
                 <i class="fa-solid fa-xmark text-sm"></i>
             </button>
         </div>
@@ -3090,13 +3097,13 @@
     <div id="float-win-perf-assessment"
          data-modal-id="float-win-perf-assessment"
          class="sceneryx-modal floating-window absolute hidden flex-col bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden z-[1200] select-none"
-         style="min-width: 420px; min-height: 300px; width: 680px; height: 500px; max-width: 95vw; max-height: 90vh;">
+         style="min-width: 420px; width: 680px; height: auto; max-width: 95vw; max-height: 90vh;">
         <!-- Drag Handle Header -->
         <div class="modal-header floating-win-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2">
                 <h3 class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">BENCHMARK // PERFORMANCE ASSESSMENT</h3>
             </div>
-            <button onclick="closeFloatingWindow('perf_assessment')" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+            <button onclick="closeFloatingWindow('perf_assessment')" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity">
                 <i class="fa-solid fa-xmark text-sm"></i>
             </button>
         </div>
@@ -3160,13 +3167,13 @@
     <div id="float-win-route-opt"
          data-modal-id="float-win-route-opt"
          class="sceneryx-modal floating-window absolute hidden flex-col bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden z-[1200] select-none"
-         style="min-width: 440px; min-height: 320px; width: 780px; height: 540px; max-width: 95vw; max-height: 90vh;">
+         style="min-width: 440px; width: 780px; height: auto; max-width: 95vw; max-height: 90vh;">
         <!-- Drag Handle Header -->
         <div class="modal-header floating-win-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2">
                 <h3 class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">OPTIMIZER // FLIGHT ROUTE CORRIDOR</h3>
             </div>
-            <button onclick="closeFloatingWindow('route')" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+            <button onclick="closeFloatingWindow('route')" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity">
                 <i class="fa-solid fa-xmark text-sm"></i>
             </button>
         </div>
@@ -3268,13 +3275,13 @@
     <div id="export-modal"
          data-modal-id="export-modal"
          class="sceneryx-modal absolute hidden flex-col bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden z-[2000] select-none"
-         style="min-width: 380px; min-height: 300px; width: 480px; height: 460px;">
+         style="min-width: 380px; width: 480px; height: auto; max-width: 95vw; max-height: 85vh;">
         <!-- Drag Handle Header -->
         <div class="modal-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2">
                 <h3 data-i18n="export.title" class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">EXPORT // SCENERY COLLECTION</h3>
             </div>
-            <button onclick="closeExportModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+            <button onclick="closeExportModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity">
                 <i class="fa-solid fa-xmark text-sm"></i>
             </button>
         </div>
@@ -3326,7 +3333,7 @@
         <div class="modal-resize-handle absolute bottom-0 right-0 w-4 h-4 cursor-se-resize flex items-end justify-end p-1">
             <svg class="w-2.5 h-2.5 text-slate-600 pointer-events-none" viewBox="0 0 6 6" fill="currentColor">
                 <circle cx="5" cy="5" r="0.8"/>
-                <circle cx="3" cy="5" r="0.8"/>
+                <circle cx="3" cy="3" r="0.8"/>
                 <circle cx="5" cy="3" r="0.8"/>
             </svg>
         </div>
@@ -3336,13 +3343,13 @@
     <div id="payware-stores-modal"
          data-modal-id="payware-stores-modal"
          class="sceneryx-modal absolute hidden flex-col bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden z-[2000] select-none"
-         style="min-width: 400px; min-height: 320px; width: 580px; height: 520px;">
+         style="min-width: 400px; width: 580px; height: auto; max-width: 95vw; max-height: 85vh;">
         <!-- Drag Handle Header -->
         <div class="modal-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2 min-w-0">
                 <h3 data-i18n="stores.title" class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase truncate">STORES // PAYWARE SCENERY SEARCH</h3>
             </div>
-            <button onclick="closePaywareStoresModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0">
+            <button onclick="closePaywareStoresModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity shrink-0">
                 <i class="fa-solid fa-xmark text-sm"></i>
             </button>
         </div>
@@ -3359,7 +3366,7 @@
         <div class="modal-resize-handle absolute bottom-0 right-0 w-4 h-4 cursor-se-resize flex items-end justify-end p-1">
             <svg class="w-2.5 h-2.5 text-slate-600 pointer-events-none" viewBox="0 0 6 6" fill="currentColor">
                 <circle cx="5" cy="5" r="0.8"/>
-                <circle cx="3" cy="5" r="0.8"/>
+                <circle cx="3" cy="3" r="0.8"/>
                 <circle cx="5" cy="3" r="0.8"/>
             </svg>
         </div>
@@ -3369,13 +3376,13 @@
     <div id="smart-lod-conflict-modal"
          data-modal-id="smart-lod-conflict-modal"
          class="sceneryx-modal absolute hidden flex-col bg-slate-900/90 backdrop-blur-md border border-amber-500/50 rounded-xl shadow-2xl overflow-hidden z-[3100] select-none"
-         style="min-width: 400px; min-height: 260px; width: 520px; height: 360px;">
+         style="min-width: 400px; width: 520px; height: auto; max-width: 95vw; max-height: 85vh;">
         <!-- Drag Handle Header -->
         <div class="modal-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2">
                 <h3 class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">SYSTEM WARNING // AUTOFPS CONFLICT DETECTED</h3>
             </div>
-            <button onclick="closeSmartLodConflictModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+            <button onclick="closeSmartLodConflictModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity">
                 <i class="fa-solid fa-xmark text-sm"></i>
             </button>
         </div>
@@ -3417,13 +3424,13 @@
     <div id="custom-modal"
          data-modal-id="custom-modal"
          class="sceneryx-modal absolute hidden flex-col bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden z-[2500] select-none"
-         style="min-width: 360px; min-height: 220px; width: 460px; height: 300px;">
+         style="min-width: 360px; width: 460px; height: auto; max-width: 95vw; max-height: 85vh;">
         <!-- Drag Handle Header -->
         <div class="modal-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2">
                 <h3 id="custom-modal-title" class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">SYSTEM ALERT // NOTIFICATION</h3>
             </div>
-            <button onclick="cancelCustomModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+            <button onclick="cancelCustomModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity">
                 <i class="fa-solid fa-xmark text-sm"></i>
             </button>
         </div>
@@ -3449,7 +3456,7 @@
         <div class="modal-resize-handle absolute bottom-0 right-0 w-4 h-4 cursor-se-resize flex items-end justify-end p-1">
             <svg class="w-2.5 h-2.5 text-slate-600 pointer-events-none" viewBox="0 0 6 6" fill="currentColor">
                 <circle cx="5" cy="5" r="0.8"/>
-                <circle cx="3" cy="5" r="0.8"/>
+                <circle cx="3" cy="3" r="0.8"/>
                 <circle cx="5" cy="3" r="0.8"/>
             </svg>
         </div>
@@ -3459,7 +3466,7 @@
     <div id="disclaimer-modal"
          data-modal-id="disclaimer-modal"
          class="sceneryx-modal absolute hidden flex-col bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden z-[3000] select-none"
-         style="min-width: 440px; min-height: 340px; width: 560px; height: 480px;">
+         style="min-width: 440px; width: 560px; height: auto; max-width: 95vw; max-height: 85vh;">
         <!-- Drag Handle Header -->
         <div class="modal-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2">
@@ -3511,7 +3518,7 @@
                 <h3 id="unified-modal-title" class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">CONFIGURATION // GRAPHICS PROFILE OPTIMIZED</h3>
             </div>
             <div class="flex items-center gap-1">
-                <button onclick="closeUnifiedUserCfgModal()" class="modal-close-btn w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+                <button onclick="closeUnifiedUserCfgModal()" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity">
                     <i class="fa-solid fa-xmark text-sm"></i>
                 </button>
             </div>
@@ -3608,7 +3615,7 @@
                 <h3 id="cadence-modal-title" class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">CALIBRATION // DISPLAY REFRESH CADENCE</h3>
             </div>
             <div class="flex items-center gap-1">
-                <button onclick="closeHzCadenceModal()" class="modal-close-btn w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+                <button onclick="closeHzCadenceModal()" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity">
                     <i class="fa-solid fa-xmark text-sm"></i>
                 </button>
             </div>
@@ -3674,7 +3681,7 @@
     <!-- DEDICATED SETTING DETAILED INFO MODAL -->
     <div id="opt-setting-info-modal" class="sceneryx-modal absolute hidden flex-col bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden z-50 select-none font-sans"
          data-modal-id="opt-setting-info-modal"
-         style="min-width: 420px; min-height: 320px; width: 768px; max-width: 95vw; height: 580px; max-height: 88vh;">
+         style="min-width: 420px; width: 768px; max-width: 95vw; height: auto; max-height: 88vh;">
         <!-- Drag Handle Header -->
         <div class="modal-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none shrink-0 gap-3">
             <div class="flex items-center gap-2 min-w-0 flex-1">
@@ -3684,7 +3691,7 @@
                 <span id="opt-info-rating" class="px-2.5 py-0.5 rounded typo-action-btn text-[10px] font-semibold uppercase">OPTIMUM</span>
             </div>
             <div class="flex items-center gap-1 shrink-0">
-                <button onclick="closeSettingInfoModal()" class="modal-close-btn w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+                <button onclick="closeSettingInfoModal()" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity">
                     <i class="fa-solid fa-xmark text-sm"></i>
                 </button>
             </div>
