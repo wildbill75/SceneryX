@@ -14829,6 +14829,12 @@ function showCustomModal(titleOrObj, messageStr, typeStr = 'info') {
         return;
     }
 
+    if (typeof titleOrObj === 'object' && titleOrObj && titleOrObj.width) {
+        modal.style.width = titleOrObj.width;
+    } else {
+        modal.style.width = '380px';
+    }
+
     const titleEl = document.getElementById('custom-modal-title');
     const msgEl = document.getElementById('custom-modal-message');
     const cancelBtn = document.getElementById('custom-modal-cancel-btn');
@@ -14847,7 +14853,7 @@ function showCustomModal(titleOrObj, messageStr, typeStr = 'info') {
         if (typeof titleOrObj === 'object' && titleOrObj && titleOrObj.messageBoxClass) {
             msgEl.className = titleOrObj.messageBoxClass;
         } else {
-            msgEl.className = "text-xs font-semibold text-slate-200 leading-relaxed bg-slate-950/70 p-4 rounded-2xl border border-slate-800/70 font-sans break-words max-h-64 overflow-y-auto space-y-1";
+            msgEl.className = "text-xs font-semibold text-slate-200 leading-relaxed bg-slate-950/70 p-4 rounded-2xl border border-slate-800/70 font-sans break-words max-h-64 overflow-y-auto space-y-1 text-center";
         }
 
         if (typeof message === 'string') {
@@ -14870,10 +14876,8 @@ function showCustomModal(titleOrObj, messageStr, typeStr = 'info') {
             confirmBtn.classList.remove('hidden');
             if (typeof titleOrObj === 'object' && titleOrObj && titleOrObj.confirmClass) {
                 confirmBtn.className = titleOrObj.confirmClass;
-            } else if (type === 'error' || type === 'warning') {
-                confirmBtn.className = "px-4 py-1.5 text-center rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-mono font-bold text-xs uppercase transition-all border-0 cursor-pointer shadow-md";
             } else {
-                confirmBtn.className = "px-4 py-1.5 text-center rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-mono font-bold text-xs uppercase transition-all border-0 cursor-pointer shadow-md";
+                confirmBtn.className = "px-5 py-1.5 text-center rounded-xl bg-blue-600 hover:bg-blue-500 text-white typo-action-btn font-semibold text-xs uppercase transition-all border-0 cursor-pointer shadow-md";
             }
         }
         if (cancelBtn) {
@@ -14882,7 +14886,7 @@ function showCustomModal(titleOrObj, messageStr, typeStr = 'info') {
             if (typeof titleOrObj === 'object' && titleOrObj && titleOrObj.cancelClass) {
                 cancelBtn.className = titleOrObj.cancelClass;
             } else {
-                cancelBtn.className = "px-4 py-1.5 text-center rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 hover:text-white font-mono text-xs font-bold uppercase transition-all cursor-pointer";
+                cancelBtn.className = "px-5 py-1.5 text-center rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 hover:text-white typo-action-btn text-xs font-semibold uppercase transition-all cursor-pointer";
             }
         }
     }
@@ -14913,6 +14917,10 @@ function showCustomModal(titleOrObj, messageStr, typeStr = 'info') {
 
     modal.classList.remove('hidden');
     modal.classList.add('flex');
+    if (window.windowManager) {
+        windowManager.bringToFront(modal);
+        windowManager.centerModal(modal);
+    }
 }
 
 function closeCustomModal() {
@@ -19927,21 +19935,24 @@ async function saveCurrentCustomProfile() {
         name = `Profile_${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}h${String(now.getMinutes()).padStart(2,'0')}`;
     }
 
-    // Check for 2D vs VR Max Frame Rate collision
-    if (msfsSettingsMatrixData) {
-        const item2D = (msfsSettingsMatrixData.matrix_2d || []).find(x => x.key === 'max_frame_rate');
-        const itemVR = (msfsSettingsMatrixData.matrix_vr || []).find(x => x.key === 'max_frame_rate');
-
-        const num2D = item2D ? (parseInt(String(item2D.raw_value || item2D.value).replace(/[^0-9]/g, '')) || 0) : 0;
-        const is2DOn = num2D > 0 && !String(item2D?.value || '').toUpperCase().includes('OFF');
-
-        const numVR = itemVR ? (parseInt(String(itemVR.raw_value || itemVR.value).replace(/[^0-9]/g, '')) || 0) : 0;
-        const isVROn = numVR > 0 && !String(itemVR?.value || '').toUpperCase().includes('OFF');
-
-        if (is2DOn && isVROn && num2D !== numVR) {
-            openFrameLimiterConflictModal(num2D, numVR, name);
-            return;
-        }
+    // Check if a profile with the exact same name already exists
+    const isDuplicate = currentCustomProfiles.some(p => (p.name || '').trim().toLowerCase() === name.toLowerCase());
+    if (isDuplicate) {
+        showCustomModal({
+            title: 'PROFILE ALREADY EXISTS',
+            message: 'Profile already exists. Please choose another name.',
+            type: 'info',
+            showCancel: false,
+            confirmText: 'OK',
+            confirmClass: 'px-5 py-1.5 text-center rounded-xl bg-blue-600 hover:bg-blue-500 text-white typo-action-btn font-semibold text-xs uppercase transition-all border-0 cursor-pointer shadow-md',
+            onConfirm: () => {
+                if (input) {
+                    input.focus();
+                    input.select();
+                }
+            }
+        });
+        return;
     }
 
     await executeSaveCurrentCustomProfile(name);
@@ -19961,7 +19972,20 @@ async function executeSaveCurrentCustomProfile(name) {
                 if (input) input.value = res.profile.name || name;
             }
         } else {
-            if (typeof showToast === 'function') showToast(`Save error: ${res.message}`, 'error');
+            showCustomModal({
+                title: 'PROFILE ALREADY EXISTS',
+                message: res.message || 'Profile already exists. Please choose another name.',
+                type: 'info',
+                showCancel: false,
+                confirmText: 'OK',
+                confirmClass: 'px-5 py-1.5 text-center rounded-xl bg-blue-600 hover:bg-blue-500 text-white typo-action-btn font-semibold text-xs uppercase transition-all border-0 cursor-pointer shadow-md',
+                onConfirm: () => {
+                    if (input) {
+                        input.focus();
+                        input.select();
+                    }
+                }
+            });
         }
     } catch (e) {
         console.error("Error saving profile:", e);
@@ -20037,8 +20061,8 @@ function confirmDeleteCustomProfile() {
             showCancel: true,
             confirmText: 'YES',
             cancelText: 'NO',
-            confirmClass: 'px-4 py-1.5 text-center rounded-xl bg-rose-600 hover:bg-rose-500 text-white typo-action-btn font-semibold text-xs uppercase transition-all border-0 cursor-pointer shadow-md',
-            cancelClass: 'px-4 py-1.5 text-center rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 hover:text-white typo-action-btn text-xs font-semibold uppercase transition-all cursor-pointer',
+            confirmClass: 'px-5 py-1.5 text-center rounded-xl bg-blue-600 hover:bg-blue-500 text-white typo-action-btn font-semibold text-xs uppercase transition-all border-0 cursor-pointer shadow-md',
+            cancelClass: 'px-5 py-1.5 text-center rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 hover:text-white typo-action-btn text-xs font-semibold uppercase transition-all cursor-pointer',
             onConfirm: async () => {
                 await deleteSelectedCustomProfile(profileId);
             }

@@ -1305,6 +1305,16 @@ def save_custom_profile(profile_name: str, user_cfg_path: Optional[str] = None) 
         if not name:
             name = f"Profile {datetime.now().strftime('%Y-%m-%d %H:%M')}"
 
+        # Prevent duplicate profile names
+        existing_profiles = list_custom_profiles()
+        for p in existing_profiles:
+            if str(p.get("name", "")).strip().lower() == name.lower():
+                return {
+                    "status": "error",
+                    "code": "DUPLICATE_NAME",
+                    "message": "Profile already exists. Please choose another name."
+                }
+
         profile_id = f"profile_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         profiles_dir = get_custom_profiles_dir()
         profile_file = os.path.join(profiles_dir, f"{profile_id}.profile.json")
