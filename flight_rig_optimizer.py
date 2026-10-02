@@ -1329,6 +1329,10 @@ def save_custom_profile(profile_name: str, user_cfg_path: Optional[str] = None) 
             except Exception:
                 pass
 
+        # Also write the updated content directly to UserCfg.opt so saving a profile applies it immediately
+        with open(path, "w", encoding="utf-8") as f_cfg:
+            f_cfg.write(content)
+
         # Mark as active
         set_active_profile_id(profile_id)
 
@@ -7088,6 +7092,8 @@ def apply_recommended_msfs_settings(mode: str, flight_profile: str = 'LINER', vr
             update_msfs_user_cfg_setting('VR', 'dynamic_settings', 'OFF', path, create_backup=False)
             update_msfs_user_cfg_setting('VR', 'reflex', 'ON', path, create_backup=False)
             update_msfs_user_cfg_setting('VR', 'texture_resolution', tex_val, path, create_backup=False)
+            update_msfs_user_cfg_setting('VR', 'sharpen_amount_vr', '0.20', path, create_backup=False)
+            update_msfs_user_cfg_setting('VR', 'reprojection_mode', 'OFF', path, create_backup=False)
             
             # Page 2
             update_msfs_user_cfg_setting('VR', 'tlod', '100', path, create_backup=False)

@@ -18799,6 +18799,7 @@ async function onMsfsSettingChanged(settingKey, newValue) {
                     selectEl.classList.add(textClass);
                 }
                 if (inputEl) {
+                    inputEl.value = newValue;
                     inputEl.classList.remove('text-emerald-400', 'text-amber-400', 'text-orange-400', 'text-rose-400');
                     inputEl.classList.add(textClass);
                 }
