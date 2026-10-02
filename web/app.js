@@ -13005,7 +13005,6 @@ const FLIGHT_OPT_SECTORS = [
     { key: 'graphics', label: 'MSFS GRAPHIC<br>SETTINGS' },
     { key: 'smart_lod', label: 'SMART LOD' },
     { key: 'telemetry', label: 'TELEMETRY' },
-    { key: 'perf_assessment', label: 'PERFORMANCE<br>ASSESSMENT' },
     { key: 'route', label: 'ROUTE<br>OPTIMIZATION' }
 ];
 
@@ -13043,10 +13042,13 @@ function renderFlightOptimizerRadialWheel() {
     const r_out = 255; // Point 9: fits inside 620px viewBox
     const midR = (r_in + r_out) / 2;
 
+    const sectorCount = FLIGHT_OPT_SECTORS.length;
+    const sectorAngle = 360 / sectorCount;
+
     let svgHtml = '';
     FLIGHT_OPT_SECTORS.forEach((item, idx) => {
-        const startAngle = -30 + (idx * 60);
-        const endAngle = startAngle + 60;
+        const startAngle = -90 - (sectorAngle / 2) + (idx * sectorAngle);
+        const endAngle = startAngle + sectorAngle;
         const midAngle = (startAngle + endAngle) / 2;
         const pathD = getAnnularSectorPath(cx, cy, r_in, r_out, startAngle, endAngle, 8.0);
 
@@ -16361,7 +16363,6 @@ const FLOATING_WINDOW_MAP = {
     'smart_lod': 'float-win-smart-lod',
     'telemetry': 'float-win-telemetry',
     'blackbox': 'float-win-telemetry',
-    'perf_assessment': 'float-win-perf-assessment',
     'route': 'float-win-route-opt'
 };
 
@@ -16370,7 +16371,6 @@ const FLOATING_DEFAULT_OFFSETS = {
     'graphics': { x: 180, y: 80 },
     'smart_lod': { x: 280, y: 110 },
     'telemetry': { x: 220, y: 150 },
-    'perf_assessment': { x: 320, y: 180 },
     'route': { x: 120, y: 90 }
 };
 
@@ -16411,6 +16411,7 @@ function openFloatingWindow(winKey, targetAp = null) {
         if (typeof loadRigDiagnostics === 'function') loadRigDiagnostics();
         else if (typeof renderMsfsSettingsMatrix === 'function') renderMsfsSettingsMatrix();
         if (typeof fetchAndRenderCustomProfiles === 'function') fetchAndRenderCustomProfiles(true);
+        if (typeof loadDetectedAddons === 'function') loadDetectedAddons();
     } else if (winKey === 'smart_lod') {
         if (typeof fetchSmartLodStatus === 'function') fetchSmartLodStatus();
     } else if (winKey === 'telemetry' || winKey === 'blackbox') {
@@ -17290,6 +17291,7 @@ async function loadRigDiagnostics() {
             refreshSmartLodStatus();
         }
         await fetchAndRenderCustomProfiles();
+        if (typeof loadDetectedAddons === 'function') await loadDetectedAddons();
 
         // Check hardware display cadence (2D screen Hz and VR headset Hz)
         await checkAndPromptCadenceCalibration(det, data);
@@ -17998,13 +18000,21 @@ function updatePerformanceCockpitGauges() {
             load2D = Math.max(14, load2D - 12);
         }
 
-        load2D = Math.min(98, Math.max(12, Math.round(load2D)));
+        if (typeof activeAddonsOverhead !== 'undefined' && activeAddonsOverhead.cpu > 0) {
+            load2D += Math.round(activeAddonsOverhead.cpu);
+        }
+
+        load2D = Math.min(99, Math.max(12, Math.round(load2D)));
+
+        const addonNote2D = (typeof activeAddonsOverhead !== 'undefined' && activeAddonsOverhead.cpu > 0)
+            ? ` • +${activeAddonsOverhead.cpu.toFixed(1)}% addons`
+            : '';
 
         let fpsTag = isFpsOff2D ? 'Uncapped' : `${Math.round(fpsCap2D)} FPS`;
         let fgDesc = (isFgActive2D && fg2D.includes('DLSSG')) ? 'DLSS 3 FG (2X)' : ((isFgActive2D && fg2D.includes('FSR3')) ? 'FSR 3 FG (2X)' : 'Native (FG OFF)');
         let badge2D = 'OPTIMUM';
         let color2D = 'emerald';
-        let desc2D = `${fgDesc} • ${fpsTag} • TLOD ${tlod2D}`;
+        let desc2D = `${fgDesc} • ${fpsTag} • TLOD ${tlod2D}${addonNote2D}`;
         if (load2D > 78) {
             badge2D = 'HAZARD';
             color2D = 'rose';
@@ -18119,13 +18129,21 @@ function updatePerformanceCockpitGauges() {
             loadVR = Math.max(14, loadVR - 10);
         }
 
+        if (typeof activeAddonsOverhead !== 'undefined' && activeAddonsOverhead.cpu > 0) {
+            loadVR += Math.round(activeAddonsOverhead.cpu);
+        }
+
         loadVR = Math.min(99, Math.max(14, Math.round(loadVR)));
+
+        const addonNoteVR = (typeof activeAddonsOverhead !== 'undefined' && activeAddonsOverhead.cpu > 0)
+            ? ` • +${activeAddonsOverhead.cpu.toFixed(1)}% addons`
+            : '';
 
         let fpsVRTag = isFpsOffVR ? 'Uncapped' : `${Math.round(fpsCapVR)} FPS`;
         let reprojDesc = reprojVR.includes('OFF') ? 'Native (Reproj OFF)' : (reprojVR.includes('AUTO') ? 'Auto Reprojection' : (reprojVR.includes('1/2') ? '1/2 Reprojection' : reprojVR));
         let badgeVR = 'OPTIMUM';
         let colorVR = 'emerald';
-        let descVR = `Stereo sync (${reprojDesc} • ${fpsVRTag}) • TLOD ${tlodVR}`;
+        let descVR = `Stereo sync (${reprojDesc} • ${fpsVRTag}) • TLOD ${tlodVR}${addonNoteVR}`;
         if (loadVR > 78) {
             badgeVR = 'HAZARD';
             colorVR = 'rose';
@@ -18428,84 +18446,6 @@ function renderMsfsSettingsMatrix() {
     const advisory = currentMsfsGraphicsMode === 'VR'
         ? msfsSettingsMatrixData.graphics_advisory_vr
         : (msfsSettingsMatrixData.graphics_advisory_2d || msfsSettingsMatrixData.graphics_advisory_vr);
-
-    // Render Pacing & Performance Projection (Simplified Single Block)
-    const pacingStatusBadge = document.getElementById('opt-pacing-status-badge');
-    const pacingTargetSummary = document.getElementById('opt-pacing-target-summary');
-    const pacingSummaryText = document.getElementById('opt-pacing-summary-text');
-    const prosList = document.getElementById('opt-pros-list');
-    const consList = document.getElementById('opt-cons-list');
-
-    if (pacingStatusBadge && advisory) {
-        let status = (advisory.status || 'OPTIMAL').toUpperCase();
-        let badgeColor = 'bg-emerald-600 text-white';
-        if (status.includes('BOTTLENECK') || status.includes('HAZARD') || status.includes('CRITICAL')) {
-            status = 'BOTTLENECK';
-            badgeColor = 'bg-rose-600 text-white';
-        } else if (status.includes('SUB') || status.includes('WATCH') || status.includes('PRESSURE') || status.includes('ACCEPTABLE')) {
-            status = 'BALANCED';
-            badgeColor = 'bg-amber-600 text-white';
-        } else {
-            status = 'OPTIMAL';
-            badgeColor = 'bg-emerald-600 text-white';
-        }
-        pacingStatusBadge.textContent = status;
-        pacingStatusBadge.className = `px-2.5 py-0.5 rounded text-[11px] font-mono font-bold uppercase ${badgeColor}`;
-    }
-
-    if (pacingTargetSummary) {
-        if (currentMsfsGraphicsMode === 'COMMON') {
-            pacingTargetSummary.textContent = 'GLOBAL SETTINGS';
-        } else if (pacing) {
-            pacingTargetSummary.textContent = `${pacing.target_fps} FPS • ${pacing.target_mainthread} • ${pacing.vram_headroom}`;
-        }
-    }
-
-    if (pacingSummaryText && advisory) {
-        const recs = Array.isArray(advisory.recommendations) && advisory.recommendations.length > 0 
-            ? ' ' + advisory.recommendations.slice(0, 2).join(' • ')
-            : '';
-        pacingSummaryText.textContent = `${advisory.summary || 'Hardware and graphics settings evaluated.'}${recs}`;
-    }
-
-    // Render Pros & Cons columns
-    if (prosList) {
-        const synergies = (advisory && advisory.synergies) ? advisory.synergies : [];
-        if (synergies.length > 0) {
-            prosList.innerHTML = synergies.map(s => `
-                <div class="flex items-start gap-2 text-emerald-400">
-                    <span class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-emerald-950 text-emerald-300 border border-emerald-800/80 shrink-0 mt-0.5">+</span>
-                    <span class="text-slate-200 leading-tight">${s}</span>
-                </div>
-            `).join('');
-        } else {
-            prosList.innerHTML = `
-                <div class="flex items-start gap-2 text-emerald-400">
-                    <span class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-emerald-950 text-emerald-300 border border-emerald-800/80 shrink-0 mt-0.5">+</span>
-                    <span class="text-slate-200 leading-tight">Stable frametimes and synchronized display pacing</span>
-                </div>
-                <div class="flex items-start gap-2 text-emerald-400">
-                    <span class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-emerald-950 text-emerald-300 border border-emerald-800/80 shrink-0 mt-0.5">+</span>
-                    <span class="text-slate-200 leading-tight">VRAM buffer calibrated within safety margin</span>
-                </div>
-            `;
-        }
-    }
-
-    if (consList) {
-        const conflicts = (advisory && advisory.conflicts) ? advisory.conflicts : [];
-        if (conflicts.length > 0) {
-            consList.innerHTML = conflicts.map(c => `
-                <div class="flex items-start gap-2 text-rose-400">
-                    <span class="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-rose-950 text-rose-300 border border-rose-800/80 shrink-0 mt-0.5">-</span>
-                    <span class="text-slate-200 leading-tight">${c}</span>
-                </div>
-            `).join('');
-        } else {
-            consList.innerHTML = `<span class="text-slate-500 italic text-[11px]">No critical bottlenecks detected.</span>`;
-        }
-    }
-
     // Helper to render individual setting card
     const renderCard = (item) => {
         // Enforce clean, single-word uppercase tag without any parentheses
@@ -19385,40 +19325,38 @@ async function selectCadenceDisplay(displayId) {
     }
 }
 
-function renderImpactGauge(type, score, defaultNote) {
-    const gaugeEl = document.getElementById(`opt-info-${type}-gauge`);
-    const cardEl = document.getElementById(`opt-info-${type}-card`);
-    if (!gaugeEl) return;
+function renderImpactIndicator(type, score, defaultNote) {
+    const pillEl = document.getElementById(`opt-info-${type}-pill`);
+    const barEl = document.getElementById(`opt-info-${type}-bar`);
+    if (!pillEl && !barEl) return;
 
-    const clampedScore = Math.max(1, Math.min(12, parseInt(score, 10) || (type === 'cpu' ? 3 : 4)));
-    const note = defaultNote || (type === 'cpu' ? 'Standard MainThread workload.' : 'Standard GPU rasterization workload.');
+    const s = Math.max(1, Math.min(12, parseInt(score, 10) || (type === 'cpu' ? 3 : 4)));
+    let label = 'LOW';
+    let width = '28%';
+    let pillClass = 'px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-slate-800 text-slate-300 border border-slate-700';
+    let barColor = 'bg-slate-400';
 
-    // Set informative tooltip directly on the gauge and card container
-    gaugeEl.title = note;
-    if (cardEl) cardEl.title = note;
-
-    let bricksHtml = '';
-    for (let i = 1; i <= 12; i++) {
-        const isLit = i <= clampedScore;
-        let litColor = 'bg-emerald-500 shadow-[0_0_6px_rgba(16,185,129,0.5)]';
-        if (i >= 10) {
-            litColor = 'bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.5)]';
-        } else if (i >= 7) {
-            litColor = 'bg-orange-500 shadow-[0_0_6px_rgba(249,115,22,0.5)]';
-        } else if (i >= 4) {
-            litColor = 'bg-amber-400 shadow-[0_0_6px_rgba(251,191,36,0.5)]';
-        }
-
-        const brickClass = isLit 
-            ? `${litColor} border border-white/20`
-            : 'bg-slate-800 border border-slate-700/40 opacity-30';
-
-        bricksHtml += `
-            <div class="flex-1 h-3 rounded-sm transition-all duration-150 cursor-help ${brickClass} hover:brightness-125" 
-                 title="${note}"></div>
-        `;
+    if (s >= 9) {
+        label = 'HIGH';
+        width = '92%';
+        pillClass = 'px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-amber-950/60 text-amber-300 border border-amber-800/80';
+        barColor = 'bg-amber-400';
+    } else if (s >= 5) {
+        label = 'MEDIUM';
+        width = '60%';
+        pillClass = 'px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-slate-800 text-slate-200 border border-slate-600';
+        barColor = 'bg-slate-300';
     }
-    gaugeEl.innerHTML = bricksHtml;
+
+    if (pillEl) {
+        pillEl.textContent = label;
+        pillEl.className = pillClass;
+        pillEl.title = defaultNote || `${type.toUpperCase()} impact: ${label}`;
+    }
+    if (barEl) {
+        barEl.style.width = width;
+        barEl.className = `h-full rounded-full ${barColor} transition-all duration-200`;
+    }
 }
 
 function openSettingInfoModal(settingKey) {
@@ -19448,50 +19386,26 @@ function openSettingInfoModal(settingKey) {
     if (!item) return;
 
     const titleEl = document.getElementById('opt-info-title');
-    const sharedEl = document.getElementById('opt-info-shared');
-    const ratingEl = document.getElementById('opt-info-rating');
     const descEl = document.getElementById('opt-info-desc');
     const linerEl = document.getElementById('opt-info-liner');
     const gaEl = document.getElementById('opt-info-ga');
 
     if (titleEl) titleEl.textContent = toSettingTitleCase(item.name || settingKey);
-    
-    if (sharedEl) {
-        if (item.shared) sharedEl.classList.remove('hidden');
-        else sharedEl.classList.add('hidden');
-    }
-
-    let cleanTag = (item.rating_label || 'OPTIMUM').toUpperCase().replace(/\(.*?\)/g, '').replace(/[^A-Z]/g, '').trim();
-    if (cleanTag.includes('HAZARD') || cleanTag.includes('NOGO') || cleanTag.includes('RISK') || cleanTag.includes('ALERT')) cleanTag = 'HAZARD';
-    else if (cleanTag.includes('SUB') || cleanTag.includes('MISMATCH')) cleanTag = 'SUBOPTIMAL';
-    else if (cleanTag.includes('ACCEPT') || cleanTag.includes('WATCH') || cleanTag.includes('PRESSURE')) cleanTag = 'ACCEPTABLE';
-    else cleanTag = 'OPTIMUM';
-
-    let badgeClass = 'bg-emerald-600 text-white font-bold';
-    if (cleanTag === 'ACCEPTABLE') badgeClass = 'bg-amber-600 text-white font-bold';
-    else if (cleanTag === 'SUBOPTIMAL') badgeClass = 'bg-orange-600 text-white font-bold';
-    else if (cleanTag === 'HAZARD') badgeClass = 'bg-rose-600 text-white font-bold';
-
-    if (ratingEl) {
-        ratingEl.textContent = cleanTag;
-        ratingEl.className = `px-2.5 py-0.5 rounded typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] ${badgeClass}`;
-    }
-
     if (descEl) descEl.textContent = item.info_desc || item.tooltip || 'MSFS graphics engine configuration setting.';
     if (linerEl) linerEl.textContent = item.info_liner || 'Recommended to preserve MainThread and VRAM during IFR operations.';
     if (gaEl) gaEl.textContent = item.info_ga || 'Ideal for VFR flight and scenery visual sharpness.';
 
-    renderImpactGauge('cpu', item.cpu_score, item.cpu_note || item.info_cpu);
-    renderImpactGauge('gpu', item.gpu_score, item.gpu_note || item.info_gpu);
-
-    const rigImpEl = document.getElementById('opt-info-rig-implications');
-    if (rigImpEl) {
-        rigImpEl.innerHTML = item.rig_implications || `<p class="text-slate-300">Technical analysis calibrated for your detected hardware configuration.</p>`;
-    }
+    renderImpactIndicator('cpu', item.cpu_score, item.cpu_note || item.info_cpu);
+    renderImpactIndicator('gpu', item.gpu_score, item.gpu_note || item.info_gpu);
 
     modal.style.zIndex = '99999';
     modal.style.display = 'flex';
     modal.classList.remove('hidden');
+
+    if (window.windowManager) {
+        windowManager.bringToFront(modal);
+        windowManager.centerModal(modal);
+    }
 }
 
 function closeSettingInfoModal() {
@@ -19711,6 +19625,23 @@ function detectProfileCategoryMode(profile) {
     return '2D';
 }
 
+function sortCustomProfilesList() {
+    let targetId = selectedProfileId;
+    if (!targetId || !currentCustomProfiles.some(p => p.id === targetId)) {
+        const active = currentCustomProfiles.find(p => p.is_active);
+        targetId = active ? active.id : '';
+    }
+    currentCustomProfiles.sort((a, b) => {
+        if (targetId) {
+            if (a.id === targetId) return -1;
+            if (b.id === targetId) return 1;
+        }
+        const timeA = a.created_at ? new Date(a.created_at.replace(' ', 'T')).getTime() : 0;
+        const timeB = b.created_at ? new Date(b.created_at.replace(' ', 'T')).getTime() : 0;
+        return timeB - timeA;
+    });
+}
+
 async function fetchAndRenderCustomProfiles(autoSwitchMode = false) {
     const dropdown = document.getElementById('opt-profiles-dropdown');
     const input = document.getElementById('opt-profile-universal-input');
@@ -19720,15 +19651,11 @@ async function fetchAndRenderCustomProfiles(autoSwitchMode = false) {
         const resStr = await window.pywebview.api.get_custom_profiles();
         currentCustomProfiles = JSON.parse(resStr) || [];
         
-        // Sort newest first (order of creation from newest to oldest)
-        currentCustomProfiles.sort((a, b) => {
-            const timeA = a.created_at ? new Date(a.created_at.replace(' ', 'T')).getTime() : 0;
-            const timeB = b.created_at ? new Date(b.created_at.replace(' ', 'T')).getTime() : 0;
-            return timeB - timeA;
-        });
+        // Sort: Selected profile at top, then active profile, then other profiles newest first
+        sortCustomProfilesList();
 
         // Find active profile or default to newest
-        let activeProfile = currentCustomProfiles.find(p => p.is_active);
+        let activeProfile = currentCustomProfiles.find(p => p.id === selectedProfileId) || currentCustomProfiles.find(p => p.is_active);
         if (!activeProfile && currentCustomProfiles.length > 0) {
             activeProfile = currentCustomProfiles[0];
         }
@@ -19780,6 +19707,8 @@ function clearProfileMultiSelection() {
 function renderCustomProfilesDropdownList() {
     const listEl = document.getElementById('opt-profile-dropdown-list');
     if (!listEl) return;
+
+    sortCustomProfilesList();
 
     if (currentCustomProfiles.length === 0) {
         listEl.innerHTML = '<div class="p-3 text-slate-500 text-center italic text-xs">No saved profiles yet</div>';
@@ -19959,6 +19888,7 @@ async function selectCustomProfileItem(profileId) {
     if (!profile) return;
 
     selectedProfileId = profile.id;
+    sortCustomProfilesList();
     const input = document.getElementById('opt-profile-universal-input');
     if (input) {
         input.value = profile.name;
@@ -21071,6 +21001,259 @@ async function toggleIngamePanelInstall() {
         await refreshIngamePanelStatus();
     } catch (e) {
         console.error("Error toggling in-game panel install:", e);
+    }
+}
+
+// ==============================================================================
+// BACKGROUND ADDONS & WORKLOAD IMPACT MANAGEMENT
+// ==============================================================================
+
+let detectedAddonsList = [];
+let activeAddonsOverhead = { cpu: 0, ram: 0, ms: 0 };
+
+async function loadDetectedAddons() {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.get_detected_addons) return;
+
+    try {
+        const resStr = await window.pywebview.api.get_detected_addons();
+        detectedAddonsList = JSON.parse(resStr) || [];
+        renderDetectedAddons();
+    } catch (e) {
+        console.error("Error loading detected addons:", e);
+    }
+}
+
+function renderDetectedAddons() {
+    const runningListEl = document.getElementById('opt-addons-running-list');
+    const installedListEl = document.getElementById('opt-addons-installed-list');
+    const uninstalledSelectEl = document.getElementById('opt-addons-uninstalled-select');
+    const runningCountEl = document.getElementById('opt-addons-running-count');
+    const installedCountEl = document.getElementById('opt-addons-installed-count');
+    const cumulativeBadgeEl = document.getElementById('opt-addons-cumulative-badge');
+
+    // 1. Calculate cumulative overhead
+    let totalCpu = 0;
+    let totalRam = 0;
+    let totalMs = 0;
+
+    const running = [];
+    const installed = [];
+    const notInstalled = [];
+
+    detectedAddonsList.forEach(a => {
+        if (a.status === 'running') {
+            running.push(a);
+            totalCpu += a.cpu_overhead_pct || 0;
+            totalRam += a.ram_mb || 0;
+            totalMs += a.mainthread_impact_ms || 0;
+        } else if (a.status === 'installed') {
+            installed.push(a);
+            if (a.is_active_in_flight) {
+                totalCpu += a.cpu_overhead_pct || 0;
+                totalRam += a.ram_mb || 0;
+                totalMs += a.mainthread_impact_ms || 0;
+            }
+        } else {
+            notInstalled.push(a);
+            if (a.is_active_in_flight) {
+                totalCpu += a.cpu_overhead_pct || 0;
+                totalRam += a.ram_mb || 0;
+                totalMs += a.mainthread_impact_ms || 0;
+            }
+        }
+    });
+
+    activeAddonsOverhead = {
+        cpu: totalCpu,
+        ram: totalRam,
+        ms: totalMs
+    };
+
+    // Update cumulative badge
+    if (cumulativeBadgeEl) {
+        if (totalCpu > 0 || totalRam > 0) {
+            cumulativeBadgeEl.innerHTML = `Total Overhead: <span class="text-amber-400 font-bold">+${totalCpu.toFixed(1)}% CPU</span> • <span class="text-sky-300 font-bold">+${Math.round(totalRam)} MB RAM</span> <span class="text-slate-400 text-[9px]">(+${totalMs.toFixed(1)}ms)</span>`;
+            cumulativeBadgeEl.className = 'px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-amber-950/40 border border-amber-600/50 text-amber-300 shadow-sm';
+        } else {
+            cumulativeBadgeEl.textContent = 'Total Overhead: +0.0% CPU • +0 MB RAM';
+            cumulativeBadgeEl.className = 'px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-slate-900 border border-slate-700/80 text-cyan-400 shadow-sm';
+        }
+    }
+
+    if (runningCountEl) runningCountEl.textContent = `${running.length} active`;
+    if (installedCountEl) installedCountEl.textContent = `${installed.length} detected`;
+
+    // 2. Render Active / Running Addons
+    if (runningListEl) {
+        if (running.length === 0) {
+            runningListEl.innerHTML = `
+                <div class="col-span-full p-2.5 rounded-md bg-slate-900/60 border border-slate-800 text-slate-500 italic text-[11px] text-center">
+                    No external simulation utilities currently running.
+                </div>
+            `;
+        } else {
+            runningListEl.innerHTML = running.map(a => `
+                <div class="p-2.5 rounded-md bg-slate-900/80 border border-emerald-500/30 flex items-center justify-between shadow-sm">
+                    <div class="flex items-center gap-2 min-w-0 pr-2">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] shrink-0"></span>
+                        <div class="flex flex-col min-w-0">
+                            <span class="text-xs font-semibold text-slate-100 truncate">${escapeHtml(a.name)}</span>
+                            <span class="text-[10px] text-slate-400 font-mono">${escapeHtml(a.category)}</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <span class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-slate-800 text-emerald-400 border border-slate-700/60" title="Estimated MainThread overhead and RAM footprint">
+                            +${a.cpu_overhead_pct.toFixed(1)}% CPU • +${a.ram_mb} MB
+                        </span>
+                        ${a.is_custom ? `
+                            <button onclick="removeCustomAddonItem('${a.id}')" title="Delete custom tool" class="text-slate-500 hover:text-rose-400 p-1 cursor-pointer border-0 bg-transparent">
+                                <i class="fa-solid fa-trash text-xs"></i>
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+    }
+
+    // 3. Render Installed (Idle) Addons with In-Flight Toggles
+    if (installedListEl) {
+        if (installed.length === 0) {
+            installedListEl.innerHTML = `
+                <div class="col-span-full p-2.5 rounded-md bg-slate-900/60 border border-slate-800 text-slate-500 italic text-[11px] text-center">
+                    No additional installed utilities detected.
+                </div>
+            `;
+        } else {
+            installedListEl.innerHTML = installed.map(a => {
+                const isChecked = !!a.is_active_in_flight;
+                return `
+                    <div class="p-2.5 rounded-md bg-slate-900/60 border border-slate-800/80 flex items-center justify-between hover:border-slate-700 transition-colors">
+                        <div class="flex items-center gap-2 min-w-0 pr-2">
+                            <span class="w-1.5 h-1.5 rounded-full bg-slate-600 shrink-0"></span>
+                            <div class="flex flex-col min-w-0">
+                                <span class="text-xs font-medium text-slate-200 truncate">${escapeHtml(a.name)}</span>
+                                <span class="text-[10px] text-slate-500 font-mono">${escapeHtml(a.category)}</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2.5 shrink-0">
+                            <span class="text-[10px] font-mono text-slate-400 hidden sm:inline" title="Estimated impact if launched">
+                                +${a.cpu_overhead_pct.toFixed(1)}% CPU
+                            </span>
+                            <label class="relative inline-flex items-center cursor-pointer select-none" title="Toggle to factor this addon into flight workload">
+                                <input type="checkbox" ${isChecked ? 'checked' : ''} onchange="toggleAddonInFlight('${a.id}', this.checked)" class="sr-only peer">
+                                <div class="w-8 h-4.5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-3.5 after:w-3.5 after:transition-all peer-checked:bg-cyan-600"></div>
+                            </label>
+                            ${a.is_custom ? `
+                                <button onclick="removeCustomAddonItem('${a.id}')" title="Delete custom tool" class="text-slate-500 hover:text-rose-400 p-1 cursor-pointer border-0 bg-transparent">
+                                    <i class="fa-solid fa-trash text-xs"></i>
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+    }
+
+    // 4. Populate Uninstalled Tools dropdown
+    if (uninstalledSelectEl) {
+        const currentVal = uninstalledSelectEl.value;
+        uninstalledSelectEl.innerHTML = '<option value="">Select uninstalled tool to monitor...</option>' +
+            notInstalled.map(a => `
+                <option value="${a.id}">${escapeHtml(a.name)} (${a.category} • +${a.cpu_overhead_pct.toFixed(1)}% CPU)</option>
+            `).join('');
+        if (currentVal) uninstalledSelectEl.value = currentVal;
+    }
+}
+
+async function toggleAddonInFlight(addonId, isChecked) {
+    const item = detectedAddonsList.find(a => a.id === addonId);
+    if (item) {
+        item.is_active_in_flight = isChecked;
+    }
+
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.set_addon_flight_status) {
+        try {
+            await window.pywebview.api.set_addon_flight_status(addonId, isChecked);
+        } catch (e) {
+            console.error("Error setting addon flight status:", e);
+        }
+    }
+
+    renderDetectedAddons();
+    if (msfsSettingsMatrixData && typeof renderMsfsSettingsMatrix === 'function') {
+        renderMsfsSettingsMatrix();
+    }
+}
+
+async function addSelectedUninstalledAddon() {
+    const selectEl = document.getElementById('opt-addons-uninstalled-select');
+    if (!selectEl || !selectEl.value) return;
+
+    const addonId = selectEl.value;
+    await toggleAddonInFlight(addonId, true);
+    if (typeof showToast === 'function') {
+        const item = detectedAddonsList.find(a => a.id === addonId);
+        showToast(`Added ${item ? item.name : 'addon'} to flight workload monitor!`, 'info');
+    }
+    await loadDetectedAddons();
+}
+
+function toggleManualAddonForm() {
+    const form = document.getElementById('opt-addon-manual-form');
+    if (form) {
+        form.classList.toggle('hidden');
+    }
+}
+
+async function submitManualCustomAddon() {
+    const nameInput = document.getElementById('opt-custom-addon-name');
+    const exeInput = document.getElementById('opt-custom-addon-exe');
+    const impactSelect = document.getElementById('opt-custom-addon-impact');
+
+    const name = nameInput ? nameInput.value.trim() : '';
+    const exe = exeInput ? exeInput.value.trim() : '';
+    const impact = impactSelect ? impactSelect.value : 'Medium';
+
+    if (!name) {
+        if (typeof showToast === 'function') showToast("Please enter an addon name.", "warning");
+        return;
+    }
+    if (!exe) {
+        if (typeof showToast === 'function') showToast("Please enter the executable name (e.g. tool.exe).", "warning");
+        return;
+    }
+
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.add_custom_addon) {
+        try {
+            const resStr = await window.pywebview.api.add_custom_addon(name, exe, impact);
+            const res = JSON.parse(resStr);
+            if (res.status === 'success') {
+                if (typeof showToast === 'function') showToast(`Registered "${name}" successfully!`, 'success');
+                if (nameInput) nameInput.value = '';
+                if (exeInput) exeInput.value = '';
+                const form = document.getElementById('opt-addon-manual-form');
+                if (form) form.classList.add('hidden');
+                await loadDetectedAddons();
+            } else {
+                if (typeof showToast === 'function') showToast(res.message || "Failed to add custom tool", 'error');
+            }
+        } catch (e) {
+            console.error("Error adding custom addon:", e);
+        }
+    }
+}
+
+async function removeCustomAddonItem(addonId) {
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.remove_custom_addon) {
+        try {
+            await window.pywebview.api.remove_custom_addon(addonId);
+            if (typeof showToast === 'function') showToast("Custom addon removed.", "info");
+            await loadDetectedAddons();
+        } catch (e) {
+            console.error("Error removing custom addon:", e);
+        }
     }
 }
 

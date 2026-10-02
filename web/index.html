@@ -2788,6 +2788,97 @@
                 </div>
             </div>
 
+            <!-- Background Addons & Workload Impact Section -->
+            <div class="mt-3 space-y-1.5" id="opt-addons-section">
+                <div class="flex items-center justify-between px-1">
+                    <span class="typo-section-title text-slate-400 uppercase tracking-wide text-xs font-semibold">
+                        Background Addons &amp; Workload Impact
+                    </span>
+                    <span id="opt-addons-cumulative-badge" class="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-slate-900 border border-slate-700/80 text-cyan-400 shadow-sm">
+                        Total Overhead: +0.0% CPU • +0 MB RAM
+                    </span>
+                </div>
+
+                <div class="p-3.5 rounded-lg bg-slate-800/85 border border-slate-700/80 shadow-sm space-y-3.5">
+                    <!-- 1. Active / Running Addons -->
+                    <div class="space-y-1.5">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[11px] font-semibold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)] animate-pulse"></span>
+                                Live Active In-Flight Tools
+                            </span>
+                            <span id="opt-addons-running-count" class="text-[10px] font-mono text-slate-400">0 running</span>
+                        </div>
+                        <div id="opt-addons-running-list" class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                            <div class="p-2.5 rounded-md bg-slate-900/60 border border-slate-800 text-slate-500 italic text-[11px]">
+                                No external simulation utilities currently running.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 2. Installed (Idle) Addons with In-Flight Toggles -->
+                    <div class="border-t border-slate-700/60 pt-3 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[11px] font-semibold text-slate-300 uppercase tracking-wider">
+                                Installed Addons (Idle) • Plan To Launch in Flight
+                            </span>
+                            <span id="opt-addons-installed-count" class="text-[10px] font-mono text-slate-400">0 detected</span>
+                        </div>
+                        <div id="opt-addons-installed-list" class="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                            <div class="p-2.5 rounded-md bg-slate-900/60 border border-slate-800 text-slate-500 italic text-[11px]">
+                                No additional installed utilities detected.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. Available Uninstalled & Manual Add Row -->
+                    <div class="border-t border-slate-700/60 pt-3 flex flex-wrap items-center justify-between gap-3 text-xs">
+                        <!-- Add Uninstalled Catalog Addon -->
+                        <div class="flex items-center gap-2 flex-1 min-w-[240px]">
+                            <select id="opt-addons-uninstalled-select"
+                                    class="flex-1 h-7.5 bg-slate-900/80 border border-slate-700/80 rounded-md px-2.5 text-xs text-slate-300 focus:outline-none focus:border-cyan-500">
+                                <option value="">Select uninstalled tool to monitor...</option>
+                            </select>
+                            <button onclick="addSelectedUninstalledAddon()"
+                                    type="button"
+                                    class="h-7.5 px-3 rounded-md bg-slate-700 hover:bg-slate-600 text-slate-200 font-semibold text-[11px] uppercase tracking-wider transition-colors cursor-pointer shrink-0">
+                                + Monitor
+                            </button>
+                        </div>
+
+                        <!-- Manual Custom Addon Trigger -->
+                        <button onclick="toggleManualAddonForm()"
+                                type="button"
+                                class="h-7.5 px-3 rounded-md border border-slate-700 bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white font-semibold text-[11px] uppercase tracking-wider transition-colors cursor-pointer shrink-0 flex items-center gap-1.5">
+                            <i class="fa-solid fa-plus text-[10px]"></i>
+                            <span>Add Custom Tool</span>
+                        </button>
+                    </div>
+
+                    <!-- 4. Collapsible Manual Add Form -->
+                    <div id="opt-addon-manual-form" class="hidden border-t border-slate-700/80 pt-3 space-y-2 bg-slate-900/40 p-3 rounded-md">
+                        <div class="text-[11px] font-semibold text-slate-300 uppercase tracking-wider">Register Custom External Tool</div>
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                            <input type="text" id="opt-custom-addon-name" placeholder="Tool Name (e.g. BeyondATC)"
+                                   class="h-7.5 bg-slate-900 border border-slate-700 rounded px-2.5 text-xs text-white focus:outline-none focus:border-cyan-500">
+                            <input type="text" id="opt-custom-addon-exe" placeholder="Executable (e.g. BeyondATC.exe)"
+                                   class="h-7.5 bg-slate-900 border border-slate-700 rounded px-2.5 text-xs text-white font-mono focus:outline-none focus:border-cyan-500">
+                            <div class="flex items-center gap-2">
+                                <select id="opt-custom-addon-impact" class="flex-1 h-7.5 bg-slate-900 border border-slate-700 rounded px-2 text-xs text-slate-300 focus:outline-none focus:border-cyan-500">
+                                    <option value="Low">Low Impact (~1.5% CPU)</option>
+                                    <option value="Medium" selected>Medium Impact (~3.5% CPU)</option>
+                                    <option value="High">High Impact (~6.0% CPU)</option>
+                                </select>
+                                <button onclick="submitManualCustomAddon()" type="button"
+                                        class="h-7.5 px-3 rounded bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-[11px] uppercase tracking-wider transition-colors cursor-pointer shrink-0">
+                                    Save
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Profile Management Zone -->
             <div class="mt-3 space-y-1.5">
                 <div class="flex items-center justify-between px-1">
@@ -3090,77 +3181,7 @@
         </div>
     </div>
 
-    <!-- 5. PERFORMANCE ASSESSMENT -->
-    <div id="float-win-perf-assessment"
-         data-modal-id="float-win-perf-assessment"
-         class="sceneryx-modal floating-window absolute hidden flex-col bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden z-[1200] select-none"
-         style="min-width: 420px; width: 680px; height: auto; max-width: 95vw; max-height: 90vh;">
-        <!-- Drag Handle Header -->
-        <div class="modal-header floating-win-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
-            <div class="flex items-center gap-2">
-                <h3 class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">BENCHMARK // PERFORMANCE ASSESSMENT</h3>
-            </div>
-            <button onclick="closeFloatingWindow('perf_assessment')" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity">
-                <i class="fa-solid fa-xmark text-sm"></i>
-            </button>
-        </div>
-
-        <div class="modal-body flex-1 p-4 overflow-y-auto custom-scrollbar space-y-3.5">
-            <!-- Pacing Summary Card -->
-            <div class="p-4 rounded-lg bg-slate-800/85 border border-slate-700/80 space-y-3.5 shadow-sm">
-                <div class="flex items-center justify-between">
-                    <span class="typo-section-title text-slate-200">Frame Pacing &amp; Graphics Evaluation</span>
-                    <span id="opt-pacing-target-summary" class="typo-metric text-xs text-sky-400 font-semibold tabular-nums">--</span>
-                </div>
-                <div class="p-3.5 rounded-lg bg-slate-900/70 border border-slate-700/80 space-y-2">
-                    <div class="flex items-center gap-2">
-                        <span id="opt-pacing-status-badge" class="px-2.5 py-0.5 rounded-full typo-action-btn text-[11px] font-semibold uppercase tracking-[0.02em] bg-emerald-600 text-white shadow-sm">OPTIMAL</span>
-                    </div>
-                    <p id="opt-pacing-summary-text" class="text-xs text-slate-300 typo-metadata leading-relaxed">
-                        Evaluating graphics settings and frame pacing sync.
-                    </p>
-                </div>
-            </div>
-
-            <!-- Bottlenecks & Balance Card -->
-            <div class="p-4 rounded-lg bg-slate-800/85 border border-slate-700/80 space-y-3.5 shadow-sm">
-                <div class="flex items-center justify-between">
-                    <span class="typo-section-title text-slate-200">Bottleneck &amp; Balance Diagnostics</span>
-                </div>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-0.5">
-                    <div class="p-3.5 rounded-lg bg-slate-900/70 border border-slate-700/80 space-y-2.5 shadow-inner">
-                        <div class="flex items-center gap-1.5 text-xs typo-section-title text-emerald-400">
-                            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-                            <span>Pros (+)</span>
-                        </div>
-                        <div id="opt-pros-list" class="space-y-1.5 text-xs typo-metadata">
-                            <span class="text-slate-500 italic text-[11px]">Analyzing benefits...</span>
-                        </div>
-                    </div>
-                    <div class="p-3.5 rounded-lg bg-slate-900/70 border border-slate-700/80 space-y-2.5 shadow-inner">
-                        <div class="flex items-center gap-1.5 text-xs typo-section-title text-rose-400">
-                            <span class="w-2 h-2 rounded-full bg-rose-400"></span>
-                            <span>Cons (-)</span>
-                        </div>
-                        <div id="opt-cons-list" class="space-y-1.5 text-xs typo-metadata">
-                            <span class="text-slate-500 italic text-[11px]">No critical bottlenecks detected.</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Resize Handle -->
-        <div class="modal-resize-handle absolute bottom-0 right-0 w-4 h-4 cursor-se-resize flex items-end justify-end p-1">
-            <svg class="w-2.5 h-2.5 text-slate-600 pointer-events-none" viewBox="0 0 6 6" fill="currentColor">
-                <circle cx="5" cy="5" r="0.8"/>
-                <circle cx="3" cy="5" r="0.8"/>
-                <circle cx="5" cy="3" r="0.8"/>
-            </svg>
-        </div>
-    </div>
-
-    <!-- 6. ROUTE OPTIMIZATION -->
+    <!-- 5. ROUTE OPTIMIZATION -->
     <div id="float-win-route-opt"
          data-modal-id="float-win-route-opt"
          class="sceneryx-modal floating-window absolute hidden flex-col bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden z-[1200] select-none"
@@ -3679,75 +3700,63 @@
     </div>
 
     <!-- DEDICATED SETTING DETAILED INFO MODAL -->
-    <div id="opt-setting-info-modal" class="sceneryx-modal absolute hidden flex-col bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden z-50 select-none font-sans"
+    <div id="opt-setting-info-modal" class="sceneryx-modal absolute hidden flex-col bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden z-50 select-none font-sans"
          data-modal-id="opt-setting-info-modal"
-         style="min-width: 420px; width: 768px; max-width: 95vw; height: auto; max-height: 88vh;">
+         style="min-width: 420px; width: 660px; max-width: 95vw; height: auto; max-height: 88vh;">
         <!-- Drag Handle Header -->
-        <div class="modal-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none shrink-0 gap-3">
+        <div class="modal-header h-[42px] px-4 bg-slate-900/70 border-b border-slate-800 flex items-center justify-between cursor-move select-none shrink-0 gap-3">
             <div class="flex items-center gap-2 min-w-0 flex-1">
                 <span class="typo-window-header text-slate-400 text-xs font-semibold tracking-wide uppercase shrink-0">DOCUMENTATION //</span>
                 <span id="opt-info-title" class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase truncate">SETTING NAME</span>
-                <span id="opt-info-shared" class="hidden px-2 py-0.5 rounded typo-action-btn text-[10px] font-semibold bg-slate-700 text-slate-300 uppercase">SHARED</span>
-                <span id="opt-info-rating" class="px-2.5 py-0.5 rounded typo-action-btn text-[10px] font-semibold uppercase">OPTIMUM</span>
             </div>
             <div class="flex items-center gap-1 shrink-0">
-                <button onclick="closeSettingInfoModal()" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity">
+                <button onclick="closeSettingInfoModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity">
                     <i class="fa-solid fa-xmark text-sm"></i>
                 </button>
             </div>
         </div>
 
         <!-- Scrollable Body -->
-        <div class="modal-body flex-1 p-5 overflow-y-auto custom-scrollbar space-y-4 text-sm text-slate-300 divide-y divide-slate-800">
-            <!-- Description -->
-            <div class="space-y-1.5">
-                <div class="typo-section-title text-slate-400">Technical Function in MSFS</div>
-                <p id="opt-info-desc" class="text-slate-200 leading-relaxed"></p>
+        <div class="modal-body flex-1 p-5 overflow-y-auto custom-scrollbar space-y-4 font-sans">
+            <!-- Technical Description -->
+            <div>
+                <p id="opt-info-desc" class="text-slate-300 text-xs leading-relaxed select-text"></p>
             </div>
 
-            <!-- Hardware Impact -->
-            <div class="pt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div id="opt-info-cpu-card" class="p-4 rounded-lg bg-slate-800/85 border border-slate-700/60 space-y-2.5 transition-all">
-                    <div class="flex items-center justify-between">
-                        <span class="typo-section-title text-cyan-400">CPU / Mainthread Impact</span>
+            <!-- Performance Impact Summary (CPU & GPU) -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                <!-- CPU Impact -->
+                <div class="p-3 rounded-lg bg-slate-900/60 border border-slate-700/50 space-y-2">
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-slate-400 font-medium">CPU / Mainthread Impact</span>
+                        <span id="opt-info-cpu-pill" class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-slate-800 text-slate-300 border border-slate-700">LOW</span>
                     </div>
-                    <!-- 12-brick segmented gauge (green to red progressive spectrum) -->
-                    <div id="opt-info-cpu-gauge" class="flex items-center gap-1.5 cursor-help"></div>
-                </div>
-                <div id="opt-info-gpu-card" class="p-4 rounded-lg bg-slate-800/85 border border-slate-700/60 space-y-2.5 transition-all">
-                    <div class="flex items-center justify-between">
-                        <span class="typo-section-title text-emerald-400">GPU / VRAM Impact</span>
+                    <div class="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                        <div id="opt-info-cpu-bar" class="h-full rounded-full bg-slate-400 transition-all duration-200" style="width: 25%;"></div>
                     </div>
-                    <!-- 12-brick segmented gauge (green to red progressive spectrum) -->
-                    <div id="opt-info-gpu-gauge" class="flex items-center gap-1.5 cursor-help"></div>
                 </div>
-            </div>
 
-            <!-- Mission Advice -->
-            <div class="pt-4 space-y-3">
-                <div class="typo-section-title text-slate-400">Recommendations by Flight Profile</div>
-                <div class="space-y-2">
-                    <div class="p-3 rounded-lg bg-slate-800/85 border border-slate-700/60 flex items-start gap-2.5">
-                        <span class="px-2 py-0.5 rounded typo-action-btn text-[10px] font-semibold bg-cyan-900 text-cyan-200 uppercase shrink-0 mt-0.5">IFR Liners</span>
-                        <p id="opt-info-liner" class="text-xs text-slate-300 leading-relaxed"></p>
+                <!-- GPU Impact -->
+                <div class="p-3 rounded-lg bg-slate-900/60 border border-slate-700/50 space-y-2">
+                    <div class="flex items-center justify-between text-xs">
+                        <span class="text-slate-400 font-medium">GPU / VRAM Impact</span>
+                        <span id="opt-info-gpu-pill" class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-slate-800 text-slate-300 border border-slate-700">LOW</span>
                     </div>
-                    <div class="p-3 rounded-lg bg-slate-800/85 border border-slate-700/60 flex items-start gap-2.5">
-                        <span class="px-2 py-0.5 rounded typo-action-btn text-[10px] font-semibold bg-emerald-900 text-emerald-200 uppercase shrink-0 mt-0.5">VFR GA</span>
-                        <p id="opt-info-ga" class="text-xs text-slate-300 leading-relaxed"></p>
+                    <div class="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                        <div id="opt-info-gpu-bar" class="h-full rounded-full bg-slate-400 transition-all duration-200" style="width: 25%;"></div>
                     </div>
                 </div>
             </div>
 
-            <!-- Hardware Implications on Detected Rig -->
-            <div class="pt-4 space-y-2.5">
-                <div class="flex items-center justify-between">
-                    <span class="typo-section-title text-cyan-400 flex items-center gap-2">
-                        <i class="fa-solid fa-microchip"></i>
-                        <span>Hardware Implications on Your Detected Rig</span>
-                    </span>
+            <!-- Recommendations: Single dual-row block -->
+            <div class="bg-slate-900/60 border border-slate-700/50 rounded-lg p-3 space-y-2.5">
+                <div class="flex items-start gap-3">
+                    <span class="text-slate-300 font-semibold text-xs shrink-0 w-24">IFR Liners:</span>
+                    <p id="opt-info-liner" class="text-slate-300 text-xs leading-relaxed select-text"></p>
                 </div>
-                <div id="opt-info-rig-implications" class="p-4 rounded-lg bg-slate-800/85 border border-slate-700/60 text-xs md:text-sm text-slate-200 leading-relaxed font-mono space-y-3">
-                    <!-- Populated dynamically with deep, rig-tailored analysis -->
+                <div class="border-t border-slate-800/80 pt-2.5 flex items-start gap-3">
+                    <span class="text-slate-300 font-semibold text-xs shrink-0 w-24">VFR GA:</span>
+                    <p id="opt-info-ga" class="text-slate-300 text-xs leading-relaxed select-text"></p>
                 </div>
             </div>
         </div>
@@ -3756,7 +3765,7 @@
         <div class="modal-resize-handle absolute bottom-0 right-0 w-4 h-4 cursor-se-resize flex items-end justify-end p-1">
             <svg class="w-2.5 h-2.5 text-slate-600 pointer-events-none" viewBox="0 0 6 6" fill="currentColor">
                 <circle cx="5" cy="5" r="0.8"/>
-                <circle cx="3" cy="3" r="0.8"/>
+                <circle cx="3" cy="5" r="0.8"/>
                 <circle cx="5" cy="3" r="0.8"/>
             </svg>
         </div>
