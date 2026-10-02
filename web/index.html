@@ -228,7 +228,7 @@
 
         /* Standard SceneryX Window Manager Rules */
         .sceneryx-modal {
-            position: absolute !important;
+            position: fixed !important;
             background: rgba(15, 23, 42, 0.90) !important;
             backdrop-filter: blur(16px) !important;
             -webkit-backdrop-filter: blur(16px) !important;
@@ -243,6 +243,21 @@
 
         .sceneryx-modal.hidden {
             display: none !important;
+        }
+
+        .modal-resize-handle {
+            position: absolute !important;
+            bottom: 0 !important;
+            right: 0 !important;
+            width: 24px !important;
+            height: 24px !important;
+            cursor: se-resize !important;
+            display: flex !important;
+            align-items: flex-end !important;
+            justify-content: flex-end !important;
+            padding: 4px !important;
+            z-index: 50 !important;
+            user-select: none !important;
         }
 
         .modal-header {
@@ -1298,12 +1313,41 @@
                         </div>
                     </div>
 
-                    <!-- SCENERY EXTENSION PILLS (Framed card panel matching radial quadrant glass & border) -->
-                    <div id="radial-sceneries-extension" onclick="event.stopPropagation();" onmousedown="event.stopPropagation();" onpointerdown="event.stopPropagation();" class="hidden absolute left-[542px] top-1/2 -translate-y-1/2 flex flex-col gap-2 pointer-events-auto z-[710] p-3 rounded-3xl shadow-xl shadow-black/50 select-none transition-all duration-200 ease-out" style="width: 380px; max-width: 380px;">
-                    </div>
-
                     </div>
                 </div>
+
+            <!-- SCENERY MANAGER (VARIANTS & ADDONS) MODAL -->
+            <div id="radial-sceneries-extension"
+                 data-modal-id="radial-sceneries-extension"
+                 class="sceneryx-modal absolute hidden flex-col bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden select-none pointer-events-auto z-[1550]"
+                 style="min-width: 440px; min-height: 400px; width: 520px; height: 560px; max-width: 95vw; max-height: calc(100vh - 120px);">
+                
+                <!-- Drag Handle & Modal Header -->
+                <div id="radial-sceneries-extension-header" class="modal-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none shrink-0">
+                    <div class="flex items-center gap-2">
+                        <h3 id="radial-sceneries-extension-title" class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">SCENERY MANAGER // AVAILABLE ADDONS</h3>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <button onclick="triggerRadialScenerySelector()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
+                            <i class="fa-solid fa-xmark text-sm"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Scrollable Body -->
+                <div id="radial-sceneries-extension-body" class="modal-body flex-1 p-4 overflow-y-auto custom-scrollbar flex flex-col gap-2.5">
+                    <!-- Rendered dynamically -->
+                </div>
+
+                <!-- Resize Handle -->
+                <div class="modal-resize-handle absolute bottom-0 right-0 w-6 h-6 cursor-se-resize flex items-end justify-end p-1.5 z-20 select-none">
+                    <svg class="w-3 h-3 text-slate-500 hover:text-cyan-400 transition-colors pointer-events-none" viewBox="0 0 6 6" fill="currentColor">
+                        <circle cx="5" cy="5" r="0.8"/>
+                        <circle cx="3" cy="3" r="0.8"/>
+                        <circle cx="5" cy="3" r="0.8"/>
+                    </svg>
+                </div>
+            </div>
 
             <!-- OPERATING AIRLINES MODAL -->
             <div id="radial-airlines-modal"
@@ -1314,7 +1358,6 @@
                 <!-- Drag Handle & Modal Header -->
                 <div id="radial-airlines-modal-header" class="modal-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
                     <div class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-sky-400"></span>
                         <h3 class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase" data-i18n="drawer.operating_airlines">AIRPORT INSPECTOR // OPERATING AIRLINES</h3>
                     </div>
                     <div class="flex items-center gap-1">
@@ -1433,7 +1476,6 @@
                 <!-- Drag Handle & Modal Header -->
                 <div id="radial-details-modal-header" class="modal-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
                     <div class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-sky-400"></span>
                         <h3 id="radial-details-modal-title" class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase" data-i18n="radial.details">AIRPORT INSPECTOR // DETAILS</h3>
                     </div>
                     <div class="flex items-center gap-1">
@@ -2031,7 +2073,6 @@
         <!-- Drag Handle Header -->
         <div class="modal-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
                 <h3 class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase" data-i18n="settings.title">SETTINGS // FOLDER LOCATIONS &amp; GSX</h3>
             </div>
             <div class="flex items-center gap-1">
@@ -2292,7 +2333,6 @@
         <!-- Drag Handle Header -->
         <div class="modal-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
                 <h3 class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">SCANNER // MSFS PACKAGES &amp; PROFILES</h3>
             </div>
             <div class="flex items-center gap-1">
@@ -2380,7 +2420,6 @@
         <!-- Drag Handle Header -->
         <div class="modal-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-amber-400"></span>
                 <h3 class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase flex items-center gap-2">
                     <span data-i18n="conflict.modal_title">SYSTEM WARNING // SCENERY CONFLICT DETECTED</span>
                     <span id="conflict-modal-step-index-title" class="typo-metric font-semibold text-amber-400">1/1</span>
@@ -2438,7 +2477,7 @@
         <div class="modal-resize-handle absolute bottom-0 right-0 w-4 h-4 cursor-se-resize flex items-end justify-end p-1">
             <svg class="w-2.5 h-2.5 text-slate-600 pointer-events-none" viewBox="0 0 6 6" fill="currentColor">
                 <circle cx="5" cy="5" r="0.8"/>
-                <circle cx="3" cy="5" r="0.8"/>
+                <circle cx="3" cy="3" r="0.8"/>
                 <circle cx="5" cy="3" r="0.8"/>
             </svg>
         </div>
@@ -2452,7 +2491,6 @@
         <!-- Drag Handle Header -->
         <div id="gsx-audit-modal-header" class="modal-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
                 <h3 class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase flex items-center gap-2">
                     <span data-i18n="gsx.audit_modal_title">GSX INSPECTOR // PROFILES AUDIT</span>
                     <span id="gsx-audit-total-badge" class="hidden typo-metric text-[10px] font-semibold px-2 py-0.5 rounded-full leading-tight bg-amber-500 text-slate-950 border-0"></span>
@@ -2547,7 +2585,6 @@
         <!-- Drag Handle Header -->
         <div class="modal-header floating-win-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
                 <h3 class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">DIAGNOSTICS // MY RIG HARDWARE</h3>
             </div>
             <button onclick="closeFloatingWindow('my_rig')" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
@@ -2631,7 +2668,6 @@
         <!-- Drag Handle Header -->
         <div class="modal-header floating-win-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
                 <h3 class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">CONFIGURATION // MSFS GRAPHIC SETTINGS</h3>
             </div>
             <button onclick="closeFloatingWindow('graphics')" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
@@ -2818,7 +2854,6 @@
         <!-- Drag Handle Header -->
         <div class="modal-header floating-win-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
                 <h3 class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">PERFORMANCE // SMART LOD DYNAMIC ENGINE</h3>
             </div>
             <button onclick="closeFloatingWindow('smart_lod')" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
@@ -2930,7 +2965,6 @@
         <!-- Drag Handle Header -->
         <div class="modal-header floating-win-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
                 <h3 class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">TELEMETRY // LIVE FLIGHT BLACKBOX</h3>
             </div>
             <button onclick="closeFloatingWindow('telemetry')" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
@@ -3060,7 +3094,6 @@
         <!-- Drag Handle Header -->
         <div class="modal-header floating-win-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
                 <h3 class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">BENCHMARK // PERFORMANCE ASSESSMENT</h3>
             </div>
             <button onclick="closeFloatingWindow('perf_assessment')" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
@@ -3131,7 +3164,6 @@
         <!-- Drag Handle Header -->
         <div class="modal-header floating-win-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
                 <h3 class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">OPTIMIZER // FLIGHT ROUTE CORRIDOR</h3>
             </div>
             <button onclick="closeFloatingWindow('route')" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
@@ -3240,7 +3272,6 @@
         <!-- Drag Handle Header -->
         <div class="modal-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
                 <h3 data-i18n="export.title" class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">EXPORT // SCENERY COLLECTION</h3>
             </div>
             <button onclick="closeExportModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
@@ -3309,7 +3340,6 @@
         <!-- Drag Handle Header -->
         <div class="modal-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2 min-w-0">
-                <span class="w-2 h-2 rounded-full bg-purple-400 shrink-0"></span>
                 <h3 data-i18n="stores.title" class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase truncate">STORES // PAYWARE SCENERY SEARCH</h3>
             </div>
             <button onclick="closePaywareStoresModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors shrink-0">
@@ -3343,7 +3373,6 @@
         <!-- Drag Handle Header -->
         <div class="modal-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-amber-400"></span>
                 <h3 class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">SYSTEM WARNING // AUTOFPS CONFLICT DETECTED</h3>
             </div>
             <button onclick="closeSmartLodConflictModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
@@ -3392,7 +3421,6 @@
         <!-- Drag Handle Header -->
         <div class="modal-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2">
-                <span id="custom-modal-dot" class="w-2 h-2 rounded-full bg-cyan-400"></span>
                 <h3 id="custom-modal-title" class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">SYSTEM ALERT // NOTIFICATION</h3>
             </div>
             <button onclick="cancelCustomModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center rounded-md text-slate-400 hover:text-red-400 hover:bg-red-500/10 transition-colors">
@@ -3435,7 +3463,6 @@
         <!-- Drag Handle Header -->
         <div class="modal-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
                 <h3 data-i18n="disclaimer.title" class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">LEGAL // TERMS OF USE &amp; DISCLAIMER</h3>
             </div>
             <div class="w-7 h-7"></div>
@@ -3481,7 +3508,6 @@
         <!-- Drag Handle Header -->
         <div class="modal-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none shrink-0">
             <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
                 <h3 id="unified-modal-title" class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">CONFIGURATION // GRAPHICS PROFILE OPTIMIZED</h3>
             </div>
             <div class="flex items-center gap-1">
@@ -3579,7 +3605,6 @@
         <!-- Drag Handle Header -->
         <div class="modal-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none shrink-0">
             <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
                 <h3 id="cadence-modal-title" class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">CALIBRATION // DISPLAY REFRESH CADENCE</h3>
             </div>
             <div class="flex items-center gap-1">
@@ -3653,7 +3678,6 @@
         <!-- Drag Handle Header -->
         <div class="modal-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none shrink-0 gap-3">
             <div class="flex items-center gap-2 min-w-0 flex-1">
-                <span class="w-2 h-2 rounded-full bg-cyan-400 shrink-0"></span>
                 <span class="typo-window-header text-slate-400 text-xs font-semibold tracking-wide uppercase shrink-0">DOCUMENTATION //</span>
                 <span id="opt-info-title" class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase truncate">SETTING NAME</span>
                 <span id="opt-info-shared" class="hidden px-2 py-0.5 rounded typo-action-btn text-[10px] font-semibold bg-slate-700 text-slate-300 uppercase">SHARED</span>

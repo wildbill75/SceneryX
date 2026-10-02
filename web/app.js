@@ -3350,45 +3350,9 @@ function handleGsxAuditSearch(event) {
 window.handleGsxAuditSearch = handleGsxAuditSearch;
 
 function initDraggableGsxAuditModal() {
-    const header = document.getElementById('gsx-audit-modal-header');
-    const modalBox = document.querySelector('#gsx-audit-modal .glass-modal');
-    if (!header || !modalBox || header._dragInit) return;
-    header._dragInit = true;
-
-    header.addEventListener('mousedown', (e) => {
-        if (e.target.closest('button') || e.target.closest('input')) return;
-        e.preventDefault();
-        e.stopPropagation();
-
-        isGsxAuditModalDragging = true;
-        gsxAuditDragStart = { x: e.clientX, y: e.clientY };
-
-        const onMouseMove = (moveEvent) => {
-            if (!isGsxAuditModalDragging) return;
-            moveEvent.preventDefault();
-            moveEvent.stopPropagation();
-
-            const dx = moveEvent.clientX - gsxAuditDragStart.x;
-            const dy = moveEvent.clientY - gsxAuditDragStart.y;
-            gsxAuditDragStart = { x: moveEvent.clientX, y: moveEvent.clientY };
-
-            gsxAuditModalOffset.x += dx;
-            gsxAuditModalOffset.y += dy;
-
-            modalBox.style.transform = `translate(${gsxAuditModalOffset.x}px, ${gsxAuditModalOffset.y}px)`;
-        };
-
-        const onMouseUp = () => {
-            if (isGsxAuditModalDragging) {
-                isGsxAuditModalDragging = false;
-                window.removeEventListener('mousemove', onMouseMove, true);
-                window.removeEventListener('mouseup', onMouseUp, true);
-            }
-        };
-
-        window.addEventListener('mousemove', onMouseMove, true);
-        window.addEventListener('mouseup', onMouseUp, true);
-    });
+    const modal = document.getElementById('gsx-audit-modal');
+    if (!modal) return;
+    if (window.windowManager) window.windowManager.register(modal);
 }
 
 function renderGsxAuditModal() {
@@ -5760,16 +5724,17 @@ function closeAirportRadialMenu(keepModals = false) {
     const extEl = document.getElementById('radial-sceneries-extension');
     if (extEl) {
         extEl.classList.add('hidden');
-        extEl.innerHTML = '';
+        extEl._hasBeenDragged = false;
+        const bodyEl = document.getElementById('radial-sceneries-extension-body');
+        if (bodyEl) bodyEl.innerHTML = '';
     }
     if (!keepModals) {
         const airlinesModal = document.getElementById('radial-airlines-modal');
         if (airlinesModal) {
             airlinesModal.classList.add('hidden');
             airlinesModal.classList.remove('user-dragged', 'is-inverted');
-            airlinesModal.style.transform = 'translateX(-50%)';
-            airlinesModal.style.top = '545px';
-            airlinesModal.style.bottom = 'auto';
+            airlinesModal.style.transform = 'none';
+            airlinesModal._hasBeenDragged = false;
         }
         hasUserDraggedAirlinesModal = false;
         airlinesModalUserOffset = { x: 0, y: 0 };
@@ -5790,7 +5755,8 @@ function closeAirportRadialMenu(keepModals = false) {
             detailsModal.classList.add('hidden');
             detailsModal.classList.remove('user-dragged');
             detailsModal.dataset.icao = '';
-            detailsModal.style.transform = 'translateX(-50%)';
+            detailsModal.style.transform = 'none';
+            detailsModal._hasBeenDragged = false;
         }
         hasUserDraggedDetailsModal = false;
         detailsModalUserOffset = { x: 0, y: 0 };
@@ -5893,29 +5859,32 @@ function updateRadialMenuPosition(force = false) {
 
     radialEl.style.transform = `translate(-50%, -50%) scale(${scale.toFixed(3)})`;
 
-    // Smart screen boundary check (horizontal & vertical) for Sceneries Extension pills
+    // Position Scenery Extension Modal in viewport coordinates (if not dragged by user)
     const extEl = document.getElementById('radial-sceneries-extension');
     if (extEl && !extEl.classList.contains('hidden')) {
-        const extWidth = extEl.offsetWidth || 380;
-        const mapW = (map && typeof map.getSize === 'function') ? map.getSize().x : window.innerWidth;
-        const isNearRightEdge = (point.x + (270 + extWidth) * scale > mapW - 16);
-        if (isNearRightEdge) {
-            extEl.style.left = 'auto';
-            extEl.style.right = '542px';
-        } else {
-            extEl.style.left = '542px';
-            extEl.style.right = 'auto';
-        }
+        if (!extEl._hasBeenDragged) {
+            const mapContainer = (typeof map.getContainer === 'function') ? map.getContainer() : null;
+            const mapRect = mapContainer ? mapContainer.getBoundingClientRect() : { left: 0, top: 0 };
+            const screenX = mapRect.left + point.x;
+            const screenY = mapRect.top + point.y;
+            const extWidth = extEl.offsetWidth || 490;
+            const extHeight = extEl.offsetHeight || 420;
 
-        // Smart vertical clamping: prevents any pills from bleeding off the top or bottom of the screen
-        const mapH = (map && typeof map.getSize === 'function') ? map.getSize().y : window.innerHeight;
-        const extHeight = extEl.offsetHeight || 380;
-        const idealTop = point.y - (extHeight / 2) * scale;
-        const minTop = 16;
-        const maxTop = Math.max(minTop, mapH - (extHeight * scale) - 16);
-        const clampedTop = Math.max(minTop, Math.min(maxTop, idealTop));
-        const dy = (clampedTop - idealTop) / (scale || 1.0);
-        extEl.style.transform = `translateY(calc(-50% + ${Math.round(dy)}px))`;
+            let idealLeft = screenX + (270 * scale) + 16;
+            if (idealLeft + extWidth > window.innerWidth - 16) {
+                idealLeft = screenX - (270 * scale) - extWidth - 16;
+            }
+            idealLeft = Math.max(16, Math.min(window.innerWidth - extWidth - 16, idealLeft));
+
+            let idealTop = screenY - (extHeight / 2);
+            idealTop = Math.max(50, Math.min(window.innerHeight - extHeight - 16, idealTop));
+
+            extEl.style.left = `${Math.round(idealLeft)}px`;
+            extEl.style.top = `${Math.round(idealTop)}px`;
+            extEl.style.right = 'auto';
+            extEl.style.bottom = 'auto';
+            extEl.style.transform = 'none';
+        }
     }
 
     // Operating Airlines Modal (Anchored directly under airport, independent of radial scale)
@@ -5927,14 +5896,13 @@ function updateRadialAirlinesModalPosition(force = false) {
     const modal = document.getElementById('radial-airlines-modal');
     if (!modal || (!force && modal.classList.contains('hidden'))) return;
 
-    if (!hasUserDraggedAirlinesModal) {
+    if (!modal._hasBeenDragged && !hasUserDraggedAirlinesModal) {
         modal.style.left = '20px';
         modal.style.top = '16px';
         modal.style.bottom = '16px';
+        modal.style.right = 'auto';
         modal.style.height = 'calc(100% - 32px)';
         modal.style.transform = 'none';
-    } else {
-        modal.style.transform = `translate(${airlinesModalUserOffset.x}px, ${airlinesModalUserOffset.y}px)`;
     }
 }
 
@@ -5943,30 +5911,37 @@ function updateRadialDetailsModalPosition(force = false) {
     if (!modal || (!force && modal.classList.contains('hidden'))) return;
     if (!currentRadialAirport || !map) return;
 
+    // If user has dragged this modal manually, do not overwrite its position
+    if (modal._hasBeenDragged || hasUserDraggedDetailsModal) return;
+
     const latLng = getWrappedAirportLatLng(currentRadialAirport);
     if (!latLng) return;
     const point = (typeof map.latLngToContainerPoint === 'function') ? map.latLngToContainerPoint(latLng) : null;
     if (!point) return;
 
-    const mapSize = (typeof map.getSize === 'function') ? map.getSize() : null;
-    const containerW = mapSize ? mapSize.x : (modal.offsetParent ? modal.offsetParent.offsetWidth : window.innerWidth);
-    const modalWidth = modal.offsetWidth || 940;
-    const halfWidth = modalWidth / 2;
-    const minLeft = halfWidth + 12;
-    const maxLeft = Math.max(minLeft, containerW - halfWidth - 12);
-    const clampedX = Math.max(minLeft, Math.min(maxLeft, Math.round(point.x)));
-    modal.style.left = `${clampedX}px`;
+    const mapContainer = (typeof map.getContainer === 'function') ? map.getContainer() : null;
+    const mapRect = mapContainer ? mapContainer.getBoundingClientRect() : { left: 0, top: 0 };
+    const screenX = mapRect.left + point.x;
+    const screenY = mapRect.top + point.y;
 
-    if (!hasUserDraggedDetailsModal) {
-        const currentZoom = (typeof map.getZoom === 'function') ? map.getZoom() : 8;
-        const scale = Math.max(0.65, Math.min(1.05, currentZoom / 8.0));
-        // South edge of the 540px radial wheel is point.y + 270 * scale
-        const desiredTop = Math.round(point.y) + Math.round(270 * scale) + 12;
-        modal.style.top = `${desiredTop}px`;
-        modal.style.transform = 'translateX(-50%)';
-    } else {
-        modal.style.transform = `translate(calc(-50% + ${detailsModalUserOffset.x}px), ${detailsModalUserOffset.y}px)`;
+    const modalWidth = modal.offsetWidth || 940;
+    const modalHeight = modal.offsetHeight || 640;
+    const currentZoom = (typeof map.getZoom === 'function') ? map.getZoom() : 8;
+    const scale = Math.max(0.65, Math.min(1.05, currentZoom / 8.0));
+
+    let desiredLeft = Math.round(screenX - modalWidth / 2);
+    desiredLeft = Math.max(16, Math.min(window.innerWidth - modalWidth - 16, desiredLeft));
+
+    let desiredTop = Math.round(screenY + (270 * scale) + 12);
+    if (desiredTop + modalHeight > window.innerHeight - 16) {
+        desiredTop = Math.max(50, window.innerHeight - modalHeight - 16);
     }
+
+    modal.style.left = `${desiredLeft}px`;
+    modal.style.top = `${desiredTop}px`;
+    modal.style.right = 'auto';
+    modal.style.bottom = 'auto';
+    modal.style.transform = 'none';
 }
 
 function panMapToAirport(ap, forcedZoom = null) {
@@ -6377,6 +6352,7 @@ function closeRadialAirlinesModal(event) {
         modal.classList.add('hidden');
         modal.classList.remove('user-dragged');
         modal.style.transform = 'none';
+        modal._hasBeenDragged = false;
     }
     hasUserDraggedAirlinesModal = false;
     airlinesModalUserOffset = { x: 0, y: 0 };
@@ -6410,49 +6386,8 @@ function closeRadialAirlinesModal(event) {
 
 function initDraggableAirlinesModal() {
     const modal = document.getElementById('radial-airlines-modal');
-    const header = document.getElementById('radial-airlines-modal-header');
-    if (!modal || !header || header._dragInitialized) return;
-
-    header._dragInitialized = true;
-
-    header.addEventListener('mousedown', (e) => {
-        if (e.target.closest('button')) return;
-        e.preventDefault();
-        e.stopPropagation();
-
-        isAirlinesModalDragging = true;
-        airlinesModalDragStart = { x: e.clientX, y: e.clientY };
-        modal.style.transition = 'none';
-
-        const onMouseMove = (moveEvent) => {
-            if (!isAirlinesModalDragging) return;
-            moveEvent.preventDefault();
-            moveEvent.stopPropagation();
-
-            const dx = moveEvent.clientX - airlinesModalDragStart.x;
-            const dy = moveEvent.clientY - airlinesModalDragStart.y;
-            airlinesModalDragStart = { x: moveEvent.clientX, y: moveEvent.clientY };
-
-            airlinesModalUserOffset.x += dx;
-            airlinesModalUserOffset.y += dy;
-            hasUserDraggedAirlinesModal = true;
-
-            modal.classList.add('user-dragged');
-            modal.style.transform = `translate(${airlinesModalUserOffset.x}px, ${airlinesModalUserOffset.y}px)`;
-        };
-
-        const onMouseUp = (upEvent) => {
-            if (isAirlinesModalDragging) {
-                isAirlinesModalDragging = false;
-                modal.style.transition = '';
-                window.removeEventListener('mousemove', onMouseMove, true);
-                window.removeEventListener('mouseup', onMouseUp, true);
-            }
-        };
-
-        window.addEventListener('mousemove', onMouseMove, true);
-        window.addEventListener('mouseup', onMouseUp, true);
-    });
+    if (!modal) return;
+    if (window.windowManager) window.windowManager.register(modal);
 }
 
 function restoreRadialQuadrants() {
@@ -7077,7 +7012,9 @@ function triggerRadialScenerySelector() {
         setTimeout(() => {
             extEl.classList.add('hidden');
             extEl.style.opacity = '';
-            extEl.innerHTML = '';
+            extEl._hasBeenDragged = false;
+            const bodyEl = document.getElementById('radial-sceneries-extension-body');
+            if (bodyEl) bodyEl.innerHTML = '';
             stagedRadialScenerySelection = null;
         }, 160);
     } else {
@@ -7134,13 +7071,6 @@ function renderRadialSceneriesExtension(ap, animate = false) {
 
     let html = '';
     let pillIndex = 0;
-
-    // Header: Available Addon Variants
-    html += `
-        <div class="flex items-center gap-2 pt-1 px-1">
-            <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">${t('drawer.addon_variants', 'Available Addon Variants')}</span>
-        </div>
-    `;
 
     // 1. Installed Base Scenery Addons
     baseSources.forEach(src => {
@@ -7366,7 +7296,9 @@ function renderRadialSceneriesExtension(ap, animate = false) {
         </div>
     `;
 
-    extEl.innerHTML = html;
+    const bodyEl = document.getElementById('radial-sceneries-extension-body') || extEl;
+    bodyEl.innerHTML = html;
+    if (window.windowManager) window.windowManager.register(extEl);
 
     // Populate or query available store downloads
     if (radialStoreCache[ap.icao]) {
@@ -7810,7 +7742,8 @@ function closeRadialDetailsModal(event, keepRadial = false) {
         modal.classList.add('hidden');
         modal.classList.remove('user-dragged');
         modal.dataset.icao = '';
-        modal.style.transform = 'translateX(-50%)';
+        modal.style.transform = 'none';
+        modal._hasBeenDragged = false;
     }
     hasUserDraggedDetailsModal = false;
     detailsModalUserOffset = { x: 0, y: 0 };
@@ -7835,49 +7768,8 @@ function closeRadialDetailsModal(event, keepRadial = false) {
 
 function initDraggableDetailsModal() {
     const modal = document.getElementById('radial-details-modal');
-    const header = document.getElementById('radial-details-modal-header');
-    if (!modal || !header || header._dragInitialized) return;
-
-    header._dragInitialized = true;
-
-    header.addEventListener('mousedown', (e) => {
-        if (e.target.closest('button')) return;
-        e.preventDefault();
-        e.stopPropagation();
-
-        isDetailsModalDragging = true;
-        detailsModalDragStart = { x: e.clientX, y: e.clientY };
-        modal.style.transition = 'none';
-
-        const onMouseMove = (moveEvent) => {
-            if (!isDetailsModalDragging) return;
-            moveEvent.preventDefault();
-            moveEvent.stopPropagation();
-
-            const dx = moveEvent.clientX - detailsModalDragStart.x;
-            const dy = moveEvent.clientY - detailsModalDragStart.y;
-            detailsModalDragStart = { x: moveEvent.clientX, y: moveEvent.clientY };
-
-            detailsModalUserOffset.x += dx;
-            detailsModalUserOffset.y += dy;
-            hasUserDraggedDetailsModal = true;
-
-            modal.classList.add('user-dragged');
-            modal.style.transform = `translate(calc(-50% + ${detailsModalUserOffset.x}px), ${detailsModalUserOffset.y}px)`;
-        };
-
-        const onMouseUp = (upEvent) => {
-            if (isDetailsModalDragging) {
-                isDetailsModalDragging = false;
-                modal.style.transition = '';
-                window.removeEventListener('mousemove', onMouseMove, true);
-                window.removeEventListener('mouseup', onMouseUp, true);
-            }
-        };
-
-        window.addEventListener('mousemove', onMouseMove, true);
-        window.addEventListener('mouseup', onMouseUp, true);
-    });
+    if (!modal) return;
+    if (window.windowManager) window.windowManager.register(modal);
 }
 
 function formatAirportCategoryDisplay(ap) {
@@ -7919,8 +7811,7 @@ function renderRadialAirportDetails(ap) {
 
     const titleEl = document.getElementById('radial-details-modal-title');
     if (titleEl) {
-        const idCode = ap.iata ? `${ap.icao} / ${ap.iata}` : ap.icao;
-        titleEl.textContent = `AIRPORT INSPECTOR // ${idCode}`;
+        titleEl.textContent = (typeof t === 'function' && t('radial.details')) ? t('radial.details') : 'AIRPORT INSPECTOR // DETAILS';
     }
 
     // Trigger seamless background GSX status check
@@ -16098,7 +15989,7 @@ class WindowManager {
             modalEl.style.transform = 'none';
         } else {
             // Check if element has an inline position or is a radial-anchored modal
-            const isRadial = modalEl.id === 'radial-details-modal' || modalEl.id === 'radial-airlines-modal';
+            const isRadial = modalEl.id === 'radial-details-modal' || modalEl.id === 'radial-airlines-modal' || modalEl.id === 'radial-sceneries-extension';
             const hasExplicitPos = modalEl._hasBeenDragged || (modalEl.style.left && modalEl.style.left !== 'auto' && modalEl.style.left !== '50%');
             if (!isRadial && !hasExplicitPos) {
                 this.centerModal(modalEl);
@@ -16115,6 +16006,8 @@ class WindowManager {
         const top = Math.max(16, Math.floor((window.innerHeight - h) / 2));
         modalEl.style.left = `${left}px`;
         modalEl.style.top = `${top}px`;
+        modalEl.style.right = 'auto';
+        modalEl.style.bottom = 'auto';
         modalEl.style.transform = 'none';
     }
 
@@ -16140,6 +16033,10 @@ class WindowManager {
                 origLeft: rect.left,
                 origTop: rect.top
             };
+            modalEl.style.left = `${rect.left}px`;
+            modalEl.style.top = `${rect.top}px`;
+            modalEl.style.right = 'auto';
+            modalEl.style.bottom = 'auto';
             modalEl.style.transform = 'none';
             modalEl._hasBeenDragged = true;
             if (typeof closeAllProfileDropdowns === 'function') closeAllProfileDropdowns();
