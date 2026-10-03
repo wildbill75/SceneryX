@@ -16412,7 +16412,9 @@ function openFloatingWindow(winKey, targetAp = null) {
         else if (typeof renderMsfsSettingsMatrix === 'function') renderMsfsSettingsMatrix();
         if (typeof fetchAndRenderCustomProfiles === 'function') fetchAndRenderCustomProfiles(true);
     } else if (winKey === 'smart_lod') {
-        if (typeof fetchSmartLodStatus === 'function') fetchSmartLodStatus();
+        if (typeof refreshSmartLodStatus === 'function') refreshSmartLodStatus();
+        if (typeof fetchAndRenderSmartLodProfiles === 'function') fetchAndRenderSmartLodProfiles(true);
+        if (typeof updatePerformanceCockpitGauges === 'function') updatePerformanceCockpitGauges();
     } else if (winKey === 'telemetry' || winKey === 'blackbox') {
         startBlackboxTelemetryPolling();
         refreshBenchmarksList();
@@ -16428,6 +16430,7 @@ function openFloatingWindow(winKey, targetAp = null) {
 
 function closeFloatingWindow(winKey) {
     if (typeof closeAllProfileDropdowns === 'function') closeAllProfileDropdowns();
+    if (typeof closeAllSmartLodProfileDropdowns === 'function') closeAllSmartLodProfileDropdowns();
     const elId = FLOATING_WINDOW_MAP[winKey] || winKey;
     const winEl = document.getElementById(elId);
     if (winEl) {
@@ -16436,6 +16439,9 @@ function closeFloatingWindow(winKey) {
     }
     if (typeof updateFlightOptimizerRadialSectors === 'function') {
         updateFlightOptimizerRadialSectors();
+    }
+    if (winKey === 'smart_lod' && typeof updatePerformanceCockpitGauges === 'function') {
+        updatePerformanceCockpitGauges();
     }
 }
 
@@ -17290,6 +17296,9 @@ async function loadRigDiagnostics() {
             refreshSmartLodStatus();
         }
         await fetchAndRenderCustomProfiles();
+        if (typeof fetchAndRenderSmartLodProfiles === 'function') {
+            await fetchAndRenderSmartLodProfiles();
+        }
 
         // Check hardware display cadence (2D screen Hz and VR headset Hz)
         await checkAndPromptCadenceCalibration(det, data);
@@ -17760,21 +17769,26 @@ document.addEventListener('click', (e) => {
     if (!e.target.closest('#opt-profile-universal-combobox') && !e.target.closest('#opt-profile-dropdown-list')) {
         closeAllProfileDropdowns();
     }
+    if (!e.target.closest('#smart-lod-profile-universal-combobox') && !e.target.closest('#smart-lod-profile-dropdown-list')) {
+        if (typeof closeAllSmartLodProfileDropdowns === 'function') closeAllSmartLodProfileDropdowns();
+    }
 });
 
 // Close floating dropdown on scroll or resize outside
 window.addEventListener('scroll', (e) => {
     if (e && e.target && e.target.closest) {
-        if (e.target.closest('[id^="opt-combo-menu-"]') || e.target.closest('[id^="opt-custom-menu-"]') || e.target.closest('#opt-profile-dropdown-list')) {
+        if (e.target.closest('[id^="opt-combo-menu-"]') || e.target.closest('[id^="opt-custom-menu-"]') || e.target.closest('#opt-profile-dropdown-list') || e.target.closest('#smart-lod-profile-dropdown-list')) {
             return; // Allow smooth mouse wheel and scrollbar scrolling inside the dropdown itself!
         }
     }
     if (typeof closeAllProfileDropdowns === 'function') closeAllProfileDropdowns();
+    if (typeof closeAllSmartLodProfileDropdowns === 'function') closeAllSmartLodProfileDropdowns();
     if (typeof closeAllComboboxes === 'function') closeAllComboboxes();
     if (typeof closeAllCustomSelects === 'function') closeAllCustomSelects();
 }, true);
 window.addEventListener('resize', () => {
     if (typeof closeAllProfileDropdowns === 'function') closeAllProfileDropdowns();
+    if (typeof closeAllSmartLodProfileDropdowns === 'function') closeAllSmartLodProfileDropdowns();
     if (typeof closeAllComboboxes === 'function') closeAllComboboxes();
     if (typeof closeAllCustomSelects === 'function') closeAllCustomSelects();
 });
@@ -17837,6 +17851,21 @@ function updatePerformanceCockpitGauges() {
     const vramTotal = parseFloat(msfsSettingsMatrixData.vram_total_gb) 
         || parseFloat(rigDiagnosticsData && rigDiagnosticsData.detected && rigDiagnosticsData.detected.gpu && rigDiagnosticsData.detected.gpu.vram_total_gb) 
         || 16.0;
+
+    // --- Dynamic Coupling with Smart LOD Engine ---
+    const smartLodModal = document.getElementById('float-win-smart-lod');
+    const isSmartLodOpen = smartLodModal && !smartLodModal.classList.contains('hidden');
+    const isSmartLodEffective = window.smartLodActive || isSmartLodOpen;
+
+    const slGroundEl = document.getElementById('smart-lod-slider-ground-tlod');
+    const slCruiseEl = document.getElementById('smart-lod-slider-cruise-tlod');
+    const slTargetFpsEl = document.getElementById('smart-lod-input-fps');
+
+    const smartLodGround = slGroundEl ? parseInt(slGroundEl.value, 10) : 100;
+    const smartLodCruise = slCruiseEl ? parseInt(slCruiseEl.value, 10) : 250;
+    const smartLodFps = slTargetFpsEl ? parseInt(slTargetFpsEl.value, 10) : 40;
+    // Dynamic weighted effective TLOD (Ground approach setpoint 65% + Cruise setpoint 35%)
+    const smartLodEffectiveTlod = Math.round(smartLodGround * 0.65 + smartLodCruise * 0.35);
 
     if (mode === 'mainthread') {
         // --- 1. SHARED (Traffic & Airport Ground Simulation) ---
@@ -17921,6 +17950,7 @@ function updatePerformanceCockpitGauges() {
         const sharedCpuImpact2D = Math.round(loadShared * 0.22);
         let load2D = 6 + sharedCpuImpact2D;
         const tlod2D = getItemNum(list2D, ['tlod', 'TerrainLoD'], 100);
+        const effectiveTlod2D = isSmartLodEffective ? smartLodEffectiveTlod : tlod2D;
         const olod2D = getItemNum(list2D, ['olod', 'ObjectsLoD'], 100);
         const glass2D = getItemVal(list2D, ['glass_cockpits', 'GlassCockpitsRefreshRate'], 'MEDIUM');
         const bld2D = getItemVal(list2D, ['buildings', 'Buildings'], 'HIGH');
@@ -17939,12 +17969,12 @@ function updatePerformanceCockpitGauges() {
         const fpsCap2D = parseFloat(fps2DVal);
         const isFpsOff2D = fps2DVal.includes('OFF') || isNaN(fpsCap2D) || fpsCap2D <= 0;
 
-        if (tlod2D <= 60) load2D += 4;
-        else if (tlod2D <= 100) load2D += 10;
-        else if (tlod2D <= 150) load2D += 18;
-        else if (tlod2D <= 200) load2D += 28;
-        else if (tlod2D <= 300) load2D += 40;
-        else load2D += 55;
+        if (effectiveTlod2D <= 60) load2D += 4;
+        else if (effectiveTlod2D <= 100) load2D += 10;
+        else if (effectiveTlod2D <= 150) load2D += 18;
+        else if (effectiveTlod2D <= 200) load2D += 28;
+        else if (effectiveTlod2D <= 300) load2D += 42;
+        else load2D += 58;
 
         if (olod2D <= 80) load2D += 3;
         else if (olod2D <= 120) load2D += 6;
@@ -18023,7 +18053,16 @@ function updatePerformanceCockpitGauges() {
             load2D += 14; // 144+ FPS extreme CPU dispatch pressure
         }
 
-        if (window.smartLodActive || (msfsSettingsMatrixData && msfsSettingsMatrixData.autofps_active)) {
+        if (isSmartLodEffective) {
+            if (smartLodFps <= 32) load2D -= 14;
+            else if (smartLodFps <= 45) load2D -= 8;
+            else if (smartLodFps <= 60) load2D += 2;
+            else if (smartLodFps <= 90) load2D += 8;
+            else load2D += 15;
+            if (window.smartLodActive) {
+                load2D = Math.max(14, load2D - 4); // Active closed-loop governor reduction
+            }
+        } else if (window.smartLodActive || (msfsSettingsMatrixData && msfsSettingsMatrixData.autofps_active)) {
             load2D = Math.max(14, load2D - 12);
         }
 
@@ -18033,19 +18072,21 @@ function updatePerformanceCockpitGauges() {
         let fgDesc = (isFgActive2D && fg2D.includes('DLSSG')) ? 'DLSS 3 FG (2X)' : ((isFgActive2D && fg2D.includes('FSR3')) ? 'FSR 3 FG (2X)' : 'Native (FG OFF)');
         let badge2D = 'OPTIMUM';
         let color2D = 'emerald';
-        let desc2D = `${fgDesc} • ${fpsTag} • TLOD ${tlod2D}`;
+        let desc2D = isSmartLodEffective 
+            ? `Smart LOD (G:${smartLodGround} / C:${smartLodCruise} • ${smartLodFps} FPS)` 
+            : `${fgDesc} • ${fpsTag} • TLOD ${tlod2D}`;
         if (load2D > 78) {
             badge2D = 'HAZARD';
             color2D = 'rose';
-            desc2D = `Heavy draw calls • ${fpsTag}`;
+            desc2D = isSmartLodEffective ? `Heavy draw calls (TLOD ${smartLodEffectiveTlod} • ${smartLodFps} FPS)` : `Heavy draw calls • ${fpsTag}`;
         } else if (load2D >= 55) {
             badge2D = 'BALANCED';
             color2D = 'amber';
-            desc2D = `Controlled workload • ${fpsTag}`;
+            desc2D = isSmartLodEffective ? `Controlled workload (TLOD ${smartLodEffectiveTlod} • ${smartLodFps} FPS)` : `Controlled workload • ${fpsTag}`;
         } else if (load2D >= 25 && load2D <= 52) {
             badge2D = 'SWEET SPOT';
             color2D = 'emerald';
-            desc2D = `${fgDesc} • ${fpsTag} • TLOD ${tlod2D} • Sweet Spot Pacing`;
+            desc2D = isSmartLodEffective ? `Smart LOD Sweet Spot (G:${smartLodGround}/C:${smartLodCruise})` : `${fgDesc} • ${fpsTag} • TLOD ${tlod2D} • Sweet Spot Pacing`;
         }
 
         updatePerfCard('2d', 'MainThread Load', `${load2D}% (${(badge2D === 'SWEET SPOT' || badge2D === 'OPTIMUM') ? 'Smooth' : (badge2D === 'BALANCED' ? 'Moderate' : 'Heavy')})`, load2D, color2D, badge2D, desc2D);
@@ -18055,6 +18096,7 @@ function updatePerformanceCockpitGauges() {
         const sharedCpuImpactVR = Math.round(loadShared * 0.20);
         let loadVR = 6 + sharedCpuImpactVR;
         const tlodVR = getItemNum(listVR, ['tlod', 'TerrainLoD'], 100);
+        const effectiveTlodVR = isSmartLodEffective ? smartLodEffectiveTlod : tlodVR;
         const olodVR = getItemNum(listVR, ['olod', 'ObjectsLoD'], 100);
         const glassVR = getItemVal(listVR, ['glass_cockpits', 'GlassCockpitsRefreshRate'], 'MEDIUM');
         const bldVR = getItemVal(listVR, ['buildings', 'Buildings'], 'MEDIUM');
@@ -18070,11 +18112,12 @@ function updatePerformanceCockpitGauges() {
         const fpsCapVR = parseFloat(fpsVRVal);
         const isFpsOffVR = fpsVRVal.includes('OFF') || isNaN(fpsCapVR) || fpsCapVR <= 0;
 
-        if (tlodVR <= 60) loadVR += 4;
-        else if (tlodVR <= 100) loadVR += 10;
-        else if (tlodVR <= 140) loadVR += 22;
-        else if (tlodVR <= 180) loadVR += 36;
-        else loadVR += 54;
+        if (effectiveTlodVR <= 60) loadVR += 4;
+        else if (effectiveTlodVR <= 100) loadVR += 10;
+        else if (effectiveTlodVR <= 140) loadVR += 22;
+        else if (effectiveTlodVR <= 180) loadVR += 36;
+        else if (effectiveTlodVR <= 250) loadVR += 48;
+        else loadVR += 64;
 
         if (olodVR <= 80) loadVR += 3;
         else if (olodVR <= 120) loadVR += 7;
@@ -18148,7 +18191,15 @@ function updatePerformanceCockpitGauges() {
             loadVR += 14; // 90+ FPS stereo without reprojection
         }
 
-        if (window.smartLodActive || (msfsSettingsMatrixData && msfsSettingsMatrixData.autofps_active)) {
+        if (isSmartLodEffective) {
+            if (smartLodFps <= 36) loadVR -= 12;
+            else if (smartLodFps <= 45) loadVR -= 6;
+            else if (smartLodFps <= 60) loadVR += 4;
+            else loadVR += 14;
+            if (window.smartLodActive) {
+                loadVR = Math.max(14, loadVR - 4);
+            }
+        } else if (window.smartLodActive || (msfsSettingsMatrixData && msfsSettingsMatrixData.autofps_active)) {
             loadVR = Math.max(14, loadVR - 10);
         }
 
@@ -18158,19 +18209,21 @@ function updatePerformanceCockpitGauges() {
         let reprojDesc = reprojVR.includes('OFF') ? 'Native (Reproj OFF)' : (reprojVR.includes('AUTO') ? 'Auto Reprojection' : (reprojVR.includes('1/2') ? '1/2 Reprojection' : reprojVR));
         let badgeVR = 'OPTIMUM';
         let colorVR = 'emerald';
-        let descVR = `Stereo sync (${reprojDesc} • ${fpsVRTag}) • TLOD ${tlodVR}`;
+        let descVR = isSmartLodEffective
+            ? `Smart LOD Stereo (G:${smartLodGround} / C:${smartLodCruise} • ${smartLodFps} FPS)`
+            : `Stereo sync (${reprojDesc} • ${fpsVRTag}) • TLOD ${tlodVR}`;
         if (loadVR > 78) {
             badgeVR = 'HAZARD';
             colorVR = 'rose';
-            descVR = `Judder risk • ${fpsVRTag}`;
+            descVR = isSmartLodEffective ? `Judder risk (TLOD ${smartLodEffectiveTlod} • ${smartLodFps} FPS)` : `Judder risk • ${fpsVRTag}`;
         } else if (loadVR >= 55) {
             badgeVR = 'BALANCED';
             colorVR = 'amber';
-            descVR = `Tight stereo cadence • ${fpsVRTag}`;
+            descVR = isSmartLodEffective ? `Tight stereo cadence (TLOD ${smartLodEffectiveTlod})` : `Tight stereo cadence • ${fpsVRTag}`;
         } else if (loadVR >= 24 && loadVR <= 52) {
             badgeVR = 'SWEET SPOT';
             colorVR = 'emerald';
-            descVR = `Stereo sync (${reprojDesc} • ${fpsVRTag}) • TLOD ${tlodVR} • Sweet Spot Pacing`;
+            descVR = isSmartLodEffective ? `Smart LOD VR Sweet Spot (G:${smartLodGround}/C:${smartLodCruise})` : `Stereo sync (${reprojDesc} • ${fpsVRTag}) • TLOD ${tlodVR} • Sweet Spot Pacing`;
         }
 
         updatePerfCard('vr', 'MainThread Load', `${loadVR}% (${(badgeVR === 'SWEET SPOT' || badgeVR === 'OPTIMUM') ? 'Solid' : (badgeVR === 'BALANCED' ? 'Tight' : 'Judder Risk')})`, loadVR, colorVR, badgeVR, descVR);
@@ -18201,8 +18254,8 @@ function updatePerformanceCockpitGauges() {
         if (!parkQty.includes('OFF')) {
             if (parkQty.includes('LOW')) vramShared += 0.4;
             else if (parkQty.includes('MED')) vramShared += 1.0;
-            else if (parkQty.includes('HIGH')) vramShared += 2.0;
-            else if (parkQty.includes('ULTRA')) vramShared += 3.0;
+            else if (parkQty.includes('HIGH')) vramShared += 2.2;
+            else if (parkQty.includes('ULTRA')) vramShared += 3.6;
 
             if (parkVar.includes('MED')) vramShared += 0.4;
             else if (parkVar.includes('HIGH')) vramShared += 1.0;
@@ -18262,6 +18315,17 @@ function updatePerformanceCockpitGauges() {
         // 2. 2D DISPLAY VRAM
         // Baseline 2D graphics engine & framebuffer + Shared traffic assets VRAM
         let vram2D = 1.8 + vramShared;
+        const tlod2DVal = getItemNum(list2D, ['tlod', 'TerrainLoD'], 100);
+        const effectiveTlod2DVram = isSmartLodEffective ? smartLodEffectiveTlod : tlod2DVal;
+
+        // Dynamic Terrain & photogrammetry mesh geometry allocation in VRAM
+        if (effectiveTlod2DVram <= 60) vram2D += 0.8;
+        else if (effectiveTlod2DVram <= 100) vram2D += 1.6;
+        else if (effectiveTlod2DVram <= 150) vram2D += 2.6;
+        else if (effectiveTlod2DVram <= 200) vram2D += 3.8;
+        else if (effectiveTlod2DVram <= 300) vram2D += 5.2;
+        else vram2D += 6.8;
+
         const tex2D = getItemVal(list2D, ['texture_resolution', 'Texture'], 'MEDIUM');
         if (tex2D.includes('ULTRA')) vram2D += 10.2;
         else if (tex2D.includes('HIGH')) vram2D += 5.8;
@@ -18333,7 +18397,7 @@ function updatePerformanceCockpitGauges() {
         updatePerfCard(
             '2d',
             'Estimated VRAM',
-            `~${vram2D.toFixed(1)} / ${vramTotal.toFixed(0)} GB (${pct2D}%)`,
+            `${vram2D.toFixed(1)} / ${vramTotal.toFixed(0)} GB (${pct2D}%)`,
             pct2D,
             color2D,
             badge2D,
@@ -18343,6 +18407,17 @@ function updatePerformanceCockpitGauges() {
         // 3. VR HEADSET VRAM (Stereo framebuffers & VR assets)
         // Baseline stereo VR framebuffers & compositor + Shared traffic assets VRAM
         let vramVR = 3.6 + vramShared;
+        const tlodVRVal = getItemNum(listVR, ['tlod', 'TerrainLoD'], 100);
+        const effectiveTlodVRVram = isSmartLodEffective ? smartLodEffectiveTlod : tlodVRVal;
+
+        // Stereo terrain & photogrammetry geometry mesh allocation in VRAM
+        if (effectiveTlodVRVram <= 60) vramVR += 1.0;
+        else if (effectiveTlodVRVram <= 100) vramVR += 2.0;
+        else if (effectiveTlodVRVram <= 150) vramVR += 3.2;
+        else if (effectiveTlodVRVram <= 200) vramVR += 4.6;
+        else if (effectiveTlodVRVram <= 300) vramVR += 6.2;
+        else vramVR += 8.0;
+
         const texVR = getItemVal(listVR, ['texture_resolution', 'Texture'], 'LOW');
         if (texVR.includes('ULTRA')) vramVR += 11.8;
         else if (texVR.includes('HIGH')) vramVR += 6.8;
@@ -18406,7 +18481,7 @@ function updatePerformanceCockpitGauges() {
         updatePerfCard(
             'vr',
             'Estimated VR VRAM',
-            `~${vramVR.toFixed(1)} / ${vramTotal.toFixed(0)} GB (${pctVR}%)`,
+            `${vramVR.toFixed(1)} / ${vramTotal.toFixed(0)} GB (${pctVR}%)`,
             pctVR,
             colorVR,
             badgeVR,
@@ -18423,6 +18498,7 @@ function updatePerfCard(section, labelText, valueText, barPct, color, badgeText,
     const subEl = document.getElementById(`opt-perf-sub-${section}`);
     const needleEl = document.getElementById(`opt-perf-needle-${section}`);
     const targetEl = document.getElementById(`opt-perf-target-${section}`);
+    const targetContainerEl = document.getElementById(`opt-perf-target-container-${section}`);
 
     const colorHexMap = {
         'emerald': '#10b981',
@@ -18464,7 +18540,10 @@ function updatePerfCard(section, labelText, valueText, barPct, color, badgeText,
         needleEl.style.left = `${targetPct}%`;
     }
     if (targetEl) {
-        targetEl.textContent = `~${targetPct}%`;
+        targetEl.textContent = `${targetPct}%`;
+    }
+    if (targetContainerEl) {
+        targetContainerEl.style.left = `${targetPct}%`;
     }
 }
 
@@ -20791,6 +20870,90 @@ function updateSmartLodSliderValue(field, val) {
         const el = document.getElementById('smart-lod-val-alt-trans');
         if (el) el.textContent = `${val} ft`;
     }
+    // Dynamic coupling: Live projection to Real-Time Performance Gauges
+    if (typeof updatePerformanceCockpitGauges === 'function') {
+        updatePerformanceCockpitGauges();
+    }
+}
+
+function switchSmartLodTargetMode(mode) {
+    currentSmartLodMode = mode || '2D';
+    const btn2D = document.getElementById('smart-lod-btn-mode-2d');
+    const btnVR = document.getElementById('smart-lod-btn-mode-vr');
+    const ind = document.getElementById('smart-lod-fps-mode-indicator');
+    if (ind) ind.textContent = currentSmartLodMode;
+
+    if (currentSmartLodMode === '2D') {
+        if (btn2D) {
+            btn2D.className = 'px-3 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer bg-cyan-600 text-white shadow-sm';
+        }
+        if (btnVR) {
+            btnVR.className = 'px-3 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer text-slate-400 hover:text-white bg-transparent';
+        }
+    } else {
+        if (btnVR) {
+            btnVR.className = 'px-3 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer bg-cyan-600 text-white shadow-sm';
+        }
+        if (btn2D) {
+            btn2D.className = 'px-3 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer text-slate-400 hover:text-white bg-transparent';
+        }
+    }
+    syncSmartLodTargetFpsFromSettings(false);
+    if (typeof updatePerformanceCockpitGauges === 'function') {
+        updatePerformanceCockpitGauges();
+    }
+}
+
+function adjustSmartLodFps(delta) {
+    const el = document.getElementById('smart-lod-input-fps');
+    if (!el) return;
+    let curr = parseInt(el.value || '40', 10);
+    if (isNaN(curr)) curr = 40;
+    curr = Math.max(20, Math.min(144, curr + delta));
+    el.value = curr;
+    if (typeof updatePerformanceCockpitGauges === 'function') {
+        updatePerformanceCockpitGauges();
+    }
+}
+
+function handleSmartLodFpsInput(val) {
+    const el = document.getElementById('smart-lod-input-fps');
+    if (!el) return;
+    let num = parseInt(val, 10);
+    if (!isNaN(num)) {
+        if (typeof updatePerformanceCockpitGauges === 'function') {
+            updatePerformanceCockpitGauges();
+        }
+    }
+}
+
+function syncSmartLodTargetFpsFromSettings(showNotification = true) {
+    let targetVal = 40;
+    if (currentSmartLodMode === 'VR') {
+        const listVR = (msfsSettingsMatrixData && msfsSettingsMatrixData.matrix_vr) || [];
+        const fpsItem = listVR.find(x => x.key === 'max_frame_rate' || x.key === 'TargetFrameRateVR' || x.key === 'FrameLimiterVR');
+        if (fpsItem && !isNaN(parseInt(fpsItem.value || fpsItem.raw_value, 10))) {
+            targetVal = parseInt(fpsItem.value || fpsItem.raw_value, 10);
+        } else {
+            targetVal = 45;
+        }
+    } else {
+        const list2D = (msfsSettingsMatrixData && msfsSettingsMatrixData.matrix_2d) || [];
+        const fpsItem = list2D.find(x => x.key === 'max_frame_rate' || x.key === 'TargetFrameRate' || x.key === 'FrameLimiter');
+        if (fpsItem && !isNaN(parseInt(fpsItem.value || fpsItem.raw_value, 10))) {
+            targetVal = parseInt(fpsItem.value || fpsItem.raw_value, 10);
+        } else {
+            targetVal = 60;
+        }
+    }
+    const el = document.getElementById('smart-lod-input-fps');
+    if (el) el.value = targetVal;
+    if (typeof updatePerformanceCockpitGauges === 'function') {
+        updatePerformanceCockpitGauges();
+    }
+    if (showNotification && typeof showToast === 'function') {
+        showToast(`Target FPS synchronisé depuis les Graphics Settings (${currentSmartLodMode}) : ${targetVal} FPS`, 'info');
+    }
 }
 
 function updateSmartLodUIFromStatus(status) {
@@ -20820,35 +20983,32 @@ function updateSmartLodUIFromStatus(status) {
         }
     }
 
-    // Active Badge
+    // Active Badge - Solid styling without borders
     const activeBadge = document.getElementById('smart-lod-active-badge');
     if (activeBadge) {
         if (window.smartLodActive) {
-            activeBadge.className = 'px-2 py-0.5 rounded typo-action-btn text-[10px] font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 uppercase tracking-[0.02em]';
+            activeBadge.className = 'px-2.5 py-0.5 rounded typo-action-btn text-[11px] font-semibold bg-emerald-600 text-white uppercase tracking-[0.02em] shadow-sm';
             activeBadge.textContent = 'ACTIF';
         } else {
-            activeBadge.className = 'px-2 py-0.5 rounded typo-action-btn text-[10px] font-semibold bg-slate-800 text-slate-400 uppercase tracking-[0.02em]';
+            activeBadge.className = 'px-2.5 py-0.5 rounded typo-action-btn text-[11px] font-semibold bg-slate-700 text-slate-300 uppercase tracking-[0.02em]';
             activeBadge.textContent = 'INACTIF';
         }
     }
 
-    // Toggle button in accordion
-    const toggleDot = document.getElementById('smart-lod-toggle-dot');
+    // Main Toggle Button - Solid color without borders and without inner dot
     const toggleText = document.getElementById('smart-lod-toggle-text');
     const mainToggle = document.getElementById('smart-lod-main-toggle');
-    if (mainToggle && toggleDot && toggleText) {
+    if (mainToggle && toggleText) {
         if (window.smartLodActive) {
-            mainToggle.className = 'px-4 py-1.5 rounded-xl bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-200 typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] transition-all cursor-pointer flex items-center gap-2 border border-emerald-500/50';
-            toggleDot.className = 'w-2 h-2 rounded-full bg-emerald-400';
+            mainToggle.className = 'h-8 px-4 rounded-md bg-rose-600 hover:bg-rose-500 text-white typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] transition-all cursor-pointer inline-flex items-center justify-center leading-none shadow-sm btn-elevate';
             toggleText.textContent = 'DÉSACTIVER';
         } else {
-            mainToggle.className = 'px-4 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] transition-all cursor-pointer flex items-center gap-2 border border-slate-700';
-            toggleDot.className = 'w-2 h-2 rounded-full bg-slate-500';
+            mainToggle.className = 'h-8 px-4 rounded-md bg-cyan-600 hover:bg-cyan-500 text-white typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] transition-all cursor-pointer inline-flex items-center justify-center leading-none shadow-sm btn-elevate';
             toggleText.textContent = 'ACTIVER';
         }
     }
 
-    // Conflict banner in accordion
+    // Conflict banner
     const conflictBanner = document.getElementById('smart-lod-conflict-banner');
     if (conflictBanner) {
         if (status.autofps_conflict) {
@@ -20858,10 +21018,13 @@ function updateSmartLodUIFromStatus(status) {
         }
     }
 
-    // If state changed from inactive to active or vice-versa, re-render matrix
+    // If state changed from inactive to active or vice-versa, re-render matrix and performance gauges
     if (wasActive !== window.smartLodActive) {
         if (typeof renderMsfsSettingsMatrix === 'function') {
             renderMsfsSettingsMatrix();
+        }
+        if (typeof updatePerformanceCockpitGauges === 'function') {
+            updatePerformanceCockpitGauges();
         }
     }
 }
@@ -20925,6 +21088,7 @@ async function toggleSmartLodActive() {
                 await refreshSmartLodStatus();
                 if (typeof showToast === 'function') showToast("Smart LOD désactivé.", "info");
                 if (typeof renderMsfsSettingsMatrix === 'function') renderMsfsSettingsMatrix();
+                if (typeof updatePerformanceCockpitGauges === 'function') updatePerformanceCockpitGauges();
             }
         } else {
             // Activer - sans forcer d'abord pour vérifier si AutoFPS tourne
@@ -20938,6 +21102,7 @@ async function toggleSmartLodActive() {
                 await refreshSmartLodStatus();
                 if (typeof showToast === 'function') showToast("Smart LOD activé (Moteur de régulation dynamique engagé).", "success");
                 if (typeof renderMsfsSettingsMatrix === 'function') renderMsfsSettingsMatrix();
+                if (typeof updatePerformanceCockpitGauges === 'function') updatePerformanceCockpitGauges();
             } else {
                 if (typeof showToast === 'function') showToast(res.error || "Impossible d'activer Smart LOD.", "error");
             }
@@ -20977,6 +21142,7 @@ async function resolveAutoFpsConflict(action) {
                     showToast("Processus AutoFPS arrêté avec succès. Smart LOD est désormais actif !", "success");
                 }
                 if (typeof renderMsfsSettingsMatrix === 'function') renderMsfsSettingsMatrix();
+                if (typeof updatePerformanceCockpitGauges === 'function') updatePerformanceCockpitGauges();
                 if (typeof loadRigDiagnostics === 'function') loadRigDiagnostics();
             } else {
                 if (typeof showToast === 'function') {
@@ -20989,46 +21155,499 @@ async function resolveAutoFpsConflict(action) {
     }
 }
 
-async function saveSmartLodUiConfig() {
-    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.save_smart_lod_config) return;
+// ================= SMART LOD PROFILES MANAGEMENT (SAVE, ACTIVATE, RENAME, MULTI-DELETE) =================
+
+let currentSmartLodProfiles = [];
+let selectedSmartLodProfileId = null;
+let multiSelectedSmartLodProfileIds = new Set();
+let lastClickedSmartLodProfileIndex = -1;
+
+async function fetchAndRenderSmartLodProfiles(silent = false) {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.get_smart_lod_profiles) return;
     try {
-        const isIfr = (currentFlightMissionProfile || 'LINER') === 'LINER';
-        const groundVal = parseInt(document.getElementById('smart-lod-slider-ground-tlod')?.value || '100', 10);
-        const cruiseVal = parseInt(document.getElementById('smart-lod-slider-cruise-tlod')?.value || '250', 10);
-        const transVal = parseInt(document.getElementById('smart-lod-slider-alt-trans')?.value || '5000', 10);
-        const fpsVal = parseInt(document.getElementById('smart-lod-input-fps')?.value || '40', 10);
-        const cloudVal = !!document.getElementById('smart-lod-cloud-recovery')?.checked;
+        const resStr = await window.pywebview.api.get_smart_lod_profiles();
+        const profiles = JSON.parse(resStr);
+        if (Array.isArray(profiles)) {
+            currentSmartLodProfiles = profiles;
+            const activeProfile = profiles.find(p => p.is_active);
+            if (activeProfile && !selectedSmartLodProfileId) {
+                selectedSmartLodProfileId = activeProfile.id;
+            } else if (!selectedSmartLodProfileId && profiles.length > 0) {
+                selectedSmartLodProfileId = profiles[0].id;
+            }
 
-        const updatePayload = {
-            "cloud_recovery": cloudVal
-        };
-
-        if (isIfr) {
-            updatePayload.ifr_tlod_ground = groundVal;
-            updatePayload.ifr_tlod_cruise = cruiseVal;
-            updatePayload.ifr_alt_transition = transVal;
-            updatePayload.ifr_target_fps = fpsVal;
-        } else {
-            updatePayload.vfr_tlod_ground = groundVal;
-            updatePayload.vfr_tlod_cruise = cruiseVal;
-            updatePayload.vfr_alt_transition = transVal;
-            updatePayload.vfr_target_fps = fpsVal;
+            const input = document.getElementById('smart-lod-profile-universal-input');
+            if (input && selectedSmartLodProfileId) {
+                const sel = profiles.find(p => p.id === selectedSmartLodProfileId);
+                if (sel) input.value = sel.name;
+            }
+            renderSmartLodProfilesDropdownList();
         }
+    } catch (e) {
+        console.error("Error fetching Smart LOD profiles:", e);
+    }
+}
 
-        const resStr = await window.pywebview.api.save_smart_lod_config(JSON.stringify(updatePayload));
-        const res = JSON.parse(resStr);
-        if (res.success) {
+function renderSmartLodProfilesDropdownList() {
+    const listEl = document.getElementById('smart-lod-profile-dropdown-list');
+    if (!listEl) return;
+
+    if (!currentSmartLodProfiles || currentSmartLodProfiles.length === 0) {
+        listEl.innerHTML = `
+            <div class="px-3 py-2.5 text-center text-slate-500 italic text-[11px]">
+                No Smart LOD profiles found
+            </div>`;
+        return;
+    }
+
+    const multiCount = multiSelectedSmartLodProfileIds.size;
+    let headerHtml = '';
+    if (multiCount > 0) {
+        headerHtml = `
+            <div class="px-2.5 py-1.5 bg-slate-800/90 border-b border-slate-700/80 flex items-center justify-between gap-2 text-[10px] text-cyan-300">
+                <span><b>${multiCount}</b> selected</span>
+                <div class="flex items-center gap-1.5">
+                    <button type="button" onclick="deleteMultiSelectedSmartLodProfiles(event)" class="px-2 py-0.5 rounded bg-rose-600/80 hover:bg-rose-500 text-white font-semibold transition-colors cursor-pointer border-0">
+                        Delete (${multiCount})
+                    </button>
+                    <button type="button" onclick="multiSelectedSmartLodProfileIds.clear(); renderSmartLodProfilesDropdownList();" class="px-1.5 py-0.5 text-slate-400 hover:text-white transition-colors cursor-pointer border-0 bg-transparent">
+                        Clear
+                    </button>
+                </div>
+            </div>`;
+    }
+
+    const rowsHtml = currentSmartLodProfiles.map((p, index) => {
+        const isSelected = (p.id === selectedSmartLodProfileId);
+        const isChecked = multiSelectedSmartLodProfileIds.has(p.id);
+        const isActive = !!p.is_active;
+
+        const modeBadge = (p.mode === 'VR')
+            ? `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">VR</span>`
+            : `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-sky-500/20 text-sky-300 border border-sky-500/30">2D</span>`;
+
+        const activeTag = isActive
+            ? `<span class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-emerald-600 text-white shadow-xs">ACTIVE</span>`
+            : '';
+
+        return `
+            <div class="group flex items-center justify-between px-2.5 py-2 cursor-pointer transition-colors ${isSelected ? 'bg-cyan-950/40 text-cyan-200' : 'hover:bg-slate-800/80 text-slate-300'}"
+                 onclick="handleSmartLodProfileRowClick('${p.id}', ${index}, event)">
+                <div class="flex items-center gap-2 min-w-0 flex-1">
+                    <input type="checkbox"
+                           ${isChecked ? 'checked' : ''}
+                           onclick="toggleSmartLodProfileMultiSelect('${p.id}', ${index}, event)"
+                           class="w-3.5 h-3.5 rounded border-slate-700 bg-slate-900 text-cyan-500 focus:ring-0 cursor-pointer shrink-0">
+                    <div class="flex flex-col min-w-0 flex-1">
+                        <div class="flex items-center gap-1.5 truncate">
+                            <span class="font-medium text-xs text-white truncate">${escapeHtml(p.name)}</span>
+                            ${modeBadge}
+                            ${activeTag}
+                        </div>
+                        <span class="text-[10px] text-slate-400 truncate">
+                            G:${p.ground_tlod || 100} • C:${p.cruise_tlod || 250} • ${p.target_fps || 40} FPS
+                        </span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-1 opacity-80 group-hover:opacity-100 shrink-0 ml-2">
+                    <button type="button"
+                            onclick="promptRenameSmartLodProfile('${p.id}', event)"
+                            class="w-6 h-6 flex items-center justify-center rounded text-slate-400 hover:text-white hover:bg-slate-700/60 transition-colors border-0 bg-transparent cursor-pointer"
+                            title="Rename Profile">
+                        <svg class="w-3 h-3 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                    </button>
+                    <button type="button"
+                            onclick="deleteSmartLodProfile('${p.id}', event)"
+                            class="w-6 h-6 flex items-center justify-center rounded text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors border-0 bg-transparent cursor-pointer"
+                            title="Delete Profile">
+                        <svg class="w-3 h-3 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    </button>
+                </div>
+            </div>`;
+    }).join('');
+
+    listEl.innerHTML = headerHtml + rowsHtml;
+}
+
+function handleSmartLodProfileRowClick(profileId, index, event) {
+    if (event.target.tagName === 'INPUT' || event.target.closest('button')) return;
+    selectSmartLodProfileItem(profileId);
+}
+
+function toggleSmartLodProfileMultiSelect(profileId, index, event) {
+    event.stopPropagation();
+    if (multiSelectedSmartLodProfileIds.has(profileId)) {
+        multiSelectedSmartLodProfileIds.delete(profileId);
+    } else {
+        multiSelectedSmartLodProfileIds.add(profileId);
+    }
+    renderSmartLodProfilesDropdownList();
+}
+
+function toggleSmartLodProfileDropdown(event) {
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
+    const listEl = document.getElementById('smart-lod-profile-dropdown-list');
+    const combobox = document.getElementById('smart-lod-profile-universal-combobox');
+    if (!listEl || !combobox) return;
+
+    const isHidden = listEl.classList.contains('hidden');
+    closeAllSmartLodProfileDropdowns();
+
+    if (isHidden) {
+        if (listEl.parentElement !== document.body) {
+            document.body.appendChild(listEl);
+        }
+        const rect = combobox.getBoundingClientRect();
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const spaceAbove = rect.top;
+
+        listEl.style.position = 'fixed';
+        listEl.style.left = `${rect.left}px`;
+        listEl.style.width = `${rect.width}px`;
+        listEl.style.zIndex = '99999';
+
+        if (spaceBelow < 220 && spaceAbove > spaceBelow) {
+            listEl.style.top = 'auto';
+            listEl.style.bottom = `${window.innerHeight - rect.top + 6}px`;
+            listEl.style.maxHeight = `${Math.max(100, Math.min(260, spaceAbove - 20))}px`;
+        } else {
+            listEl.style.bottom = 'auto';
+            listEl.style.top = `${rect.bottom + 6}px`;
+            listEl.style.maxHeight = `${Math.max(100, Math.min(260, spaceBelow - 20))}px`;
+        }
+        renderSmartLodProfilesDropdownList();
+        listEl.classList.remove('hidden');
+    }
+}
+
+function closeAllSmartLodProfileDropdowns() {
+    const listEl = document.getElementById('smart-lod-profile-dropdown-list');
+    if (listEl) {
+        listEl.classList.add('hidden');
+        const combobox = document.getElementById('smart-lod-profile-universal-combobox');
+        if (combobox && listEl.parentElement !== combobox) {
+            combobox.appendChild(listEl);
+        }
+    }
+    multiSelectedSmartLodProfileIds.clear();
+    lastClickedSmartLodProfileIndex = -1;
+}
+
+async function selectSmartLodProfileItem(profileId) {
+    const prof = currentSmartLodProfiles.find(p => p.id === profileId);
+    if (!prof) return;
+
+    selectedSmartLodProfileId = prof.id;
+    const input = document.getElementById('smart-lod-profile-universal-input');
+    if (input) input.value = prof.name;
+    closeAllSmartLodProfileDropdowns();
+
+    // Populate UI fields
+    const slG = document.getElementById('smart-lod-slider-ground-tlod');
+    if (slG) { slG.value = prof.ground_tlod || 100; updateSmartLodSliderValue('ground-tlod', slG.value); }
+    const slC = document.getElementById('smart-lod-slider-cruise-tlod');
+    if (slC) { slC.value = prof.cruise_tlod || 250; updateSmartLodSliderValue('cruise-tlod', slC.value); }
+    const slA = document.getElementById('smart-lod-slider-alt-trans');
+    if (slA) { slA.value = prof.alt_trans || 5000; updateSmartLodSliderValue('alt-trans', slA.value); }
+    const inFps = document.getElementById('smart-lod-input-fps');
+    if (inFps) inFps.value = prof.target_fps || 40;
+    const chkCloud = document.getElementById('smart-lod-cloud-recovery');
+    if (chkCloud) chkCloud.checked = (prof.cloud_recovery !== false);
+
+    switchSmartLodTargetMode(prof.mode || '2D');
+
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.activate_smart_lod_profile) {
+        try {
+            await window.pywebview.api.activate_smart_lod_profile(profileId);
+            await fetchAndRenderSmartLodProfiles(true);
             if (typeof showToast === 'function') {
-                showToast(`Profil Smart LOD ${isIfr ? 'IFR' : 'VFR'} sauvegardé !`, "success");
+                showToast(`Profil Smart LOD "${prof.name}" chargé !`, 'info');
+            }
+        } catch (e) {
+            console.error("Error activating smart lod profile:", e);
+        }
+    }
+    if (typeof updatePerformanceCockpitGauges === 'function') {
+        updatePerformanceCockpitGauges();
+    }
+}
+
+function handleSmartLodProfileInputFocus() {
+    const input = document.getElementById('smart-lod-profile-universal-input');
+    if (!input) return;
+    input.value = '';
+    closeAllSmartLodProfileDropdowns();
+}
+
+function handleSmartLodProfileInputBlur() {
+    const input = document.getElementById('smart-lod-profile-universal-input');
+    if (!input) return;
+    if (!input.value.trim() && selectedSmartLodProfileId) {
+        const prof = currentSmartLodProfiles.find(p => p.id === selectedSmartLodProfileId);
+        if (prof) input.value = prof.name;
+    }
+}
+
+function getCurrentSmartLodUiPayload() {
+    return {
+        mode: currentSmartLodMode || '2D',
+        flight_mode: (currentFlightMissionProfile || 'LINER') === 'LINER' ? 'IFR' : 'VFR',
+        ground_tlod: parseInt(document.getElementById('smart-lod-slider-ground-tlod')?.value || '100', 10),
+        cruise_tlod: parseInt(document.getElementById('smart-lod-slider-cruise-tlod')?.value || '250', 10),
+        alt_trans: parseInt(document.getElementById('smart-lod-slider-alt-trans')?.value || '5000', 10),
+        target_fps: parseInt(document.getElementById('smart-lod-input-fps')?.value || '40', 10),
+        cloud_recovery: !!document.getElementById('smart-lod-cloud-recovery')?.checked
+    };
+}
+
+async function saveCurrentSmartLodProfile() {
+    const input = document.getElementById('smart-lod-profile-universal-input');
+    let name = input ? input.value.trim() : '';
+    if (!name) {
+        const now = new Date();
+        name = `LOD_Profile_${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}_${String(now.getHours()).padStart(2,'0')}h${String(now.getMinutes()).padStart(2,'0')}`;
+    }
+
+    const payload = getCurrentSmartLodUiPayload();
+    const matchingProfile = currentSmartLodProfiles.find(p => (p.name || '').trim().toLowerCase() === name.toLowerCase());
+
+    if (matchingProfile) {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.check_smart_lod_profile_changes) {
+            try {
+                const chkStr = await window.pywebview.api.check_smart_lod_profile_changes(matchingProfile.id, JSON.stringify(payload));
+                const chk = JSON.parse(chkStr);
+                if (chk.status === 'success') {
+                    if (chk.has_changes) {
+                        showCustomModal({
+                            title: 'REPLACE PROFILE',
+                            message: `Des modifications ont été détectées.<br><br>Voulez-vous remplacer le profil "<b>${escapeHtml(matchingProfile.name)}</b>" avec vos réglages actuels ?`,
+                            type: 'info',
+                            showCancel: true,
+                            confirmText: 'OUI',
+                            cancelText: 'NON',
+                            confirmClass: 'px-5 py-1.5 text-center rounded-xl bg-blue-600 hover:bg-blue-500 text-white typo-action-btn font-semibold text-xs uppercase transition-all border-0 cursor-pointer shadow-md',
+                            cancelClass: 'px-5 py-1.5 text-center rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 hover:text-white typo-action-btn text-xs font-semibold uppercase transition-all cursor-pointer',
+                            onConfirm: async () => {
+                                await executeSaveCurrentSmartLodProfile(matchingProfile.name, matchingProfile.id);
+                            }
+                        });
+                        return;
+                    } else {
+                        showCustomModal({
+                            title: 'PROFILE UP TO DATE',
+                            message: `Aucune modification détectée.<br><br>Le profil "<b>${escapeHtml(matchingProfile.name)}</b>" est déjà à jour.`,
+                            type: 'info',
+                            showCancel: false,
+                            confirmText: 'OK',
+                            confirmClass: 'px-5 py-1.5 text-center rounded-xl bg-blue-600 hover:bg-blue-500 text-white typo-action-btn font-semibold text-xs uppercase transition-all border-0 cursor-pointer shadow-md'
+                        });
+                        return;
+                    }
+                }
+            } catch (e) {
+                console.error("Error checking smart lod profile changes:", e);
+            }
+        }
+        await executeSaveCurrentSmartLodProfile(matchingProfile.name, matchingProfile.id);
+        return;
+    }
+
+    const currSelected = currentSmartLodProfiles.find(p => p.id === selectedSmartLodProfileId);
+    if (currSelected && currSelected.name.trim().toLowerCase() !== name.toLowerCase()) {
+        showCustomModal({
+            title: 'PROFILE SAVE / RENAME',
+            message: `Le nom du profil a été modifié de "<b>${escapeHtml(currSelected.name)}</b>" en "<b>${escapeHtml(name)}</b>".<br><br>Voulez-vous renommer le profil existant ou sauvegarder comme nouveau profil ?`,
+            type: 'info',
+            showCancel: true,
+            confirmText: 'RENOMMER',
+            secondaryText: 'NOUVEAU PROFIL',
+            cancelText: 'ANNULER',
+            confirmClass: 'px-4 py-1.5 text-center rounded-xl bg-blue-600 hover:bg-blue-500 text-white typo-action-btn font-semibold text-xs uppercase transition-all border-0 cursor-pointer shadow-md',
+            secondaryClass: 'px-4 py-1.5 text-center rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white typo-action-btn font-semibold uppercase transition-all cursor-pointer text-xs shadow-md',
+            cancelClass: 'px-4 py-1.5 text-center rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 hover:text-white typo-action-btn text-xs font-semibold uppercase transition-all cursor-pointer',
+            onConfirm: async () => {
+                await executeRenameSmartLodProfile(currSelected.id, name);
+            },
+            onSecondary: async () => {
+                await executeSaveCurrentSmartLodProfile(name, null);
+            }
+        });
+        return;
+    }
+
+    await executeSaveCurrentSmartLodProfile(name, null);
+}
+
+async function executeSaveCurrentSmartLodProfile(name, overwriteId = null) {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.save_smart_lod_profile) return;
+    try {
+        const payload = getCurrentSmartLodUiPayload();
+        const resStr = await window.pywebview.api.save_smart_lod_profile(name, JSON.stringify(payload), overwriteId);
+        const res = JSON.parse(resStr);
+        if (res.status === 'success') {
+            if (typeof showToast === 'function') {
+                showToast(`Profil Smart LOD "${res.profile.name}" sauvegardé !`, 'success');
+            }
+            selectedSmartLodProfileId = res.profile.id;
+            await fetchAndRenderSmartLodProfiles(true);
+            if (typeof updatePerformanceCockpitGauges === 'function') {
+                updatePerformanceCockpitGauges();
             }
         } else {
             if (typeof showToast === 'function') {
-                showToast("Erreur de sauvegarde de la configuration Smart LOD.", "error");
+                showToast(`Erreur de sauvegarde: ${res.message}`, 'error');
             }
         }
     } catch (e) {
-        console.error("Error saving Smart LOD UI config:", e);
+        console.error("Error executing save smart lod profile:", e);
     }
+}
+
+function promptRenameSmartLodProfile(profileId, event) {
+    if (event) { event.stopPropagation(); event.preventDefault(); }
+    const prof = currentSmartLodProfiles.find(p => p.id === profileId);
+    if (!prof) return;
+
+    showCustomModal({
+        title: 'RENAME SMART LOD PROFILE',
+        message: `Entrez un nouveau nom pour le profil "<b>${escapeHtml(prof.name)}</b>" :`,
+        type: 'prompt',
+        defaultValue: prof.name,
+        showCancel: true,
+        confirmText: 'RENOMMER',
+        cancelText: 'ANNULER',
+        confirmClass: 'px-5 py-1.5 text-center rounded-xl bg-blue-600 hover:bg-blue-500 text-white typo-action-btn font-semibold text-xs uppercase transition-all border-0 cursor-pointer shadow-md',
+        cancelClass: 'px-5 py-1.5 text-center rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 hover:text-white typo-action-btn text-xs font-semibold uppercase transition-all cursor-pointer',
+        onConfirm: async (val) => {
+            const clean = (val || '').trim();
+            if (clean && clean !== prof.name) {
+                await executeRenameSmartLodProfile(profileId, clean);
+            }
+        }
+    });
+}
+
+async function executeRenameSmartLodProfile(profileId, newName) {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.rename_smart_lod_profile) return;
+    try {
+        const resStr = await window.pywebview.api.rename_smart_lod_profile(profileId, newName);
+        const res = JSON.parse(resStr);
+        if (res.status === 'success') {
+            if (typeof showToast === 'function') showToast(`Profil renommé en "${newName}" !`, 'success');
+            await fetchAndRenderSmartLodProfiles(true);
+            const input = document.getElementById('smart-lod-profile-universal-input');
+            if (selectedSmartLodProfileId === profileId && input) {
+                input.value = newName;
+            }
+        } else {
+            showCustomModal({
+                title: 'CANNOT RENAME PROFILE',
+                message: res.message || 'Un profil avec ce nom existe déjà.',
+                type: 'info',
+                showCancel: false,
+                confirmText: 'OK',
+                confirmClass: 'px-5 py-1.5 text-center rounded-xl bg-blue-600 hover:bg-blue-500 text-white typo-action-btn font-semibold text-xs uppercase transition-all border-0 cursor-pointer shadow-md'
+            });
+        }
+    } catch (e) {
+        console.error("Error renaming smart lod profile:", e);
+    }
+}
+
+async function activateSelectedSmartLodProfile() {
+    if (!selectedSmartLodProfileId) {
+        if (typeof showToast === 'function') showToast("Veuillez sélectionner un profil Smart LOD.", "warning");
+        return;
+    }
+    const prof = currentSmartLodProfiles.find(p => p.id === selectedSmartLodProfileId);
+    if (!prof) return;
+
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.activate_smart_lod_profile) {
+        try {
+            const resStr = await window.pywebview.api.activate_smart_lod_profile(selectedSmartLodProfileId);
+            const res = JSON.parse(resStr);
+            if (res.status === 'success') {
+                if (typeof showToast === 'function') {
+                    showToast(`Profil Smart LOD "${prof.name}" activé avec succès !`, 'success');
+                }
+                await fetchAndRenderSmartLodProfiles(true);
+                await refreshSmartLodStatus();
+                if (typeof updatePerformanceCockpitGauges === 'function') {
+                    updatePerformanceCockpitGauges();
+                }
+            } else {
+                if (typeof showToast === 'function') showToast(`Erreur d'activation: ${res.message}`, 'error');
+            }
+        } catch (e) {
+            console.error("Error activating smart lod profile:", e);
+        }
+    }
+}
+
+function deleteSmartLodProfile(profileId, event) {
+    if (event) { event.stopPropagation(); event.preventDefault(); }
+    const prof = currentSmartLodProfiles.find(p => p.id === profileId);
+    if (!prof) return;
+
+    showCustomModal({
+        title: 'DELETE SMART LOD PROFILE',
+        message: `Êtes-vous sûr de vouloir supprimer le profil "<b>${escapeHtml(prof.name)}</b>" ?`,
+        type: 'danger',
+        showCancel: true,
+        confirmText: 'SUPPRIMER',
+        cancelText: 'ANNULER',
+        confirmClass: 'px-5 py-1.5 text-center rounded-xl bg-rose-600 hover:bg-rose-500 text-white typo-action-btn font-semibold text-xs uppercase transition-all border-0 cursor-pointer shadow-md',
+        cancelClass: 'px-5 py-1.5 text-center rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 hover:text-white typo-action-btn text-xs font-semibold uppercase transition-all cursor-pointer',
+        onConfirm: async () => {
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.delete_smart_lod_profile) {
+                try {
+                    await window.pywebview.api.delete_smart_lod_profile(profileId);
+                    if (selectedSmartLodProfileId === profileId) {
+                        selectedSmartLodProfileId = null;
+                    }
+                    if (typeof showToast === 'function') showToast(`Profil "${prof.name}" supprimé.`, 'info');
+                    await fetchAndRenderSmartLodProfiles(true);
+                } catch (e) {
+                    console.error("Error deleting smart lod profile:", e);
+                }
+            }
+        }
+    });
+}
+
+function deleteMultiSelectedSmartLodProfiles(event) {
+    if (event) { event.stopPropagation(); event.preventDefault(); }
+    const count = multiSelectedSmartLodProfileIds.size;
+    if (count === 0) return;
+
+    showCustomModal({
+        title: 'DELETE PROFILES',
+        message: `Êtes-vous sûr de vouloir supprimer les <b>${count}</b> profils Smart LOD sélectionnés ?`,
+        type: 'danger',
+        showCancel: true,
+        confirmText: `SUPPRIMER (${count})`,
+        cancelText: 'ANNULER',
+        confirmClass: 'px-5 py-1.5 text-center rounded-xl bg-rose-600 hover:bg-rose-500 text-white typo-action-btn font-semibold text-xs uppercase transition-all border-0 cursor-pointer shadow-md',
+        cancelClass: 'px-5 py-1.5 text-center rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 hover:text-white typo-action-btn text-xs font-semibold uppercase transition-all cursor-pointer',
+        onConfirm: async () => {
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.delete_smart_lod_profile) {
+                try {
+                    for (const pid of Array.from(multiSelectedSmartLodProfileIds)) {
+                        await window.pywebview.api.delete_smart_lod_profile(pid);
+                        if (selectedSmartLodProfileId === pid) selectedSmartLodProfileId = null;
+                    }
+                    multiSelectedSmartLodProfileIds.clear();
+                    if (typeof showToast === 'function') showToast(`${count} profils Smart LOD supprimés.`, 'info');
+                    await fetchAndRenderSmartLodProfiles(true);
+                } catch (e) {
+                    console.error("Error deleting multi profiles:", e);
+                }
+            }
+        }
+    });
 }
 
 // ================= MSFS IN-GAME TOOLBAR PANEL UI CONTROLLERS =================

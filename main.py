@@ -3727,6 +3727,56 @@ class Api:
         except Exception as e:
             return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
 
+    def get_smart_lod_profiles(self):
+        try:
+            import flight_lod_controller
+            profiles = flight_lod_controller.get_smart_lod_profiles()
+            return json.dumps(profiles, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps([], ensure_ascii=False)
+
+    def save_smart_lod_profile(self, profile_name, config_json_str, overwrite_id=None):
+        try:
+            import flight_lod_controller
+            cfg = json.loads(config_json_str) if isinstance(config_json_str, str) else config_json_str
+            res = flight_lod_controller.save_smart_lod_profile(profile_name, cfg, overwrite_id=overwrite_id)
+            return json.dumps(res, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    def check_smart_lod_profile_changes(self, profile_id, current_config_json_str):
+        try:
+            import flight_lod_controller
+            cfg = json.loads(current_config_json_str) if isinstance(current_config_json_str, str) else current_config_json_str
+            res = flight_lod_controller.check_smart_lod_profile_changes(profile_id, cfg)
+            return json.dumps(res, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    def rename_smart_lod_profile(self, profile_id, new_name):
+        try:
+            import flight_lod_controller
+            res = flight_lod_controller.rename_smart_lod_profile(profile_id, new_name)
+            return json.dumps(res, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    def activate_smart_lod_profile(self, profile_id):
+        try:
+            import flight_lod_controller
+            res = flight_lod_controller.activate_smart_lod_profile(profile_id)
+            return json.dumps(res, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    def delete_smart_lod_profile(self, profile_id):
+        try:
+            import flight_lod_controller
+            res = flight_lod_controller.delete_smart_lod_profile(profile_id)
+            return json.dumps(res, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
     # ================= MSFS IN-GAME TOOLBAR PANEL MANAGEMENT =================
 
     def _get_all_community_paths(self):

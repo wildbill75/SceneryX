@@ -11,6 +11,9 @@ import sys
 import time
 import json
 import threading
+import glob
+from datetime import datetime
+from typing import List
 from typing import Dict, Any, Optional
 
 from flight_memory_engine import get_memory_engine, FlightMemoryEngine
@@ -408,3 +411,296 @@ if __name__ == "__main__":
     print("=== Test SceneryX Smart LOD Controller ===")
     ctrl = SmartLodController()
     print("Status:", ctrl.get_status())
+
+
+# ==============================================================================
+# SMART LOD PROFILES STORE (SAVE & ACTIVATE DYNAMIC PROFILES)
+# ==============================================================================
+
+def get_smart_lod_profiles_dir() -> str:
+    """Returns directory where Smart LOD custom profiles are stored."""
+    profiles_dir = os.path.join(get_user_data_dir(), "smart_lod_profiles")
+    os.makedirs(profiles_dir, exist_ok=True)
+    return profiles_dir
+
+
+def generate_default_smart_lod_profiles() -> List[Dict[str, Any]]:
+    """Generates standard calibrated Smart LOD profiles for flight simmers."""
+    profiles_dir = get_smart_lod_profiles_dir()
+    defaults = [
+        {
+            "id": "lod_prof_balanced_airliner",
+            "name": "Balanced Airliner (IFR)",
+            "description": "Standard IFR setpoint: TLOD 100 on ground, smooth climb to 250 in cruise.",
+            "mode": "2D",
+            "flight_mode": "IFR",
+            "ground_tlod": 100,
+            "cruise_tlod": 250,
+            "alt_trans": 5000,
+            "target_fps": 45,
+            "cloud_recovery": True,
+            "created_at": "2026-01-01T00:00:00"
+        },
+        {
+            "id": "lod_prof_heavy_hub_optimizer",
+            "name": "Heavy Hub & Megacity (EGLL / KJFK)",
+            "description": "Maximum FPS protection at congested payware hubs: TLOD 80 on ground, 200 cruise.",
+            "mode": "2D",
+            "flight_mode": "IFR",
+            "ground_tlod": 80,
+            "cruise_tlod": 200,
+            "alt_trans": 4000,
+            "target_fps": 40,
+            "cloud_recovery": True,
+            "created_at": "2026-01-01T00:01:00"
+        },
+        {
+            "id": "lod_prof_vfr_bush_sightseeing",
+            "name": "VFR Bush & Mountain Sightseeing",
+            "description": "Pristine terrain relief: TLOD 150 ground, 350 cruise for backcountry exploration.",
+            "mode": "2D",
+            "flight_mode": "VFR",
+            "ground_tlod": 150,
+            "cruise_tlod": 350,
+            "alt_trans": 3000,
+            "target_fps": 60,
+            "cloud_recovery": True,
+            "created_at": "2026-01-01T00:02:00"
+        },
+        {
+            "id": "lod_prof_vr_headset_pacing",
+            "name": "VR Headset Locked Stereo Cadence",
+            "description": "Tailored for VR stereo reprojection: TLOD 90 ground, 220 cruise with locked 45 FPS.",
+            "mode": "VR",
+            "flight_mode": "IFR",
+            "ground_tlod": 90,
+            "cruise_tlod": 220,
+            "alt_trans": 4500,
+            "target_fps": 45,
+            "cloud_recovery": True,
+            "created_at": "2026-01-01T00:03:00"
+        }
+    ]
+    for d in defaults:
+        p_path = os.path.join(profiles_dir, f"{d['id']}.lodprofile.json")
+        try:
+            with open(p_path, "w", encoding="utf-8") as f:
+                json.dump(d, f, indent=2, ensure_ascii=False)
+        except Exception:
+            pass
+    set_active_smart_lod_profile_id(defaults[0]["id"])
+    defaults[0]["is_active"] = True
+    return defaults
+
+
+def get_active_smart_lod_profile_id() -> str:
+    profiles_dir = get_smart_lod_profiles_dir()
+    state_file = os.path.join(profiles_dir, "active_profile.json")
+    if os.path.exists(state_file):
+        try:
+            with open(state_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                aid = data.get("active_id", "")
+                if aid and os.path.exists(os.path.join(profiles_dir, f"{aid}.lodprofile.json")):
+                    return aid
+        except Exception:
+            pass
+    files = glob.glob(os.path.join(profiles_dir, "*.lodprofile.json"))
+    if files:
+        newest = max(files, key=os.path.getmtime)
+        aid = os.path.basename(newest)[:-len(".lodprofile.json")]
+        set_active_smart_lod_profile_id(aid)
+        return aid
+    return ""
+
+
+def set_active_smart_lod_profile_id(profile_id: str):
+    profiles_dir = get_smart_lod_profiles_dir()
+    state_file = os.path.join(profiles_dir, "active_profile.json")
+    try:
+        with open(state_file, "w", encoding="utf-8") as f:
+            json.dump({"active_id": profile_id, "updated_at": datetime.now().isoformat()}, f, indent=2)
+    except Exception:
+        pass
+
+
+def get_smart_lod_profiles() -> List[Dict[str, Any]]:
+    profiles_dir = get_smart_lod_profiles_dir()
+    files = glob.glob(os.path.join(profiles_dir, "*.lodprofile.json"))
+    if not files:
+        return generate_default_smart_lod_profiles()
+
+    active_id = get_active_smart_lod_profile_id()
+    profiles = []
+    for f in files:
+        try:
+            with open(f, "r", encoding="utf-8") as pf:
+                data = json.load(pf)
+                data["is_active"] = (data.get("id") == active_id)
+                profiles.append(data)
+        except Exception:
+            pass
+
+    profiles.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+    if profiles and not any(p.get("is_active") for p in profiles):
+        profiles[0]["is_active"] = True
+        set_active_smart_lod_profile_id(profiles[0].get("id", ""))
+    return profiles
+
+
+def save_smart_lod_profile(name: str, config_data: Dict[str, Any], overwrite_id: Optional[str] = None) -> Dict[str, Any]:
+    clean_name = str(name).strip()
+    if not clean_name:
+        return {"status": "error", "message": "Profile name cannot be empty."}
+
+    profiles_dir = get_smart_lod_profiles_dir()
+    existing = get_smart_lod_profiles()
+
+    target_id = overwrite_id
+    if not target_id:
+        for p in existing:
+            if p.get("name", "").strip().lower() == clean_name.lower():
+                target_id = p.get("id")
+                break
+
+    if not target_id:
+        import uuid
+        target_id = f"lod_prof_{uuid.uuid4().hex[:10]}"
+
+    profile_obj = {
+        "id": target_id,
+        "name": clean_name,
+        "mode": config_data.get("mode", "2D"),
+        "flight_mode": config_data.get("flight_mode", "IFR"),
+        "ground_tlod": int(config_data.get("ground_tlod", 100)),
+        "cruise_tlod": int(config_data.get("cruise_tlod", 250)),
+        "alt_trans": int(config_data.get("alt_trans", 5000)),
+        "target_fps": int(config_data.get("target_fps", 40)),
+        "cloud_recovery": bool(config_data.get("cloud_recovery", True)),
+        "created_at": datetime.now().isoformat()
+    }
+
+    file_path = os.path.join(profiles_dir, f"{target_id}.lodprofile.json")
+    try:
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(profile_obj, f, indent=2, ensure_ascii=False)
+        set_active_smart_lod_profile_id(target_id)
+        
+        # Also apply to live smart lod controller config
+        ctrl = get_smart_lod_controller()
+        cfg_update = {
+            "cloud_recovery": profile_obj["cloud_recovery"],
+        }
+        if profile_obj["flight_mode"] == "IFR":
+            cfg_update["ifr_tlod_ground"] = profile_obj["ground_tlod"]
+            cfg_update["ifr_tlod_cruise"] = profile_obj["cruise_tlod"]
+            cfg_update["ifr_alt_transition"] = profile_obj["alt_trans"]
+            cfg_update["ifr_target_fps"] = profile_obj["target_fps"]
+        else:
+            cfg_update["vfr_tlod_ground"] = profile_obj["ground_tlod"]
+            cfg_update["vfr_tlod_cruise"] = profile_obj["cruise_tlod"]
+            cfg_update["vfr_alt_transition"] = profile_obj["alt_trans"]
+            cfg_update["vfr_target_fps"] = profile_obj["target_fps"]
+        ctrl.save_config(cfg_update)
+
+        return {"status": "success", "profile": profile_obj}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+def check_smart_lod_profile_changes(profile_id: str, current_data: Dict[str, Any]) -> Dict[str, Any]:
+    profiles_dir = get_smart_lod_profiles_dir()
+    pfile = os.path.join(profiles_dir, f"{profile_id}.lodprofile.json")
+    if not os.path.exists(pfile):
+        return {"status": "error", "message": "Profile not found."}
+    try:
+        with open(pfile, "r", encoding="utf-8") as f:
+            pdata = json.load(f)
+        
+        has_changes = (
+            int(pdata.get("ground_tlod", 100)) != int(current_data.get("ground_tlod", 100)) or
+            int(pdata.get("cruise_tlod", 250)) != int(current_data.get("cruise_tlod", 250)) or
+            int(pdata.get("alt_trans", 5000)) != int(current_data.get("alt_trans", 5000)) or
+            int(pdata.get("target_fps", 40)) != int(current_data.get("target_fps", 40)) or
+            bool(pdata.get("cloud_recovery", True)) != bool(current_data.get("cloud_recovery", True)) or
+            str(pdata.get("mode", "2D")) != str(current_data.get("mode", "2D"))
+        )
+        return {
+            "status": "success",
+            "has_changes": has_changes,
+            "profile_id": profile_id,
+            "profile_name": pdata.get("name", "")
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+def rename_smart_lod_profile(profile_id: str, new_name: str) -> Dict[str, Any]:
+    clean_name = str(new_name).strip()
+    if not clean_name:
+        return {"status": "error", "message": "Profile name cannot be empty."}
+    profiles = get_smart_lod_profiles()
+    for p in profiles:
+        if p.get("id") != profile_id and p.get("name", "").strip().lower() == clean_name.lower():
+            return {"status": "error", "message": f'A profile named "{clean_name}" already exists.'}
+    profiles_dir = get_smart_lod_profiles_dir()
+    pfile = os.path.join(profiles_dir, f"{profile_id}.lodprofile.json")
+    if not os.path.exists(pfile):
+        return {"status": "error", "message": "Profile not found."}
+    try:
+        with open(pfile, "r", encoding="utf-8") as f:
+            pdata = json.load(f)
+        pdata["name"] = clean_name
+        pdata["updated_at"] = datetime.now().isoformat()
+        with open(pfile, "w", encoding="utf-8") as f:
+            json.dump(pdata, f, indent=2, ensure_ascii=False)
+        return {"status": "success", "profile": pdata}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+def activate_smart_lod_profile(profile_id: str) -> Dict[str, Any]:
+    profiles_dir = get_smart_lod_profiles_dir()
+    pfile = os.path.join(profiles_dir, f"{profile_id}.lodprofile.json")
+    if not os.path.exists(pfile):
+        return {"status": "error", "message": "Profile not found."}
+    try:
+        with open(pfile, "r", encoding="utf-8") as f:
+            pdata = json.load(f)
+        set_active_smart_lod_profile_id(profile_id)
+        ctrl = get_smart_lod_controller()
+        cfg_update = {
+            "cloud_recovery": pdata.get("cloud_recovery", True),
+        }
+        f_mode = pdata.get("flight_mode", "IFR")
+        if f_mode == "IFR":
+            cfg_update["ifr_tlod_ground"] = pdata.get("ground_tlod", 100)
+            cfg_update["ifr_tlod_cruise"] = pdata.get("cruise_tlod", 250)
+            cfg_update["ifr_alt_transition"] = pdata.get("alt_trans", 5000)
+            cfg_update["ifr_target_fps"] = pdata.get("target_fps", 40)
+        else:
+            cfg_update["vfr_tlod_ground"] = pdata.get("ground_tlod", 100)
+            cfg_update["vfr_tlod_cruise"] = pdata.get("cruise_tlod", 250)
+            cfg_update["vfr_alt_transition"] = pdata.get("alt_trans", 5000)
+            cfg_update["vfr_target_fps"] = pdata.get("target_fps", 40)
+        ctrl.save_config(cfg_update)
+        return {"status": "success", "profile": pdata}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+def delete_smart_lod_profile(profile_id: str) -> Dict[str, Any]:
+    profiles_dir = get_smart_lod_profiles_dir()
+    pfile = os.path.join(profiles_dir, f"{profile_id}.lodprofile.json")
+    if not os.path.exists(pfile):
+        return {"status": "error", "message": "Profile not found."}
+    try:
+        os.remove(pfile)
+        active_id = get_active_smart_lod_profile_id()
+        if active_id == profile_id:
+            rem = get_smart_lod_profiles()
+            if rem:
+                set_active_smart_lod_profile_id(rem[0].get("id", ""))
+        return {"status": "success", "deleted_id": profile_id}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}

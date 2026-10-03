@@ -362,20 +362,23 @@
         /* High-usability scrollbars for menus, dropdowns and dialog lists */
         .custom-scrollbar::-webkit-scrollbar,
         [id^="opt-combo-menu-"]::-webkit-scrollbar,
-        #opt-profile-dropdown-list::-webkit-scrollbar {
+        #opt-profile-dropdown-list::-webkit-scrollbar,
+        #smart-lod-profile-dropdown-list::-webkit-scrollbar {
             width: 12px;
             height: 12px;
         }
         .custom-scrollbar::-webkit-scrollbar-track,
         [id^="opt-combo-menu-"]::-webkit-scrollbar-track,
-        #opt-profile-dropdown-list::-webkit-scrollbar-track {
+        #opt-profile-dropdown-list::-webkit-scrollbar-track,
+        #smart-lod-profile-dropdown-list::-webkit-scrollbar-track {
             background: rgba(15, 23, 42, 0.95);
             border-radius: 8px;
             margin: 4px 0;
         }
         .custom-scrollbar::-webkit-scrollbar-thumb,
         [id^="opt-combo-menu-"]::-webkit-scrollbar-thumb,
-        #opt-profile-dropdown-list::-webkit-scrollbar-thumb {
+        #opt-profile-dropdown-list::-webkit-scrollbar-thumb,
+        #smart-lod-profile-dropdown-list::-webkit-scrollbar-thumb {
             background: rgba(71, 85, 105, 0.9);
             border-radius: 8px;
             border: 2px solid rgba(15, 23, 42, 0.95);
@@ -383,7 +386,8 @@
         }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover,
         [id^="opt-combo-menu-"]::-webkit-scrollbar-thumb:hover,
-        #opt-profile-dropdown-list::-webkit-scrollbar-thumb:hover {
+        #opt-profile-dropdown-list::-webkit-scrollbar-thumb:hover,
+        #smart-lod-profile-dropdown-list::-webkit-scrollbar-thumb:hover {
             background: rgba(14, 165, 233, 1);
         }
         /* High-Performance GPU Compositor Acceleration */
@@ -2765,10 +2769,13 @@
                                         <!-- Sweet Spot Needle Marker -->
                                         <div id="opt-perf-needle-2d" class="absolute top-0 bottom-0 w-0.5 bg-[#fbbf24] shadow-[0_0_6px_rgba(251,191,36,0.9)] z-10 pointer-events-none" style="left: 45%;"></div>
                                     </div>
-                                    <div class="flex items-center justify-between text-[9px] text-slate-500 pt-1 select-none font-medium">
-                                        <span>0%</span>
-                                        <span class="inline-flex items-center gap-1 font-semibold text-[#2ce586] cursor-help" title="Calibrated Sweet Spot target for optimal frame pacing without stuttering"><span class="text-[#fbbf24] drop-shadow-[0_0_4px_rgba(251,191,36,0.85)] text-[9px]">★</span> SWEET SPOT (<span id="opt-perf-target-2d">~45%</span>)</span>
-                                        <span>100%</span>
+                                    <div class="relative w-full h-3.5 text-[8px] text-slate-500 pt-0.5 select-none font-medium">
+                                        <span class="absolute left-0 top-0.5">0%</span>
+                                        <span id="opt-perf-target-container-2d" class="absolute top-0.5 -translate-x-1/2 inline-flex items-center gap-0.5 font-semibold text-[#2ce586] whitespace-nowrap cursor-help" style="left: 45%;" title="Calibrated Sweet Spot target">
+                                            <span class="text-[#fbbf24] drop-shadow-[0_0_3px_rgba(251,191,36,0.8)] text-[8px]">★</span>
+                                            <span id="opt-perf-target-2d">45%</span>
+                                        </span>
+                                        <span class="absolute right-0 top-0.5">100%</span>
                                     </div>
                                 </div>
                             </div>
@@ -2792,10 +2799,13 @@
                                         <!-- Sweet Spot Needle Marker -->
                                         <div id="opt-perf-needle-vr" class="absolute top-0 bottom-0 w-0.5 bg-[#fbbf24] shadow-[0_0_6px_rgba(251,191,36,0.9)] z-10 pointer-events-none" style="left: 45%;"></div>
                                     </div>
-                                    <div class="flex items-center justify-between text-[9px] text-slate-500 pt-1 select-none font-medium">
-                                        <span>0%</span>
-                                        <span class="inline-flex items-center gap-1 font-semibold text-[#2ce586] cursor-help" title="Calibrated Sweet Spot target for stereo VR pacing without reprojection drops"><span class="text-[#fbbf24] drop-shadow-[0_0_4px_rgba(251,191,36,0.85)] text-[9px]">★</span> SWEET SPOT (<span id="opt-perf-target-vr">~45%</span>)</span>
-                                        <span>100%</span>
+                                    <div class="relative w-full h-3.5 text-[8px] text-slate-500 pt-0.5 select-none font-medium">
+                                        <span class="absolute left-0 top-0.5">0%</span>
+                                        <span id="opt-perf-target-container-vr" class="absolute top-0.5 -translate-x-1/2 inline-flex items-center gap-0.5 font-semibold text-[#2ce586] whitespace-nowrap cursor-help" style="left: 45%;" title="Calibrated Sweet Spot target">
+                                            <span class="text-[#fbbf24] drop-shadow-[0_0_3px_rgba(251,191,36,0.8)] text-[8px]">★</span>
+                                            <span id="opt-perf-target-vr">45%</span>
+                                        </span>
+                                        <span class="absolute right-0 top-0.5">100%</span>
                                     </div>
                                 </div>
                             </div>
@@ -2875,7 +2885,7 @@
         <!-- Drag Handle Header -->
         <div class="modal-header floating-win-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2">
-                <h3 class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">PERFORMANCE // SMART LOD DYNAMIC ENGINE</h3>
+                <h3 class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">SMART LOD DYNAMIC ENGINE</h3>
             </div>
             <button onclick="closeFloatingWindow('smart_lod')" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity">
                 <i class="fa-solid fa-xmark text-sm"></i>
@@ -2891,17 +2901,15 @@
                 </div>
                 <div class="flex items-center justify-between flex-wrap gap-2 pt-0.5">
                     <div class="flex items-center gap-3">
-                        <span id="smart-lod-active-badge" class="px-2.5 py-0.5 rounded-full typo-action-btn text-[11px] font-semibold bg-slate-900 text-slate-400 uppercase tracking-[0.02em] border border-slate-700/60">INACTIVE</span>
-                        <span class="typo-metadata text-xs text-slate-400 hidden sm:inline">Adaptive terrain resolution sync</span>
+                        <span id="smart-lod-active-badge" class="px-2.5 py-0.5 rounded typo-action-btn text-[11px] font-semibold bg-slate-700 text-slate-300 uppercase tracking-[0.02em]">INACTIF</span>
                     </div>
                     <div class="flex items-center gap-3">
                         <div class="h-8 px-3 rounded-md bg-slate-900/70 border border-slate-700/80 text-xs text-slate-300 inline-flex items-center gap-2">
                             <span class="typo-metadata text-slate-500 text-[10px] uppercase font-bold">LIVE TLOD:</span>
                             <span id="smart-lod-live-tlod" class="typo-metric text-sky-400 font-semibold tabular-nums text-xs">--</span>
                         </div>
-                        <button id="smart-lod-main-toggle" onclick="toggleSmartLodActive()" class="h-8 px-4 rounded-md bg-cyan-600 hover:bg-cyan-500 text-white typo-action-btn text-xs font-semibold tracking-[0.02em] transition-all cursor-pointer inline-flex items-center gap-2 leading-none shadow-sm btn-elevate">
-                            <span class="w-2 h-2 rounded-full bg-white" id="smart-lod-toggle-dot"></span>
-                            <span id="smart-lod-toggle-text">ACTIVATE</span>
+                        <button id="smart-lod-main-toggle" onclick="toggleSmartLodActive()" class="h-8 px-4 rounded-md bg-cyan-600 hover:bg-cyan-500 text-white typo-action-btn text-xs font-semibold tracking-[0.02em] transition-all cursor-pointer inline-flex items-center justify-center leading-none shadow-sm btn-elevate">
+                            <span id="smart-lod-toggle-text">ACTIVER</span>
                         </button>
                     </div>
                 </div>
@@ -2922,6 +2930,15 @@
             <div class="p-4 rounded-lg bg-slate-800/85 border border-slate-700/80 space-y-3.5 shadow-sm">
                 <div class="flex items-center justify-between">
                     <span class="typo-section-title text-slate-200">Dynamic LOD Thresholds &amp; Targets</span>
+                    <!-- 2D / VR Switcher -->
+                    <div class="inline-flex p-0.5 rounded-lg bg-slate-950 border border-slate-700/80">
+                        <button type="button" id="smart-lod-btn-mode-2d" onclick="switchSmartLodTargetMode('2D')" class="px-3 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer bg-cyan-600 text-white shadow-sm">
+                            2D Display
+                        </button>
+                        <button type="button" id="smart-lod-btn-mode-vr" onclick="switchSmartLodTargetMode('VR')" class="px-3 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer text-slate-400 hover:text-white bg-transparent">
+                            VR Headset
+                        </button>
+                    </div>
                 </div>
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-0.5">
                     <div class="p-3.5 rounded-lg bg-slate-900/70 border border-slate-700/80 space-y-2 shadow-inner">
@@ -2953,15 +2970,69 @@
 
                     <div class="p-3.5 rounded-lg bg-slate-900/70 border border-slate-700/80 space-y-2 shadow-inner">
                         <div class="flex items-center justify-between">
-                            <span class="typo-setting-label text-[10px] text-slate-400">Target FPS</span>
-                            <input type="number" id="smart-lod-input-fps" min="20" max="120" value="40" class="w-14 bg-slate-950 border border-slate-700 rounded-md px-1.5 py-0.5 text-xs typo-input-val font-semibold text-right text-cyan-400 focus:outline-none tabular-nums">
+                            <span class="typo-setting-label text-[10px] text-slate-400">Target FPS (<span id="smart-lod-fps-mode-indicator">2D</span>)</span>
+                            <div class="flex items-center gap-1.5">
+                                <button type="button" onclick="adjustSmartLodFps(-1)" class="w-7 h-7 rounded bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-slate-200 hover:text-white flex items-center justify-center font-bold text-sm transition-colors cursor-pointer select-none" title="-1 FPS">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M20 12H4"/></svg>
+                                </button>
+                                <input type="number" id="smart-lod-input-fps" min="20" max="144" value="40" oninput="handleSmartLodFpsInput(this.value)" class="w-12 h-7 bg-slate-950 border border-slate-700 rounded text-center text-xs font-bold text-cyan-400 focus:outline-none focus:border-cyan-500 tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none">
+                                <button type="button" onclick="adjustSmartLodFps(1)" class="w-7 h-7 rounded bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-slate-200 hover:text-white flex items-center justify-center font-bold text-sm transition-colors cursor-pointer select-none" title="+1 FPS">
+                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+                                </button>
+                                <button type="button" onclick="syncSmartLodTargetFpsFromSettings()" class="h-7 px-2 rounded bg-slate-800/90 hover:bg-slate-700 text-cyan-400 hover:text-cyan-300 text-[10px] font-semibold tracking-wide uppercase transition-colors cursor-pointer inline-flex items-center gap-1 border border-cyan-800/50" title="Synchroniser avec le Target FPS des Graphics Settings">
+                                    <svg class="w-3 h-3 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                                    <span>SYNC</span>
+                                </button>
+                            </div>
                         </div>
                         <div class="flex items-center justify-between pt-1">
                             <label for="smart-lod-cloud-recovery" class="typo-setting-label text-[11px] text-slate-300 cursor-pointer">Auto Cloud Recovery</label>
-                            <input type="checkbox" id="smart-lod-cloud-recovery" checked class="w-3.5 h-3.5 accent-cyan-500 rounded cursor-pointer">
+                            <input type="checkbox" id="smart-lod-cloud-recovery" checked onchange="updatePerformanceCockpitGauges()" class="w-3.5 h-3.5 accent-cyan-500 rounded cursor-pointer">
                         </div>
-                        <button onclick="saveSmartLodUiConfig()" class="h-8 w-full rounded-md bg-cyan-600 hover:bg-cyan-500 text-white typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] transition-all cursor-pointer inline-flex items-center justify-center leading-none mt-1 shadow-sm btn-elevate">
-                            Save Profile
+                        <span class="typo-metadata text-[10px] text-slate-500 block leading-tight">Dynamic LOD governor setpoint</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Smart LOD Profile Management Zone -->
+            <div class="mt-3 space-y-1.5">
+                <div class="flex items-center justify-between px-1">
+                    <span class="typo-section-title text-slate-400">Profiles Management</span>
+                </div>
+                <div class="p-3.5 rounded-lg bg-slate-800/85 border border-slate-700/80 shadow-sm">
+                    <div class="flex items-center gap-2.5 flex-nowrap w-full">
+                        <!-- Universal Profile Combobox Field -->
+                        <div class="relative flex-1 min-w-[200px]" id="smart-lod-profile-universal-combobox">
+                            <div class="relative flex items-center">
+                                <input type="text"
+                                       id="smart-lod-profile-universal-input"
+                                       placeholder="Enter profile name (e.g. Balanced Airliner)..."
+                                       onfocus="handleSmartLodProfileInputFocus()"
+                                       onblur="handleSmartLodProfileInputBlur()"
+                                       class="w-full h-8 bg-slate-900/70 border border-slate-700/80 rounded-md px-3 pr-8 typo-input-val text-xs text-white font-medium focus:outline-none focus:border-cyan-500 placeholder:text-slate-500 transition-colors leading-none"
+                                       autocomplete="off">
+                                <button type="button"
+                                        id="smart-lod-profile-dropdown-btn"
+                                        onclick="toggleSmartLodProfileDropdown(event)"
+                                        class="absolute right-1 top-1/2 -translate-y-1/2 w-6 h-6 flex items-center justify-center text-slate-400 hover:text-white transition-colors cursor-pointer border-0 bg-transparent"
+                                        title="View existing profiles">
+                                    <svg class="w-3.5 h-3.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                                </button>
+                            </div>
+                            <!-- Dropdown List Menu -->
+                            <div id="smart-lod-profile-dropdown-list"
+                                 onwheel="event.stopPropagation();"
+                                 style="overscroll-behavior: contain;"
+                                 class="hidden fixed max-h-56 overflow-y-auto custom-scrollbar bg-slate-900 border border-slate-700/90 rounded-md shadow-2xl z-[99999] py-1 typo-input-val text-xs divide-y divide-slate-800/60">
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons with uniform h-8 height -->
+                        <button onclick="saveCurrentSmartLodProfile()" class="h-8 px-3 rounded-md border border-cyan-500/40 bg-cyan-600 hover:bg-cyan-500 text-white typo-action-btn text-xs font-semibold tracking-[0.02em] transition-all cursor-pointer shadow-sm uppercase shrink-0 whitespace-nowrap inline-flex items-center justify-center leading-none btn-elevate" title="Save current settings as profile">
+                            SAVE PROFILE
+                        </button>
+                        <button onclick="activateSelectedSmartLodProfile()" class="h-8 px-3 rounded-md border border-emerald-500/40 bg-emerald-600 hover:bg-emerald-500 text-white typo-action-btn text-xs font-semibold tracking-[0.02em] transition-all cursor-pointer shadow-sm uppercase shrink-0 whitespace-nowrap inline-flex items-center justify-center leading-none btn-elevate" title="Activate selected profile">
+                            ACTIVATE
                         </button>
                     </div>
                 </div>
