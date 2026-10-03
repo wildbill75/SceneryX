@@ -25,7 +25,6 @@ pyinstaller_cmd = [
     "--collect-all=SimConnect",
     "--collect-all=pystray",
     "--collect-all=PIL",
-    "--collect-all=psutil",
     os.path.join(BASE_DIR, "main.py")
 ]
 

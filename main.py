@@ -3633,34 +3633,6 @@ class Api:
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
 
-    def get_detected_addons(self):
-        try:
-            addons = flight_rig_optimizer.get_detected_addons()
-            return json.dumps(addons, ensure_ascii=False)
-        except Exception as e:
-            return json.dumps([], ensure_ascii=False)
-
-    def add_custom_addon(self, name, exe_name, profile_impact="Medium"):
-        try:
-            res = flight_rig_optimizer.add_custom_addon(name, exe_name, profile_impact)
-            return json.dumps(res, ensure_ascii=False)
-        except Exception as e:
-            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
-
-    def remove_custom_addon(self, addon_id):
-        try:
-            res = flight_rig_optimizer.remove_custom_addon(addon_id)
-            return json.dumps(res, ensure_ascii=False)
-        except Exception as e:
-            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
-
-    def set_addon_flight_status(self, addon_id, is_active):
-        try:
-            res = flight_rig_optimizer.set_addon_flight_status(addon_id, is_active)
-            return json.dumps(res, ensure_ascii=False)
-        except Exception as e:
-            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
-
     def start_flight_blackbox(self, flight_name, dep_icao, arr_icao, aircraft):
         try:
             res = flight_perf_tracker.BLACKBOX.start(flight_name=flight_name, dep=dep_icao, arr=arr_icao, aircraft=aircraft)
