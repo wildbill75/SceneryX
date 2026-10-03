@@ -17534,6 +17534,53 @@ function selectComboboxPreset(key, value, minVal, maxVal) {
     onMsfsManualSettingSubmitted(key, value, minVal, maxVal);
 }
 
+function getSettingRatingBadgeHtml(tag, rating, isCompact = false, isHeader = false, id = null, title = null) {
+    const rawTag = String(tag || '').trim().toUpperCase();
+    let cleanTag = 'OPTIMUM';
+    if (rawTag.includes('SWEET')) {
+        cleanTag = 'SWEET SPOT';
+    } else if (rawTag.includes('OFF') || rawTag.includes('INACTIVE') || rawTag.includes('DISABLED')) {
+        cleanTag = 'OFF';
+    } else if (rawTag.includes('HAZARD') || rawTag.includes('NOGO') || rawTag.includes('RISK') || rawTag.includes('ALERT')) {
+        cleanTag = 'HAZARD';
+    } else if (rawTag.includes('SUB') || rawTag.includes('MISMATCH')) {
+        cleanTag = 'SUBOPTIMAL';
+    } else if (rawTag.includes('ACCEPT') || rawTag.includes('WATCH') || rawTag.includes('PRESSURE')) {
+        cleanTag = 'ACCEPTABLE';
+    } else {
+        cleanTag = 'OPTIMUM';
+    }
+
+    const idAttr = id ? `id="${id}"` : '';
+    const titleAttr = title ? `title="${String(title).replace(/"/g, '&quot;')}"` : '';
+    const cursorClass = title ? 'cursor-help' : '';
+
+    if (cleanTag === 'SWEET SPOT') {
+        if (isHeader) {
+            return `<span ${idAttr} ${titleAttr} class="px-2.5 py-0.5 rounded typo-action-btn text-xs font-bold uppercase tracking-[0.02em] shrink-0 shadow-sm inline-flex items-center gap-1 bg-slate-950/90 border border-[#2ce586]/80 text-[#2ce586] ${cursorClass}"><span class="text-[#fbbf24] drop-shadow-[0_0_5px_rgba(251,191,36,0.85)] leading-none select-none">★</span><span class="tracking-wider">SWEET SPOT</span></span>`;
+        } else {
+            return `<span ${idAttr} ${titleAttr} class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide inline-flex items-center gap-1 shrink-0 shadow-sm bg-slate-950/95 border border-[#2ce586]/70 text-[#2ce586] ${cursorClass}"><span class="text-[#fbbf24] drop-shadow-[0_0_4px_rgba(251,191,36,0.85)] text-[9px] leading-none select-none">★</span><span class="tracking-wider">SWEET SPOT</span></span>`;
+        }
+    }
+
+    let bgClass = 'bg-emerald-600 text-white font-bold';
+    if (cleanTag === 'OFF') {
+        bgClass = 'bg-slate-700 text-slate-300 font-bold';
+    } else if (cleanTag === 'ACCEPTABLE') {
+        bgClass = 'bg-amber-600 text-white font-bold';
+    } else if (cleanTag === 'SUBOPTIMAL') {
+        bgClass = 'bg-orange-600 text-white font-bold';
+    } else if (cleanTag === 'HAZARD') {
+        bgClass = 'bg-rose-600 text-white font-bold';
+    }
+
+    if (isHeader) {
+        return `<span ${idAttr} ${titleAttr} class="px-2.5 py-0.5 rounded typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] shrink-0 shadow-sm ${bgClass} ${cursorClass}">${cleanTag}</span>`;
+    } else {
+        return `<span ${idAttr} ${titleAttr} class="text-[9px] font-bold px-1.5 py-0.5 rounded tracking-wide uppercase shrink-0 shadow-sm ${bgClass} ${cursorClass}">${cleanTag}</span>`;
+    }
+}
+
 function getSettingItemAndOptionData(key, optValue) {
     if (!msfsSettingsMatrixData) return { item: null, optData: null };
     const modeNorm = String(currentMsfsGraphicsMode || '2D').toUpperCase();
@@ -17586,13 +17633,9 @@ function onCustomOptionHover(key, optValue) {
         const rating = optData.rating || 'acceptable';
         const tag = optData.tag || rating.toUpperCase();
         const reason = optData.reason || '';
-        let badgeClass = 'bg-amber-600 text-white';
-        if (rating === 'optimum') badgeClass = 'bg-emerald-600 text-white';
-        else if (rating === 'suboptimal') badgeClass = 'bg-orange-600 text-white';
-        else if (rating === 'hazard') badgeClass = 'bg-rose-600 text-white';
 
         previewEl.innerHTML = `
-            <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${badgeClass} shrink-0">${tag}</span>
+            ${getSettingRatingBadgeHtml(tag, rating, true, false)}
             <span class="text-slate-200 text-[10.5px] leading-tight" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${reason || optValue}</span>
         `;
     }
@@ -17609,13 +17652,8 @@ function onCustomOptionLeave(key) {
     const tag = optData ? (optData.tag || rating.toUpperCase()) : (item.tag_badge || item.rating_label || 'OPTIMUM').toUpperCase();
     const reason = (optData && optData.reason) ? optData.reason : (item.tag_reason || item.rating_reason || 'Hover over an option to preview its technical impact...');
 
-    let badgeClass = 'bg-amber-600 text-white';
-    if (rating === 'optimum') badgeClass = 'bg-emerald-600 text-white';
-    else if (rating === 'suboptimal') badgeClass = 'bg-orange-600 text-white';
-    else if (rating === 'hazard') badgeClass = 'bg-rose-600 text-white';
-
     previewEl.innerHTML = `
-        <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${badgeClass} shrink-0">${tag}</span>
+        ${getSettingRatingBadgeHtml(tag, rating, true, false)}
         <span class="text-slate-300 text-[10.5px] leading-tight" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${reason}</span>
     `;
 }
@@ -17629,13 +17667,9 @@ function onComboboxOptionHover(key, optValue) {
         const rating = optData.rating || 'acceptable';
         const tag = optData.tag || rating.toUpperCase();
         const reason = optData.reason || '';
-        let badgeClass = 'bg-amber-600 text-white';
-        if (rating === 'optimum') badgeClass = 'bg-emerald-600 text-white';
-        else if (rating === 'suboptimal') badgeClass = 'bg-orange-600 text-white';
-        else if (rating === 'hazard') badgeClass = 'bg-rose-600 text-white';
 
         previewEl.innerHTML = `
-            <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${badgeClass} shrink-0">${tag}</span>
+            ${getSettingRatingBadgeHtml(tag, rating, true, false)}
             <span class="text-slate-200 text-[10.5px] leading-tight" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${reason || optValue}</span>
         `;
     }
@@ -17653,13 +17687,8 @@ function onComboboxOptionLeave(key) {
     const tag = optData ? (optData.tag || rating.toUpperCase()) : (item.tag_badge || item.rating_label || 'OPTIMUM').toUpperCase();
     const reason = (optData && optData.reason) ? optData.reason : (item.tag_reason || item.rating_reason || 'Hover over a preset to preview its impact...');
 
-    let badgeClass = 'bg-amber-600 text-white';
-    if (rating === 'optimum') badgeClass = 'bg-emerald-600 text-white';
-    else if (rating === 'suboptimal') badgeClass = 'bg-orange-600 text-white';
-    else if (rating === 'hazard') badgeClass = 'bg-rose-600 text-white';
-
     previewEl.innerHTML = `
-        <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${badgeClass} shrink-0">${tag}</span>
+        ${getSettingRatingBadgeHtml(tag, rating, true, false)}
         <span class="text-slate-300 text-[10.5px] leading-tight" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${reason}</span>
     `;
 }
@@ -18430,9 +18459,11 @@ function renderMsfsSettingsMatrix() {
         : (msfsSettingsMatrixData.graphics_advisory_2d || msfsSettingsMatrixData.graphics_advisory_vr);
     // Helper to render individual setting card
     const renderCard = (item) => {
-        // Enforce clean, single-word uppercase tag without any parentheses
-        let cleanTag = (item.rating_label || 'OPTIMUM').toUpperCase().replace(/\(.*?\)/g, '').replace(/[^A-Z]/g, '').trim();
-        if (cleanTag.includes('OFF') || item.is_active === false || ((item.key === 'max_frame_rate') && (item.value === 'OFF' || item.raw_value === '0'))) {
+        // Enforce clean, uppercase tag without any parentheses
+        let cleanTag = (item.tag_badge || item.rating_label || 'OPTIMUM').toUpperCase().replace(/\(.*?\)/g, '').trim();
+        if (cleanTag.includes('SWEET')) {
+            cleanTag = 'SWEET SPOT';
+        } else if (cleanTag.includes('OFF') || item.is_active === false || ((item.key === 'max_frame_rate') && (item.value === 'OFF' || item.raw_value === '0'))) {
             cleanTag = 'OFF';
         } else if (cleanTag.includes('HAZARD') || cleanTag.includes('NOGO') || cleanTag.includes('RISK') || cleanTag.includes('ALERT')) {
             cleanTag = 'HAZARD';
@@ -18444,20 +18475,17 @@ function renderMsfsSettingsMatrix() {
             cleanTag = 'OPTIMUM';
         }
 
-        // Solid background colors without stroke or glass effects
-        let badgeColorClass = 'bg-emerald-600 text-white font-bold';
+        // Val color for closed select button text
         let valColorClass = 'text-emerald-400';
         if (cleanTag === 'OFF') {
-            badgeColorClass = 'bg-slate-700 text-slate-300 font-bold';
             valColorClass = 'text-slate-500 opacity-60';
-        } else if (item.rating_color === 'yellow' || item.rating_color === 'amber' || cleanTag === 'ACCEPTABLE') {
-            badgeColorClass = 'bg-amber-600 text-white font-bold';
+        } else if (cleanTag === 'SWEET SPOT') {
+            valColorClass = 'text-[#2ce586]';
+        } else if (cleanTag === 'ACCEPTABLE') {
             valColorClass = 'text-amber-400';
-        } else if (item.rating_color === 'orange' || cleanTag === 'SUBOPTIMAL') {
-            badgeColorClass = 'bg-orange-600 text-white font-bold';
+        } else if (cleanTag === 'SUBOPTIMAL') {
             valColorClass = 'text-orange-400';
-        } else if (item.rating_color === 'rose' || cleanTag === 'HAZARD') {
-            badgeColorClass = 'bg-rose-600 text-white font-bold';
+        } else if (cleanTag === 'HAZARD') {
             valColorClass = 'text-rose-400';
         }
 
@@ -18465,7 +18493,7 @@ function renderMsfsSettingsMatrix() {
         
         // Removed SHARED badge on setting cards per user request
         const sharedBadge = '';
-        const ratingBadge = `<span id="opt-badge-${item.key}" class="px-2.5 py-0.5 rounded typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] shrink-0 shadow-sm cursor-help ${badgeColorClass}" title="${tagTooltip}">${cleanTag}</span>`;
+        const ratingBadge = getSettingRatingBadgeHtml(cleanTag, item.rating_color || item.rating, false, true, `opt-badge-${item.key}`, tagTooltip);
         const infoButton = `<button type="button" onclick="openSettingInfoModal('${item.key}')" class="w-6 h-6 flex items-center justify-center rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white typo-action-btn text-xs font-semibold transition-colors cursor-pointer shrink-0 select-none" title="Detailed Technical Information">i</button>`;
 
         // Headset Software Scale badge (e.g. [PIMAX PLAY: 0.80]) - Solid color, no glass effect, white typography
@@ -18555,26 +18583,16 @@ function renderMsfsSettingsMatrix() {
                         currentComboTag = optTag;
                     }
 
-                    let textClass = 'text-amber-400 font-semibold';
-                    let tagBadgeClass = 'bg-amber-600 text-white font-bold';
-                    if (optRating === 'optimum') {
-                        textClass = 'text-emerald-300 font-semibold';
-                        tagBadgeClass = 'bg-emerald-600 text-white font-bold';
-                    } else if (optRating === 'suboptimal') {
-                        textClass = 'text-orange-400 font-semibold';
-                        tagBadgeClass = 'bg-orange-600 text-white font-bold';
-                    } else if (optRating === 'hazard') {
-                        textClass = 'text-rose-400 font-semibold';
-                        tagBadgeClass = 'bg-rose-600 text-white font-bold';
-                    }
+                    const badgeHtml = getSettingRatingBadgeHtml(optTag, optRating, true, false);
+
                     return `
-                        <div class="px-3 py-1.5 hover:bg-slate-800 ${isCur ? 'bg-slate-800/90 text-white font-semibold' : textClass} cursor-pointer transition-colors flex items-center justify-between typo-input-val text-xs font-semibold tabular-nums select-none"
+                        <div class="px-3 py-1.5 hover:bg-slate-800 ${isCur ? 'bg-slate-800/90 text-white font-semibold' : 'text-slate-200 font-medium'} cursor-pointer transition-colors flex items-center justify-between typo-input-val text-xs tabular-nums select-none"
                              onmouseenter="onComboboxOptionHover('${item.key}', '${optEscaped}')"
                              onmouseleave="onComboboxOptionLeave('${item.key}')"
                              onmousedown="selectComboboxPreset('${item.key}', '${optEscaped}', ${item.min_val ?? 0}, ${item.max_val ?? 400})">
-                            <span class="font-semibold tabular-nums">${opt}</span>
+                            <span class="tabular-nums ${isCur ? 'font-semibold text-white' : 'text-slate-200'}">${opt}</span>
                             <div class="flex items-center gap-1.5 shrink-0">
-                                ${optTag ? `<span class="text-[9px] font-bold px-1.5 py-0.5 rounded tracking-wide uppercase shadow-sm ${tagBadgeClass}">${optTag}</span>` : ''}
+                                ${badgeHtml}
                                 ${isCur ? '<span class="text-[9px] font-semibold bg-slate-700 text-white px-1.5 py-0.5 rounded typo-action-btn uppercase shadow-sm">CURRENT</span>' : ''}
                             </div>
                         </div>
@@ -18582,13 +18600,8 @@ function renderMsfsSettingsMatrix() {
                 }).join('');
             }
 
-            let comboBadgeClass = 'bg-amber-600 text-white';
-            if (currentComboRating === 'optimum') comboBadgeClass = 'bg-emerald-600 text-white';
-            else if (currentComboRating === 'suboptimal') comboBadgeClass = 'bg-orange-600 text-white';
-            else if (currentComboRating === 'hazard') comboBadgeClass = 'bg-rose-600 text-white';
-
             const defaultComboPreviewHtml = `
-                <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${comboBadgeClass} shrink-0">${currentComboTag}</span>
+                ${getSettingRatingBadgeHtml(currentComboTag, currentComboRating, true, false)}
                 <span class="text-slate-300 text-[10.5px] leading-tight" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${currentComboReason || 'Hover over a preset to preview its impact...'}</span>
             `;
 
@@ -18736,27 +18749,16 @@ function renderMsfsSettingsMatrix() {
                         currentTag = optTag;
                     }
 
-                    let textClass = 'text-amber-400 font-semibold';
-                    let tagBadgeClass = 'bg-amber-600 text-white font-bold';
-                    if (optRating === 'optimum') {
-                        textClass = 'text-emerald-400 font-semibold';
-                        tagBadgeClass = 'bg-emerald-600 text-white font-bold';
-                    } else if (optRating === 'suboptimal') {
-                        textClass = 'text-orange-400 font-semibold';
-                        tagBadgeClass = 'bg-orange-600 text-white font-bold';
-                    } else if (optRating === 'hazard') {
-                        textClass = 'text-rose-400 font-semibold';
-                        tagBadgeClass = 'bg-rose-600 text-white font-bold';
-                    }
+                    const badgeHtml = getSettingRatingBadgeHtml(optTag, optRating, true, false);
 
                     return `
                         <div class="px-3 py-2 hover:bg-slate-800 ${isSelected ? 'bg-slate-800/80' : ''} cursor-pointer transition-colors flex items-center justify-between typo-input-val text-xs gap-2 select-none"
                              onmouseenter="onCustomOptionHover('${item.key}', '${optEscaped}')"
                              onmouseleave="onCustomOptionLeave('${item.key}')"
                              onmousedown="selectCustomOption('${item.key}', '${optEscaped}')">
-                            <span class="${textClass} truncate">${opt}</span>
+                            <span class="${isSelected ? 'text-white font-semibold' : 'text-slate-200 group-hover:text-white font-medium'} truncate">${opt}</span>
                             <div class="flex items-center gap-1.5 shrink-0">
-                                <span class="text-[9px] font-bold px-1.5 py-0.5 rounded tracking-wide uppercase shadow-sm ${tagBadgeClass}">${optTag}</span>
+                                ${badgeHtml}
                                 ${isSelected ? '<span class="text-[9px] font-semibold bg-slate-700 text-white px-1.5 py-0.5 rounded typo-action-btn uppercase shadow-sm">CURRENT</span>' : ''}
                             </div>
                         </div>
@@ -18764,13 +18766,8 @@ function renderMsfsSettingsMatrix() {
                 }).join('');
             }
 
-            let badgeClass = 'bg-amber-600 text-white';
-            if (currentRating === 'optimum') badgeClass = 'bg-emerald-600 text-white';
-            else if (currentRating === 'suboptimal') badgeClass = 'bg-orange-600 text-white';
-            else if (currentRating === 'hazard') badgeClass = 'bg-rose-600 text-white';
-
             const defaultCustomPreviewHtml = `
-                <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${badgeClass} shrink-0">${currentTag}</span>
+                ${getSettingRatingBadgeHtml(currentTag, currentRating, true, false)}
                 <span class="text-slate-300 text-[10.5px] leading-tight" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${currentReason || 'Hover over an option to preview its technical impact...'}</span>
             `;
 
@@ -18908,11 +18905,12 @@ async function onMsfsSettingChanged(settingKey, newValue) {
             }
             if (optInfo) {
                 found.rating = optInfo.rating;
-                found.tag_badge = optInfo.rating.toUpperCase();
-                found.rating_label = optInfo.rating.toUpperCase();
+                found.tag_badge = optInfo.tag || optInfo.rating.toUpperCase();
+                found.rating_label = optInfo.tag || optInfo.rating.toUpperCase();
                 found.rating_reason = optInfo.reason;
                 found.tag_reason = optInfo.reason;
-                if (optInfo.rating === 'optimum') found.rating_color = 'emerald';
+                if (optInfo.tag && optInfo.tag.includes('SWEET')) found.rating_color = 'emerald';
+                else if (optInfo.rating === 'optimum') found.rating_color = 'emerald';
                 else if (optInfo.rating === 'acceptable') found.rating_color = 'amber';
                 else if (optInfo.rating === 'suboptimal') found.rating_color = 'orange';
                 else if (optInfo.rating === 'hazard') found.rating_color = 'rose';
@@ -18931,85 +18929,84 @@ async function onMsfsSettingChanged(settingKey, newValue) {
                 ? (String(newValue) !== '0' && String(newValue).toUpperCase() !== 'OFF')
                 : (String(newValue).trim().toUpperCase().startsWith('ON') || String(newValue) === '1' || String(newValue).trim().toUpperCase() === 'TRUE');
 
+            let cleanTag = (found.tag_badge || found.rating_label || found.rating || 'OPTIMUM').toUpperCase();
+            if (cleanTag.includes('SWEET')) {
+                cleanTag = 'SWEET SPOT';
+            } else if (cleanTag.includes('OFF') || (settingKey === 'max_frame_rate' && !isNewActive)) {
+                cleanTag = 'OFF';
+            } else if (cleanTag.includes('HAZARD') || cleanTag.includes('NOGO') || cleanTag.includes('RISK') || cleanTag.includes('ALERT')) {
+                cleanTag = 'HAZARD';
+            } else if (cleanTag.includes('SUB') || cleanTag.includes('MISMATCH')) {
+                cleanTag = 'SUBOPTIMAL';
+            } else if (cleanTag.includes('ACCEPT') || cleanTag.includes('WATCH') || cleanTag.includes('PRESSURE')) {
+                cleanTag = 'ACCEPTABLE';
+            } else {
+                cleanTag = 'OPTIMUM';
+            }
+
             if (badgeEl) {
-                let cleanTag = (found.tag_badge || found.rating_label || found.rating || 'OPTIMUM').toUpperCase();
-                if (cleanTag.includes('OFF') || (settingKey === 'max_frame_rate' && !isNewActive)) {
-                    cleanTag = 'OFF';
-                } else if (cleanTag.includes('HAZARD') || cleanTag.includes('NOGO') || cleanTag.includes('RISK') || cleanTag.includes('ALERT')) {
-                    cleanTag = 'HAZARD';
-                } else if (cleanTag.includes('SUB') || cleanTag.includes('MISMATCH')) {
-                    cleanTag = 'SUBOPTIMAL';
-                } else if (cleanTag.includes('ACCEPT') || cleanTag.includes('WATCH') || cleanTag.includes('PRESSURE')) {
-                    cleanTag = 'ACCEPTABLE';
-                } else {
-                    cleanTag = 'OPTIMUM';
-                }
-                badgeEl.textContent = cleanTag;
-                let badgeClass = 'bg-emerald-600 text-white font-bold';
-                let textClass = 'text-emerald-400';
-                if (cleanTag === 'OFF') {
-                    badgeClass = 'bg-slate-700 text-slate-300 font-bold';
-                    textClass = 'text-slate-500 opacity-60';
-                } else if (found.rating_color === 'yellow' || found.rating_color === 'amber' || cleanTag === 'ACCEPTABLE') {
-                    badgeClass = 'bg-amber-600 text-white font-bold';
-                    textClass = 'text-amber-400';
-                } else if (found.rating_color === 'orange' || cleanTag === 'SUBOPTIMAL') {
-                    badgeClass = 'bg-orange-600 text-white font-bold';
-                    textClass = 'text-orange-400';
-                } else if (found.rating_color === 'rose' || cleanTag === 'HAZARD') {
-                    badgeClass = 'bg-rose-600 text-white font-bold';
-                    textClass = 'text-rose-400';
-                }
-                badgeEl.className = `px-2.5 py-0.5 rounded typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] shrink-0 shadow-sm cursor-help ${badgeClass}`;
-                if (found.tag_reason || found.rating_reason) {
-                    badgeEl.title = found.tag_reason || found.rating_reason;
-                }
-                if (selectEl) {
-                    selectEl.classList.remove('text-emerald-400', 'text-amber-400', 'text-orange-400', 'text-rose-400', 'text-slate-500', 'opacity-60');
-                    selectEl.classList.add(textClass);
-                }
-                if (inputEl) {
-                    if (settingKey === 'max_frame_rate') {
-                        if (isNewActive) {
-                            inputEl.value = String(newValue).replace(/[^0-9]/g, '') || inputEl.value;
-                            inputEl.classList.remove('text-slate-500', 'opacity-60', 'text-amber-400', 'text-orange-400', 'text-rose-400');
-                            inputEl.classList.add('text-emerald-400');
-                            inputEl.title = 'Target frame rate active';
-                        } else {
-                            const fallbackVal = found._lastActiveFps || inputEl.value.replace(/[^0-9]/g, '') || (String(currentMsfsGraphicsMode || '2D').toUpperCase() === 'VR' ? '45' : '82');
-                            inputEl.value = fallbackVal;
-                            inputEl.classList.remove('text-emerald-400', 'text-amber-400', 'text-orange-400', 'text-rose-400');
-                            inputEl.classList.add('text-slate-500', 'opacity-60');
-                            inputEl.title = 'Frame limiter is disabled (OFF) - Target preserved';
-                        }
+                badgeEl.outerHTML = getSettingRatingBadgeHtml(cleanTag, found.rating_color || found.rating, false, true, `opt-badge-${settingKey}`, found.tag_reason || found.rating_reason || '');
+            }
+
+            let textClass = 'text-emerald-400';
+            if (cleanTag === 'OFF') {
+                textClass = 'text-slate-500 opacity-60';
+            } else if (cleanTag === 'SWEET SPOT') {
+                textClass = 'text-[#2ce586]';
+            } else if (cleanTag === 'ACCEPTABLE') {
+                textClass = 'text-amber-400';
+            } else if (cleanTag === 'SUBOPTIMAL') {
+                textClass = 'text-orange-400';
+            } else if (cleanTag === 'HAZARD') {
+                textClass = 'text-rose-400';
+            }
+
+            if (selectEl) {
+                selectEl.classList.remove('text-emerald-400', 'text-[#2ce586]', 'text-amber-400', 'text-orange-400', 'text-rose-400', 'text-slate-500', 'opacity-60');
+                selectEl.classList.add(textClass);
+            }
+            if (inputEl) {
+                if (settingKey === 'max_frame_rate') {
+                    if (isNewActive) {
+                        inputEl.value = String(newValue).replace(/[^0-9]/g, '') || inputEl.value;
+                        inputEl.classList.remove('text-slate-500', 'opacity-60', 'text-[#2ce586]', 'text-amber-400', 'text-orange-400', 'text-rose-400');
+                        inputEl.classList.add(cleanTag === 'SWEET SPOT' ? 'text-[#2ce586]' : 'text-emerald-400');
+                        inputEl.title = 'Target frame rate active';
                     } else {
-                        inputEl.value = newValue;
-                        inputEl.classList.remove('text-emerald-400', 'text-amber-400', 'text-orange-400', 'text-rose-400', 'text-slate-500', 'opacity-60');
-                        inputEl.classList.add(textClass);
+                        const fallbackVal = found._lastActiveFps || inputEl.value.replace(/[^0-9]/g, '') || (String(currentMsfsGraphicsMode || '2D').toUpperCase() === 'VR' ? '45' : '82');
+                        inputEl.value = fallbackVal;
+                        inputEl.classList.remove('text-emerald-400', 'text-[#2ce586]', 'text-amber-400', 'text-orange-400', 'text-rose-400');
+                        inputEl.classList.add('text-slate-500', 'opacity-60');
+                        inputEl.title = 'Frame limiter is disabled (OFF) - Target preserved';
                     }
+                } else {
+                    inputEl.value = newValue;
+                    inputEl.classList.remove('text-emerald-400', 'text-[#2ce586]', 'text-amber-400', 'text-orange-400', 'text-rose-400', 'text-slate-500', 'opacity-60');
+                    inputEl.classList.add(textClass);
                 }
-                if (customBtn) {
-                    customBtn.classList.remove('text-emerald-400', 'text-amber-400', 'text-orange-400', 'text-rose-400', 'text-slate-500', 'opacity-60');
-                    customBtn.classList.add(textClass);
-                    if (found.tag_reason || found.rating_reason) {
-                        customBtn.title = found.tag_reason || found.rating_reason;
-                    }
+            }
+            if (customBtn) {
+                customBtn.classList.remove('text-emerald-400', 'text-[#2ce586]', 'text-amber-400', 'text-orange-400', 'text-rose-400', 'text-slate-500', 'opacity-60');
+                customBtn.classList.add(textClass);
+                if (found.tag_reason || found.rating_reason) {
+                    customBtn.title = found.tag_reason || found.rating_reason;
                 }
-                if (customLabel) {
-                    customLabel.textContent = newValue;
-                }
-                if (customPreview) {
-                    customPreview.innerHTML = `
-                        <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${badgeClass} shrink-0">${cleanTag}</span>
-                        <span class="text-slate-300 text-[10.5px] leading-tight" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${found.tag_reason || found.rating_reason || ''}</span>
-                    `;
-                }
-                if (comboPreview) {
-                    comboPreview.innerHTML = `
-                        <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${badgeClass} shrink-0">${cleanTag}</span>
-                        <span class="text-slate-300 text-[10.5px] leading-tight" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${found.tag_reason || found.rating_reason || ''}</span>
-                    `;
-                }
+            }
+            if (customLabel) {
+                customLabel.textContent = newValue;
+            }
+            if (customPreview) {
+                customPreview.innerHTML = `
+                    ${getSettingRatingBadgeHtml(cleanTag, found.rating_color || found.rating, true, false)}
+                    <span class="text-slate-300 text-[10.5px] leading-tight" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${found.tag_reason || found.rating_reason || ''}</span>
+                `;
+            }
+            if (comboPreview) {
+                comboPreview.innerHTML = `
+                    ${getSettingRatingBadgeHtml(cleanTag, found.rating_color || found.rating, true, false)}
+                    <span class="text-slate-300 text-[10.5px] leading-tight" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${found.tag_reason || found.rating_reason || ''}</span>
+                `;
+            }
 
                 // Immediately synchronize Toggle Switch state in the DOM if this setting has a switch
                 const switchLabel = document.getElementById(`opt-switch-label-${settingKey}`);
@@ -19030,7 +19027,6 @@ async function onMsfsSettingChanged(settingKey, newValue) {
                 if (switchCont) {
                     switchCont.title = isNewActive ? 'Click to disable frame limiter (OFF)' : 'Click to enable frame limiter';
                 }
-            }
 
             // Immediately synchronize Framerate Multiplier card when Frame Generation is toggled
             if (settingKey === 'frame_generation') {
@@ -19054,9 +19050,7 @@ async function onMsfsSettingChanged(settingKey, newValue) {
                     const multCustomPreview = document.getElementById('opt-custom-preview-framerate_multiplier');
 
                     if (multBadge) {
-                        multBadge.textContent = multItem.tag_badge;
-                        multBadge.className = `px-2.5 py-0.5 rounded typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] shrink-0 shadow-sm cursor-help ${isOff ? 'bg-amber-600 text-white font-bold' : 'bg-emerald-600 text-white font-bold'}`;
-                        multBadge.title = multItem.tag_reason;
+                        multBadge.outerHTML = getSettingRatingBadgeHtml(multItem.tag_badge, multItem.rating_color, false, true, 'opt-badge-framerate_multiplier', multItem.tag_reason);
                     }
                     if (multSelect) {
                         multSelect.innerHTML = `<option value="${multItem.value}">${multItem.value}</option>`;
