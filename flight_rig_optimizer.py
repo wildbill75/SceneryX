@@ -3504,49 +3504,51 @@ def calculate_option_ratings(key: str, options: List[str], is_liner: bool, is_vr
 
         elif key == "anti_aliasing":
             if is_vr:
-                if "QUALITY" in o_up or (o_up == "DLSS" and not any(k in o_up for k in ["PERFORMANCE", "BALANCED"])):
+                if "QUALITY" in o_up or (o_up == "DLSS" and not any(k in o_up for k in ["PERFORMANCE", "BALANCED", "DLAA"])):
                     r, c = "optimum", "emerald"
                     tag = "SWEET SPOT"
-                    reason = "67% internal render: crisp cockpit avionics, runway markings, and clean HUD lines with DLSS AI reconstruction."
+                    reason = "67% Render Scale (~45% native pixels) • AI Tensor Reconstruction: The calibrated VR Sweet Spot. Restores crystal-clear EFIS flight displays, runway markings and HUD lines while slashing pixel shading times by ~55%."
                 elif "BALANCED" in o_up:
-                    r, c = ("optimum", "emerald") if not is_flagship_gpu else ("acceptable", "amber")
-                    reason = "58% internal render: steady 90Hz frame pacing with slight softening on distant taxiway signs."
+                    r, c = "optimum", "emerald"
+                    tag = "SWEET SPOT" if is_entry_rig else None
+                    reason = "58% Render Scale (~34% native pixels) • AI Upscaling: Massive GPU frame time relief (+45-50% FPS). Keeps stereo frame delivery locked to 72/80/90 Hz in heavy weather or demanding payware cockpits, with subtle distant softening."
                 elif "PERFORMANCE" in o_up:
-                    r, c = "acceptable" if is_entry_rig else "suboptimal", "amber" if is_entry_rig else "orange"
-                    reason = "50% internal render: frees GPU fillrate, but induces noticeable blur and ghosting on EFIS dials."
+                    r, c = ("optimum", "emerald") if is_entry_rig else ("acceptable", "amber")
+                    tag = "SWEET SPOT" if is_entry_rig else None
+                    reason = "50% Render Scale (25% native pixels) • Maximum Fillrate Relief (+60% FPS): Ultimate performance mode for high-PPD headsets (Quest 3, Aero, Crystal). Frees up to 4-5 ms GPU stereo frame time to prevent reprojection judder at major hubs."
                 elif "DLAA" in o_up:
                     r, c = "hazard", "rose"
-                    reason = "HAZARD in VR: 100% native stereo AI workload severely overburdens GPU frametimes, causing motion reprojection collapse."
+                    reason = "100% Native AI Workload • Extreme Overhead: HAZARD in VR. Runs dual full-resolution AI reconstruction passes with zero upscaling benefit, overloading GPU frame times and breaking headset motion reprojection."
                 elif "TAA" in o_up:
-                    r, c = "suboptimal", "orange"
-                    reason = "100% native stereo rasterization: heavy fill-rate workload, risks reprojection drops without AI acceleration."
+                    r, c = ("optimum", "emerald") if is_flagship_gpu else ("acceptable", "amber")
+                    reason = "100% Native Stereo Rasterization • Zero AI Ghosting: Gold standard for pilot readability. Eliminates DLSS temporal ghosting on digital glass avionics (PFD/ND/MFD) and fast-moving needles. Heavy GPU fillrate workload."
                 else:
                     r, c = "acceptable", "amber"
                     reason = "Anti-aliasing mode evaluated for VR stereo pipeline."
             else: # 2D Desktop
-                if "QUALITY" in o_up:
+                if "QUALITY" in o_up or (o_up == "DLSS" and not any(k in o_up for k in ["PERFORMANCE", "BALANCED", "DLAA"])):
                     r, c = "optimum", "emerald"
                     tag = "SWEET SPOT"
-                    reason = "67% render scale + DLSS 3 optical flow: pristine cockpit clarity with high framerate."
+                    reason = "67% Render Scale (~45% native pixels) • DLSS 3 Optical Flow: Benchmark Sweet Spot. Delivers pristine cockpit clarity and razor-sharp avionics with +35-40% framerate gain and native DLSS 3 Frame Generation compatibility."
                 elif "DLAA" in o_up:
                     if is_flagship_gpu:
                         r, c = "optimum", "emerald"
-                        reason = "100% native AI anti-aliasing: absolute peak edge sharpness on flagship GPUs."
+                        reason = "100% Native AI Tensor Smoothing • Zero Upscaling: Ultimate sub-pixel edge sharpness on high-end GPUs (RTX 4080/4090/5090). Superior foliage and line antialiasing with full native GPU rasterization workload."
                     else:
                         r, c = "acceptable", "amber"
-                        reason = "100% native AI anti-aliasing: pristine edges with full GPU rasterization workload."
+                        reason = "100% Native AI Tensor Smoothing: Pristine sub-pixel edges with full native GPU rasterization workload."
                 elif "BALANCED" in o_up:
-                    r, c = "acceptable", "amber"
-                    reason = "58% render scale: low GPU load with subtle softening on distant ground detail."
+                    r, c = "optimum", "emerald"
+                    reason = "58% Render Scale (~34% native pixels) • AI Upscaling: High-efficiency profile offering +45-50% framerate uplift. Ideal for 4K UHD monitors to stay above target refresh with negligible softening on small cockpit dials."
                 elif "PERFORMANCE" in o_up:
-                    r, c = "acceptable", "amber"
-                    reason = "50% render scale: maximum framerate boost, ideal for GPU-bound scenarios."
+                    r, c = ("optimum", "emerald") if is_entry_rig else ("acceptable", "amber")
+                    reason = "50% Render Scale (25% native pixels) • Maximum Fillrate Relief (+60% FPS): Peak throughput for 4K displays and heavy cloud/photogrammetry scenes. Fully unburdens GPU rasterization at the cost of slight avionics softening."
                 elif "TAA" in o_up:
-                    r, c = "acceptable", "amber"
-                    reason = "Standard native rasterization: reliable clarity without temporal AI reconstruction."
+                    r, c = ("optimum", "emerald") if (is_flagship_gpu or not is_entry_rig) else ("acceptable", "amber")
+                    reason = "100% Native Resolution Rasterization • Zero Temporal Ghosting: The simmer standard for razor-sharp glass cockpits. Guarantees zero smearing on moving altimeter tapes, PFD compass roses and FMC fonts."
                 else:
-                    r, c = "suboptimal", "orange"
-                    reason = "Legacy anti-aliasing mode with suboptimal edge reconstruction."
+                    r, c = "acceptable", "amber"
+                    reason = "Standard anti-aliasing reconstruction evaluated for display."
 
         elif key == "grass":
             opt_lead = o_up.split("(")[0].strip()
@@ -5944,14 +5946,17 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
             if "PERFORMANCE" in v_upper:
                 return ("+ MAX GPU HEADROOM", "Cuts GPU rasterization workload by ~50%, securing locked framerates in heavy weather.",
                         "- AI RECONSTRUCTION", "Relies heavily on AI temporal upscaling.")
-            elif "DLSS" in v_upper:
-                return ("+ 25% GPU HEADROOM", "DLSS Tensor upscaling saves massive GPU frame time and stabilizes edges.",
+            elif "BALANCED" in v_upper:
+                return ("+ HIGH GPU HEADROOM", "Cuts GPU rasterization by ~40%, locking smooth refresh with minimal softening.",
+                        "- AI RECONSTRUCTION", "Slight font softening compared to Quality.")
+            elif "DLSS" in v_upper or "QUALITY" in v_upper:
+                return ("+ 25-35% GPU HEADROOM", "DLSS Tensor upscaling saves massive GPU frame time and stabilizes edges.",
                         "- MILD HUD GHOSTING", "Subtle temporal ghosting on fast digital cockpit displays.")
             elif "DLAA" in v_upper:
                 return ("+ ULTRA SHARP EDGES", "AI edge smoothing at native resolution with zero upscaling blur.",
                         "- FULL GPU WORKLOAD", "Runs at native resolution without upscaling performance boost.")
-            else:
-                return ("+ NATIVE CLARITY", "Native raster clarity without AI reconstruction artifacts.",
+            else: # TAA
+                return ("+ ZERO GAUGE GHOSTING", "Native raster clarity without temporal AI smearing on moving glass instruments.",
                         "- HIGH GPU LOAD", "Full native shading workload reduces headroom in heavy clouds.")
 
         if key == "max_frame_rate":
@@ -7077,7 +7082,7 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
         "DLSS (Performance • 50% Render • Maximum FPS)",
         "DLSS (Balanced • 58% Render • Stable 90Hz)",
         "DLSS (Quality • 67% Render • Sharp Cockpits)",
-        "TAA (100% Native Raster • High Fill-Rate)",
+        "TAA (100% Native Raster • Zero Ghosting Cockpits)",
         "DLAA (100% Native AI • Extreme GPU Load)"
     ]
     aa_options_2d = [
@@ -7085,7 +7090,7 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
         "DLAA (100% Native AI • Ultra Sharp)",
         "DLSS (Balanced • 58% Render • Low GPU Load)",
         "DLSS (Performance • 50% Render • Max FPS)",
-        "TAA (100% Native Raster • Standard)"
+        "TAA (100% Native Raster • Crisp Avionics)"
     ]
 
     def format_aa_display(val: str, is_vr_mode: bool) -> str:
@@ -7100,8 +7105,8 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
             if "DLAA" in v:
                 return "DLAA (100% Native AI • Extreme GPU Load)"
             if "TAA" in v:
-                return "TAA (100% Native Raster • High Fill-Rate)"
-            return "DLSS (Performance • 50% Render • Maximum FPS)"
+                return "TAA (100% Native Raster • Zero Ghosting Cockpits)"
+            return "DLSS (Quality • 67% Render • Sharp Cockpits)"
         else:
             if "QUALITY" in v:
                 return "DLSS (Quality • 67% Render • Sweet Spot)"
@@ -7112,7 +7117,7 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
             if "PERFORMANCE" in v:
                 return "DLSS (Performance • 50% Render • Max FPS)"
             if "TAA" in v:
-                return "TAA (100% Native Raster • Standard)"
+                return "TAA (100% Native Raster • Crisp Avionics)"
             return "DLSS (Quality • 67% Render • Sweet Spot)"
 
     # Glass Cockpit Ratings
@@ -7344,10 +7349,16 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
     reflex_2d_reason = "Drains GPU render queue to minimize input latency." if reflex_2d == "ON" else ("Locks GPU core and memory clocks to maximum boost frequency; higher power draw with negligible latency gain." if "BOOST" in reflex_2d else "Reflex OFF increases input-to-display latency during flight maneuvers.")
 
     val_aa_2d_up = val_aa_2d.upper()
-    if "QUALITY" in val_aa_2d_up:
-        aa_2d_rating, aa_2d_color, aa_2d_lbl = "optimum", "emerald", "OPTIMUM"
+    if "QUALITY" in val_aa_2d_up or (val_aa_2d_up == "DLSS" and not any(k in val_aa_2d_up for k in ["PERFORMANCE", "BALANCED", "DLAA"])):
+        aa_2d_rating, aa_2d_color, aa_2d_lbl = "optimum", "emerald", "SWEET SPOT"
     elif "DLAA" in val_aa_2d_up:
         aa_2d_rating, aa_2d_color, aa_2d_lbl = ("optimum", "emerald", "OPTIMUM") if is_flagship_gpu else ("acceptable", "amber", "ACCEPTABLE")
+    elif "BALANCED" in val_aa_2d_up:
+        aa_2d_rating, aa_2d_color, aa_2d_lbl = "optimum", "emerald", "OPTIMUM"
+    elif "PERFORMANCE" in val_aa_2d_up:
+        aa_2d_rating, aa_2d_color, aa_2d_lbl = ("optimum", "emerald", "OPTIMUM") if is_entry_rig else ("acceptable", "amber", "ACCEPTABLE")
+    elif "TAA" in val_aa_2d_up:
+        aa_2d_rating, aa_2d_color, aa_2d_lbl = ("optimum", "emerald", "OPTIMUM") if (is_flagship_gpu or not is_entry_rig) else ("acceptable", "amber", "ACCEPTABLE")
     else:
         aa_2d_rating, aa_2d_color, aa_2d_lbl = "acceptable", "amber", "ACCEPTABLE"
 
@@ -7447,22 +7458,22 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
         ),
 
         # PAGE 4: LIGHTING (5)
-        make_setting_item("shadow_maps", "Shadow Maps Resolution", shd_2d_val, shd_2d_raw, False, "optimum" if "1536" in shd_2d_val else "acceptable", "emerald" if "1536" in shd_2d_val else "amber", "OPTIMUM" if "1536" in shd_2d_val else "ACCEPTABLE", f"Description: Direct sunlight shadow map buffer resolution for airframe and structures.\nCurrent: {shd_2d_val}.\nRecommendation: HIGH (1536) for clean shadow lines without shimmering.", shadow_options, page=4, tag_reason="High shadow map resolution delivers sharp cockpit and airframe shadows.", rec_guidance="HIGH (1536) • Crisp cockpit and airframe shadows", is_vr=False),
-        make_setting_item("terrain_shadows", "Terrain Shadows", tshd_2d_val, tshd_2d_raw, False, "optimum" if "512" in tshd_2d_val else "acceptable", "emerald" if "512" in tshd_2d_val else "amber", "OPTIMUM" if "512" in tshd_2d_val else "ACCEPTABLE", f"Description: Long-distance heightfield mountain and ridge self-shadowing.\nCurrent: {tshd_2d_val}.\nRecommendation: HIGH (512) for realistic mountain terrain relief during golden hour approaches.", hf_options, page=4, tag_reason="Realistic mountain shadowing during sunrise and sunset.", rec_guidance="HIGH (512) • Realistic mountain relief during low sun angles", is_vr=False),
-        make_setting_item("contact_shadows", "Contact Shadows", cshd_2d_val, cshd_2d_raw, False, "optimum" if cshd_2d_val == "High" else "acceptable", "emerald" if cshd_2d_val == "High" else "amber", "OPTIMUM" if cshd_2d_val == "High" else "ACCEPTABLE", f"Description: Screen-space micro-shadows beneath wheels, switches, levers, and small cockpit fixtures.\nCurrent: {cshd_2d_val}.\nRecommendation: HIGH provides realistic contact depth in the cockpit with negligible GPU impact.", q_options, page=4, tag_reason="Enhances tactile depth around cockpit instruments and switches.", rec_guidance="HIGH • Precise contact depth under switches and levers", is_vr=False),
+        make_setting_item("shadow_maps", "Shadow Maps Resolution", shd_2d_val, shd_2d_raw, False, "optimum" if "1536" in shd_2d_val else "acceptable", "emerald" if "1536" in shd_2d_val else "amber", "OPTIMUM" if "1536" in shd_2d_val else "ACCEPTABLE", f"Description: Direct sunlight shadow map buffer resolution for airframe and structures.\nCurrent: {shd_2d_val}.\nRecommendation: HIGH (1536) for clean shadow lines without shimmering.", shadow_options, page=4, tag_reason="1536x1536 cascade buffer: razor-sharp canopy frame shadows and gear bay details without 2048 VRAM overhead.", rec_guidance="HIGH (1536) • Crisp cockpit and airframe shadows", is_vr=False),
+        make_setting_item("terrain_shadows", "Terrain Shadows", tshd_2d_val, tshd_2d_raw, False, "optimum" if "512" in tshd_2d_val else "acceptable", "emerald" if "512" in tshd_2d_val else "amber", "OPTIMUM" if "512" in tshd_2d_val else "ACCEPTABLE", f"Description: Long-distance heightfield mountain and ridge self-shadowing.\nCurrent: {tshd_2d_val}.\nRecommendation: HIGH (512) for realistic mountain terrain relief during golden hour approaches.", hf_options, page=4, tag_reason="512x512 heightfield ray cast: authentic ridge self-shadowing and alpine relief during dawn/dusk approaches.", rec_guidance="HIGH (512) • Realistic mountain relief during low sun angles", is_vr=False),
+        make_setting_item("contact_shadows", "Contact Shadows", cshd_2d_val, cshd_2d_raw, False, "optimum" if cshd_2d_val == "High" else "acceptable", "emerald" if cshd_2d_val == "High" else "amber", "OPTIMUM" if cshd_2d_val == "High" else "ACCEPTABLE", f"Description: Screen-space micro-shadows beneath wheels, switches, levers, and small cockpit fixtures.\nCurrent: {cshd_2d_val}.\nRecommendation: HIGH provides realistic contact depth in the cockpit with negligible GPU impact.", q_options, page=4, tag_reason="Full-resolution screen-space contact pass: crisp ambient shadow lines under circuit breakers, throttles, and rudder pedals.", rec_guidance="HIGH • Precise contact depth under switches and levers", is_vr=False),
         make_setting_item("raytraced_shadows", "Raytraced Shadows", rt_2d_val, "1" if rt_2d_val == "ON" else "0", False, "optimum" if rt_2d_val == "OFF" else "acceptable", "emerald" if rt_2d_val == "OFF" else "amber", "OPTIMUM" if rt_2d_val == "OFF" else "ACCEPTABLE", f"Description: Hardware ray-traced shadows on RT cores.\nCurrent: {rt_2d_val}.\nRecommendation: Keep OFF in flight sims to conserve RT cores and GPU frame time for DLSS.", ["OFF", "ON"], page=4, tag_reason="Disabled ray tracing frees RT cores for DLSS frame generation." if rt_2d_val == "OFF" else "Enables RT shadows at the cost of GPU frame time.", rec_guidance="OFF • Conserves RT cores and frame time for DLSS FG", is_vr=False),
-        make_setting_item("volumetric_lights", "Volumetric Lights", vl_2d_val, vl_2d_raw, False, "optimum" if vl_2d_val == "High" else "acceptable", "emerald" if vl_2d_val == "High" else "amber", "OPTIMUM" if vl_2d_val == "High" else "ACCEPTABLE", f"Description: Atmospheric light beam scattering from runway lights, beacons, and landing lights in fog/clouds.\nCurrent: {vl_2d_val}.\nRecommendation: HIGH for dramatic night lighting and authentic low-visibility CAT III approaches.", q_options, page=4, tag_reason="Atmospheric light shaft rendering during night and low-visibility weather.", rec_guidance="HIGH • Dramatic light shafts at night and in low visibility", is_vr=False),
+        make_setting_item("volumetric_lights", "Volumetric Lights", vl_2d_val, vl_2d_raw, False, "optimum" if vl_2d_val == "High" else "acceptable", "emerald" if vl_2d_val == "High" else "amber", "OPTIMUM" if vl_2d_val == "High" else "ACCEPTABLE", f"Description: Atmospheric light beam scattering from runway lights, beacons, and landing lights in fog/clouds.\nCurrent: {vl_2d_val}.\nRecommendation: HIGH for dramatic night lighting and authentic low-visibility CAT III approaches.", q_options, page=4, tag_reason="In-scattering light shafts: renders atmospheric beam cone scattering from landing lights and approach strobes in fog/clouds.", rec_guidance="HIGH • Dramatic light shafts at night and in low visibility", is_vr=False),
 
         # PAGE 5: COCKPIT (3)
         make_setting_item("glass_cockpits", "Glass Cockpit Refresh", glass_2d_val, glass_2d_raw, False, glass_2d_rating, glass_2d_color, glass_2d_label, glass_2d_tip, glass_options, page=5, tag_reason=glass_2d_reason, rec_guidance="MEDIUM • Smooth EFIS refresh while protecting MainThread", is_vr=False),
-        make_setting_item("ambient_occlusion", "Ambient Occlusion (SSAO)", ssao_2d_val, ssao_2d_raw, False, "optimum" if ssao_2d_val == "High" else "acceptable", "emerald" if ssao_2d_val == "High" else "amber", "OPTIMUM" if ssao_2d_val == "High" else "ACCEPTABLE", f"Description: Screen-space ambient occlusion (SSAO) providing realistic contact shading in crevices and corners.\nCurrent: {ssao_2d_val}.\nRecommendation: HIGH provides natural cockpit lighting and shadow depth without excessive shader overhead.", q_options, page=5, tag_reason="Natural contact shading in cockpit crevices and airframe recesses.", rec_guidance="HIGH • Natural contact shading without heavy GPU penalty", is_vr=False),
+        make_setting_item("ambient_occlusion", "Ambient Occlusion (SSAO)", ssao_2d_val, ssao_2d_raw, False, "optimum" if ssao_2d_val == "High" else "acceptable", "emerald" if ssao_2d_val == "High" else "amber", "OPTIMUM" if ssao_2d_val == "High" else "ACCEPTABLE", f"Description: Screen-space ambient occlusion (SSAO) providing realistic contact shading in crevices and corners.\nCurrent: {ssao_2d_val}.\nRecommendation: HIGH provides natural cockpit lighting and shadow depth without excessive shader overhead.", q_options, page=5, tag_reason="Full-resolution SSAO kernel: deepens crevice shading in complex flight decks (Fenix A320, PMDG 737) with ~1ms GPU cost.", rec_guidance="HIGH • Natural contact shading without heavy GPU penalty", is_vr=False),
         make_setting_item("windshield_effects", "Windshield Effects", wind_2d_val, wind_2d_raw, False, "optimum" if wind_2d_val == "High" else "acceptable", "emerald" if wind_2d_val == "High" else "amber", "OPTIMUM" if wind_2d_val == "High" else "ACCEPTABLE", f"Description: Dynamic raindrops, icing accretion, wiper blade sweeps, and glass reflection effects on windshield.\nCurrent: {wind_2d_val}.\nRecommendation: HIGH for full weather immersion on the flight deck.", q_options, page=5, tag_reason="Realistic dynamic rain, icing, and wiper sweep effects.", rec_guidance="HIGH • Dynamic rain and icing immersion on flight deck", is_vr=False),
 
         # PAGE 6: POST-PROCESSING (7)
-        make_setting_item("anti_aliasing", "Anti-Aliasing & Upscaling", format_aa_display(val_aa_2d, False), aa_2d, False, aa_2d_rating, aa_2d_color, aa_2d_lbl, f"Description: Anti-aliasing method and AI upscaling mode (DLSS/TAA/DLAA).\nCurrent: {val_aa_2d}.\nRecommendation: DLSS Quality balances sharp flight decks with DLSS 3 FG; DLAA for maximum native edge clarity.", aa_options_2d, page=6, rec_guidance="Quality balances sharp flight decks with DLSS 3 FG • DLAA for maximum native edge clarity", is_vr=False),
+        make_setting_item("anti_aliasing", "Anti-Aliasing & Upscaling", format_aa_display(val_aa_2d, False), aa_2d, False, aa_2d_rating, aa_2d_color, aa_2d_lbl, f"Description: Anti-aliasing method and AI upscaling mode (DLSS/TAA/DLAA).\nCurrent: {val_aa_2d}.\nRecommendation: DLSS Quality balances sharp flight decks with DLSS 3 FG; DLAA for maximum native edge clarity; TAA for zero-ghosting avionics.", aa_options_2d, page=6, tag_reason="67% Render Scale (~45% native pixels) • DLSS 3 Optical Flow: Benchmark Sweet Spot. Delivers pristine cockpit clarity and razor-sharp avionics with +35-40% framerate gain." if "QUALITY" in val_aa_2d.upper() else ("100% Native Resolution Rasterization • Zero Temporal Ghosting: Simmer benchmark for razor-sharp EFIS dials without AI smearing." if "TAA" in val_aa_2d.upper() else ("58% Render Scale • AI Upscaling: High-efficiency profile offering +45-50% FPS." if "BALANCED" in val_aa_2d.upper() else ("50% Render Scale • Maximum Fillrate Relief (+60% FPS) for 4K displays." if "PERFORMANCE" in val_aa_2d.upper() else ("100% Native AI Tensor Smoothing on flagship GPUs." if "DLAA" in val_aa_2d.upper() else "Anti-aliasing mode evaluated.")))), rec_guidance="DLSS Quality with FG for smooth 4K • TAA for zero-ghosting avionics • DLAA on flagship GPUs", is_vr=False),
         make_setting_item("dynamic_settings", "Dynamic Settings", dyn_2d, "0" if dyn_2d == "OFF" else "1", False, "optimum" if dyn_2d == "OFF" else "suboptimal", "emerald" if dyn_2d == "OFF" else "orange", "OPTIMUM" if dyn_2d == "OFF" else "SUBOPTIMAL", f"Description: Dynamic internal resolution scaling during heavy scenes.\nCurrent: {dyn_2d}.\nRecommendation: Keep OFF. Dynamic resolution triggers fluctuating cockpit blur and inconsistent image clarity.", ["OFF", "ON"], page=6, tag_reason="Disabled dynamic scaling guarantees consistent render sharpness in all phases." if dyn_2d == "OFF" else "Dynamic scaling lowers resolution unpredictably, blurring cockpit screens.", rec_guidance="OFF • Guarantees consistent cockpit gauge clarity", is_vr=False),
-        make_setting_item("reflections_ssr", "Screen Reflections (SSR)", ssr_2d_val, ssr_2d_raw, False, "optimum" if ssr_2d_val == "High" else "acceptable", "emerald" if ssr_2d_val == "High" else "amber", "OPTIMUM" if ssr_2d_val == "High" else "ACCEPTABLE", f"Description: Screen space reflections on wet runways, water puddles, and cockpit windshields.\nCurrent: {ssr_2d_val}.\nRecommendation: HIGH in 2D mode for realistic rainy runway reflections; LOW in VR mode to save GPU fill rate.", q_options, page=6, rec_guidance="HIGH • Realistic runway reflections in wet conditions", is_vr=False),
-        make_setting_item("cubemap_reflections", "Cubemap Reflections", cube_2d_val, cube_2d_raw, False, "optimum" if cube_2d_val == "192" else "acceptable", "emerald" if cube_2d_val == "192" else "amber", "OPTIMUM" if cube_2d_val == "192" else "ACCEPTABLE", f"Description: Resolution of cubemap reflection probes used for cockpit dials, canopy gloss, and shiny metal surfaces.\nCurrent: {cube_2d_val}.\nRecommendation: 192 for crisp reflections without excessive probe rendering cost.", cube_options, page=6, tag_reason="Balanced reflection probe resolution.", rec_guidance="192 • Sharp reflections on instruments and canopy glass", is_vr=False),
+        make_setting_item("reflections_ssr", "Screen Reflections (SSR)", ssr_2d_val, ssr_2d_raw, False, "optimum" if ssr_2d_val == "High" else "acceptable", "emerald" if ssr_2d_val == "High" else "amber", "OPTIMUM" if ssr_2d_val == "High" else "ACCEPTABLE", f"Description: Screen space reflections on wet runways, water puddles, and cockpit windshields.\nCurrent: {ssr_2d_val}.\nRecommendation: HIGH in 2D mode for realistic rainy runway reflections; LOW in VR mode to save GPU fill rate.", q_options, page=6, tag_reason="Full-precision screen-space raymarching: mirrors runway centerline strobes and wet apron puddle reflections in real-time.", rec_guidance="HIGH • Realistic runway reflections in wet conditions", is_vr=False),
+        make_setting_item("cubemap_reflections", "Cubemap Reflections", cube_2d_val, cube_2d_raw, False, "optimum" if cube_2d_val == "192" else "acceptable", "emerald" if cube_2d_val == "192" else "amber", "OPTIMUM" if cube_2d_val == "192" else "ACCEPTABLE", f"Description: Resolution of cubemap reflection probes used for cockpit dials, canopy gloss, and shiny metal surfaces.\nCurrent: {cube_2d_val}.\nRecommendation: 192 for crisp reflections without excessive probe rendering cost.", cube_options, page=6, tag_reason="192x192 6-face reflection probe: renders clean dial glass and metal bezel gloss with negligible VRAM impact.", rec_guidance="192 • Sharp reflections on instruments and canopy glass", is_vr=False),
         make_setting_item("dof", "Depth Of Field (DOF)", dof_2d_val, dof_2d_raw, False, "optimum" if dof_2d_val == "OFF" else "acceptable", "emerald" if dof_2d_val == "OFF" else "amber", "OPTIMUM" if dof_2d_val == "OFF" else "ACCEPTABLE", f"Description: Cinematic focal blur on distant cockpit or exterior objects.\nCurrent: {dof_2d_val}.\nRecommendation: Keep OFF for maximum cockpit gauge legibility.", dof_options, page=6, tag_reason="Disabled DOF keeps all flight instruments sharp." if dof_2d_val == "OFF" else "DOF blurs out-of-focus cockpit gauges.", rec_guidance="OFF • Keeps all flight instruments and dials crystal clear", is_vr=False),
         make_setting_item("motion_blur", "Motion Blur", mb_2d_val, mb_2d_raw, False, "optimum" if mb_2d_val == "OFF" else "suboptimal", "emerald" if mb_2d_val == "OFF" else "orange", "OPTIMUM" if mb_2d_val == "OFF" else "SUBOPTIMAL", f"Description: Directional camera velocity smearing.\nCurrent: {mb_2d_val}.\nRecommendation: Keep OFF. Motion blur smears runway centerline markings and avionics during landing flare.", mb_options, page=6, tag_reason="Disabled blur ensures sharp vision during landing maneuvers." if mb_2d_val == "OFF" else "Smears gauges and runway markings during camera motion.", rec_guidance="OFF • Crisp vision of runway centerline during flare", is_vr=False),
         make_setting_item("particles", "Particles Quality", part_2d_val, part_2d_raw, False, "optimum" if part_2d_is_opt else "acceptable", "emerald" if part_2d_is_opt else "amber", "OPTIMUM" if part_2d_is_opt else "ACCEPTABLE", f"Description: Contrails, engine smoke, tire touchdown smoke, and spray particles.\nCurrent: {part_2d_val}.\nRecommendation: LOW (minimal alpha fill rate) or MEDIUM (balanced smoke and contrails).", part_options, page=6, tag_reason="Minimal alpha fill-rate workload, preventing frame drops in dense smoke." if part_2d_val == "Low" else ("Balanced particle density prevents alpha fill drops in heavy smoke." if part_2d_val == "Medium" else "Particle counts evaluated."), rec_guidance="MEDIUM • Balanced smoke and contrails without FPS drops", is_vr=False),
@@ -7513,16 +7524,16 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
     )
 
     val_aa_vr_up = val_aa_vr.upper()
-    if "QUALITY" in val_aa_vr_up or (val_aa_vr_up == "DLSS" and not any(k in val_aa_vr_up for k in ["PERFORMANCE", "BALANCED"])):
-        aa_vr_rating, aa_vr_color, aa_vr_lbl = "optimum", "emerald", "OPTIMUM"
+    if "QUALITY" in val_aa_vr_up or (val_aa_vr_up == "DLSS" and not any(k in val_aa_vr_up for k in ["PERFORMANCE", "BALANCED", "DLAA"])):
+        aa_vr_rating, aa_vr_color, aa_vr_lbl = "optimum", "emerald", "SWEET SPOT"
     elif "BALANCED" in val_aa_vr_up:
-        aa_vr_rating, aa_vr_color, aa_vr_lbl = "acceptable", "amber", "ACCEPTABLE"
+        aa_vr_rating, aa_vr_color, aa_vr_lbl = ("optimum", "emerald", "SWEET SPOT") if is_entry_rig else ("optimum", "emerald", "OPTIMUM")
     elif "PERFORMANCE" in val_aa_vr_up:
-        aa_vr_rating, aa_vr_color, aa_vr_lbl = "suboptimal", "orange", "SUBOPTIMAL"
+        aa_vr_rating, aa_vr_color, aa_vr_lbl = ("optimum", "emerald", "SWEET SPOT") if is_entry_rig else ("acceptable", "amber", "ACCEPTABLE")
     elif "DLAA" in val_aa_vr_up:
         aa_vr_rating, aa_vr_color, aa_vr_lbl = "hazard", "rose", "HAZARD"
     elif "TAA" in val_aa_vr_up:
-        aa_vr_rating, aa_vr_color, aa_vr_lbl = "suboptimal", "orange", "SUBOPTIMAL"
+        aa_vr_rating, aa_vr_color, aa_vr_lbl = ("optimum", "emerald", "OPTIMUM") if is_flagship_gpu else ("acceptable", "amber", "ACCEPTABLE")
     else:
         aa_vr_rating, aa_vr_color, aa_vr_lbl = "acceptable", "amber", "ACCEPTABLE"
 
@@ -7564,7 +7575,7 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
         make_setting_item("sharpen_amount_vr", "VR Sharpening", sharpen_vr_val, sharpen_vr_raw, False, "optimum" if abs(float(sharpen_vr_val) - 0.20) < 0.05 else "acceptable", "emerald" if abs(float(sharpen_vr_val) - 0.20) < 0.05 else "amber", "OPTIMUM" if abs(float(sharpen_vr_val) - 0.20) < 0.05 else "ACCEPTABLE", f"Description: Post-processing sharpening filter in VR headset.\nCurrent: {sharpen_vr_val}.\nRecommendation: Set to 0.20 when using DLSS. Excessive values (>1.0) cause harsh shimmering on runway lines and horizon.", sharpen_vr_options, page=1, is_numeric=True, min_val=0.0, max_val=2.0, step=0.1, tag_reason="Subtle sharpening without shimmering." if abs(float(sharpen_vr_val) - 0.20) < 0.05 else "High sharpening causes noise and shimmering in VR.", rec_guidance="0.20 • Clean clarity without noise or horizon shimmering", is_vr=True),
 
         # PAGE 2: VR OPTIMIZATIONS & DLSS (4)
-        make_setting_item("anti_aliasing", "Anti-Aliasing & Upscaling (VR)", format_aa_display(val_aa_vr, True), aa_vr, False, aa_vr_rating, aa_vr_color, aa_vr_lbl, f"Description: Anti-aliasing and upscaling mode in VR stereo.\nCurrent: {val_aa_vr}.\nRecommendation: DLSS Quality balances sharp flight decks with high framerate in VR stereo.", aa_options_vr, page=2, rec_guidance="DLSS (Quality) • Crisp cockpit gauges and runway lines • Balanced for lower tier GPUs", is_vr=True),
+        make_setting_item("anti_aliasing", "Anti-Aliasing & Upscaling (VR)", format_aa_display(val_aa_vr, True), aa_vr, False, aa_vr_rating, aa_vr_color, aa_vr_lbl, f"Description: Anti-aliasing and upscaling mode in VR stereo.\nCurrent: {val_aa_vr}.\nRecommendation: DLSS Quality balances sharp flight decks with high framerate in VR stereo. TAA eliminates AI gauge ghosting.", aa_options_vr, page=2, tag_reason="67% Render Scale (~45% native pixels) • AI Tensor Reconstruction: The calibrated VR Sweet Spot. Crystal-clear EFIS flight displays and runway lines while slashing pixel shading times by ~55%." if "QUALITY" in val_aa_vr.upper() else ("100% Native Stereo Rasterization • Zero AI Ghosting: Eliminates temporal ghosting on digital glass avionics and needles." if "TAA" in val_aa_vr.upper() else ("58% Render Scale • AI Upscaling: Massive GPU frame time relief (+45-50% FPS) to lock 72/80/90 Hz." if "BALANCED" in val_aa_vr.upper() else ("50% Render Scale • Maximum Fillrate Relief (+60% FPS): Ultimate performance mode for high-PPD headsets." if "PERFORMANCE" in val_aa_vr.upper() else ("100% Native AI Workload: HAZARD in VR (causes reprojection collapse)." if "DLAA" in val_aa_vr.upper() else "Anti-aliasing evaluated for VR.")))), rec_guidance="DLSS Quality for balanced clarity • TAA for zero-ghosting avionics • Performance for max FPS", is_vr=True),
         make_setting_item("foveated_rendering", "Foveated Rendering", fov_vr_val, fov_vr_raw, False, "optimum" if fov_vr_val == "ON" else "acceptable", "emerald" if fov_vr_val == "ON" else "amber", "OPTIMUM" if fov_vr_val == "ON" else "ACCEPTABLE", f"Description: Variable rate shading reducing GPU load in peripheral vision.\nCurrent: {fov_vr_val}.\nRecommendation: ON for 10-15% GPU frame time reduction in VR headsets.", ["ON", "OFF"], page=2, tag_reason="Reduces GPU peripheral shading workload in headset.", rec_guidance="ON • 10-15% GPU frame time savings in peripheral vision", is_vr=True),
         make_setting_item("dynamic_settings", "Dynamic Settings (VR)", dyn_vr, "0" if dyn_vr == "OFF" else "1", False, "optimum" if dyn_vr == "OFF" else "suboptimal", "emerald" if dyn_vr == "OFF" else "orange", "OPTIMUM" if dyn_vr == "OFF" else "SUBOPTIMAL", f"Description: Dynamic resolution in VR.\nCurrent: {dyn_vr}.\nRecommendation: Keep OFF in VR to avoid sudden stereo blurriness.", ["OFF", "ON"], page=2, tag_reason="Disabled dynamic scaling prevents sudden VR stereo resolution drops.", rec_guidance="OFF • Prevents abrupt stereo resolution drops in headset", is_vr=True),
         make_setting_item("foveated_scale", "Foveated Scale", fov_scale_pct, fov_scale_raw, False, "optimum" if "40%" in fov_scale_pct else "acceptable", "emerald" if "40%" in fov_scale_pct else "amber", "OPTIMUM" if "40%" in fov_scale_pct else "ACCEPTABLE", f"Description: Inner foveal resolution radius.\nCurrent: {fov_scale_pct}.\nRecommendation: 40% offers the best balance between peripheral performance gain and central sharpness.", fov_scale_options, page=2, tag_reason="Optimal foveal radius for wide-FOV headsets.", rec_guidance="40% • Optimal balance of central clarity and GPU savings", is_vr=True),
@@ -7632,21 +7643,21 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
             "OPTIMUM" if "1024" in shd_vr_val else "ACCEPTABLE",
             f"Description: Shadows buffer size in VR.\nCurrent: {shd_vr_val}.\nRecommendation: MEDIUM (1024) for clean cockpit shadows without heavy VRAM or stereo rasterization penalty.",
             shadow_options, page=5,
-            tag_reason="Clean shadow rendering in VR headset without rasterization spikes.",
+            tag_reason="1024x1024 depth texture: optimal shadow cascade filtering; halves shadow map render passes compared to 2048.",
             rec_guidance="MEDIUM (1024) • Soft cockpit shadows tuned for VR headset",
             is_vr=True
         ),
-        make_setting_item("terrain_shadows", "Terrain Shadows", tshd_vr_val, tshd_vr_raw, False, "optimum" if "256" in tshd_vr_val else "acceptable", "emerald" if "256" in tshd_vr_val else "amber", "OPTIMUM" if "256" in tshd_vr_val else "ACCEPTABLE", f"Description: Heightfield mountain shadows in VR.\nCurrent: {tshd_vr_val}.\nRecommendation: MEDIUM (256) for rich mountain contours with safe stereo frame budget.", hf_options, page=5, tag_reason="Terrain self-shadowing in VR.", rec_guidance="MEDIUM (256) • Lightweight mountain relief shadows in VR", is_vr=True),
-        make_setting_item("contact_shadows", "Contact Shadows", cshd_vr_val, cshd_vr_raw, False, "optimum" if cshd_vr_val == "Medium" else "acceptable", "emerald" if cshd_vr_val == "Medium" else "amber", "OPTIMUM" if cshd_vr_val == "Medium" else "ACCEPTABLE", f"Description: Cockpit contact shadows in VR.\nCurrent: {cshd_vr_val}.\nRecommendation: MEDIUM for tactile cockpit depth.", q_options, page=5, tag_reason="Tactile depth for cockpit controls in VR.", rec_guidance="MEDIUM • Tactile depth for cockpit controls in VR", is_vr=True),
+        make_setting_item("terrain_shadows", "Terrain Shadows", tshd_vr_val, tshd_vr_raw, False, "optimum" if "256" in tshd_vr_val else "acceptable", "emerald" if "256" in tshd_vr_val else "amber", "OPTIMUM" if "256" in tshd_vr_val else "ACCEPTABLE", f"Description: Heightfield mountain shadows in VR.\nCurrent: {tshd_vr_val}.\nRecommendation: MEDIUM (256) for rich mountain contours with safe stereo frame budget.", hf_options, page=5, tag_reason="256x256 heightfield shadow map: accurate mountain self-shadowing during golden hour with minimal stereo compute overhead.", rec_guidance="MEDIUM (256) • Lightweight mountain relief shadows in VR", is_vr=True),
+        make_setting_item("contact_shadows", "Contact Shadows", cshd_vr_val, cshd_vr_raw, False, "optimum" if cshd_vr_val == "Medium" else "acceptable", "emerald" if cshd_vr_val == "Medium" else "amber", "OPTIMUM" if cshd_vr_val == "Medium" else "ACCEPTABLE", f"Description: Cockpit contact shadows in VR.\nCurrent: {cshd_vr_val}.\nRecommendation: MEDIUM for tactile cockpit depth.", q_options, page=5, tag_reason="Screen-space contact pass (HBAO): adds tactile shadow depth under switchguards and pedestal levers in headset.", rec_guidance="MEDIUM • Tactile depth for cockpit controls in VR", is_vr=True),
         make_setting_item("raytraced_shadows", "Raytraced Shadows (VR)", rt_vr_val, "1" if rt_vr_val == "ON" else "0", False, "optimum" if rt_vr_val == "OFF" else "hazard", "emerald" if rt_vr_val == "OFF" else "rose", "OPTIMUM" if rt_vr_val == "OFF" else "HAZARD", f"Description: Hardware ray-traced shadows in VR stereo.\nCurrent: {rt_vr_val}.\nRecommendation: Strictly keep OFF in VR. Ray tracing severely bottlenecks stereo VR frame times!", ["OFF", "ON"], page=5, tag_reason="Disabled ray tracing is essential to preserve VR stereo framerate." if rt_vr_val == "OFF" else "HAZARD: Ray tracing in VR causes catastrophic stereo reprojection collapse.", rec_guidance="OFF • Strictly forbidden in VR (causes reprojection collapse)", is_vr=True),
 
         # PAGE 6: COCKPIT & POST VR (8)
         make_setting_item("glass_cockpits", "Glass Cockpit Refresh", glass_vr_val, glass_vr_raw, False, glass_vr_rating, glass_vr_color, glass_vr_label, glass_vr_tip, glass_options, page=6, tag_reason=glass_vr_reason, rec_guidance="LOW or MEDIUM • Relieves CoherentGT UI thread in headset", is_vr=True),
-        make_setting_item("ambient_occlusion", "Ambient Occlusion (SSAO)", ssao_vr_val, ssao_vr_raw, False, "optimum" if ssao_vr_val == "Low" else "acceptable", "emerald" if ssao_vr_val == "Low" else "amber", "OPTIMUM" if ssao_vr_val == "Low" else "ACCEPTABLE", f"Description: Screen-space ambient occlusion in VR.\nCurrent: {ssao_vr_val}.\nRecommendation: LOW for natural depth without heavy stereo shading passes.", q_options, page=6, tag_reason="Natural contact shading for VR flight deck.", rec_guidance="LOW • Contact shading without heavy stereo shader passes", is_vr=True),
+        make_setting_item("ambient_occlusion", "Ambient Occlusion (SSAO)", ssao_vr_val, ssao_vr_raw, False, "optimum" if ssao_vr_val == "Low" else "acceptable", "emerald" if ssao_vr_val == "Low" else "amber", "OPTIMUM" if ssao_vr_val == "Low" else "ACCEPTABLE", f"Description: Screen-space ambient occlusion in VR.\nCurrent: {ssao_vr_val}.\nRecommendation: LOW for natural depth without heavy stereo shading passes.", q_options, page=6, tag_reason="Quarter-resolution SSAO sampling: provides essential cockpit corner shading while cutting stereo compute time by 60%.", rec_guidance="LOW • Contact shading without heavy stereo shader passes", is_vr=True),
         make_setting_item("windshield_effects", "Windshield Effects", wind_vr_val, wind_vr_raw, False, "optimum" if wind_vr_val == "High" else "acceptable", "emerald" if wind_vr_val == "High" else "amber", "OPTIMUM" if wind_vr_val == "High" else "ACCEPTABLE", f"Description: Windshield rain and icing in VR.\nCurrent: {wind_vr_val}.\nRecommendation: HIGH for authentic weather immersion in VR.", q_options, page=6, tag_reason="Raindrops and ice accretion in VR.", rec_guidance="HIGH • Realistic rain and icing immersion on VR windshield", is_vr=True),
-        make_setting_item("reflections_ssr", "Screen Reflections (SSR)", ssr_vr_val, ssr_vr_raw, False, "optimum" if ssr_vr_val == "Low" else "acceptable", "emerald" if ssr_vr_val == "Low" else "amber", "OPTIMUM" if ssr_vr_val == "Low" else "ACCEPTABLE", f"Description: Screen space reflections in VR.\nCurrent: {ssr_vr_val}.\nRecommendation: LOW in VR saves substantial stereo GPU fill rate.", q_options, page=6, rec_guidance="LOW or OFF • Saves substantial stereo GPU fill rate in VR", is_vr=True),
-        make_setting_item("cubemap_reflections", "Cubemap Reflections (VR)", cube_vr_val, cube_vr_raw, False, "optimum" if cube_vr_val == "128" else "acceptable", "emerald" if cube_vr_val == "128" else "amber", "OPTIMUM" if cube_vr_val == "128" else "ACCEPTABLE", f"Description: Cubemap reflection probe resolution in VR.\nCurrent: {cube_vr_val}.\nRecommendation: 128 in VR to protect stereo frame budget.", cube_options, page=6, tag_reason="Lightweight cubemap resolution for VR.", rec_guidance="128 • Lightweight reflection probe resolution for headset", is_vr=True),
-        make_setting_item("particles", "Particles Quality (VR)", part_vr_val, part_vr_raw, False, "optimum" if part_vr_val == "Low" else "acceptable", "emerald" if part_vr_val == "Low" else "amber", "OPTIMUM" if part_vr_val == "Low" else "ACCEPTABLE", f"Description: Contrails, smoke, and spray particles in VR.\nCurrent: {part_vr_val}.\nRecommendation: LOW to prevent alpha blending drops in headset.", part_options, page=6, tag_reason="Controlled particles save stereo alpha fill rate.", rec_guidance="LOW • Prevents alpha-blending frame drops in heavy smoke", is_vr=True),
+        make_setting_item("reflections_ssr", "Screen Reflections (SSR)", ssr_vr_val, ssr_vr_raw, False, "optimum" if ssr_vr_val == "Low" else "acceptable", "emerald" if ssr_vr_val == "Low" else "amber", "OPTIMUM" if ssr_vr_val == "Low" else "ACCEPTABLE", f"Description: Screen space reflections in VR.\nCurrent: {ssr_vr_val}.\nRecommendation: LOW in VR saves substantial stereo GPU fill rate.", q_options, page=6, tag_reason="Half-resolution raymarching on reflective surfaces: preserves ~1.5ms GPU frame time over high SSR in wet conditions.", rec_guidance="LOW or OFF • Saves substantial stereo GPU fill rate in VR", is_vr=True),
+        make_setting_item("cubemap_reflections", "Cubemap Reflections (VR)", cube_vr_val, cube_vr_raw, False, "optimum" if cube_vr_val == "128" else "acceptable", "emerald" if cube_vr_val == "128" else "amber", "OPTIMUM" if cube_vr_val == "128" else "ACCEPTABLE", f"Description: Cubemap reflection probe resolution in VR.\nCurrent: {cube_vr_val}.\nRecommendation: 128 in VR to protect stereo frame budget.", cube_options, page=6, tag_reason="128x128 6-face cube buffer: sharp canopy specular reflections with low memory bandwidth overhead.", rec_guidance="128 • Lightweight reflection probe resolution for headset", is_vr=True),
+        make_setting_item("particles", "Particles Quality (VR)", part_vr_val, part_vr_raw, False, "optimum" if part_vr_val == "Low" else "acceptable", "emerald" if part_vr_val == "Low" else "amber", "OPTIMUM" if part_vr_val == "Low" else "ACCEPTABLE", f"Description: Contrails, smoke, and spray particles in VR.\nCurrent: {part_vr_val}.\nRecommendation: LOW to prevent alpha blending drops in headset.", part_options, page=6, tag_reason="Limits maximum alpha-blended sprite count: eliminates GPU fill-rate throttling during reverse thrust and dense cloud fly-through.", rec_guidance="LOW • Prevents alpha-blending frame drops in heavy smoke", is_vr=True),
         make_setting_item("dof", "Depth Of Field (DOF VR)", dof_vr_val, "OFF" if dof_vr_val == "OFF" else dof_vr_raw, False, "optimum" if dof_vr_val == "OFF" else "acceptable", "emerald" if dof_vr_val == "OFF" else "amber", "OPTIMUM" if dof_vr_val == "OFF" else "ACCEPTABLE", f"Description: Cinematic focal blur in VR.\nCurrent: {dof_vr_val}.\nRecommendation: Keep strictly OFF in VR to avoid stereo eye fatigue and blurry instruments.", dof_options, page=6, tag_reason="Disabled DOF prevents stereo eye strain in VR." if dof_vr_val in ["OFF", "Low"] else "DOF in VR blurs gauges and induces eye fatigue.", rec_guidance="OFF • Eliminates stereo eye strain and blurred gauges", is_vr=True),
         make_setting_item("motion_blur", "Motion Blur (VR)", mb_vr_val, "OFF" if mb_vr_val == "OFF" else mb_vr_raw, False, "optimum" if mb_vr_val == "OFF" else "suboptimal", "emerald" if mb_vr_val == "OFF" else "orange", "OPTIMUM" if mb_vr_val == "OFF" else "SUBOPTIMAL", f"Description: Camera motion smearing in VR.\nCurrent: {mb_vr_val}.\nRecommendation: Keep strictly OFF in VR to eliminate VR motion sickness and smearing during head movements.", mb_options, page=6, tag_reason="Disabled motion blur prevents simulator sickness in headset." if mb_vr_val == "OFF" else "Motion blur in VR causes severe motion disorientation.", rec_guidance="OFF • Eliminates VR motion sickness and rotation smearing", is_vr=True),
     ]

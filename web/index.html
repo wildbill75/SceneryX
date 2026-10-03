@@ -2754,13 +2754,22 @@
                                 <span class="typo-section-title text-slate-200">2D Display</span>
                                 <span id="opt-perf-badge-2d" class="px-2 py-0.5 rounded-full typo-action-btn text-[10px] font-semibold uppercase tracking-[0.02em] bg-emerald-600 text-white shadow-sm">OPTIMUM</span>
                             </div>
-                            <div class="space-y-1">
+                            <div class="space-y-1.5">
                                 <div class="flex items-center justify-between text-[11px]">
                                     <span id="opt-perf-label-2d" class="typo-metadata text-slate-400">MainThread Load</span>
                                     <span id="opt-perf-val-2d" class="typo-metric text-emerald-400 font-semibold text-xs tabular-nums">38% (Moderate)</span>
                                 </div>
-                                <div class="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
-                                    <div id="opt-perf-bar-2d" class="h-full rounded-full bg-emerald-500 transition-all duration-300 ease-out" style="width: 38%;"></div>
+                                <div class="relative w-full">
+                                    <div class="w-full h-2 rounded-full bg-slate-800 overflow-hidden relative">
+                                        <div id="opt-perf-bar-2d" class="h-full rounded-full bg-emerald-500 transition-all duration-300 ease-out" style="width: 38%;"></div>
+                                        <!-- Sweet Spot Needle Marker -->
+                                        <div id="opt-perf-needle-2d" class="absolute top-0 bottom-0 w-0.5 bg-[#fbbf24] shadow-[0_0_6px_rgba(251,191,36,0.9)] z-10 pointer-events-none" style="left: 45%;"></div>
+                                    </div>
+                                    <div class="flex items-center justify-between text-[9px] text-slate-500 pt-1 select-none font-medium">
+                                        <span>0%</span>
+                                        <span class="inline-flex items-center gap-1 font-semibold text-[#2ce586] cursor-help" title="Calibrated Sweet Spot target for optimal frame pacing without stuttering"><span class="text-[#fbbf24] drop-shadow-[0_0_4px_rgba(251,191,36,0.85)] text-[9px]">★</span> SWEET SPOT (<span id="opt-perf-target-2d">~45%</span>)</span>
+                                        <span>100%</span>
+                                    </div>
                                 </div>
                             </div>
                             <p id="opt-perf-sub-2d" class="typo-metadata text-[11px] font-normal text-slate-400/80 leading-tight truncate" title="TLOD, terrain shadows & monitor rendering">Monitor draw calls & textures</p>
@@ -2772,13 +2781,22 @@
                                 <span class="typo-section-title text-slate-200">VR Headset</span>
                                 <span id="opt-perf-badge-vr" class="px-2 py-0.5 rounded-full typo-action-btn text-[10px] font-semibold uppercase tracking-[0.02em] bg-amber-600 text-white shadow-sm">BALANCED</span>
                             </div>
-                            <div class="space-y-1">
+                            <div class="space-y-1.5">
                                 <div class="flex items-center justify-between text-[11px]">
                                     <span id="opt-perf-label-vr" class="typo-metadata text-slate-400">MainThread Load</span>
                                     <span id="opt-perf-val-vr" class="typo-metric text-amber-400 font-semibold text-xs tabular-nums">54% (Stereo Sync)</span>
                                 </div>
-                                <div class="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
-                                    <div id="opt-perf-bar-vr" class="h-full rounded-full bg-amber-500 transition-all duration-300 ease-out" style="width: 54%;"></div>
+                                <div class="relative w-full">
+                                    <div class="w-full h-2 rounded-full bg-slate-800 overflow-hidden relative">
+                                        <div id="opt-perf-bar-vr" class="h-full rounded-full bg-amber-500 transition-all duration-300 ease-out" style="width: 54%;"></div>
+                                        <!-- Sweet Spot Needle Marker -->
+                                        <div id="opt-perf-needle-vr" class="absolute top-0 bottom-0 w-0.5 bg-[#fbbf24] shadow-[0_0_6px_rgba(251,191,36,0.9)] z-10 pointer-events-none" style="left: 45%;"></div>
+                                    </div>
+                                    <div class="flex items-center justify-between text-[9px] text-slate-500 pt-1 select-none font-medium">
+                                        <span>0%</span>
+                                        <span class="inline-flex items-center gap-1 font-semibold text-[#2ce586] cursor-help" title="Calibrated Sweet Spot target for stereo VR pacing without reprojection drops"><span class="text-[#fbbf24] drop-shadow-[0_0_4px_rgba(251,191,36,0.85)] text-[9px]">★</span> SWEET SPOT (<span id="opt-perf-target-vr">~45%</span>)</span>
+                                        <span>100%</span>
+                                    </div>
                                 </div>
                             </div>
                             <p id="opt-perf-sub-vr" class="typo-metadata text-[11px] font-normal text-slate-400/80 leading-tight truncate" title="OpenXR stereo pass & DLSS/Foveated buffer">Stereo viewport & reprojection loop</p>
@@ -3614,7 +3632,6 @@
         <!-- Drag Handle Header -->
         <div class="modal-header h-[42px] px-4 bg-slate-900/70 border-b border-slate-800 flex items-center justify-between cursor-move select-none shrink-0 gap-3">
             <div class="flex items-center gap-2 min-w-0 flex-1">
-                <span class="typo-window-header text-slate-400 text-xs font-semibold tracking-wide uppercase shrink-0">DOCUMENTATION //</span>
                 <span id="opt-info-title" class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase truncate">SETTING NAME</span>
             </div>
             <div class="flex items-center gap-1 shrink-0">

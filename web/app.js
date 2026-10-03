@@ -18038,13 +18038,17 @@ function updatePerformanceCockpitGauges() {
             badge2D = 'HAZARD';
             color2D = 'rose';
             desc2D = `Heavy draw calls • ${fpsTag}`;
-        } else if (load2D >= 58) {
+        } else if (load2D >= 55) {
             badge2D = 'BALANCED';
             color2D = 'amber';
             desc2D = `Controlled workload • ${fpsTag}`;
+        } else if (load2D >= 25 && load2D <= 52) {
+            badge2D = 'SWEET SPOT';
+            color2D = 'emerald';
+            desc2D = `${fgDesc} • ${fpsTag} • TLOD ${tlod2D} • Sweet Spot Pacing`;
         }
 
-        updatePerfCard('2d', 'MainThread Load', `${load2D}% (${badge2D === 'OPTIMUM' ? 'Smooth' : (badge2D === 'BALANCED' ? 'Moderate' : 'Heavy')})`, load2D, color2D, badge2D, desc2D);
+        updatePerfCard('2d', 'MainThread Load', `${load2D}% (${(badge2D === 'SWEET SPOT' || badge2D === 'OPTIMUM') ? 'Smooth' : (badge2D === 'BALANCED' ? 'Moderate' : 'Heavy')})`, load2D, color2D, badge2D, desc2D);
 
         // --- 3. VR HEADSET (Stereo OpenXR loop & Headset Pacing) ---
         // Baseline stereo VR compositor thread + Shared traffic CPU simulation load
@@ -18159,13 +18163,17 @@ function updatePerformanceCockpitGauges() {
             badgeVR = 'HAZARD';
             colorVR = 'rose';
             descVR = `Judder risk • ${fpsVRTag}`;
-        } else if (loadVR >= 56) {
+        } else if (loadVR >= 55) {
             badgeVR = 'BALANCED';
             colorVR = 'amber';
             descVR = `Tight stereo cadence • ${fpsVRTag}`;
+        } else if (loadVR >= 24 && loadVR <= 52) {
+            badgeVR = 'SWEET SPOT';
+            colorVR = 'emerald';
+            descVR = `Stereo sync (${reprojDesc} • ${fpsVRTag}) • TLOD ${tlodVR} • Sweet Spot Pacing`;
         }
 
-        updatePerfCard('vr', 'MainThread Load', `${loadVR}% (${badgeVR === 'OPTIMUM' ? 'Solid' : (badgeVR === 'BALANCED' ? 'Tight' : 'Judder Risk')})`, loadVR, colorVR, badgeVR, descVR);
+        updatePerfCard('vr', 'MainThread Load', `${loadVR}% (${(badgeVR === 'SWEET SPOT' || badgeVR === 'OPTIMUM') ? 'Solid' : (badgeVR === 'BALANCED' ? 'Tight' : 'Judder Risk')})`, loadVR, colorVR, badgeVR, descVR);
 
     } else {
         // --- PERSPECTIVE B: VRAM & GPU ---
@@ -18308,14 +18316,18 @@ function updatePerformanceCockpitGauges() {
         let badge2D = 'OPTIMUM';
         let color2D = 'emerald';
         let desc2D = `+${free2D} GB Free VRAM headroom${fgVramNote}`;
-        if (pct2D > 88) {
+        if (pct2D > 86) {
             badge2D = 'HAZARD';
             color2D = 'rose';
             desc2D = `VRAM saturation hazard (${pct2D}% used)`;
-        } else if (pct2D >= 68) {
+        } else if (pct2D >= 78) {
             badge2D = 'ACCEPTABLE';
             color2D = 'amber';
             desc2D = `High VRAM allocation (+${free2D} GB free)`;
+        } else if (pct2D >= 55 && pct2D <= 77) {
+            badge2D = 'SWEET SPOT';
+            color2D = 'emerald';
+            desc2D = `Balanced VRAM budget (+${free2D} GB free safety buffer)`;
         }
 
         updatePerfCard(
@@ -18381,10 +18393,14 @@ function updatePerformanceCockpitGauges() {
             badgeVR = 'HAZARD';
             colorVR = 'rose';
             descVR = `Critical: Stereo VRAM overflow risks CTD`;
-        } else if (pctVR >= 68) {
+        } else if (pctVR >= 78) {
             badgeVR = 'ACCEPTABLE';
             colorVR = 'amber';
             descVR = `Heavy VR stereo buffer (+${freeVR} GB free)`;
+        } else if (pctVR >= 55 && pctVR <= 77) {
+            badgeVR = 'SWEET SPOT';
+            colorVR = 'emerald';
+            descVR = `Balanced VR buffer (+${freeVR} GB free safety margin)`;
         }
 
         updatePerfCard(
@@ -18405,6 +18421,8 @@ function updatePerfCard(section, labelText, valueText, barPct, color, badgeText,
     const barEl = document.getElementById(`opt-perf-bar-${section}`);
     const badgeEl = document.getElementById(`opt-perf-badge-${section}`);
     const subEl = document.getElementById(`opt-perf-sub-${section}`);
+    const needleEl = document.getElementById(`opt-perf-needle-${section}`);
+    const targetEl = document.getElementById(`opt-perf-target-${section}`);
 
     const colorHexMap = {
         'emerald': '#10b981',
@@ -18418,21 +18436,35 @@ function updatePerfCard(section, labelText, valueText, barPct, color, badgeText,
     if (labelEl) labelEl.textContent = labelText;
     if (valEl) {
         valEl.textContent = valueText;
-        valEl.style.color = hex;
+        valEl.style.color = (badgeText === 'SWEET SPOT') ? '#2ce586' : hex;
         valEl.className = 'typo-metric font-semibold text-xs tabular-nums';
     }
     if (barEl) {
         barEl.style.width = `${Math.min(100, Math.max(0, barPct))}%`;
-        barEl.style.backgroundColor = hex;
+        barEl.style.backgroundColor = (badgeText === 'SWEET SPOT') ? '#2ce586' : hex;
     }
     if (badgeEl) {
-        badgeEl.textContent = badgeText;
-        badgeEl.style.backgroundColor = hex;
-        badgeEl.className = 'px-2 py-0.5 rounded typo-action-btn text-[10px] font-semibold uppercase tracking-[0.02em] text-white shadow-sm';
+        if (badgeText === 'SWEET SPOT') {
+            badgeEl.innerHTML = `<span class="text-[#fbbf24] drop-shadow-[0_0_4px_rgba(251,191,36,0.85)] mr-1 select-none">★</span><span class="tracking-wider">SWEET SPOT</span>`;
+            badgeEl.className = 'px-2 py-0.5 rounded typo-action-btn text-[10px] font-bold uppercase tracking-[0.02em] inline-flex items-center bg-slate-950/90 border border-[#2ce586]/80 text-[#2ce586] shadow-sm';
+            badgeEl.style.backgroundColor = '';
+        } else {
+            badgeEl.textContent = badgeText;
+            badgeEl.style.backgroundColor = hex;
+            badgeEl.className = 'px-2 py-0.5 rounded typo-action-btn text-[10px] font-semibold uppercase tracking-[0.02em] text-white shadow-sm';
+        }
     }
     if (subEl) {
         subEl.textContent = subText;
         subEl.title = subText;
+    }
+
+    const targetPct = (currentPerformanceMetricMode === 'mainthread') ? 45 : 70;
+    if (needleEl) {
+        needleEl.style.left = `${targetPct}%`;
+    }
+    if (targetEl) {
+        targetEl.textContent = `~${targetPct}%`;
     }
 }
 
@@ -18723,18 +18755,41 @@ function renderMsfsSettingsMatrix() {
 
             let optionsHtml = '';
             if (Array.isArray(item.options)) {
-                optionsHtml = item.options.map(opt => {
-                    const optUpper = String(opt).toUpperCase();
-                    const valUpper = String(item.value || '').toUpperCase();
-                    const rawUpper = String(item.raw_value || '').toUpperCase();
-                    const isSelected = valUpper === optUpper 
-                        || rawUpper === optUpper 
-                        || (valUpper.length >= 3 && (optUpper.startsWith(valUpper + ' ') || optUpper.startsWith(valUpper + '(')))
-                        || (rawUpper.length >= 3 && (optUpper.startsWith(rawUpper + ' ') || optUpper.startsWith(rawUpper + '(')));
+                // Determine the uniquely selected option to prevent duplicate CURRENT badges
+                const valUpper = String(item.value || '').trim().toUpperCase();
+                const rawUpper = String(item.raw_value || '').trim().toUpperCase();
 
-                    if (isSelected) {
-                        displayVal = opt;
-                    }
+                let selectedOpt = item.options.find(opt => {
+                    const optUpper = String(opt).trim().toUpperCase();
+                    return optUpper === valUpper;
+                });
+                if (!selectedOpt && rawUpper) {
+                    selectedOpt = item.options.find(opt => {
+                        const optUpper = String(opt).trim().toUpperCase();
+                        return optUpper === rawUpper;
+                    });
+                }
+                if (!selectedOpt && valUpper) {
+                    selectedOpt = item.options.find(opt => {
+                        const optUpper = String(opt).trim().toUpperCase();
+                        return (valUpper.length >= 4 && (optUpper.startsWith(valUpper + ' ') || optUpper.startsWith(valUpper + '(') || valUpper.startsWith(optUpper)));
+                    });
+                }
+                if (!selectedOpt && rawUpper && rawUpper !== 'DLSS') {
+                    selectedOpt = item.options.find(opt => {
+                        const optUpper = String(opt).trim().toUpperCase();
+                        return (rawUpper.length >= 4 && (optUpper.startsWith(rawUpper + ' ') || optUpper.startsWith(rawUpper + '(') || rawUpper.startsWith(optUpper)));
+                    });
+                }
+                if (!selectedOpt && item.options.length > 0) {
+                    selectedOpt = item.options[0];
+                }
+                if (selectedOpt) {
+                    displayVal = selectedOpt;
+                }
+
+                optionsHtml = item.options.map(opt => {
+                    const isSelected = (opt === selectedOpt);
 
                     const optData = (item.option_ratings && item.option_ratings[opt]) ? item.option_ratings[opt] : null;
                     const optRating = optData ? optData.rating : 'acceptable';
@@ -19006,6 +19061,63 @@ async function onMsfsSettingChanged(settingKey, newValue) {
                     ${getSettingRatingBadgeHtml(cleanTag, found.rating_color || found.rating, true, false)}
                     <span class="text-slate-300 text-[10.5px] leading-tight" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${found.tag_reason || found.rating_reason || ''}</span>
                 `;
+            }
+
+            // Immediately synchronize CURRENT badge and selected styling in dropdown menus
+            const customMenu = document.getElementById(`opt-custom-menu-${settingKey}`);
+            if (customMenu) {
+                const optRows = customMenu.querySelectorAll('[onmousedown*="selectCustomOption"]');
+                optRows.forEach(row => {
+                    const textSpan = row.querySelector('span.truncate');
+                    const isCur = textSpan && (textSpan.textContent.trim().toUpperCase() === String(newValue).trim().toUpperCase());
+                    if (isCur) {
+                        row.classList.add('bg-slate-800/80');
+                        if (textSpan) {
+                            textSpan.className = 'text-white font-semibold truncate';
+                        }
+                        const badgeContainer = row.querySelector('.flex.items-center.gap-1\\.5.shrink-0');
+                        if (badgeContainer && !badgeContainer.querySelector('span.bg-slate-700')) {
+                            const curSpan = document.createElement('span');
+                            curSpan.className = 'text-[9px] font-semibold bg-slate-700 text-white px-1.5 py-0.5 rounded typo-action-btn uppercase shadow-sm';
+                            curSpan.textContent = 'CURRENT';
+                            badgeContainer.appendChild(curSpan);
+                        }
+                    } else {
+                        row.classList.remove('bg-slate-800/80');
+                        if (textSpan) {
+                            textSpan.className = 'text-slate-200 group-hover:text-white font-medium truncate';
+                        }
+                        const curBadge = row.querySelector('span.bg-slate-700');
+                        if (curBadge && curBadge.textContent.includes('CURRENT')) {
+                            curBadge.remove();
+                        }
+                    }
+                });
+            }
+
+            const comboMenu = document.getElementById(`opt-combo-menu-${settingKey}`);
+            if (comboMenu) {
+                const optRows = comboMenu.querySelectorAll('[onmousedown*="selectComboboxPreset"]');
+                optRows.forEach(row => {
+                    const textSpan = row.querySelector('span.tabular-nums');
+                    const isCur = textSpan && (textSpan.textContent.trim().toUpperCase() === String(newValue).trim().toUpperCase());
+                    if (isCur) {
+                        row.className = 'px-3 py-1.5 hover:bg-slate-800 bg-slate-800/90 text-white font-semibold cursor-pointer transition-colors flex items-center justify-between typo-input-val text-xs tabular-nums select-none';
+                        const badgeContainer = row.querySelector('.flex.items-center.gap-1\\.5.shrink-0');
+                        if (badgeContainer && !badgeContainer.querySelector('span.bg-slate-700')) {
+                            const curSpan = document.createElement('span');
+                            curSpan.className = 'text-[9px] font-semibold bg-slate-700 text-white px-1.5 py-0.5 rounded typo-action-btn uppercase shadow-sm';
+                            curSpan.textContent = 'CURRENT';
+                            badgeContainer.appendChild(curSpan);
+                        }
+                    } else {
+                        row.className = 'px-3 py-1.5 hover:bg-slate-800 text-slate-200 font-medium cursor-pointer transition-colors flex items-center justify-between typo-input-val text-xs tabular-nums select-none';
+                        const curBadge = row.querySelector('span.bg-slate-700');
+                        if (curBadge && curBadge.textContent.includes('CURRENT')) {
+                            curBadge.remove();
+                        }
+                    }
+                });
             }
 
                 // Immediately synchronize Toggle Switch state in the DOM if this setting has a switch
