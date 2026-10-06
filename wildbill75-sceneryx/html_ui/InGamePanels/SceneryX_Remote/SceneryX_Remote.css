@@ -63,17 +63,22 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
 .main-content {
     display: flex;
     flex-direction: column;
-    gap: 9px;
-    padding: 10px 12px 14px 12px;
+    gap: 11px;
+    padding: 12px 14px 16px 14px;
     width: 100%;
+    min-height: 100%;
+    background: #020617;
+    border: 1px solid rgba(51, 65, 85, 0.85);
+    border-radius: 8px;
     box-sizing: border-box;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
 }
 
 .panel-section {
     background: rgba(15, 23, 42, 0.92);
     border: 1px solid rgba(51, 65, 85, 0.6);
     border-radius: 6px;
-    padding: 9px 12px;
+    padding: 10px 12px;
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -81,10 +86,15 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
 }
 
 .section-rec {
-    padding: 7px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 10px;
     background: rgba(15, 23, 42, 0.6);
     border: 1px solid rgba(51, 65, 85, 0.5);
     border-radius: 6px;
+    box-sizing: border-box;
+    width: 100%;
 }
 
 .section-header {
@@ -102,19 +112,20 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
     text-transform: uppercase;
 }
 
-/* STATUS PILLS & BADGES - Slate badges with 6px semantic dots */
+/* STATUS PILLS & BADGES - Clean text badges without dots */
 .badge-tag {
-    font-size: 10.5px;
+    font-size: 10px;
     font-weight: 800;
-    padding: 2.5px 8px;
+    padding: 2.5px 7px;
     border-radius: 4px;
     letter-spacing: 0.5px;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    justify-content: center;
     white-space: nowrap;
     user-select: none;
     transition: all 0.15s ease;
+    line-height: 1;
 }
 
 .tag-neutral {
@@ -123,39 +134,37 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
     color: #cbd5e1;
 }
 
-.pill-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    display: inline-block;
+.tag-amber {
+    background: rgba(245, 158, 11, 0.15);
+    border: 1px solid rgba(245, 158, 11, 0.5);
+    color: #fbbf24;
 }
 
-.dot-green {
-    background: #10b981;
-    box-shadow: 0 0 4px rgba(16, 185, 129, 0.4);
+.tag-green {
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.5);
+    color: #34d399;
 }
 
-.dot-amber {
-    background: #f59e0b;
-    box-shadow: 0 0 4px rgba(245, 158, 11, 0.4);
+.tag-red {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.5);
+    color: #f87171;
 }
 
-.dot-red {
-    background: #ef4444;
-    box-shadow: 0 0 4px rgba(239, 68, 68, 0.4);
+.pill-dot, .base-dot {
+    display: none !important;
 }
 
 /* BUTTONS */
 .msfs-btn {
-    width: auto;
-    min-width: 170px;
-    max-width: 220px;
-    margin: 2px auto;
-    padding: 6px 20px;
+    width: 100%;
+    min-height: 28px;
+    margin: 0 auto;
+    padding: 6px 16px;
     border: none;
     border-radius: 4px;
-    font-size: 11.5px;
+    font-size: 11px;
     font-weight: 800;
     letter-spacing: 0.8px;
     cursor: pointer;
@@ -166,6 +175,8 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
     align-items: center;
     justify-content: center;
     text-align: center;
+    line-height: 1;
+    box-sizing: border-box;
 }
 
 .msfs-btn-inline {
@@ -217,20 +228,19 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
 }
 
 .lod-axis-card {
-    background: rgba(11, 15, 25, 0.7);
+    background: rgba(11, 15, 25, 0.75);
     border: 1px solid rgba(51, 65, 85, 0.5);
-    border-radius: 5px;
-    padding: 7px 9px 6px 9px;
+    border-radius: 6px;
+    padding: 8px 10px 7px 10px;
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 6px;
 }
 
 .lod-axis-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
 }
 
 .lod-title-group {
@@ -266,37 +276,43 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
 .lod-values-group {
     display: flex;
     align-items: center;
-    gap: 10px;
+    justify-content: space-between;
+    background: rgba(15, 23, 42, 0.55);
+    border: 1px solid rgba(51, 65, 85, 0.4);
+    border-radius: 4px;
+    padding: 4px 8px;
 }
 
 .lod-param {
     display: flex;
     align-items: center;
-    gap: 3px;
+    gap: 5px;
 }
 
 .param-lbl {
     color: #94a3b8;
     font-weight: 700;
     font-size: 11px;
+    letter-spacing: 0.2px;
 }
 
 .param-val {
     font-family: 'Consolas', monospace;
     font-weight: 900;
     color: #38bdf8;
-    font-size: 12.5px;
+    font-size: 12px;
+    min-width: 24px;
 }
 
 .alt-param {
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: 4px;
 }
 
 .alt-input {
-    width: 48px;
-    background: #0f172a;
+    width: 52px;
+    background: #0b0f19;
     border: 1px solid rgba(51, 65, 85, 0.8);
     border-radius: 3px;
     color: #f1f5f9;
@@ -304,7 +320,7 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
     font-size: 11px;
     font-weight: 700;
     text-align: center;
-    padding: 1px 2px;
+    padding: 2px 3px;
     outline: none;
 }
 
@@ -316,14 +332,14 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
 .param-unit {
     color: #64748b;
     font-size: 10px;
-    font-weight: 700;
+    font-weight: 600;
 }
 
 /* DUAL RANGE SLIDER CONTAINER & THUMBS */
 .dual-slider-container {
     position: relative;
     width: 100%;
-    height: 22px;
+    height: 20px;
     display: flex;
     align-items: center;
 }
@@ -331,7 +347,7 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
 .dual-slider-track-bg {
     position: absolute;
     left: 0;
-    top: 8px;
+    top: 7px;
     width: 100%;
     height: 6px;
     background: #1e293b;
@@ -342,7 +358,7 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
 
 .dual-slider-track-highlight {
     position: absolute;
-    top: 8px;
+    top: 7px;
     height: 6px;
     background: #0284c7;
     border-radius: 3px;
@@ -354,9 +370,9 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
 .dual-slider-input {
     position: absolute;
     left: 0;
-    top: 0;
+    top: 7px;
     width: 100%;
-    height: 100%;
+    height: 6px;
     margin: 0;
     padding: 0;
     background: transparent !important;
@@ -374,7 +390,7 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
     background-color: transparent !important;
     border: none !important;
     box-shadow: none !important;
-    height: 100% !important;
+    height: 6px !important;
     -webkit-appearance: none !important;
     cursor: pointer;
 }
@@ -384,7 +400,7 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
     background-color: transparent !important;
     border: none !important;
     box-shadow: none !important;
-    height: 100% !important;
+    height: 6px !important;
     cursor: pointer;
 }
 
@@ -393,8 +409,9 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
     cursor: pointer !important;
     -webkit-appearance: none !important;
     appearance: none !important;
-    width: 15px !important;
-    height: 15px !important;
+    width: 16px !important;
+    height: 16px !important;
+    margin-top: -5px !important;
     border-radius: 50% !important;
     background: #ffffff !important;
     background-color: #ffffff !important;
@@ -407,8 +424,8 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
 .dual-slider-input::-moz-range-thumb {
     pointer-events: auto !important;
     cursor: pointer !important;
-    width: 15px !important;
-    height: 15px !important;
+    width: 16px !important;
+    height: 16px !important;
     border-radius: 50% !important;
     background: #ffffff !important;
     background-color: #ffffff !important;
@@ -420,7 +437,7 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
 
 .dual-slider-input:hover::-webkit-slider-thumb,
 .dual-slider-input:focus::-webkit-slider-thumb {
-    transform: scale(1.18) !important;
+    transform: scale(1.15) !important;
     border-color: #38bdf8 !important;
     background: #ffffff !important;
     background-color: #ffffff !important;
@@ -429,7 +446,7 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
 
 .dual-slider-input:hover::-moz-range-thumb,
 .dual-slider-input:focus::-moz-range-thumb {
-    transform: scale(1.18) !important;
+    transform: scale(1.15) !important;
     border-color: #38bdf8 !important;
     background: #ffffff !important;
     background-color: #ffffff !important;
@@ -437,7 +454,7 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
 }
 
 .dual-slider-input:active::-webkit-slider-thumb {
-    transform: scale(1.22) !important;
+    transform: scale(1.2) !important;
     border-color: #0ea5e9 !important;
     background: #ffffff !important;
     background-color: #ffffff !important;
@@ -445,7 +462,7 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
 }
 
 .dual-slider-input:active::-moz-range-thumb {
-    transform: scale(1.22) !important;
+    transform: scale(1.2) !important;
     border-color: #0ea5e9 !important;
     background: #ffffff !important;
     background-color: #ffffff !important;

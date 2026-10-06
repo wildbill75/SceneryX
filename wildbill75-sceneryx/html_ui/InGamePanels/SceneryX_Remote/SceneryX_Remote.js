@@ -42,6 +42,7 @@ checkAutoload();
     let tlodIsManual = false;
     let olodIsManual = false;
     let currentIsVr = false;
+    let currentLodActive = false;
 
     let isUserInteracting = false;
     let userInteractionTimeout = null;
@@ -122,32 +123,22 @@ checkAutoload();
         }
     }
 
-    function setAxisUiState(axis, isManual) {
-        if (axis === "tlod") {
-            tlodIsManual = isManual;
-            let dot = document.getElementById("tlod-badge-dot");
-            let txt = document.getElementById("tlod-badge-text");
-            if (dot && txt) {
-                if (isManual) {
-                    dot.className = "pill-dot dot-amber";
-                    txt.textContent = "MAN";
-                } else {
-                    dot.className = "pill-dot dot-green";
-                    txt.textContent = "AUTO";
-                }
-            }
-        } else if (axis === "olod") {
-            olodIsManual = isManual;
-            let dot = document.getElementById("olod-badge-dot");
-            let txt = document.getElementById("olod-badge-text");
-            if (dot && txt) {
-                if (isManual) {
-                    dot.className = "pill-dot dot-amber";
-                    txt.textContent = "MAN";
-                } else {
-                    dot.className = "pill-dot dot-green";
-                    txt.textContent = "AUTO";
-                }
+    function setAxisUiState(axis, isManual, isOff) {
+        let badge = document.getElementById(axis + "-mode-badge");
+        let txt = document.getElementById(axis + "-badge-text");
+        if (axis === "tlod") tlodIsManual = isManual;
+        else olodIsManual = isManual;
+
+        if (txt && badge) {
+            if (isOff) {
+                badge.className = "badge-tag tag-neutral";
+                txt.textContent = "OFF";
+            } else if (isManual) {
+                badge.className = "badge-tag tag-amber";
+                txt.textContent = "MAN";
+            } else {
+                badge.className = "badge-tag tag-green";
+                txt.textContent = "AUTO";
             }
         }
     }
@@ -160,19 +151,33 @@ checkAutoload();
         }, 2500);
     }
 
-    function queueAxisConfigUpdate(axis) {
+    function queueAxisConfigUpdate(axis, directVal) {
         markUserInteracting();
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(function () {
-            sendAxisConfigUpdate(axis);
-        }, 200);
+            sendAxisConfigUpdate(axis, directVal);
+        }, 120);
     }
 
-    function sendAxisConfigUpdate(axis) {
+    function sendAxisConfigUpdate(axis, directVal) {
         let mode = currentIsVr ? "VR" : "2D";
         let baseVal = (axis === "tlod") ? currentTlodFloor : currentOlodFloor;
         let targetVal = (axis === "tlod") ? currentTlodCruise : currentOlodCruise;
         let altVal = (axis === "tlod") ? currentTlodAlt : currentOlodAlt;
+
+        if (!currentLodActive) {
+            // Smart LOD is disengaged: write live to MSFS memory directly without changing profile files
+            let valToWrite = (directVal !== undefined) ? directVal : baseVal;
+            let payload = {};
+            payload[axis] = valToWrite;
+            let url = getApiBase() + "/smart_lod/set_lod";
+            let xhr = new XMLHttpRequest();
+            xhr.open("POST", url, true);
+            xhr.setRequestHeader("Content-Type", "application/json");
+            xhr.timeout = 2500;
+            xhr.send(JSON.stringify(payload));
+            return;
+        }
 
         let url = getApiBase() + "/smart_lod/axis_config";
         let xhr = new XMLHttpRequest();
@@ -184,8 +189,7 @@ checkAutoload();
             axis: axis,
             base: baseVal,
             target: targetVal,
-            altitude: altVal,
-            enabled: true
+            altitude: altVal
         }));
     }
 
@@ -299,6 +303,7 @@ checkAutoload();
         // 1. SMART LOD REGULATION
         let lod = data.smart_lod || {};
         let lodActive = (lod.active !== undefined) ? !!lod.active : (!!data.smart_lod_running && !!data.smart_lod_enabled);
+        currentLodActive = lodActive;
 
         let sTlod = (lod.current_tlod !== undefined && lod.current_tlod !== null) ? lod.current_tlod : (data.smart_lod_tlod !== undefined ? data.smart_lod_tlod : 100);
         let sOlod = (lod.current_olod !== undefined && lod.current_olod !== null) ? lod.current_olod : (data.smart_lod_olod !== undefined ? data.smart_lod_olod : 100);
@@ -357,8 +362,8 @@ checkAutoload();
 
             let tlodManualRemote = !!(lod.tlod_manual !== undefined ? lod.tlod_manual : data.smart_lod_tlod_manual);
             let olodManualRemote = !!(lod.olod_manual !== undefined ? lod.olod_manual : data.smart_lod_olod_manual);
-            setAxisUiState("tlod", tlodManualRemote);
-            setAxisUiState("olod", olodManualRemote);
+            setAxisUiState("tlod", tlodManualRemote, !lodActive);
+            setAxisUiState("olod", olodManualRemote, !lodActive);
         }
 
         let btnLod = document.getElementById("smart-lod-toggle-btn");
@@ -389,18 +394,18 @@ checkAutoload();
         let elMt = document.getElementById("live-mt-val");
         if (elMt) elMt.textContent = (mtMs && mtMs > 0) ? Number(mtMs).toFixed(1) : "--";
 
-        let elPacingDot = document.getElementById("pacing-badge-dot");
         let elPacingTxt = document.getElementById("pacing-badge-text");
-        if (elPacingTxt && elPacingDot) {
+        let elPacingBadge = document.getElementById("live-pacing-status");
+        if (elPacingTxt && elPacingBadge) {
             if (pacing === "OPTIMAL" || pacing === "FLUIDE") {
                 elPacingTxt.textContent = "OPTIMAL";
-                elPacingDot.className = "pill-dot dot-green";
+                elPacingBadge.className = "badge-tag tag-green";
             } else if (pacing === "ACCEPTABLE" || pacing === "CHARGE" || pacing === "CHARGÉ") {
                 elPacingTxt.textContent = "ACCEPTABLE";
-                elPacingDot.className = "pill-dot dot-amber";
+                elPacingBadge.className = "badge-tag tag-amber";
             } else {
                 elPacingTxt.textContent = "HEAVY";
-                elPacingDot.className = "pill-dot dot-red";
+                elPacingBadge.className = "badge-tag tag-red";
             }
         }
 
@@ -435,14 +440,14 @@ checkAutoload();
         // 5. SYSTEM METRICS (GPU, CPU, VRAM, CACHE with spaced units)
         let elGpu = document.getElementById("live-gpu-val");
         if (elGpu) {
-            let gpuPct = data.gpu_util_pct !== undefined ? data.gpu_util_pct : 0;
-            elGpu.textContent = (gpuPct && gpuPct > 0) ? Math.round(gpuPct) : "--";
+            let gpuPct = (data.gpu_util_pct !== undefined && data.gpu_util_pct !== null) ? data.gpu_util_pct : 0;
+            elGpu.textContent = Math.round(Number(gpuPct) || 0);
         }
 
         let elCpu = document.getElementById("live-cpu-val");
         if (elCpu) {
-            let cpuPct = data.cpu_pct !== undefined ? data.cpu_pct : 0;
-            elCpu.textContent = (cpuPct && cpuPct > 0) ? Math.round(cpuPct) : "--";
+            let cpuPct = (data.cpu_pct !== undefined && data.cpu_pct !== null) ? data.cpu_pct : 0;
+            elCpu.textContent = Math.round(Number(cpuPct) || 0);
         }
 
         let elVram = document.getElementById("live-vram-val");
@@ -601,8 +606,12 @@ checkAutoload();
 
                 if (floorValLbl) floorValLbl.textContent = fVal;
                 updateDualSliderTrack(axis, fVal, cVal);
-                setAxisUiState(axis, true);
-                queueAxisConfigUpdate(axis);
+                setAxisUiState(axis, true, !currentLodActive);
+                if (!currentLodActive) {
+                    let liveEl = document.getElementById(axis + "-live-val");
+                    if (liveEl) liveEl.textContent = fVal;
+                }
+                queueAxisConfigUpdate(axis, fVal);
             });
             floorRange.addEventListener("dblclick", function (e) {
                 e.preventDefault();
@@ -628,8 +637,12 @@ checkAutoload();
 
                 if (cruiseValLbl) cruiseValLbl.textContent = cVal;
                 updateDualSliderTrack(axis, fVal, cVal);
-                setAxisUiState(axis, true);
-                queueAxisConfigUpdate(axis);
+                setAxisUiState(axis, true, !currentLodActive);
+                if (!currentLodActive) {
+                    let liveEl = document.getElementById(axis + "-live-val");
+                    if (liveEl) liveEl.textContent = cVal;
+                }
+                queueAxisConfigUpdate(axis, cVal);
             });
             cruiseRange.addEventListener("dblclick", function (e) {
                 e.preventDefault();

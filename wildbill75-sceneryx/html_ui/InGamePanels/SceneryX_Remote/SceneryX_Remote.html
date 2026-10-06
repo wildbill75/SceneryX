@@ -50,25 +50,24 @@
                                     <span class="lod-axis-title" id="tlod-name-label" title="Terrain LOD (Double-click to reset to Auto)">TLOD</span>
                                     <span class="lod-live-tag" title="Real-time in-sim TLOD setpoint">LIVE: <span id="tlod-live-val" class="live-num">100</span></span>
                                 </div>
-                                <div class="lod-values-group">
-                                    <div class="lod-param" title="Floor LOD below transition altitude">
-                                        <span class="param-lbl">Floor:</span>
-                                        <span id="tlod-floor-val" class="param-val">100</span>
-                                    </div>
-                                    <div class="lod-param alt-param" title="Transition altitude in feet AGL">
-                                        <span class="param-lbl">Alt:</span>
-                                        <input type="number" id="tlod-alt-input" class="alt-input" value="5000" step="500" min="500" max="45000" />
-                                        <span class="param-unit">ft</span>
-                                    </div>
-                                    <div class="lod-param" title="Cruise LOD at or above transition altitude">
-                                        <span class="param-lbl">Cruise:</span>
-                                        <span id="tlod-cruise-val" class="param-val">200</span>
-                                    </div>
-                                </div>
                                 <span class="badge-tag tag-neutral" id="tlod-mode-badge" title="Double-click slider or click badge to reset to Auto">
-                                    <span class="pill-dot dot-green" id="tlod-badge-dot"></span>
                                     <span id="tlod-badge-text">AUTO</span>
                                 </span>
+                            </div>
+                            <div class="lod-values-group">
+                                <div class="lod-param" title="Floor LOD below transition altitude">
+                                    <span class="param-lbl">Floor:</span>
+                                    <span id="tlod-floor-val" class="param-val">100</span>
+                                </div>
+                                <div class="lod-param alt-param" title="Transition altitude in feet AGL">
+                                    <span class="param-lbl">Alt:</span>
+                                    <input type="number" id="tlod-alt-input" class="alt-input" value="5000" step="500" min="500" max="45000" />
+                                    <span class="param-unit">ft AGL</span>
+                                </div>
+                                <div class="lod-param" title="Cruise LOD at or above transition altitude">
+                                    <span class="param-lbl">Cruise:</span>
+                                    <span id="tlod-cruise-val" class="param-val">200</span>
+                                </div>
                             </div>
                             <!-- Track Container -->
                             <div class="dual-slider-container" id="tlod-dual-container">
@@ -79,7 +78,7 @@
                             </div>
                             <div class="dual-slider-labels">
                                 <span>0</span>
-                                <span class="range-sub">Dynamic Range (Floor &rarr; Cruise)</span>
+                                <span class="range-sub">Dynamic Range (Floor to Cruise)</span>
                                 <span>400</span>
                             </div>
                         </div>
@@ -91,25 +90,24 @@
                                     <span class="lod-axis-title" id="olod-name-label" title="Object LOD (Double-click to reset to Auto)">OLOD</span>
                                     <span class="lod-live-tag" title="Real-time in-sim OLOD setpoint">LIVE: <span id="olod-live-val" class="live-num">100</span></span>
                                 </div>
-                                <div class="lod-values-group">
-                                    <div class="lod-param" title="Floor LOD below transition altitude">
-                                        <span class="param-lbl">Floor:</span>
-                                        <span id="olod-floor-val" class="param-val">100</span>
-                                    </div>
-                                    <div class="lod-param alt-param" title="Transition altitude in feet AGL">
-                                        <span class="param-lbl">Alt:</span>
-                                        <input type="number" id="olod-alt-input" class="alt-input" value="3000" step="500" min="500" max="45000" />
-                                        <span class="param-unit">ft</span>
-                                    </div>
-                                    <div class="lod-param" title="Cruise LOD at or above transition altitude">
-                                        <span class="param-lbl">Cruise:</span>
-                                        <span id="olod-cruise-val" class="param-val">100</span>
-                                    </div>
-                                </div>
                                 <span class="badge-tag tag-neutral" id="olod-mode-badge" title="Double-click slider or click badge to reset to Auto">
-                                    <span class="pill-dot dot-green" id="olod-badge-dot"></span>
                                     <span id="olod-badge-text">AUTO</span>
                                 </span>
+                            </div>
+                            <div class="lod-values-group">
+                                <div class="lod-param" title="Floor LOD below transition altitude">
+                                    <span class="param-lbl">Floor:</span>
+                                    <span id="olod-floor-val" class="param-val">100</span>
+                                </div>
+                                <div class="lod-param alt-param" title="Transition altitude in feet AGL">
+                                    <span class="param-lbl">Alt:</span>
+                                    <input type="number" id="olod-alt-input" class="alt-input" value="3000" step="500" min="500" max="45000" />
+                                    <span class="param-unit">ft AGL</span>
+                                </div>
+                                <div class="lod-param" title="Cruise LOD at or above transition altitude">
+                                    <span class="param-lbl">Cruise:</span>
+                                    <span id="olod-cruise-val" class="param-val">100</span>
+                                </div>
                             </div>
                             <!-- Track Container -->
                             <div class="dual-slider-container" id="olod-dual-container">
@@ -120,7 +118,7 @@
                             </div>
                             <div class="dual-slider-labels">
                                 <span>0</span>
-                                <span class="range-sub">Dynamic Range (Floor &rarr; Cruise)</span>
+                                <span class="range-sub">Dynamic Range (Floor to Cruise)</span>
                                 <span>300</span>
                             </div>
                         </div>
@@ -132,7 +130,6 @@
                     <div class="section-header">
                         <span class="section-title">PERFORMANCE MONITORING</span>
                         <span id="live-pacing-status" class="badge-tag tag-neutral">
-                            <span class="pill-dot dot-green" id="pacing-badge-dot"></span>
                             <span id="pacing-badge-text">OPTIMAL</span>
                         </span>
                     </div>
@@ -144,7 +141,6 @@
                                 <span class="metric-unit">FPS</span>
                             </div>
                             <div id="live-fps-base-wrap" class="metric-base-badge" title="Native Frame Rate without Frame Generation">
-                                <span class="base-dot"></span>
                                 <span class="base-label">BASE</span>
                                 <span id="live-fps-base" class="base-val">--</span>
                                 <span class="base-unit">FPS</span>

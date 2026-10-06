@@ -238,8 +238,13 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
             pass
 
         gpu_util = telem.get("gpu_util_pct", 0)
-        gpu_temp = telem.get("gpu_temp_c", 0)
-        cpu_util = telem.get("msfs_cpu_pct", 0)
+        cpu_util = telem.get("cpu_pct") or telem.get("msfs_cpu_pct") or 0
+        if not cpu_util:
+            try:
+                import psutil
+                cpu_util = round(psutil.cpu_percent(interval=None), 1)
+            except Exception:
+                pass
 
         telemetry_data = {
             "app_running": True,
@@ -300,9 +305,7 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
             import flight_lod_controller
             lod_ctrl = flight_lod_controller.get_smart_lod_controller()
             current_status = lod_ctrl.get_status()
-            new_state = not current_status.get("enabled", False)
-            if new_state:
-                _LAST_MANUAL_LOD.clear()
+            _LAST_MANUAL_LOD.clear()
             res = lod_ctrl.set_enabled(new_state, force_kill_autofps=True)
             self._send_json(200, res)
         except Exception as e:

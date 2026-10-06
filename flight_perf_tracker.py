@@ -23,6 +23,13 @@ import threading
 from datetime import datetime
 
 try:
+    import psutil
+    # Prime non-blocking psutil cpu_percent
+    psutil.cpu_percent(interval=None)
+except Exception:
+    psutil = None
+
+try:
     from SimConnect import SimConnect, RECV_EVENT_FRAME, PERIOD_SECOND
     import SimConnect.scdefs as scdefs
     HAS_SIMCONNECT = True
@@ -3283,10 +3290,21 @@ class BlackboxSession:
             telemetry["tlod"] = autofps.get("tlod")
             telemetry["olod"] = autofps.get("olod")
 
+        system_cpu_pct = 0.0
+        if psutil:
+            try:
+                system_cpu_pct = psutil.cpu_percent(interval=None)
+            except Exception:
+                pass
+
+        telemetry["cpu_pct"] = round(system_cpu_pct, 1)
+
         if msfs:
             telemetry["msfs_ram_mb"] = msfs.get("ram_mb", 0)
             telemetry["msfs_vram_mb"] = msfs.get("vram_mb", 0.0)
-            telemetry["msfs_cpu_pct"] = msfs.get("cpu_pct", 0)
+            telemetry["msfs_cpu_pct"] = msfs.get("cpu_pct", 0) or round(system_cpu_pct, 1)
+        else:
+            telemetry["msfs_cpu_pct"] = round(system_cpu_pct, 1)
 
         telemetry["agl_ft"] = sc_data.get("agl_ft")
         telemetry["on_ground"] = sc_data.get("on_ground", False if (sc_data.get("agl_ft") is not None and sc_data.get("agl_ft") > 80) else True)

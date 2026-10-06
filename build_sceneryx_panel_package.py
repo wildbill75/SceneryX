@@ -257,25 +257,24 @@ def build():
                                     <span class="lod-axis-title" id="tlod-name-label" title="Terrain LOD (Double-click to reset to Auto)">TLOD</span>
                                     <span class="lod-live-tag" title="Real-time in-sim TLOD setpoint">LIVE: <span id="tlod-live-val" class="live-num">100</span></span>
                                 </div>
-                                <div class="lod-values-group">
-                                    <div class="lod-param" title="Floor LOD below transition altitude">
-                                        <span class="param-lbl">Floor:</span>
-                                        <span id="tlod-floor-val" class="param-val">100</span>
-                                    </div>
-                                    <div class="lod-param alt-param" title="Transition altitude in feet AGL">
-                                        <span class="param-lbl">Alt:</span>
-                                        <input type="number" id="tlod-alt-input" class="alt-input" value="5000" step="500" min="500" max="45000" />
-                                        <span class="param-unit">ft</span>
-                                    </div>
-                                    <div class="lod-param" title="Cruise LOD at or above transition altitude">
-                                        <span class="param-lbl">Cruise:</span>
-                                        <span id="tlod-cruise-val" class="param-val">200</span>
-                                    </div>
-                                </div>
                                 <span class="badge-tag tag-neutral" id="tlod-mode-badge" title="Double-click slider or click badge to reset to Auto">
-                                    <span class="pill-dot dot-green" id="tlod-badge-dot"></span>
                                     <span id="tlod-badge-text">AUTO</span>
                                 </span>
+                            </div>
+                            <div class="lod-values-group">
+                                <div class="lod-param" title="Floor LOD below transition altitude">
+                                    <span class="param-lbl">Floor:</span>
+                                    <span id="tlod-floor-val" class="param-val">100</span>
+                                </div>
+                                <div class="lod-param alt-param" title="Transition altitude in feet AGL">
+                                    <span class="param-lbl">Alt:</span>
+                                    <input type="number" id="tlod-alt-input" class="alt-input" value="5000" step="500" min="500" max="45000" />
+                                    <span class="param-unit">ft AGL</span>
+                                </div>
+                                <div class="lod-param" title="Cruise LOD at or above transition altitude">
+                                    <span class="param-lbl">Cruise:</span>
+                                    <span id="tlod-cruise-val" class="param-val">200</span>
+                                </div>
                             </div>
                             <!-- Track Container -->
                             <div class="dual-slider-container" id="tlod-dual-container">
@@ -286,7 +285,7 @@ def build():
                             </div>
                             <div class="dual-slider-labels">
                                 <span>0</span>
-                                <span class="range-sub">Dynamic Range (Floor &rarr; Cruise)</span>
+                                <span class="range-sub">Dynamic Range (Floor to Cruise)</span>
                                 <span>400</span>
                             </div>
                         </div>
@@ -298,25 +297,24 @@ def build():
                                     <span class="lod-axis-title" id="olod-name-label" title="Object LOD (Double-click to reset to Auto)">OLOD</span>
                                     <span class="lod-live-tag" title="Real-time in-sim OLOD setpoint">LIVE: <span id="olod-live-val" class="live-num">100</span></span>
                                 </div>
-                                <div class="lod-values-group">
-                                    <div class="lod-param" title="Floor LOD below transition altitude">
-                                        <span class="param-lbl">Floor:</span>
-                                        <span id="olod-floor-val" class="param-val">100</span>
-                                    </div>
-                                    <div class="lod-param alt-param" title="Transition altitude in feet AGL">
-                                        <span class="param-lbl">Alt:</span>
-                                        <input type="number" id="olod-alt-input" class="alt-input" value="3000" step="500" min="500" max="45000" />
-                                        <span class="param-unit">ft</span>
-                                    </div>
-                                    <div class="lod-param" title="Cruise LOD at or above transition altitude">
-                                        <span class="param-lbl">Cruise:</span>
-                                        <span id="olod-cruise-val" class="param-val">100</span>
-                                    </div>
-                                </div>
                                 <span class="badge-tag tag-neutral" id="olod-mode-badge" title="Double-click slider or click badge to reset to Auto">
-                                    <span class="pill-dot dot-green" id="olod-badge-dot"></span>
                                     <span id="olod-badge-text">AUTO</span>
                                 </span>
+                            </div>
+                            <div class="lod-values-group">
+                                <div class="lod-param" title="Floor LOD below transition altitude">
+                                    <span class="param-lbl">Floor:</span>
+                                    <span id="olod-floor-val" class="param-val">100</span>
+                                </div>
+                                <div class="lod-param alt-param" title="Transition altitude in feet AGL">
+                                    <span class="param-lbl">Alt:</span>
+                                    <input type="number" id="olod-alt-input" class="alt-input" value="3000" step="500" min="500" max="45000" />
+                                    <span class="param-unit">ft AGL</span>
+                                </div>
+                                <div class="lod-param" title="Cruise LOD at or above transition altitude">
+                                    <span class="param-lbl">Cruise:</span>
+                                    <span id="olod-cruise-val" class="param-val">100</span>
+                                </div>
                             </div>
                             <!-- Track Container -->
                             <div class="dual-slider-container" id="olod-dual-container">
@@ -327,7 +325,7 @@ def build():
                             </div>
                             <div class="dual-slider-labels">
                                 <span>0</span>
-                                <span class="range-sub">Dynamic Range (Floor &rarr; Cruise)</span>
+                                <span class="range-sub">Dynamic Range (Floor to Cruise)</span>
                                 <span>300</span>
                             </div>
                         </div>
@@ -339,7 +337,6 @@ def build():
                     <div class="section-header">
                         <span class="section-title">PERFORMANCE MONITORING</span>
                         <span id="live-pacing-status" class="badge-tag tag-neutral">
-                            <span class="pill-dot dot-green" id="pacing-badge-dot"></span>
                             <span id="pacing-badge-text">OPTIMAL</span>
                         </span>
                     </div>
@@ -351,7 +348,6 @@ def build():
                                 <span class="metric-unit">FPS</span>
                             </div>
                             <div id="live-fps-base-wrap" class="metric-base-badge" title="Native Frame Rate without Frame Generation">
-                                <span class="base-dot"></span>
                                 <span class="base-label">BASE</span>
                                 <span id="live-fps-base" class="base-val">--</span>
                                 <span class="base-unit">FPS</span>
@@ -485,17 +481,22 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
 .main-content {
     display: flex;
     flex-direction: column;
-    gap: 9px;
-    padding: 10px 12px 14px 12px;
+    gap: 11px;
+    padding: 12px 14px 16px 14px;
     width: 100%;
+    min-height: 100%;
+    background: #020617;
+    border: 1px solid rgba(51, 65, 85, 0.85);
+    border-radius: 8px;
     box-sizing: border-box;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
 }
 
 .panel-section {
     background: rgba(15, 23, 42, 0.92);
     border: 1px solid rgba(51, 65, 85, 0.6);
     border-radius: 6px;
-    padding: 9px 12px;
+    padding: 10px 12px;
     display: flex;
     flex-direction: column;
     gap: 8px;
@@ -503,10 +504,15 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
 }
 
 .section-rec {
-    padding: 7px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 10px;
     background: rgba(15, 23, 42, 0.6);
     border: 1px solid rgba(51, 65, 85, 0.5);
     border-radius: 6px;
+    box-sizing: border-box;
+    width: 100%;
 }
 
 .section-header {
@@ -524,19 +530,20 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
     text-transform: uppercase;
 }
 
-/* STATUS PILLS & BADGES - Slate badges with 6px semantic dots */
+/* STATUS PILLS & BADGES - Clean text badges without dots */
 .badge-tag {
-    font-size: 10.5px;
+    font-size: 10px;
     font-weight: 800;
-    padding: 2.5px 8px;
+    padding: 2.5px 7px;
     border-radius: 4px;
     letter-spacing: 0.5px;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    justify-content: center;
     white-space: nowrap;
     user-select: none;
     transition: all 0.15s ease;
+    line-height: 1;
 }
 
 .tag-neutral {
@@ -545,39 +552,37 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
     color: #cbd5e1;
 }
 
-.pill-dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    display: inline-block;
+.tag-amber {
+    background: rgba(245, 158, 11, 0.15);
+    border: 1px solid rgba(245, 158, 11, 0.5);
+    color: #fbbf24;
 }
 
-.dot-green {
-    background: #10b981;
-    box-shadow: 0 0 4px rgba(16, 185, 129, 0.4);
+.tag-green {
+    background: rgba(16, 185, 129, 0.15);
+    border: 1px solid rgba(16, 185, 129, 0.5);
+    color: #34d399;
 }
 
-.dot-amber {
-    background: #f59e0b;
-    box-shadow: 0 0 4px rgba(245, 158, 11, 0.4);
+.tag-red {
+    background: rgba(239, 68, 68, 0.15);
+    border: 1px solid rgba(239, 68, 68, 0.5);
+    color: #f87171;
 }
 
-.dot-red {
-    background: #ef4444;
-    box-shadow: 0 0 4px rgba(239, 68, 68, 0.4);
+.pill-dot, .base-dot {
+    display: none !important;
 }
 
 /* BUTTONS */
 .msfs-btn {
-    width: auto;
-    min-width: 170px;
-    max-width: 220px;
-    margin: 2px auto;
-    padding: 6px 20px;
+    width: 100%;
+    min-height: 28px;
+    margin: 0 auto;
+    padding: 6px 16px;
     border: none;
     border-radius: 4px;
-    font-size: 11.5px;
+    font-size: 11px;
     font-weight: 800;
     letter-spacing: 0.8px;
     cursor: pointer;
@@ -588,6 +593,8 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
     align-items: center;
     justify-content: center;
     text-align: center;
+    line-height: 1;
+    box-sizing: border-box;
 }
 
 .msfs-btn-inline {
@@ -639,20 +646,19 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
 }
 
 .lod-axis-card {
-    background: rgba(11, 15, 25, 0.7);
+    background: rgba(11, 15, 25, 0.75);
     border: 1px solid rgba(51, 65, 85, 0.5);
-    border-radius: 5px;
-    padding: 7px 9px 6px 9px;
+    border-radius: 6px;
+    padding: 8px 10px 7px 10px;
     display: flex;
     flex-direction: column;
-    gap: 5px;
+    gap: 6px;
 }
 
 .lod-axis-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 8px;
 }
 
 .lod-title-group {
@@ -688,37 +694,43 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
 .lod-values-group {
     display: flex;
     align-items: center;
-    gap: 10px;
+    justify-content: space-between;
+    background: rgba(15, 23, 42, 0.55);
+    border: 1px solid rgba(51, 65, 85, 0.4);
+    border-radius: 4px;
+    padding: 4px 8px;
 }
 
 .lod-param {
     display: flex;
     align-items: center;
-    gap: 3px;
+    gap: 5px;
 }
 
 .param-lbl {
     color: #94a3b8;
     font-weight: 700;
     font-size: 11px;
+    letter-spacing: 0.2px;
 }
 
 .param-val {
     font-family: 'Consolas', monospace;
     font-weight: 900;
     color: #38bdf8;
-    font-size: 12.5px;
+    font-size: 12px;
+    min-width: 24px;
 }
 
 .alt-param {
     display: flex;
     align-items: center;
-    gap: 2px;
+    gap: 4px;
 }
 
 .alt-input {
-    width: 48px;
-    background: #0f172a;
+    width: 52px;
+    background: #0b0f19;
     border: 1px solid rgba(51, 65, 85, 0.8);
     border-radius: 3px;
     color: #f1f5f9;
@@ -726,7 +738,7 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
     font-size: 11px;
     font-weight: 700;
     text-align: center;
-    padding: 1px 2px;
+    padding: 2px 3px;
     outline: none;
 }
 
@@ -738,14 +750,14 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
 .param-unit {
     color: #64748b;
     font-size: 10px;
-    font-weight: 700;
+    font-weight: 600;
 }
 
 /* DUAL RANGE SLIDER CONTAINER & THUMBS */
 .dual-slider-container {
     position: relative;
     width: 100%;
-    height: 22px;
+    height: 20px;
     display: flex;
     align-items: center;
 }
@@ -753,7 +765,7 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
 .dual-slider-track-bg {
     position: absolute;
     left: 0;
-    top: 8px;
+    top: 7px;
     width: 100%;
     height: 6px;
     background: #1e293b;
@@ -764,7 +776,7 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
 
 .dual-slider-track-highlight {
     position: absolute;
-    top: 8px;
+    top: 7px;
     height: 6px;
     background: #0284c7;
     border-radius: 3px;
@@ -776,9 +788,9 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
 .dual-slider-input {
     position: absolute;
     left: 0;
-    top: 0;
+    top: 7px;
     width: 100%;
-    height: 100%;
+    height: 6px;
     margin: 0;
     padding: 0;
     background: transparent !important;
@@ -796,7 +808,7 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
     background-color: transparent !important;
     border: none !important;
     box-shadow: none !important;
-    height: 100% !important;
+    height: 6px !important;
     -webkit-appearance: none !important;
     cursor: pointer;
 }
@@ -806,7 +818,7 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
     background-color: transparent !important;
     border: none !important;
     box-shadow: none !important;
-    height: 100% !important;
+    height: 6px !important;
     cursor: pointer;
 }
 
@@ -815,8 +827,9 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
     cursor: pointer !important;
     -webkit-appearance: none !important;
     appearance: none !important;
-    width: 15px !important;
-    height: 15px !important;
+    width: 16px !important;
+    height: 16px !important;
+    margin-top: -5px !important;
     border-radius: 50% !important;
     background: #ffffff !important;
     background-color: #ffffff !important;
@@ -829,8 +842,8 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
 .dual-slider-input::-moz-range-thumb {
     pointer-events: auto !important;
     cursor: pointer !important;
-    width: 15px !important;
-    height: 15px !important;
+    width: 16px !important;
+    height: 16px !important;
     border-radius: 50% !important;
     background: #ffffff !important;
     background-color: #ffffff !important;
@@ -842,7 +855,7 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
 
 .dual-slider-input:hover::-webkit-slider-thumb,
 .dual-slider-input:focus::-webkit-slider-thumb {
-    transform: scale(1.18) !important;
+    transform: scale(1.15) !important;
     border-color: #38bdf8 !important;
     background: #ffffff !important;
     background-color: #ffffff !important;
@@ -851,7 +864,7 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
 
 .dual-slider-input:hover::-moz-range-thumb,
 .dual-slider-input:focus::-moz-range-thumb {
-    transform: scale(1.18) !important;
+    transform: scale(1.15) !important;
     border-color: #38bdf8 !important;
     background: #ffffff !important;
     background-color: #ffffff !important;
@@ -859,7 +872,7 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
 }
 
 .dual-slider-input:active::-webkit-slider-thumb {
-    transform: scale(1.22) !important;
+    transform: scale(1.2) !important;
     border-color: #0ea5e9 !important;
     background: #ffffff !important;
     background-color: #ffffff !important;
@@ -867,7 +880,7 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
 }
 
 .dual-slider-input:active::-moz-range-thumb {
-    transform: scale(1.22) !important;
+    transform: scale(1.2) !important;
     border-color: #0ea5e9 !important;
     background: #ffffff !important;
     background-color: #ffffff !important;
@@ -1107,6 +1120,7 @@ checkAutoload();
     let tlodIsManual = false;
     let olodIsManual = false;
     let currentIsVr = false;
+    let currentLodActive = false;
 
     let isUserInteracting = false;
     let userInteractionTimeout = null;
@@ -1187,32 +1201,22 @@ checkAutoload();
         }
     }
 
-    function setAxisUiState(axis, isManual) {
-        if (axis === "tlod") {
-            tlodIsManual = isManual;
-            let dot = document.getElementById("tlod-badge-dot");
-            let txt = document.getElementById("tlod-badge-text");
-            if (dot && txt) {
-                if (isManual) {
-                    dot.className = "pill-dot dot-amber";
-                    txt.textContent = "MAN";
-                } else {
-                    dot.className = "pill-dot dot-green";
-                    txt.textContent = "AUTO";
-                }
-            }
-        } else if (axis === "olod") {
-            olodIsManual = isManual;
-            let dot = document.getElementById("olod-badge-dot");
-            let txt = document.getElementById("olod-badge-text");
-            if (dot && txt) {
-                if (isManual) {
-                    dot.className = "pill-dot dot-amber";
-                    txt.textContent = "MAN";
-                } else {
-                    dot.className = "pill-dot dot-green";
-                    txt.textContent = "AUTO";
-                }
+    function setAxisUiState(axis, isManual, isOff) {
+        let badge = document.getElementById(axis + "-mode-badge");
+        let txt = document.getElementById(axis + "-badge-text");
+        if (axis === "tlod") tlodIsManual = isManual;
+        else olodIsManual = isManual;
+
+        if (txt && badge) {
+            if (isOff) {
+                badge.className = "badge-tag tag-neutral";
+                txt.textContent = "OFF";
+            } else if (isManual) {
+                badge.className = "badge-tag tag-amber";
+                txt.textContent = "MAN";
+            } else {
+                badge.className = "badge-tag tag-green";
+                txt.textContent = "AUTO";
             }
         }
     }
@@ -1225,19 +1229,33 @@ checkAutoload();
         }, 2500);
     }
 
-    function queueAxisConfigUpdate(axis) {
+    function queueAxisConfigUpdate(axis, directVal) {
         markUserInteracting();
         if (debounceTimer) clearTimeout(debounceTimer);
         debounceTimer = setTimeout(function () {
-            sendAxisConfigUpdate(axis);
-        }, 200);
+            sendAxisConfigUpdate(axis, directVal);
+        }, 120);
     }
 
-    function sendAxisConfigUpdate(axis) {
+    function sendAxisConfigUpdate(axis, directVal) {
         let mode = currentIsVr ? "VR" : "2D";
         let baseVal = (axis === "tlod") ? currentTlodFloor : currentOlodFloor;
         let targetVal = (axis === "tlod") ? currentTlodCruise : currentOlodCruise;
         let altVal = (axis === "tlod") ? currentTlodAlt : currentOlodAlt;
+
+        if (!currentLodActive) {
+            // Smart LOD is disengaged: write live to MSFS memory directly without changing profile files
+            let valToWrite = (directVal !== undefined) ? directVal : baseVal;
+            let payload = {};
+            payload[axis] = valToWrite;
+            let url = getApiBase() + "/smart_lod/set_lod";
+            let xhr = new XMLHttpRequest();
+            xhr.open("POST", url, true);
+            xhr.setRequestHeader("Content-Type", "application/json");
+            xhr.timeout = 2500;
+            xhr.send(JSON.stringify(payload));
+            return;
+        }
 
         let url = getApiBase() + "/smart_lod/axis_config";
         let xhr = new XMLHttpRequest();
@@ -1249,8 +1267,7 @@ checkAutoload();
             axis: axis,
             base: baseVal,
             target: targetVal,
-            altitude: altVal,
-            enabled: true
+            altitude: altVal
         }));
     }
 
@@ -1364,6 +1381,7 @@ checkAutoload();
         // 1. SMART LOD REGULATION
         let lod = data.smart_lod || {};
         let lodActive = (lod.active !== undefined) ? !!lod.active : (!!data.smart_lod_running && !!data.smart_lod_enabled);
+        currentLodActive = lodActive;
 
         let sTlod = (lod.current_tlod !== undefined && lod.current_tlod !== null) ? lod.current_tlod : (data.smart_lod_tlod !== undefined ? data.smart_lod_tlod : 100);
         let sOlod = (lod.current_olod !== undefined && lod.current_olod !== null) ? lod.current_olod : (data.smart_lod_olod !== undefined ? data.smart_lod_olod : 100);
@@ -1422,8 +1440,8 @@ checkAutoload();
 
             let tlodManualRemote = !!(lod.tlod_manual !== undefined ? lod.tlod_manual : data.smart_lod_tlod_manual);
             let olodManualRemote = !!(lod.olod_manual !== undefined ? lod.olod_manual : data.smart_lod_olod_manual);
-            setAxisUiState("tlod", tlodManualRemote);
-            setAxisUiState("olod", olodManualRemote);
+            setAxisUiState("tlod", tlodManualRemote, !lodActive);
+            setAxisUiState("olod", olodManualRemote, !lodActive);
         }
 
         let btnLod = document.getElementById("smart-lod-toggle-btn");
@@ -1454,18 +1472,18 @@ checkAutoload();
         let elMt = document.getElementById("live-mt-val");
         if (elMt) elMt.textContent = (mtMs && mtMs > 0) ? Number(mtMs).toFixed(1) : "--";
 
-        let elPacingDot = document.getElementById("pacing-badge-dot");
         let elPacingTxt = document.getElementById("pacing-badge-text");
-        if (elPacingTxt && elPacingDot) {
+        let elPacingBadge = document.getElementById("live-pacing-status");
+        if (elPacingTxt && elPacingBadge) {
             if (pacing === "OPTIMAL" || pacing === "FLUIDE") {
                 elPacingTxt.textContent = "OPTIMAL";
-                elPacingDot.className = "pill-dot dot-green";
+                elPacingBadge.className = "badge-tag tag-green";
             } else if (pacing === "ACCEPTABLE" || pacing === "CHARGE" || pacing === "CHARGÉ") {
                 elPacingTxt.textContent = "ACCEPTABLE";
-                elPacingDot.className = "pill-dot dot-amber";
+                elPacingBadge.className = "badge-tag tag-amber";
             } else {
                 elPacingTxt.textContent = "HEAVY";
-                elPacingDot.className = "pill-dot dot-red";
+                elPacingBadge.className = "badge-tag tag-red";
             }
         }
 
@@ -1500,14 +1518,14 @@ checkAutoload();
         // 5. SYSTEM METRICS (GPU, CPU, VRAM, CACHE with spaced units)
         let elGpu = document.getElementById("live-gpu-val");
         if (elGpu) {
-            let gpuPct = data.gpu_util_pct !== undefined ? data.gpu_util_pct : 0;
-            elGpu.textContent = (gpuPct && gpuPct > 0) ? Math.round(gpuPct) : "--";
+            let gpuPct = (data.gpu_util_pct !== undefined && data.gpu_util_pct !== null) ? data.gpu_util_pct : 0;
+            elGpu.textContent = Math.round(Number(gpuPct) || 0);
         }
 
         let elCpu = document.getElementById("live-cpu-val");
         if (elCpu) {
-            let cpuPct = data.cpu_pct !== undefined ? data.cpu_pct : 0;
-            elCpu.textContent = (cpuPct && cpuPct > 0) ? Math.round(cpuPct) : "--";
+            let cpuPct = (data.cpu_pct !== undefined && data.cpu_pct !== null) ? data.cpu_pct : 0;
+            elCpu.textContent = Math.round(Number(cpuPct) || 0);
         }
 
         let elVram = document.getElementById("live-vram-val");
@@ -1666,8 +1684,12 @@ checkAutoload();
 
                 if (floorValLbl) floorValLbl.textContent = fVal;
                 updateDualSliderTrack(axis, fVal, cVal);
-                setAxisUiState(axis, true);
-                queueAxisConfigUpdate(axis);
+                setAxisUiState(axis, true, !currentLodActive);
+                if (!currentLodActive) {
+                    let liveEl = document.getElementById(axis + "-live-val");
+                    if (liveEl) liveEl.textContent = fVal;
+                }
+                queueAxisConfigUpdate(axis, fVal);
             });
             floorRange.addEventListener("dblclick", function (e) {
                 e.preventDefault();
@@ -1693,8 +1715,12 @@ checkAutoload();
 
                 if (cruiseValLbl) cruiseValLbl.textContent = cVal;
                 updateDualSliderTrack(axis, fVal, cVal);
-                setAxisUiState(axis, true);
-                queueAxisConfigUpdate(axis);
+                setAxisUiState(axis, true, !currentLodActive);
+                if (!currentLodActive) {
+                    let liveEl = document.getElementById(axis + "-live-val");
+                    if (liveEl) liveEl.textContent = cVal;
+                }
+                queueAxisConfigUpdate(axis, cVal);
             });
             cruiseRange.addEventListener("dblclick", function (e) {
                 e.preventDefault();

@@ -244,7 +244,8 @@ class SmartLodController:
                 self.config.get("vr_tlod_active", False),
                 self.config.get("vr_olod_active", False),
             ])
-            self.config["enabled"] = any_active and not self.config.get("external_autofps", False)
+            if enabled is not None:
+                self.config["enabled"] = any_active and not self.config.get("external_autofps", False)
             try:
                 with open(CONFIG_FILE_PATH, "w", encoding="utf-8") as f:
                     json.dump(self.config, f, indent=4)
@@ -258,8 +259,7 @@ class SmartLodController:
             except Exception:
                 pass
         else:
-            if not any_active:
-                self.stop()
+            self.stop(detach=False)
                 
         return self.get_axis_state(mode)
 
@@ -329,17 +329,17 @@ class SmartLodController:
         self._thread.start()
         print("[SmartLOD] Moteur de régulation démarré.")
 
-    def stop(self):
+    def stop(self, detach: bool = False):
         """Arrête la boucle de régulation."""
-        if not self.is_running:
-            return
-        self.is_running = False
-        self._stop_event.set()
-        if self._thread and self._thread.is_alive():
-            self._thread.join(timeout=1.5)
-        self._thread = None
-        self.engine.detach()
-        print("[SmartLOD] Moteur de régulation arrêté.")
+        if self.is_running:
+            self.is_running = False
+            self._stop_event.set()
+            if self._thread and self._thread.is_alive():
+                self._thread.join(timeout=1.5)
+            self._thread = None
+            print("[SmartLOD] Moteur de régulation arrêté.")
+        if detach:
+            self.engine.detach()
 
     def set_enabled(self, enabled: bool, force_kill_autofps: bool = False) -> Dict[str, Any]:
         """Active ou désactive Smart LOD avec arbitrage de conflit AutoFPS."""
@@ -348,6 +348,12 @@ class SmartLodController:
             with self._lock:
                 self.manual_tlod = None
                 self.manual_olod = None
+                self.config["enabled"] = True
+                self.config["source"] = "native"
+                self.config["2d_tlod_active"] = True
+                self.config["2d_olod_active"] = True
+                self.config["vr_tlod_active"] = True
+                self.config["vr_olod_active"] = True
 
             # Vérifier si AutoFPS externe tourne
             af_running, pid = self.engine.is_autofps_running()
@@ -368,7 +374,14 @@ class SmartLodController:
                         "message": "AutoFPS externe est actif. Conflit détecté."
                     }
 
-            self.save_config({"enabled": True, "source": "native"})
+            self.save_config({
+                "enabled": True,
+                "source": "native",
+                "2d_tlod_active": True,
+                "2d_olod_active": True,
+                "vr_tlod_active": True,
+                "vr_olod_active": True
+            })
             self.start()
             # Forcer un premier tick de régulation immédiat
             try:
@@ -377,9 +390,26 @@ class SmartLodController:
                 pass
             return {"success": True, "conflict": False, "enabled": True}
         else:
-            self.save_config({"enabled": False})
-            self.stop()
-            return {"success": True, "conflict": False, "enabled": False}
+            with self._lock:
+                self.manual_tlod = None
+                self.manual_olod = None
+                self.config["enabled"] = False
+                self.config["2d_tlod_active"] = False
+                self.config["2d_olod_active"] = False
+                self.config["vr_tlod_active"] = False
+                self.config["vr_olod_active"] = False
+
+            self.save_config({
+                "enabled": False,
+                "2d_tlod_active": False,
+                "2d_olod_active": False,
+                "vr_tlod_active": False,
+                "vr_olod_active": False
+            })
+            self.stop(detach=False)
+            reset_res = self.reset_to_active_profile("all")
+            self.status_message = "Off (Nominal Active Profile)"
+            return {"success": True, "conflict": False, "enabled": False, "reset_info": reset_res}
 
     # ================= REGULATION ALGORITHM =================
 
@@ -755,6 +785,7 @@ def save_smart_lod_profile(name: str, config_data: Dict[str, Any], overwrite_id:
         import uuid
         target_id = f"lod_prof_{uuid.uuid4().hex[:10]}"
 
+    pfx = "vr" if str(config_data.get("mode", "2D")).upper() == "VR" else "2d"
     profile_obj = {
         "id": target_id,
         "name": clean_name,
@@ -763,6 +794,9 @@ def save_smart_lod_profile(name: str, config_data: Dict[str, Any], overwrite_id:
         "ground_tlod": int(config_data.get("ground_tlod", 100)),
         "cruise_tlod": int(config_data.get("cruise_tlod", 250)),
         "alt_trans": int(config_data.get("alt_trans", 5000)),
+        "ground_olod": int(config_data.get("ground_olod", 100)),
+        "cruise_olod": int(config_data.get("cruise_olod", 100)),
+        "alt_trans_olod": int(config_data.get("alt_trans_olod", 3000)),
         "target_fps": int(config_data.get("target_fps", 40)),
         "cloud_recovery": bool(config_data.get("cloud_recovery", True)),
         "created_at": datetime.now().isoformat()
@@ -778,6 +812,12 @@ def save_smart_lod_profile(name: str, config_data: Dict[str, Any], overwrite_id:
         ctrl = get_smart_lod_controller()
         cfg_update = {
             "cloud_recovery": profile_obj["cloud_recovery"],
+            f"{pfx}_tlod_base": profile_obj["ground_tlod"],
+            f"{pfx}_tlod_target": profile_obj["cruise_tlod"],
+            f"{pfx}_tlod_altitude": profile_obj["alt_trans"],
+            f"{pfx}_olod_base": profile_obj["ground_olod"],
+            f"{pfx}_olod_target": profile_obj["cruise_olod"],
+            f"{pfx}_olod_altitude": profile_obj["alt_trans_olod"],
         }
         if profile_obj["flight_mode"] == "IFR":
             cfg_update["ifr_tlod_ground"] = profile_obj["ground_tlod"]
@@ -809,6 +849,9 @@ def check_smart_lod_profile_changes(profile_id: str, current_data: Dict[str, Any
             int(pdata.get("ground_tlod", 100)) != int(current_data.get("ground_tlod", 100)) or
             int(pdata.get("cruise_tlod", 250)) != int(current_data.get("cruise_tlod", 250)) or
             int(pdata.get("alt_trans", 5000)) != int(current_data.get("alt_trans", 5000)) or
+            int(pdata.get("ground_olod", 100)) != int(current_data.get("ground_olod", 100)) or
+            int(pdata.get("cruise_olod", 100)) != int(current_data.get("cruise_olod", 100)) or
+            int(pdata.get("alt_trans_olod", 3000)) != int(current_data.get("alt_trans_olod", 3000)) or
             int(pdata.get("target_fps", 40)) != int(current_data.get("target_fps", 40)) or
             bool(pdata.get("cloud_recovery", True)) != bool(current_data.get("cloud_recovery", True)) or
             str(pdata.get("mode", "2D")) != str(current_data.get("mode", "2D"))
@@ -856,9 +899,16 @@ def activate_smart_lod_profile(profile_id: str) -> Dict[str, Any]:
         with open(pfile, "r", encoding="utf-8") as f:
             pdata = json.load(f)
         set_active_smart_lod_profile_id(profile_id)
+        pfx = "vr" if str(pdata.get("mode", "2D")).upper() == "VR" else "2d"
         ctrl = get_smart_lod_controller()
         cfg_update = {
             "cloud_recovery": pdata.get("cloud_recovery", True),
+            f"{pfx}_tlod_base": int(pdata.get("ground_tlod", 100)),
+            f"{pfx}_tlod_target": int(pdata.get("cruise_tlod", 250)),
+            f"{pfx}_tlod_altitude": int(pdata.get("alt_trans", 5000)),
+            f"{pfx}_olod_base": int(pdata.get("ground_olod", 100)),
+            f"{pfx}_olod_target": int(pdata.get("cruise_olod", 100)),
+            f"{pfx}_olod_altitude": int(pdata.get("alt_trans_olod", 3000)),
         }
         f_mode = pdata.get("flight_mode", "IFR")
         if f_mode == "IFR":

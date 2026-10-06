@@ -17410,7 +17410,7 @@ async function fetchSmartLodAxisState() {
 }
 
 function syncSmartLodCardSliders() {
-    const modeKey = (String(currentMsfsGraphicsMode || '2D').toUpperCase() === 'VR') ? 'vr' : '2d';
+    const modeKey = (String((typeof currentSmartLodMode !== 'undefined' && currentSmartLodMode) || currentMsfsGraphicsMode || '2D').toUpperCase() === 'VR') ? 'vr' : '2d';
     ['tlod', 'olod'].forEach(axis => {
         const state = smartLodAxisState[modeKey];
         if (!state) return;
@@ -17436,7 +17436,7 @@ function syncSmartLodCardSliders() {
 }
 
 function toggleSmartLodAxis(axis) {
-    const modeKey = (String(currentMsfsGraphicsMode || '2D').toUpperCase() === 'VR') ? 'vr' : '2d';
+    const modeKey = (String((typeof currentSmartLodMode !== 'undefined' && currentSmartLodMode) || currentMsfsGraphicsMode || '2D').toUpperCase() === 'VR') ? 'vr' : '2d';
     if (!smartLodAxisState[modeKey]) {
         smartLodAxisState[modeKey] = {};
     }
@@ -17495,10 +17495,10 @@ function onDualSliderMouseMove(e, axis) {
 }
 
 function onSmartLodBaseInput(axis, val) {
-    const modeKey = (String(currentMsfsGraphicsMode || '2D').toUpperCase() === 'VR') ? 'vr' : '2d';
+    const modeKey = (String((typeof currentSmartLodMode !== 'undefined' && currentSmartLodMode) || currentMsfsGraphicsMode || '2D').toUpperCase() === 'VR') ? 'vr' : '2d';
     let baseNum = parseInt(val, 10);
     const targetInput = document.getElementById(`smart-lod-target-range-${axis}`);
-    let targetNum = targetInput ? parseInt(targetInput.value, 10) : 200;
+    let targetNum = targetInput ? parseInt(targetInput.value, 10) : (axis === 'tlod' ? 200 : 100);
 
     // Prevent floor thumb from crossing above cruise thumb
     if (baseNum > targetNum) {
@@ -17518,10 +17518,10 @@ function onSmartLodBaseInput(axis, val) {
 }
 
 function onSmartLodTargetInput(axis, val) {
-    const modeKey = (String(currentMsfsGraphicsMode || '2D').toUpperCase() === 'VR') ? 'vr' : '2d';
+    const modeKey = (String((typeof currentSmartLodMode !== 'undefined' && currentSmartLodMode) || currentMsfsGraphicsMode || '2D').toUpperCase() === 'VR') ? 'vr' : '2d';
     let targetNum = parseInt(val, 10);
     const baseInput = document.getElementById(`smart-lod-base-range-${axis}`);
-    let baseNum = baseInput ? parseInt(baseInput.value, 10) : 100;
+    let baseNum = baseInput ? parseInt(baseInput.value, 10) : (axis === 'tlod' ? 100 : 100);
 
     // Prevent cruise thumb from crossing below floor thumb
     if (targetNum < baseNum) {
@@ -17541,7 +17541,7 @@ function onSmartLodTargetInput(axis, val) {
 }
 
 function onSmartLodDualSliderChange(axis) {
-    const modeKey = (String(currentMsfsGraphicsMode || '2D').toUpperCase() === 'VR') ? 'vr' : '2d';
+    const modeKey = (String((typeof currentSmartLodMode !== 'undefined' && currentSmartLodMode) || currentMsfsGraphicsMode || '2D').toUpperCase() === 'VR') ? 'vr' : '2d';
     const base = (smartLodAxisState[modeKey] && smartLodAxisState[modeKey][`${axis}_base`] !== undefined)
         ? smartLodAxisState[modeKey][`${axis}_base`]
         : (axis === 'tlod' ? (modeKey === 'vr' ? 90 : 100) : (modeKey === 'vr' ? 80 : 100));
@@ -17557,8 +17557,8 @@ function onSmartLodDualSliderChange(axis) {
 }
 
 function onSmartLodAltitudeChange(axis, alt) {
-    const modeKey = (String(currentMsfsGraphicsMode || '2D').toUpperCase() === 'VR') ? 'vr' : '2d';
-    const num = Math.max(500, Math.min(45000, parseInt(alt, 10) || 5000));
+    const modeKey = (String((typeof currentSmartLodMode !== 'undefined' && currentSmartLodMode) || currentMsfsGraphicsMode || '2D').toUpperCase() === 'VR') ? 'vr' : '2d';
+    const num = Math.max(500, Math.min(45000, parseInt(alt, 10) || (axis === 'tlod' ? 5000 : 3000)));
     if (smartLodAxisState[modeKey]) {
         smartLodAxisState[modeKey][`${axis}_altitude`] = num;
     }
@@ -18566,8 +18566,8 @@ function updatePerformanceCockpitGauges() {
     const isSmartLodOpen = smartLodModal && !smartLodModal.classList.contains('hidden');
     const isSmartLodEffective = window.smartLodActive || isSmartLodOpen;
 
-    const slGroundEl = document.getElementById('smart-lod-slider-ground-tlod');
-    const slCruiseEl = document.getElementById('smart-lod-slider-cruise-tlod');
+    const slGroundEl = document.getElementById('smart-lod-base-range-tlod') || document.getElementById('smart-lod-slider-ground-tlod');
+    const slCruiseEl = document.getElementById('smart-lod-target-range-tlod') || document.getElementById('smart-lod-slider-cruise-tlod');
     const slTargetFpsEl = document.getElementById('smart-lod-input-fps');
 
     const smartLodGround = slGroundEl ? parseInt(slGroundEl.value, 10) : 100;
@@ -19383,65 +19383,12 @@ function renderMsfsSettingsMatrix() {
             `;
         } else if (isLodAxis && axisActive) {
             inputHtml = `
-                <div class="w-full bg-slate-950 border border-slate-700/80 rounded-xl p-2.5 space-y-2.5">
-                    <div class="flex items-center justify-between text-xs">
-                        <div class="flex items-center gap-1.5" title="Floor LOD setting below transition altitude">
-                            <span class="text-slate-400 font-medium">Floor:</span>
-                            <span id="smart-lod-base-val-${axis}" class="font-bold text-sky-400 tabular-nums">${axisBase}</span>
-                        </div>
-                        <div class="flex items-center gap-1">
-                            <span class="text-slate-400 font-medium" title="Transition / cruise altitude in feet AGL">Alt:</span>
-                            <input type="number"
-                                   id="smart-lod-alt-${axis}"
-                                   value="${axisAltitude}"
-                                   step="500"
-                                   min="500"
-                                   max="45000"
-                                   onchange="onSmartLodAltitudeChange('${axis}', this.value)"
-                                   class="w-16 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-center text-xs text-slate-200 font-semibold focus:outline-none focus:border-slate-400 focus:bg-slate-800 tabular-nums"
-                                   title="Transition altitude in feet AGL">
-                            <span class="text-slate-400 text-[11px]">ft</span>
-                        </div>
-                        <div class="flex items-center gap-1.5" title="Cruise LOD setting above transition altitude">
-                            <span class="text-slate-400 font-medium">Cruise:</span>
-                            <span id="smart-lod-target-val-${axis}" class="font-bold text-sky-400 tabular-nums">${axisTarget}</span>
-                        </div>
-                    </div>
-                    <div class="dual-slider-container" onmousemove="onDualSliderMouseMove(event, '${axis}')">
-                        <!-- Full Track Background -->
-                        <div class="w-full h-1.5 bg-slate-800 rounded-lg absolute pointer-events-none z-0"></div>
-                        <!-- Active Range Highlight Bar -->
-                        <div id="smart-lod-track-highlight-${axis}" class="absolute h-1.5 bg-sky-500 rounded-lg pointer-events-none transition-all duration-75 z-[1]" style="left: ${leftPct}%; width: ${widthPct}%;"></div>
-                        <!-- Floor Input Slider (Left Thumb) -->
-                        <input type="range"
-                               id="smart-lod-base-range-${axis}"
-                               min="0"
-                               max="${maxLodVal}"
-                               step="5"
-                               value="${axisBase}"
-                               oninput="onSmartLodBaseInput('${axis}', this.value)"
-                               onchange="onSmartLodDualSliderChange('${axis}')"
-                               onmousedown="this.style.zIndex = 25;"
-                               class="dual-slider-input"
-                               title="Floor LOD: ${axisBase} (Active below ${axisAltitude} ft AGL)">
-                        <!-- Cruise Input Slider (Right Thumb) -->
-                        <input type="range"
-                               id="smart-lod-target-range-${axis}"
-                               min="0"
-                               max="${maxLodVal}"
-                               step="5"
-                               value="${axisTarget}"
-                               oninput="onSmartLodTargetInput('${axis}', this.value)"
-                               onchange="onSmartLodDualSliderChange('${axis}')"
-                               onmousedown="this.style.zIndex = 25;"
-                               class="dual-slider-input"
-                               title="Cruise LOD: ${axisTarget} (Active at/above ${axisAltitude} ft AGL)">
-                    </div>
-                    <div class="flex justify-between text-[10px] text-slate-400 font-mono select-none px-0.5">
-                        <span>0</span>
-                        <span class="text-slate-400 font-sans">Dynamic Range (Floor &rarr; Cruise)</span>
-                        <span>${maxLodVal}</span>
-                    </div>
+                <div class="relative w-full pt-0.5">
+                    <input type="text"
+                           value="SMART LOD ACTIVE"
+                           disabled
+                           class="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-2 typo-input-val text-xs text-sky-400 font-medium cursor-not-allowed opacity-80"
+                           title="This setting is dynamically regulated in real-time by Smart LOD according to altitude and performance targets.">
                 </div>
             `;
         } else if (item.is_numeric) {
@@ -22141,6 +22088,7 @@ function switchSmartLodTargetMode(mode) {
             btn2D.className = 'px-3 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer text-slate-400 hover:text-white bg-transparent';
         }
     }
+    syncSmartLodCardSliders();
     syncSmartLodTargetFpsFromSettings(false);
     if (typeof updatePerformanceCockpitGauges === 'function') {
         updatePerformanceCockpitGauges();
@@ -22237,6 +22185,24 @@ function updateSmartLodUIFromStatus(status) {
         }
     }
 
+    // Modal Live Badges for TLOD & OLOD cards
+    const modalLiveTlod = document.getElementById('smart-lod-modal-live-tlod');
+    if (modalLiveTlod) {
+        if (window.smartLodActive && status.current_tlod_setpoint !== undefined && status.current_tlod_setpoint !== null) {
+            modalLiveTlod.textContent = Math.round(status.current_tlod_setpoint);
+        } else {
+            modalLiveTlod.textContent = '--';
+        }
+    }
+    const modalLiveOlod = document.getElementById('smart-lod-modal-live-olod');
+    if (modalLiveOlod) {
+        if (window.smartLodActive && status.current_olod_setpoint !== undefined && status.current_olod_setpoint !== null) {
+            modalLiveOlod.textContent = Math.round(status.current_olod_setpoint);
+        } else {
+            modalLiveOlod.textContent = '--';
+        }
+    }
+
     // Active Badge - Solid styling without borders
     const activeBadge = document.getElementById('smart-lod-active-badge');
     if (activeBadge) {
@@ -22291,26 +22257,17 @@ async function refreshSmartLodStatus() {
         if (status) {
             updateSmartLodUIFromStatus(status);
 
-            // Populate sliders with existing config if present
+            // Populate settings with existing config if present
             if (status.config) {
                 const cfg = status.config;
                 const isIfr = (currentFlightMissionProfile || 'LINER') === 'LINER';
-                const groundTlod = isIfr ? (cfg.ifr_tlod_ground || 100) : (cfg.vfr_tlod_ground || 120);
-                const cruiseTlod = isIfr ? (cfg.ifr_tlod_cruise || 250) : (cfg.vfr_tlod_cruise || 300);
-                const altTrans = isIfr ? (cfg.ifr_alt_transition || 5000) : (cfg.vfr_alt_transition || 3000);
                 const targetFps = isIfr ? (cfg.ifr_target_fps || 40) : (cfg.vfr_target_fps || 40);
-
-                const slG = document.getElementById('smart-lod-slider-ground-tlod');
-                if (slG) { slG.value = groundTlod; updateSmartLodSliderValue('ground-tlod', groundTlod); }
-                const slC = document.getElementById('smart-lod-slider-cruise-tlod');
-                if (slC) { slC.value = cruiseTlod; updateSmartLodSliderValue('cruise-tlod', cruiseTlod); }
-                const slA = document.getElementById('smart-lod-slider-alt-trans');
-                if (slA) { slA.value = altTrans; updateSmartLodSliderValue('alt-trans', altTrans); }
                 const inFps = document.getElementById('smart-lod-input-fps');
-                if (inFps) inFps.value = targetFps;
+                if (inFps && (!inFps.value || inFps.value === '40')) inFps.value = targetFps;
                 const chkCloud = document.getElementById('smart-lod-cloud-recovery');
                 if (chkCloud) chkCloud.checked = cfg.cloud_recovery !== false;
             }
+            syncSmartLodCardSliders();
         }
     } catch (e) {
         console.error("Error refreshing Smart LOD status:", e);
@@ -22599,19 +22556,26 @@ async function selectSmartLodProfileItem(profileId) {
     if (input) input.value = prof.name;
     closeAllSmartLodProfileDropdowns();
 
-    // Populate UI fields
-    const slG = document.getElementById('smart-lod-slider-ground-tlod');
-    if (slG) { slG.value = prof.ground_tlod || 100; updateSmartLodSliderValue('ground-tlod', slG.value); }
-    const slC = document.getElementById('smart-lod-slider-cruise-tlod');
-    if (slC) { slC.value = prof.cruise_tlod || 250; updateSmartLodSliderValue('cruise-tlod', slC.value); }
-    const slA = document.getElementById('smart-lod-slider-alt-trans');
-    if (slA) { slA.value = prof.alt_trans || 5000; updateSmartLodSliderValue('alt-trans', slA.value); }
+    const profMode = prof.mode || '2D';
+    const modeKey = (String(profMode).toUpperCase() === 'VR') ? 'vr' : '2d';
+
+    if (!smartLodAxisState[modeKey]) {
+        smartLodAxisState[modeKey] = {};
+    }
+    smartLodAxisState[modeKey].tlod_base = prof.ground_tlod !== undefined ? prof.ground_tlod : 100;
+    smartLodAxisState[modeKey].tlod_target = prof.cruise_tlod !== undefined ? prof.cruise_tlod : 200;
+    smartLodAxisState[modeKey].tlod_altitude = prof.alt_trans !== undefined ? prof.alt_trans : 5000;
+    smartLodAxisState[modeKey].olod_base = prof.ground_olod !== undefined ? prof.ground_olod : 100;
+    smartLodAxisState[modeKey].olod_target = prof.cruise_olod !== undefined ? prof.cruise_olod : 100;
+    smartLodAxisState[modeKey].olod_altitude = prof.alt_trans_olod !== undefined ? prof.alt_trans_olod : 3000;
+
     const inFps = document.getElementById('smart-lod-input-fps');
     if (inFps) inFps.value = prof.target_fps || 40;
     const chkCloud = document.getElementById('smart-lod-cloud-recovery');
     if (chkCloud) chkCloud.checked = (prof.cloud_recovery !== false);
 
-    switchSmartLodTargetMode(prof.mode || '2D');
+    switchSmartLodTargetMode(profMode);
+    syncSmartLodCardSliders();
 
     if (window.pywebview && window.pywebview.api && window.pywebview.api.activate_smart_lod_profile) {
         try {
@@ -22646,12 +22610,23 @@ function handleSmartLodProfileInputBlur() {
 }
 
 function getCurrentSmartLodUiPayload() {
+    const tlodBase = parseInt(document.getElementById('smart-lod-base-range-tlod')?.value || '100', 10);
+    const tlodTarget = parseInt(document.getElementById('smart-lod-target-range-tlod')?.value || '200', 10);
+    const tlodAlt = parseInt(document.getElementById('smart-lod-alt-tlod')?.value || '5000', 10);
+
+    const olodBase = parseInt(document.getElementById('smart-lod-base-range-olod')?.value || '100', 10);
+    const olodTarget = parseInt(document.getElementById('smart-lod-target-range-olod')?.value || '100', 10);
+    const olodAlt = parseInt(document.getElementById('smart-lod-alt-olod')?.value || '3000', 10);
+
     return {
         mode: currentSmartLodMode || '2D',
         flight_mode: (currentFlightMissionProfile || 'LINER') === 'LINER' ? 'IFR' : 'VFR',
-        ground_tlod: parseInt(document.getElementById('smart-lod-slider-ground-tlod')?.value || '100', 10),
-        cruise_tlod: parseInt(document.getElementById('smart-lod-slider-cruise-tlod')?.value || '250', 10),
-        alt_trans: parseInt(document.getElementById('smart-lod-slider-alt-trans')?.value || '5000', 10),
+        ground_tlod: tlodBase,
+        cruise_tlod: tlodTarget,
+        alt_trans: tlodAlt,
+        ground_olod: olodBase,
+        cruise_olod: olodTarget,
+        alt_trans_olod: olodAlt,
         target_fps: parseInt(document.getElementById('smart-lod-input-fps')?.value || '40', 10),
         cloud_recovery: !!document.getElementById('smart-lod-cloud-recovery')?.checked
     };
