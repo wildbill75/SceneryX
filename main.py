@@ -4494,10 +4494,10 @@ class Api:
         except Exception as e:
             return json.dumps({"error": str(e)}, ensure_ascii=False)
 
-    def set_smart_lod_axis_state(self, mode, axis, enabled=None, target=None, altitude=None):
+    def set_smart_lod_axis_state(self, mode, axis, enabled=None, target=None, altitude=None, base=None):
         try:
             import flight_lod_controller
-            st = flight_lod_controller.set_smart_lod_axis_state(mode, axis, enabled=enabled, target=target, altitude=altitude)
+            st = flight_lod_controller.set_smart_lod_axis_state(mode, axis, enabled=enabled, target=target, altitude=altitude, base=base)
             return json.dumps(st, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"error": str(e)}, ensure_ascii=False)

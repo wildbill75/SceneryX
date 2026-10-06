@@ -17362,17 +17362,21 @@ let smartLodAxisState = {
     external_autofps: false,
     '2d': {
         tlod_active: false,
+        tlod_base: 100,
         tlod_target: 200,
         tlod_altitude: 5000,
         olod_active: false,
+        olod_base: 100,
         olod_target: 100,
         olod_altitude: 3000
     },
     'vr': {
         tlod_active: false,
+        tlod_base: 90,
         tlod_target: 150,
         tlod_altitude: 4000,
         olod_active: false,
+        olod_base: 80,
         olod_target: 80,
         olod_altitude: 2500
     }
@@ -17412,11 +17416,12 @@ function toggleSmartLodAxis(axis) {
     const curActive = !smartLodAxisState[modeKey][`${axis}_active`];
     smartLodAxisState[modeKey][`${axis}_active`] = curActive;
 
+    const base = smartLodAxisState[modeKey][`${axis}_base`] || (axis === 'tlod' ? (modeKey === 'vr' ? 90 : 100) : (modeKey === 'vr' ? 80 : 100));
     const target = smartLodAxisState[modeKey][`${axis}_target`] || (axis === 'tlod' ? (modeKey === 'vr' ? 150 : 200) : (modeKey === 'vr' ? 80 : 100));
     const altitude = smartLodAxisState[modeKey][`${axis}_altitude`] || (axis === 'tlod' ? (modeKey === 'vr' ? 4000 : 5000) : (modeKey === 'vr' ? 2500 : 3000));
 
     if (window.pywebview && window.pywebview.api && window.pywebview.api.set_smart_lod_axis_state) {
-        window.pywebview.api.set_smart_lod_axis_state(modeKey.toUpperCase(), axis, curActive, target, altitude);
+        window.pywebview.api.set_smart_lod_axis_state(modeKey.toUpperCase(), axis, curActive, target, altitude, base);
     }
 
     if (typeof renderMsfsSettingsMatrix === 'function') {
@@ -17424,29 +17429,102 @@ function toggleSmartLodAxis(axis) {
     }
 }
 
-function onSmartLodSliderInput(axis, val) {
-    const modeKey = (String(currentMsfsGraphicsMode || '2D').toUpperCase() === 'VR') ? 'vr' : '2d';
-    const num = parseInt(val, 10);
-    const labelEl = document.getElementById(`smart-lod-val-${axis}`);
-    if (labelEl) {
-        labelEl.textContent = num;
-    }
-    if (smartLodAxisState[modeKey]) {
-        smartLodAxisState[modeKey][`${axis}_target`] = num;
+function updateDualSliderTrack(axis, base, target) {
+    const maxVal = axis === 'tlod' ? 400 : 300;
+    const highlight = document.getElementById(`smart-lod-track-highlight-${axis}`);
+    if (highlight) {
+        const leftPct = (Math.max(0, Math.min(maxVal, base)) / maxVal) * 100;
+        const widthPct = (Math.max(0, Math.min(maxVal - base, target - base)) / maxVal) * 100;
+        highlight.style.left = `${leftPct}%`;
+        highlight.style.width = `${widthPct}%`;
     }
 }
 
-function onSmartLodSliderChange(axis, val) {
-    const modeKey = (String(currentMsfsGraphicsMode || '2D').toUpperCase() === 'VR') ? 'vr' : '2d';
-    const num = parseInt(val, 10);
-    if (smartLodAxisState[modeKey]) {
-        smartLodAxisState[modeKey][`${axis}_target`] = num;
+function onDualSliderMouseMove(e, axis) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (!rect.width) return;
+    const x = e.clientX - rect.left;
+    const pct = Math.max(0, Math.min(1, x / rect.width));
+    const maxVal = axis === 'tlod' ? 400 : 300;
+    const mouseVal = pct * maxVal;
+
+    const baseInput = document.getElementById(`smart-lod-base-range-${axis}`);
+    const targetInput = document.getElementById(`smart-lod-target-range-${axis}`);
+    if (!baseInput || !targetInput) return;
+
+    const baseVal = parseInt(baseInput.value, 10);
+    const targetVal = parseInt(targetInput.value, 10);
+
+    const distBase = Math.abs(mouseVal - baseVal);
+    const distTarget = Math.abs(mouseVal - targetVal);
+    if (distBase < distTarget || (distBase === distTarget && mouseVal <= baseVal)) {
+        baseInput.style.zIndex = '20';
+        targetInput.style.zIndex = '10';
+    } else {
+        baseInput.style.zIndex = '10';
+        targetInput.style.zIndex = '20';
     }
+}
+
+function onSmartLodBaseInput(axis, val) {
+    const modeKey = (String(currentMsfsGraphicsMode || '2D').toUpperCase() === 'VR') ? 'vr' : '2d';
+    let baseNum = parseInt(val, 10);
+    const targetInput = document.getElementById(`smart-lod-target-range-${axis}`);
+    let targetNum = targetInput ? parseInt(targetInput.value, 10) : 200;
+
+    // Prevent floor thumb from crossing above cruise thumb
+    if (baseNum > targetNum) {
+        baseNum = targetNum;
+        const baseInput = document.getElementById(`smart-lod-base-range-${axis}`);
+        if (baseInput) baseInput.value = baseNum;
+    }
+
+    const labelEl = document.getElementById(`smart-lod-base-val-${axis}`);
+    if (labelEl) {
+        labelEl.textContent = baseNum;
+    }
+    if (smartLodAxisState[modeKey]) {
+        smartLodAxisState[modeKey][`${axis}_base`] = baseNum;
+    }
+    updateDualSliderTrack(axis, baseNum, targetNum);
+}
+
+function onSmartLodTargetInput(axis, val) {
+    const modeKey = (String(currentMsfsGraphicsMode || '2D').toUpperCase() === 'VR') ? 'vr' : '2d';
+    let targetNum = parseInt(val, 10);
+    const baseInput = document.getElementById(`smart-lod-base-range-${axis}`);
+    let baseNum = baseInput ? parseInt(baseInput.value, 10) : 100;
+
+    // Prevent cruise thumb from crossing below floor thumb
+    if (targetNum < baseNum) {
+        targetNum = baseNum;
+        const targetInput = document.getElementById(`smart-lod-target-range-${axis}`);
+        if (targetInput) targetInput.value = targetNum;
+    }
+
+    const labelEl = document.getElementById(`smart-lod-target-val-${axis}`);
+    if (labelEl) {
+        labelEl.textContent = targetNum;
+    }
+    if (smartLodAxisState[modeKey]) {
+        smartLodAxisState[modeKey][`${axis}_target`] = targetNum;
+    }
+    updateDualSliderTrack(axis, baseNum, targetNum);
+}
+
+function onSmartLodDualSliderChange(axis) {
+    const modeKey = (String(currentMsfsGraphicsMode || '2D').toUpperCase() === 'VR') ? 'vr' : '2d';
+    const base = (smartLodAxisState[modeKey] && smartLodAxisState[modeKey][`${axis}_base`] !== undefined)
+        ? smartLodAxisState[modeKey][`${axis}_base`]
+        : (axis === 'tlod' ? (modeKey === 'vr' ? 90 : 100) : (modeKey === 'vr' ? 80 : 100));
+    const target = (smartLodAxisState[modeKey] && smartLodAxisState[modeKey][`${axis}_target`] !== undefined)
+        ? smartLodAxisState[modeKey][`${axis}_target`]
+        : (axis === 'tlod' ? (modeKey === 'vr' ? 150 : 200) : (modeKey === 'vr' ? 80 : 100));
     const active = !!(smartLodAxisState[modeKey] && smartLodAxisState[modeKey][`${axis}_active`]);
-    const altitude = (smartLodAxisState[modeKey] && smartLodAxisState[modeKey][`${axis}_altitude`]) || 5000;
+    const altitude = (smartLodAxisState[modeKey] && smartLodAxisState[modeKey][`${axis}_altitude`]) || (axis === 'tlod' ? 5000 : 3000);
 
     if (window.pywebview && window.pywebview.api && window.pywebview.api.set_smart_lod_axis_state) {
-        window.pywebview.api.set_smart_lod_axis_state(modeKey.toUpperCase(), axis, active, num, altitude);
+        window.pywebview.api.set_smart_lod_axis_state(modeKey.toUpperCase(), axis, active, target, altitude, base);
     }
 }
 
@@ -17457,11 +17535,21 @@ function onSmartLodAltitudeChange(axis, alt) {
         smartLodAxisState[modeKey][`${axis}_altitude`] = num;
     }
     const active = !!(smartLodAxisState[modeKey] && smartLodAxisState[modeKey][`${axis}_active`]);
-    const target = (smartLodAxisState[modeKey] && smartLodAxisState[modeKey][`${axis}_target`]) || (axis === 'tlod' ? 200 : 100);
+    const target = (smartLodAxisState[modeKey] && smartLodAxisState[modeKey][`${axis}_target`]) || (axis === 'tlod' ? (modeKey === 'vr' ? 150 : 200) : (modeKey === 'vr' ? 80 : 100));
+    const base = (smartLodAxisState[modeKey] && smartLodAxisState[modeKey][`${axis}_base`]) || (axis === 'tlod' ? (modeKey === 'vr' ? 90 : 100) : (modeKey === 'vr' ? 80 : 100));
 
     if (window.pywebview && window.pywebview.api && window.pywebview.api.set_smart_lod_axis_state) {
-        window.pywebview.api.set_smart_lod_axis_state(modeKey.toUpperCase(), axis, active, target, num);
+        window.pywebview.api.set_smart_lod_axis_state(modeKey.toUpperCase(), axis, active, target, num, base);
     }
+}
+
+// Backward-compatible aliases
+function onSmartLodSliderInput(axis, val) {
+    onSmartLodTargetInput(axis, val);
+}
+
+function onSmartLodSliderChange(axis, val) {
+    onSmartLodDualSliderChange(axis);
 }
 
 function renderMsfsCategoryTabs() {
@@ -19229,9 +19317,12 @@ function renderMsfsSettingsMatrix() {
         const modeKey = (String(currentMsfsGraphicsMode || '2D').toUpperCase() === 'VR') ? 'vr' : '2d';
         const isExternalAutoFps = !!(currentSettings && (currentSettings.external_autofps || currentSettings.dynamic_lod_engine === 'external_autofps'));
         const axisActive = isLodAxis && !isExternalAutoFps && !!(smartLodAxisState[modeKey] && smartLodAxisState[modeKey][`${axis}_active`]);
-        const axisTarget = isLodAxis ? ((smartLodAxisState[modeKey] && smartLodAxisState[modeKey][`${axis}_target`]) || (axis === 'tlod' ? (modeKey === 'vr' ? 150 : 200) : (modeKey === 'vr' ? 80 : 100))) : 100;
+        const axisBase = isLodAxis ? ((smartLodAxisState[modeKey] && smartLodAxisState[modeKey][`${axis}_base`] !== undefined) ? smartLodAxisState[modeKey][`${axis}_base`] : (axis === 'tlod' ? (modeKey === 'vr' ? 90 : 100) : (modeKey === 'vr' ? 80 : 100))) : 100;
+        const axisTarget = isLodAxis ? ((smartLodAxisState[modeKey] && smartLodAxisState[modeKey][`${axis}_target`] !== undefined) ? smartLodAxisState[modeKey][`${axis}_target`] : (axis === 'tlod' ? (modeKey === 'vr' ? 150 : 200) : (modeKey === 'vr' ? 80 : 100))) : 100;
         const axisAltitude = isLodAxis ? ((smartLodAxisState[modeKey] && smartLodAxisState[modeKey][`${axis}_altitude`]) || (axis === 'tlod' ? (modeKey === 'vr' ? 4000 : 5000) : (modeKey === 'vr' ? 2500 : 3000))) : 5000;
         const maxLodVal = axis === 'tlod' ? 400 : 300;
+        const leftPct = (Math.max(0, Math.min(maxLodVal, axisBase)) / maxLodVal) * 100;
+        const widthPct = (Math.max(0, Math.min(maxLodVal - axisBase, axisTarget - axisBase)) / maxLodVal) * 100;
 
         let autoFpsBadge = '';
         if (isLodAxis) {
@@ -19264,13 +19355,13 @@ function renderMsfsSettingsMatrix() {
             `;
         } else if (isLodAxis && axisActive) {
             inputHtml = `
-                <div class="w-full bg-slate-950 border border-slate-700/80 rounded-xl p-2.5 space-y-2">
+                <div class="w-full bg-slate-950 border border-slate-700/80 rounded-xl p-2.5 space-y-2.5">
                     <div class="flex items-center justify-between text-xs">
-                        <div class="flex items-center gap-1.5">
-                            <span class="text-slate-400 font-medium">Target:</span>
-                            <span id="smart-lod-val-${axis}" class="font-bold text-sky-400 tabular-nums">${axisTarget}</span>
+                        <div class="flex items-center gap-1.5" title="Floor LOD setting below transition altitude">
+                            <span class="text-slate-400 font-medium">Floor:</span>
+                            <span id="smart-lod-base-val-${axis}" class="font-bold text-sky-400 tabular-nums">${axisBase}</span>
                         </div>
-                        <div class="flex items-center gap-1.5">
+                        <div class="flex items-center gap-1">
                             <span class="text-slate-400 font-medium" title="Transition / cruise altitude in feet AGL">Alt:</span>
                             <input type="number"
                                    id="smart-lod-alt-${axis}"
@@ -19283,22 +19374,44 @@ function renderMsfsSettingsMatrix() {
                                    title="Transition altitude in feet AGL">
                             <span class="text-slate-400 text-[11px]">ft</span>
                         </div>
+                        <div class="flex items-center gap-1.5" title="Cruise LOD setting above transition altitude">
+                            <span class="text-slate-400 font-medium">Cruise:</span>
+                            <span id="smart-lod-target-val-${axis}" class="font-bold text-sky-400 tabular-nums">${axisTarget}</span>
+                        </div>
                     </div>
-                    <div class="relative flex items-center">
+                    <div class="dual-slider-container" onmousemove="onDualSliderMouseMove(event, '${axis}')">
+                        <!-- Full Track Background -->
+                        <div class="w-full h-1.5 bg-slate-800 rounded-lg absolute pointer-events-none"></div>
+                        <!-- Active Range Highlight Bar -->
+                        <div id="smart-lod-track-highlight-${axis}" class="absolute h-1.5 bg-sky-500 rounded-lg pointer-events-none transition-all duration-75" style="left: ${leftPct}%; width: ${widthPct}%;"></div>
+                        <!-- Floor Input Slider (Left Thumb) -->
                         <input type="range"
-                               id="smart-lod-range-${axis}"
+                               id="smart-lod-base-range-${axis}"
+                               min="0"
+                               max="${maxLodVal}"
+                               step="5"
+                               value="${axisBase}"
+                               oninput="onSmartLodBaseInput('${axis}', this.value)"
+                               onchange="onSmartLodDualSliderChange('${axis}')"
+                               onmousedown="this.style.zIndex = 25;"
+                               class="dual-slider-input"
+                               title="Floor LOD: ${axisBase} (Active below ${axisAltitude} ft AGL)">
+                        <!-- Cruise Input Slider (Right Thumb) -->
+                        <input type="range"
+                               id="smart-lod-target-range-${axis}"
                                min="0"
                                max="${maxLodVal}"
                                step="5"
                                value="${axisTarget}"
-                               oninput="onSmartLodSliderInput('${axis}', this.value)"
-                               onchange="onSmartLodSliderChange('${axis}', this.value)"
-                               class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500 hover:accent-sky-400 focus:outline-none"
-                               title="${axis.toUpperCase()} Dynamic Target: ${axisTarget} (Range: 0 - ${maxLodVal}, step 5)">
+                               oninput="onSmartLodTargetInput('${axis}', this.value)"
+                               onchange="onSmartLodDualSliderChange('${axis}')"
+                               onmousedown="this.style.zIndex = 25;"
+                               class="dual-slider-input"
+                               title="Cruise LOD: ${axisTarget} (Active at/above ${axisAltitude} ft AGL)">
                     </div>
                     <div class="flex justify-between text-[10px] text-slate-400 font-mono select-none px-0.5">
                         <span>0</span>
-                        <span class="text-slate-400 font-sans">Dynamic Cruise Target (step 5)</span>
+                        <span class="text-slate-400 font-sans">Dynamic Range (Floor &rarr; Cruise)</span>
                         <span>${maxLodVal}</span>
                     </div>
                 </div>

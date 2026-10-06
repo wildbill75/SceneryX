@@ -117,7 +117,8 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
                     params.get("axis", "tlod"),
                     enabled=params.get("enabled"),
                     target=params.get("target"),
-                    altitude=params.get("altitude")
+                    altitude=params.get("altitude"),
+                    base=params.get("base")
                 )
                 self._send_json(200, st)
             except Exception as e:

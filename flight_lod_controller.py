@@ -37,17 +37,21 @@ DEFAULT_CONFIG = {
     
     # 2D Independent LOD Axis
     "2d_tlod_active": False,
+    "2d_tlod_base": 100,
     "2d_tlod_target": 200,
     "2d_tlod_altitude": 5000,
     "2d_olod_active": False,
+    "2d_olod_base": 100,
     "2d_olod_target": 100,
     "2d_olod_altitude": 3000,
     
     # VR Independent LOD Axis
     "vr_tlod_active": False,
+    "vr_tlod_base": 90,
     "vr_tlod_target": 150,
     "vr_tlod_altitude": 4000,
     "vr_olod_active": False,
+    "vr_olod_base": 80,
     "vr_olod_target": 80,
     "vr_olod_altitude": 2500,
     
@@ -193,22 +197,26 @@ class SmartLodController:
                 "mode": pfx.upper(),
                 "external_autofps": bool(self.config.get("external_autofps", False)),
                 "tlod_active": bool(self.config.get(f"{pfx}_tlod_active", False)),
+                "tlod_base": int(self.config.get(f"{pfx}_tlod_base", 100 if pfx == "2d" else 90)),
                 "tlod_target": int(self.config.get(f"{pfx}_tlod_target", 200 if pfx == "2d" else 150)),
                 "tlod_altitude": int(self.config.get(f"{pfx}_tlod_altitude", 5000 if pfx == "2d" else 4000)),
                 "olod_active": bool(self.config.get(f"{pfx}_olod_active", False)),
+                "olod_base": int(self.config.get(f"{pfx}_olod_base", 100 if pfx == "2d" else 80)),
                 "olod_target": int(self.config.get(f"{pfx}_olod_target", 100 if pfx == "2d" else 80)),
                 "olod_altitude": int(self.config.get(f"{pfx}_olod_altitude", 3000 if pfx == "2d" else 2500)),
             }
 
-    def set_axis_state(self, mode: str, axis: str, enabled: Optional[bool] = None, target: Optional[int] = None, altitude: Optional[int] = None) -> Dict[str, Any]:
+    def set_axis_state(self, mode: str, axis: str, enabled: Optional[bool] = None, target: Optional[int] = None, altitude: Optional[int] = None, base: Optional[int] = None) -> Dict[str, Any]:
         with self._lock:
             pfx = "vr" if str(mode).upper() == "VR" else "2d"
             ax = "olod" if "olod" in str(axis).lower() else "tlod"
             
             if enabled is not None:
                 self.config[f"{pfx}_{ax}_active"] = bool(enabled)
+            max_v = 400 if ax == "tlod" else 300
+            if base is not None:
+                self.config[f"{pfx}_{ax}_base"] = max(0, min(int(base), max_v))
             if target is not None:
-                max_v = 400 if ax == "tlod" else 300
                 self.config[f"{pfx}_{ax}_target"] = max(0, min(int(target), max_v))
             if altitude is not None:
                 self.config[f"{pfx}_{ax}_altitude"] = max(0, int(altitude))
@@ -418,8 +426,8 @@ class SmartLodController:
         # 4. Gestion indépendante du Terrain LOD (TLOD) si activé
         if tlod_is_active:
             tlod_cruise = float(self.config.get(f"{pfx}_tlod_target", 200 if pfx == "2d" else 150))
+            tlod_ground = float(self.config.get(f"{pfx}_tlod_base", 100 if pfx == "2d" else 90))
             alt_trans = float(self.config.get(f"{pfx}_tlod_altitude", 5000 if pfx == "2d" else 4000))
-            tlod_ground = min(tlod_cruise, 100.0) if tlod_cruise >= 100 else max(10.0, tlod_cruise * 0.7)
 
             if getattr(self, "manual_tlod", None) is not None:
                 self.current_tlod_setpoint = float(self.manual_tlod)
@@ -451,8 +459,8 @@ class SmartLodController:
         # 5. Gestion indépendante de l'Object LOD (OLOD) si activé
         if olod_is_active:
             olod_cruise = float(self.config.get(f"{pfx}_olod_target", 100 if pfx == "2d" else 80))
+            olod_ground = float(self.config.get(f"{pfx}_olod_base", 100 if pfx == "2d" else 80))
             alt_trans_olod = float(self.config.get(f"{pfx}_olod_altitude", 3000 if pfx == "2d" else 2500))
-            olod_ground = min(olod_cruise, 100.0)
 
             if getattr(self, "manual_olod", None) is not None:
                 self.current_olod_setpoint = float(self.manual_olod)
@@ -461,7 +469,7 @@ class SmartLodController:
                     target_olod = float(olod_cruise)
                 else:
                     ratio = max(0.0, min(1.0, agl / max(1.0, alt_trans_olod)))
-                    target_olod = olod_ground - ratio * (olod_ground - olod_cruise)
+                    target_olod = olod_ground + ratio * (olod_cruise - olod_ground)
                 self.current_olod_setpoint = max(0.0, min(300.0, target_olod))
 
             ok_olod = self.engine.write_olod(self.current_olod_setpoint)
@@ -835,8 +843,8 @@ def get_smart_lod_axis_state(mode="2D") -> Dict[str, Any]:
     return get_smart_lod_controller().get_axis_state(mode)
 
 
-def set_smart_lod_axis_state(mode: str, axis: str, enabled=None, target=None, altitude=None) -> Dict[str, Any]:
-    return get_smart_lod_controller().set_axis_state(mode, axis, enabled, target, altitude)
+def set_smart_lod_axis_state(mode: str, axis: str, enabled=None, target=None, altitude=None, base=None) -> Dict[str, Any]:
+    return get_smart_lod_controller().set_axis_state(mode, axis, enabled, target, altitude, base)
 
 
 def set_external_autofps(enabled: bool) -> bool:
