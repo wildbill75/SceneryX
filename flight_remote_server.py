@@ -228,6 +228,17 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
         except Exception:
             pass
 
+        axis_state = {}
+        try:
+            if lod_ctrl:
+                axis_state = lod_ctrl.get_axis_state("VR" if is_vr_mode else "2D")
+        except Exception:
+            pass
+
+        gpu_util = telem.get("gpu_util_pct", 0)
+        gpu_temp = telem.get("gpu_temp_c", 0)
+        cpu_util = telem.get("msfs_cpu_pct", 0)
+
         telemetry_data = {
             "app_running": True,
             "connected": True,
@@ -249,10 +260,20 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
                 "tlod_manual": tlod_is_manual,
                 "olod_manual": olod_is_manual,
                 "is_vr": is_vr_mode,
-                "status": status_msg
+                "status": status_msg,
+                "axis_state": axis_state,
+                "tlod_base": axis_state.get("tlod_base", 100),
+                "tlod_target": axis_state.get("tlod_target", 200),
+                "tlod_altitude": axis_state.get("tlod_altitude", 5000),
+                "olod_base": axis_state.get("olod_base", 100),
+                "olod_target": axis_state.get("olod_target", 100),
+                "olod_altitude": axis_state.get("olod_altitude", 3000),
             },
             "vram_used_gb": vram_used_gb,
             "vram_total_gb": vram_total_gb,
+            "gpu_util_pct": gpu_util,
+            "gpu_temp_c": gpu_temp,
+            "cpu_pct": cpu_util,
             "rolling_cache_gb": round(cache_mbps, 1),
             "blackbox_recording": is_tracking,
             # Flat fields for direct compatibility

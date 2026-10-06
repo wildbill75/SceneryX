@@ -28,16 +28,24 @@ checkAutoload();
     let isSmartLodToggling = false;
     let isBlackboxToggling = false;
 
-    // Independent LOD tracking & Débrayage (Selected vs Managed Mode)
-    let currentTlod = 100;
-    let currentOlod = 100;
+    // Dual LOD State
+    let currentTlodFloor = 100;
+    let currentTlodCruise = 200;
+    let currentTlodAlt = 5000;
+    let currentTlodLive = 100;
+
+    let currentOlodFloor = 100;
+    let currentOlodCruise = 100;
+    let currentOlodAlt = 3000;
+    let currentOlodLive = 100;
+
     let tlodIsManual = false;
     let olodIsManual = false;
+    let currentIsVr = false;
 
-    let isUserDraggingLod = false;
-    let lodGraceUntil = 0;
-    let lodDebounceTimer = null;
-    let pendingLodUpdates = { tlod: false, olod: false };
+    let isUserInteracting = false;
+    let userInteractionTimeout = null;
+    let debounceTimer = null;
 
     function getApiBase() {
         return HOSTS[hostIndex % HOSTS.length] + "/api";
@@ -73,56 +81,111 @@ checkAutoload();
         }
     }
 
+    function updateDualSliderTrack(axis, floor, cruise) {
+        let maxVal = (axis === "tlod") ? 400 : 300;
+        let highlight = document.getElementById(axis + "-track-highlight");
+        if (highlight) {
+            let leftPct = (Math.max(0, Math.min(maxVal, floor)) / maxVal) * 100;
+            let widthPct = (Math.max(0, Math.min(maxVal - floor, cruise - floor)) / maxVal) * 100;
+            highlight.style.left = leftPct + "%";
+            highlight.style.width = widthPct + "%";
+        }
+    }
+
+    function onDualSliderMouseMove(e, axis) {
+        if (e.buttons === 1) return; // Never switch z-index while dragging
+        let container = document.getElementById(axis + "-dual-container");
+        if (!container) return;
+        let rect = container.getBoundingClientRect();
+        if (!rect.width) return;
+        let x = e.clientX - rect.left;
+        let pct = Math.max(0, Math.min(1, x / rect.width));
+        let maxVal = (axis === "tlod") ? 400 : 300;
+        let mouseVal = pct * maxVal;
+
+        let floorInput = document.getElementById(axis + "-floor-range");
+        let cruiseInput = document.getElementById(axis + "-cruise-range");
+        if (!floorInput || !cruiseInput) return;
+
+        let floorVal = parseInt(floorInput.value, 10);
+        let cruiseVal = parseInt(cruiseInput.value, 10);
+
+        let distFloor = Math.abs(mouseVal - floorVal);
+        let distCruise = Math.abs(mouseVal - cruiseVal);
+
+        if (distFloor < distCruise || (distFloor === distCruise && mouseVal <= floorVal)) {
+            floorInput.style.zIndex = "25";
+            cruiseInput.style.zIndex = "10";
+        } else {
+            floorInput.style.zIndex = "10";
+            cruiseInput.style.zIndex = "25";
+        }
+    }
+
     function setAxisUiState(axis, isManual) {
         if (axis === "tlod") {
             tlodIsManual = isManual;
-            let sl = document.getElementById("tlod-slider");
-            let valLbl = document.getElementById("tlod-val-label");
-            let badge = document.getElementById("tlod-mode-badge");
-            if (sl) {
-                if (isManual) sl.classList.add("is-manual");
-                else sl.classList.remove("is-manual");
-            }
-            if (valLbl) {
-                if (isManual) valLbl.classList.add("is-manual");
-                else valLbl.classList.remove("is-manual");
-            }
-            if (badge) {
+            let dot = document.getElementById("tlod-badge-dot");
+            let txt = document.getElementById("tlod-badge-text");
+            if (dot && txt) {
                 if (isManual) {
-                    badge.textContent = "MAN";
-                    badge.className = "lod-mode-badge badge-mode-manual";
-                    badge.title = "Manual override active. Click badge or double-click slider to reset to Auto";
+                    dot.className = "pill-dot dot-amber";
+                    txt.textContent = "MAN";
                 } else {
-                    badge.textContent = "AUTO";
-                    badge.className = "lod-mode-badge badge-mode-auto";
-                    badge.title = "Automatic altitude profile active";
+                    dot.className = "pill-dot dot-green";
+                    txt.textContent = "AUTO";
                 }
             }
         } else if (axis === "olod") {
             olodIsManual = isManual;
-            let sl = document.getElementById("olod-slider");
-            let valLbl = document.getElementById("olod-val-label");
-            let badge = document.getElementById("olod-mode-badge");
-            if (sl) {
-                if (isManual) sl.classList.add("is-manual");
-                else sl.classList.remove("is-manual");
-            }
-            if (valLbl) {
-                if (isManual) valLbl.classList.add("is-manual");
-                else valLbl.classList.remove("is-manual");
-            }
-            if (badge) {
+            let dot = document.getElementById("olod-badge-dot");
+            let txt = document.getElementById("olod-badge-text");
+            if (dot && txt) {
                 if (isManual) {
-                    badge.textContent = "MAN";
-                    badge.className = "lod-mode-badge badge-mode-manual";
-                    badge.title = "Manual override active. Click badge or double-click slider to reset to Auto";
+                    dot.className = "pill-dot dot-amber";
+                    txt.textContent = "MAN";
                 } else {
-                    badge.textContent = "AUTO";
-                    badge.className = "lod-mode-badge badge-mode-auto";
-                    badge.title = "Automatic altitude profile active";
+                    dot.className = "pill-dot dot-green";
+                    txt.textContent = "AUTO";
                 }
             }
         }
+    }
+
+    function markUserInteracting() {
+        isUserInteracting = true;
+        if (userInteractionTimeout) clearTimeout(userInteractionTimeout);
+        userInteractionTimeout = setTimeout(function () {
+            isUserInteracting = false;
+        }, 2500);
+    }
+
+    function queueAxisConfigUpdate(axis) {
+        markUserInteracting();
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(function () {
+            sendAxisConfigUpdate(axis);
+        }, 200);
+    }
+
+    function sendAxisConfigUpdate(axis) {
+        let mode = currentIsVr ? "VR" : "2D";
+        let baseVal = (axis === "tlod") ? currentTlodFloor : currentOlodFloor;
+        let targetVal = (axis === "tlod") ? currentTlodCruise : currentOlodCruise;
+        let altVal = (axis === "tlod") ? currentTlodAlt : currentOlodAlt;
+
+        let url = getApiBase() + "/smart_lod/axis_config";
+        let xhr = new XMLHttpRequest();
+        xhr.open("POST", url, true);
+        xhr.setRequestHeader("Content-Type", "application/json");
+        xhr.timeout = 2500;
+        xhr.send(JSON.stringify({
+            mode: mode,
+            axis: axis,
+            base: baseVal,
+            target: targetVal,
+            altitude: altVal
+        }));
     }
 
     function resetToProfile(axis) {
@@ -133,43 +196,19 @@ checkAutoload();
         } else {
             setAxisUiState(axis, false);
         }
-        isUserDraggingLod = false;
-        lodGraceUntil = 0;
+        isUserInteracting = false;
 
         let url = getApiBase() + "/smart_lod/reset_to_profile?axis=" + axis + "&_=" + Date.now();
         let xhr = new XMLHttpRequest();
         xhr.open("GET", url, true);
         xhr.timeout = 2000;
         xhr.onload = function () {
-            if (xhr.status >= 200 && xhr.status < 300) {
-                try {
-                    let res = JSON.parse(xhr.responseText);
-                    if (res.current_tlod !== undefined) {
-                        currentTlod = Math.round(Number(res.current_tlod));
-                        let sl = document.getElementById("tlod-slider");
-                        let lbl = document.getElementById("tlod-val-label");
-                        if (sl) sl.value = currentTlod;
-                        if (lbl) lbl.textContent = currentTlod;
-                    }
-                    if (res.current_olod !== undefined) {
-                        currentOlod = Math.round(Number(res.current_olod));
-                        let sl = document.getElementById("olod-slider");
-                        let lbl = document.getElementById("olod-val-label");
-                        if (sl) sl.value = currentOlod;
-                        if (lbl) lbl.textContent = currentOlod;
-                    }
-                } catch(e) {}
-            }
             pollTelemetry();
         };
         xhr.onerror = function () {
             pollTelemetry();
         };
         xhr.send();
-    }
-
-    function resetAxisToAuto(axis) {
-        resetToProfile(axis);
     }
 
     function drawSparkline() {
@@ -254,26 +293,66 @@ checkAutoload();
     function updateTelemetryUI(data) {
         if (!data) return;
 
-        // 1. SMART LOD
+        currentIsVr = !!data.is_vr;
+
+        // 1. SMART LOD REGULATION
         let lod = data.smart_lod || {};
         let lodActive = (lod.active !== undefined) ? !!lod.active : (!!data.smart_lod_running && !!data.smart_lod_enabled);
+
         let sTlod = (lod.current_tlod !== undefined && lod.current_tlod !== null) ? lod.current_tlod : (data.smart_lod_tlod !== undefined ? data.smart_lod_tlod : 100);
         let sOlod = (lod.current_olod !== undefined && lod.current_olod !== null) ? lod.current_olod : (data.smart_lod_olod !== undefined ? data.smart_lod_olod : 100);
 
-        let now = Date.now();
-        if (!isUserDraggingLod && now > lodGraceUntil) {
-            currentTlod = Math.round(Number(sTlod) || 100);
-            currentOlod = Math.round(Number(sOlod) || 100);
+        currentTlodLive = Math.round(Number(sTlod) || 100);
+        currentOlodLive = Math.round(Number(sOlod) || 100);
 
-            let slTlod = document.getElementById("tlod-slider");
-            if (slTlod) slTlod.value = currentTlod;
-            let lblTlod = document.getElementById("tlod-val-label");
-            if (lblTlod) lblTlod.textContent = currentTlod;
+        let liveTlodEl = document.getElementById("tlod-live-val");
+        if (liveTlodEl) liveTlodEl.textContent = currentTlodLive;
+        let liveOlodEl = document.getElementById("olod-live-val");
+        if (liveOlodEl) liveOlodEl.textContent = currentOlodLive;
 
-            let slOlod = document.getElementById("olod-slider");
-            if (slOlod) slOlod.value = currentOlod;
-            let lblOlod = document.getElementById("olod-val-label");
-            if (lblOlod) lblOlod.textContent = currentOlod;
+        if (!isUserInteracting) {
+            let tlodFloorVal = lod.tlod_base !== undefined ? lod.tlod_base : 100;
+            let tlodCruiseVal = lod.tlod_target !== undefined ? lod.tlod_target : 200;
+            let tlodAltVal = lod.tlod_altitude !== undefined ? lod.tlod_altitude : 5000;
+
+            let olodFloorVal = lod.olod_base !== undefined ? lod.olod_base : 100;
+            let olodCruiseVal = lod.olod_target !== undefined ? lod.olod_target : 100;
+            let olodAltVal = lod.olod_altitude !== undefined ? lod.olod_altitude : 3000;
+
+            currentTlodFloor = tlodFloorVal;
+            currentTlodCruise = tlodCruiseVal;
+            currentTlodAlt = tlodAltVal;
+
+            currentOlodFloor = olodFloorVal;
+            currentOlodCruise = olodCruiseVal;
+            currentOlodAlt = olodAltVal;
+
+            // Update DOM inputs and readouts
+            let tFloorRange = document.getElementById("tlod-floor-range");
+            let tCruiseRange = document.getElementById("tlod-cruise-range");
+            let tAltInput = document.getElementById("tlod-alt-input");
+            let tFloorVal = document.getElementById("tlod-floor-val");
+            let tCruiseVal = document.getElementById("tlod-cruise-val");
+
+            if (tFloorRange) tFloorRange.value = currentTlodFloor;
+            if (tCruiseRange) tCruiseRange.value = currentTlodCruise;
+            if (tAltInput && document.activeElement !== tAltInput) tAltInput.value = currentTlodAlt;
+            if (tFloorVal) tFloorVal.textContent = currentTlodFloor;
+            if (tCruiseVal) tCruiseVal.textContent = currentTlodCruise;
+            updateDualSliderTrack("tlod", currentTlodFloor, currentTlodCruise);
+
+            let oFloorRange = document.getElementById("olod-floor-range");
+            let oCruiseRange = document.getElementById("olod-cruise-range");
+            let oAltInput = document.getElementById("olod-alt-input");
+            let oFloorVal = document.getElementById("olod-floor-val");
+            let oCruiseVal = document.getElementById("olod-cruise-val");
+
+            if (oFloorRange) oFloorRange.value = currentOlodFloor;
+            if (oCruiseRange) oCruiseRange.value = currentOlodCruise;
+            if (oAltInput && document.activeElement !== oAltInput) oAltInput.value = currentOlodAlt;
+            if (oFloorVal) oFloorVal.textContent = currentOlodFloor;
+            if (oCruiseVal) oCruiseVal.textContent = currentOlodCruise;
+            updateDualSliderTrack("olod", currentOlodFloor, currentOlodCruise);
 
             let tlodManualRemote = !!(lod.tlod_manual !== undefined ? lod.tlod_manual : data.smart_lod_tlod_manual);
             let olodManualRemote = !!(lod.olod_manual !== undefined ? lod.olod_manual : data.smart_lod_olod_manual);
@@ -285,15 +364,15 @@ checkAutoload();
         let lblLod = document.getElementById("smart-lod-btn-label");
         if (btnLod && !isSmartLodToggling) {
             if (lodActive) {
-                btnLod.className = "msfs-btn btn-active-green";
+                btnLod.className = "msfs-btn-inline btn-active-green";
                 if (lblLod) lblLod.textContent = "ACTIVE";
             } else {
-                btnLod.className = "msfs-btn btn-primary";
+                btnLod.className = "msfs-btn-inline btn-primary";
                 if (lblLod) lblLod.textContent = "ENGAGE";
             }
         }
 
-        // 2. LIVE PERFORMANCE (ALWAYS LIVE MONITORED)
+        // 2. LIVE PERFORMANCE (Enlarged typography with spaced units)
         let perf = data.perf || {};
         let dispFps = (perf.displayed_fps !== undefined && perf.displayed_fps !== null) ? perf.displayed_fps : (data.displayed_fps || 0);
         let baseFps = (perf.fps !== undefined && perf.fps !== null) ? perf.fps : (data.base_fps || 0);
@@ -304,22 +383,23 @@ checkAutoload();
         if (elFps) elFps.textContent = (dispFps && dispFps > 0) ? Math.round(dispFps) : "--";
 
         let elBase = document.getElementById("live-fps-base");
-        if (elBase) elBase.textContent = (baseFps && baseFps > 0) ? "(" + Math.round(baseFps) + " base)" : "";
+        if (elBase) elBase.textContent = (baseFps && baseFps > 0) ? Math.round(baseFps) : "--";
 
         let elMt = document.getElementById("live-mt-val");
         if (elMt) elMt.textContent = (mtMs && mtMs > 0) ? Number(mtMs).toFixed(1) : "--";
 
-        let elPacing = document.getElementById("live-pacing-status");
-        if (elPacing) {
+        let elPacingDot = document.getElementById("pacing-badge-dot");
+        let elPacingTxt = document.getElementById("pacing-badge-text");
+        if (elPacingTxt && elPacingDot) {
             if (pacing === "OPTIMAL" || pacing === "FLUIDE") {
-                elPacing.textContent = "OPTIMAL";
-                elPacing.className = "badge-tag tag-green";
+                elPacingTxt.textContent = "OPTIMAL";
+                elPacingDot.className = "pill-dot dot-green";
             } else if (pacing === "ACCEPTABLE" || pacing === "CHARGE" || pacing === "CHARGÉ") {
-                elPacing.textContent = "ACCEPTABLE";
-                elPacing.className = "badge-tag tag-amber";
+                elPacingTxt.textContent = "ACCEPTABLE";
+                elPacingDot.className = "pill-dot dot-amber";
             } else {
-                elPacing.textContent = "HEAVY";
-                elPacing.className = "badge-tag tag-red";
+                elPacingTxt.textContent = "HEAVY";
+                elPacingDot.className = "pill-dot dot-red";
             }
         }
 
@@ -337,7 +417,7 @@ checkAutoload();
             }
         }
 
-        // 4. SPARKLINE TREND GRAPH (MONITORS ONLY WHILE RECORDING!)
+        // 4. SPARKLINE TREND GRAPH (MONITORS DURING RECORDING)
         if (isRec && !wasRecording) {
             fpsHistory = [];
         }
@@ -351,22 +431,34 @@ checkAutoload();
             drawSparkline();
         }
 
-        // 5. SYSTEM METRICS
+        // 5. SYSTEM METRICS (GPU, CPU, VRAM, CACHE with spaced units)
+        let elGpu = document.getElementById("live-gpu-val");
+        if (elGpu) {
+            let gpuPct = data.gpu_util_pct !== undefined ? data.gpu_util_pct : 0;
+            elGpu.textContent = (gpuPct && gpuPct > 0) ? Math.round(gpuPct) : "--";
+        }
+
+        let elCpu = document.getElementById("live-cpu-val");
+        if (elCpu) {
+            let cpuPct = data.cpu_pct !== undefined ? data.cpu_pct : 0;
+            elCpu.textContent = (cpuPct && cpuPct > 0) ? Math.round(cpuPct) : "--";
+        }
+
         let elVram = document.getElementById("live-vram-val");
         if (elVram) {
             let vramUsed = data.vram_used_gb !== undefined ? data.vram_used_gb : "--";
             let vramTot = data.vram_total_gb !== undefined ? data.vram_total_gb : "--";
             if (vramUsed !== "--" && vramTot !== "--") {
-                elVram.textContent = vramUsed + " / " + vramTot + " GB";
+                elVram.textContent = vramUsed + " / " + vramTot;
             } else {
-                elVram.textContent = "-- GB";
+                elVram.textContent = "--";
             }
         }
 
         let elCache = document.getElementById("live-cache-val");
         if (elCache) {
             let cacheVal = data.rolling_cache_gb !== undefined ? data.rolling_cache_gb : 0.0;
-            elCache.textContent = cacheVal + " MB/s";
+            elCache.textContent = Number(cacheVal).toFixed(1);
         }
     }
 
@@ -427,43 +519,6 @@ checkAutoload();
         }
     }
 
-    function queueLodAxisUpdate(axis) {
-        pendingLodUpdates[axis] = true;
-        isUserDraggingLod = true;
-        lodGraceUntil = Date.now() + 2500;
-        if (lodDebounceTimer) clearTimeout(lodDebounceTimer);
-        lodDebounceTimer = setTimeout(sendPendingLodUpdates, 150);
-    }
-
-    function sendPendingLodUpdates() {
-        let params = [];
-        if (pendingLodUpdates.tlod) {
-            params.push("tlod=" + currentTlod);
-        }
-        if (pendingLodUpdates.olod) {
-            params.push("olod=" + currentOlod);
-        }
-        pendingLodUpdates = { tlod: false, olod: false };
-        if (params.length === 0) return;
-
-        let url = getApiBase() + "/smart_lod/set_lod?" + params.join("&") + "&_=" + Date.now();
-        let xhr = new XMLHttpRequest();
-        xhr.open("GET", url, true);
-        xhr.timeout = 2000;
-        xhr.onload = function () {
-            lodGraceUntil = Date.now() + 1500;
-            setTimeout(function () {
-                isUserDraggingLod = false;
-            }, 1500);
-        };
-        xhr.onerror = function () {
-            setTimeout(function () {
-                isUserDraggingLod = false;
-            }, 1500);
-        };
-        xhr.send();
-    }
-
     function onSmartLodClick() {
         isSmartLodToggling = true;
         let url = getApiBase() + "/smart_lod/toggle";
@@ -505,6 +560,108 @@ checkAutoload();
         xhr.send();
     }
 
+    function setupDualSliderAxis(axis) {
+        let maxVal = (axis === "tlod") ? 400 : 300;
+        let container = document.getElementById(axis + "-dual-container");
+        let floorRange = document.getElementById(axis + "-floor-range");
+        let cruiseRange = document.getElementById(axis + "-cruise-range");
+        let altInput = document.getElementById(axis + "-alt-input");
+        let floorValLbl = document.getElementById(axis + "-floor-val");
+        let cruiseValLbl = document.getElementById(axis + "-cruise-val");
+        let badge = document.getElementById(axis + "-mode-badge");
+        let nameLbl = document.getElementById(axis + "-name-label");
+        let card = document.getElementById(axis + "-card");
+
+        if (container) {
+            container.addEventListener("mousemove", function (e) {
+                onDualSliderMouseMove(e, axis);
+            });
+            container.addEventListener("dblclick", function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                resetToProfile(axis);
+            });
+        }
+
+        if (floorRange) {
+            floorRange.addEventListener("input", function () {
+                let fVal = parseInt(floorRange.value, 10);
+                let cVal = parseInt(cruiseRange.value, 10);
+                if (fVal > cVal) {
+                    fVal = cVal;
+                    floorRange.value = fVal;
+                }
+                if (axis === "tlod") currentTlodFloor = fVal;
+                else currentOlodFloor = fVal;
+
+                if (floorValLbl) floorValLbl.textContent = fVal;
+                updateDualSliderTrack(axis, fVal, cVal);
+                setAxisUiState(axis, true);
+                queueAxisConfigUpdate(axis);
+            });
+            floorRange.addEventListener("dblclick", function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                resetToProfile(axis);
+            });
+        }
+
+        if (cruiseRange) {
+            cruiseRange.addEventListener("input", function () {
+                let fVal = parseInt(floorRange.value, 10);
+                let cVal = parseInt(cruiseRange.value, 10);
+                if (cVal < fVal) {
+                    cVal = fVal;
+                    cruiseRange.value = cVal;
+                }
+                if (axis === "tlod") currentTlodCruise = cVal;
+                else currentOlodCruise = cVal;
+
+                if (cruiseValLbl) cruiseValLbl.textContent = cVal;
+                updateDualSliderTrack(axis, fVal, cVal);
+                setAxisUiState(axis, true);
+                queueAxisConfigUpdate(axis);
+            });
+            cruiseRange.addEventListener("dblclick", function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                resetToProfile(axis);
+            });
+        }
+
+        if (altInput) {
+            altInput.addEventListener("change", function () {
+                let num = Math.max(500, Math.min(45000, parseInt(altInput.value, 10) || 5000));
+                altInput.value = num;
+                if (axis === "tlod") currentTlodAlt = num;
+                else currentOlodAlt = num;
+                queueAxisConfigUpdate(axis);
+            });
+        }
+
+        if (badge) {
+            badge.addEventListener("click", function () {
+                resetToProfile(axis);
+            });
+        }
+
+        if (nameLbl) {
+            nameLbl.addEventListener("dblclick", function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                resetToProfile(axis);
+            });
+        }
+
+        if (card) {
+            card.addEventListener("dblclick", function (e) {
+                if (e.target.tagName !== 'INPUT') {
+                    resetToProfile(axis);
+                }
+            });
+        }
+    }
+
     function init() {
         let discView = document.getElementById("disconnected-view");
         let connView = document.getElementById("connected-view");
@@ -534,125 +691,8 @@ checkAutoload();
             btnRec.addEventListener("click", onBlackboxClick);
         }
 
-        // Wire TLOD Controls
-        let slTlod = document.getElementById("tlod-slider");
-        let lblTlod = document.getElementById("tlod-val-label");
-        let nameTlod = document.getElementById("tlod-name-label");
-        let badgeTlod = document.getElementById("tlod-mode-badge");
-
-        if (slTlod) {
-            slTlod.addEventListener("input", function () {
-                currentTlod = parseInt(slTlod.value, 10) || 100;
-                if (lblTlod) lblTlod.textContent = currentTlod;
-                setAxisUiState("tlod", true);
-                queueLodAxisUpdate("tlod");
-            });
-            slTlod.addEventListener("dblclick", function (e) {
-                e.preventDefault();
-                e.stopPropagation();
-                resetAxisToAuto("tlod");
-            });
-        }
-        if (lblTlod) {
-            lblTlod.addEventListener("dblclick", function (e) {
-                e.preventDefault();
-                e.stopPropagation();
-                resetAxisToAuto("tlod");
-            });
-        }
-        if (nameTlod) {
-            nameTlod.addEventListener("dblclick", function (e) {
-                e.preventDefault();
-                e.stopPropagation();
-                resetAxisToAuto("tlod");
-            });
-        }
-        if (badgeTlod) {
-            badgeTlod.addEventListener("click", function () {
-                if (tlodIsManual) resetAxisToAuto("tlod");
-            });
-        }
-
-        let btnTlodMinus = document.getElementById("tlod-minus-btn");
-        if (btnTlodMinus) {
-            btnTlodMinus.addEventListener("click", function () {
-                currentTlod = Math.max(10, currentTlod - 10);
-                if (slTlod) slTlod.value = currentTlod;
-                if (lblTlod) lblTlod.textContent = currentTlod;
-                setAxisUiState("tlod", true);
-                queueLodAxisUpdate("tlod");
-            });
-        }
-        let btnTlodPlus = document.getElementById("tlod-plus-btn");
-        if (btnTlodPlus) {
-            btnTlodPlus.addEventListener("click", function () {
-                currentTlod = Math.min(400, currentTlod + 10);
-                if (slTlod) slTlod.value = currentTlod;
-                if (lblTlod) lblTlod.textContent = currentTlod;
-                setAxisUiState("tlod", true);
-                queueLodAxisUpdate("tlod");
-            });
-        }
-
-        // Wire OLOD Controls
-        let slOlod = document.getElementById("olod-slider");
-        let lblOlod = document.getElementById("olod-val-label");
-        let nameOlod = document.getElementById("olod-name-label");
-        let badgeOlod = document.getElementById("olod-mode-badge");
-
-        if (slOlod) {
-            slOlod.addEventListener("input", function () {
-                currentOlod = parseInt(slOlod.value, 10) || 100;
-                if (lblOlod) lblOlod.textContent = currentOlod;
-                setAxisUiState("olod", true);
-                queueLodAxisUpdate("olod");
-            });
-            slOlod.addEventListener("dblclick", function (e) {
-                e.preventDefault();
-                e.stopPropagation();
-                resetAxisToAuto("olod");
-            });
-        }
-        if (lblOlod) {
-            lblOlod.addEventListener("dblclick", function (e) {
-                e.preventDefault();
-                e.stopPropagation();
-                resetAxisToAuto("olod");
-            });
-        }
-        if (nameOlod) {
-            nameOlod.addEventListener("dblclick", function (e) {
-                e.preventDefault();
-                e.stopPropagation();
-                resetAxisToAuto("olod");
-            });
-        }
-        if (badgeOlod) {
-            badgeOlod.addEventListener("click", function () {
-                if (olodIsManual) resetAxisToAuto("olod");
-            });
-        }
-
-        let btnOlodMinus = document.getElementById("olod-minus-btn");
-        if (btnOlodMinus) {
-            btnOlodMinus.addEventListener("click", function () {
-                currentOlod = Math.max(10, currentOlod - 10);
-                if (slOlod) slOlod.value = currentOlod;
-                if (lblOlod) lblOlod.textContent = currentOlod;
-                setAxisUiState("olod", true);
-                queueLodAxisUpdate("olod");
-            });
-        }
-        let btnOlodPlus = document.getElementById("olod-plus-btn");
-        if (btnOlodPlus) {
-            btnOlodPlus.addEventListener("click", function () {
-                currentOlod = Math.min(400, currentOlod + 10);
-                if (slOlod) slOlod.value = currentOlod;
-                if (lblOlod) lblOlod.textContent = currentOlod;
-                setAxisUiState("olod", true);
-                queueLodAxisUpdate("olod");
-            });
-        }
+        setupDualSliderAxis("tlod");
+        setupDualSliderAxis("olod");
 
         pollTelemetry();
         setInterval(pollTelemetry, POLL_INTERVAL_MS);

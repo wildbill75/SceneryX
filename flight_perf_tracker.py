@@ -3265,6 +3265,8 @@ class BlackboxSession:
             telemetry["vram_total_mb"] = gpu.get("vram_total_mb", 16376)
             telemetry["vram_pct"] = gpu.get("vram_pct", 0)
             telemetry["gpu_power_w"] = gpu.get("gpu_power_w", 0)
+            telemetry["gpu_util_pct"] = gpu.get("gpu_util_pct", 0)
+            telemetry["gpu_temp_c"] = gpu.get("gpu_temp_c", 0)
 
         if sc_connected and sc_data.get("base_fps") is not None:
             telemetry["displayed_fps"] = sc_data.get("displayed_fps")
@@ -3283,6 +3285,7 @@ class BlackboxSession:
         if msfs:
             telemetry["msfs_ram_mb"] = msfs.get("ram_mb", 0)
             telemetry["msfs_vram_mb"] = msfs.get("vram_mb", 0.0)
+            telemetry["msfs_cpu_pct"] = msfs.get("cpu_pct", 0)
         return telemetry
 
 

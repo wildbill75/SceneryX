@@ -1,5 +1,5 @@
 /* =========================================================
-   SceneryX MSFS In-Game Toolbar Panel - Native MSFS Theme
+   SceneryX MSFS In-Game Toolbar Panel - Native Theme
    ========================================================= */
 
 html, body {
@@ -28,7 +28,6 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
     overflow: hidden !important;
 }
 
-/* Scoped layout rules - never interfere with MSFS stock header buttons */
 .main-content, .offline-box {
     box-sizing: border-box;
     font-family: 'Open Sans', 'Segoe UI', Tahoma, sans-serif;
@@ -41,7 +40,7 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
     box-sizing: border-box;
 }
 
-/* OFFLINE VIEW - Centered clean white message */
+/* OFFLINE VIEW */
 .offline-box {
     display: flex;
     align-items: center;
@@ -64,27 +63,27 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
 .main-content {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    padding: 10px 12px 12px 12px;
+    gap: 9px;
+    padding: 10px 12px 14px 12px;
     width: 100%;
     box-sizing: border-box;
 }
 
 .panel-section {
-    background: rgba(15, 23, 42, 0.85);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(15, 23, 42, 0.92);
+    border: 1px solid rgba(51, 65, 85, 0.6);
     border-radius: 6px;
-    padding: 10px 14px;
+    padding: 9px 12px;
     display: flex;
     flex-direction: column;
     gap: 8px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 
 .section-rec {
-    padding: 8px 12px;
+    padding: 7px 12px;
     background: rgba(15, 23, 42, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(51, 65, 85, 0.5);
     border-radius: 6px;
 }
 
@@ -92,52 +91,71 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 12px;
 }
 
 .section-title {
-    font-size: 11.5px;
+    font-size: 11px;
     font-weight: 800;
     color: #94a3b8;
     letter-spacing: 0.8px;
     text-transform: uppercase;
 }
 
-/* BADGES / PILLS */
+/* STATUS PILLS & BADGES - Slate badges with 6px semantic dots */
 .badge-tag {
     font-size: 10.5px;
     font-weight: 800;
-    padding: 3px 8px;
+    padding: 2.5px 8px;
     border-radius: 4px;
     letter-spacing: 0.5px;
-    background: rgba(148, 163, 184, 0.15);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    user-select: none;
+    transition: all 0.15s ease;
+}
+
+.tag-neutral {
+    background: #1e293b;
+    border: 1px solid rgba(51, 65, 85, 0.6);
     color: #cbd5e1;
 }
 
-.tag-green {
-    background: rgba(16, 185, 129, 0.2);
-    color: #34d399;
+.pill-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    shrink: 0;
+    display: inline-block;
 }
 
-.tag-amber {
-    background: rgba(245, 158, 11, 0.2);
-    color: #fbbf24;
+.dot-green {
+    background: #10b981;
+    box-shadow: 0 0 4px rgba(16, 185, 129, 0.4);
 }
 
-.tag-red {
-    background: rgba(239, 68, 68, 0.2);
-    color: #f87171;
+.dot-amber {
+    background: #f59e0b;
+    box-shadow: 0 0 4px rgba(245, 158, 11, 0.4);
 }
 
-/* BUTTONS - Centered, stylish, solid colors, sky-blue default */
+.dot-red {
+    background: #ef4444;
+    box-shadow: 0 0 4px rgba(239, 68, 68, 0.4);
+}
+
+/* BUTTONS */
 .msfs-btn {
     width: auto;
     min-width: 170px;
     max-width: 220px;
-    margin: 3px auto;
-    padding: 7px 22px;
+    margin: 2px auto;
+    padding: 6px 20px;
     border: none;
     border-radius: 4px;
-    font-size: 12px;
+    font-size: 11.5px;
     font-weight: 800;
     letter-spacing: 0.8px;
     cursor: pointer;
@@ -148,6 +166,22 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
     align-items: center;
     justify-content: center;
     text-align: center;
+}
+
+.msfs-btn-inline {
+    padding: 3px 12px;
+    border: none;
+    border-radius: 4px;
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: 0.6px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: background 0.15s ease;
+    color: #ffffff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .btn-primary {
@@ -174,136 +208,242 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
     background: #dc2626;
 }
 
-/* LOD CONTROLS BOX */
+/* SMART LOD DUAL SLIDERS (OPTION B) */
 .lod-controls-box {
     display: flex;
     flex-direction: column;
-    gap: 7px;
-    margin-top: 3px;
-    padding-top: 7px;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    gap: 8px;
+    margin-top: 1px;
 }
 
-.lod-control-row {
+.lod-axis-card {
+    background: rgba(11, 15, 25, 0.7);
+    border: 1px solid rgba(51, 65, 85, 0.5);
+    border-radius: 5px;
+    padding: 7px 9px 6px 9px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.lod-axis-header {
     display: flex;
     align-items: center;
-    gap: 7px;
+    justify-content: space-between;
+    gap: 8px;
 }
 
-.lod-name {
-    width: 38px;
+.lod-title-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.lod-axis-title {
     font-size: 12px;
-    font-weight: 800;
-    color: #cbd5e1;
-    letter-spacing: 0.5px;
-    cursor: default;
+    font-weight: 900;
+    color: #f8fafc;
+    letter-spacing: 0.6px;
+    cursor: pointer;
 }
 
-.lod-step-btn {
-    background: #1e293b;
-    color: #ffffff;
-    border: none;
-    border-radius: 3px;
+.lod-live-tag {
     font-size: 10px;
-    font-weight: 800;
-    padding: 4px 7px;
-    cursor: pointer;
-    min-width: 28px;
-    text-align: center;
-}
-
-.lod-step-btn:hover {
-    background: #334155;
-}
-
-.lod-step-btn:active {
-    background: #0284c7;
-}
-
-.lod-slider {
-    flex: 1;
-    height: 6px;
-    -webkit-appearance: none;
-    appearance: none;
-    cursor: pointer;
-    background: #334155;
+    font-weight: 700;
+    color: #64748b;
+    background: rgba(30, 41, 59, 0.7);
+    padding: 1px 5px;
     border-radius: 3px;
+    border: 1px solid rgba(51, 65, 85, 0.4);
+}
+
+.live-num {
+    font-family: 'Consolas', monospace;
+    font-weight: 900;
+    color: #38bdf8;
+}
+
+.lod-values-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.lod-param {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.param-lbl {
+    color: #94a3b8;
+    font-weight: 700;
+    font-size: 11px;
+}
+
+.param-val {
+    font-family: 'Consolas', monospace;
+    font-weight: 900;
+    color: #38bdf8;
+    font-size: 12.5px;
+}
+
+.alt-param {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.alt-input {
+    width: 48px;
+    background: #0f172a;
+    border: 1px solid rgba(51, 65, 85, 0.8);
+    border-radius: 3px;
+    color: #f1f5f9;
+    font-family: 'Consolas', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    text-align: center;
+    padding: 1px 2px;
     outline: none;
 }
 
-/* Default AUTO mode thumb: Sky Blue */
-.lod-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 15px;
-    height: 15px;
-    border-radius: 50%;
-    background: #0284c7;
-    border: 2px solid #ffffff;
-    cursor: pointer;
-    box-shadow: 0 0 5px rgba(2, 132, 199, 0.7);
-    transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+.alt-input:focus {
+    border-color: #94a3b8;
+    background: #1e293b;
 }
 
-.lod-slider::-webkit-slider-thumb:hover {
-    transform: scale(1.15);
-    box-shadow: 0 0 8px rgba(56, 189, 248, 0.9);
+.param-unit {
+    color: #64748b;
+    font-size: 10px;
+    font-weight: 700;
 }
 
-/* DÉBRAYÉ / MANUAL OVERRIDE mode thumb: Amber / Orange */
-.lod-slider.is-manual::-webkit-slider-thumb {
-    background: #f59e0b !important;
-    border: 2px solid #ffffff !important;
-    box-shadow: 0 0 8px rgba(245, 158, 11, 0.9) !important;
+/* DUAL RANGE SLIDER CONTAINER & THUMBS */
+.dual-slider-container {
+    position: relative;
+    width: 100%;
+    height: 22px;
+    display: flex;
+    align-items: center;
 }
 
-.lod-val {
-    width: 32px;
-    font-family: 'Consolas', monospace;
-    font-size: 14px;
-    font-weight: 900;
-    color: #38bdf8;
-    text-align: right;
-    cursor: pointer;
-    transition: color 0.15s ease;
-}
-
-.lod-val.is-manual {
-    color: #f59e0b !important;
-}
-
-/* Mode pill: AUTO (Sky-blue subtle) vs MAN (Amber warning) */
-.lod-mode-badge {
-    font-size: 8.5px;
-    font-weight: 800;
-    padding: 2px 4px;
+.dual-slider-track-bg {
+    position: absolute;
+    left: 0;
+    top: 8px;
+    width: 100%;
+    height: 6px;
+    background: #1e293b;
     border-radius: 3px;
-    letter-spacing: 0.5px;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.dual-slider-track-highlight {
+    position: absolute;
+    top: 8px;
+    height: 6px;
+    background: #0284c7;
+    border-radius: 3px;
+    pointer-events: none;
+    z-index: 1;
+    transition: left 0.04s ease, width 0.04s ease;
+}
+
+.dual-slider-input {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background: transparent !important;
+    background-color: transparent !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    pointer-events: none;
+    outline: none !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.dual-slider-input::-webkit-slider-runnable-track {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    height: 100% !important;
+    -webkit-appearance: none !important;
     cursor: pointer;
-    user-select: none;
-    min-width: 32px;
-    text-align: center;
-    transition: all 0.15s ease;
 }
 
-.badge-mode-auto {
-    background: rgba(2, 132, 199, 0.2);
-    color: #38bdf8;
-    border: 1px solid rgba(2, 132, 199, 0.35);
+.dual-slider-input::-moz-range-track {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    height: 100% !important;
+    cursor: pointer;
 }
 
-.badge-mode-manual {
-    background: rgba(245, 158, 11, 0.25);
-    color: #f59e0b;
-    border: 1px solid rgba(245, 158, 11, 0.6);
+.dual-slider-input::-webkit-slider-thumb {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    width: 15px !important;
+    height: 15px !important;
+    border-radius: 50% !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    border: 2px solid #0284c7 !important;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6) !important;
+    transition: transform 0.1s ease, border-color 0.1s ease !important;
+    opacity: 1 !important;
 }
 
-.badge-mode-manual:hover {
-    background: rgba(245, 158, 11, 0.4);
-    box-shadow: 0 0 6px rgba(245, 158, 11, 0.5);
+.dual-slider-input::-moz-range-thumb {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+    width: 15px !important;
+    height: 15px !important;
+    border-radius: 50% !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    border: 2px solid #0284c7 !important;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6) !important;
+    transition: transform 0.1s ease, border-color 0.1s ease !important;
+    opacity: 1 !important;
 }
 
-/* PERFORMANCE GRID */
+.dual-slider-input:hover::-webkit-slider-thumb {
+    transform: scale(1.18) !important;
+    border-color: #38bdf8 !important;
+}
+
+.dual-slider-input:active::-webkit-slider-thumb {
+    transform: scale(1.22) !important;
+    border-color: #0ea5e9 !important;
+}
+
+.dual-slider-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 9.5px;
+    font-family: 'Consolas', monospace;
+    color: #64748b;
+    padding: 0 2px;
+}
+
+.range-sub {
+    font-family: 'Open Sans', sans-serif;
+    font-size: 9px;
+    color: #475569;
+}
+
+/* PERFORMANCE GRID & TYPOGRAPHY */
 .perf-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -314,9 +454,10 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
     display: flex;
     flex-direction: column;
     align-items: center;
-    background: rgba(10, 14, 22, 0.6);
-    border-radius: 4px;
-    padding: 7px 8px;
+    background: rgba(10, 14, 22, 0.7);
+    border: 1px solid rgba(51, 65, 85, 0.4);
+    border-radius: 5px;
+    padding: 7px 10px 8px 10px;
 }
 
 .metric-label {
@@ -324,34 +465,73 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
     font-weight: 800;
     color: #94a3b8;
     letter-spacing: 0.6px;
-    margin-bottom: 3px;
+    margin-bottom: 2px;
 }
 
 .metric-val-wrap {
     display: flex;
     align-items: baseline;
-    gap: 4px;
+    gap: 6px;
 }
 
 .metric-number {
     font-family: 'Consolas', monospace;
-    font-size: 26px;
+    font-size: 28px;
     font-weight: 900;
     color: #ffffff;
     line-height: 1;
 }
 
 .metric-unit {
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 800;
     color: #94a3b8;
 }
 
-.metric-sub {
-    font-size: 11px;
-    color: #64748b;
-    font-weight: 700;
+/* PROMINENT BASE FPS PILL */
+.metric-base-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(30, 41, 59, 0.85);
+    border: 1px solid rgba(51, 65, 85, 0.7);
+    border-radius: 4px;
+    padding: 2.5px 8px;
+    margin-top: 5px;
+}
+
+.base-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #10b981;
+}
+
+.base-label {
+    font-size: 10px;
+    font-weight: 800;
+    color: #94a3b8;
+    letter-spacing: 0.4px;
+}
+
+.base-val {
+    font-family: 'Consolas', monospace;
+    font-size: 13.5px;
+    font-weight: 900;
+    color: #ffffff;
     margin-left: 2px;
+}
+
+.base-unit {
+    font-size: 10px;
+    font-weight: 700;
+    color: #94a3b8;
+    margin-left: 2px;
+}
+
+.metric-frametime-badge {
+    background: rgba(30, 41, 59, 0.4);
+    border: 1px solid rgba(51, 65, 85, 0.4);
 }
 
 /* SPARKLINE */
@@ -360,9 +540,10 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
     flex-direction: column;
     gap: 4px;
     background: rgba(10, 14, 22, 0.4);
+    border: 1px solid rgba(51, 65, 85, 0.4);
     border-radius: 4px;
     padding: 6px 8px;
-    margin-top: 2px;
+    margin-top: 1px;
 }
 
 .sparkline-top {
@@ -394,31 +575,39 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
     display: block;
 }
 
-/* SYSTEM METRICS ROW */
-.metrics-row {
-    display: flex;
-    justify-content: space-around;
-    align-items: center;
-    padding: 2px 0;
+/* SYSTEM METRICS GRID (GPU, CPU, VRAM, CACHE) */
+.metrics-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 16px;
+    padding: 2px 4px;
 }
 
 .metric-compact {
     display: flex;
-    gap: 6px;
     align-items: baseline;
+    gap: 5px;
 }
 
 .compact-label {
     color: #94a3b8;
     font-weight: 800;
-    font-size: 12px;
+    font-size: 11.5px;
+    letter-spacing: 0.4px;
 }
 
 .compact-val {
     font-family: 'Consolas', monospace;
     color: #ffffff;
     font-weight: 900;
-    font-size: 14.5px;
+    font-size: 15.5px;
+}
+
+.compact-unit {
+    color: #94a3b8;
+    font-weight: 700;
+    font-size: 11px;
+    margin-left: 2px;
 }
 
 .hidden {

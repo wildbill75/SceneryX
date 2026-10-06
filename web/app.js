@@ -20099,6 +20099,9 @@ async function onMsfsSettingChanged(settingKey, newValue) {
         const res = JSON.parse(resStr);
         if (res.status === 'success') {
             await loadRigDiagnostics();
+            if (typeof updateProfileActivateButtonState === 'function') {
+                await updateProfileActivateButtonState();
+            }
         } else {
             if (typeof showToast === 'function') {
                 showToast(`Failed to stage setting: ${res.message}`, 'error');
@@ -20663,7 +20666,7 @@ async function updateProfileActivateButtonState() {
 
         if (!hasChanges) {
             // Profile is active and identical: Solid green background as requested
-            btn.innerHTML = `ACTIVE`;
+            btn.innerHTML = `ACTIVE IN MSFS`;
             btn.className = "h-8 px-3 rounded-md bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold border border-emerald-500/50 typo-action-btn text-xs tracking-[0.02em] uppercase shrink-0 whitespace-nowrap inline-flex items-center justify-center leading-none transition-all cursor-pointer shadow-sm select-none";
             btn.title = `Profile "${selectedProfile.name}" is currently active in MSFS`;
             return;
@@ -20671,7 +20674,7 @@ async function updateProfileActivateButtonState() {
     }
 
     // Profile needs activation or has unsaved changes: Gray basic button with mouse over + onclick
-    btn.innerHTML = `ACTIVATE`;
+    btn.innerHTML = `ACTIVATE IN MSFS`;
     btn.className = "h-8 px-3 rounded-md bg-slate-800 hover:bg-slate-700 active:bg-slate-600 border border-slate-700/80 text-slate-200 hover:text-white typo-action-btn text-xs font-semibold tracking-[0.02em] transition-all cursor-pointer uppercase shrink-0 whitespace-nowrap inline-flex items-center justify-center leading-none shadow-sm active:scale-[0.98]";
     btn.title = selectedProfile ? `Activate "${selectedProfile.name}" into MSFS` : "Activate profile into MSFS";
 }
@@ -20945,14 +20948,28 @@ async function selectCustomProfileItem(profileId) {
         switchMsfsGraphicsMode(targetMode, false);
     }
 
-    // Load preview of profile settings into UI cards without modifying disk
-    try {
-        await loadRigDiagnostics(profile.id);
-        if (typeof updateProfileActivateButtonState === 'function') {
-            await updateProfileActivateButtonState();
+    // 1-Click Profile Selection: Immediately activate profile into MSFS
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.activate_custom_profile) {
+        try {
+            const resStr = await window.pywebview.api.activate_custom_profile(profile.id);
+            const res = JSON.parse(resStr);
+            if (res.status === 'success') {
+                if (typeof showToast === 'function') {
+                    showToast(`Profile "${profile.name}" activated into MSFS!`, 'success');
+                }
+            } else {
+                console.warn("Profile activation returned warning:", res.message);
+            }
+        } catch (e) {
+            console.error("Error activating profile on 1-click selection:", e);
         }
-    } catch (e) {
-        console.error("Error previewing profile settings:", e);
+    }
+
+    // Refresh custom profiles list to display the ACTIVE tag on selected profile
+    await fetchAndRenderCustomProfiles(false);
+    await loadRigDiagnostics();
+    if (typeof updateProfileActivateButtonState === 'function') {
+        await updateProfileActivateButtonState();
     }
 }
 
@@ -21283,6 +21300,21 @@ async function activateSelectedCustomProfile() {
         const targetMode = detectProfileCategoryMode(profile);
         if (typeof switchMsfsGraphicsMode === 'function') {
             switchMsfsGraphicsMode(targetMode, false);
+        }
+    }
+
+    // If there are unsaved staged changes for this profile, save them first so activating preserves latest edits
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.check_profile_changes) {
+        try {
+            const chkStr = await window.pywebview.api.check_profile_changes(profileId);
+            const chk = JSON.parse(chkStr);
+            if (chk && chk.status === 'success' && chk.has_changes) {
+                if (window.pywebview.api.save_custom_profile && profile) {
+                    await window.pywebview.api.save_custom_profile(profile.name, profile.id);
+                }
+            }
+        } catch (e) {
+            console.warn("Error auto-saving changes before activation:", e);
         }
     }
 

@@ -64,17 +64,17 @@ def build_spb(
     # Prop 9: int 3 (window type)
     # Prop 10: float 4.0 (x min/pad)
     # Prop 11: float 5.0 (y min/pad)
-    # Prop 12: float 28.0 (defaultWidth: 28% screen width)
-    # Prop 13: float 24.0 (defaultHeight: 24% screen height - well-proportioned rectangle matching Screen 2)
-    # Prop 14: float 20.0 (minWidth)
+    # Prop 12: float 36.0 (defaultWidth: 36% screen width)
+    # Prop 13: float 34.0 (defaultHeight: 34% screen height - generous room for dual sliders and telemetry)
+    # Prop 14: float 26.0 (minWidth)
     # Prop 15: float 2.0 (minHeight - allows clean compact fitting)
     numeric_chunk = bytearray()
     numeric_chunk.extend(struct.pack("<II", 9, 3))
     numeric_chunk.extend(struct.pack("<If", 10, 4.0))
     numeric_chunk.extend(struct.pack("<If", 11, 5.0))
-    numeric_chunk.extend(struct.pack("<If", 12, 28.0))
-    numeric_chunk.extend(struct.pack("<If", 13, 24.0))
-    numeric_chunk.extend(struct.pack("<If", 14, 20.0))
+    numeric_chunk.extend(struct.pack("<If", 12, 36.0))
+    numeric_chunk.extend(struct.pack("<If", 13, 34.0))
+    numeric_chunk.extend(struct.pack("<If", 14, 26.0))
     numeric_chunk.extend(struct.pack("<If", 15, 2.0))
     children.extend(numeric_chunk)
 
@@ -230,7 +230,7 @@ def build():
         <ingame-ui id="SceneryX_Remote" panel-id="PANEL_SCENERYX" title="SCENERY X"
                    class="ingameUiFrame panelInvisible"
                    content-fit="true" resize="both"
-                   min-width="320" min-height="220">
+                   min-width="380" min-height="340">
 
             <!-- OFFLINE VIEW -->
             <div id="disconnected-view" class="offline-box">
@@ -239,31 +239,97 @@ def build():
 
             <!-- ONLINE VIEW -->
             <div id="connected-view" class="main-content hidden">
-                <!-- SECTION 1: SMART LOD -->
+                <!-- SECTION 1: SMART LOD REGULATION -->
                 <div class="panel-section">
                     <div class="section-header">
-                        <span class="section-title">SMART LOD</span>
+                        <span class="section-title">SMART LOD REGULATION</span>
+                        <button type="button" id="smart-lod-toggle-btn" class="msfs-btn-inline btn-primary">
+                            <span id="smart-lod-btn-label">ENGAGE</span>
+                        </button>
                     </div>
-                    <button type="button" id="smart-lod-toggle-btn" class="msfs-btn btn-primary">
-                        <span id="smart-lod-btn-label">ENGAGE</span>
-                    </button>
-                    <!-- On-the-fly LOD Controls -->
+
+                    <!-- DUAL SLIDERS BOX (OPTION B) -->
                     <div class="lod-controls-box">
-                        <div class="lod-control-row" id="tlod-row">
-                            <span class="lod-name" id="tlod-name-label" title="Terrain LOD (Double-click to reset to Auto)">TLOD</span>
-                            <button type="button" class="lod-step-btn" id="tlod-minus-btn" title="Decrease TLOD by 10">-10</button>
-                            <input type="range" class="lod-slider" id="tlod-slider" min="10" max="400" step="10" value="100" title="Double-click thumb to reset to Auto" />
-                            <button type="button" class="lod-step-btn" id="tlod-plus-btn" title="Increase TLOD by 10">+10</button>
-                            <span class="lod-val" id="tlod-val-label" title="Double-click to reset to Auto">100</span>
-                            <span class="lod-mode-badge badge-mode-auto" id="tlod-mode-badge" title="Double-click slider or click badge to reset to Auto">AUTO</span>
+                        <!-- TLOD AXIS CARD -->
+                        <div class="lod-axis-card" id="tlod-card">
+                            <div class="lod-axis-header">
+                                <div class="lod-title-group">
+                                    <span class="lod-axis-title" id="tlod-name-label" title="Terrain LOD (Double-click to reset to Auto)">TLOD</span>
+                                    <span class="lod-live-tag" title="Real-time in-sim TLOD setpoint">LIVE: <span id="tlod-live-val" class="live-num">100</span></span>
+                                </div>
+                                <div class="lod-values-group">
+                                    <div class="lod-param" title="Floor LOD below transition altitude">
+                                        <span class="param-lbl">Floor:</span>
+                                        <span id="tlod-floor-val" class="param-val">100</span>
+                                    </div>
+                                    <div class="lod-param alt-param" title="Transition altitude in feet AGL">
+                                        <span class="param-lbl">Alt:</span>
+                                        <input type="number" id="tlod-alt-input" class="alt-input" value="5000" step="500" min="500" max="45000" />
+                                        <span class="param-unit">ft</span>
+                                    </div>
+                                    <div class="lod-param" title="Cruise LOD at or above transition altitude">
+                                        <span class="param-lbl">Cruise:</span>
+                                        <span id="tlod-cruise-val" class="param-val">200</span>
+                                    </div>
+                                </div>
+                                <span class="badge-tag tag-neutral" id="tlod-mode-badge" title="Double-click slider or click badge to reset to Auto">
+                                    <span class="pill-dot dot-green" id="tlod-badge-dot"></span>
+                                    <span id="tlod-badge-text">AUTO</span>
+                                </span>
+                            </div>
+                            <!-- Track Container -->
+                            <div class="dual-slider-container" id="tlod-dual-container">
+                                <div class="dual-slider-track-bg"></div>
+                                <div id="tlod-track-highlight" class="dual-slider-track-highlight"></div>
+                                <input type="range" class="dual-slider-input" id="tlod-floor-range" min="0" max="400" step="5" value="100" title="Floor LOD: 100" />
+                                <input type="range" class="dual-slider-input" id="tlod-cruise-range" min="0" max="400" step="5" value="200" title="Cruise LOD: 200" />
+                            </div>
+                            <div class="dual-slider-labels">
+                                <span>0</span>
+                                <span class="range-sub">Dynamic Range (Floor &rarr; Cruise)</span>
+                                <span>400</span>
+                            </div>
                         </div>
-                        <div class="lod-control-row" id="olod-row">
-                            <span class="lod-name" id="olod-name-label" title="Object LOD (Double-click to reset to Auto)">OLOD</span>
-                            <button type="button" class="lod-step-btn" id="olod-minus-btn" title="Decrease OLOD by 10">-10</button>
-                            <input type="range" class="lod-slider" id="olod-slider" min="10" max="400" step="10" value="100" title="Double-click thumb to reset to Auto" />
-                            <button type="button" class="lod-step-btn" id="olod-plus-btn" title="Increase OLOD by 10">+10</button>
-                            <span class="lod-val" id="olod-val-label" title="Double-click to reset to Auto">100</span>
-                            <span class="lod-mode-badge badge-mode-auto" id="olod-mode-badge" title="Double-click slider or click badge to reset to Auto">AUTO</span>
+
+                        <!-- OLOD AXIS CARD -->
+                        <div class="lod-axis-card" id="olod-card">
+                            <div class="lod-axis-header">
+                                <div class="lod-title-group">
+                                    <span class="lod-axis-title" id="olod-name-label" title="Object LOD (Double-click to reset to Auto)">OLOD</span>
+                                    <span class="lod-live-tag" title="Real-time in-sim OLOD setpoint">LIVE: <span id="olod-live-val" class="live-num">100</span></span>
+                                </div>
+                                <div class="lod-values-group">
+                                    <div class="lod-param" title="Floor LOD below transition altitude">
+                                        <span class="param-lbl">Floor:</span>
+                                        <span id="olod-floor-val" class="param-val">100</span>
+                                    </div>
+                                    <div class="lod-param alt-param" title="Transition altitude in feet AGL">
+                                        <span class="param-lbl">Alt:</span>
+                                        <input type="number" id="olod-alt-input" class="alt-input" value="3000" step="500" min="500" max="45000" />
+                                        <span class="param-unit">ft</span>
+                                    </div>
+                                    <div class="lod-param" title="Cruise LOD at or above transition altitude">
+                                        <span class="param-lbl">Cruise:</span>
+                                        <span id="olod-cruise-val" class="param-val">100</span>
+                                    </div>
+                                </div>
+                                <span class="badge-tag tag-neutral" id="olod-mode-badge" title="Double-click slider or click badge to reset to Auto">
+                                    <span class="pill-dot dot-green" id="olod-badge-dot"></span>
+                                    <span id="olod-badge-text">AUTO</span>
+                                </span>
+                            </div>
+                            <!-- Track Container -->
+                            <div class="dual-slider-container" id="olod-dual-container">
+                                <div class="dual-slider-track-bg"></div>
+                                <div id="olod-track-highlight" class="dual-slider-track-highlight"></div>
+                                <input type="range" class="dual-slider-input" id="olod-floor-range" min="0" max="300" step="5" value="100" title="Floor LOD: 100" />
+                                <input type="range" class="dual-slider-input" id="olod-cruise-range" min="0" max="300" step="5" value="100" title="Cruise LOD: 100" />
+                            </div>
+                            <div class="dual-slider-labels">
+                                <span>0</span>
+                                <span class="range-sub">Dynamic Range (Floor &rarr; Cruise)</span>
+                                <span>300</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -271,8 +337,11 @@ def build():
                 <!-- SECTION 2: PERFORMANCE -->
                 <div class="panel-section">
                     <div class="section-header">
-                        <span class="section-title">PERFORMANCE</span>
-                        <span id="live-pacing-status" class="badge-tag tag-green">OPTIMAL</span>
+                        <span class="section-title">PERFORMANCE MONITORING</span>
+                        <span id="live-pacing-status" class="badge-tag tag-neutral">
+                            <span class="pill-dot dot-green" id="pacing-badge-dot"></span>
+                            <span id="pacing-badge-text">OPTIMAL</span>
+                        </span>
                     </div>
                     <div class="perf-row">
                         <div class="perf-metric">
@@ -280,7 +349,12 @@ def build():
                             <div class="metric-val-wrap">
                                 <span id="live-fps-val" class="metric-number">--</span>
                                 <span class="metric-unit">FPS</span>
-                                <span id="live-fps-base" class="metric-sub"></span>
+                            </div>
+                            <div id="live-fps-base-wrap" class="metric-base-badge" title="Native Frame Rate without Frame Generation">
+                                <span class="base-dot"></span>
+                                <span class="base-label">BASE</span>
+                                <span id="live-fps-base" class="base-val">--</span>
+                                <span class="base-unit">FPS</span>
                             </div>
                         </div>
                         <div class="perf-metric">
@@ -288,6 +362,9 @@ def build():
                             <div class="metric-val-wrap">
                                 <span id="live-mt-val" class="metric-number">--</span>
                                 <span class="metric-unit">ms</span>
+                            </div>
+                            <div class="metric-base-badge metric-frametime-badge">
+                                <span class="base-label">FRAMETIME</span>
                             </div>
                         </div>
                     </div>
@@ -297,20 +374,32 @@ def build():
                             <span class="sparkline-title">30S TREND</span>
                             <span id="fps-delta-label" class="delta-label delta-neutral">0 FPS</span>
                         </div>
-                        <canvas id="fps-sparkline-canvas" class="sparkline-canvas" width="280" height="32"></canvas>
+                        <canvas id="fps-sparkline-canvas" class="sparkline-canvas" width="340" height="32"></canvas>
                     </div>
                 </div>
 
                 <!-- SECTION 3: SYSTEM METRICS -->
                 <div class="panel-section">
-                    <div class="metrics-row">
+                    <div class="metrics-grid">
+                        <div class="metric-compact">
+                            <span class="compact-label">GPU:</span>
+                            <span id="live-gpu-val" class="compact-val">--</span>
+                            <span class="compact-unit">%</span>
+                        </div>
+                        <div class="metric-compact">
+                            <span class="compact-label">CPU:</span>
+                            <span id="live-cpu-val" class="compact-val">--</span>
+                            <span class="compact-unit">%</span>
+                        </div>
                         <div class="metric-compact">
                             <span class="compact-label">VRAM:</span>
-                            <span id="live-vram-val" class="compact-val">-- GB</span>
+                            <span id="live-vram-val" class="compact-val">--</span>
+                            <span class="compact-unit">GB</span>
                         </div>
                         <div class="metric-compact">
                             <span class="compact-label">CACHE:</span>
-                            <span id="live-cache-val" class="compact-val">-- MB/s</span>
+                            <span id="live-cache-val" class="compact-val">--</span>
+                            <span class="compact-unit">MB/s</span>
                         </div>
                     </div>
                 </div>
@@ -332,7 +421,7 @@ def build():
         f.write(html_content)
 
     css_content = '''/* =========================================================
-   SceneryX MSFS In-Game Toolbar Panel - Native MSFS Theme
+   SceneryX MSFS In-Game Toolbar Panel - Native Theme
    ========================================================= */
 
 html, body {
@@ -361,7 +450,6 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
     overflow: hidden !important;
 }
 
-/* Scoped layout rules - never interfere with MSFS stock header buttons */
 .main-content, .offline-box {
     box-sizing: border-box;
     font-family: 'Open Sans', 'Segoe UI', Tahoma, sans-serif;
@@ -374,7 +462,7 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
     box-sizing: border-box;
 }
 
-/* OFFLINE VIEW - Centered clean white message */
+/* OFFLINE VIEW */
 .offline-box {
     display: flex;
     align-items: center;
@@ -397,27 +485,27 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
 .main-content {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    padding: 10px 12px 12px 12px;
+    gap: 9px;
+    padding: 10px 12px 14px 12px;
     width: 100%;
     box-sizing: border-box;
 }
 
 .panel-section {
-    background: rgba(15, 23, 42, 0.85);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(15, 23, 42, 0.92);
+    border: 1px solid rgba(51, 65, 85, 0.6);
     border-radius: 6px;
-    padding: 10px 14px;
+    padding: 9px 12px;
     display: flex;
     flex-direction: column;
     gap: 8px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
 }
 
 .section-rec {
-    padding: 8px 12px;
+    padding: 7px 12px;
     background: rgba(15, 23, 42, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(51, 65, 85, 0.5);
     border-radius: 6px;
 }
 
@@ -425,52 +513,71 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 12px;
 }
 
 .section-title {
-    font-size: 11.5px;
+    font-size: 11px;
     font-weight: 800;
     color: #94a3b8;
     letter-spacing: 0.8px;
     text-transform: uppercase;
 }
 
-/* BADGES / PILLS */
+/* STATUS PILLS & BADGES - Slate badges with 6px semantic dots */
 .badge-tag {
     font-size: 10.5px;
     font-weight: 800;
-    padding: 3px 8px;
+    padding: 2.5px 8px;
     border-radius: 4px;
     letter-spacing: 0.5px;
-    background: rgba(148, 163, 184, 0.15);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    user-select: none;
+    transition: all 0.15s ease;
+}
+
+.tag-neutral {
+    background: #1e293b;
+    border: 1px solid rgba(51, 65, 85, 0.6);
     color: #cbd5e1;
 }
 
-.tag-green {
-    background: rgba(16, 185, 129, 0.2);
-    color: #34d399;
+.pill-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    shrink: 0;
+    display: inline-block;
 }
 
-.tag-amber {
-    background: rgba(245, 158, 11, 0.2);
-    color: #fbbf24;
+.dot-green {
+    background: #10b981;
+    box-shadow: 0 0 4px rgba(16, 185, 129, 0.4);
 }
 
-.tag-red {
-    background: rgba(239, 68, 68, 0.2);
-    color: #f87171;
+.dot-amber {
+    background: #f59e0b;
+    box-shadow: 0 0 4px rgba(245, 158, 11, 0.4);
 }
 
-/* BUTTONS - Centered, stylish, solid colors, sky-blue default */
+.dot-red {
+    background: #ef4444;
+    box-shadow: 0 0 4px rgba(239, 68, 68, 0.4);
+}
+
+/* BUTTONS */
 .msfs-btn {
     width: auto;
     min-width: 170px;
     max-width: 220px;
-    margin: 3px auto;
-    padding: 7px 22px;
+    margin: 2px auto;
+    padding: 6px 20px;
     border: none;
     border-radius: 4px;
-    font-size: 12px;
+    font-size: 11.5px;
     font-weight: 800;
     letter-spacing: 0.8px;
     cursor: pointer;
@@ -481,6 +588,22 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
     align-items: center;
     justify-content: center;
     text-align: center;
+}
+
+.msfs-btn-inline {
+    padding: 3px 12px;
+    border: none;
+    border-radius: 4px;
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: 0.6px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: background 0.15s ease;
+    color: #ffffff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .btn-primary {
@@ -507,136 +630,242 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
     background: #dc2626;
 }
 
-/* LOD CONTROLS BOX */
+/* SMART LOD DUAL SLIDERS (OPTION B) */
 .lod-controls-box {
     display: flex;
     flex-direction: column;
-    gap: 7px;
-    margin-top: 3px;
-    padding-top: 7px;
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    gap: 8px;
+    margin-top: 1px;
 }
 
-.lod-control-row {
+.lod-axis-card {
+    background: rgba(11, 15, 25, 0.7);
+    border: 1px solid rgba(51, 65, 85, 0.5);
+    border-radius: 5px;
+    padding: 7px 9px 6px 9px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.lod-axis-header {
     display: flex;
     align-items: center;
-    gap: 7px;
+    justify-content: space-between;
+    gap: 8px;
 }
 
-.lod-name {
-    width: 38px;
+.lod-title-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.lod-axis-title {
     font-size: 12px;
-    font-weight: 800;
-    color: #cbd5e1;
-    letter-spacing: 0.5px;
-    cursor: default;
+    font-weight: 900;
+    color: #f8fafc;
+    letter-spacing: 0.6px;
+    cursor: pointer;
 }
 
-.lod-step-btn {
-    background: #1e293b;
-    color: #ffffff;
-    border: none;
-    border-radius: 3px;
+.lod-live-tag {
     font-size: 10px;
-    font-weight: 800;
-    padding: 4px 7px;
-    cursor: pointer;
-    min-width: 28px;
-    text-align: center;
-}
-
-.lod-step-btn:hover {
-    background: #334155;
-}
-
-.lod-step-btn:active {
-    background: #0284c7;
-}
-
-.lod-slider {
-    flex: 1;
-    height: 6px;
-    -webkit-appearance: none;
-    appearance: none;
-    cursor: pointer;
-    background: #334155;
+    font-weight: 700;
+    color: #64748b;
+    background: rgba(30, 41, 59, 0.7);
+    padding: 1px 5px;
     border-radius: 3px;
+    border: 1px solid rgba(51, 65, 85, 0.4);
+}
+
+.live-num {
+    font-family: 'Consolas', monospace;
+    font-weight: 900;
+    color: #38bdf8;
+}
+
+.lod-values-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.lod-param {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.param-lbl {
+    color: #94a3b8;
+    font-weight: 700;
+    font-size: 11px;
+}
+
+.param-val {
+    font-family: 'Consolas', monospace;
+    font-weight: 900;
+    color: #38bdf8;
+    font-size: 12.5px;
+}
+
+.alt-param {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
+.alt-input {
+    width: 48px;
+    background: #0f172a;
+    border: 1px solid rgba(51, 65, 85, 0.8);
+    border-radius: 3px;
+    color: #f1f5f9;
+    font-family: 'Consolas', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    text-align: center;
+    padding: 1px 2px;
     outline: none;
 }
 
-/* Default AUTO mode thumb: Sky Blue */
-.lod-slider::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 15px;
-    height: 15px;
-    border-radius: 50%;
-    background: #0284c7;
-    border: 2px solid #ffffff;
-    cursor: pointer;
-    box-shadow: 0 0 5px rgba(2, 132, 199, 0.7);
-    transition: background 0.15s ease, box-shadow 0.15s ease, transform 0.1s ease;
+.alt-input:focus {
+    border-color: #94a3b8;
+    background: #1e293b;
 }
 
-.lod-slider::-webkit-slider-thumb:hover {
-    transform: scale(1.15);
-    box-shadow: 0 0 8px rgba(56, 189, 248, 0.9);
+.param-unit {
+    color: #64748b;
+    font-size: 10px;
+    font-weight: 700;
 }
 
-/* DÉBRAYÉ / MANUAL OVERRIDE mode thumb: Amber / Orange */
-.lod-slider.is-manual::-webkit-slider-thumb {
-    background: #f59e0b !important;
-    border: 2px solid #ffffff !important;
-    box-shadow: 0 0 8px rgba(245, 158, 11, 0.9) !important;
+/* DUAL RANGE SLIDER CONTAINER & THUMBS */
+.dual-slider-container {
+    position: relative;
+    width: 100%;
+    height: 22px;
+    display: flex;
+    align-items: center;
 }
 
-.lod-val {
-    width: 32px;
-    font-family: 'Consolas', monospace;
-    font-size: 14px;
-    font-weight: 900;
-    color: #38bdf8;
-    text-align: right;
-    cursor: pointer;
-    transition: color 0.15s ease;
-}
-
-.lod-val.is-manual {
-    color: #f59e0b !important;
-}
-
-/* Mode pill: AUTO (Sky-blue subtle) vs MAN (Amber warning) */
-.lod-mode-badge {
-    font-size: 8.5px;
-    font-weight: 800;
-    padding: 2px 4px;
+.dual-slider-track-bg {
+    position: absolute;
+    left: 0;
+    top: 8px;
+    width: 100%;
+    height: 6px;
+    background: #1e293b;
     border-radius: 3px;
-    letter-spacing: 0.5px;
+    pointer-events: none;
+    z-index: 0;
+}
+
+.dual-slider-track-highlight {
+    position: absolute;
+    top: 8px;
+    height: 6px;
+    background: #0284c7;
+    border-radius: 3px;
+    pointer-events: none;
+    z-index: 1;
+    transition: left 0.04s ease, width 0.04s ease;
+}
+
+.dual-slider-input {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background: transparent !important;
+    background-color: transparent !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    pointer-events: none;
+    outline: none !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.dual-slider-input::-webkit-slider-runnable-track {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    height: 100% !important;
+    -webkit-appearance: none !important;
     cursor: pointer;
-    user-select: none;
-    min-width: 32px;
-    text-align: center;
-    transition: all 0.15s ease;
 }
 
-.badge-mode-auto {
-    background: rgba(2, 132, 199, 0.2);
-    color: #38bdf8;
-    border: 1px solid rgba(2, 132, 199, 0.35);
+.dual-slider-input::-moz-range-track {
+    background: transparent !important;
+    background-color: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    height: 100% !important;
+    cursor: pointer;
 }
 
-.badge-mode-manual {
-    background: rgba(245, 158, 11, 0.25);
-    color: #f59e0b;
-    border: 1px solid rgba(245, 158, 11, 0.6);
+.dual-slider-input::-webkit-slider-thumb {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    width: 15px !important;
+    height: 15px !important;
+    border-radius: 50% !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    border: 2px solid #0284c7 !important;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6) !important;
+    transition: transform 0.1s ease, border-color 0.1s ease !important;
+    opacity: 1 !important;
 }
 
-.badge-mode-manual:hover {
-    background: rgba(245, 158, 11, 0.4);
-    box-shadow: 0 0 6px rgba(245, 158, 11, 0.5);
+.dual-slider-input::-moz-range-thumb {
+    pointer-events: auto !important;
+    cursor: pointer !important;
+    width: 15px !important;
+    height: 15px !important;
+    border-radius: 50% !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    border: 2px solid #0284c7 !important;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6) !important;
+    transition: transform 0.1s ease, border-color 0.1s ease !important;
+    opacity: 1 !important;
 }
 
-/* PERFORMANCE GRID */
+.dual-slider-input:hover::-webkit-slider-thumb {
+    transform: scale(1.18) !important;
+    border-color: #38bdf8 !important;
+}
+
+.dual-slider-input:active::-webkit-slider-thumb {
+    transform: scale(1.22) !important;
+    border-color: #0ea5e9 !important;
+}
+
+.dual-slider-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 9.5px;
+    font-family: 'Consolas', monospace;
+    color: #64748b;
+    padding: 0 2px;
+}
+
+.range-sub {
+    font-family: 'Open Sans', sans-serif;
+    font-size: 9px;
+    color: #475569;
+}
+
+/* PERFORMANCE GRID & TYPOGRAPHY */
 .perf-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -647,9 +876,10 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
     display: flex;
     flex-direction: column;
     align-items: center;
-    background: rgba(10, 14, 22, 0.6);
-    border-radius: 4px;
-    padding: 7px 8px;
+    background: rgba(10, 14, 22, 0.7);
+    border: 1px solid rgba(51, 65, 85, 0.4);
+    border-radius: 5px;
+    padding: 7px 10px 8px 10px;
 }
 
 .metric-label {
@@ -657,34 +887,73 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
     font-weight: 800;
     color: #94a3b8;
     letter-spacing: 0.6px;
-    margin-bottom: 3px;
+    margin-bottom: 2px;
 }
 
 .metric-val-wrap {
     display: flex;
     align-items: baseline;
-    gap: 4px;
+    gap: 6px;
 }
 
 .metric-number {
     font-family: 'Consolas', monospace;
-    font-size: 26px;
+    font-size: 28px;
     font-weight: 900;
     color: #ffffff;
     line-height: 1;
 }
 
 .metric-unit {
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 800;
     color: #94a3b8;
 }
 
-.metric-sub {
-    font-size: 11px;
-    color: #64748b;
-    font-weight: 700;
+/* PROMINENT BASE FPS PILL */
+.metric-base-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(30, 41, 59, 0.85);
+    border: 1px solid rgba(51, 65, 85, 0.7);
+    border-radius: 4px;
+    padding: 2.5px 8px;
+    margin-top: 5px;
+}
+
+.base-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #10b981;
+}
+
+.base-label {
+    font-size: 10px;
+    font-weight: 800;
+    color: #94a3b8;
+    letter-spacing: 0.4px;
+}
+
+.base-val {
+    font-family: 'Consolas', monospace;
+    font-size: 13.5px;
+    font-weight: 900;
+    color: #ffffff;
     margin-left: 2px;
+}
+
+.base-unit {
+    font-size: 10px;
+    font-weight: 700;
+    color: #94a3b8;
+    margin-left: 2px;
+}
+
+.metric-frametime-badge {
+    background: rgba(30, 41, 59, 0.4);
+    border: 1px solid rgba(51, 65, 85, 0.4);
 }
 
 /* SPARKLINE */
@@ -693,9 +962,10 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
     flex-direction: column;
     gap: 4px;
     background: rgba(10, 14, 22, 0.4);
+    border: 1px solid rgba(51, 65, 85, 0.4);
     border-radius: 4px;
     padding: 6px 8px;
-    margin-top: 2px;
+    margin-top: 1px;
 }
 
 .sparkline-top {
@@ -727,31 +997,39 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
     display: block;
 }
 
-/* SYSTEM METRICS ROW */
-.metrics-row {
-    display: flex;
-    justify-content: space-around;
-    align-items: center;
-    padding: 2px 0;
+/* SYSTEM METRICS GRID (GPU, CPU, VRAM, CACHE) */
+.metrics-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px 16px;
+    padding: 2px 4px;
 }
 
 .metric-compact {
     display: flex;
-    gap: 6px;
     align-items: baseline;
+    gap: 5px;
 }
 
 .compact-label {
     color: #94a3b8;
     font-weight: 800;
-    font-size: 12px;
+    font-size: 11.5px;
+    letter-spacing: 0.4px;
 }
 
 .compact-val {
     font-family: 'Consolas', monospace;
     color: #ffffff;
     font-weight: 900;
-    font-size: 14.5px;
+    font-size: 15.5px;
+}
+
+.compact-unit {
+    color: #94a3b8;
+    font-weight: 700;
+    font-size: 11px;
+    margin-left: 2px;
 }
 
 .hidden {
@@ -791,16 +1069,24 @@ checkAutoload();
     let isSmartLodToggling = false;
     let isBlackboxToggling = false;
 
-    // Independent LOD tracking & Débrayage (Selected vs Managed Mode)
-    let currentTlod = 100;
-    let currentOlod = 100;
+    // Dual LOD State
+    let currentTlodFloor = 100;
+    let currentTlodCruise = 200;
+    let currentTlodAlt = 5000;
+    let currentTlodLive = 100;
+
+    let currentOlodFloor = 100;
+    let currentOlodCruise = 100;
+    let currentOlodAlt = 3000;
+    let currentOlodLive = 100;
+
     let tlodIsManual = false;
     let olodIsManual = false;
+    let currentIsVr = false;
 
-    let isUserDraggingLod = false;
-    let lodGraceUntil = 0;
-    let lodDebounceTimer = null;
-    let pendingLodUpdates = { tlod: false, olod: false };
+    let isUserInteracting = false;
+    let userInteractionTimeout = null;
+    let debounceTimer = null;
 
     function getApiBase() {
         return HOSTS[hostIndex % HOSTS.length] + "/api";
@@ -836,56 +1122,111 @@ checkAutoload();
         }
     }
 
+    function updateDualSliderTrack(axis, floor, cruise) {
+        let maxVal = (axis === "tlod") ? 400 : 300;
+        let highlight = document.getElementById(axis + "-track-highlight");
+        if (highlight) {
+            let leftPct = (Math.max(0, Math.min(maxVal, floor)) / maxVal) * 100;
+            let widthPct = (Math.max(0, Math.min(maxVal - floor, cruise - floor)) / maxVal) * 100;
+            highlight.style.left = leftPct + "%";
+            highlight.style.width = widthPct + "%";
+        }
+    }
+
+    function onDualSliderMouseMove(e, axis) {
+        if (e.buttons === 1) return; // Never switch z-index while dragging
+        let container = document.getElementById(axis + "-dual-container");
+        if (!container) return;
+        let rect = container.getBoundingClientRect();
+        if (!rect.width) return;
+        let x = e.clientX - rect.left;
+        let pct = Math.max(0, Math.min(1, x / rect.width));
+        let maxVal = (axis === "tlod") ? 400 : 300;
+        let mouseVal = pct * maxVal;
+
+        let floorInput = document.getElementById(axis + "-floor-range");
+        let cruiseInput = document.getElementById(axis + "-cruise-range");
+        if (!floorInput || !cruiseInput) return;
+
+        let floorVal = parseInt(floorInput.value, 10);
+        let cruiseVal = parseInt(cruiseInput.value, 10);
+
+        let distFloor = Math.abs(mouseVal - floorVal);
+        let distCruise = Math.abs(mouseVal - cruiseVal);
+
+        if (distFloor < distCruise || (distFloor === distCruise && mouseVal <= floorVal)) {
+            floorInput.style.zIndex = "25";
+            cruiseInput.style.zIndex = "10";
+        } else {
+            floorInput.style.zIndex = "10";
+            cruiseInput.style.zIndex = "25";
+        }
+    }
+
     function setAxisUiState(axis, isManual) {
         if (axis === "tlod") {
             tlodIsManual = isManual;
-            let sl = document.getElementById("tlod-slider");
-            let valLbl = document.getElementById("tlod-val-label");
-            let badge = document.getElementById("tlod-mode-badge");
-            if (sl) {
-                if (isManual) sl.classList.add("is-manual");
-                else sl.classList.remove("is-manual");
-            }
-            if (valLbl) {
-                if (isManual) valLbl.classList.add("is-manual");
-                else valLbl.classList.remove("is-manual");
-            }
-            if (badge) {
+            let dot = document.getElementById("tlod-badge-dot");
+            let txt = document.getElementById("tlod-badge-text");
+            if (dot && txt) {
                 if (isManual) {
-                    badge.textContent = "MAN";
-                    badge.className = "lod-mode-badge badge-mode-manual";
-                    badge.title = "Manual override active. Click badge or double-click slider to reset to Auto";
+                    dot.className = "pill-dot dot-amber";
+                    txt.textContent = "MAN";
                 } else {
-                    badge.textContent = "AUTO";
-                    badge.className = "lod-mode-badge badge-mode-auto";
-                    badge.title = "Automatic altitude profile active";
+                    dot.className = "pill-dot dot-green";
+                    txt.textContent = "AUTO";
                 }
             }
         } else if (axis === "olod") {
             olodIsManual = isManual;
-            let sl = document.getElementById("olod-slider");
-            let valLbl = document.getElementById("olod-val-label");
-            let badge = document.getElementById("olod-mode-badge");
-            if (sl) {
-                if (isManual) sl.classList.add("is-manual");
-                else sl.classList.remove("is-manual");
-            }
-            if (valLbl) {
-                if (isManual) valLbl.classList.add("is-manual");
-                else valLbl.classList.remove("is-manual");
-            }
-            if (badge) {
+            let dot = document.getElementById("olod-badge-dot");
+            let txt = document.getElementById("olod-badge-text");
+            if (dot && txt) {
                 if (isManual) {
-                    badge.textContent = "MAN";
-                    badge.className = "lod-mode-badge badge-mode-manual";
-                    badge.title = "Manual override active. Click badge or double-click slider to reset to Auto";
+                    dot.className = "pill-dot dot-amber";
+                    txt.textContent = "MAN";
                 } else {
-                    badge.textContent = "AUTO";
-                    badge.className = "lod-mode-badge badge-mode-auto";
-                    badge.title = "Automatic altitude profile active";
+                    dot.className = "pill-dot dot-green";
+                    txt.textContent = "AUTO";
                 }
             }
         }
+    }
+
+    function markUserInteracting() {
+        isUserInteracting = true;
+        if (userInteractionTimeout) clearTimeout(userInteractionTimeout);
+        userInteractionTimeout = setTimeout(function () {
+            isUserInteracting = false;
+        }, 2500);
+    }
+
+    function queueAxisConfigUpdate(axis) {
+        markUserInteracting();
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(function () {
+            sendAxisConfigUpdate(axis);
+        }, 200);
+    }
+
+    function sendAxisConfigUpdate(axis) {
+        let mode = currentIsVr ? "VR" : "2D";
+        let baseVal = (axis === "tlod") ? currentTlodFloor : currentOlodFloor;
+        let targetVal = (axis === "tlod") ? currentTlodCruise : currentOlodCruise;
+        let altVal = (axis === "tlod") ? currentTlodAlt : currentOlodAlt;
+
+        let url = getApiBase() + "/smart_lod/axis_config";
+        let xhr = new XMLHttpRequest();
+        xhr.open("POST", url, true);
+        xhr.setRequestHeader("Content-Type", "application/json");
+        xhr.timeout = 2500;
+        xhr.send(JSON.stringify({
+            mode: mode,
+            axis: axis,
+            base: baseVal,
+            target: targetVal,
+            altitude: altVal
+        }));
     }
 
     function resetToProfile(axis) {
@@ -896,43 +1237,19 @@ checkAutoload();
         } else {
             setAxisUiState(axis, false);
         }
-        isUserDraggingLod = false;
-        lodGraceUntil = 0;
+        isUserInteracting = false;
 
         let url = getApiBase() + "/smart_lod/reset_to_profile?axis=" + axis + "&_=" + Date.now();
         let xhr = new XMLHttpRequest();
         xhr.open("GET", url, true);
         xhr.timeout = 2000;
         xhr.onload = function () {
-            if (xhr.status >= 200 && xhr.status < 300) {
-                try {
-                    let res = JSON.parse(xhr.responseText);
-                    if (res.current_tlod !== undefined) {
-                        currentTlod = Math.round(Number(res.current_tlod));
-                        let sl = document.getElementById("tlod-slider");
-                        let lbl = document.getElementById("tlod-val-label");
-                        if (sl) sl.value = currentTlod;
-                        if (lbl) lbl.textContent = currentTlod;
-                    }
-                    if (res.current_olod !== undefined) {
-                        currentOlod = Math.round(Number(res.current_olod));
-                        let sl = document.getElementById("olod-slider");
-                        let lbl = document.getElementById("olod-val-label");
-                        if (sl) sl.value = currentOlod;
-                        if (lbl) lbl.textContent = currentOlod;
-                    }
-                } catch(e) {}
-            }
             pollTelemetry();
         };
         xhr.onerror = function () {
             pollTelemetry();
         };
         xhr.send();
-    }
-
-    function resetAxisToAuto(axis) {
-        resetToProfile(axis);
     }
 
     function drawSparkline() {
@@ -1017,26 +1334,66 @@ checkAutoload();
     function updateTelemetryUI(data) {
         if (!data) return;
 
-        // 1. SMART LOD
+        currentIsVr = !!data.is_vr;
+
+        // 1. SMART LOD REGULATION
         let lod = data.smart_lod || {};
         let lodActive = (lod.active !== undefined) ? !!lod.active : (!!data.smart_lod_running && !!data.smart_lod_enabled);
+
         let sTlod = (lod.current_tlod !== undefined && lod.current_tlod !== null) ? lod.current_tlod : (data.smart_lod_tlod !== undefined ? data.smart_lod_tlod : 100);
         let sOlod = (lod.current_olod !== undefined && lod.current_olod !== null) ? lod.current_olod : (data.smart_lod_olod !== undefined ? data.smart_lod_olod : 100);
 
-        let now = Date.now();
-        if (!isUserDraggingLod && now > lodGraceUntil) {
-            currentTlod = Math.round(Number(sTlod) || 100);
-            currentOlod = Math.round(Number(sOlod) || 100);
+        currentTlodLive = Math.round(Number(sTlod) || 100);
+        currentOlodLive = Math.round(Number(sOlod) || 100);
 
-            let slTlod = document.getElementById("tlod-slider");
-            if (slTlod) slTlod.value = currentTlod;
-            let lblTlod = document.getElementById("tlod-val-label");
-            if (lblTlod) lblTlod.textContent = currentTlod;
+        let liveTlodEl = document.getElementById("tlod-live-val");
+        if (liveTlodEl) liveTlodEl.textContent = currentTlodLive;
+        let liveOlodEl = document.getElementById("olod-live-val");
+        if (liveOlodEl) liveOlodEl.textContent = currentOlodLive;
 
-            let slOlod = document.getElementById("olod-slider");
-            if (slOlod) slOlod.value = currentOlod;
-            let lblOlod = document.getElementById("olod-val-label");
-            if (lblOlod) lblOlod.textContent = currentOlod;
+        if (!isUserInteracting) {
+            let tlodFloorVal = lod.tlod_base !== undefined ? lod.tlod_base : 100;
+            let tlodCruiseVal = lod.tlod_target !== undefined ? lod.tlod_target : 200;
+            let tlodAltVal = lod.tlod_altitude !== undefined ? lod.tlod_altitude : 5000;
+
+            let olodFloorVal = lod.olod_base !== undefined ? lod.olod_base : 100;
+            let olodCruiseVal = lod.olod_target !== undefined ? lod.olod_target : 100;
+            let olodAltVal = lod.olod_altitude !== undefined ? lod.olod_altitude : 3000;
+
+            currentTlodFloor = tlodFloorVal;
+            currentTlodCruise = tlodCruiseVal;
+            currentTlodAlt = tlodAltVal;
+
+            currentOlodFloor = olodFloorVal;
+            currentOlodCruise = olodCruiseVal;
+            currentOlodAlt = olodAltVal;
+
+            // Update DOM inputs and readouts
+            let tFloorRange = document.getElementById("tlod-floor-range");
+            let tCruiseRange = document.getElementById("tlod-cruise-range");
+            let tAltInput = document.getElementById("tlod-alt-input");
+            let tFloorVal = document.getElementById("tlod-floor-val");
+            let tCruiseVal = document.getElementById("tlod-cruise-val");
+
+            if (tFloorRange) tFloorRange.value = currentTlodFloor;
+            if (tCruiseRange) tCruiseRange.value = currentTlodCruise;
+            if (tAltInput && document.activeElement !== tAltInput) tAltInput.value = currentTlodAlt;
+            if (tFloorVal) tFloorVal.textContent = currentTlodFloor;
+            if (tCruiseVal) tCruiseVal.textContent = currentTlodCruise;
+            updateDualSliderTrack("tlod", currentTlodFloor, currentTlodCruise);
+
+            let oFloorRange = document.getElementById("olod-floor-range");
+            let oCruiseRange = document.getElementById("olod-cruise-range");
+            let oAltInput = document.getElementById("olod-alt-input");
+            let oFloorVal = document.getElementById("olod-floor-val");
+            let oCruiseVal = document.getElementById("olod-cruise-val");
+
+            if (oFloorRange) oFloorRange.value = currentOlodFloor;
+            if (oCruiseRange) oCruiseRange.value = currentOlodCruise;
+            if (oAltInput && document.activeElement !== oAltInput) oAltInput.value = currentOlodAlt;
+            if (oFloorVal) oFloorVal.textContent = currentOlodFloor;
+            if (oCruiseVal) oCruiseVal.textContent = currentOlodCruise;
+            updateDualSliderTrack("olod", currentOlodFloor, currentOlodCruise);
 
             let tlodManualRemote = !!(lod.tlod_manual !== undefined ? lod.tlod_manual : data.smart_lod_tlod_manual);
             let olodManualRemote = !!(lod.olod_manual !== undefined ? lod.olod_manual : data.smart_lod_olod_manual);
@@ -1048,15 +1405,15 @@ checkAutoload();
         let lblLod = document.getElementById("smart-lod-btn-label");
         if (btnLod && !isSmartLodToggling) {
             if (lodActive) {
-                btnLod.className = "msfs-btn btn-active-green";
+                btnLod.className = "msfs-btn-inline btn-active-green";
                 if (lblLod) lblLod.textContent = "ACTIVE";
             } else {
-                btnLod.className = "msfs-btn btn-primary";
+                btnLod.className = "msfs-btn-inline btn-primary";
                 if (lblLod) lblLod.textContent = "ENGAGE";
             }
         }
 
-        // 2. LIVE PERFORMANCE (ALWAYS LIVE MONITORED)
+        // 2. LIVE PERFORMANCE (Enlarged typography with spaced units)
         let perf = data.perf || {};
         let dispFps = (perf.displayed_fps !== undefined && perf.displayed_fps !== null) ? perf.displayed_fps : (data.displayed_fps || 0);
         let baseFps = (perf.fps !== undefined && perf.fps !== null) ? perf.fps : (data.base_fps || 0);
@@ -1067,22 +1424,23 @@ checkAutoload();
         if (elFps) elFps.textContent = (dispFps && dispFps > 0) ? Math.round(dispFps) : "--";
 
         let elBase = document.getElementById("live-fps-base");
-        if (elBase) elBase.textContent = (baseFps && baseFps > 0) ? "(" + Math.round(baseFps) + " base)" : "";
+        if (elBase) elBase.textContent = (baseFps && baseFps > 0) ? Math.round(baseFps) : "--";
 
         let elMt = document.getElementById("live-mt-val");
         if (elMt) elMt.textContent = (mtMs && mtMs > 0) ? Number(mtMs).toFixed(1) : "--";
 
-        let elPacing = document.getElementById("live-pacing-status");
-        if (elPacing) {
+        let elPacingDot = document.getElementById("pacing-badge-dot");
+        let elPacingTxt = document.getElementById("pacing-badge-text");
+        if (elPacingTxt && elPacingDot) {
             if (pacing === "OPTIMAL" || pacing === "FLUIDE") {
-                elPacing.textContent = "OPTIMAL";
-                elPacing.className = "badge-tag tag-green";
+                elPacingTxt.textContent = "OPTIMAL";
+                elPacingDot.className = "pill-dot dot-green";
             } else if (pacing === "ACCEPTABLE" || pacing === "CHARGE" || pacing === "CHARGÉ") {
-                elPacing.textContent = "ACCEPTABLE";
-                elPacing.className = "badge-tag tag-amber";
+                elPacingTxt.textContent = "ACCEPTABLE";
+                elPacingDot.className = "pill-dot dot-amber";
             } else {
-                elPacing.textContent = "HEAVY";
-                elPacing.className = "badge-tag tag-red";
+                elPacingTxt.textContent = "HEAVY";
+                elPacingDot.className = "pill-dot dot-red";
             }
         }
 
@@ -1100,7 +1458,7 @@ checkAutoload();
             }
         }
 
-        // 4. SPARKLINE TREND GRAPH (MONITORS ONLY WHILE RECORDING!)
+        // 4. SPARKLINE TREND GRAPH (MONITORS DURING RECORDING)
         if (isRec && !wasRecording) {
             fpsHistory = [];
         }
@@ -1114,22 +1472,34 @@ checkAutoload();
             drawSparkline();
         }
 
-        // 5. SYSTEM METRICS
+        // 5. SYSTEM METRICS (GPU, CPU, VRAM, CACHE with spaced units)
+        let elGpu = document.getElementById("live-gpu-val");
+        if (elGpu) {
+            let gpuPct = data.gpu_util_pct !== undefined ? data.gpu_util_pct : 0;
+            elGpu.textContent = (gpuPct && gpuPct > 0) ? Math.round(gpuPct) : "--";
+        }
+
+        let elCpu = document.getElementById("live-cpu-val");
+        if (elCpu) {
+            let cpuPct = data.cpu_pct !== undefined ? data.cpu_pct : 0;
+            elCpu.textContent = (cpuPct && cpuPct > 0) ? Math.round(cpuPct) : "--";
+        }
+
         let elVram = document.getElementById("live-vram-val");
         if (elVram) {
             let vramUsed = data.vram_used_gb !== undefined ? data.vram_used_gb : "--";
             let vramTot = data.vram_total_gb !== undefined ? data.vram_total_gb : "--";
             if (vramUsed !== "--" && vramTot !== "--") {
-                elVram.textContent = vramUsed + " / " + vramTot + " GB";
+                elVram.textContent = vramUsed + " / " + vramTot;
             } else {
-                elVram.textContent = "-- GB";
+                elVram.textContent = "--";
             }
         }
 
         let elCache = document.getElementById("live-cache-val");
         if (elCache) {
             let cacheVal = data.rolling_cache_gb !== undefined ? data.rolling_cache_gb : 0.0;
-            elCache.textContent = cacheVal + " MB/s";
+            elCache.textContent = Number(cacheVal).toFixed(1);
         }
     }
 
@@ -1190,43 +1560,6 @@ checkAutoload();
         }
     }
 
-    function queueLodAxisUpdate(axis) {
-        pendingLodUpdates[axis] = true;
-        isUserDraggingLod = true;
-        lodGraceUntil = Date.now() + 2500;
-        if (lodDebounceTimer) clearTimeout(lodDebounceTimer);
-        lodDebounceTimer = setTimeout(sendPendingLodUpdates, 150);
-    }
-
-    function sendPendingLodUpdates() {
-        let params = [];
-        if (pendingLodUpdates.tlod) {
-            params.push("tlod=" + currentTlod);
-        }
-        if (pendingLodUpdates.olod) {
-            params.push("olod=" + currentOlod);
-        }
-        pendingLodUpdates = { tlod: false, olod: false };
-        if (params.length === 0) return;
-
-        let url = getApiBase() + "/smart_lod/set_lod?" + params.join("&") + "&_=" + Date.now();
-        let xhr = new XMLHttpRequest();
-        xhr.open("GET", url, true);
-        xhr.timeout = 2000;
-        xhr.onload = function () {
-            lodGraceUntil = Date.now() + 1500;
-            setTimeout(function () {
-                isUserDraggingLod = false;
-            }, 1500);
-        };
-        xhr.onerror = function () {
-            setTimeout(function () {
-                isUserDraggingLod = false;
-            }, 1500);
-        };
-        xhr.send();
-    }
-
     function onSmartLodClick() {
         isSmartLodToggling = true;
         let url = getApiBase() + "/smart_lod/toggle";
@@ -1268,6 +1601,108 @@ checkAutoload();
         xhr.send();
     }
 
+    function setupDualSliderAxis(axis) {
+        let maxVal = (axis === "tlod") ? 400 : 300;
+        let container = document.getElementById(axis + "-dual-container");
+        let floorRange = document.getElementById(axis + "-floor-range");
+        let cruiseRange = document.getElementById(axis + "-cruise-range");
+        let altInput = document.getElementById(axis + "-alt-input");
+        let floorValLbl = document.getElementById(axis + "-floor-val");
+        let cruiseValLbl = document.getElementById(axis + "-cruise-val");
+        let badge = document.getElementById(axis + "-mode-badge");
+        let nameLbl = document.getElementById(axis + "-name-label");
+        let card = document.getElementById(axis + "-card");
+
+        if (container) {
+            container.addEventListener("mousemove", function (e) {
+                onDualSliderMouseMove(e, axis);
+            });
+            container.addEventListener("dblclick", function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                resetToProfile(axis);
+            });
+        }
+
+        if (floorRange) {
+            floorRange.addEventListener("input", function () {
+                let fVal = parseInt(floorRange.value, 10);
+                let cVal = parseInt(cruiseRange.value, 10);
+                if (fVal > cVal) {
+                    fVal = cVal;
+                    floorRange.value = fVal;
+                }
+                if (axis === "tlod") currentTlodFloor = fVal;
+                else currentOlodFloor = fVal;
+
+                if (floorValLbl) floorValLbl.textContent = fVal;
+                updateDualSliderTrack(axis, fVal, cVal);
+                setAxisUiState(axis, true);
+                queueAxisConfigUpdate(axis);
+            });
+            floorRange.addEventListener("dblclick", function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                resetToProfile(axis);
+            });
+        }
+
+        if (cruiseRange) {
+            cruiseRange.addEventListener("input", function () {
+                let fVal = parseInt(floorRange.value, 10);
+                let cVal = parseInt(cruiseRange.value, 10);
+                if (cVal < fVal) {
+                    cVal = fVal;
+                    cruiseRange.value = cVal;
+                }
+                if (axis === "tlod") currentTlodCruise = cVal;
+                else currentOlodCruise = cVal;
+
+                if (cruiseValLbl) cruiseValLbl.textContent = cVal;
+                updateDualSliderTrack(axis, fVal, cVal);
+                setAxisUiState(axis, true);
+                queueAxisConfigUpdate(axis);
+            });
+            cruiseRange.addEventListener("dblclick", function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                resetToProfile(axis);
+            });
+        }
+
+        if (altInput) {
+            altInput.addEventListener("change", function () {
+                let num = Math.max(500, Math.min(45000, parseInt(altInput.value, 10) || 5000));
+                altInput.value = num;
+                if (axis === "tlod") currentTlodAlt = num;
+                else currentOlodAlt = num;
+                queueAxisConfigUpdate(axis);
+            });
+        }
+
+        if (badge) {
+            badge.addEventListener("click", function () {
+                resetToProfile(axis);
+            });
+        }
+
+        if (nameLbl) {
+            nameLbl.addEventListener("dblclick", function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                resetToProfile(axis);
+            });
+        }
+
+        if (card) {
+            card.addEventListener("dblclick", function (e) {
+                if (e.target.tagName !== 'INPUT') {
+                    resetToProfile(axis);
+                }
+            });
+        }
+    }
+
     function init() {
         let discView = document.getElementById("disconnected-view");
         let connView = document.getElementById("connected-view");
@@ -1297,125 +1732,8 @@ checkAutoload();
             btnRec.addEventListener("click", onBlackboxClick);
         }
 
-        // Wire TLOD Controls
-        let slTlod = document.getElementById("tlod-slider");
-        let lblTlod = document.getElementById("tlod-val-label");
-        let nameTlod = document.getElementById("tlod-name-label");
-        let badgeTlod = document.getElementById("tlod-mode-badge");
-
-        if (slTlod) {
-            slTlod.addEventListener("input", function () {
-                currentTlod = parseInt(slTlod.value, 10) || 100;
-                if (lblTlod) lblTlod.textContent = currentTlod;
-                setAxisUiState("tlod", true);
-                queueLodAxisUpdate("tlod");
-            });
-            slTlod.addEventListener("dblclick", function (e) {
-                e.preventDefault();
-                e.stopPropagation();
-                resetAxisToAuto("tlod");
-            });
-        }
-        if (lblTlod) {
-            lblTlod.addEventListener("dblclick", function (e) {
-                e.preventDefault();
-                e.stopPropagation();
-                resetAxisToAuto("tlod");
-            });
-        }
-        if (nameTlod) {
-            nameTlod.addEventListener("dblclick", function (e) {
-                e.preventDefault();
-                e.stopPropagation();
-                resetAxisToAuto("tlod");
-            });
-        }
-        if (badgeTlod) {
-            badgeTlod.addEventListener("click", function () {
-                if (tlodIsManual) resetAxisToAuto("tlod");
-            });
-        }
-
-        let btnTlodMinus = document.getElementById("tlod-minus-btn");
-        if (btnTlodMinus) {
-            btnTlodMinus.addEventListener("click", function () {
-                currentTlod = Math.max(10, currentTlod - 10);
-                if (slTlod) slTlod.value = currentTlod;
-                if (lblTlod) lblTlod.textContent = currentTlod;
-                setAxisUiState("tlod", true);
-                queueLodAxisUpdate("tlod");
-            });
-        }
-        let btnTlodPlus = document.getElementById("tlod-plus-btn");
-        if (btnTlodPlus) {
-            btnTlodPlus.addEventListener("click", function () {
-                currentTlod = Math.min(400, currentTlod + 10);
-                if (slTlod) slTlod.value = currentTlod;
-                if (lblTlod) lblTlod.textContent = currentTlod;
-                setAxisUiState("tlod", true);
-                queueLodAxisUpdate("tlod");
-            });
-        }
-
-        // Wire OLOD Controls
-        let slOlod = document.getElementById("olod-slider");
-        let lblOlod = document.getElementById("olod-val-label");
-        let nameOlod = document.getElementById("olod-name-label");
-        let badgeOlod = document.getElementById("olod-mode-badge");
-
-        if (slOlod) {
-            slOlod.addEventListener("input", function () {
-                currentOlod = parseInt(slOlod.value, 10) || 100;
-                if (lblOlod) lblOlod.textContent = currentOlod;
-                setAxisUiState("olod", true);
-                queueLodAxisUpdate("olod");
-            });
-            slOlod.addEventListener("dblclick", function (e) {
-                e.preventDefault();
-                e.stopPropagation();
-                resetAxisToAuto("olod");
-            });
-        }
-        if (lblOlod) {
-            lblOlod.addEventListener("dblclick", function (e) {
-                e.preventDefault();
-                e.stopPropagation();
-                resetAxisToAuto("olod");
-            });
-        }
-        if (nameOlod) {
-            nameOlod.addEventListener("dblclick", function (e) {
-                e.preventDefault();
-                e.stopPropagation();
-                resetAxisToAuto("olod");
-            });
-        }
-        if (badgeOlod) {
-            badgeOlod.addEventListener("click", function () {
-                if (olodIsManual) resetAxisToAuto("olod");
-            });
-        }
-
-        let btnOlodMinus = document.getElementById("olod-minus-btn");
-        if (btnOlodMinus) {
-            btnOlodMinus.addEventListener("click", function () {
-                currentOlod = Math.max(10, currentOlod - 10);
-                if (slOlod) slOlod.value = currentOlod;
-                if (lblOlod) lblOlod.textContent = currentOlod;
-                setAxisUiState("olod", true);
-                queueLodAxisUpdate("olod");
-            });
-        }
-        let btnOlodPlus = document.getElementById("olod-plus-btn");
-        if (btnOlodPlus) {
-            btnOlodPlus.addEventListener("click", function () {
-                currentOlod = Math.min(400, currentOlod + 10);
-                if (slOlod) slOlod.value = currentOlod;
-                if (lblOlod) lblOlod.textContent = currentOlod;
-                setAxisUiState("olod", true);
-                queueLodAxisUpdate("olod");
-            });
-        }
+        setupDualSliderAxis("tlod");
+        setupDualSliderAxis("olod");
 
         pollTelemetry();
         setInterval(pollTelemetry, POLL_INTERVAL_MS);
