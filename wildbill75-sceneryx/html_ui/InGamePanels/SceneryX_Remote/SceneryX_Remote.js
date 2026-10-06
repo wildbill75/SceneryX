@@ -125,13 +125,18 @@ checkAutoload();
         }
     }
 
-    function resetAxisToAuto(axis) {
-        // Optimistic UI state reset
-        setAxisUiState(axis, false);
+    function resetToProfile(axis) {
+        if (!axis) axis = "all";
+        if (axis === "all") {
+            setAxisUiState("tlod", false);
+            setAxisUiState("olod", false);
+        } else {
+            setAxisUiState(axis, false);
+        }
         isUserDraggingLod = false;
         lodGraceUntil = 0;
 
-        let url = getApiBase() + "/smart_lod/reset_override?axis=" + axis + "&_=" + Date.now();
+        let url = getApiBase() + "/smart_lod/reset_to_profile?axis=" + axis + "&_=" + Date.now();
         let xhr = new XMLHttpRequest();
         xhr.open("GET", url, true);
         xhr.timeout = 2000;
@@ -161,6 +166,10 @@ checkAutoload();
             pollTelemetry();
         };
         xhr.send();
+    }
+
+    function resetAxisToAuto(axis) {
+        resetToProfile(axis);
     }
 
     function drawSparkline() {
@@ -503,6 +512,17 @@ checkAutoload();
             setTimeout(init, 100);
             return;
         }
+
+        connView.addEventListener("dblclick", function (e) {
+            if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON') {
+                resetToProfile("all");
+            }
+        });
+        document.body.addEventListener("dblclick", function (e) {
+            if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'BUTTON') {
+                resetToProfile("all");
+            }
+        });
 
         let btnLod = document.getElementById("smart-lod-toggle-btn");
         if (btnLod) {

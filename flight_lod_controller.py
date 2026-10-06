@@ -33,6 +33,23 @@ DEFAULT_CONFIG = {
     "mode": "IFR",               # "IFR" (Airliner) ou "VFR" (GA)
     "source": "native",          # "native" (Smart LOD) ou "external_autofps" ou "manual"
     "auto_kill_autofps": False,  # Fermer automatiquement AutoFPS au démarrage
+    "external_autofps": False,   # Si True, délègue totalement à MSFS_AutoFPS.exe
+    
+    # 2D Independent LOD Axis
+    "2d_tlod_active": False,
+    "2d_tlod_target": 200,
+    "2d_tlod_altitude": 5000,
+    "2d_olod_active": False,
+    "2d_olod_target": 100,
+    "2d_olod_altitude": 3000,
+    
+    # VR Independent LOD Axis
+    "vr_tlod_active": False,
+    "vr_tlod_target": 150,
+    "vr_tlod_altitude": 4000,
+    "vr_olod_active": False,
+    "vr_olod_target": 80,
+    "vr_olod_altitude": 2500,
     
     # Paramètres IFR
     "ifr_tlod_ground": 100,      # TLOD au sol / approche (Min)
@@ -108,54 +125,144 @@ class SmartLodController:
                 self.trigger_events.clear()
             return events
 
-    def reset_manual_override(self, axis: str = "all") -> Dict[str, Any]:
-        """Réengage les limitations d'altitude et l'automatisation en supprimant le débrayage manuel.
-        Si Smart LOD est inactif, recalibre immédiatement les curseurs sur les valeurs du profil actif."""
+    def reset_to_active_profile(self, axis: str = "all") -> Dict[str, Any]:
+        """
+        Recalibre immédiatement les curseurs et la mémoire MSFS sur les valeurs nominales du profil actif,
+        en supprimant tout débrayage manuel ou temporaire.
+        """
+        nom_tlod = 100.0
+        nom_olod = 100.0
+        profile_name = "Active Profile"
+        try:
+            import flight_rig_optimizer
+            snap = flight_rig_optimizer.get_active_profile_snapshot()
+            profile_name = snap.get("name", "Active Profile")
+            hl = snap.get("highlights", {})
+            if "Terrain LOD (TLOD)" in hl:
+                val_str = str(hl["Terrain LOD (TLOD)"]).replace("%", "").strip()
+                try:
+                    nom_tlod = float(val_str)
+                except ValueError:
+                    pass
+            if "Objects LOD (OLOD)" in hl:
+                val_str = str(hl["Objects LOD (OLOD)"]).replace("%", "").strip()
+                try:
+                    nom_olod = float(val_str)
+                except ValueError:
+                    pass
+        except Exception as e:
+            print(f"[SmartLOD] Erreur lecture snapshot profil actif: {e}")
+
         with self._lock:
             if axis in ("tlod", "all"):
                 self.manual_tlod = None
+                self.current_tlod_setpoint = float(nom_tlod)
             if axis in ("olod", "all"):
                 self.manual_olod = None
+                self.current_olod_setpoint = float(nom_olod)
 
-        if self.is_running:
+        if not self.engine.is_attached:
+            self.engine.attach()
+
+        if self.engine.is_attached and not self.engine.safe_read_only:
+            if axis in ("tlod", "all"):
+                self.engine.write_tlod(nom_tlod)
+            if axis in ("olod", "all"):
+                self.engine.write_olod(nom_olod)
+
+        print(f"[SmartLOD] Reset to active profile '{profile_name}': TLOD={nom_tlod}, OLOD={nom_olod}")
+        return {
+            "success": True,
+            "axis": axis,
+            "reset_to_profile": True,
+            "profile_name": profile_name,
+            "manual_tlod": False,
+            "manual_olod": False,
+            "current_tlod": round(self.current_tlod_setpoint, 1),
+            "current_olod": round(self.current_olod_setpoint, 1)
+        }
+
+    def reset_manual_override(self, axis: str = "all") -> Dict[str, Any]:
+        """Réengage les limitations d'altitude et l'automatisation en réinitialisant sur le profil actif."""
+        return self.reset_to_active_profile(axis)
+
+    def get_axis_state(self, mode: str = "2D") -> Dict[str, Any]:
+        with self._lock:
+            pfx = "vr" if str(mode).upper() == "VR" else "2d"
+            return {
+                "mode": pfx.upper(),
+                "external_autofps": bool(self.config.get("external_autofps", False)),
+                "tlod_active": bool(self.config.get(f"{pfx}_tlod_active", False)),
+                "tlod_target": int(self.config.get(f"{pfx}_tlod_target", 200 if pfx == "2d" else 150)),
+                "tlod_altitude": int(self.config.get(f"{pfx}_tlod_altitude", 5000 if pfx == "2d" else 4000)),
+                "olod_active": bool(self.config.get(f"{pfx}_olod_active", False)),
+                "olod_target": int(self.config.get(f"{pfx}_olod_target", 100 if pfx == "2d" else 80)),
+                "olod_altitude": int(self.config.get(f"{pfx}_olod_altitude", 3000 if pfx == "2d" else 2500)),
+            }
+
+    def set_axis_state(self, mode: str, axis: str, enabled: Optional[bool] = None, target: Optional[int] = None, altitude: Optional[int] = None) -> Dict[str, Any]:
+        with self._lock:
+            pfx = "vr" if str(mode).upper() == "VR" else "2d"
+            ax = "olod" if "olod" in str(axis).lower() else "tlod"
+            
+            if enabled is not None:
+                self.config[f"{pfx}_{ax}_active"] = bool(enabled)
+            if target is not None:
+                max_v = 400 if ax == "tlod" else 300
+                self.config[f"{pfx}_{ax}_target"] = max(0, min(int(target), max_v))
+            if altitude is not None:
+                self.config[f"{pfx}_{ax}_altitude"] = max(0, int(altitude))
+                
+            any_active = any([
+                self.config.get("2d_tlod_active", False),
+                self.config.get("2d_olod_active", False),
+                self.config.get("vr_tlod_active", False),
+                self.config.get("vr_olod_active", False),
+            ])
+            self.config["enabled"] = any_active and not self.config.get("external_autofps", False)
+            try:
+                with open(CONFIG_FILE_PATH, "w", encoding="utf-8") as f:
+                    json.dump(self.config, f, indent=4)
+            except Exception as e:
+                print(f"[SmartLOD] Erreur sauvegarde config: {e}")
+                
+        if self.config.get("enabled"):
+            self.start()
             try:
                 self._tick()
             except Exception:
                 pass
         else:
-            # Smart LOD est inactif : réinitialiser sur le profil graphique actif
-            try:
-                import flight_rig_optimizer
-                snap = flight_rig_optimizer.get_active_profile_snapshot()
-                hl = snap.get("highlights", {})
+            if not any_active:
+                self.stop()
                 
-                # Récupérer TLOD et OLOD nominaux
-                nom_tlod = float(hl.get("Terrain LOD (TLOD)", 100))
-                nom_olod = float(hl.get("Objects LOD (OLOD)", 100))
+        return self.get_axis_state(mode)
 
-                if not self.engine.is_attached:
-                    self.engine.attach()
-
-                if axis in ("tlod", "all"):
-                    self.current_tlod_setpoint = nom_tlod
-                    if self.engine.is_attached and not self.engine.safe_read_only:
-                        self.engine.write_tlod(nom_tlod)
-
-                if axis in ("olod", "all"):
-                    self.current_olod_setpoint = nom_olod
-                    if self.engine.is_attached and not self.engine.safe_read_only:
-                        self.engine.write_olod(nom_olod)
+    def set_external_autofps(self, enabled: bool) -> bool:
+        with self._lock:
+            self.config["external_autofps"] = bool(enabled)
+            if enabled:
+                self.config["enabled"] = False
+                self.config["source"] = "external_autofps"
+            else:
+                self.config["source"] = "native"
+                any_active = any([
+                    self.config.get("2d_tlod_active", False),
+                    self.config.get("2d_olod_active", False),
+                    self.config.get("vr_tlod_active", False),
+                    self.config.get("vr_olod_active", False),
+                ])
+                self.config["enabled"] = any_active
+            try:
+                with open(CONFIG_FILE_PATH, "w", encoding="utf-8") as f:
+                    json.dump(self.config, f, indent=4)
             except Exception as e:
-                print(f"[SmartLOD] Erreur recalage profil actif: {e}")
-
-        return {
-            "success": True,
-            "axis": axis,
-            "manual_tlod": self.manual_tlod is not None,
-            "manual_olod": self.manual_olod is not None,
-            "current_tlod": round(self.current_tlod_setpoint, 1),
-            "current_olod": round(self.current_olod_setpoint, 1)
-        }
+                print(f"[SmartLOD] Erreur sauvegarde config: {e}")
+        if enabled:
+            self.stop()
+        elif self.config.get("enabled"):
+            self.start()
+        return True
 
     # ================= CONFIG PERSISTENCE =================
 
@@ -261,8 +368,8 @@ class SmartLodController:
             time.sleep(1.0)
 
     def _tick(self):
-        if not self.config.get("enabled", False):
-            self.status_message = "Désactivé"
+        if not self.config.get("enabled", False) or self.config.get("external_autofps", False):
+            self.status_message = "Handled by External AutoFPS" if self.config.get("external_autofps", False) else "Désactivé"
             return
 
         # 1. Vérifier la présence d'AutoFPS externe
@@ -285,127 +392,87 @@ class SmartLodController:
             self.status_message = "Mode Sécurité : Read-Only (écriture désactivée)"
             return
 
-        # 3. Récupérer la télémétrie de vol depuis flight_perf_tracker
+        # 3. Mode et activation des axes indépendants
+        is_vr = self.engine.is_vr_active() if self.engine.is_attached else False
+        pfx = "vr" if is_vr else "2d"
+        tlod_is_active = bool(self.config.get(f"{pfx}_tlod_active", False))
+        olod_is_active = bool(self.config.get(f"{pfx}_olod_active", False))
+
+        if not tlod_is_active and not olod_is_active:
+            self.status_message = f"Standby (No {pfx.upper()} LOD axis active)"
+            return
+
+        # Récupérer la télémétrie de vol depuis flight_perf_tracker
         telemetry = self._get_live_flight_telemetry()
         agl = telemetry.get("agl_ft", 0) or 0
         on_ground = telemetry.get("on_ground", False)
         base_fps = telemetry.get("base_fps", 0) or telemetry.get("displayed_fps", 0) or 0
-        
-        mode = self.config.get("mode", "IFR")
-        is_vr = self.engine.is_vr_active() if self.engine.is_attached else False
-        mode_key = "vr" if (is_vr and mode.upper() == "VR") else mode.lower()
 
-        tlod_ground = self.config.get(f"{mode_key}_tlod_ground", 100)
-        tlod_cruise = self.config.get(f"{mode_key}_tlod_cruise", 250)
-        alt_trans = self.config.get(f"{mode_key}_alt_transition", 5000)
-
-        # En VR, si vr_target_fps est configuré, adapter la cible automatiquement pour respecter la cadence VR (ex: 36 FPS @ 72Hz)
-        if is_vr and "vr_target_fps" in self.config:
-            target_fps = self.config.get("vr_target_fps", 36)
-        else:
-            target_fps = self.config.get(f"{mode_key}_target_fps", 40)
-
+        target_fps = self.config.get("vr_target_fps", 36) if is_vr else self.config.get("2d_target_fps", self.config.get("ifr_target_fps", 40))
         deadband = self.config.get("deadband_fps", 2)
         step = self.config.get("step_size", 5)
 
-        # 4-6. Gestion du Terrain LOD (TLOD)
-        if getattr(self, "manual_tlod", None) is not None:
-            # Mode Débrayé / Manual Override : Consigne manuelle stricte (contourne les profils d'altitude)
-            self.current_tlod_setpoint = float(self.manual_tlod)
-        else:
-            # Mode Automatique : Calcul de la consigne d'altitude (Interpolation Sol -> Croisière)
-            if on_ground or agl < 500:
-                altitude_target_tlod = float(tlod_ground)
-            elif agl >= alt_trans:
-                altitude_target_tlod = float(tlod_cruise)
+        ok_tlod = True
+        ok_olod = True
+
+        # 4. Gestion indépendante du Terrain LOD (TLOD) si activé
+        if tlod_is_active:
+            tlod_cruise = float(self.config.get(f"{pfx}_tlod_target", 200 if pfx == "2d" else 150))
+            alt_trans = float(self.config.get(f"{pfx}_tlod_altitude", 5000 if pfx == "2d" else 4000))
+            tlod_ground = min(tlod_cruise, 100.0) if tlod_cruise >= 100 else max(10.0, tlod_cruise * 0.7)
+
+            if getattr(self, "manual_tlod", None) is not None:
+                self.current_tlod_setpoint = float(self.manual_tlod)
             else:
-                # Interpolation linéaire douce
-                ratio = max(0.0, min(1.0, (agl - 500) / max(1, alt_trans - 500)))
-                altitude_target_tlod = tlod_ground + ratio * (tlod_cruise - tlod_ground)
-
-            # 5. Ajustement selon le framerate réel (si en vol et FPS disponible)
-            target_tlod = altitude_target_tlod
-            if base_fps > 0 and agl >= 1000:
-                if base_fps < (target_fps - deadband):
-                    # Sous-performance : Baisse du TLOD
-                    deficit = (target_fps - base_fps)
-                    target_tlod = max(tlod_ground, self.current_tlod_setpoint - (step * (deficit / 3.0)))
-                elif base_fps > (target_fps + deadband):
-                    # Marge de performance : Remontée progressive
-                    target_tlod = min(altitude_target_tlod, self.current_tlod_setpoint + step)
-
-            # 6. Lissage progressif anti-saccades (Max step par cycle)
-            delta = target_tlod - self.current_tlod_setpoint
-            if abs(delta) > step:
-                delta = step if delta > 0 else -step
-            self.current_tlod_setpoint += delta
-            self.current_tlod_setpoint = max(float(tlod_ground), min(float(tlod_cruise), self.current_tlod_setpoint))
-
-        # 7. Écriture en mémoire
-        ok = self.engine.write_tlod(self.current_tlod_setpoint)
-        
-        # 8. Gestion de l'Object LOD (OLOD)
-        if getattr(self, "manual_olod", None) is not None:
-            # Mode Débrayé / Manual Override : Consigne manuelle stricte
-            self.current_olod_setpoint = float(self.manual_olod)
-            self.engine.write_olod(self.current_olod_setpoint)
-        else:
-            # Mode Automatique : Interpolation selon profil d'altitude
-            olod_ground = self.config.get(f"{mode.lower()}_olod_ground", 100)
-            olod_cruise = self.config.get(f"{mode.lower()}_olod_cruise", 50)
-            if agl >= alt_trans:
-                target_olod = float(olod_cruise)
-            else:
-                ratio = max(0.0, min(1.0, agl / max(1, alt_trans)))
-                target_olod = olod_ground - ratio * (olod_ground - olod_cruise)
-            self.current_olod_setpoint = target_olod
-            self.engine.write_olod(target_olod)
-
-        if ok:
-            # Enregistrement des déclenchements (Triggers) pour feedback visuel et télémétrie
-            current_phase = "ground" if (on_ground or agl < 500) else ("cruise" if agl >= alt_trans else "climb_descent")
-            phase_changed = current_phase != self._last_phase
-            tlod_rounded = round(self.current_tlod_setpoint)
-            last_tlod = self._last_logged_tlod if self._last_logged_tlod is not None else tlod_rounded
-            tlod_diff = abs(tlod_rounded - last_tlod)
-
-            if phase_changed or tlod_diff >= 10:
-                import datetime
-                now_iso = datetime.datetime.now().strftime("%H:%M:%S")
-                trigger_type = "phase_transition" if phase_changed else ("fps_regulation_drop" if tlod_rounded < last_tlod else "fps_regulation_boost")
-                reason_text = ""
-                if phase_changed:
-                    if current_phase == "cruise":
-                        reason_text = f"Plafond croisière atteint (> {alt_trans} ft) -> TLOD {tlod_rounded}"
-                    elif current_phase == "ground":
-                        reason_text = f"Zone sol / approche (< 500 ft) -> TLOD {tlod_rounded} (protection MainThread)"
-                    else:
-                        reason_text = f"Transition montée/descente ({round(agl)} ft) -> TLOD {tlod_rounded}"
-                elif tlod_rounded < last_tlod:
-                    reason_text = f"Régulation FPS : baisse TLOD {last_tlod} -> {tlod_rounded} (FPS {round(base_fps)} < {target_fps})"
+                if on_ground or agl < 500:
+                    altitude_target_tlod = float(tlod_ground)
+                elif agl >= alt_trans:
+                    altitude_target_tlod = float(tlod_cruise)
                 else:
-                    reason_text = f"Marge de fluidité : montée TLOD {last_tlod} -> {tlod_rounded} (FPS {round(base_fps)})"
+                    ratio = max(0.0, min(1.0, (agl - 500) / max(1.0, alt_trans - 500)))
+                    altitude_target_tlod = tlod_ground + ratio * (tlod_cruise - tlod_ground)
 
-                event = {
-                    "timestamp": time.time(),
-                    "time_str": now_iso,
-                    "agl_ft": round(agl),
-                    "phase": current_phase,
-                    "old_tlod": last_tlod,
-                    "new_tlod": tlod_rounded,
-                    "fps": round(base_fps, 1),
-                    "type": trigger_type,
-                    "reason": reason_text
-                }
-                with self._lock:
-                    self.trigger_events.append(event)
-                    if len(self.trigger_events) > 100:
-                        self.trigger_events.pop(0)
+                target_tlod = altitude_target_tlod
+                if base_fps > 0 and agl >= 1000:
+                    if base_fps < (target_fps - deadband):
+                        deficit = (target_fps - base_fps)
+                        target_tlod = max(tlod_ground, self.current_tlod_setpoint - (step * (deficit / 3.0)))
+                    elif base_fps > (target_fps + deadband):
+                        target_tlod = min(altitude_target_tlod, self.current_tlod_setpoint + step)
 
-                self._last_logged_tlod = tlod_rounded
-                self._last_phase = current_phase
+                delta = target_tlod - self.current_tlod_setpoint
+                if abs(delta) > step:
+                    delta = step if delta > 0 else -step
+                self.current_tlod_setpoint += delta
+                self.current_tlod_setpoint = max(0.0, min(400.0, self.current_tlod_setpoint))
 
-            self.status_message = f"Actif • TLOD {round(self.current_tlod_setpoint)} • {mode} ({round(base_fps)} FPS)"
+            ok_tlod = self.engine.write_tlod(self.current_tlod_setpoint)
+
+        # 5. Gestion indépendante de l'Object LOD (OLOD) si activé
+        if olod_is_active:
+            olod_cruise = float(self.config.get(f"{pfx}_olod_target", 100 if pfx == "2d" else 80))
+            alt_trans_olod = float(self.config.get(f"{pfx}_olod_altitude", 3000 if pfx == "2d" else 2500))
+            olod_ground = min(olod_cruise, 100.0)
+
+            if getattr(self, "manual_olod", None) is not None:
+                self.current_olod_setpoint = float(self.manual_olod)
+            else:
+                if agl >= alt_trans_olod:
+                    target_olod = float(olod_cruise)
+                else:
+                    ratio = max(0.0, min(1.0, agl / max(1.0, alt_trans_olod)))
+                    target_olod = olod_ground - ratio * (olod_ground - olod_cruise)
+                self.current_olod_setpoint = max(0.0, min(300.0, target_olod))
+
+            ok_olod = self.engine.write_olod(self.current_olod_setpoint)
+
+        if ok_tlod and ok_olod:
+            status_parts = []
+            if tlod_is_active:
+                status_parts.append(f"TLOD {round(self.current_tlod_setpoint)}")
+            if olod_is_active:
+                status_parts.append(f"OLOD {round(self.current_olod_setpoint)}")
+            self.status_message = f"Smart LOD Active • {' | '.join(status_parts)} • {pfx.upper()} ({round(base_fps)} FPS)"
         else:
             self.status_message = "Erreur d'écriture mémoire"
 
@@ -435,12 +502,15 @@ class SmartLodController:
         
         return {
             "enabled": self.config.get("enabled", False),
+            "external_autofps": bool(self.config.get("external_autofps", False)),
             "is_running": self.is_running,
             "status_message": self.status_message,
             "current_tlod_setpoint": round(self.current_tlod_setpoint, 1),
             "current_olod_setpoint": round(self.current_olod_setpoint, 1),
             "manual_tlod": self.manual_tlod is not None,
             "manual_olod": self.manual_olod is not None,
+            "axis_state_2d": self.get_axis_state("2D"),
+            "axis_state_vr": self.get_axis_state("VR"),
             "mode": self.config.get("mode", "IFR"),
             "source": self.config.get("source", "native"),
             "autofps_conflict": is_af_running,
@@ -759,3 +829,20 @@ def delete_smart_lod_profile(profile_id: str) -> Dict[str, Any]:
         return {"status": "success", "deleted_id": profile_id}
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
+def get_smart_lod_axis_state(mode="2D") -> Dict[str, Any]:
+    return get_smart_lod_controller().get_axis_state(mode)
+
+
+def set_smart_lod_axis_state(mode: str, axis: str, enabled=None, target=None, altitude=None) -> Dict[str, Any]:
+    return get_smart_lod_controller().set_axis_state(mode, axis, enabled, target, altitude)
+
+
+def set_external_autofps(enabled: bool) -> bool:
+    return get_smart_lod_controller().set_external_autofps(enabled)
+
+
+def reset_smart_lod_to_profile(axis: str = "all") -> Dict[str, Any]:
+    return get_smart_lod_controller().reset_to_active_profile(axis)
+

@@ -14386,14 +14386,10 @@ async function openSettingsModal() {
     const chkCity = document.getElementById('cfg-label-city');
     if (chkCity) chkCity.checked = currentSettings.show_label_city !== false;
 
-    const lodSelect = document.getElementById('cfg-dynamic-lod-engine');
-    if (lodSelect) {
-        lodSelect.value = currentSettings.dynamic_lod_engine || 'smart_lod';
-    }
-    const chkAutoFpsKill = document.getElementById('cfg-autofps-autokill');
-    if (chkAutoFpsKill) {
-        chkAutoFpsKill.checked = !!currentSettings.autofps_autokill;
-    }
+    const isExtAutoFps = !!(currentSettings.external_autofps || currentSettings.dynamic_lod_engine === 'external_autofps');
+    currentSettings.external_autofps = isExtAutoFps;
+    updateExternalAutoFpsSwitchUI(isExtAutoFps);
+
     const closeActionSelect = document.getElementById('cfg-close-action');
     if (closeActionSelect) {
         closeActionSelect.value = currentSettings.close_action || 'quit';
@@ -14417,6 +14413,35 @@ async function openSettingsModal() {
     if (modal) {
         modal.classList.remove('hidden');
         modal.classList.add('flex');
+    }
+}
+
+function updateExternalAutoFpsSwitchUI(isActive) {
+    const track = document.getElementById('cfg-external-autofps-track');
+    const thumb = document.getElementById('cfg-external-autofps-thumb');
+    if (track && thumb) {
+        if (isActive) {
+            track.className = 'w-10 h-5 rounded-full transition-colors duration-200 ease-in-out p-0.5 bg-sky-500 shadow-sm';
+            thumb.className = 'w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out translate-x-5';
+        } else {
+            track.className = 'w-10 h-5 rounded-full transition-colors duration-200 ease-in-out p-0.5 bg-slate-700';
+            thumb.className = 'w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out translate-x-0';
+        }
+    }
+}
+
+function toggleExternalAutoFpsSettingSwitch() {
+    currentSettings.external_autofps = !currentSettings.external_autofps;
+    currentSettings.dynamic_lod_engine = currentSettings.external_autofps ? 'external_autofps' : 'smart_lod';
+    updateExternalAutoFpsSwitchUI(currentSettings.external_autofps);
+    if (window.smartLodAxisState) {
+        window.smartLodAxisState.external_autofps = currentSettings.external_autofps;
+    }
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.set_external_autofps) {
+        window.pywebview.api.set_external_autofps(currentSettings.external_autofps);
+    }
+    if (typeof renderMsfsSettingsMatrix === 'function') {
+        renderMsfsSettingsMatrix();
     }
 }
 
@@ -14615,13 +14640,11 @@ async function saveSettings() {
     const chkCity = document.getElementById('cfg-label-city');
     if (chkCity) currentSettings.show_label_city = chkCity.checked;
 
-    const lodSelect = document.getElementById('cfg-dynamic-lod-engine');
-    if (lodSelect) {
-        currentSettings.dynamic_lod_engine = lodSelect.value;
-    }
-    const chkAutoFpsKill = document.getElementById('cfg-autofps-autokill');
-    if (chkAutoFpsKill) {
-        currentSettings.autofps_autokill = chkAutoFpsKill.checked;
+    const isExt = !!currentSettings.external_autofps;
+    currentSettings.external_autofps = isExt;
+    currentSettings.dynamic_lod_engine = isExt ? 'external_autofps' : 'smart_lod';
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.set_external_autofps) {
+        window.pywebview.api.set_external_autofps(isExt);
     }
     const closeActionSelect = document.getElementById('cfg-close-action');
     if (closeActionSelect) {
@@ -17335,6 +17358,112 @@ let currentGraphicsSettingsPage = 0;
 let msfsSettingsMatrixData = null;
 let userCfgBackupsList = [];
 
+let smartLodAxisState = {
+    external_autofps: false,
+    '2d': {
+        tlod_active: false,
+        tlod_target: 200,
+        tlod_altitude: 5000,
+        olod_active: false,
+        olod_target: 100,
+        olod_altitude: 3000
+    },
+    'vr': {
+        tlod_active: false,
+        tlod_target: 150,
+        tlod_altitude: 4000,
+        olod_active: false,
+        olod_target: 80,
+        olod_altitude: 2500
+    }
+};
+window.smartLodAxisState = smartLodAxisState;
+
+async function fetchSmartLodAxisState() {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.get_smart_lod_status) return;
+    try {
+        const raw = await window.pywebview.api.get_smart_lod_status();
+        const data = (typeof raw === 'string') ? JSON.parse(raw) : raw;
+        if (data) {
+            if (data.external_autofps !== undefined) {
+                smartLodAxisState.external_autofps = !!data.external_autofps;
+                if (currentSettings) {
+                    currentSettings.external_autofps = !!data.external_autofps;
+                    currentSettings.dynamic_lod_engine = data.external_autofps ? 'external_autofps' : 'smart_lod';
+                }
+            }
+            if (data.axis_state_2d) {
+                smartLodAxisState['2d'] = Object.assign(smartLodAxisState['2d'], data.axis_state_2d);
+            }
+            if (data.axis_state_vr) {
+                smartLodAxisState['vr'] = Object.assign(smartLodAxisState['vr'], data.axis_state_vr);
+            }
+        }
+    } catch (e) {
+        console.warn('[SmartLOD] Error fetching axis state:', e);
+    }
+}
+
+function toggleSmartLodAxis(axis) {
+    const modeKey = (String(currentMsfsGraphicsMode || '2D').toUpperCase() === 'VR') ? 'vr' : '2d';
+    if (!smartLodAxisState[modeKey]) {
+        smartLodAxisState[modeKey] = {};
+    }
+    const curActive = !smartLodAxisState[modeKey][`${axis}_active`];
+    smartLodAxisState[modeKey][`${axis}_active`] = curActive;
+
+    const target = smartLodAxisState[modeKey][`${axis}_target`] || (axis === 'tlod' ? (modeKey === 'vr' ? 150 : 200) : (modeKey === 'vr' ? 80 : 100));
+    const altitude = smartLodAxisState[modeKey][`${axis}_altitude`] || (axis === 'tlod' ? (modeKey === 'vr' ? 4000 : 5000) : (modeKey === 'vr' ? 2500 : 3000));
+
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.set_smart_lod_axis_state) {
+        window.pywebview.api.set_smart_lod_axis_state(modeKey.toUpperCase(), axis, curActive, target, altitude);
+    }
+
+    if (typeof renderMsfsSettingsMatrix === 'function') {
+        renderMsfsSettingsMatrix();
+    }
+}
+
+function onSmartLodSliderInput(axis, val) {
+    const modeKey = (String(currentMsfsGraphicsMode || '2D').toUpperCase() === 'VR') ? 'vr' : '2d';
+    const num = parseInt(val, 10);
+    const labelEl = document.getElementById(`smart-lod-val-${axis}`);
+    if (labelEl) {
+        labelEl.textContent = num;
+    }
+    if (smartLodAxisState[modeKey]) {
+        smartLodAxisState[modeKey][`${axis}_target`] = num;
+    }
+}
+
+function onSmartLodSliderChange(axis, val) {
+    const modeKey = (String(currentMsfsGraphicsMode || '2D').toUpperCase() === 'VR') ? 'vr' : '2d';
+    const num = parseInt(val, 10);
+    if (smartLodAxisState[modeKey]) {
+        smartLodAxisState[modeKey][`${axis}_target`] = num;
+    }
+    const active = !!(smartLodAxisState[modeKey] && smartLodAxisState[modeKey][`${axis}_active`]);
+    const altitude = (smartLodAxisState[modeKey] && smartLodAxisState[modeKey][`${axis}_altitude`]) || 5000;
+
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.set_smart_lod_axis_state) {
+        window.pywebview.api.set_smart_lod_axis_state(modeKey.toUpperCase(), axis, active, num, altitude);
+    }
+}
+
+function onSmartLodAltitudeChange(axis, alt) {
+    const modeKey = (String(currentMsfsGraphicsMode || '2D').toUpperCase() === 'VR') ? 'vr' : '2d';
+    const num = Math.max(500, Math.min(45000, parseInt(alt, 10) || 5000));
+    if (smartLodAxisState[modeKey]) {
+        smartLodAxisState[modeKey][`${axis}_altitude`] = num;
+    }
+    const active = !!(smartLodAxisState[modeKey] && smartLodAxisState[modeKey][`${axis}_active`]);
+    const target = (smartLodAxisState[modeKey] && smartLodAxisState[modeKey][`${axis}_target`]) || (axis === 'tlod' ? 200 : 100);
+
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.set_smart_lod_axis_state) {
+        window.pywebview.api.set_smart_lod_axis_state(modeKey.toUpperCase(), axis, active, target, num);
+    }
+}
+
 function renderMsfsCategoryTabs() {
     const container = document.getElementById('opt-msfs-category-tabs');
     if (!container) return;
@@ -17747,6 +17876,9 @@ async function loadRigDiagnostics(profileId = null) {
         }
 
         msfsSettingsMatrixData = data.settings_matrix;
+        if (typeof fetchSmartLodAxisState === 'function') {
+            await fetchSmartLodAxisState();
+        }
         switchMsfsGraphicsMode(currentMsfsGraphicsMode);
         if (typeof refreshSmartLodStatus === 'function') {
             refreshSmartLodStatus();
@@ -19091,12 +19223,24 @@ function renderMsfsSettingsMatrix() {
             ? `<span class="px-2.5 py-0.5 rounded typo-action-btn text-xs font-semibold bg-indigo-600 text-white uppercase tracking-[0.02em] shrink-0 shadow-sm" title="Detected resolution in ${item.software_name}: ${item.software_render_scale} (${item.software_render_scale_pct}%)">${item.software_name}: ${item.software_render_scale.toFixed(2)}</span>`
             : '';
 
-        // AutoFPS & Smart LOD dynamic regulation check
-        const isSmartLodManaged = (item.key === 'tlod' || item.key === 'olod') && window.smartLodActive;
-        const isAutoFpsManaged = (item.key === 'tlod' || item.key === 'olod') && !isSmartLodManaged && (msfsSettingsMatrixData && msfsSettingsMatrixData.autofps_active);
-        const autoFpsBadge = isSmartLodManaged 
-            ? '<span class="px-2 py-0.5 rounded typo-action-btn text-xs font-semibold bg-cyan-900 text-cyan-300 uppercase tracking-[0.02em] shrink-0" title="Dynamically regulated in real-time by Smart LOD">SMART LOD</span>' 
-            : (isAutoFpsManaged ? '<span class="px-2 py-0.5 rounded typo-action-btn text-xs font-semibold bg-cyan-900 text-cyan-300 uppercase tracking-[0.02em] shrink-0" title="Dynamically regulated in real-time by AutoFPS">AUTOFPS</span>' : '');
+        // AutoFPS & Smart LOD independent axis regulation check
+        const isLodAxis = (item.key === 'tlod' || item.key === 'olod');
+        const axis = item.key;
+        const modeKey = (String(currentMsfsGraphicsMode || '2D').toUpperCase() === 'VR') ? 'vr' : '2d';
+        const isExternalAutoFps = !!(currentSettings && (currentSettings.external_autofps || currentSettings.dynamic_lod_engine === 'external_autofps'));
+        const axisActive = isLodAxis && !isExternalAutoFps && !!(smartLodAxisState[modeKey] && smartLodAxisState[modeKey][`${axis}_active`]);
+        const axisTarget = isLodAxis ? ((smartLodAxisState[modeKey] && smartLodAxisState[modeKey][`${axis}_target`]) || (axis === 'tlod' ? (modeKey === 'vr' ? 150 : 200) : (modeKey === 'vr' ? 80 : 100))) : 100;
+        const axisAltitude = isLodAxis ? ((smartLodAxisState[modeKey] && smartLodAxisState[modeKey][`${axis}_altitude`]) || (axis === 'tlod' ? (modeKey === 'vr' ? 4000 : 5000) : (modeKey === 'vr' ? 2500 : 3000))) : 5000;
+        const maxLodVal = axis === 'tlod' ? 400 : 300;
+
+        let autoFpsBadge = '';
+        if (isLodAxis) {
+            if (isExternalAutoFps) {
+                autoFpsBadge = '<span class="px-2 py-0.5 rounded typo-action-btn text-xs font-semibold bg-cyan-900 text-cyan-300 uppercase tracking-[0.02em] shrink-0" title="Dynamically regulated by external MSFS_AutoFPS">AUTOFPS</span>';
+            } else if (axisActive) {
+                autoFpsBadge = '<span class="px-2 py-0.5 rounded typo-action-btn text-xs font-semibold bg-sky-900 text-sky-300 uppercase tracking-[0.02em] shrink-0" title="Dynamically regulated by Smart LOD">SMART LOD</span>';
+            }
+        }
 
         // Unified SVG down arrow chevron identical on both text/numeric inputs and select dropdowns
         const chevronSvg = `
@@ -19108,17 +19252,7 @@ function renderMsfsSettingsMatrix() {
         `;
 
         let inputHtml = '';
-        if (isSmartLodManaged) {
-            inputHtml = `
-                <div class="relative w-full pt-0.5">
-                    <input type="text"
-                           value="HANDLED BY SMART LOD"
-                           disabled
-                           class="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-2 typo-input-val text-xs text-cyan-400 font-medium cursor-not-allowed opacity-80"
-                           title="This setting is dynamically regulated in real-time by SceneryX Smart LOD according to your target frame rate.">
-                </div>
-            `;
-        } else if (isAutoFpsManaged) {
+        if (isLodAxis && isExternalAutoFps) {
             inputHtml = `
                 <div class="relative w-full pt-0.5">
                     <input type="text"
@@ -19126,6 +19260,47 @@ function renderMsfsSettingsMatrix() {
                            disabled
                            class="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-2 typo-input-val text-xs text-cyan-400 font-medium cursor-not-allowed opacity-80"
                            title="This setting is dynamically regulated in real-time by AutoFPS according to your target frame rate.">
+                </div>
+            `;
+        } else if (isLodAxis && axisActive) {
+            inputHtml = `
+                <div class="w-full bg-slate-950 border border-slate-700/80 rounded-xl p-2.5 space-y-2">
+                    <div class="flex items-center justify-between text-xs">
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-slate-400 font-medium">Target:</span>
+                            <span id="smart-lod-val-${axis}" class="font-bold text-sky-400 tabular-nums">${axisTarget}</span>
+                        </div>
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-slate-400 font-medium" title="Transition / cruise altitude in feet AGL">Alt:</span>
+                            <input type="number"
+                                   id="smart-lod-alt-${axis}"
+                                   value="${axisAltitude}"
+                                   step="500"
+                                   min="500"
+                                   max="45000"
+                                   onchange="onSmartLodAltitudeChange('${axis}', this.value)"
+                                   class="w-16 bg-slate-900 border border-slate-700 rounded px-1.5 py-0.5 text-center text-xs text-slate-200 font-semibold focus:outline-none focus:border-slate-400 focus:bg-slate-800 tabular-nums"
+                                   title="Transition altitude in feet AGL">
+                            <span class="text-slate-400 text-[11px]">ft</span>
+                        </div>
+                    </div>
+                    <div class="relative flex items-center">
+                        <input type="range"
+                               id="smart-lod-range-${axis}"
+                               min="0"
+                               max="${maxLodVal}"
+                               step="5"
+                               value="${axisTarget}"
+                               oninput="onSmartLodSliderInput('${axis}', this.value)"
+                               onchange="onSmartLodSliderChange('${axis}', this.value)"
+                               class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500 hover:accent-sky-400 focus:outline-none"
+                               title="${axis.toUpperCase()} Dynamic Target: ${axisTarget} (Range: 0 - ${maxLodVal}, step 5)">
+                    </div>
+                    <div class="flex justify-between text-[10px] text-slate-400 font-mono select-none px-0.5">
+                        <span>0</span>
+                        <span class="text-slate-400 font-sans">Dynamic Cruise Target (step 5)</span>
+                        <span>${maxLodVal}</span>
+                    </div>
                 </div>
             `;
         } else if (item.is_numeric) {
@@ -19411,6 +19586,27 @@ function renderMsfsSettingsMatrix() {
             }
         }
 
+        let shortTip = item.rec_guidance || '';
+        if (axis === 'tlod') {
+            shortTip = (modeKey === 'vr') ? '80 - 100 • Protects stereo cadence' : '100 - 120 • Protects MainThread';
+        } else if (axis === 'olod') {
+            shortTip = (modeKey === 'vr') ? '80 - 100 • Balances dual-eye objects' : '100 - 120 • Balances 3D draw calls';
+        }
+        const fullTip = item.rec_guidance || shortTip;
+
+        const smartLodSwitchHtml = (!isExternalAutoFps && isLodAxis) ? `
+            <div class="flex items-center gap-1.5 shrink-0 select-none ml-2">
+                <span class="text-[9.5px] font-bold tracking-wider text-slate-400 uppercase">SMART LOD</span>
+                <div onclick="toggleSmartLodAxis('${axis}')"
+                     class="relative inline-flex items-center cursor-pointer p-0.5 rounded-full transition-colors select-none"
+                     title="${axisActive ? 'Smart LOD dynamic regulation active for ' + axis.toUpperCase() + '. Click to switch to manual.' : 'Click to enable Smart LOD dynamic regulation for ' + axis.toUpperCase()}">
+                    <div class="w-8 h-4 rounded-full transition-colors duration-200 ease-in-out p-0.5 ${axisActive ? 'bg-sky-500 shadow-sm' : 'bg-slate-700'}">
+                        <div class="w-3 h-3 rounded-full bg-white shadow-sm transform transition-transform duration-200 ease-in-out ${axisActive ? 'translate-x-4' : 'translate-x-0'}"></div>
+                    </div>
+                </div>
+            </div>
+        ` : '';
+
         return `
             <div class="setting-card relative p-3.5 rounded-2xl bg-slate-900/70 border border-slate-800 hover:border-slate-700 transition-all flex flex-col justify-between space-y-2.5" title="${(item.tooltip || '').replace(/"/g, '&quot;')}">
                 <div class="flex items-center justify-between gap-2">
@@ -19424,10 +19620,13 @@ function renderMsfsSettingsMatrix() {
                     </div>
                 </div>
                 ${inputHtml}
-                ${item.rec_guidance ? `
-                    <div class="flex items-center gap-1.5 pt-0.5 px-0.5 text-[11px] leading-tight text-slate-400 font-normal">
-                        <span class="font-bold text-slate-200 tracking-wide uppercase shrink-0">TIP:</span>
-                        <span class="truncate text-slate-400" title="${item.rec_guidance.replace(/"/g, '&quot;')}">${item.rec_guidance}</span>
+                ${(item.rec_guidance || isLodAxis) ? `
+                    <div class="flex items-center justify-between gap-1.5 pt-0.5 px-0.5 text-[11px] leading-tight text-slate-400 font-normal">
+                        <div class="flex items-center gap-1.5 min-w-0 flex-1 truncate" title="${(fullTip || '').replace(/"/g, '&quot;')}">
+                            <span class="font-bold text-slate-200 tracking-wide uppercase shrink-0">TIP:</span>
+                            <span class="truncate text-slate-400 cursor-help">${shortTip}</span>
+                        </div>
+                        ${smartLodSwitchHtml}
                     </div>
                 ` : ''}
             </div>
@@ -21831,6 +22030,16 @@ function updateSmartLodUIFromStatus(status) {
     if (!status) return;
     const wasActive = window.smartLodActive;
     window.smartLodActive = !!(status.enabled && status.is_running);
+
+    if (status.axis_state_2d) {
+        smartLodAxisState['2d'] = Object.assign(smartLodAxisState['2d'], status.axis_state_2d);
+    }
+    if (status.axis_state_vr) {
+        smartLodAxisState['vr'] = Object.assign(smartLodAxisState['vr'], status.axis_state_vr);
+    }
+    if (status.external_autofps !== undefined) {
+        smartLodAxisState.external_autofps = !!status.external_autofps;
+    }
 
     // Indicator Dot on Button
     const dot = document.getElementById('opt-smart-lod-indicator-dot');

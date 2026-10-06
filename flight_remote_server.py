@@ -63,18 +63,27 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
                 except ValueError:
                     pass
             self._handle_smart_lod_set_lod(params)
-        elif clean_path == "/api/smart_lod/reset_override":
+        elif clean_path in ("/api/smart_lod/reset_override", "/smart_lod/reset_override", "/api/smart_lod/reset_to_profile", "/smart_lod/reset_to_profile"):
             query_params = urllib.parse.parse_qs(parsed.query)
             axis = query_params.get("axis", ["all"])[0]
-            self._handle_smart_lod_reset_override({"axis": axis})
+            self._handle_smart_lod_reset_to_profile({"axis": axis})
+        elif clean_path in ("/api/smart_lod/axis_config", "/smart_lod/axis_config"):
+            query_params = urllib.parse.parse_qs(parsed.query)
+            mode = query_params.get("mode", ["2D"])[0]
+            try:
+                import flight_lod_controller
+                st = flight_lod_controller.get_smart_lod_axis_state(mode)
+                self._send_json(200, st)
+            except Exception as e:
+                self._send_json(500, {"error": str(e)})
         else:
             self._send_json(404, {"error": "Not found", "path": self.path})
 
     def do_POST(self):
         clean_path = self.path.split("?")[0]
-        if clean_path == "/api/smart_lod/toggle":
+        if clean_path in ("/api/smart_lod/toggle", "/smart_lod/toggle"):
             self._handle_smart_lod_toggle()
-        elif clean_path == "/api/smart_lod/set_lod":
+        elif clean_path in ("/api/smart_lod/set_lod", "/smart_lod/set_lod"):
             try:
                 length = int(self.headers.get("Content-Length", 0))
                 body = self.rfile.read(length).decode("utf-8") if length > 0 else "{}"
@@ -82,7 +91,7 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
             except Exception:
                 params = {}
             self._handle_smart_lod_set_lod(params)
-        elif clean_path == "/api/smart_lod/reset_override":
+        elif clean_path in ("/api/smart_lod/reset_override", "/smart_lod/reset_override", "/api/smart_lod/reset_to_profile", "/smart_lod/reset_to_profile"):
             try:
                 length = int(self.headers.get("Content-Length", 0))
                 body = self.rfile.read(length).decode("utf-8") if length > 0 else "{}"
@@ -93,8 +102,27 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
                 parsed = urllib.parse.urlparse(self.path)
                 query_params = urllib.parse.parse_qs(parsed.query)
                 params["axis"] = query_params.get("axis", ["all"])[0]
-            self._handle_smart_lod_reset_override(params)
-        elif clean_path == "/api/blackbox/toggle":
+            self._handle_smart_lod_reset_to_profile(params)
+        elif clean_path in ("/api/smart_lod/axis_config", "/smart_lod/axis_config"):
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+                body = self.rfile.read(length).decode("utf-8") if length > 0 else "{}"
+                params = json.loads(body)
+            except Exception:
+                params = {}
+            try:
+                import flight_lod_controller
+                st = flight_lod_controller.set_smart_lod_axis_state(
+                    params.get("mode", "2D"),
+                    params.get("axis", "tlod"),
+                    enabled=params.get("enabled"),
+                    target=params.get("target"),
+                    altitude=params.get("altitude")
+                )
+                self._send_json(200, st)
+            except Exception as e:
+                self._send_json(500, {"error": str(e)})
+        elif clean_path in ("/api/blackbox/toggle", "/blackbox/toggle"):
             self._handle_blackbox_toggle()
         else:
             self._send_json(404, {"error": "Not found", "path": self.path})
@@ -298,7 +326,7 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
         except Exception as e:
             self._send_json(500, {"success": False, "error": str(e)})
 
-    def _handle_smart_lod_reset_override(self, params: Dict[str, Any]):
+    def _handle_smart_lod_reset_to_profile(self, params: Dict[str, Any]):
         global _LAST_MANUAL_LOD
         try:
             axis = params.get("axis", "all")
@@ -311,13 +339,16 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
             try:
                 import flight_lod_controller
                 lod_ctrl = flight_lod_controller.get_smart_lod_controller()
-                res = lod_ctrl.reset_manual_override(axis)
+                res = lod_ctrl.reset_to_active_profile(axis)
             except Exception as e:
-                print(f"[RemoteServer] Reset override error: {e}")
+                print(f"[RemoteServer] Reset to profile error: {e}")
 
             self._send_json(200, res)
         except Exception as e:
             self._send_json(500, {"success": False, "error": str(e)})
+
+    def _handle_smart_lod_reset_override(self, params: Dict[str, Any]):
+        return self._handle_smart_lod_reset_to_profile(params)
 
     def _handle_blackbox_toggle(self):
         try:

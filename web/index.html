@@ -2677,25 +2677,17 @@
                     <div class="flex items-center justify-between">
                         <label class="typo-section-title text-slate-400 block">Dynamic LOD &amp; Performance Engine</label>
                     </div>
-                    
-                    <div class="space-y-1.5">
-                        <div class="flex items-center justify-between">
-                            <label class="typo-setting-label text-slate-300">Preferred Dynamic LOD Engine</label>
-                            <span class="typo-metadata">MSFS 2020 / 2024</span>
-                        </div>
-                        <select id="cfg-dynamic-lod-engine" class="w-full bg-slate-900 border border-slate-700/60 rounded-md px-3.5 py-2 typo-input-val text-slate-200 cursor-pointer focus:outline-none focus:border-slate-400">
-                            <option value="smart_lod">Smart LOD (Built-in SceneryX Engine - Recommended)</option>
-                            <option value="external_autofps">External AutoFPS (MSFS_AutoFPS.exe)</option>
-                            <option value="disabled">Disabled (Manual fixed LOD)</option>
-                        </select>
-                    </div>
 
-                    <div class="flex items-center justify-between bg-slate-950/80 p-3 rounded-lg border border-slate-700/60">
+                    <div class="flex items-center justify-between bg-slate-950/80 p-3.5 rounded-lg border border-slate-700/60">
                         <div>
-                            <label for="cfg-autofps-autokill" class="typo-setting-label text-slate-300 cursor-pointer block">Close external AutoFPS on startup</label>
-                            <span class="typo-metadata text-slate-500 block">Avoids memory hook conflicts by closing MSFS_AutoFPS when Smart LOD is active</span>
+                            <label onclick="toggleExternalAutoFpsSettingSwitch()" class="typo-setting-label text-slate-200 cursor-pointer block font-semibold">External AutoFPS (MSFS_AutoFPS.exe)</label>
+                            <span class="typo-metadata text-slate-400 block mt-0.5">Delegate dynamic LOD regulation exclusively to the external MSFS_AutoFPS utility instead of SceneryX Smart LOD</span>
                         </div>
-                        <input type="checkbox" id="cfg-autofps-autokill" class="w-4 h-4 accent-slate-400 rounded cursor-pointer shrink-0">
+                        <div id="cfg-external-autofps-switch" onclick="toggleExternalAutoFpsSettingSwitch()" class="relative inline-flex items-center shrink-0 cursor-pointer p-1 rounded-xl transition-colors" title="Toggle External AutoFPS usage">
+                            <div id="cfg-external-autofps-track" class="w-10 h-5 rounded-full transition-colors duration-200 ease-in-out p-0.5 bg-slate-700">
+                                <div id="cfg-external-autofps-thumb" class="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out translate-x-0"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
