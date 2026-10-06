@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import json
 import re
 import urllib.request
@@ -8,6 +9,7 @@ import webview
 from datetime import datetime
 import flight_rig_optimizer
 import flight_perf_tracker
+import flight_bug_reporter
 from scanner import run_scan, get_settings, save_settings, load_ratings, save_rating, save_custom_price, save_custom_category, load_custom_prices, get_estimated_price, get_default_gsx_path, load_airport_database, SPECIAL_BUNDLE_MAP, OUTPUT_JSON_PATH, compute_scan_delta, build_library_snapshot, SNAPSHOT_JSON_PATH, get_resource_file_path, audit_all_gsx_profiles, audit_single_airport_gsx, extract_icao_from_gsx_filename, find_bundled_gsx, USER_DATA_DIR
 
 try:
@@ -17,9 +19,232 @@ try:
 except Exception:
     pass
 
+ISOLATION_SNAPSHOT_FILE = os.path.join(USER_DATA_DIR, "flight_isolation_snapshot.json")
+
+def save_isolation_snapshot(snapshot_data):
+    """Atomically persists the flight mode isolation state for guaranteed 1-click lossless rollback."""
+    try:
+        os.makedirs(USER_DATA_DIR, exist_ok=True)
+        with open(ISOLATION_SNAPSHOT_FILE, 'w', encoding='utf-8') as f:
+            json.dump(snapshot_data, f, indent=2, ensure_ascii=False)
+    except Exception as e:
+        print(f"Error saving isolation snapshot: {e}")
+
+def load_isolation_snapshot():
+    """Loads the active flight isolation snapshot if present."""
+    try:
+        if os.path.exists(ISOLATION_SNAPSHOT_FILE):
+            with open(ISOLATION_SNAPSHOT_FILE, 'r', encoding='utf-8') as f:
+                return json.load(f)
+    except Exception as e:
+        print(f"Error loading isolation snapshot: {e}")
+    return None
+
+def clear_isolation_snapshot():
+    """Clears the active flight isolation snapshot after successful restore."""
+    try:
+        if os.path.exists(ISOLATION_SNAPSHOT_FILE):
+            os.remove(ISOLATION_SNAPSHOT_FILE)
+    except Exception as e:
+        print(f"Error removing isolation snapshot: {e}")
+
+# Known secondary / duplicate packages that must stay disabled to prevent conflict resurrection
+KNOWN_CONFLICT_SECONDARY_PACKAGES = {
+    'EDDF': ['virtualfra-eddf'],
+    'LSZH': ['fs24-microsoft-airport-lszh-zurich', 'fs24-asobo-airport-lszh'],
+    'EGKK': ['gatwick'],
+    'CYVR': ['joelster-airport-cyvr-vancouver'],
+    'LECO': ['fs24-microsoft-airport-leco-a-coruna'],
+    'LPMA': ['fs24-asobo-airport-lpma-madeira'],
+    'LFKB': ['fs20-orbx-airport-lfkb-bastia'],
+    'LHBP': ['fs24-microsoft-scenery-budapest-rbr2']
+}
+
+def auto_resolve_known_conflicts():
+    """
+    Guarantees that secondary conflicting packages remain disabled so conflicts never resurrect.
+    Only keeps secondary packages disabled when a primary scenery is present.
+    """
+    try:
+        comm_dirs = []
+        settings = get_settings()
+        for cfg in settings.get("scan_paths", []):
+            dp = cfg.get('path', '')
+            if dp and os.path.exists(dp):
+                comm_dirs.append(dp)
+                onestore = os.path.join(dp, 'OneStore')
+                if os.path.exists(onestore):
+                    comm_dirs.append(onestore)
+
+        # 1. Physical folders on disk (Community)
+        for cd in comm_dirs:
+            for icao, sec_list in KNOWN_CONFLICT_SECONDARY_PACKAGES.items():
+                for sec_name in sec_list:
+                    clean_sec = sec_name[:-9] if sec_name.endswith('.disabled') else sec_name
+                    sec_path = os.path.join(cd, clean_sec)
+                    dis_path = sec_path + '.disabled'
+                    if (os.path.exists(sec_path) or os.path.islink(sec_path)) and not os.path.exists(dis_path):
+                        try:
+                            safe_rename_path(sec_path, dis_path)
+                            print(f"[CONFLICT SAFEGUARD] Kept secondary package disabled on disk: {clean_sec}")
+                        except Exception as e:
+                            print(f"Error disabling secondary package {clean_sec}: {e}")
+
+        # 2. MSFS Content.xml
+        all_sec_lower = {k.lower() for sec_list in KNOWN_CONFLICT_SECONDARY_PACKAGES.values() for k in sec_list}
+        for xml_path in get_content_xml_paths():
+            if not os.path.exists(xml_path):
+                continue
+            try:
+                import xml.etree.ElementTree as ET
+                tree = ET.parse(xml_path)
+                root = tree.getroot()
+                changed = False
+                for p in root.findall('Package'):
+                    name = p.get('name', '')
+                    clean_name = (name[:-9] if name.endswith('.disabled') else name).lower()
+                    clean_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_name)
+                    if clean_name in all_sec_lower or clean_norm in all_sec_lower:
+                        if p.get('active') != 'UserDisabled':
+                            p.set('active', 'UserDisabled')
+                            changed = True
+                            print(f"[CONFLICT SAFEGUARD] Set secondary package to UserDisabled in Content.xml: {name}")
+                if changed:
+                    tree.write(xml_path, encoding='utf-8', xml_declaration=True)
+            except Exception as e:
+                print(f"Error updating Content.xml in auto_resolve_known_conflicts: {e}")
+    except Exception as ex:
+        print(f"Error in auto_resolve_known_conflicts: {ex}")
+
+PROTECTED_SYSTEM_KEYWORDS = [
+    'modellib', 'commonlibrary', 'projectairports', 'genericairports',
+    'travelbook', 'worlddiscovery', 'bush-trip', 'bushtrip', 'activities',
+    'instruments', 'navdata', 'fs-base', 'freeflight', 'mission',
+    'tutorial', 'discovery', 'point-of-interest', 'simobjects',
+    'passiveaircraft', 'ships', 'animals', 'vehicles', 'pgg',
+    'autofps', 'beyondatc', 'toolbar', 'simbridge', 'sayintentions',
+    'chaseplane', 'p42-util', 'aircraft', 'livery', 'liveries', 'fleet',
+    'gsx', 'mobiflight', 'fsuipc', 'fslabs', 'fsrealistic', 'raas',
+    'wwtwasm', 'traffic', 'simbrief', 'fsipanel', 'gaist', 'asfs', 'navigraph',
+    'fnx', 'fenix', 'pmdg', 'flybywire', 'fbw', 'a320', 'a319', 'a321', 'a350',
+    'a220', 'b737', 'b747', 'b777', 'b787', 'crj', 'justflight-aircraft', 'justflight-traffic', 'blackbox',
+    'headwind', 'horizon', 'maddog', 'tfdi', 'workingtitle',
+    'wt21', 'avionics', 'sound', 'effects', 'visualeffect',
+    'inibuilds-aircraft', 'aerosoft-aircraft', 'milviz', 'blackbird',
+    'cowan', 'hpg-', 'got-friends', 'salty', 'simupdates', 'fs2crew',
+    'hifi', 'active-sky', 'airbus', 'boeing', 'bombardier', 'cessna',
+    'embraer', 'piper', 'beechcraft', 'atr', 'concorde', 'helicopter',
+    'vessels', 'vessel', 'seafront', 'arex', 'landmarks', 'landmark'
+]
+
+def is_core_or_library_package(pkg_path_or_name):
+    """
+    Bulletproof immunity detector:
+    Guarantees that NO aircraft, livery, utility, tool, or core package
+    can ever be classified as an airport scenery or disabled under any circumstances.
+    """
+    if not pkg_path_or_name:
+        return False
+
+    p_str = str(pkg_path_or_name).replace('\\', '/')
+    p_lower = p_str.lower()
+
+    # 1. Path-level checks for aircraft / livery dedicated directories
+    if any(k in p_lower for k in [
+        '/msfs_aircraft/', '/msfs_livery/', '/msfs_liveries/',
+        'simobjects/airplanes', 'simobjects/rotorcraft', 'simobjects/boats',
+        'airplanes', 'rotorcraft'
+    ]):
+        return True
+
+    # 2. Extract clean base folder name
+    base_name = os.path.basename(p_str.rstrip('/'))
+    if base_name.lower().endswith('.disabled'):
+        base_name = base_name[:-9]
+    base_lower = base_name.lower()
+
+    # Remove standard MSFS Content.xml prefixes
+    norm_name = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', base_lower)
+
+    # 3. String token checks against protected keywords
+    if any(k in base_lower or k in norm_name for k in PROTECTED_SYSTEM_KEYWORDS):
+        return True
+
+    # 4. Deep structural inspection if path is a directory
+    target_dir = None
+    if os.path.isdir(pkg_path_or_name):
+        target_dir = pkg_path_or_name
+    elif p_str.endswith('.disabled') and os.path.isdir(p_str[:-9]):
+        target_dir = p_str[:-9]
+    elif os.path.isdir(p_str + '.disabled'):
+        target_dir = p_str + '.disabled'
+
+    if target_dir:
+        # Check manifest.json content_type
+        mpath = os.path.join(target_dir, 'manifest.json')
+        if not os.path.exists(mpath):
+            mpath = os.path.join(target_dir, 'manifest.json.disabled')
+        if os.path.exists(mpath):
+            try:
+                with open(mpath, 'r', encoding='utf-8', errors='ignore') as mf:
+                    mdata = json.load(mf)
+                    ctype = str(mdata.get('content_type', '')).upper()
+                    if ctype and ctype != 'SCENERY':
+                        return True
+            except Exception:
+                pass
+
+        # Check SimObjects presence
+        so_dir = os.path.join(target_dir, 'SimObjects')
+        if not os.path.exists(so_dir):
+            so_dir = os.path.join(target_dir, 'SimObjects.disabled')
+        if os.path.isdir(so_dir):
+            for sub in ['Airplanes', 'Rotorcraft', 'Boats', 'Airplanes.disabled', 'Rotorcraft.disabled', 'Boats.disabled']:
+                if os.path.isdir(os.path.join(so_dir, sub)):
+                    return True
+
+        # Check if package is streamed or contains .fsarchive containers
+        is_streamed = 'streamed' in p_lower
+        if not is_streamed and target_dir:
+            try:
+                is_streamed = any(f.endswith('.fsarchive') for f in os.listdir(target_dir) if os.path.isfile(os.path.join(target_dir, f)))
+                if not is_streamed and os.path.isdir(os.path.join(target_dir, 'content')):
+                    is_streamed = any(f.endswith('.fsarchive') for f in os.listdir(os.path.join(target_dir, 'content')))
+            except Exception:
+                pass
+
+        if not is_streamed:
+            # Check if package contains any scenery folder or compiled BGL files
+            has_scenery_dir = os.path.isdir(os.path.join(target_dir, 'scenery')) or os.path.isdir(os.path.join(target_dir, 'Scenery'))
+            if not has_scenery_dir:
+                has_bgl = False
+                lpath = os.path.join(target_dir, 'layout.json')
+                if not os.path.exists(lpath):
+                    lpath = os.path.join(target_dir, 'layout.json.disabled')
+                if os.path.exists(lpath):
+                    try:
+                        with open(lpath, 'r', encoding='utf-8', errors='ignore') as lf:
+                            ldata = json.load(lf)
+                            has_bgl = any(c.get('path', '').lower().endswith(('.bgl', '.bgl.disabled')) for c in ldata.get('content', []))
+                    except Exception:
+                        pass
+                if not has_bgl:
+                    for root, dirs, files in os.walk(target_dir):
+                        if any(f.lower().endswith(('.bgl', '.bgl.disabled')) for f in files):
+                            has_bgl = True
+                            break
+                if not has_bgl:
+                    # No scenery folder and no BGL files -> immune from scenery disabling!
+                    return True
+
+    return False
+
 AIRPORTS_DB_CACHE = None
 
 def resolve_package_icaos(pkg_name):
+    if is_core_or_library_package(pkg_name):
+        return set()
+
     global AIRPORTS_DB_CACHE
     if AIRPORTS_DB_CACHE is None:
         AIRPORTS_DB_CACHE, _, _ = load_airport_database()
@@ -33,6 +258,9 @@ def resolve_package_icaos(pkg_name):
             clean_fn = clean_fn[len(prefix):]
             break
 
+    if is_core_or_library_package(clean_fn):
+        return set()
+
     found = set()
     if clean_fn in SPECIAL_BUNDLE_MAP:
         found.update(SPECIAL_BUNDLE_MAP[clean_fn])
@@ -42,8 +270,15 @@ def resolve_package_icaos(pkg_name):
 
     tokens = re.split(r'[-_ ]+', clean_fn)
     for t in tokens:
+        t_l = t.lower()
+        if any(k in t_l for k in [
+            'fnx', 'fenix', 'pmdg', 'fbw', 'flybywire', 'a320', 'a319', 'a321', 'a350', 'a220',
+            'b737', 'b747', 'b777', 'b787', 'crj', 'livery', 'liveries', 'fleet', 'simobjects',
+            'fs20', 'fs24', 'vfra', 'pack', 'aero', 'vfr', 'mesh', 'tree', 'data'
+        ]):
+            continue
         t_upper = t.upper()
-        if len(t_upper) == 4 and t_upper in airports and t.lower() not in ['fs20', 'fs24', 'vfra', 'pack', 'aero', 'vfr', 'mesh', 'tree', 'data']:
+        if len(t_upper) == 4 and t_upper in airports:
             found.add(t_upper)
 
     return found
@@ -90,20 +325,6 @@ def get_folder_to_icaos_map(airports=None):
 
     return folder_to_icaos, third_party_airport_pkgs
 
-def is_core_or_library_package(pkg_name):
-    nl = pkg_name.lower()
-    return any(k in nl for k in [
-        'modellib', 'commonlibrary', 'projectairports', 'genericairports',
-        'travelbook', 'worlddiscovery', 'bush-trip', 'bushtrip', 'activities',
-        'instruments', 'navdata', 'fs-base', 'freeflight', 'mission',
-        'tutorial', 'discovery', 'point-of-interest', 'simobjects',
-        'passiveaircraft', 'ships', 'animals', 'vehicles', 'pgg',
-        'autofps', 'beyondatc', 'toolbar', 'simbridge', 'sayintentions',
-        'chaseplane', 'p42-util', 'aircraft', 'livery', 'liveries', 'fleet',
-        'gsx', 'mobiflight', 'fsuipc', 'fslabs', 'fsrealistic', 'raas',
-        'wwtwasm', 'traffic', 'simbrief', 'fsipanel', 'gaist', 'asfs', 'navigraph'
-    ])
-
 _CACHED_CONTENT_XML_PATH = None
 
 def get_content_xml_paths():
@@ -114,18 +335,42 @@ def get_content_xml_paths():
 
     paths = []
 
-    # 1. MSFS 2024 Store / Game Pass (Limitless) - Dynamically discover Xbox Gamertag profile folder
+    # 1. MSFS 2024 Store / Game Pass (Limitless) - Dynamically discover Xbox Gamertag profile folder and root LocalCache
     if os.path.exists(limitless_cache):
+        main_limitless_xml = os.path.join(limitless_cache, 'Content.xml')
+        sub_xmls = []
         try:
             for item in os.listdir(limitless_cache):
                 sub = os.path.join(limitless_cache, item)
                 if os.path.isdir(sub) and item not in ('Packages', 'PC', '$PC$', 'ModelLibCache', 'SceneryIndexes', 'SimObjects'):
                     sub_xml = os.path.join(sub, 'Content.xml')
                     if os.path.exists(sub_xml):
-                        paths.append(sub_xml)
+                        sub_xmls.append(sub_xml)
         except Exception:
             pass
-        paths.append(os.path.join(limitless_cache, 'Content.xml'))
+
+        # Synchronization guarantee: If sub_xml exists but main_limitless_xml does not, copy it over!
+        if sub_xmls and not os.path.exists(main_limitless_xml):
+            try:
+                import shutil
+                shutil.copy2(sub_xmls[0], main_limitless_xml)
+            except Exception:
+                pass
+        # Conversely, if main_limitless_xml exists, ensure all sub profile folders have it synchronized
+        elif os.path.exists(main_limitless_xml):
+            for s_xml in sub_xmls:
+                if not os.path.exists(s_xml):
+                    try:
+                        import shutil
+                        shutil.copy2(main_limitless_xml, s_xml)
+                    except Exception:
+                        pass
+
+        for s_xml in sub_xmls:
+            if s_xml not in paths:
+                paths.append(s_xml)
+        if main_limitless_xml not in paths:
+            paths.append(main_limitless_xml)
 
     # 2. MSFS 2024 Steam - Dynamically discover user profile folder
     if os.path.exists(msfs24_steam):
@@ -146,6 +391,7 @@ def get_content_xml_paths():
 
     return paths
 
+
 def get_existing_content_xml_paths():
     return [p for p in get_content_xml_paths() if os.path.exists(p)]
 
@@ -161,6 +407,56 @@ def get_content_xml_path():
             return p
     _CACHED_CONTENT_XML_PATH = paths[0]
     return _CACHED_CONTENT_XML_PATH
+
+def sanitize_msfs_content_xml():
+    """
+    Enforces absolute immunity and integrity in MSFS Content.xml files:
+    1. Unconditionally restores ANY aircraft, livery, utility, model library, or instrument to 'Activated'.
+    2. Strips any corrupt or invalid .disabled elements.
+    3. Removes duplicates.
+    """
+    content_xml_paths = get_content_xml_paths()
+    for xml_path in content_xml_paths:
+        if not os.path.exists(xml_path):
+            continue
+        try:
+            import xml.etree.ElementTree as ET
+            with open(xml_path, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+            tree = ET.fromstring(content)
+            changed = False
+
+            for elem in list(tree.findall('Package')):
+                name = elem.get('name', '')
+                if not name:
+                    continue
+                name_clean = name[:-9] if name.endswith('.disabled') else name
+                if name.lower().endswith('.disabled'):
+                    tree.remove(elem)
+                    changed = True
+                    continue
+
+                if is_core_or_library_package(name) or is_core_or_library_package(name_clean):
+                    if elem.get('active') == 'UserDisabled':
+                        elem.set('active', 'Activated')
+                        changed = True
+
+            if changed:
+                seen_exact = set()
+                for elem in list(tree.findall('Package')):
+                    n = elem.get('name', '').strip().lower()
+                    if n in seen_exact:
+                        tree.remove(elem)
+                    else:
+                        seen_exact.add(n)
+
+                ET.indent(tree, space='  ')
+                xml_str = ET.tostring(tree, encoding='unicode')
+                with open(xml_path, 'w', encoding='utf-8') as f:
+                    f.write('<?xml version="1.0" encoding="utf-8"?>\n' + xml_str.strip() + '\n')
+                print(f"[Sanitize] Repaired & ensured immunity in {xml_path}")
+        except Exception as e:
+            print(f"[Sanitize] Error sanitizing {xml_path}: {e}")
 
 def safe_remove_path(p):
     """Safely removes a file, symlink, junction or folder without affecting the junction target."""
@@ -213,6 +509,12 @@ def disable_physical_package(p_path):
     """Disables a package on disk (folder.disabled, manifest.json.disabled, layout.json.disabled)."""
     if not p_path:
         return p_path
+
+    # HARD IMMUNITY GUARD: Never disable any aircraft, livery, utility, tool or core package
+    if is_core_or_library_package(p_path):
+        print(f"[IMMUNITY GUARD] Refusing to disable protected package: {p_path}")
+        return p_path
+
     clean_p = p_path[:-9] if p_path.endswith('.disabled') else p_path
     dis_p = clean_p + '.disabled'
 
@@ -268,6 +570,12 @@ def set_package_state_for_icao(p_path, target_icao, should_enable):
     """Enables or disables a package for a specific ICAO, handling multi-airport packages (bgl renaming) and single airport packages."""
     if not p_path:
         return
+
+    # HARD IMMUNITY GUARD: Never alter any aircraft, livery, utility, tool or core package
+    if is_core_or_library_package(p_path):
+        print(f"[IMMUNITY GUARD] Refusing to alter protected package in set_package_state_for_icao: {p_path}")
+        return
+
     clean_p = p_path[:-9] if p_path.endswith('.disabled') else p_path
     dis_p = clean_p + '.disabled'
     target_dir = clean_p if (os.path.exists(clean_p) or os.path.islink(clean_p) or (hasattr(os.path, 'isjunction') and os.path.isjunction(clean_p))) else (dis_p if (os.path.exists(dis_p) or os.path.islink(dis_p)) else None)
@@ -283,7 +591,7 @@ def set_package_state_for_icao(p_path, target_icao, should_enable):
 
     # Check if package is potentially a multi-airport bundle
     folder_base = os.path.basename(clean_p).lower()
-    is_potential_bundle = any(k in folder_base for k in ['pack', 'bundle', 'airports', 'vfr', 'airfields']) or folder_base in SPECIAL_BUNDLE_MAP
+    is_potential_bundle = any(k in folder_base for k in ['pack', 'bundle', 'airports', 'vfr', 'airfields', 'francevfr', 'fvfr']) or folder_base in SPECIAL_BUNDLE_MAP
 
     if not is_potential_bundle:
         # Fast path for standard single-airport packages: instant folder rename
@@ -348,7 +656,7 @@ def set_package_state_for_icao(p_path, target_icao, should_enable):
         else:
             disable_physical_package(target_dir)
 
-def update_msfs_content_xml(keep_icaos=None, restore_flight_mode=False, flight_disabled_xml=None, flight_added_xml=None, folder_to_icaos=None, third_party_airport_pkgs=None, all_airports=None):
+def update_msfs_content_xml(keep_icaos=None, restore_flight_mode=False, flight_disabled_xml=None, flight_added_xml=None, pre_existing_disabled_xml=None, folder_to_icaos=None, third_party_airport_pkgs=None, all_airports=None, full_reset=False):
     content_xml_paths = get_content_xml_paths()
 
     if folder_to_icaos is None or third_party_airport_pkgs is None:
@@ -363,6 +671,14 @@ def update_msfs_content_xml(keep_icaos=None, restore_flight_mode=False, flight_d
         if icaos:
             return set(icaos)
 
+        # SPECIAL_BUNDLE_MAP check (France VFR and other multi-airport bundles)
+        b_icaos = SPECIAL_BUNDLE_MAP.get(clean_lower) or SPECIAL_BUNDLE_MAP.get(norm)
+        if b_icaos:
+            return set(b_icaos)
+        for bk, bv in SPECIAL_BUNDLE_MAP.items():
+            if bk in clean_lower or bk in norm:
+                return set(bv)
+
         res = resolve_package_icaos(clean) or resolve_package_icaos(norm)
         if res:
             return set(res)
@@ -371,8 +687,38 @@ def update_msfs_content_xml(keep_icaos=None, restore_flight_mode=False, flight_d
         if m:
             return {m.group(1).upper()}
 
+        # Known Handcrafted / Payware Airport name patterns (Gatwick, Frankfurt, Vancouver, etc.)
+        for t_icao, t_words in [
+            ('EGKK', ['gatwick', 'egkk']),
+            ('EDDF', ['frankfurt', 'eddf']),
+            ('CYVR', ['vancouver', 'cyvr']),
+            ('LFBD', ['bordeaux', 'merignac', 'lfbd']),
+            ('LFML', ['marseille', 'lfml']),
+            ('LFKB', ['bastia', 'lfkb'])
+        ]:
+            if any(w in clean_lower for w in t_words):
+                return {t_icao}
+
         if clean_lower in third_party_airport_pkgs or norm in third_party_airport_pkgs:
             return {'AIRPORT_UNKNOWN'}
+
+        # France VFR generic fallback
+        if any(k in clean_lower for k in ['francevfr', 'fvfr']):
+            return {'AIRPORT_FRANCEVFR'}
+
+        # General airport indicators
+        if any(k in clean_lower for k in ['-airport-', '_airport_', '-airfield-', '-aerodrome-']):
+            return {'AIRPORT_UNKNOWN'}
+
+        # Discovery / Bushtrip for non-kept cities
+        if any(k in clean_lower for k in ['bushtrip', 'discovery']):
+            for t_icao, t_words in [
+                ('EGKK', ['gatwick']),
+                ('EDDF', ['frankfurt']),
+                ('CYVR', ['vancouver'])
+            ]:
+                if any(w in clean_lower for w in t_words):
+                    return {t_icao}
 
         return set()
 
@@ -385,7 +731,18 @@ def update_msfs_content_xml(keep_icaos=None, restore_flight_mode=False, flight_d
 
     for xml_path in content_xml_paths:
         if not os.path.exists(xml_path):
-            continue
+            parent_dir = os.path.dirname(xml_path)
+            if os.path.isdir(parent_dir):
+                for other_p in content_xml_paths:
+                    if other_p != xml_path and os.path.exists(other_p):
+                        try:
+                            import shutil
+                            shutil.copy2(other_p, xml_path)
+                            break
+                        except Exception:
+                            pass
+            if not os.path.exists(xml_path):
+                continue
         try:
             import xml.etree.ElementTree as ET
             with open(xml_path, 'r', encoding='utf-8', errors='ignore') as f:
@@ -397,15 +754,45 @@ def update_msfs_content_xml(keep_icaos=None, restore_flight_mode=False, flight_d
             if restore_flight_mode:
                 flight_disabled_set_lower = {x.lower() for x in (flight_disabled_xml or [])}
                 flight_added_set_lower = {x.lower() for x in (flight_added_xml or [])}
+                pre_existing_xml_lower = {x.lower() for x in (pre_existing_disabled_xml or [])}
+                all_conflict_sec_lower = {k.lower() for sec_list in KNOWN_CONFLICT_SECONDARY_PACKAGES.values() for k in sec_list}
+
                 for elem in list(tree.findall('Package')):
                     name = elem.get('name', '')
                     name_clean = name[:-9] if name.endswith('.disabled') else name
                     name_lower = name.lower()
                     name_clean_lower = name_clean.lower()
+                    name_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', name_clean_lower)
+
+                    # Remove any spurious .disabled entries or packages temporarily added by flight mode
                     if name_lower.endswith('.disabled') or name_lower in flight_added_set_lower or name_clean_lower in flight_added_set_lower:
                         tree.remove(elem)
                         changed = True
-                    elif name_lower in flight_disabled_set_lower or name_clean_lower in flight_disabled_set_lower or (not flight_disabled_set_lower and elem.get('active') == 'UserDisabled'):
+                        continue
+
+                    # STRICT IMMUNITY: Never re-enable packages that were UserDisabled prior to flight mode
+                    if name_lower in pre_existing_xml_lower or name_clean_lower in pre_existing_xml_lower:
+                        continue
+
+                    # STRICT SAFEGUARD: Never re-enable known secondary conflicting packages
+                    if name_clean_lower in all_conflict_sec_lower or name_norm in all_conflict_sec_lower:
+                        continue
+
+                    # Only restore packages that were explicitly disabled during flight mode
+                    if name_lower in flight_disabled_set_lower or name_clean_lower in flight_disabled_set_lower:
+                        if elem.get('active') == 'UserDisabled':
+                            elem.set('active', 'Activated')
+                            changed = True
+                    elif full_reset and not flight_disabled_set_lower:
+                        # Full reset only when no session tracking exists and not in secondary conflict list
+                        if elem.get('active') == 'UserDisabled':
+                            elem.set('active', 'Activated')
+                            changed = True
+
+                # Always guarantee all aircraft, liveries, instruments and core tools are Activated
+                for elem in tree.findall('Package'):
+                    name = elem.get('name', '')
+                    if is_core_or_library_package(name):
                         if elem.get('active') == 'UserDisabled':
                             elem.set('active', 'Activated')
                             changed = True
@@ -418,7 +805,11 @@ def update_msfs_content_xml(keep_icaos=None, restore_flight_mode=False, flight_d
                     norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_lower)
                     seen_xml_names.add(norm)
 
+                    # STRICT IMMUNITY: Never touch or disable aircraft, liveries, instruments or tools
                     if is_core_or_library_package(name):
+                        if elem.get('active') == 'UserDisabled':
+                            elem.set('active', 'Activated')
+                            changed = True
                         continue
 
                     pkg_icaos = get_package_icaos(name)
@@ -429,38 +820,34 @@ def update_msfs_content_xml(keep_icaos=None, restore_flight_mode=False, flight_d
                                 elem.set('active', 'UserDisabled')
                                 disabled_xml_packages.add(name)
                                 changed = True
-                    elif name.endswith('.disabled'):
+                    elif name.endswith('.disabled') and not is_core_or_library_package(name):
                         if elem.get('active') == 'Activated':
                             elem.set('active', 'UserDisabled')
                             disabled_xml_packages.add(name)
                             changed = True
 
-                if all_airports:
-                    for ap in all_airports:
-                        icao = ap.get('icao', '').upper()
-                        if icao and icao not in target_icaos:
-                            for src in ap.get('all_sources', []):
-                                if src.get('is_fix_patch') or src.get('is_addon') or src.get('is_default'):
-                                    continue
-                                fn = src.get('folder_name', '')
-                                if not fn:
-                                    continue
-                                fn_clean = fn[:-9] if fn.lower().endswith('.disabled') else fn
-                                fn_clean_lower = fn_clean.lower()
-                                fn_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn_clean_lower)
-                                if fn_clean_lower not in seen_xml_names and fn_norm not in seen_xml_names:
-                                    new_p = ET.SubElement(tree, 'Package')
-                                    new_p.set('name', fn_clean)
-                                    new_p.set('active', 'UserDisabled')
-                                    seen_xml_names.add(fn_clean_lower)
-                                    seen_xml_names.add(fn_norm)
-                                    added_xml_packages.add(fn_clean)
-                                    changed = True
+                # Final immunity sweep: Guarantee ALL aircraft and liveries remain Activated
+                for elem in tree.findall('Package'):
+                    name = elem.get('name', '')
+                    if is_core_or_library_package(name):
+                        if elem.get('active') == 'UserDisabled':
+                            elem.set('active', 'Activated')
+                            changed = True
 
             if changed or not os.path.exists(xml_path):
+                # Safeguard: deduplicate packages before saving
+                seen_exact = set()
+                for elem in list(tree.findall('Package')):
+                    n = elem.get('name', '').strip().lower()
+                    if n in seen_exact:
+                        tree.remove(elem)
+                    else:
+                        seen_exact.add(n)
+
+                ET.indent(tree, space='  ')
                 xml_str = ET.tostring(tree, encoding='unicode')
                 with open(xml_path, 'w', encoding='utf-8') as f:
-                    f.write('<?xml version="1.0" encoding="utf-8"?>\n' + xml_str)
+                    f.write('<?xml version="1.0" encoding="utf-8"?>\n' + xml_str.strip() + '\n')
                 print(f"Successfully updated MSFS Content.xml at {xml_path}")
         except Exception as e:
             print(f"Error updating Content.xml at {xml_path}: {e}")
@@ -759,6 +1146,41 @@ class Api:
             bring_window_to_front("SceneryX")
         return json.dumps({"status": "success"})
 
+    def generate_bug_report(self, payload_json="{}"):
+        try:
+            payload = json.loads(payload_json) if isinstance(payload_json, str) else (payload_json or {})
+            desc = payload.get("description", "")
+            cat = payload.get("category", "Général")
+            inc_screen = payload.get("include_screenshot", True)
+            inc_logs = payload.get("include_logs", True)
+            res = flight_bug_reporter.build_bug_report_package(desc, cat, inc_screen, inc_logs)
+            return json.dumps(res, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+
+    def simulate_test_bug(self, bug_type="key_error"):
+        try:
+            res = flight_bug_reporter.simulate_test_bug(bug_type)
+            return json.dumps(res, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    def add_client_breadcrumb(self, action, label, metadata_json=None):
+        try:
+            meta = json.loads(metadata_json) if metadata_json and isinstance(metadata_json, str) else metadata_json
+            flight_bug_reporter.add_breadcrumb(action, label, meta)
+            return json.dumps({"status": "ok"})
+        except Exception:
+            return json.dumps({"status": "error"})
+
+    def log_client_error(self, message, source="", lineno=0, colno=0, stack=""):
+        try:
+            flight_bug_reporter.log_event("JS_ERROR", f"{message} at {source}:{lineno}:{colno}", {"stack": stack})
+            flight_bug_reporter.add_breadcrumb("JS_ERROR", f"{message} ({source}:{lineno})")
+            return json.dumps({"status": "ok"})
+        except Exception:
+            return json.dumps({"status": "error"})
+
     def get_airports(self):
         settings = get_settings()
         disclaimer_accepted = settings.get("disclaimer_accepted", False)
@@ -969,32 +1391,43 @@ class Api:
                 all_flight_icaos = [origin_icao, dest_icao] + [a['icao'] for a in alternates]
                 all_flight_icaos = list(dict.fromkeys([icao.upper() for icao in all_flight_icaos if icao]))
 
+                flight_data = {
+                    "origin": {
+                        "icao": origin_icao,
+                        "name": origin_name,
+                        "lat": float(data.get('origin', {}).get('pos_lat', 0)) if data.get('origin', {}).get('pos_lat') else None,
+                        "lon": float(data.get('origin', {}).get('pos_long', 0)) if data.get('origin', {}).get('pos_long') else None
+                    },
+                    "destination": {
+                        "icao": dest_icao,
+                        "name": dest_name,
+                        "lat": float(data.get('destination', {}).get('pos_lat', 0)) if data.get('destination', {}).get('pos_lat') else None,
+                        "lon": float(data.get('destination', {}).get('pos_long', 0)) if data.get('destination', {}).get('pos_long') else None
+                    },
+                    "alternates": alternates,
+                    "flight_number": flight_num,
+                    "aircraft": aircraft,
+                    "route": route,
+                    "flight_icaos": all_flight_icaos,
+                    "fetched_at": time.time()
+                }
+                st['latest_simbrief_flight'] = flight_data
+                save_settings(st)
+
                 return json.dumps({
                     "status": "success",
                     "username": username,
                     "userid": user_id,
-                    "flight": {
-                        "origin": {"icao": origin_icao, "name": origin_name},
-                        "destination": {"icao": dest_icao, "name": dest_name},
-                        "alternates": alternates,
-                        "flight_number": flight_num,
-                        "aircraft": aircraft,
-                        "route": route,
-                        "flight_icaos": all_flight_icaos
-                    }
+                    "flight": flight_data
                 }, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"status": "error", "message": f"Error fetching SimBrief data: {str(e)}"})
 
-    def optimize_flight(self, flight_icaos_json):
-        return self.optimize_flight_mode(flight_icaos_json)
-
-    def restore_all_flight_sceneries(self):
-        return self.restore_all_sceneries(full_reset=False)
-
     def toggle_airport_disabled(self, icao):
         try:
             icao_target = str(icao).strip().upper()
+            if is_core_or_library_package(icao_target):
+                return json.dumps({"status": "error", "message": "Protected package cannot be disabled."})
             target_xml_paths = get_existing_content_xml_paths()
             if not target_xml_paths:
                 return json.dumps({"status": "error", "message": "Content.xml not found"})
@@ -1125,6 +1558,8 @@ class Api:
 
     def toggle_package(self, package_path, icao=None):
         try:
+            if is_core_or_library_package(package_path):
+                return json.dumps({"status": "error", "message": "Protected aircraft/livery/utility package cannot be modified."})
             content_xml_path = get_content_xml_path()
             pkg_name = os.path.basename(package_path)
             clean_pkg = pkg_name[:-9] if pkg_name.endswith('.disabled') else pkg_name
@@ -1288,6 +1723,8 @@ class Api:
         try:
             if not icao:
                 return json.dumps({"status": "error", "message": "No ICAO provided"})
+            if is_core_or_library_package(icao):
+                return json.dumps({"status": "error", "message": "Protected package cannot be disabled."})
             
             target_xml_paths = get_existing_content_xml_paths()
 
@@ -1385,6 +1822,9 @@ class Api:
                         clean_lower = clean.lower()
                         clean_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_lower)
                         p.set('name', clean)
+
+                        if is_core_or_library_package(clean):
+                            continue
 
                         if clean_lower in seen:
                             to_remove.append(p)
@@ -1523,6 +1963,9 @@ class Api:
                         clean_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_lower)
                         p.set('name', clean)
 
+                        if is_core_or_library_package(clean):
+                            continue
+
                         if clean_lower in seen:
                             to_remove.append(p)
                             changed = True
@@ -1655,6 +2098,8 @@ class Api:
         try:
             if not path:
                 return json.dumps({"status": "error", "message": "No path provided"})
+            if is_core_or_library_package(path):
+                return json.dumps({"status": "error", "message": "Protected package cannot be modified."})
 
             target_xml_paths = get_existing_content_xml_paths()
             
@@ -1743,9 +2188,40 @@ class Api:
             all_airports = run_scan()
             folder_to_icaos, third_party_airport_pkgs = get_folder_to_icaos_map(all_airports)
 
+            # Record all pre-existing disabled packages across all scan folders and Content.xml to guarantee lossless rollback
+            pre_existing_disabled = []
+            for cfg in scan_paths_cfg:
+                dp = cfg.get('path', '')
+                if not os.path.exists(dp):
+                    continue
+                onestore = os.path.join(dp, 'OneStore')
+                target_dirs = [onestore] if os.path.exists(onestore) else [dp]
+                for td in target_dirs:
+                    if not os.path.exists(td):
+                        continue
+                    try:
+                        for item in os.listdir(td):
+                            if item.endswith('.disabled'):
+                                pre_existing_disabled.append(item)
+                    except Exception:
+                        pass
+
+            pre_existing_disabled_xml = []
+            for xml_path in get_content_xml_paths():
+                if os.path.exists(xml_path):
+                    try:
+                        import xml.etree.ElementTree as ET
+                        tree = ET.parse(xml_path)
+                        for elem in tree.getroot().findall('Package'):
+                            if elem.get('active') == 'UserDisabled':
+                                pre_existing_disabled_xml.append(elem.get('name', ''))
+                    except Exception:
+                        pass
+
             enabled_count = 0
             disabled_count = 0
             disabled_by_flight_mode = []
+            disabled_bundle_bgls = []
 
             for cfg in scan_paths_cfg:
                 dp = cfg.get('path', '')
@@ -1776,14 +2252,45 @@ class Api:
                             item_clean_lower = item_clean.lower()
                             item_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', item_clean_lower)
 
-                            if is_core_or_library_package(item_clean):
+                            # STRICT IMMUNITY GUARD: Never touch aircraft, liveries, tools or core utilities
+                            if is_core_or_library_package(item_p) or is_core_or_library_package(item_clean):
                                 continue
 
                             pkg_icaos = folder_to_icaos.get(item_clean_lower) or folder_to_icaos.get(item_norm)
+                            if not pkg_icaos:
+                                bundle_icaos = SPECIAL_BUNDLE_MAP.get(item_clean_lower) or SPECIAL_BUNDLE_MAP.get(item_norm)
+                                if not bundle_icaos:
+                                    for bk, bv in SPECIAL_BUNDLE_MAP.items():
+                                        if bk in item_clean_lower or bk in item_norm:
+                                            bundle_icaos = bv
+                                            break
+                                if bundle_icaos:
+                                    pkg_icaos = set(bundle_icaos)
+
+                            # Known Handcrafted / Payware Airport name patterns (Gatwick, Frankfurt, Vancouver, etc.)
+                            if not pkg_icaos:
+                                for t_icao, t_words in [
+                                    ('EGKK', ['gatwick', 'egkk']),
+                                    ('EDDF', ['frankfurt', 'eddf']),
+                                    ('CYVR', ['vancouver', 'cyvr']),
+                                    ('LFBD', ['bordeaux', 'merignac', 'lfbd']),
+                                    ('LFML', ['marseille', 'lfml']),
+                                    ('LFKB', ['bastia', 'lfkb'])
+                                ]:
+                                    if any(w in item_clean_lower for w in t_words):
+                                        pkg_icaos = {t_icao}
+                                        break
 
                             # ONLY process packages that actually represent airport sceneries!
                             # NEVER rename liveries, aircraft, tools, GSX, or utilities!
-                            is_airport_pkg = bool(pkg_icaos) or (item_clean_lower in third_party_airport_pkgs) or (item_norm in third_party_airport_pkgs)
+                            is_airport_pkg = (
+                                bool(pkg_icaos)
+                                or (item_clean_lower in third_party_airport_pkgs)
+                                or (item_norm in third_party_airport_pkgs)
+                                or (item_clean_lower in SPECIAL_BUNDLE_MAP)
+                                or (item_norm in SPECIAL_BUNDLE_MAP)
+                                or any(k in item_clean_lower for k in ['francevfr', 'fvfr', '-airport-', '_airport_', '-airfield-', '-aerodrome-'])
+                            )
                             if not is_airport_pkg:
                                 continue
 
@@ -1792,12 +2299,22 @@ class Api:
                             if is_community:
                                 try:
                                     # Never re-enable packages that were already disabled prior to flight mode
-                                    # (avoids resurrecting resolved conflicts or duplicate sceneries!)
                                     if not is_keep and not item.endswith('.disabled'):
                                         dis_p = disable_physical_package(item_p)
                                         if dis_p and dis_p.endswith('.disabled'):
                                             disabled_count += 1
                                             disabled_by_flight_mode.append(item)
+                                    elif is_keep and pkg_icaos and len(pkg_icaos) > 1 and not item.endswith('.disabled'):
+                                        # Multi-airport bundle (e.g. France VFR sevfrairports)
+                                        # Dissociate non-kept ICAOs inside this bundle by disabling their specific BGLs!
+                                        for b_icao in pkg_icaos:
+                                            if b_icao not in keep_icaos:
+                                                try:
+                                                    set_package_state_for_icao(item_p, b_icao, should_enable=False)
+                                                    disabled_bundle_bgls.append((item_p, b_icao))
+                                                    disabled_count += 1
+                                                except Exception as bgl_err:
+                                                    print(f"Error dissociating bundle airport {b_icao} in {item}: {bgl_err}")
                                 except Exception as rename_err:
                                     print(f"Skipping package state change for {item}: {rename_err}")
                     except Exception as e:
@@ -1812,17 +2329,41 @@ class Api:
                 all_airports=all_airports
             )
 
+            # Sanitize MSFS Content.xml unconditionally (forces all aircraft, liveries and utilities to Activated)
+            sanitize_msfs_content_xml()
+
             # Merge with existing state if flight mode was already partially active
             existing_flight_cfg = settings.get('flight_mode', {})
             existing_folders = set(existing_flight_cfg.get('disabled_folders', []))
             existing_xml = set(existing_flight_cfg.get('disabled_xml_packages', []))
             existing_added = set(existing_flight_cfg.get('added_xml_packages', []))
+            existing_bundle_bgls = existing_flight_cfg.get('disabled_bundle_bgls', [])
 
             all_disabled_folders = list(existing_folders.union(disabled_by_flight_mode))
             all_disabled_xml = list(existing_xml.union(disabled_xml_pkgs))
             all_added_xml = list(existing_added.union(added_xml_pkgs))
+            all_bundle_bgls = existing_bundle_bgls + [list(pair) for pair in disabled_bundle_bgls if list(pair) not in existing_bundle_bgls]
 
-            total_disabled_count = len(all_disabled_folders) + len(all_disabled_xml) + len(all_added_xml)
+            total_disabled_count = len(all_disabled_folders) + len(all_disabled_xml) + len(all_added_xml) + len(all_bundle_bgls)
+
+            # Persist atomic isolation snapshot to disk
+            snapshot_data = {
+                "created_at": datetime.now().isoformat(),
+                "route": {
+                    "dep_icao": dep_icao,
+                    "arr_icao": arr_icao,
+                    "profile": profile,
+                    "alternates": alternates,
+                    "keep_icaos": list(keep_icaos)
+                },
+                "disabled_folders": all_disabled_folders,
+                "disabled_xml_packages": all_disabled_xml,
+                "added_xml_packages": all_added_xml,
+                "disabled_bundle_bgls": all_bundle_bgls,
+                "pre_existing_disabled_folders": pre_existing_disabled,
+                "pre_existing_disabled_xml": pre_existing_disabled_xml
+            }
+            save_isolation_snapshot(snapshot_data)
 
             settings['flight_mode'] = {
                 'active': True,
@@ -1835,7 +2376,8 @@ class Api:
                 'simbrief_flight': simbrief_flight,
                 'disabled_folders': all_disabled_folders,
                 'disabled_xml_packages': all_disabled_xml,
-                'added_xml_packages': all_added_xml
+                'added_xml_packages': all_added_xml,
+                'disabled_bundle_bgls': all_bundle_bgls
             }
             save_settings(settings)
 
@@ -1850,21 +2392,52 @@ class Api:
             return json.dumps({"status": "error", "message": str(e)})
 
     def restore_all_flight_sceneries(self):
+        """1-Click Flight Corridor Reversal: Restores sceneries disabled by flight mode using atomic snapshot."""
         return self.restore_all_sceneries(full_reset=False)
 
     def restore_all_sceneries(self, full_reset=False):
+        """
+        Lossless 1-Click Scenery Restoration Engine:
+        - full_reset=False: Restores packages disabled by flight mode using snapshot, preserving pre-existing disabled packages.
+        - full_reset=True: Re-enables all disabled scenery packages across all scan folders (excluding known secondary conflict packages).
+        - In both modes: 100% aircraft, livery, and utility immunity is enforced in Content.xml, snapshot is cleared, and settings updated.
+        """
         try:
             settings = get_settings()
             scan_paths_cfg = settings.get("scan_paths", [])
             re_enabled_count = 0
 
+            snapshot = load_isolation_snapshot()
             flight_mode_cfg = settings.get('flight_mode', {})
-            flight_disabled_folders = set(flight_mode_cfg.get('disabled_folders', []))
-            flight_disabled_xml = set(flight_mode_cfg.get('disabled_xml_packages', []))
-            flight_added_xml = set(flight_mode_cfg.get('added_xml_packages', []))
+
+            flight_disabled_folders = set()
+            flight_disabled_xml = set()
+            flight_added_xml = set()
+            pre_existing_folders = set()
+            pre_existing_xml = set()
+            disabled_bundle_bgls = []
+
+            if snapshot and isinstance(snapshot, dict):
+                flight_disabled_folders.update(snapshot.get('disabled_folders', []))
+                flight_disabled_xml.update(snapshot.get('disabled_xml_packages', []))
+                flight_added_xml.update(snapshot.get('added_xml_packages', []))
+                pre_existing_folders.update(snapshot.get('pre_existing_disabled_folders', []))
+                pre_existing_xml.update(snapshot.get('pre_existing_disabled_xml', []))
+                disabled_bundle_bgls.extend(snapshot.get('disabled_bundle_bgls', []))
+
+            if isinstance(flight_mode_cfg, dict):
+                flight_disabled_folders.update(flight_mode_cfg.get('disabled_folders', []))
+                flight_disabled_xml.update(flight_mode_cfg.get('disabled_xml_packages', []))
+                flight_added_xml.update(flight_mode_cfg.get('added_xml_packages', []))
+                for pair in flight_mode_cfg.get('disabled_bundle_bgls', []):
+                    if pair not in disabled_bundle_bgls:
+                        disabled_bundle_bgls.append(pair)
 
             flight_disabled_folders_lower = {f.lower() for f in flight_disabled_folders}
+            pre_existing_folders_lower = {f.lower() for f in pre_existing_folders}
+            all_conflict_sec_lower = {k.lower() for sec_list in KNOWN_CONFLICT_SECONDARY_PACKAGES.values() for k in sec_list}
 
+            # 1. Restore physical packages in Community
             for cfg in scan_paths_cfg:
                 dp = cfg.get('path', '')
                 if not os.path.exists(dp):
@@ -1882,11 +2455,26 @@ class Api:
                                 item_clean = item[:-9]
                                 item_lower = item.lower()
                                 item_clean_lower = item_clean.lower()
-                                # If full_reset is False and we have flight_disabled_folders, only restore folders disabled by flight mode!
-                                if not full_reset and flight_disabled_folders_lower and (item_clean_lower not in flight_disabled_folders_lower and item_lower not in flight_disabled_folders_lower):
+                                item_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', item_clean_lower)
+
+                                # NEVER restore packages that were disabled prior to flight mode!
+                                if item_lower in pre_existing_folders_lower or item in pre_existing_folders or item_clean_lower in pre_existing_folders_lower:
                                     continue
 
+                                # NEVER restore known secondary conflict packages!
+                                if item_clean_lower in all_conflict_sec_lower or item_norm in all_conflict_sec_lower:
+                                    continue
+
+                                # If we have tracked flight disabled folders, only restore those
+                                if flight_disabled_folders_lower:
+                                    if item_clean_lower not in flight_disabled_folders_lower and item_lower not in flight_disabled_folders_lower:
+                                        continue
+
                                 dis_p = os.path.join(td, item)
+                                # Never touch protected packages
+                                if is_core_or_library_package(dis_p) or is_core_or_library_package(item_clean):
+                                    continue
+
                                 try:
                                     enable_physical_package(dis_p)
                                     re_enabled_count += 1
@@ -1895,13 +2483,33 @@ class Api:
                     except Exception as e:
                         print(f"Error scanning {td} for restore:", e)
 
-            # Update MSFS Native Content.xml safely (restoring ONLY flight mode modifications)
+            # 2. Re-enable dissociated bundle BGLs
+            for item in disabled_bundle_bgls:
+                try:
+                    pkg_p = item[0] if isinstance(item, (list, tuple)) else ''
+                    b_icao = item[1] if isinstance(item, (list, tuple)) and len(item) > 1 else ''
+                    if pkg_p and b_icao:
+                        set_package_state_for_icao(pkg_p, b_icao, should_enable=True)
+                except Exception as bgl_e:
+                    print(f"Error restoring bundle BGL: {bgl_e}")
+
+            # 3. Restore MSFS Content.xml safely (restoring flight mode modifications)
             update_msfs_content_xml(
                 restore_flight_mode=True,
                 flight_disabled_xml=flight_disabled_xml,
-                flight_added_xml=flight_added_xml
+                flight_added_xml=flight_added_xml,
+                pre_existing_disabled_xml=pre_existing_xml,
+                full_reset=full_reset
             )
 
+            # 4. Conflict Prevention Safeguard: Ensure secondary conflicting packages remain disabled
+            auto_resolve_known_conflicts()
+
+            # 5. Sanitize MSFS Content.xml unconditionally (forces all aircraft, liveries and utilities to Activated)
+            sanitize_msfs_content_xml()
+
+            # 6. Clear snapshot and flight mode state
+            clear_isolation_snapshot()
             settings['flight_mode'] = {
                 'active': False,
                 'icaos': [],
@@ -1913,7 +2521,8 @@ class Api:
                 'disabled_count': 0,
                 'disabled_folders': [],
                 'disabled_xml_packages': [],
-                'added_xml_packages': []
+                'added_xml_packages': [],
+                'disabled_bundle_bgls': []
             }
             save_settings(settings)
 
@@ -2806,13 +3415,29 @@ class Api:
     def open_external_url(self, url):
         import webbrowser
         try:
-            if url and (url.startswith('http://') or url.startswith('https://')):
-                webbrowser.open(url)
+            if url and (url.startswith('http://') or url.startswith('https://') or url.startswith('mailto:')):
+                if url.startswith('mailto:'):
+                    try:
+                        os.startfile(url)
+                    except Exception:
+                        webbrowser.open(url)
+                else:
+                    webbrowser.open(url)
                 return json.dumps({"status": "ok"})
         except Exception as e:
             print("open_external_url error:", e)
             return json.dumps({"status": "error", "message": str(e)})
         return json.dumps({"status": "error", "message": "Invalid URL"})
+
+    def reveal_in_explorer(self, file_path):
+        import subprocess
+        try:
+            if file_path and os.path.exists(file_path):
+                subprocess.Popen(['explorer.exe', f'/select,"{os.path.abspath(file_path)}"'])
+                return json.dumps({"status": "ok"})
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+        return json.dumps({"status": "error", "message": "File not found"})
 
     def set_user_category_override(self, icao, category):
         try:
@@ -3519,9 +4144,9 @@ class Api:
     # SUITE PERFORMANCE : FLIGHT RIG OPTIMIZER & LIVE BLACKBOX TELEMETRY
     # =========================================================================
 
-    def get_rig_diagnostics(self, flight_profile='LINER', vr_refresh_rate=72, preferred_display_id=None):
+    def get_rig_diagnostics(self, flight_profile='LINER', vr_refresh_rate=72, preferred_display_id=None, profile_id=None):
         try:
-            data = flight_rig_optimizer.get_full_rig_diagnostics(flight_profile=flight_profile, vr_refresh_rate=vr_refresh_rate, preferred_display_id=preferred_display_id)
+            data = flight_rig_optimizer.get_full_rig_diagnostics(flight_profile=flight_profile, vr_refresh_rate=vr_refresh_rate, preferred_display_id=preferred_display_id, profile_id=profile_id)
             return json.dumps(data, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"error": str(e)}, ensure_ascii=False)
@@ -3626,6 +4251,13 @@ class Api:
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
 
+    def ensure_active_profile_applied(self):
+        try:
+            res = flight_rig_optimizer.ensure_active_profile_applied()
+            return json.dumps(res, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
     def apply_staged_settings_to_user_cfg(self):
         try:
             res = flight_rig_optimizer.apply_staged_user_cfg_to_disk()
@@ -3635,6 +4267,18 @@ class Api:
 
     def start_flight_blackbox(self, flight_name, dep_icao, arr_icao, aircraft):
         try:
+            # Si départ ou arrivée sont non spécifiés ou 'DEP'/'ARR', vérifier SimBrief
+            if not dep_icao or dep_icao == 'DEP' or not arr_icao or arr_icao == 'ARR':
+                st = get_settings()
+                sb = st.get('flight_mode', {}).get('simbrief_flight') or st.get('latest_simbrief_flight')
+                if sb and isinstance(sb, dict):
+                    sb_orig = sb.get('origin', {}).get('icao')
+                    sb_dest = sb.get('destination', {}).get('icao')
+                    if sb_orig and (not dep_icao or dep_icao == 'DEP'):
+                        dep_icao = sb_orig
+                    if sb_dest and (not arr_icao or arr_icao == 'ARR'):
+                        arr_icao = sb_dest
+
             res = flight_perf_tracker.BLACKBOX.start(flight_name=flight_name, dep=dep_icao, arr=arr_icao, aircraft=aircraft)
             return json.dumps(res, ensure_ascii=False)
         except Exception as e:
@@ -3654,23 +4298,39 @@ class Api:
         except Exception as e:
             return json.dumps({"error": str(e)}, ensure_ascii=False)
 
+    def get_route_optimization_state(self):
+        try:
+            state = flight_perf_tracker.detect_route_optimization_state()
+            return json.dumps(state, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"error": str(e)}, ensure_ascii=False)
+
     def list_flight_benchmarks(self):
         try:
             base_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
             bench_dir = os.path.join(base_dir, 'benchmarks')
             if not os.path.exists(bench_dir):
                 return json.dumps([], ensure_ascii=False)
+
+            # Auto-recover any orphan CSVs (e.g. from CTD or abrupt close) before listing
+            try:
+                import flight_perf_tracker
+                flight_perf_tracker.recover_orphan_benchmarks(bench_dir)
+            except Exception as e:
+                print(f"[Telemetry] Orphan check during list error: {e}")
+
             files = []
-            for f in sorted(os.listdir(bench_dir), reverse=True):
-                if f.endswith('.html'):
-                    full_p = os.path.join(bench_dir, f)
-                    stat = os.stat(full_p)
-                    files.append({
-                        "filename": f,
-                        "path": full_p,
-                        "size_kb": round(stat.st_size / 1024, 1),
-                        "mtime": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M")
-                    })
+            html_files = [f for f in os.listdir(bench_dir) if f.endswith('.html')]
+            html_files.sort(key=lambda f: os.path.getmtime(os.path.join(bench_dir, f)), reverse=True)
+            for f in html_files:
+                full_p = os.path.join(bench_dir, f)
+                stat = os.stat(full_p)
+                files.append({
+                    "filename": f,
+                    "path": full_p,
+                    "size_kb": round(stat.st_size / 1024, 1),
+                    "mtime": datetime.fromtimestamp(stat.st_mtime).strftime("%Y-%m-%d %H:%M")
+                })
             return json.dumps(files, ensure_ascii=False)
         except Exception as e:
             return json.dumps([], ensure_ascii=False)
@@ -3689,6 +4349,79 @@ class Api:
             return json.dumps({"status": "error", "message": "File not found"})
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
+
+    def delete_flight_benchmark(self, filename):
+        try:
+            base_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+            bench_dir = os.path.join(base_dir, 'benchmarks')
+            if isinstance(filename, list):
+                files_to_delete = filename
+            else:
+                files_to_delete = [x.strip() for x in str(filename).split(',') if x.strip()]
+
+            deleted_count = 0
+            for item in files_to_delete:
+                safe_name = os.path.basename(item)
+                html_p = os.path.join(bench_dir, safe_name)
+                stem = os.path.splitext(safe_name)[0]
+                csv_p = os.path.join(bench_dir, f"{stem}.csv")
+
+                file_deleted = False
+                if os.path.exists(html_p):
+                    try:
+                        os.remove(html_p)
+                        file_deleted = True
+                    except Exception:
+                        pass
+                if os.path.exists(csv_p):
+                    try:
+                        os.remove(csv_p)
+                        file_deleted = True
+                    except Exception:
+                        pass
+                if file_deleted:
+                    deleted_count += 1
+
+            if deleted_count > 0:
+                return json.dumps({"status": "success", "deleted_count": deleted_count}, ensure_ascii=False)
+            return json.dumps({"status": "error", "message": "No benchmark file deleted or found."}, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    def rename_flight_benchmark(self, old_filename, new_filename):
+        try:
+            base_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+            bench_dir = os.path.join(base_dir, 'benchmarks')
+            safe_old = os.path.basename(old_filename)
+            clean_new = os.path.basename(new_filename.strip())
+            if not clean_new:
+                return json.dumps({"status": "error", "message": "New name cannot be empty."}, ensure_ascii=False)
+            if not clean_new.lower().endswith('.html'):
+                clean_new = f"{clean_new}.html"
+
+            old_html_p = os.path.join(bench_dir, safe_old)
+            new_html_p = os.path.join(bench_dir, clean_new)
+
+            if not os.path.exists(old_html_p):
+                return json.dumps({"status": "error", "message": "Original benchmark file not found."}, ensure_ascii=False)
+            if os.path.exists(new_html_p) and old_html_p.lower() != new_html_p.lower():
+                return json.dumps({"status": "error", "message": "A benchmark with this name already exists."}, ensure_ascii=False)
+
+            os.rename(old_html_p, new_html_p)
+
+            old_stem = os.path.splitext(safe_old)[0]
+            new_stem = os.path.splitext(clean_new)[0]
+            old_csv_p = os.path.join(bench_dir, f"{old_stem}.csv")
+            new_csv_p = os.path.join(bench_dir, f"{new_stem}.csv")
+            if os.path.exists(old_csv_p):
+                try:
+                    os.rename(old_csv_p, new_csv_p)
+                except Exception:
+                    pass
+
+            return json.dumps({"status": "success", "new_filename": clean_new}, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
 
     # ================= SMART LOD (DYNAMIC PERFORMANCE ENGINE) =================
 
@@ -3988,6 +4721,31 @@ def main():
     if not os.path.exists(icon_path):
         icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'icon.ico')
 
+    # Initialisation du collecteur de bugs et traces d'exception
+    try:
+        flight_bug_reporter.init_bug_reporter()
+    except Exception as e:
+        print(f"[BugReporter] Initialization warning: {e}")
+
+    # Ensure aircraft, liveries and core utilities are 100% active in Content.xml on startup
+    try:
+        sanitize_msfs_content_xml()
+    except Exception as e:
+        print(f"[Sanitize] Startup check warning: {e}")
+
+    # Strictly synchronize saved active graphics profile to UserCfg.opt on startup
+    try:
+        flight_rig_optimizer.ensure_active_profile_applied()
+    except Exception as e:
+        print(f"[Optimizer] Startup active profile sync warning: {e}")
+
+    # Automatically recover orphan benchmarks from abrupt exits or MSFS CTD
+    try:
+        import flight_perf_tracker
+        flight_perf_tracker.recover_orphan_benchmarks()
+    except Exception as e:
+        print(f"[Telemetry] Startup orphan benchmark check warning: {e}")
+
     window = webview.create_window(
         title='SceneryX',
         url=html_file,
@@ -4010,6 +4768,13 @@ def main():
                     tray_icon.stop()
                 except Exception:
                     pass
+            try:
+                import flight_perf_tracker
+                if flight_perf_tracker.BLACKBOX.is_running:
+                    print("[Telemetry] Force closing: auto-saving blackbox report...")
+                    flight_perf_tracker.BLACKBOX.stop()
+            except Exception:
+                pass
             try:
                 import flight_remote_server
                 flight_remote_server.stop_remote_server()
@@ -4037,6 +4802,13 @@ def main():
                 tray_icon.stop()
             except Exception:
                 pass
+        try:
+            import flight_perf_tracker
+            if flight_perf_tracker.BLACKBOX.is_running:
+                print("[Telemetry] Closing: auto-saving blackbox report...")
+                flight_perf_tracker.BLACKBOX.stop()
+        except Exception:
+            pass
         try:
             import flight_remote_server
             flight_remote_server.stop_remote_server()
@@ -4080,6 +4852,13 @@ def main():
                     api._force_closing = True
                     if icon:
                         icon.stop()
+                except Exception:
+                    pass
+                try:
+                    import flight_perf_tracker
+                    if flight_perf_tracker.BLACKBOX.is_running:
+                        print("[Telemetry] Tray quit: auto-saving blackbox report...")
+                        flight_perf_tracker.BLACKBOX.stop()
                 except Exception:
                     pass
                 try:

@@ -50,6 +50,14 @@ DEFAULT_CONFIG = {
     "vfr_olod_cruise": 80,
     "vfr_target_fps": 40,
     
+    # Paramètres VR (Stéréo HMD Cadence)
+    "vr_tlod_ground": 90,
+    "vr_tlod_cruise": 200,
+    "vr_alt_transition": 4000,
+    "vr_olod_ground": 100,
+    "vr_olod_cruise": 50,
+    "vr_target_fps": 36,
+    
     # Options avancées
     "cloud_recovery": True,      # Réduction temporaire des nuages si saturation GPU
     "step_size": 5,              # Pas d'ajustement par seconde (lissage anti-stutter)
@@ -101,17 +109,45 @@ class SmartLodController:
             return events
 
     def reset_manual_override(self, axis: str = "all") -> Dict[str, Any]:
-        """Réengage les limitations d'altitude et l'automatisation en supprimant le débrayage manuel."""
+        """Réengage les limitations d'altitude et l'automatisation en supprimant le débrayage manuel.
+        Si Smart LOD est inactif, recalibre immédiatement les curseurs sur les valeurs du profil actif."""
         with self._lock:
             if axis in ("tlod", "all"):
                 self.manual_tlod = None
             if axis in ("olod", "all"):
                 self.manual_olod = None
+
         if self.is_running:
             try:
                 self._tick()
             except Exception:
                 pass
+        else:
+            # Smart LOD est inactif : réinitialiser sur le profil graphique actif
+            try:
+                import flight_rig_optimizer
+                snap = flight_rig_optimizer.get_active_profile_snapshot()
+                hl = snap.get("highlights", {})
+                
+                # Récupérer TLOD et OLOD nominaux
+                nom_tlod = float(hl.get("Terrain LOD (TLOD)", 100))
+                nom_olod = float(hl.get("Objects LOD (OLOD)", 100))
+
+                if not self.engine.is_attached:
+                    self.engine.attach()
+
+                if axis in ("tlod", "all"):
+                    self.current_tlod_setpoint = nom_tlod
+                    if self.engine.is_attached and not self.engine.safe_read_only:
+                        self.engine.write_tlod(nom_tlod)
+
+                if axis in ("olod", "all"):
+                    self.current_olod_setpoint = nom_olod
+                    if self.engine.is_attached and not self.engine.safe_read_only:
+                        self.engine.write_olod(nom_olod)
+            except Exception as e:
+                print(f"[SmartLOD] Erreur recalage profil actif: {e}")
+
         return {
             "success": True,
             "axis": axis,
@@ -176,6 +212,11 @@ class SmartLodController:
     def set_enabled(self, enabled: bool, force_kill_autofps: bool = False) -> Dict[str, Any]:
         """Active ou désactive Smart LOD avec arbitrage de conflit AutoFPS."""
         if enabled:
+            # Réinitialiser les débrayages manuels pour reprendre la régulation automatique immédiate
+            with self._lock:
+                self.manual_tlod = None
+                self.manual_olod = None
+
             # Vérifier si AutoFPS externe tourne
             af_running, pid = self.engine.is_autofps_running()
             if af_running:
@@ -197,6 +238,11 @@ class SmartLodController:
 
             self.save_config({"enabled": True, "source": "native"})
             self.start()
+            # Forcer un premier tick de régulation immédiat
+            try:
+                self._tick()
+            except Exception:
+                pass
             return {"success": True, "conflict": False, "enabled": True}
         else:
             self.save_config({"enabled": False})
@@ -246,10 +292,19 @@ class SmartLodController:
         base_fps = telemetry.get("base_fps", 0) or telemetry.get("displayed_fps", 0) or 0
         
         mode = self.config.get("mode", "IFR")
-        tlod_ground = self.config.get(f"{mode.lower()}_tlod_ground", 100)
-        tlod_cruise = self.config.get(f"{mode.lower()}_tlod_cruise", 250)
-        alt_trans = self.config.get(f"{mode.lower()}_alt_transition", 5000)
-        target_fps = self.config.get(f"{mode.lower()}_target_fps", 40)
+        is_vr = self.engine.is_vr_active() if self.engine.is_attached else False
+        mode_key = "vr" if (is_vr and mode.upper() == "VR") else mode.lower()
+
+        tlod_ground = self.config.get(f"{mode_key}_tlod_ground", 100)
+        tlod_cruise = self.config.get(f"{mode_key}_tlod_cruise", 250)
+        alt_trans = self.config.get(f"{mode_key}_alt_transition", 5000)
+
+        # En VR, si vr_target_fps est configuré, adapter la cible automatiquement pour respecter la cadence VR (ex: 36 FPS @ 72Hz)
+        if is_vr and "vr_target_fps" in self.config:
+            target_fps = self.config.get("vr_target_fps", 36)
+        else:
+            target_fps = self.config.get(f"{mode_key}_target_fps", 40)
+
         deadband = self.config.get("deadband_fps", 2)
         step = self.config.get("step_size", 5)
 

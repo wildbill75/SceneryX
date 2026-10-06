@@ -136,6 +136,25 @@ checkAutoload();
         xhr.open("GET", url, true);
         xhr.timeout = 2000;
         xhr.onload = function () {
+            if (xhr.status >= 200 && xhr.status < 300) {
+                try {
+                    let res = JSON.parse(xhr.responseText);
+                    if (res.current_tlod !== undefined) {
+                        currentTlod = Math.round(Number(res.current_tlod));
+                        let sl = document.getElementById("tlod-slider");
+                        let lbl = document.getElementById("tlod-val-label");
+                        if (sl) sl.value = currentTlod;
+                        if (lbl) lbl.textContent = currentTlod;
+                    }
+                    if (res.current_olod !== undefined) {
+                        currentOlod = Math.round(Number(res.current_olod));
+                        let sl = document.getElementById("olod-slider");
+                        let lbl = document.getElementById("olod-val-label");
+                        if (sl) sl.value = currentOlod;
+                        if (lbl) lbl.textContent = currentOlod;
+                    }
+                } catch(e) {}
+            }
             pollTelemetry();
         };
         xhr.onerror = function () {
@@ -607,7 +626,7 @@ checkAutoload();
         let btnOlodPlus = document.getElementById("olod-plus-btn");
         if (btnOlodPlus) {
             btnOlodPlus.addEventListener("click", function () {
-                currentOlod = Math.min(300, currentOlod + 10);
+                currentOlod = Math.min(400, currentOlod + 10);
                 if (slOlod) slOlod.value = currentOlod;
                 if (lblOlod) lblOlod.textContent = currentOlod;
                 setAxisUiState("olod", true);

@@ -192,12 +192,19 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
 
         tlod_is_manual = bool(getattr(lod_ctrl, "manual_tlod", None) is not None or "tlod" in _LAST_MANUAL_LOD)
         olod_is_manual = bool(getattr(lod_ctrl, "manual_olod", None) is not None or "olod" in _LAST_MANUAL_LOD)
+        is_vr_mode = False
+        try:
+            if mem.is_attached:
+                is_vr_mode = mem.is_vr_active()
+        except Exception:
+            pass
 
         telemetry_data = {
             "app_running": True,
             "connected": True,
             "sim_connected": bool(telem.get("simconnect_connected", False)),
             "msfs_active": bool(telem.get("msfs_active", False)),
+            "is_vr": is_vr_mode,
             "perf": {
                 "displayed_fps": disp_fps,
                 "fps": base_fps,
@@ -212,6 +219,7 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
                 "current_olod": cur_olod if cur_olod is not None else 100,
                 "tlod_manual": tlod_is_manual,
                 "olod_manual": olod_is_manual,
+                "is_vr": is_vr_mode,
                 "status": status_msg
             },
             "vram_used_gb": vram_used_gb,
@@ -234,11 +242,14 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
         self._send_json(200, telemetry_data)
 
     def _handle_smart_lod_toggle(self):
+        global _LAST_MANUAL_LOD
         try:
             import flight_lod_controller
             lod_ctrl = flight_lod_controller.get_smart_lod_controller()
             current_status = lod_ctrl.get_status()
             new_state = not current_status.get("enabled", False)
+            if new_state:
+                _LAST_MANUAL_LOD.clear()
             res = lod_ctrl.set_enabled(new_state, force_kill_autofps=True)
             self._send_json(200, res)
         except Exception as e:

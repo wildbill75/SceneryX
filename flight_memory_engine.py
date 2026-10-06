@@ -98,6 +98,7 @@ class FlightMemoryEngine:
     OFFSETS_2024 = {
         'default_module_base': 0x0A5BFF94,
         'sim_module': 'FlightSimulator2024.exe',
+        'offset_vr': 0x148,  # Décalage VR vs 2D Desktop (+328 octets)
         'tlod': 0x358,
         'olod': 0x36C,
         'cloud_q': 0x3A4,
@@ -113,15 +114,22 @@ class FlightMemoryEngine:
         'trees': 0x418,
         'plants': 0x41C,
         'grass': 0x424,
+        # Offsets VR directs
+        'tlod_vr': 0x4A0,     # 0x358 + 0x148
+        'olod_vr': 0x4B4,     # 0x36C + 0x148
+        'cloud_q_vr': 0x4EC,  # 0x3A4 + 0x148
     }
 
     OFFSETS_2020 = {
         'default_module_base': 0x004B2368,
         'sim_module': 'FlightSimulator.exe',
-        'pointer_main': 0x0,
-        'tlod': 0x0,
-        'olod': 0x0,
-        'cloud_q': 0x0
+        'pointer_main': 0x03D0,
+        'pointer_tlod': 0x0C,
+        'pointer_tlod_vr': 0x0114,
+        'pointer_olod': 0x0C,
+        'pointer_cloud_q': 0x44,
+        'pointer_cloud_q_vr': 0x0108,
+        'pointer_vr_mode': 0x1C
     }
 
     def __init__(self):
@@ -132,12 +140,18 @@ class FlightMemoryEngine:
         self.module_base_address: int = 0
         self.offset_module_base: int = 0
         
-        # Adresses directes calculées
+        # Adresses directes calculées (2D Desktop)
         self.addr_tlod: int = 0
         self.addr_olod: int = 0
         self.addr_cloud_q: int = 0
         self.addr_dyn_set: int = 0
         self.addr_vr_mode: int = 0
+        
+        # Adresses directes calculées (VR Headset)
+        self.addr_tlod_vr: int = 0
+        self.addr_olod_vr: int = 0
+        self.addr_cloud_q_vr: int = 0
+        self.addr_dyn_set_vr: int = 0
         
         # État et sécurité
         self.is_attached: bool = False
@@ -295,16 +309,35 @@ class FlightMemoryEngine:
             self.addr_cloud_q = base_ptr + self.OFFSETS_2024['cloud_q']
             self.addr_dyn_set = base_ptr + self.OFFSETS_2024['dyn_set']
             self.addr_vr_mode = base_ptr + self.OFFSETS_2024['vr_mode']
+            self.addr_dyn_set_vr = base_ptr + self.OFFSETS_2024['dyn_set_vr']
+
+            # Offsets VR Headset (base_ptr + offset_2d + offset_vr)
+            offset_vr = self.OFFSETS_2024.get('offset_vr', 0x148)
+            self.addr_tlod_vr = self.addr_tlod + offset_vr
+            self.addr_olod_vr = self.addr_olod + offset_vr
+            self.addr_cloud_q_vr = self.addr_cloud_q + offset_vr
         else:
             self.offset_module_base = self.OFFSETS_2020['default_module_base']
             # MSFS 2020 utilise un pointeur indirectionnel
             ptr_val = self._read_int64(self.module_base_address + self.offset_module_base)
             if ptr_val and ptr_val > 0x10000:
-                self.addr_tlod = ptr_val
-                self.addr_olod = ptr_val + 0x10 # Offset typique 2020
+                self.addr_tlod = self._read_int64(ptr_val + self.OFFSETS_2020['pointer_tlod']) or 0
+                self.addr_tlod_vr = self._read_int64(ptr_val + self.OFFSETS_2020['pointer_tlod_vr']) or 0
+                if self.addr_tlod:
+                    self.addr_olod = self.addr_tlod + self.OFFSETS_2020['pointer_olod']
+                    self.addr_cloud_q = self.addr_tlod + self.OFFSETS_2020['pointer_cloud_q']
+                    self.addr_vr_mode = self.addr_tlod + self.OFFSETS_2020['pointer_vr_mode']
+                if self.addr_tlod_vr:
+                    self.addr_olod_vr = self.addr_tlod_vr + self.OFFSETS_2020['pointer_olod']
+                    self.addr_cloud_q_vr = self.addr_tlod_vr + self.OFFSETS_2020['pointer_cloud_q_vr']
             else:
                 self.addr_tlod = 0
                 self.addr_olod = 0
+                self.addr_tlod_vr = 0
+                self.addr_olod_vr = 0
+                self.addr_cloud_q = 0
+                self.addr_cloud_q_vr = 0
+                self.addr_vr_mode = 0
 
         # Test de validation de sécurité
         if self._run_safety_validation():
@@ -330,6 +363,15 @@ class FlightMemoryEngine:
         self.is_attached = False
         self.safe_read_only = True
         self.consecutive_valid_reads = 0
+        self.addr_tlod = 0
+        self.addr_olod = 0
+        self.addr_cloud_q = 0
+        self.addr_dyn_set = 0
+        self.addr_vr_mode = 0
+        self.addr_tlod_vr = 0
+        self.addr_olod_vr = 0
+        self.addr_cloud_q_vr = 0
+        self.addr_dyn_set_vr = 0
 
     def _read_saved_autofps_offset_2024(self) -> Optional[int]:
         """Tente de lire l'offset validé le plus récent dans la configuration locale d'AutoFPS si présente."""
@@ -351,12 +393,29 @@ class FlightMemoryEngine:
         """
         Vérifie que la lecture du TLOD produit un flottant réaliste (entre 10 et 1000).
         Si la valeur lue est aberrante, l'écriture est totalement bloquée pour protéger MSFS.
+        Valide à la fois les adresses 2D Desktop et VR Headset.
         """
-        if not self.addr_tlod:
+        if not self.addr_tlod and not self.addr_tlod_vr:
             return False
 
-        val = self.read_tlod()
-        if val is not None and 10.0 <= val <= 1000.0:
+        pc_ok = False
+        if self.addr_tlod:
+            raw_pc = self._read_float(self.addr_tlod)
+            if raw_pc is not None and 0.1 <= raw_pc <= 10.0:
+                pc_ok = True
+
+        vr_ok = False
+        if self.addr_tlod_vr:
+            raw_vr = self._read_float(self.addr_tlod_vr)
+            if raw_vr is not None and 0.1 <= raw_vr <= 10.0:
+                vr_ok = True
+            else:
+                # Si l'adresse VR n'est pas cohérente, invalidation préventive des adresses VR
+                self.addr_tlod_vr = 0
+                self.addr_olod_vr = 0
+                self.addr_cloud_q_vr = 0
+
+        if pc_ok or vr_ok:
             self.consecutive_valid_reads += 1
             return True
         return False
@@ -442,45 +501,75 @@ class FlightMemoryEngine:
     # ================= PUBLIC HIGH-LEVEL API =================
 
     def read_tlod(self) -> Optional[float]:
-        """Retourne la valeur actuelle de Terrain LOD (ex: 100.0, 150.0, 250.0)."""
-        raw = self._read_float(self.addr_tlod)
+        """Retourne la valeur actuelle de Terrain LOD (ex: 100.0, 150.0, 250.0).
+        En mode VR actif, lit préférentiellement l'adresse VR."""
+        addr = self.addr_tlod_vr if (self.is_vr_active() and self.addr_tlod_vr) else self.addr_tlod
+        if not addr:
+            addr = self.addr_tlod or self.addr_tlod_vr
+        raw = self._read_float(addr)
         if raw is not None:
             # Facteur d'échelle 1.0f = 100
             return round(raw * 100.0, 1)
         return None
 
     def write_tlod(self, value: float) -> bool:
-        """Ajuste le Terrain LOD (sécurisé entre 10 et 1000)."""
-        if self.safe_read_only or not self.addr_tlod:
+        """Ajuste le Terrain LOD (sécurisé entre 10 et 1000) sur 2D et VR simultanément (Dual-Write)."""
+        if self.safe_read_only or (not self.addr_tlod and not self.addr_tlod_vr):
             return False
         val_clamped = max(10.0, min(float(value), 1000.0))
-        # Écriture du flottant avec mise à l'échelle (ex: 150 -> 1.5f)
-        return self._write_float(self.addr_tlod, val_clamped / 100.0)
+        float_val = val_clamped / 100.0
+        ok_pc = False
+        ok_vr = False
+        if self.addr_tlod:
+            ok_pc = self._write_float(self.addr_tlod, float_val)
+        if self.addr_tlod_vr:
+            ok_vr = self._write_float(self.addr_tlod_vr, float_val)
+        return ok_pc or ok_vr
 
     def read_olod(self) -> Optional[float]:
-        """Retourne la valeur actuelle d'Object LOD (ex: 100.0, 50.0, 20.0)."""
-        raw = self._read_float(self.addr_olod)
+        """Retourne la valeur actuelle d'Object LOD (ex: 100.0, 50.0, 20.0).
+        En mode VR actif, lit préférentiellement l'adresse VR."""
+        addr = self.addr_olod_vr if (self.is_vr_active() and self.addr_olod_vr) else self.addr_olod
+        if not addr:
+            addr = self.addr_olod or self.addr_olod_vr
+        raw = self._read_float(addr)
         if raw is not None:
             return round(raw * 100.0, 1)
         return None
 
     def write_olod(self, value: float) -> bool:
-        """Ajuste l'Object LOD (sécurisé entre 10 et 500)."""
-        if self.safe_read_only or not self.addr_olod:
+        """Ajuste l'Object LOD (sécurisé entre 10 et 500) sur 2D et VR simultanément (Dual-Write)."""
+        if self.safe_read_only or (not self.addr_olod and not self.addr_olod_vr):
             return False
         val_clamped = max(10.0, min(float(value), 500.0))
-        return self._write_float(self.addr_olod, val_clamped / 100.0)
+        float_val = val_clamped / 100.0
+        ok_pc = False
+        ok_vr = False
+        if self.addr_olod:
+            ok_pc = self._write_float(self.addr_olod, float_val)
+        if self.addr_olod_vr:
+            ok_vr = self._write_float(self.addr_olod_vr, float_val)
+        return ok_pc or ok_vr
 
     def read_cloud_quality(self) -> Optional[int]:
         """Retourne la qualité des nuages (0=Low, 1=Medium, 2=High, 3=Ultra)."""
-        return self._read_int32(self.addr_cloud_q)
+        addr = self.addr_cloud_q_vr if (self.is_vr_active() and self.addr_cloud_q_vr) else self.addr_cloud_q
+        if not addr:
+            addr = self.addr_cloud_q or self.addr_cloud_q_vr
+        return self._read_int32(addr)
 
     def write_cloud_quality(self, quality: int) -> bool:
-        """Modifie la qualité des nuages (0=Low, 1=Medium, 2=High, 3=Ultra)."""
-        if self.safe_read_only or not self.addr_cloud_q:
+        """Modifie la qualité des nuages (0=Low, 1=Medium, 2=High, 3=Ultra) sur 2D et VR simultanément."""
+        if self.safe_read_only or (not self.addr_cloud_q and not self.addr_cloud_q_vr):
             return False
         q_clamped = max(0, min(int(quality), 3))
-        return self._write_int32(self.addr_cloud_q, q_clamped)
+        ok_pc = False
+        ok_vr = False
+        if self.addr_cloud_q:
+            ok_pc = self._write_int32(self.addr_cloud_q, q_clamped)
+        if self.addr_cloud_q_vr:
+            ok_vr = self._write_int32(self.addr_cloud_q_vr, q_clamped)
+        return ok_pc or ok_vr
 
     def is_vr_active(self) -> bool:
         """Indique si le mode VR est actif dans le simulateur."""
@@ -492,6 +581,7 @@ class FlightMemoryEngine:
     def get_status(self) -> Dict[str, Any]:
         """Retourne un dictionnaire complet sur l'état du moteur mémoire."""
         is_autofps_up, autofps_pid = self.is_autofps_running()
+        is_vr = self.is_vr_active() if self.is_attached else False
         return {
             "is_attached": self.is_attached,
             "safe_read_only": self.safe_read_only,
@@ -500,10 +590,13 @@ class FlightMemoryEngine:
             "is_2024": self.is_2024,
             "addr_tlod": hex(self.addr_tlod) if self.addr_tlod else None,
             "addr_olod": hex(self.addr_olod) if self.addr_olod else None,
+            "addr_tlod_vr": hex(self.addr_tlod_vr) if self.addr_tlod_vr else None,
+            "addr_olod_vr": hex(self.addr_olod_vr) if self.addr_olod_vr else None,
+            "addr_cloud_q_vr": hex(self.addr_cloud_q_vr) if self.addr_cloud_q_vr else None,
             "current_tlod": self.read_tlod() if self.is_attached else None,
             "current_olod": self.read_olod() if self.is_attached else None,
             "cloud_quality": self.read_cloud_quality() if self.is_attached else None,
-            "is_vr": self.is_vr_active() if self.is_attached else False,
+            "is_vr": is_vr,
             "autofps_conflict": is_autofps_up,
             "autofps_pid": autofps_pid,
             "last_error": self.last_attach_error

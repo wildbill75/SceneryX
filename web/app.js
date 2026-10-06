@@ -773,52 +773,7 @@ function applyRestoredAirportsData(airports) {
 }
 
 async function executeRestoreAllSceneries() {
-    // Clear all departure & arrival flight selections completely
-    flightOriginAirport = null;
-    flightDestAirport = null;
-    isFlightOptimizerActive = false;
-    isFlightCorridorOptimized = false;
-    flightCorridorDisabledCount = 0;
-    if (flightRouteLineGroup) {
-        flightRouteLineGroup.clearLayers();
-    }
-    updateFlightOptimizerUI();
-    filterAirports();
-
-    showCustomModal({
-        title: '',
-        message: `<div class="flex flex-col items-center justify-center py-2 text-center">` +
-                 `  <p class="text-sm text-slate-100 font-bold mb-1">Restoring Full Scenery Library</p>` +
-                 `  <p class="text-xs text-slate-400">Re-enabling all previously isolated sceneries and restoring Content.xml...</p>` +
-                 `  <p class="mt-3.5 text-sm font-bold text-slate-100">Please wait<span class="loading-dots ml-1"><span>.</span><span>.</span><span>.</span></span></p>` +
-                 `</div>`,
-        type: 'loading'
-    });
-
-    try {
-        if (window.pywebview) {
-            const apiFn = window.pywebview.api.restore_all_sceneries || window.pywebview.api.restore_all_flight_sceneries;
-            const resRaw = await apiFn.call(window.pywebview.api);
-            const res = JSON.parse(resRaw);
-            if (res.status === 'ok' || res.status === 'success') {
-                applyRestoredAirportsData(res.airports);
-                updateFlightOptimizerUI();
-                updateFlightModeBannerUI({ active: false, icaos: [] });
-                updatePersistentFlightBannerUI({ active: false });
-                filterAirports();
-                showCustomModal(
-                    "All Sceneries Restored!",
-                    `Successfully re-enabled ${res.re_enabled_count || 0} sceneries. All your add-ons are now active.`,
-                    "success"
-                );
-            } else {
-                showCustomModal("Restore Error", res.message || "Failed to restore sceneries.", "error");
-            }
-        }
-    } catch (err) {
-        console.error("Failed to restore sceneries:", err);
-        showCustomModal("Error", "Restore execution failed: " + err, "error");
-    }
+    return restoreFlightCorridorSceneries();
 }
 
 function executeFlightOptimizerQuickPrompt() {
@@ -864,6 +819,11 @@ async function ensureAppLoaded() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
+    try {
+        localStorage.removeItem('sceneryx_my_rig_pinned');
+        sessionStorage.removeItem('sceneryx_my_rig_pinned');
+    } catch (e) {}
+    if (typeof isRigWindowSessionPinned !== 'undefined') isRigWindowSessionPinned = false;
     if (window.windowManager) window.windowManager.init();
     initMap();
     initSidebarResize();
@@ -3270,20 +3230,13 @@ async function openGsxAuditModal(filter = 'ALL') {
     const modal = document.getElementById('gsx-audit-modal');
     if (!modal) return;
 
-    // Direct floating panel on top of the interactive map (no blur backdrop)
-    modal.classList.remove('hidden', 'bg-slate-950/80', 'backdrop-blur-md', 'items-center', 'justify-center');
-    modal.classList.add('pointer-events-none', 'bg-transparent', 'items-start', 'justify-start', 'pt-[126px]', 'pl-4', 'pb-4');
-
-    const modalBox = modal.querySelector('.glass-modal');
-    if (modalBox) {
-        modalBox.classList.add('pointer-events-auto', 'shadow-2xl');
-        modalBox.style.transform = 'none';
-        modalBox.style.width = '540px';
-        modalBox.style.maxWidth = '560px';
-        modalBox.style.height = 'calc(100vh - 142px)';
-        modalBox.style.maxHeight = 'calc(100vh - 142px)';
-        gsxAuditModalOffset = { x: 0, y: 0 };
-    }
+    // Purge any legacy/parasitic classes that broke interactivity and layout
+    modal.classList.remove('hidden', 'pointer-events-none', 'bg-transparent', 'pt-[126px]', 'pl-4', 'pb-4', 'items-start', 'justify-start');
+    modal.classList.add('flex', 'pointer-events-auto');
+    modal.style.paddingTop = '';
+    modal.style.paddingLeft = '';
+    modal.style.paddingBottom = '';
+    modal.style.paddingRight = '';
 
     const openMapBtn = document.getElementById('btn-gsx-open-map') || modal.querySelector('button[onclick*="openMapFromGsxAudit"]');
     if (openMapBtn) {
@@ -3291,8 +3244,20 @@ async function openGsxAuditModal(filter = 'ALL') {
     }
 
     initDraggableGsxAuditModal();
+
+    if (window.windowManager) {
+        window.windowManager.bringToFront(modal);
+        if (!modal._hasBeenDragged && (!modal.style.left || modal.style.left === 'auto')) {
+            window.windowManager.centerModal(modal);
+        }
+    }
+
     setGsxAuditFilter(currentGsxAuditFilter);
     modal.classList.remove('hidden');
+
+    if (typeof renderIcons === 'function') {
+        renderIcons(modal);
+    }
 
     // Force map to display GSX audited airports (including default MSFS airports like EPWA)
     if (typeof filterAirports === 'function') {
@@ -3367,23 +3332,12 @@ function openMapFromGsxAudit() {
 
     gsxAuditFloatingMode = true;
 
-    // 1. Position the GSX audit window docked on the LEFT (Below top header)
-
-    // 2. Position the GSX audit window docked on the LEFT (Below top header)
-    modal.classList.remove('hidden');
-    modal.classList.remove('bg-slate-950/80', 'backdrop-blur-md', 'items-center', 'justify-center');
-    modal.classList.add('pointer-events-none', 'bg-transparent', 'items-start', 'justify-start', 'pt-[126px]', 'pl-4', 'pb-4');
-
-    const modalBox = modal.querySelector('.glass-modal');
-    if (modalBox) {
-        modalBox.classList.add('pointer-events-auto', 'shadow-2xl');
-        modalBox.style.transform = 'none';
-        modalBox.style.width = '540px';
-        modalBox.style.maxWidth = '560px';
-        modalBox.style.height = 'calc(100vh - 142px)';
-        modalBox.style.maxHeight = 'calc(100vh - 142px)';
-        gsxAuditModalOffset = { x: 0, y: 0 };
-    }
+    modal.classList.remove('hidden', 'pointer-events-none', 'bg-transparent', 'pt-[126px]', 'pl-4', 'pb-4', 'items-start', 'justify-start');
+    modal.classList.add('flex', 'pointer-events-auto');
+    modal.style.paddingTop = '';
+    modal.style.paddingLeft = '';
+    modal.style.paddingBottom = '';
+    modal.style.paddingRight = '';
 
     // Hide Open Map button when map mode is active (no useless green Map Active button)
     const openMapBtn = document.getElementById('btn-gsx-open-map') || modal.querySelector('button[onclick*="openMapFromGsxAudit"]');
@@ -3391,7 +3345,13 @@ function openMapFromGsxAudit() {
         openMapBtn.classList.add('hidden');
     }
 
-    // 3. Reactivate direct pan links in the audit list cards
+    initDraggableGsxAuditModal();
+
+    if (window.windowManager) {
+        window.windowManager.bringToFront(modal);
+    }
+
+    // Reactivate direct pan links in the audit list cards
     renderGsxAuditModal();
 
     // Ensure GSX audit state is active and forced markers are rendered
@@ -3401,7 +3361,7 @@ function openMapFromGsxAudit() {
         filterAirports();
     }
 
-    // 4. Refresh and invalidate map size so the map renders fully and immediately under the floating window
+    // Refresh and invalidate map size so the map renders fully and immediately under the floating window
     if (window.map) {
         setTimeout(() => {
             window.map.invalidateSize();
@@ -3419,12 +3379,7 @@ function closeGsxAuditModal() {
     const modal = document.getElementById('gsx-audit-modal');
     if (modal) {
         modal.classList.add('hidden');
-    }
-
-    const modalBox = modal ? modal.querySelector('.glass-modal') : null;
-    if (modalBox) {
-        modalBox.style.transform = 'none';
-        gsxAuditModalOffset = { x: 0, y: 0 };
+        modal.classList.remove('flex');
     }
 
     gsxAuditFloatingMode = false;
@@ -3462,9 +3417,9 @@ function setGsxAuditFilter(filter) {
         const el = document.getElementById(b.id);
         if (!el) return;
         if (b.key === currentGsxAuditFilter) {
-            el.className = 'px-3 py-1.5 rounded-xl text-xs font-mono font-bold leading-tight bg-cyan-600 text-white border-0 cursor-pointer transition-colors';
+            el.className = 'px-2.5 py-1 rounded-full text-xs typo-action-btn font-semibold leading-tight pill-soft-cyan cursor-pointer transition-colors';
         } else {
-            el.className = 'px-3 py-1.5 rounded-xl text-xs font-mono font-bold leading-tight bg-slate-800 text-slate-300 hover:text-white border-0 cursor-pointer transition-colors';
+            el.className = 'px-2.5 py-1 rounded-full text-xs typo-action-btn font-semibold leading-tight pill-soft-slate hover:text-white cursor-pointer transition-colors';
         }
     });
 
@@ -9327,6 +9282,16 @@ async function executeFlightCorridorOptimization() {
                     allAirportsData = res.airports;
                 }
 
+                currentFlightMode = {
+                    active: true,
+                    icaos: keepIcaos,
+                    dep_icao: dep.icao,
+                    arr_icao: arr.icao,
+                    profile: flightCorridorProfile,
+                    disabled_count: flightCorridorDisabledCount
+                };
+                updateFlightModeBannerUI(currentFlightMode);
+
                 updateFlightPlanningBannerUI();
                 const restoreBtn = document.getElementById('opt-btn-restore-sceneries');
                 if (restoreBtn) restoreBtn.classList.remove('hidden');
@@ -9378,9 +9343,42 @@ async function restoreFlightCorridorSceneries() {
                 try {
                     localStorage.removeItem('sceneryx_saved_flight_plan');
                 } catch (e) {}
+
+                // Fully reset flight route planning state
+                optimizerOrigin = null;
+                optimizerDest = null;
+                optimizerActiveAnchorAirport = null;
+                flightPlanningDeparture = null;
+                flightPlanningDestination = null;
+                flightOriginAirport = null;
+                flightDestAirport = null;
+                flightDestinationAirport = null;
+                flightCorridorArrivalAirport = null;
+                selectedAirport = null;
+                currentRadialAirport = null;
+                operatingAirlinesOriginAirport = null;
+                currentSimBriefFlight = null;
+                currentSimBriefAlternates = [];
+                isFlightPlanningMode = false;
                 isFlightCorridorOptimized = false;
                 isFlightOptimizerActive = false;
                 flightCorridorDisabledCount = 0;
+                currentFlightMode = { active: false, icaos: [] };
+                isDirectRouteMode = false;
+
+                // Clear route corridor vector layers from map
+                if (flightCorridorLayerGroup && map) {
+                    flightCorridorLayerGroup.clearLayers();
+                }
+                if (typeof activeRouteLinesGroup !== 'undefined' && activeRouteLinesGroup) {
+                    activeRouteLinesGroup.clearLayers();
+                }
+                if (typeof flightRouteLineGroup !== 'undefined' && flightRouteLineGroup) {
+                    flightRouteLineGroup.clearLayers();
+                }
+                if (typeof clearFlightCorridor === 'function') {
+                    clearFlightCorridor();
+                }
 
                 applyRestoredAirportsData(res.airports);
 
@@ -9391,7 +9389,17 @@ async function restoreFlightCorridorSceneries() {
                 const restoreBtn = document.getElementById('opt-btn-restore-sceneries');
                 if (restoreBtn) restoreBtn.classList.add('hidden');
                 updateOptimizerRouteUI();
-                filterAirports();
+
+                // Instant full-map airport state refresh helper
+                const forceRefreshFullMapAirportState = () => {
+                    if (airportMarkerCache) airportMarkerCache.clear();
+                    if (customDivIconCache) customDivIconCache.clear();
+                    if (markerClusterGroup) markerClusterGroup.clearLayers();
+                    filterAirports();
+                    if (map) map.invalidateSize();
+                };
+
+                forceRefreshFullMapAirportState();
 
                 showCustomModal({
                     title: 'Sceneries Restored Successfully!',
@@ -9400,7 +9408,10 @@ async function restoreFlightCorridorSceneries() {
                              `  <p>Your full MSFS scenery library has been restored to its active state.</p>` +
                              `</div>`,
                     type: 'success',
-                    confirmText: 'OK'
+                    confirmText: 'OK',
+                    onConfirm: () => {
+                        forceRefreshFullMapAirportState();
+                    }
                 });
             } else {
                 showCustomModal('Restore Error', res.message || 'Failed to restore sceneries.', 'error');
@@ -9569,6 +9580,16 @@ function restoreFlightPlanningStateOnStartup() {
         if (map) {
             map.invalidateSize();
         }
+        currentFlightMode = {
+            active: true,
+            icaos: (savedFm && savedFm.icaos) || (localFp && localFp.keep_icaos) || [depIcao, arrIcao],
+            dep_icao: depIcao,
+            arr_icao: arrIcao,
+            profile: profile,
+            disabled_count: flightCorridorDisabledCount
+        };
+        updateFlightModeBannerUI(currentFlightMode);
+
         renderFlightCorridor();
         filterAirports();
 
@@ -11182,19 +11203,19 @@ function showToast(message, type = 'success', duration = 3200) {
     if (!container) {
         container = document.createElement('div');
         container.id = 'toast-container';
-        container.className = 'fixed bottom-8 left-1/2 -translate-x-1/2 z-[99999] pointer-events-none flex flex-col items-center gap-2 max-w-[92vw] px-4 transition-all duration-200';
+        container.className = 'fixed bottom-28 left-1/2 -translate-x-1/2 z-[99999] pointer-events-none flex flex-col items-center gap-2 max-w-[92vw] px-4 transition-all duration-200';
         document.body.appendChild(container);
     }
 
-    // If flight optimizer bar is currently displayed, position slightly higher so they don't collide
+    // Position well above the bottom toolbar and search bar
     const optBar = document.getElementById('flight-optimizer-bar');
     const isOptBarVisible = optBar && !optBar.classList.contains('hidden');
     if (isOptBarVisible) {
-        container.classList.remove('bottom-8');
-        container.classList.add('bottom-24');
+        container.classList.remove('bottom-28');
+        container.classList.add('bottom-36');
     } else {
-        container.classList.remove('bottom-24');
-        container.classList.add('bottom-8');
+        container.classList.remove('bottom-36');
+        container.classList.add('bottom-28');
     }
 
     let toast = document.getElementById('sceneryx-toast');
@@ -11209,22 +11230,21 @@ function showToast(message, type = 'success', duration = 3200) {
         toastTimeout = null;
     }
 
-    let borderColor = 'border-emerald-500';
-    let iconClass = 'fa-solid fa-circle-check text-emerald-400';
-
+    // Strictly compliant with Scenery X Core UI Directives:
+    // - NO SATURATED COLORED BORDERS: All structural borders must stay strictly neutral (border-slate-700/60)
+    // - NO DECORATIVE ICONS: Strip all redundant FontAwesome/SVG icons
+    // - NEUTRAL STATUS: Neutral slate surface paired with a 6px semantic colored dot indicator (emerald, amber, red). Info messages remain clean without colored dot.
+    let dotHtml = '';
     if (type === 'error') {
-        borderColor = 'border-rose-500';
-        iconClass = 'fa-solid fa-circle-xmark text-rose-400';
+        dotHtml = '<span class="w-1.5 h-1.5 rounded-full bg-rose-400 shrink-0"></span>';
     } else if (type === 'warning') {
-        borderColor = 'border-amber-500';
-        iconClass = 'fa-solid fa-triangle-exclamation text-amber-400';
-    } else if (type === 'info') {
-        borderColor = 'border-cyan-500';
-        iconClass = 'fa-solid fa-circle-info text-cyan-400';
+        dotHtml = '<span class="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0"></span>';
+    } else if (type === 'success') {
+        dotHtml = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0"></span>';
     }
 
-    toast.className = `px-5 py-3 rounded-xl border ${borderColor} bg-slate-900 text-slate-100 shadow-2xl flex items-center gap-3 transition-all duration-300 transform opacity-100 scale-100 pointer-events-auto font-semibold text-xs tracking-wide select-none max-w-full text-center sm:text-left`;
-    toast.innerHTML = `<i class="${iconClass} text-base shrink-0"></i> <span class="leading-relaxed">${message}</span>`;
+    toast.className = 'px-4 py-2.5 rounded-lg border border-slate-700/60 bg-slate-900 text-slate-200 shadow-2xl flex items-center gap-2.5 transition-all duration-300 transform opacity-100 scale-100 pointer-events-auto font-medium text-xs tracking-wide select-none max-w-full text-center sm:text-left';
+    toast.innerHTML = `${dotHtml}<span class="leading-relaxed">${message}</span>`;
 
     toastTimeout = setTimeout(() => {
         toast.classList.remove('opacity-100', 'scale-100', 'pointer-events-auto');
@@ -12110,6 +12130,18 @@ function filterAirports() {
     const normalizedSearch = (search && search.normalize) ? search.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : search;
 
     currentlyFilteredAirports = allAirportsData.filter(ap => {
+        // Highest Priority: Active Flight Isolation Mode (Strictly limit map and view to isolated flight sceneries)
+        if (currentFlightMode && currentFlightMode.active && currentFlightMode.icaos && currentFlightMode.icaos.length > 0) {
+            if (!currentFlightMode.icaos.includes(ap.icao)) {
+                return false;
+            }
+            if (search && search.length > 0) {
+                const searchStr = ap._searchKey || buildAirportSearchKey(ap);
+                if (!searchStr.includes(search) && !searchStr.includes(normalizedSearch)) return false;
+            }
+            return true;
+        }
+
         // High Priority: Origin Airport & Direct Airline Route Destinations (Bypasses global filters)
         if (activeRouteDestIcaos) {
             if (ap.icao === activeRouteOrigin.icao || activeRouteDestIcaos.has(ap.icao)) {
@@ -12123,27 +12155,25 @@ function filterAirports() {
         }
 
         // Active Flight Corridor Filter
-        const corridorDep = (isFlightPlanningMode && flightPlanningDeparture) ? flightPlanningDeparture : selectedAirport;
-        const corridorArr = (isFlightPlanningMode && flightPlanningDestination) ? flightPlanningDestination : flightCorridorArrivalAirport;
+        const isRouteWinOpen = (typeof isFlightOptimizerModalOpen === 'function' && isFlightOptimizerModalOpen());
+        const corridorDep = optimizerOrigin || (isFlightPlanningMode && flightPlanningDeparture ? flightPlanningDeparture : selectedAirport);
+        const corridorArr = optimizerDest || (isFlightPlanningMode && flightPlanningDestination ? flightPlanningDestination : flightCorridorArrivalAirport);
+        const effectiveProfile = optimizerMode || flightCorridorProfile || 'DIRECT';
 
-        if (corridorDep && corridorArr) {
-            const isCorridorEndpoint = (ap.icao === corridorDep.icao || ap.icao === corridorArr.icao || (flightCorridorProfile === 'SIMBRIEF' && typeof currentSimBriefAlternates !== 'undefined' && currentSimBriefAlternates.some(alt => alt.icao === ap.icao)));
+        if (corridorDep && corridorArr && (isRouteWinOpen || isFlightPlanningMode || isFlightCorridorOptimized || (currentFlightMode && currentFlightMode.active))) {
+            const isCorridorEndpoint = (ap.icao === corridorDep.icao || ap.icao === corridorArr.icao || (effectiveProfile === 'SIMBRIEF' && typeof currentSimBriefAlternates !== 'undefined' && currentSimBriefAlternates.some(alt => alt.icao === ap.icao)));
 
             if (isCorridorEndpoint) {
-                // EXCEPTION TO THE RULE:
-                // Departure, Destination and SimBrief Alternates MUST ALWAYS remain visible on the map,
-                // even if they are Default MSFS procedural airports!
-                // They bypass all exclusion rules, pricing filters, and geographic restrictions.
+                // Departure, Destination and SimBrief Alternates ALWAYS remain visible
                 return true;
             }
 
-            // If user selected 'DIRECT' profile: ONLY keep Departure & Destination, hide intermediate addons!
-            if (flightCorridorProfile === 'DIRECT') {
+            // In 'DIRECT' profile: ONLY keep Departure & Destination, strictly hide all other airports!
+            if (effectiveProfile === 'DIRECT') {
                 return false;
             }
 
-            // Flight Corridor Optimizer: For EN-ROUTE airports, only display custom addon sceneries (Payware, Freeware, Asobo).
-            // Exclude all Default MSFS base procedural airports as they cannot and will never be disabled.
+            // In 'CORRIDOR' / 'SIMBRIEF' profile: For EN-ROUTE airports, only display custom addon sceneries along corridor
             const pt = getAirportPricingType(ap);
             if (pt === 'Default' || ap.pricing_type === 'Default' || ap.is_default || ap.package_name === 'Default MSFS Base Airport' || (ap.package_name && ap.package_name.startsWith('msfs-default-'))) {
                 return false;
@@ -12152,19 +12182,17 @@ function filterAirports() {
             if (!isAirportInCorridor(ap, corridorDep, corridorArr)) {
                 return false;
             }
-        } else if (isFlightPlanningMode && flightPlanningDeparture && ap.icao === flightPlanningDeparture.icao) {
-            // While setting up flight plan (departure selected, waiting for arrival), keep departure airport visible
-            return true;
-        } else if (currentFlightMode && currentFlightMode.active && currentFlightMode.icaos && currentFlightMode.icaos.length > 0) {
-            // When Flight Isolation Mode is active: ONLY keep the flight's isolated airports (bypassing region and source filters)
-            if (!currentFlightMode.icaos.includes(ap.icao)) {
-                return false;
-            }
+
             if (search && search.length > 0) {
                 const searchStr = ap._searchKey || buildAirportSearchKey(ap);
                 if (!searchStr.includes(search) && !searchStr.includes(normalizedSearch)) return false;
             }
             return true;
+        } else if (corridorDep && (isRouteWinOpen || isFlightPlanningMode) && !corridorArr) {
+            // While setting up flight plan (departure selected, waiting for arrival), keep departure airport visible
+            if (ap.icao === corridorDep.icao) {
+                return true;
+            }
         }
 
         // GSX Audit Temporary Marker Override:
@@ -15284,49 +15312,7 @@ function updateFlightModeBannerUI(flightMode) {
 }
 
 function restoreAllFlightSceneriesUI() {
-    if (!window.pywebview) return;
-
-    showCustomModal({
-        title: '',
-        message: `<div class="flex flex-col items-center justify-center py-2 text-center">` +
-                 `  <p class="text-sm text-slate-100 font-bold mb-1">Restoring Full Scenery Library</p>` +
-                 `  <p class="text-xs text-slate-400">Re-enabling all previously isolated sceneries and restoring Content.xml...</p>` +
-                 `  <p class="mt-3.5 text-sm font-bold text-slate-100">Please wait<span class="loading-dots ml-1"><span>.</span><span>.</span><span>.</span></span></p>` +
-                 `</div>`,
-        type: 'loading'
-    });
-
-    const apiFn = window.pywebview.api.restore_all_sceneries || window.pywebview.api.restore_all_flight_sceneries;
-    apiFn.call(window.pywebview.api).then(resStr => {
-        try {
-            const res = JSON.parse(resStr);
-            if (res.status === 'ok' || res.status === 'success') {
-                try {
-                    localStorage.removeItem('sceneryx_saved_flight_plan');
-                } catch (e) {}
-                applyRestoredAirportsData(res.airports);
-                isFlightOptimizerActive = false;
-                isFlightCorridorOptimized = false;
-                flightCorridorDisabledCount = 0;
-                updateFlightModeBannerUI({ active: false, icaos: [] });
-                updatePersistentFlightBannerUI({ active: false });
-                updateFlightPlanningBannerUI();
-                closePlanningBannerClean();
-                filterAirports();
-                showCustomModal(
-                    'Sceneries Restored',
-                    'All 3rd-party airport sceneries have been restored to their active state.',
-                    'success'
-                );
-            } else {
-                showCustomModal('Restore Error', res.message || "Failed to restore sceneries.", 'error');
-            }
-        } catch(e){
-            console.error("Error parsing restore result:", e);
-        }
-    }).catch(err => {
-        showCustomModal('Restore Error', String(err), 'error');
-    });
+    return restoreFlightCorridorSceneries();
 }
 
 
@@ -15828,11 +15814,16 @@ function handleAirportRouteSelection(ap) {
         flightCorridorArrivalAirport = null;
         selectedAirport = ap;
         isFlightPlanningMode = true;
+        flightCorridorProfile = optimizerMode || 'DIRECT';
+        isDirectRouteMode = (flightCorridorProfile === 'DIRECT');
         currentSimBriefFlight = null;
         currentSimBriefAlternates = [];
 
         if (flightCorridorLayerGroup && map) {
             flightCorridorLayerGroup.clearLayers();
+        }
+        if (typeof filterAirports === 'function') {
+            filterAirports();
         }
         if (typeof showToast === 'function') {
             showToast(`✈ Departure set: ${ap.icao}. Click another airport on the map to set Arrival.`, 'info');
@@ -15851,9 +15842,14 @@ function handleAirportRouteSelection(ap) {
         flightDestAirport = ap;
         flightCorridorArrivalAirport = ap;
         isFlightPlanningMode = true;
+        flightCorridorProfile = optimizerMode || 'DIRECT';
+        isDirectRouteMode = (flightCorridorProfile === 'DIRECT');
 
         if (typeof renderFlightCorridor === 'function') {
             renderFlightCorridor();
+        }
+        if (typeof filterAirports === 'function') {
+            filterAirports();
         }
         if (typeof showToast === 'function') {
             showToast(`✈ Flight Route set: ${optimizerOrigin.icao} ➔ ${ap.icao}. Sceneries ready for flight isolation.`, 'success');
@@ -16175,13 +16171,23 @@ class WindowManager {
         this.bringToFront(modalEl);
         this.activeModals.add(modalEl);
 
+        if (modalEl.classList.contains('is-pinned')) {
+            return;
+        }
+
         const modalId = modalEl.dataset.modalId || modalEl.id;
         const saved = modalId ? this.sessionState[modalId] : null;
 
         if (saved) {
             if (saved.left !== undefined) modalEl.style.left = `${saved.left}px`;
             if (saved.top !== undefined) modalEl.style.top = `${saved.top}px`;
-            if (saved.width !== undefined) modalEl.style.width = `${saved.width}px`;
+            if (saved.width !== undefined) {
+                if (modalId === 'float-win-route-opt') {
+                    modalEl.style.width = 'fit-content';
+                } else {
+                    modalEl.style.width = `${saved.width}px`;
+                }
+            }
             if (saved.height !== undefined) modalEl.style.height = `${saved.height}px`;
             modalEl.style.transform = 'none';
         } else {
@@ -16196,11 +16202,16 @@ class WindowManager {
 
     centerModal(modalEl) {
         if (!modalEl) return;
+        if (modalEl.id === 'float-win-route-opt' || modalEl.dataset?.modalId === 'float-win-route-opt') {
+            modalEl.style.width = 'fit-content';
+        }
         const rect = modalEl.getBoundingClientRect();
-        const w = rect.width || parseInt(modalEl.style.width) || 500;
+        const w = rect.width || modalEl.offsetWidth || 960;
         const h = rect.height || parseInt(modalEl.style.height) || 400;
         const left = Math.max(16, Math.floor((window.innerWidth - w) / 2));
-        const top = Math.max(16, Math.floor((window.innerHeight - h) / 2));
+        const top = (modalEl.id === 'float-win-route-opt' || modalEl.dataset?.modalId === 'float-win-route-opt')
+            ? 76
+            : Math.max(16, Math.floor((window.innerHeight - h) / 2));
         modalEl.style.left = `${left}px`;
         modalEl.style.top = `${top}px`;
         modalEl.style.right = 'auto';
@@ -16219,6 +16230,7 @@ class WindowManager {
         headerEl._dragInitialized = true;
 
         headerEl.addEventListener('mousedown', (e) => {
+            if (modalEl.classList.contains('is-pinned')) return;
             if (e.target.closest('button') || e.target.closest('input') || e.target.closest('select') || e.target.closest('textarea')) return;
             this.bringToFront(modalEl);
 
@@ -16245,6 +16257,7 @@ class WindowManager {
         resizeHandle._resizeInitialized = true;
 
         resizeHandle.addEventListener('mousedown', (e) => {
+            if (modalEl.classList.contains('is-pinned')) return;
             e.preventDefault();
             e.stopPropagation();
             this.bringToFront(modalEl);
@@ -16363,7 +16376,8 @@ const FLOATING_WINDOW_MAP = {
     'smart_lod': 'float-win-smart-lod',
     'telemetry': 'float-win-telemetry',
     'blackbox': 'float-win-telemetry',
-    'route': 'float-win-route-opt'
+    'route': 'float-win-route-opt',
+    'bug_report': 'float-win-bug-report'
 };
 
 const FLOATING_DEFAULT_OFFSETS = {
@@ -16371,7 +16385,8 @@ const FLOATING_DEFAULT_OFFSETS = {
     'graphics': { x: 180, y: 80 },
     'smart_lod': { x: 280, y: 110 },
     'telemetry': { x: 220, y: 150 },
-    'route': { x: 120, y: 90 }
+    'route': { x: 120, y: 90 },
+    'bug_report': { x: 260, y: 110 }
 };
 
 function openFloatingWindow(winKey, targetAp = null) {
@@ -16382,21 +16397,35 @@ function openFloatingWindow(winKey, targetAp = null) {
         return;
     }
 
+    if (winKey === 'my_rig' || winKey === 'rig' || elId === 'float-win-my-rig') {
+        setRigWindowPinned(isRigWindowSessionPinned);
+    }
+
     const headerEl = winEl.querySelector('.floating-win-header');
     if (headerEl) {
         initDraggableFloatingWindow(winEl, headerEl);
     }
 
-    if (!winEl._hasBeenDragged && !winEl.style.left) {
-        const offset = FLOATING_DEFAULT_OFFSETS[winKey] || { x: 140, y: 100 };
-        const left = Math.max(20, Math.min(window.innerWidth - 650, offset.x));
-        const top = Math.max(20, Math.min(window.innerHeight - 500, offset.y));
-        winEl.style.left = `${left}px`;
-        winEl.style.top = `${top}px`;
-    }
+    if (!winEl.classList.contains('is-pinned')) {
+        if (!winEl._hasBeenDragged && !winEl.style.left) {
+            if (winKey === 'route' || elId === 'float-win-route-opt') {
+                winEl.style.width = 'fit-content';
+                const targetW = winEl.offsetWidth || 960;
+                const left = Math.max(20, Math.floor((window.innerWidth - targetW) / 2));
+                winEl.style.left = `${left}px`;
+                winEl.style.top = '76px';
+            } else {
+                const offset = FLOATING_DEFAULT_OFFSETS[winKey] || { x: 140, y: 100 };
+                const left = Math.max(20, Math.min(window.innerWidth - 650, offset.x));
+                const top = Math.max(20, Math.min(window.innerHeight - 500, offset.y));
+                winEl.style.left = `${left}px`;
+                winEl.style.top = `${top}px`;
+            }
+        }
 
-    // Auto-dimension window to content at opening (removes empty bottom void)
-    winEl.style.height = 'auto';
+        // Auto-dimension window to content at opening (removes empty bottom void)
+        winEl.style.height = 'auto';
+    }
 
     winEl.classList.remove('hidden');
     bringFloatingWindowToFront(winEl);
@@ -16408,9 +16437,12 @@ function openFloatingWindow(winKey, targetAp = null) {
     if (winKey === 'my_rig' || winKey === 'rig') {
         if (typeof loadRigDiagnostics === 'function') loadRigDiagnostics();
     } else if (winKey === 'graphics') {
-        if (typeof loadRigDiagnostics === 'function') loadRigDiagnostics();
-        else if (typeof renderMsfsSettingsMatrix === 'function') renderMsfsSettingsMatrix();
-        if (typeof fetchAndRenderCustomProfiles === 'function') fetchAndRenderCustomProfiles(true);
+        if (typeof openGraphicsSettingsModal === 'function') {
+            openGraphicsSettingsModal();
+        } else {
+            if (typeof loadRigDiagnostics === 'function') loadRigDiagnostics();
+            if (typeof fetchAndRenderCustomProfiles === 'function') fetchAndRenderCustomProfiles(true);
+        }
     } else if (winKey === 'smart_lod') {
         if (typeof refreshSmartLodStatus === 'function') refreshSmartLodStatus();
         if (typeof fetchAndRenderSmartLodProfiles === 'function') fetchAndRenderSmartLodProfiles(true);
@@ -16442,6 +16474,224 @@ function closeFloatingWindow(winKey) {
     }
     if (winKey === 'smart_lod' && typeof updatePerformanceCockpitGauges === 'function') {
         updatePerformanceCockpitGauges();
+    }
+}
+
+// ==============================================================================
+// GESTIONNAIRE D'ASSISTANCE TECHNIQUE ET DE RAPPORT DE BUG
+// ==============================================================================
+
+function openBugReportModal() {
+    const win = document.getElementById('float-win-bug-report');
+    if (!win) return;
+    openFloatingWindow('bug_report');
+    if (window.windowManager) {
+        window.windowManager.centerModal(win);
+    }
+    const feedbackEl = document.getElementById('bug-report-sim-feedback');
+    if (feedbackEl) feedbackEl.classList.add('hidden');
+    const banner = document.getElementById('bug-report-status-banner');
+    if (banner) banner.classList.add('hidden');
+
+    try {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.add_client_breadcrumb) {
+            window.pywebview.api.add_client_breadcrumb('UI_MODAL', 'Ouverture de la modale Assistance & Rapport de Bug');
+        }
+    } catch(e) {}
+}
+
+function closeBugReportModal() {
+    closeFloatingWindow('bug_report');
+}
+
+async function simulateTestBug(type = 'key_error') {
+    const feedbackEl = document.getElementById('bug-report-sim-feedback');
+    const descEl = document.getElementById('bug-report-desc');
+    const catEl = document.getElementById('bug-report-category');
+    
+    if (feedbackEl) {
+        feedbackEl.classList.remove('hidden');
+        feedbackEl.className = 'text-xs text-amber-400 font-medium';
+        feedbackEl.textContent = 'Simulating...';
+    }
+
+    try {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.simulate_test_bug) {
+            const raw = await window.pywebview.api.simulate_test_bug(type);
+            const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            if (feedbackEl) {
+                feedbackEl.className = 'text-xs text-emerald-400 font-medium';
+                feedbackEl.textContent = 'Captured';
+            }
+            if (descEl) {
+                descEl.value = "[TEST INCIDENT] Simulated KeyError during VR profile optimization to verify the diagnostic pipeline.";
+            }
+            if (catEl) {
+                catEl.value = 'Crash & Freezes';
+            }
+            if (typeof showToastNotification === 'function') {
+                showToastNotification("Test error simulated and captured in blackbox.", "info");
+            }
+        }
+    } catch(err) {
+        if (feedbackEl) {
+            feedbackEl.className = 'text-xs text-rose-400 font-medium';
+            feedbackEl.textContent = 'Error: ' + err.message;
+        }
+    }
+}
+
+let currentBugReportResult = null;
+
+function openBugReportInBrowser() {
+    if (!currentBugReportResult) return;
+    const url = currentBugReportResult.browser_mail_url || currentBugReportResult.mailto_url;
+    if (url) {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.open_external_url) {
+            window.pywebview.api.open_external_url(url);
+        } else {
+            window.open(url, '_blank');
+        }
+    }
+}
+
+function copyBugReportSummary() {
+    const text = (currentBugReportResult && currentBugReportResult.summary_md) ? currentBugReportResult.summary_md : '';
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+            if (typeof showToastNotification === 'function') {
+                showToastNotification("Report copied to clipboard!", "success");
+            }
+        });
+    }
+}
+
+function copyBugEmailAddress() {
+    const email = (currentBugReportResult && currentBugReportResult.recipient) ? currentBugReportResult.recipient : 'contact@sidestickpriority.com';
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(email).then(() => {
+            if (typeof showToastNotification === 'function') {
+                showToastNotification("Email address copied!", "success");
+            }
+        });
+    }
+}
+
+function revealBugReportFile() {
+    if (!currentBugReportResult) return;
+    const path = currentBugReportResult.zip_path || currentBugReportResult.md_path;
+    if (path && window.pywebview && window.pywebview.api && window.pywebview.api.reveal_in_explorer) {
+        window.pywebview.api.reveal_in_explorer(path);
+    }
+}
+
+async function submitBugReport() {
+    const btn = document.getElementById('btn-submit-bug-report');
+    const descEl = document.getElementById('bug-report-desc');
+    const catEl = document.getElementById('bug-report-category');
+    const incScreenEl = document.getElementById('bug-report-inc-screenshot');
+    const incLogsEl = document.getElementById('bug-report-inc-logs');
+    const statusBanner = document.getElementById('bug-report-status-banner');
+    const fileBadge = document.getElementById('bug-report-file-badge');
+
+    const desc = descEl ? descEl.value.trim() : '';
+    const cat = catEl ? catEl.value : 'UI & Display';
+    const incScreen = incScreenEl ? incScreenEl.checked : true;
+    const incLogs = incLogsEl ? incLogsEl.checked : true;
+
+    if (!desc) {
+        alert("Please enter a brief description of the issue.");
+        if (descEl) descEl.focus();
+        return;
+    }
+
+    if (btn) {
+        btn.disabled = true;
+        btn.classList.add('opacity-70', 'pointer-events-none');
+        btn.innerHTML = '<span>Generating report...</span>';
+    }
+
+    try {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.generate_bug_report) {
+            const payload = {
+                description: desc,
+                category: cat,
+                include_screenshot: incScreen,
+                include_logs: incLogs
+            };
+            const raw = await window.pywebview.api.generate_bug_report(JSON.stringify(payload));
+            const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
+
+            if (res && res.success) {
+                currentBugReportResult = res;
+                if (statusBanner) {
+                    statusBanner.classList.remove('hidden');
+                }
+                if (fileBadge) {
+                    fileBadge.textContent = res.filename || 'SceneryX_BugReport.zip';
+                }
+                if (typeof showToastNotification === 'function') {
+                    showToastNotification("Archive created on Desktop.", "success");
+                }
+            } else {
+                alert("Error generating report: " + (res.error || 'Unknown error'));
+            }
+        }
+    } catch(err) {
+        alert("Unexpected error: " + err.message);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.classList.remove('opacity-70', 'pointer-events-none');
+            btn.innerHTML = '<span>Generate Report</span>';
+        }
+    }
+}
+
+let isRigWindowSessionPinned = false;
+
+function togglePinRigWindow() {
+    const win = document.getElementById('float-win-my-rig');
+    if (!win) return;
+    const isPinned = win.classList.contains('is-pinned');
+    setRigWindowPinned(!isPinned);
+}
+
+function setRigWindowPinned(pinned) {
+    const win = document.getElementById('float-win-my-rig');
+    const pinBtn = document.getElementById('my-rig-pin-btn');
+    if (!win) return;
+
+    isRigWindowSessionPinned = !!pinned;
+    try {
+        localStorage.removeItem('sceneryx_my_rig_pinned');
+    } catch (e) {}
+
+    if (pinned) {
+        win.classList.add('is-pinned');
+        win.style.left = '';
+        win.style.top = '';
+        win.style.width = '';
+        win.style.height = '';
+        if (pinBtn) {
+            pinBtn.title = "Unpin window (restore floating mode)";
+            pinBtn.classList.add('bg-slate-700', 'text-white');
+            pinBtn.classList.remove('text-slate-400', 'bg-sky-500/20', 'text-sky-400');
+        }
+    } else {
+        win.classList.remove('is-pinned');
+        if (pinBtn) {
+            pinBtn.title = "Pin to top (Horizontal HUD)";
+            pinBtn.classList.remove('bg-slate-700', 'text-white', 'bg-sky-500/20', 'text-sky-400');
+            pinBtn.classList.add('text-slate-400');
+        }
+        win.style.left = '';
+        win.style.top = '';
+        win.style.width = '';
+        win.style.height = 'auto';
+        if (window.windowManager) {
+            window.windowManager.centerModal(win);
+        }
     }
 }
 
@@ -16654,9 +16904,15 @@ function clearOptimizerRoutePlanning() {
 
     updateOptimizerRouteUI();
 
-    // Re-filter airports so normal map state is restored
+    // Re-filter airports and force instant full-map redraw
+    if (airportMarkerCache) airportMarkerCache.clear();
+    if (customDivIconCache) customDivIconCache.clear();
+    if (markerClusterGroup) markerClusterGroup.clearLayers();
     if (typeof filterAirports === 'function') {
         filterAirports();
+    }
+    if (map) {
+        map.invalidateSize();
     }
 
     if (typeof showToast === 'function') {
@@ -16694,12 +16950,12 @@ function updateOptimizerRouteUI() {
 
     if (origIcao) {
         origIcao.textContent = optimizerOrigin ? optimizerOrigin.icao : '----';
-        origIcao.className = `font-mono text-3xl font-black ${getAirportPricingTextColor(optimizerOrigin)} leading-none`;
+        origIcao.className = `font-mono text-xl font-bold ${getAirportPricingTextColor(optimizerOrigin)} leading-none`;
         if (origName) origName.textContent = optimizerOrigin ? (optimizerOrigin.name || '') : '';
     }
     if (destIcao) {
         destIcao.textContent = optimizerDest ? optimizerDest.icao : '----';
-        destIcao.className = `font-mono text-3xl font-black ${getAirportPricingTextColor(optimizerDest)} leading-none`;
+        destIcao.className = `font-mono text-xl font-bold ${getAirportPricingTextColor(optimizerDest)} leading-none`;
         if (destName) destName.textContent = optimizerDest ? (optimizerDest.name || '') : '';
     }
 
@@ -16713,15 +16969,7 @@ function updateOptimizerRouteUI() {
     }
 
     if (flightBadge) {
-        if (optimizerOrigin && optimizerDest) {
-            flightBadge.textContent = `${optimizerOrigin.icao} ➔ ${optimizerDest.icao}`;
-            flightBadge.classList.remove('hidden');
-        } else if (optimizerOrigin) {
-            flightBadge.textContent = `DEP: ${optimizerOrigin.icao}`;
-            flightBadge.classList.remove('hidden');
-        } else {
-            flightBadge.classList.add('hidden');
-        }
+        flightBadge.classList.add('hidden');
     }
 
     ['direct', 'corridor', 'simbrief'].forEach(m => {
@@ -16729,11 +16977,11 @@ function updateOptimizerRouteUI() {
         if (card) {
             const titleSpan = card.querySelector('span');
             if (m.toUpperCase() === optimizerMode) {
-                card.className = 'p-3 rounded-2xl bg-slate-800 border-2 border-blue-500 flex flex-col items-center justify-center text-center cursor-pointer transition-all';
-                if (titleSpan) titleSpan.className = 'text-sm font-black text-white uppercase tracking-wider';
+                card.className = 'h-9 px-3 rounded bg-blue-600 text-white font-semibold text-xs transition-colors cursor-pointer border-0 outline-none flex items-center justify-center';
+                if (titleSpan) titleSpan.className = 'font-semibold text-white';
             } else {
-                card.className = 'p-3 rounded-2xl bg-slate-950 border border-slate-800 hover:bg-slate-900 hover:border-slate-700 flex flex-col items-center justify-center text-center cursor-pointer transition-all';
-                if (titleSpan) titleSpan.className = 'text-sm font-black text-slate-300 uppercase tracking-wider';
+                card.className = 'h-9 px-3 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-semibold text-xs transition-colors cursor-pointer border-0 outline-none flex items-center justify-center';
+                if (titleSpan) titleSpan.className = 'font-semibold text-slate-300';
             }
         }
     });
@@ -16741,23 +16989,30 @@ function updateOptimizerRouteUI() {
     const clearRouteBtn = document.getElementById('opt-btn-clear-route');
     if (clearRouteBtn) {
         const hasRoute = !!(optimizerOrigin || optimizerDest);
-        if (hasRoute) {
-            clearRouteBtn.disabled = false;
-            clearRouteBtn.className = 'px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-blue-600 text-white border border-slate-600 hover:border-blue-500 font-bold text-xs uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center shadow-sm';
-            clearRouteBtn.title = 'Clear current flight route';
-        } else {
-            clearRouteBtn.disabled = true;
-            clearRouteBtn.className = 'px-4 py-2.5 rounded-xl bg-slate-800/60 text-slate-400 border border-slate-700/60 font-bold text-xs uppercase tracking-wider cursor-not-allowed opacity-60 flex items-center justify-center pointer-events-none';
-            clearRouteBtn.title = 'No active flight route to reset';
-        }
+        clearRouteBtn.disabled = false;
+        clearRouteBtn.className = 'h-9 px-4 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-semibold text-xs transition-colors cursor-pointer border-0 outline-none flex items-center justify-center shadow-sm';
+        clearRouteBtn.title = hasRoute ? 'Clear current flight route' : 'Start a new flight route';
     }
 
     const restoreBtn = document.getElementById('opt-btn-restore-sceneries');
     if (restoreBtn) {
+        restoreBtn.className = 'h-9 px-3.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-semibold text-xs transition-colors cursor-pointer border-0 outline-none flex items-center justify-center shadow-sm';
         if (isFlightCorridorOptimized) {
             restoreBtn.classList.remove('hidden');
         } else {
             restoreBtn.classList.add('hidden');
+        }
+    }
+
+    const routeWinEl = document.getElementById('float-win-route-opt');
+    if (routeWinEl) {
+        routeWinEl.style.width = 'fit-content';
+        if (!routeWinEl._hasBeenDragged && typeof centerModal === 'function') {
+            const w = routeWinEl.offsetWidth;
+            if (w > 0) {
+                const left = Math.max(16, Math.floor((window.innerWidth - w) / 2));
+                routeWinEl.style.left = `${left}px`;
+            }
         }
     }
 
@@ -16866,7 +17121,7 @@ async function setOptimizerMode(mode) {
         }
         updateOptimizerRouteUI();
         if (typeof showToast === 'function') {
-            showToast("Flight Mode: Direct A ➔ B (Departure & Destination only)", "info");
+            showToast("Flight Mode: Direct A -> B (Departure & Destination only)", "info");
         }
     } else if (mode === 'CORRIDOR') {
         currentSimBriefAlternates = [];
@@ -17081,11 +17336,11 @@ function switchVrRefreshRate(hz) {
     loadRigDiagnostics();
 }
 
-async function loadRigDiagnostics() {
+async function loadRigDiagnostics(profileId = null) {
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.get_rig_diagnostics) return;
     try {
         const selectedDisplayId = localStorage.getItem('sceneryx_selected_display_id') || null;
-        const resStr = await window.pywebview.api.get_rig_diagnostics(currentFlightMissionProfile, currentVrRefreshRate, selectedDisplayId);
+        const resStr = await window.pywebview.api.get_rig_diagnostics(currentFlightMissionProfile, currentVrRefreshRate, selectedDisplayId, profileId);
         const data = JSON.parse(resStr);
         rigDiagnosticsData = data;
 
@@ -17111,9 +17366,15 @@ async function loadRigDiagnostics() {
             cpuNameEl.textContent = (det.cpu.name_simplified || det.cpu.name || 'UNKNOWN CPU').toUpperCase();
             cpuNameEl.title = det.cpu.name || det.cpu.name_simplified || '';
             if (cpuCoresEl) {
+                const cores = det.cpu.cores || 8;
+                const threads = det.cpu.threads || 16;
+                let coreColor = 'text-emerald-400';
+                if (cores < 6) coreColor = 'text-rose-400';
+                else if (cores < 8) coreColor = 'text-amber-400';
+                else if (cores < 16) coreColor = 'text-sky-400';
                 cpuCoresEl.innerHTML = `
-                    <span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-semibold tabular-nums bg-slate-800 text-slate-200 uppercase">${det.cpu.cores || 8} CORES</span>
-                    <span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-semibold tabular-nums bg-slate-800 text-slate-200 uppercase">${det.cpu.threads || 16} THREADS</span>
+                    <span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-semibold tabular-nums bg-slate-800 border border-slate-700/60 ${coreColor} uppercase">${cores} CORES</span>
+                    <span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-semibold tabular-nums bg-slate-800 border border-slate-700/60 text-slate-300 uppercase">${threads} THREADS</span>
                 `;
             }
         }
@@ -17124,9 +17385,21 @@ async function loadRigDiagnostics() {
             gpuNameEl.textContent = (det.gpu.name_simplified || det.gpu.name || 'UNKNOWN GPU').toUpperCase();
             gpuNameEl.title = det.gpu.name || det.gpu.name_simplified || '';
             if (gpuVramEl) {
+                const vramGb = det.gpu.vram_total_gb || 0;
+                let vramColor = 'text-emerald-400';
+                if (vramGb < 8) vramColor = 'text-rose-400';
+                else if (vramGb < 12) vramColor = 'text-amber-400';
+                else if (vramGb < 16) vramColor = 'text-sky-400';
+
+                const isDriverCurrent = det.gpu.is_driver_current !== false;
+                const driverColor = isDriverCurrent ? 'text-emerald-400' : 'text-amber-400';
+                const driverTitle = isDriverCurrent 
+                    ? `Driver ${det.gpu.driver_version} (Up to date)` 
+                    : `Driver ${det.gpu.driver_version} (Outdated - Latest: ${det.gpu.latest_driver_version || 'newer'})`;
+
                 gpuVramEl.innerHTML = `
-                    <span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-semibold tabular-nums bg-slate-800 text-cyan-300 uppercase">${det.gpu.vram_total_gb || 16} GB VRAM</span>
-                    <span class="px-2.5 py-1 rounded-lg typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] bg-slate-800 text-slate-300">DRIVER ${det.gpu.driver_version || 'LATEST'}</span>
+                    <span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-semibold tabular-nums bg-slate-800 border border-slate-700/60 ${vramColor} uppercase">${vramGb} GB VRAM</span>
+                    <span class="px-2.5 py-1 rounded-lg typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] bg-slate-800 border border-slate-700/60 ${driverColor}" title="${driverTitle}">DRIVER ${det.gpu.driver_version || 'LATEST'}</span>
                 `;
             }
         }
@@ -17143,12 +17416,12 @@ async function loadRigDiagnostics() {
                     displayResEl.innerHTML = det.all_displays.map(d => {
                         const isSel = (d.id === activeId || String(d.index) === String(activeId));
                         const hz = d.refresh_rate_int || 60;
-                        const bgClass = isSel ? 'bg-cyan-600 text-white shadow-sm' : 'bg-slate-800 text-slate-300 hover:bg-slate-700';
-                        return `<button type="button" onclick="selectCadenceDisplay('${d.id}')" class="px-2.5 py-1 rounded-lg typo-action-btn text-xs font-semibold tabular-nums uppercase tracking-[0.02em] ${bgClass} transition-colors cursor-pointer" title="${d.formatted || d.id}">${d.id} (${hz} HZ)</button>`;
+                        const bgClass = isSel ? 'pill-soft-sky text-white shadow-sm' : 'pill-soft-slate text-slate-200 hover:bg-slate-600';
+                        return `<button type="button" onclick="selectCadenceDisplay('${d.id}')" class="px-2.5 py-0.5 rounded-full typo-action-btn text-xs font-bold tabular-nums uppercase tracking-[0.02em] ${bgClass} transition-colors cursor-pointer border-0" title="${d.formatted || d.id}">${d.id} (${hz} HZ)</button>`;
                     }).join('');
                 } else {
                     displayResEl.innerHTML = `
-                        <span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-semibold tabular-nums bg-cyan-950 text-cyan-300 uppercase">${det.display.refresh_rate_int || 60} HZ</span>
+                        <span class="px-2.5 py-0.5 rounded-full typo-metric text-xs font-bold tabular-nums pill-soft-cyan uppercase">${det.display.refresh_rate_int || 60} HZ</span>
                         <span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-semibold tabular-nums bg-slate-800 text-slate-300 uppercase">${det.display.width}x${det.display.height}</span>
                     `;
                 }
@@ -17163,7 +17436,9 @@ async function loadRigDiagnostics() {
             if (vrHeadset && vrHeadset.detected) {
                 vrNameEl.textContent = (vrHeadset.name || 'VR HEADSET').toUpperCase();
                 if (vrHzEl) {
-                    vrHzEl.innerHTML = `<span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-semibold tabular-nums bg-cyan-950 text-cyan-300 uppercase">${vrHeadset.refresh_rate_hz || 72} HZ ACTIVE</span>`;
+                    const hz = vrHeadset.refresh_rate_hz || 72;
+                    const vrColor = hz >= 72 ? 'text-emerald-400' : 'text-amber-400';
+                    vrHzEl.innerHTML = `<span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-bold tabular-nums bg-slate-800 border border-slate-700/60 ${vrColor} uppercase">${hz} HZ ACTIVE</span>`;
                 }
                 if (vrHeadset.refresh_rate_hz) {
                     currentVrRefreshRate = vrHeadset.refresh_rate_hz;
@@ -17171,7 +17446,7 @@ async function loadRigDiagnostics() {
             } else {
                 vrNameEl.textContent = 'NONE DETECTED';
                 if (vrHzEl) {
-                    vrHzEl.innerHTML = `<span class="px-2.5 py-1 rounded-lg typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] bg-slate-800 text-slate-400">DESKTOP MODE</span>`;
+                    vrHzEl.innerHTML = `<span class="px-2.5 py-1 rounded-lg typo-action-btn text-xs font-bold uppercase tracking-[0.02em] bg-slate-800 border border-slate-700/60 text-slate-400">DESKTOP MODE</span>`;
                 }
             }
         }
@@ -17182,10 +17457,15 @@ async function loadRigDiagnostics() {
         if (ramValEl && det.ram) {
             ramValEl.textContent = `${det.ram.total_gb || 32} GB RAM`;
             if (ramBadgesEl) {
-                const xmpClass = det.ram.is_xmp_active ? 'bg-emerald-950 text-emerald-300' : 'bg-slate-800 text-slate-400';
+                const speedMhz = det.ram.speed_mhz || 3200;
+                let speedColor = 'text-emerald-400';
+                if (speedMhz < 3000) speedColor = 'text-amber-400';
+                else if (speedMhz < 3600) speedColor = 'text-sky-400';
+                const isXmp = !!det.ram.is_xmp_active;
+                const xmpColor = isXmp ? 'text-emerald-400' : 'text-amber-400';
                 ramBadgesEl.innerHTML = `
-                    <span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-semibold tabular-nums bg-slate-800 text-slate-200 uppercase">${det.ram.speed_mhz || 3200} MHZ</span>
-                    <span class="px-2.5 py-1 rounded-lg typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] ${xmpClass}">${det.ram.is_xmp_active ? 'XMP ON' : 'XMP OFF'}</span>
+                    <span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-semibold tabular-nums bg-slate-800 border border-slate-700/60 ${speedColor} uppercase">${speedMhz} MHZ</span>
+                    <span class="px-2.5 py-1 rounded-lg typo-action-btn text-xs font-bold uppercase tracking-[0.02em] bg-slate-800 border border-slate-700/60 ${xmpColor}">${isXmp ? 'XMP ON' : 'XMP OFF'}</span>
                 `;
             }
         }
@@ -17193,14 +17473,28 @@ async function loadRigDiagnostics() {
         // DRIVERS & MISC Card in MY RIG
         const miscBadgesEl = document.getElementById('opt-detected-misc-badges');
         if (miscBadgesEl) {
-            const rbarClass = det.rbar_active ? 'bg-emerald-950 text-emerald-300' : 'bg-slate-800 text-slate-400';
-            const hagsClass = det.hags_active ? 'bg-emerald-950 text-emerald-300' : 'bg-slate-800 text-slate-400';
-            const dlssVer = (det.dlss && det.dlss.version) ? det.dlss.version : '3.10';
-            miscBadgesEl.innerHTML = `
-                <span class="px-2.5 py-1 rounded-lg typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] ${rbarClass}">R-BAR</span>
-                <span class="px-2.5 py-1 rounded-lg typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] ${hagsClass}">HAGS</span>
-                <span class="px-2.5 py-1 rounded-lg typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] bg-slate-800 text-cyan-300">DLSS ${dlssVer}</span>
+            const isRbar = !!det.rbar_active;
+            const rbarColor = isRbar ? 'text-emerald-400' : 'text-amber-400';
+            const isHags = !!det.hags_active;
+            const hagsColor = isHags ? 'text-emerald-400' : 'text-amber-400';
+            
+            const dlssObj = det.dlss || {};
+            const dlssVer = dlssObj.version || '3.10';
+            const isDlssCurrent = dlssObj.is_up_to_date !== false;
+            const dlssColor = isDlssCurrent ? 'text-emerald-400' : 'text-amber-400';
+            const dlssTitle = isDlssCurrent 
+                ? `DLSS ${dlssVer} (Up to date)` 
+                : `DLSS ${dlssVer} (Outdated - Latest: ${dlssObj.latest_version || 'newer'})`;
+
+            let html = `
+                <span class="px-2.5 py-1 rounded-lg typo-action-btn text-xs font-bold uppercase tracking-[0.02em] bg-slate-800 border border-slate-700/60 ${rbarColor}">R-BAR ${isRbar ? 'ON' : 'OFF'}</span>
+                <span class="px-2.5 py-1 rounded-lg typo-action-btn text-xs font-bold uppercase tracking-[0.02em] bg-slate-800 border border-slate-700/60 ${hagsColor}">HAGS ${isHags ? 'ON' : 'OFF'}</span>
+                <span class="px-2.5 py-1 rounded-lg typo-action-btn text-xs font-bold uppercase tracking-[0.02em] bg-slate-800 border border-slate-700/60 ${dlssColor}" title="${dlssTitle}">DLSS ${dlssVer}</span>
             `;
+            if (dlssObj.frame_gen_version) {
+                html += `<span class="px-2.5 py-1 rounded-lg typo-action-btn text-xs font-bold uppercase tracking-[0.02em] bg-slate-800 border border-slate-700/60 text-emerald-400" title="Frame Generation DLL active">FRAME GEN</span>`;
+            }
+            miscBadgesEl.innerHTML = html;
         }
 
         // STORAGE / MSFS DRIVE Card in MY RIG
@@ -17214,11 +17508,11 @@ async function loadRigDiagnostics() {
             if (storageBadgeEl) {
                 storageBadgeEl.textContent = (s.tier || 'NVMe SSD').toUpperCase();
                 if (s.is_hdd) {
-                    storageBadgeEl.className = 'px-2 py-0.5 rounded typo-action-btn text-[10px] font-semibold uppercase tracking-[0.02em] bg-rose-950 text-rose-300 border border-rose-700 animate-pulse';
+                    storageBadgeEl.className = 'px-3 py-1 rounded-full typo-action-btn text-[10.5px] font-bold uppercase tracking-[0.02em] bg-slate-800 border border-slate-700/60 text-rose-400 animate-pulse';
                 } else if (s.is_nvme) {
-                    storageBadgeEl.className = 'px-2 py-0.5 rounded typo-action-btn text-[10px] font-semibold uppercase tracking-[0.02em] bg-emerald-950 text-emerald-400 border border-emerald-800/80';
+                    storageBadgeEl.className = 'px-3 py-1 rounded-full typo-action-btn text-[10.5px] font-bold uppercase tracking-[0.02em] bg-slate-800 border border-slate-700/60 text-emerald-400';
                 } else {
-                    storageBadgeEl.className = 'px-2 py-0.5 rounded typo-action-btn text-[10px] font-semibold uppercase tracking-[0.02em] bg-cyan-950 text-cyan-400 border border-cyan-800/80';
+                    storageBadgeEl.className = 'px-3 py-1 rounded-full typo-action-btn text-[10.5px] font-bold uppercase tracking-[0.02em] bg-slate-800 border border-slate-700/60 text-sky-400';
                 }
             }
             if (storageNameEl) {
@@ -17226,9 +17520,13 @@ async function loadRigDiagnostics() {
                 storageNameEl.title = `MSFS Packages Path: ${s.packages_path || s.drive_letter}`;
             }
             if (storageDetailsEl) {
+                const freeGb = s.free_gb || 0;
+                let freeColor = 'text-emerald-400';
+                if (freeGb < 40) freeColor = 'text-rose-400';
+                else if (freeGb < 100) freeColor = 'text-amber-400';
                 storageDetailsEl.innerHTML = `
-                    <span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-semibold tabular-nums bg-slate-800 text-slate-200 uppercase">${s.free_gb || 0} GB FREE</span>
-                    <span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-semibold tabular-nums bg-slate-800 text-slate-400 uppercase">${s.total_gb || 0} GB TOTAL</span>
+                    <span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-semibold tabular-nums bg-slate-800 border border-slate-700/60 ${freeColor} uppercase">${freeGb} GB FREE</span>
+                    <span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-semibold tabular-nums bg-slate-800 border border-slate-700/60 text-slate-400 uppercase">${s.total_gb || 0} GB TOTAL</span>
                 `;
             }
             if (storageWarningEl) {
@@ -17240,9 +17538,52 @@ async function loadRigDiagnostics() {
             }
         }
 
+        // NETWORK / INTERNET Card in MY RIG
+        const netBadgeEl = document.getElementById('opt-detected-net-badge');
+        const netSpeedEl = document.getElementById('opt-detected-net-speed');
+        const netDetailsEl = document.getElementById('opt-detected-net-details');
+
+        if (det.network) {
+            const net = det.network;
+            if (netBadgeEl) {
+                if (net.is_wifi) {
+                    const sigTxt = (net.wifi_signal_pct !== null && net.wifi_signal_pct !== undefined) ? ` (${net.wifi_signal_pct}%)` : '';
+                    netBadgeEl.textContent = `WI-FI${sigTxt}`;
+                    netBadgeEl.className = 'px-3 py-1 rounded-full typo-action-btn text-[10.5px] font-bold uppercase tracking-[0.02em] bg-slate-800 border border-slate-700/60 text-amber-400';
+                } else if (net.is_connected) {
+                    netBadgeEl.textContent = 'ETHERNET';
+                    netBadgeEl.className = 'px-3 py-1 rounded-full typo-action-btn text-[10.5px] font-bold uppercase tracking-[0.02em] bg-slate-800 border border-slate-700/60 text-emerald-400';
+                } else {
+                    netBadgeEl.textContent = 'OFFLINE';
+                    netBadgeEl.className = 'px-3 py-1 rounded-full typo-action-btn text-[10.5px] font-bold uppercase tracking-[0.02em] bg-slate-800 border border-slate-700/60 text-rose-400';
+                }
+            }
+            if (netSpeedEl) {
+                const duplexTxt = (net.duplex && net.duplex !== 'Unknown') ? ` • ${net.duplex}` : '';
+                netSpeedEl.textContent = `${net.link_speed_str || 'Link Speed Unknown'}${duplexTxt}`;
+                netSpeedEl.title = `${net.adapter_name || 'Network Adapter'} (${net.connection_name || ''})`;
+            }
+            if (netDetailsEl) {
+                let pingColor = 'text-emerald-400';
+                let pingTxt = 'Online';
+                if (net.ping_ms !== null && net.ping_ms !== undefined) {
+                    pingTxt = `${net.ping_ms} MS`;
+                    if (net.ping_ms >= 120) pingColor = 'text-rose-400';
+                    else if (net.ping_ms >= 60) pingColor = 'text-amber-400';
+                    else if (net.ping_ms >= 30) pingColor = 'text-sky-400';
+                    else pingColor = 'text-emerald-400';
+                }
+                netDetailsEl.innerHTML = `
+                    <span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-semibold tabular-nums bg-slate-800 border border-slate-700/60 ${pingColor} uppercase">${pingTxt} PING</span>
+                    <span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-semibold tabular-nums bg-slate-800 border border-slate-700/60 text-slate-300 uppercase truncate max-w-[190px]" title="${net.adapter_name || ''}">${net.adapter_name || 'Adapter Active'}</span>
+                `;
+            }
+        }
+
         // System Balance Badge & Description (Colorized according to system performance tier)
         const balanceBadge = document.getElementById('opt-rig-balance-badge');
         const balanceDesc = document.getElementById('opt-rig-summary-desc');
+        const pinnedTag = document.getElementById('opt-rig-pinned-tag');
         if (det.system_balance) {
             const b = det.system_balance;
             let tierColorClass = 'text-emerald-400';
@@ -17256,13 +17597,11 @@ async function loadRigDiagnostics() {
 
             if (balanceBadge) {
                 balanceBadge.textContent = b.tier;
-                if (b.color === 'emerald') {
-                    balanceBadge.className = 'px-2.5 py-1 rounded-lg typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] bg-emerald-950/80 text-emerald-400 border border-emerald-800/80';
-                } else if (b.color === 'amber' || b.color === 'yellow') {
-                    balanceBadge.className = 'px-2.5 py-1 rounded-lg typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] bg-amber-950/80 text-amber-400 border border-amber-800/80';
-                } else {
-                    balanceBadge.className = 'px-2.5 py-1 rounded-lg typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] bg-rose-950/80 text-rose-400 border border-rose-800/80';
-                }
+                balanceBadge.className = 'px-3 py-1 rounded-full typo-action-btn text-xs font-bold uppercase tracking-[0.02em] bg-slate-800 border border-slate-700/60 ' + tierColorClass;
+            }
+            if (pinnedTag) {
+                pinnedTag.textContent = (b.tier || 'OPTIMUM').toUpperCase();
+                pinnedTag.className = 'hidden px-3 py-1 rounded-full text-[10.5px] font-bold tracking-wider uppercase bg-slate-800 border border-slate-700/60 ' + tierColorClass;
             }
             if (balanceDesc) {
                 balanceDesc.textContent = b.summary;
@@ -17772,23 +18111,28 @@ document.addEventListener('click', (e) => {
     if (!e.target.closest('#smart-lod-profile-universal-combobox') && !e.target.closest('#smart-lod-profile-dropdown-list')) {
         if (typeof closeAllSmartLodProfileDropdowns === 'function') closeAllSmartLodProfileDropdowns();
     }
+    if (!e.target.closest('#opt-benchmark-universal-combobox') && !e.target.closest('#opt-benchmark-dropdown-list')) {
+        if (typeof closeBenchmarkDropdown === 'function') closeBenchmarkDropdown();
+    }
 });
 
 // Close floating dropdown on scroll or resize outside
 window.addEventListener('scroll', (e) => {
     if (e && e.target && e.target.closest) {
-        if (e.target.closest('[id^="opt-combo-menu-"]') || e.target.closest('[id^="opt-custom-menu-"]') || e.target.closest('#opt-profile-dropdown-list') || e.target.closest('#smart-lod-profile-dropdown-list')) {
+        if (e.target.closest('[id^="opt-combo-menu-"]') || e.target.closest('[id^="opt-custom-menu-"]') || e.target.closest('#opt-profile-dropdown-list') || e.target.closest('#smart-lod-profile-dropdown-list') || e.target.closest('#opt-benchmark-dropdown-list')) {
             return; // Allow smooth mouse wheel and scrollbar scrolling inside the dropdown itself!
         }
     }
     if (typeof closeAllProfileDropdowns === 'function') closeAllProfileDropdowns();
     if (typeof closeAllSmartLodProfileDropdowns === 'function') closeAllSmartLodProfileDropdowns();
+    if (typeof closeBenchmarkDropdown === 'function') closeBenchmarkDropdown();
     if (typeof closeAllComboboxes === 'function') closeAllComboboxes();
     if (typeof closeAllCustomSelects === 'function') closeAllCustomSelects();
 }, true);
 window.addEventListener('resize', () => {
     if (typeof closeAllProfileDropdowns === 'function') closeAllProfileDropdowns();
     if (typeof closeAllSmartLodProfileDropdowns === 'function') closeAllSmartLodProfileDropdowns();
+    if (typeof closeBenchmarkDropdown === 'function') closeBenchmarkDropdown();
     if (typeof closeAllComboboxes === 'function') closeAllComboboxes();
     if (typeof closeAllCustomSelects === 'function') closeAllCustomSelects();
 });
@@ -18083,7 +18427,7 @@ function updatePerformanceCockpitGauges() {
             badge2D = 'BALANCED';
             color2D = 'amber';
             desc2D = isSmartLodEffective ? `Controlled workload (TLOD ${smartLodEffectiveTlod} • ${smartLodFps} FPS)` : `Controlled workload • ${fpsTag}`;
-        } else if (load2D >= 25 && load2D <= 52) {
+        } else {
             badge2D = 'SWEET SPOT';
             color2D = 'emerald';
             desc2D = isSmartLodEffective ? `Smart LOD Sweet Spot (G:${smartLodGround}/C:${smartLodCruise})` : `${fgDesc} • ${fpsTag} • TLOD ${tlod2D} • Sweet Spot Pacing`;
@@ -18220,7 +18564,7 @@ function updatePerformanceCockpitGauges() {
             badgeVR = 'BALANCED';
             colorVR = 'amber';
             descVR = isSmartLodEffective ? `Tight stereo cadence (TLOD ${smartLodEffectiveTlod})` : `Tight stereo cadence • ${fpsVRTag}`;
-        } else if (loadVR >= 24 && loadVR <= 52) {
+        } else {
             badgeVR = 'SWEET SPOT';
             colorVR = 'emerald';
             descVR = isSmartLodEffective ? `Smart LOD VR Sweet Spot (G:${smartLodGround}/C:${smartLodCruise})` : `Stereo sync (${reprojDesc} • ${fpsVRTag}) • TLOD ${tlodVR} • Sweet Spot Pacing`;
@@ -18232,166 +18576,167 @@ function updatePerformanceCockpitGauges() {
         // --- PERSPECTIVE B: VRAM & GPU ---
 
         // 1. SHARED VRAM (AI Traffic, Ground Vehicles & Liveries)
-        let vramShared = 1.4;
+        let vramShared = 0.8;
         const airQty = getItemVal(commonList, ['aircraft_traffic_quantity', 'air_traffic', 'aircraft_traffic'], 'OFF');
         const airVar = getItemVal(commonList, ['aircraft_traffic_variety', 'air_traffic_variety'], 'LOW');
         if (!airQty.includes('OFF')) {
-            if (airQty.includes('LOW')) vramShared += 0.5;
-            else if (airQty.includes('MED')) vramShared += 1.4;
-            else if (airQty.includes('HIGH') || airQty.includes('REAL')) vramShared += 2.8;
-            else if (airQty.includes('ULTRA')) vramShared += 4.2;
+            if (airQty.includes('LOW')) vramShared += 0.2;
+            else if (airQty.includes('MED')) vramShared += 0.4;
+            else if (airQty.includes('HIGH') || airQty.includes('REAL')) vramShared += 0.8;
+            else if (airQty.includes('ULTRA')) vramShared += 1.2;
 
-            if (airVar.includes('MED')) vramShared += 0.5;
-            else if (airVar.includes('HIGH')) vramShared += 1.2;
-            else if (airVar.includes('ULTRA')) vramShared += 2.0;
-        } else {
-            if (airVar.includes('ULTRA')) vramShared += 0.2;
-            else if (airVar.includes('HIGH')) vramShared += 0.1;
+            if (airVar.includes('MED')) vramShared += 0.1;
+            else if (airVar.includes('HIGH')) vramShared += 0.3;
+            else if (airVar.includes('ULTRA')) vramShared += 0.5;
         }
 
         const parkQty = getItemVal(commonList, ['parked_aircraft_quantity', 'parked_aircraft'], 'OFF');
         const parkVar = getItemVal(commonList, ['parked_aircraft_variety'], 'LOW');
         if (!parkQty.includes('OFF')) {
-            if (parkQty.includes('LOW')) vramShared += 0.4;
-            else if (parkQty.includes('MED')) vramShared += 1.0;
-            else if (parkQty.includes('HIGH')) vramShared += 2.2;
-            else if (parkQty.includes('ULTRA')) vramShared += 3.6;
+            if (parkQty.includes('LOW')) vramShared += 0.15;
+            else if (parkQty.includes('MED')) vramShared += 0.35;
+            else if (parkQty.includes('HIGH')) vramShared += 0.6;
+            else if (parkQty.includes('ULTRA')) vramShared += 1.0;
 
-            if (parkVar.includes('MED')) vramShared += 0.4;
-            else if (parkVar.includes('HIGH')) vramShared += 1.0;
-            else if (parkVar.includes('ULTRA')) vramShared += 1.8;
-        } else {
-            if (parkVar.includes('ULTRA')) vramShared += 0.2;
-            else if (parkVar.includes('HIGH')) vramShared += 0.1;
+            if (parkVar.includes('MED')) vramShared += 0.1;
+            else if (parkVar.includes('HIGH')) vramShared += 0.2;
+            else if (parkVar.includes('ULTRA')) vramShared += 0.4;
         }
 
         const svcQty = getItemVal(commonList, ['airport_services_quantity', 'airport_services'], 'OFF');
         const svcVar = getItemVal(commonList, ['airport_services_variety'], 'LOW');
         if (!svcQty.includes('OFF')) {
-            if (svcQty.includes('LOW')) vramShared += 0.3;
-            else if (svcQty.includes('MED')) vramShared += 0.8;
-            else if (svcQty.includes('HIGH')) vramShared += 1.5;
-            else if (svcQty.includes('ULTRA')) vramShared += 2.4;
+            if (svcQty.includes('LOW')) vramShared += 0.1;
+            else if (svcQty.includes('MED')) vramShared += 0.2;
+            else if (svcQty.includes('HIGH')) vramShared += 0.4;
+            else if (svcQty.includes('ULTRA')) vramShared += 0.7;
 
-            if (svcVar.includes('MED')) vramShared += 0.3;
-            else if (svcVar.includes('HIGH')) vramShared += 0.8;
-            else if (svcVar.includes('ULTRA')) vramShared += 1.4;
-        } else {
-            if (svcVar.includes('ULTRA')) vramShared += 0.2;
-            else if (svcVar.includes('HIGH')) vramShared += 0.1;
+            if (svcVar.includes('MED')) vramShared += 0.05;
+            else if (svcVar.includes('HIGH')) vramShared += 0.15;
+            else if (svcVar.includes('ULTRA')) vramShared += 0.3;
         }
 
         const roadVram = getItemVal(commonList, ['road_traffic'], 'OFF');
-        if (roadVram.includes('LOW')) vramShared += 0.2;
-        else if (roadVram.includes('MED')) vramShared += 0.6;
-        else if (roadVram.includes('HIGH')) vramShared += 1.2;
-        else if (roadVram.includes('ULTRA')) vramShared += 2.0;
+        if (roadVram.includes('LOW')) vramShared += 0.05;
+        else if (roadVram.includes('MED')) vramShared += 0.15;
+        else if (roadVram.includes('HIGH')) vramShared += 0.3;
+        else if (roadVram.includes('ULTRA')) vramShared += 0.5;
 
         const seaVram = getItemVal(commonList, ['sea_traffic'], 'OFF');
-        if (seaVram.includes('LOW')) vramShared += 0.05;
-        else if (seaVram.includes('MED')) vramShared += 0.1;
-        else if (seaVram.includes('HIGH')) vramShared += 0.2;
-        else if (seaVram.includes('ULTRA')) vramShared += 0.3;
+        if (seaVram.includes('LOW')) vramShared += 0.02;
+        else if (seaVram.includes('MED')) vramShared += 0.05;
+        else if (seaVram.includes('HIGH')) vramShared += 0.1;
+        else if (seaVram.includes('ULTRA')) vramShared += 0.15;
 
         const charQtyVram = getItemVal(commonList, ['characters_quantity'], 'OFF');
-        if (charQtyVram.includes('LOW')) vramShared += 0.2;
-        else if (charQtyVram.includes('MED')) vramShared += 0.5;
-        else if (charQtyVram.includes('HIGH')) vramShared += 1.0;
-        else if (charQtyVram.includes('ULTRA')) vramShared += 1.6;
+        if (charQtyVram.includes('LOW')) vramShared += 0.05;
+        else if (charQtyVram.includes('MED')) vramShared += 0.15;
+        else if (charQtyVram.includes('HIGH')) vramShared += 0.3;
+        else if (charQtyVram.includes('ULTRA')) vramShared += 0.5;
 
         const charVarVram = getItemVal(commonList, ['characters_variety'], 'LOW');
-        if (charVarVram.includes('MED')) vramShared += 0.3;
-        else if (charVarVram.includes('HIGH')) vramShared += 0.8;
-        else if (charVarVram.includes('ULTRA')) vramShared += 1.6;
+        if (charVarVram.includes('MED')) vramShared += 0.05;
+        else if (charVarVram.includes('HIGH')) vramShared += 0.15;
+        else if (charVarVram.includes('ULTRA')) vramShared += 0.3;
 
         const charQltVram = getItemVal(commonList, ['characters_quality'], 'LOW');
-        if (charQltVram.includes('MED')) vramShared += 0.2;
-        else if (charQltVram.includes('HIGH')) vramShared += 0.6;
-        else if (charQltVram.includes('ULTRA')) vramShared += 1.2;
+        if (charQltVram.includes('MED')) vramShared += 0.05;
+        else if (charQltVram.includes('HIGH')) vramShared += 0.15;
+        else if (charQltVram.includes('ULTRA')) vramShared += 0.3;
 
-        vramShared = Math.min(vramTotal, Math.max(1.6, parseFloat(vramShared.toFixed(1))));
+        vramShared = Math.min(vramTotal, Math.max(0.8, parseFloat(vramShared.toFixed(1))));
         const pctShared = Math.min(100, Math.round((vramShared / vramTotal) * 100));
 
         // 2. 2D DISPLAY VRAM
         // Baseline 2D graphics engine & framebuffer + Shared traffic assets VRAM
-        let vram2D = 1.8 + vramShared;
+        vram2D = 0.6 + vramShared;
         const tlod2DVal = getItemNum(list2D, ['tlod', 'TerrainLoD'], 100);
         const effectiveTlod2DVram = isSmartLodEffective ? smartLodEffectiveTlod : tlod2DVal;
 
         // Dynamic Terrain & photogrammetry mesh geometry allocation in VRAM
-        if (effectiveTlod2DVram <= 60) vram2D += 0.8;
-        else if (effectiveTlod2DVram <= 100) vram2D += 1.6;
-        else if (effectiveTlod2DVram <= 150) vram2D += 2.6;
-        else if (effectiveTlod2DVram <= 200) vram2D += 3.8;
-        else if (effectiveTlod2DVram <= 300) vram2D += 5.2;
-        else vram2D += 6.8;
+        if (effectiveTlod2DVram <= 60) vram2D += 0.3;
+        else if (effectiveTlod2DVram <= 100) vram2D += 0.6;
+        else if (effectiveTlod2DVram <= 150) vram2D += 1.0;
+        else if (effectiveTlod2DVram <= 200) vram2D += 1.5;
+        else if (effectiveTlod2DVram <= 300) vram2D += 2.2;
+        else vram2D += 3.0;
 
         const tex2D = getItemVal(list2D, ['texture_resolution', 'Texture'], 'MEDIUM');
-        if (tex2D.includes('ULTRA')) vram2D += 10.2;
-        else if (tex2D.includes('HIGH')) vram2D += 5.8;
-        else if (tex2D.includes('MED')) vram2D += 3.0;
-        else vram2D += 1.4;
+        if (tex2D.includes('ULTRA')) vram2D += 3.8;
+        else if (tex2D.includes('HIGH')) vram2D += 2.2;
+        else if (tex2D.includes('MED')) vram2D += 1.2;
+        else vram2D += 0.5;
 
         const cld2D = getItemVal(list2D, ['volumetric_clouds', 'VolumetricClouds', 'clouds'], 'HIGH');
-        if (cld2D.includes('ULTRA')) vram2D += 3.4;
-        else if (cld2D.includes('HIGH')) vram2D += 1.8;
-        else if (cld2D.includes('MED')) vram2D += 0.9;
-        else vram2D += 0.4;
-
-        const bld2D = getItemVal(list2D, ['buildings', 'Buildings'], 'HIGH');
-        if (bld2D.includes('ULTRA')) vram2D += 2.6;
-        else if (bld2D.includes('HIGH')) vram2D += 1.4;
-        else if (bld2D.includes('MED')) vram2D += 0.7;
-        else vram2D += 0.3;
-
-        const tree2D = getItemVal(list2D, ['trees', 'TreesQuality'], 'HIGH');
-        if (tree2D.includes('ULTRA')) vram2D += 1.8;
-        else if (tree2D.includes('HIGH')) vram2D += 1.0;
-        else if (tree2D.includes('MED')) vram2D += 0.5;
+        if (cld2D.includes('ULTRA')) vram2D += 1.4;
+        else if (cld2D.includes('HIGH')) vram2D += 0.7;
+        else if (cld2D.includes('MED')) vram2D += 0.4;
         else vram2D += 0.2;
 
+        const bld2D = getItemVal(list2D, ['buildings', 'Buildings'], 'HIGH');
+        if (bld2D.includes('ULTRA')) vram2D += 1.0;
+        else if (bld2D.includes('HIGH')) vram2D += 0.5;
+        else if (bld2D.includes('MED')) vram2D += 0.3;
+        else vram2D += 0.1;
+
+        const tree2D = getItemVal(list2D, ['trees', 'TreesQuality'], 'HIGH');
+        if (tree2D.includes('ULTRA')) vram2D += 0.8;
+        else if (tree2D.includes('HIGH')) vram2D += 0.4;
+        else if (tree2D.includes('MED')) vram2D += 0.2;
+        else vram2D += 0.1;
+
         const shd2D = getItemVal(list2D, ['shadow_maps', 'Shadows'], '1536');
-        if (shd2D.includes('2048') || shd2D.includes('ULTRA')) vram2D += 2.0;
-        else if (shd2D.includes('1536') || shd2D.includes('HIGH')) vram2D += 1.1;
-        else if (shd2D.includes('1024') || shd2D.includes('MED')) vram2D += 0.5;
+        if (shd2D.includes('2048') || shd2D.includes('ULTRA')) vram2D += 0.7;
+        else if (shd2D.includes('1536') || shd2D.includes('HIGH')) vram2D += 0.4;
+        else if (shd2D.includes('1024') || shd2D.includes('MED')) vram2D += 0.2;
+        else vram2D += 0.1;
 
         const aa2D = getItemVal(list2D, ['anti_aliasing', 'AntiAliasing'], 'TAA');
-        if (aa2D.includes('PERFORMANCE')) vram2D -= 2.2;
-        else if (aa2D.includes('BALANCED')) vram2D -= 1.4;
-        else if (aa2D.includes('QUALITY')) vram2D -= 0.8;
-        else if (aa2D.includes('DLAA')) vram2D += 0.8;
+        if (aa2D.includes('PERFORMANCE')) vram2D -= 1.2;
+        else if (aa2D.includes('BALANCED')) vram2D -= 0.8;
+        else if (aa2D.includes('QUALITY')) vram2D -= 0.5;
+        else if (aa2D.includes('DLAA')) vram2D += 0.4;
 
         const fg2D = getItemVal(list2D, ['frame_generation', 'FrameGeneration'], 'OFF');
         const mult2DVram = getItemVal(list2D, ['framerate_multiplier', 'NBFramesToGenerate'], '1');
         const isFgActive2D = (fg2D.includes('DLSSG') || fg2D.includes('FSR3') || fg2D.includes('2X')) && !mult2DVram.includes('OFF') && !mult2DVram.includes('INACTIVE') && mult2DVram !== '0';
-        if (isFgActive2D) vram2D += 1.8;
+        if (isFgActive2D) vram2D += 0.7;
 
         const rt2D = getItemVal(list2D, ['raytraced_shadows', 'RaytracedShadows'], 'OFF');
-        if (rt2D === 'ON' || rt2D === '1') vram2D += 2.5;
+        if (rt2D === 'ON' || rt2D === '1') vram2D += 1.2;
 
         const reflex2DVram = getItemVal(list2D, ['reflex', 'Reflex'], 'ON');
-        if (reflex2DVram.includes('OFF')) vram2D += 0.2; // Unregulated swapchain pre-rendered queue buffers
+        if (reflex2DVram.includes('OFF')) vram2D += 0.1;
 
-        vram2D = Math.min(vramTotal * 1.25, Math.max(3.8, parseFloat(vram2D.toFixed(1))));
-        const pct2D = Math.min(100, Math.round((vram2D / vramTotal) * 100));
+        const disp2DVram = getItemVal(list2D, ['displacement_mapping', 'DisplacementMapping'], 'OFF');
+        if (disp2DVram === 'ON' || disp2DVram === '1') vram2D += 0.2;
+
+        const precache2DVram = getItemVal(list2D, ['offscreen_precaching', 'PreCaching'], 'HIGH');
+        if (precache2DVram.includes('ULTRA')) vram2D += 0.6;
+        else if (precache2DVram.includes('HIGH')) vram2D += 0.3;
+
+        const ssr2DVram = getItemVal(list2D, ['reflections_ssr', 'SSR'], 'MEDIUM');
+        if (ssr2DVram.includes('ULTRA')) vram2D += 0.3;
+        else if (ssr2DVram.includes('HIGH')) vram2D += 0.15;
+        else if (ssr2DVram.includes('MED')) vram2D += 0.05;
+
+        vram2D = Math.min(vramTotal * 1.1, Math.max(2.4, parseFloat(vram2D.toFixed(1))));
+        pct2D = Math.min(100, Math.round((vram2D / vramTotal) * 100));
         const free2D = Math.max(0, (vramTotal - vram2D)).toFixed(1);
 
         const fgVramNote = isFgActive2D ? ' (incl. FG Buffer)' : '';
-        let badge2D = 'OPTIMUM';
-        let color2D = 'emerald';
-        let desc2D = `+${free2D} GB Free VRAM headroom${fgVramNote}`;
-        if (pct2D > 86) {
+        if (pct2D >= 88) {
             badge2D = 'HAZARD';
             color2D = 'rose';
             desc2D = `VRAM saturation hazard (${pct2D}% used)`;
-        } else if (pct2D >= 78) {
+        } else if (pct2D >= 76) {
             badge2D = 'ACCEPTABLE';
             color2D = 'amber';
             desc2D = `High VRAM allocation (+${free2D} GB free)`;
-        } else if (pct2D >= 55 && pct2D <= 77) {
+        } else {
             badge2D = 'SWEET SPOT';
             color2D = 'emerald';
-            desc2D = `Balanced VRAM budget (+${free2D} GB free safety buffer)`;
+            desc2D = `Balanced VRAM budget (+${free2D} GB safety headroom${fgVramNote})`;
         }
 
         updatePerfCard(
@@ -18406,76 +18751,93 @@ function updatePerformanceCockpitGauges() {
 
         // 3. VR HEADSET VRAM (Stereo framebuffers & VR assets)
         // Baseline stereo VR framebuffers & compositor + Shared traffic assets VRAM
-        let vramVR = 3.6 + vramShared;
+        vramVR = 1.2 + vramShared;
         const tlodVRVal = getItemNum(listVR, ['tlod', 'TerrainLoD'], 100);
         const effectiveTlodVRVram = isSmartLodEffective ? smartLodEffectiveTlod : tlodVRVal;
 
         // Stereo terrain & photogrammetry geometry mesh allocation in VRAM
-        if (effectiveTlodVRVram <= 60) vramVR += 1.0;
-        else if (effectiveTlodVRVram <= 100) vramVR += 2.0;
-        else if (effectiveTlodVRVram <= 150) vramVR += 3.2;
-        else if (effectiveTlodVRVram <= 200) vramVR += 4.6;
-        else if (effectiveTlodVRVram <= 300) vramVR += 6.2;
-        else vramVR += 8.0;
+        if (effectiveTlodVRVram <= 60) vramVR += 0.4;
+        else if (effectiveTlodVRVram <= 100) vramVR += 0.8;
+        else if (effectiveTlodVRVram <= 150) vramVR += 1.4;
+        else if (effectiveTlodVRVram <= 200) vramVR += 2.0;
+        else if (effectiveTlodVRVram <= 300) vramVR += 2.8;
+        else vramVR += 3.8;
 
         const texVR = getItemVal(listVR, ['texture_resolution', 'Texture'], 'LOW');
-        if (texVR.includes('ULTRA')) vramVR += 11.8;
-        else if (texVR.includes('HIGH')) vramVR += 6.8;
-        else if (texVR.includes('MED')) vramVR += 3.8;
-        else vramVR += 1.8;
+        if (texVR.includes('ULTRA')) vramVR += 4.5;
+        else if (texVR.includes('HIGH')) vramVR += 2.8;
+        else if (texVR.includes('MED')) vramVR += 1.6;
+        else vramVR += 0.7;
 
         const cldVR = getItemVal(listVR, ['volumetric_clouds', 'VolumetricClouds', 'clouds'], 'MEDIUM');
-        if (cldVR.includes('ULTRA')) vramVR += 4.6;
-        else if (cldVR.includes('HIGH')) vramVR += 2.6;
-        else if (cldVR.includes('MED')) vramVR += 1.4;
-        else vramVR += 0.6;
+        if (cldVR.includes('ULTRA')) vramVR += 1.8;
+        else if (cldVR.includes('HIGH')) vramVR += 1.0;
+        else if (cldVR.includes('MED')) vramVR += 0.5;
+        else vramVR += 0.2;
 
         const bldVR = getItemVal(listVR, ['buildings', 'Buildings'], 'MEDIUM');
-        if (bldVR.includes('ULTRA')) vramVR += 3.6;
-        else if (bldVR.includes('HIGH')) vramVR += 2.0;
-        else if (bldVR.includes('MED')) vramVR += 1.0;
-        else vramVR += 0.4;
+        if (bldVR.includes('ULTRA')) vramVR += 1.2;
+        else if (bldVR.includes('HIGH')) vramVR += 0.7;
+        else if (bldVR.includes('MED')) vramVR += 0.4;
+        else vramVR += 0.15;
 
         const treeVR = getItemVal(listVR, ['trees', 'TreesQuality'], 'MEDIUM');
-        if (treeVR.includes('ULTRA')) vramVR += 2.8;
-        else if (treeVR.includes('HIGH')) vramVR += 1.6;
-        else if (treeVR.includes('MED')) vramVR += 0.8;
-        else vramVR += 0.3;
+        if (treeVR.includes('ULTRA')) vramVR += 1.0;
+        else if (treeVR.includes('HIGH')) vramVR += 0.6;
+        else if (treeVR.includes('MED')) vramVR += 0.3;
+        else vramVR += 0.1;
+
+        const shdVR = getItemVal(listVR, ['shadow_maps', 'Shadows'], '1024');
+        if (shdVR.includes('2048') || shdVR.includes('ULTRA')) vramVR += 0.6;
+        else if (shdVR.includes('1536') || shdVR.includes('HIGH')) vramVR += 0.35;
+        else if (shdVR.includes('1024') || shdVR.includes('MED')) vramVR += 0.2;
+        else vramVR += 0.1;
 
         const aaVR = getItemVal(listVR, ['anti_aliasing', 'AntiAliasing'], 'DLSS');
-        if (aaVR.includes('PERFORMANCE')) vramVR -= 2.8;
-        else if (aaVR.includes('BALANCED')) vramVR -= 1.8;
-        else if (aaVR.includes('QUALITY')) vramVR -= 1.0;
-        else if (aaVR.includes('DLAA')) vramVR += 1.2;
+        if (aaVR.includes('PERFORMANCE')) vramVR -= 1.5;
+        else if (aaVR.includes('BALANCED')) vramVR -= 1.0;
+        else if (aaVR.includes('QUALITY')) vramVR -= 0.6;
+        else if (aaVR.includes('DLAA')) vramVR += 0.6;
 
         const fovVR = getItemVal(listVR, ['foveated_rendering', 'FoveatedRendering'], 'ON');
-        if (fovVR === 'ON' || fovVR === '1') vramVR -= 1.0;
+        if (fovVR === 'ON' || fovVR === '1') vramVR -= 0.7;
 
         const rtVR = getItemVal(listVR, ['raytraced_shadows', 'RaytracedShadows'], 'OFF');
-        if (rtVR === 'ON' || rtVR === '1') vramVR += 3.2;
+        if (rtVR === 'ON' || rtVR === '1') vramVR += 1.5;
 
         const reflexVRVram = getItemVal(listVR, ['reflex', 'ReflexVR', 'Reflex'], 'ON');
-        if (reflexVRVram.includes('OFF')) vramVR += 0.2; // Unregulated stereo frame queue buffers
+        if (reflexVRVram.includes('OFF')) vramVR += 0.1;
 
-        vramVR = Math.min(vramTotal * 1.3, Math.max(5.8, parseFloat(vramVR.toFixed(1))));
-        const pctVR = Math.min(100, Math.round((vramVR / vramTotal) * 100));
+        const scaleVRVram = getItemVal(listVR, ['primary_scaling_vr'], '100%');
+        if (scaleVRVram.includes('70%') || scaleVRVram.includes('60%')) vramVR -= 0.6;
+        else if (scaleVRVram.includes('80%') || scaleVRVram.includes('85%')) vramVR -= 0.3;
+
+        const dispVRVram = getItemVal(listVR, ['displacement_mapping', 'DisplacementMapping'], 'OFF');
+        if (dispVRVram === 'ON' || dispVRVram === '1') vramVR += 0.4;
+
+        const precacheVRVram = getItemVal(listVR, ['offscreen_precaching', 'PreCaching'], 'HIGH');
+        if (precacheVRVram.includes('ULTRA')) vramVR += 0.8;
+        else if (precacheVRVram.includes('HIGH')) vramVR += 0.4;
+
+        const ssrVRVram = getItemVal(listVR, ['reflections_ssr', 'SSR'], 'OFF');
+        if (ssrVRVram.includes('ULTRA') || ssrVRVram.includes('HIGH')) vramVR += 0.3;
+
+        vramVR = Math.min(vramTotal * 1.1, Math.max(3.2, parseFloat(vramVR.toFixed(1))));
+        pctVR = Math.min(100, Math.round((vramVR / vramTotal) * 100));
         const freeVR = Math.max(0, (vramTotal - vramVR)).toFixed(1);
 
-        let badgeVR = 'OPTIMUM';
-        let colorVR = 'emerald';
-        let descVR = `+${freeVR} GB Free VR headroom`;
-        if (pctVR > 86) {
+        if (pctVR >= 88) {
             badgeVR = 'HAZARD';
             colorVR = 'rose';
-            descVR = `Critical: Stereo VRAM overflow risks CTD`;
-        } else if (pctVR >= 78) {
+            descVR = `Critical: Stereo VRAM overflow risks CTD (${pctVR}% used)`;
+        } else if (pctVR >= 76) {
             badgeVR = 'ACCEPTABLE';
             colorVR = 'amber';
             descVR = `Heavy VR stereo buffer (+${freeVR} GB free)`;
-        } else if (pctVR >= 55 && pctVR <= 77) {
+        } else {
             badgeVR = 'SWEET SPOT';
             colorVR = 'emerald';
-            descVR = `Balanced VR buffer (+${freeVR} GB free safety margin)`;
+            descVR = `Balanced VR buffer (+${freeVR} GB safety headroom)`;
         }
 
         updatePerfCard(
@@ -19809,6 +20171,67 @@ function sortCustomProfilesList() {
     });
 }
 
+async function openGraphicsSettingsModal() {
+    try {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.ensure_active_profile_applied) {
+            await window.pywebview.api.ensure_active_profile_applied();
+        }
+        if (typeof fetchAndRenderCustomProfiles === 'function') {
+            await fetchAndRenderCustomProfiles(true);
+        }
+        if (typeof loadRigDiagnostics === 'function') {
+            await loadRigDiagnostics();
+        } else if (typeof renderMsfsSettingsMatrix === 'function') {
+            renderMsfsSettingsMatrix();
+        }
+        if (typeof updateProfileActivateButtonState === 'function') {
+            await updateProfileActivateButtonState();
+        }
+    } catch (e) {
+        console.error("Error opening graphics settings modal:", e);
+    }
+}
+
+async function updateProfileActivateButtonState() {
+    const btn = document.getElementById('opt-profile-activate-btn');
+    if (!btn) return;
+
+    const input = document.getElementById('opt-profile-universal-input');
+    const typedName = (input ? input.value : '').trim().toLowerCase();
+
+    const activeProfile = (currentCustomProfiles || []).find(p => p.is_active);
+    const selectedProfile = (currentCustomProfiles || []).find(p => p.id === selectedProfileId);
+
+    // If selected profile is the active profile and typed name matches
+    if (selectedProfile && activeProfile && selectedProfile.id === activeProfile.id && typedName === (selectedProfile.name || '').trim().toLowerCase()) {
+        let hasChanges = false;
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.check_profile_changes) {
+            try {
+                const resStr = await window.pywebview.api.check_profile_changes(selectedProfile.id);
+                const res = JSON.parse(resStr);
+                if (res && res.status === 'success') {
+                    hasChanges = Boolean(res.has_changes);
+                }
+            } catch (e) {
+                console.warn("Error checking profile changes:", e);
+            }
+        }
+
+        if (!hasChanges) {
+            // Profile is active and identical: Solid green background as requested
+            btn.innerHTML = `ACTIVE`;
+            btn.className = "h-8 px-3 rounded-md bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold border border-emerald-500/50 typo-action-btn text-xs tracking-[0.02em] uppercase shrink-0 whitespace-nowrap inline-flex items-center justify-center leading-none transition-all cursor-pointer shadow-sm select-none";
+            btn.title = `Profile "${selectedProfile.name}" is currently active in MSFS`;
+            return;
+        }
+    }
+
+    // Profile needs activation or has unsaved changes: Gray basic button with mouse over + onclick
+    btn.innerHTML = `ACTIVATE`;
+    btn.className = "h-8 px-3 rounded-md bg-slate-800 hover:bg-slate-700 active:bg-slate-600 border border-slate-700/80 text-slate-200 hover:text-white typo-action-btn text-xs font-semibold tracking-[0.02em] transition-all cursor-pointer uppercase shrink-0 whitespace-nowrap inline-flex items-center justify-center leading-none shadow-sm active:scale-[0.98]";
+    btn.title = selectedProfile ? `Activate "${selectedProfile.name}" into MSFS` : "Activate profile into MSFS";
+}
+
 async function fetchAndRenderCustomProfiles(autoSwitchMode = false) {
     const dropdown = document.getElementById('opt-profiles-dropdown');
     const input = document.getElementById('opt-profile-universal-input');
@@ -19860,6 +20283,10 @@ async function fetchAndRenderCustomProfiles(autoSwitchMode = false) {
 
         // Render dropdown list
         renderCustomProfilesDropdownList();
+
+        if (typeof updateProfileActivateButtonState === 'function') {
+            await updateProfileActivateButtonState();
+        }
     } catch (e) {
         console.error("Error fetching custom profiles:", e);
     }
@@ -19909,9 +20336,9 @@ function renderCustomProfilesDropdownList() {
 
     const itemsHtml = currentCustomProfiles.map((p, index) => {
         const isMultiSelected = multiSelectedProfileIds.has(p.id);
-        const isCurrentActive = p.id === (activeProfile ? activeProfile.id : '');
+        const isCurrentActive = Boolean(p.is_active || (activeProfile && p.id === activeProfile.id));
         const dateFormatted = formatProfileDate(p.created_at);
-        const activeBadge = p.is_active 
+        const activeBadge = isCurrentActive 
             ? `<span class="px-2 py-0.5 rounded typo-action-btn text-[10px] font-semibold bg-emerald-600 text-white shadow-sm uppercase tracking-[0.02em]">ACTIVE</span>`
             : '';
 
@@ -19919,7 +20346,9 @@ function renderCustomProfilesDropdownList() {
         if (isMultiSelected) {
             rowBgClass = 'bg-blue-600/25 border-l-2 border-blue-400 hover:bg-blue-600/30';
         } else if (isCurrentActive) {
-            rowBgClass = 'bg-slate-800/60 hover:bg-slate-800';
+            rowBgClass = 'bg-slate-800/80 border-l-2 border-emerald-500 hover:bg-slate-800';
+        } else if (p.id === selectedProfileId) {
+            rowBgClass = 'bg-slate-800/40 border-l-2 border-slate-500 hover:bg-slate-800';
         }
 
         const checkboxIcon = hasMultiSelection
@@ -20072,33 +20501,21 @@ async function selectCustomProfileItem(profileId) {
         switchMsfsGraphicsMode(targetMode, false);
     }
 
-    // Immediately load the selected profile into the main window and active session
-    if (window.pywebview && window.pywebview.api && window.pywebview.api.activate_custom_profile) {
-        try {
-            const resStr = await window.pywebview.api.activate_custom_profile(profileId);
-            const res = JSON.parse(resStr);
-            if (res.status === 'success') {
-                if (typeof showToast === 'function') {
-                    showToast(`Profile "${profile.name}" loaded into editor!`, 'info');
-                }
-                await fetchAndRenderCustomProfiles(false);
-                await loadRigDiagnostics();
-            } else {
-                if (typeof showToast === 'function') {
-                    showToast(`Failed to load profile: ${res.message}`, 'error');
-                }
-            }
-        } catch (e) {
-            console.error("Error loading profile into main window:", e);
+    // Load preview of profile settings into UI cards without modifying disk
+    try {
+        await loadRigDiagnostics(profile.id);
+        if (typeof updateProfileActivateButtonState === 'function') {
+            await updateProfileActivateButtonState();
         }
+    } catch (e) {
+        console.error("Error previewing profile settings:", e);
     }
 }
 
 function handleProfileInputFocus() {
     const input = document.getElementById('opt-profile-universal-input');
     if (!input) return;
-    // When clicking into the field to enter a new profile, clear the input so user can type immediately
-    input.value = '';
+    input.select();
     closeAllProfileDropdowns();
 }
 
@@ -20111,6 +20528,15 @@ function handleProfileInputBlur() {
         if (prof) {
             input.value = prof.name;
         }
+    }
+    if (typeof updateProfileActivateButtonState === 'function') {
+        updateProfileActivateButtonState();
+    }
+}
+
+function handleProfileInputChange() {
+    if (typeof updateProfileActivateButtonState === 'function') {
+        updateProfileActivateButtonState();
     }
 }
 
@@ -20297,48 +20723,26 @@ async function saveCurrentCustomProfile() {
     const matchingProfile = currentCustomProfiles.find(p => (p.name || '').trim().toLowerCase() === name.toLowerCase());
 
     if (matchingProfile) {
-        // Name matches an existing profile.
-        // User has the right to keep the same name if modifications were made.
-        // Check if there is a change between current staged settings and the saved profile file!
-        if (window.pywebview && window.pywebview.api && window.pywebview.api.check_profile_changes) {
-            try {
-                const chkStr = await window.pywebview.api.check_profile_changes(matchingProfile.id);
-                const chk = JSON.parse(chkStr);
-                if (chk.status === 'success') {
-                    if (chk.has_changes) {
-                        // Changes detected! Propose to replace/overwrite the existing file.
-                        showCustomModal({
-                            title: 'REPLACE PROFILE',
-                            message: `Changes detected in your settings.<br><br>Do you want to replace "<b>${escapeHtml(matchingProfile.name)}</b>" with current settings?`,
-                            type: 'info',
-                            showCancel: true,
-                            confirmText: 'YES',
-                            cancelText: 'NO',
-                            confirmClass: 'px-5 py-1.5 text-center rounded-xl bg-blue-600 hover:bg-blue-500 text-white typo-action-btn font-semibold text-xs uppercase transition-all border-0 cursor-pointer shadow-md',
-                            cancelClass: 'px-5 py-1.5 text-center rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 hover:text-white typo-action-btn text-xs font-semibold uppercase transition-all cursor-pointer',
-                            onConfirm: async () => {
-                                await executeSaveCurrentCustomProfile(matchingProfile.name, matchingProfile.id);
-                            }
-                        });
-                        return;
-                    } else {
-                        // No changes detected!
-                        showCustomModal({
-                            title: 'PROFILE UP TO DATE',
-                            message: `No changes detected.<br><br>Profile "<b>${escapeHtml(matchingProfile.name)}</b>" is already up to date with your current settings.`,
-                            type: 'info',
-                            showCancel: false,
-                            confirmText: 'OK',
-                            confirmClass: 'px-5 py-1.5 text-center rounded-xl bg-blue-600 hover:bg-blue-500 text-white typo-action-btn font-semibold text-xs uppercase transition-all border-0 cursor-pointer shadow-md'
-                        });
-                        return;
-                    }
-                }
-            } catch (e) {
-                console.error("Error checking profile changes:", e);
-            }
+        // If this is the currently selected profile, save directly without modal interruption!
+        if (selectedProfileId && matchingProfile.id === selectedProfileId) {
+            await executeSaveCurrentCustomProfile(matchingProfile.name, matchingProfile.id);
+            return;
         }
-        await executeSaveCurrentCustomProfile(matchingProfile.name, matchingProfile.id);
+
+        // If it matches another profile name, prompt user to confirm overwrite
+        showCustomModal({
+            title: 'REPLACE PROFILE',
+            message: `A profile named "<b>${escapeHtml(matchingProfile.name)}</b>" already exists.<br><br>Do you want to overwrite it with current settings?`,
+            type: 'warning',
+            showCancel: true,
+            confirmText: 'YES',
+            cancelText: 'NO',
+            confirmClass: 'px-5 py-1.5 text-center rounded-xl bg-blue-600 hover:bg-blue-500 text-white typo-action-btn font-semibold text-xs uppercase transition-all border-0 cursor-pointer shadow-md',
+            cancelClass: 'px-5 py-1.5 text-center rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 hover:text-white typo-action-btn text-xs font-semibold uppercase transition-all cursor-pointer',
+            onConfirm: async () => {
+                await executeSaveCurrentCustomProfile(matchingProfile.name, matchingProfile.id);
+            }
+        });
         return;
     }
 
@@ -20384,6 +20788,9 @@ async function executeSaveCurrentCustomProfile(name, overwriteId = null) {
             if (res.profile && res.profile.id) {
                 selectedProfileId = res.profile.id;
                 if (input) input.value = res.profile.name || name;
+            }
+            if (typeof updateProfileActivateButtonState === 'function') {
+                await updateProfileActivateButtonState();
             }
         } else {
             showCustomModal({
@@ -20443,6 +20850,9 @@ async function activateSelectedCustomProfile() {
             if (typeof showToast === 'function') showToast(`Profile "${res.profile_name}" activated into MSFS!`, 'success');
             await fetchAndRenderCustomProfiles(false);
             await loadRigDiagnostics();
+            if (typeof updateProfileActivateButtonState === 'function') {
+                await updateProfileActivateButtonState();
+            }
         } else {
             if (typeof showToast === 'function') showToast(`Activation failed: ${res.message}`, 'error');
         }
@@ -20536,6 +20946,15 @@ document.addEventListener('keydown', (e) => {
         if (isDropdownOpen && multiSelectedProfileIds.size > 0) {
             e.preventDefault();
             requestDeleteMultiSelectedProfiles();
+            return;
+        }
+
+        const benchListEl = document.getElementById('opt-benchmark-dropdown-list');
+        const isBenchDropdownOpen = benchListEl && !benchListEl.classList.contains('hidden');
+        if (isBenchDropdownOpen && typeof multiSelectedBenchmarkFiles !== 'undefined' && multiSelectedBenchmarkFiles.size > 0) {
+            e.preventDefault();
+            requestDeleteMultiSelectedBenchmarks();
+            return;
         }
     }
 });
@@ -20611,12 +21030,31 @@ async function toggleBlackboxRecording() {
     if (!window.pywebview || !window.pywebview.api) return;
     const btn = document.getElementById('opt-btn-record');
     const btnText = document.getElementById('opt-rec-btn-text');
+    const recIcon = document.getElementById('opt-rec-icon');
     const recDot = document.getElementById('opt-tab-rec-dot');
     const lastReportBtn = document.getElementById('opt-btn-view-last-report');
 
     if (!isBlackboxRunning) {
-        const dep = optimizerOrigin ? optimizerOrigin.icao : 'DEP';
-        const arr = optimizerDest ? optimizerDest.icao : 'ARR';
+        let dep = (optimizerOrigin && optimizerOrigin.icao) ? optimizerOrigin.icao : '';
+        let arr = (optimizerDest && optimizerDest.icao) ? optimizerDest.icao : '';
+
+        // Priorité SimBrief ou Flight Planning si pas défini manuellement
+        if (!dep || dep === 'DEP') {
+            if (typeof currentSimBriefFlight !== 'undefined' && currentSimBriefFlight && currentSimBriefFlight.origin && currentSimBriefFlight.origin.icao) {
+                dep = currentSimBriefFlight.origin.icao;
+            } else if (typeof flightPlanningDeparture !== 'undefined' && flightPlanningDeparture && flightPlanningDeparture.icao) {
+                dep = flightPlanningDeparture.icao;
+            }
+        }
+        if (!arr || arr === 'ARR') {
+            if (typeof currentSimBriefFlight !== 'undefined' && currentSimBriefFlight && currentSimBriefFlight.destination && currentSimBriefFlight.destination.icao) {
+                arr = currentSimBriefFlight.destination.icao;
+            } else if (typeof flightPlanningDestination !== 'undefined' && flightPlanningDestination && flightPlanningDestination.icao) {
+                arr = flightPlanningDestination.icao;
+            }
+        }
+        dep = dep || 'DEP';
+        arr = arr || 'ARR';
         const studio = document.getElementById('opt-studio-select')?.value || 'Aircraft';
         const flightName = `${dep}_${arr}_${studio}`;
 
@@ -20624,39 +21062,47 @@ async function toggleBlackboxRecording() {
             const resStr = await window.pywebview.api.start_flight_blackbox(flightName, dep, arr, studio);
             isBlackboxRunning = true;
             if (btnText) btnText.textContent = "Stop Flight & Debrief";
-            if (btn) btn.className = "px-4 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white typo-action-btn font-semibold text-xs transition-all cursor-pointer active:scale-95 flex items-center gap-2 shadow-lg shadow-amber-600/30";
+            if (btn) btn.className = "h-9 px-4 rounded-md bg-amber-600 hover:bg-amber-500 text-white font-bold tracking-wider text-xs transition-all cursor-pointer active:scale-95 inline-flex items-center gap-2 shadow-md shadow-amber-950/30 btn-elevate uppercase leading-none";
+            if (recIcon) recIcon.className = "w-2.5 h-2.5 rounded-full bg-red-400 animate-pulse inline-block shrink-0 shadow-sm shadow-red-950";
             if (recDot) recDot.classList.remove('hidden');
             const statusLbl = document.getElementById('opt-blackbox-status-label');
             if (statusLbl) {
                 statusLbl.textContent = "Recording flight...";
                 statusLbl.className = "typo-metadata text-[10px] text-emerald-400 font-semibold block animate-pulse";
             }
-            if (typeof showToast === 'function') showToast("Blackbox started! Recording flight telemetry...", "success");
+            if (typeof showToast === 'function') showToast("Flight recording started! Logging telemetry...", "success");
         } catch (e) {
-            if (typeof showToast === 'function') showToast("Error starting Blackbox: " + e, "error");
+            if (typeof showToast === 'function') showToast("Error starting recording: " + e, "error");
         }
     } else {
         try {
             const resStr = await window.pywebview.api.stop_flight_blackbox();
             const res = JSON.parse(resStr);
             isBlackboxRunning = false;
-            if (btnText) btnText.textContent = "Start Flight (Blackbox)";
-            if (btn) btn.className = "px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white typo-action-btn font-semibold text-xs transition-all cursor-pointer active:scale-95 flex items-center gap-2 shadow-lg shadow-red-600/30";
+            if (btnText) btnText.textContent = "Start Flight";
+            if (btn) btn.className = "h-9 px-4 rounded-md bg-cyan-600 hover:bg-cyan-500 text-white font-bold tracking-wider text-xs transition-all cursor-pointer active:scale-95 inline-flex items-center gap-2 shadow-md shadow-cyan-950/30 btn-elevate uppercase leading-none";
+            if (recIcon) recIcon.className = "w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block shrink-0 shadow-sm shadow-emerald-950";
             if (recDot) recDot.classList.add('hidden');
             if (lastReportBtn) lastReportBtn.classList.remove('hidden');
+            const timerEl = document.getElementById('opt-blackbox-timer');
+            if (timerEl) timerEl.textContent = "00:00";
             const statusLbl = document.getElementById('opt-blackbox-status-label');
             if (statusLbl) {
                 statusLbl.textContent = "Ready to record";
                 statusLbl.className = "typo-metadata text-[10px] text-slate-400 block";
             }
 
-            if (typeof showToast === 'function') showToast("Flight recorded! Performance benchmark generated successfully.", "success");
-            refreshBenchmarksList();
+            let reportName = null;
+            if (res.report_path) {
+                const parts = res.report_path.replace(/\\/g, '/').split('/');
+                reportName = parts[parts.length - 1];
+            }
+            refreshBenchmarksList(reportName);
             if (res.report_path) {
                 window.pywebview.api.open_benchmark_report(res.report_path);
             }
         } catch (e) {
-            if (typeof showToast === 'function') showToast("Error stopping Blackbox: " + e, "error");
+            if (typeof showToast === 'function') showToast("Error stopping recording: " + e, "error");
         }
     }
 }
@@ -20675,23 +21121,58 @@ function startBlackboxTelemetryPolling() {
             const resStr = await window.pywebview.api.get_live_blackbox_telemetry();
             const telem = JSON.parse(resStr);
 
+            // Live Timer & auto-reset on stop
             const timerEl = document.getElementById('opt-blackbox-timer');
             if (timerEl) {
-                if (telem.elapsed_str) {
+                if (telem.is_tracking && telem.elapsed_str) {
                     timerEl.textContent = telem.elapsed_str;
-                } else if (!telem.is_tracking) {
-                    timerEl.textContent = "00:00:00";
+                } else {
+                    timerEl.textContent = "00:00";
                 }
             }
 
+            // Auto-stop transition detection from backend
+            if (isBlackboxRunning && !telem.is_tracking) {
+                isBlackboxRunning = false;
+                const btn = document.getElementById('opt-btn-record');
+                const btnText = document.getElementById('opt-rec-btn-text');
+                const recIcon = document.getElementById('opt-rec-icon');
+                const recDot = document.getElementById('opt-tab-rec-dot');
+                const lastReportBtn = document.getElementById('opt-btn-view-last-report');
+                const statusLbl = document.getElementById('opt-blackbox-status-label');
+
+                if (btnText) btnText.textContent = "Start Flight";
+                if (btn) btn.className = "h-9 px-4 rounded-md bg-cyan-600 hover:bg-cyan-500 text-white font-bold tracking-wider text-xs transition-all cursor-pointer active:scale-95 inline-flex items-center gap-2 shadow-md shadow-cyan-950/30 btn-elevate uppercase leading-none";
+                if (recIcon) recIcon.className = "w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block shrink-0 shadow-sm shadow-emerald-950";
+                if (recDot) recDot.classList.add('hidden');
+                if (lastReportBtn) lastReportBtn.classList.remove('hidden');
+                if (statusLbl) {
+                    statusLbl.textContent = "Ready to record";
+                    statusLbl.className = "typo-metadata text-[10px] text-slate-400 block";
+                }
+                if (typeof showToast === 'function') {
+                    showToast("Flight ended. Recording stopped automatically.", "info");
+                }
+                refreshBenchmarksList();
+            }
+
             const statusLbl = document.getElementById('opt-blackbox-status-label');
+            const recIcon = document.getElementById('opt-rec-icon');
             if (statusLbl) {
                 if (telem.is_tracking) {
-                    statusLbl.textContent = "Recording flight...";
-                    statusLbl.className = "typo-metadata text-[10px] text-emerald-400 font-semibold block animate-pulse";
+                    if (telem.is_paused) {
+                        statusLbl.textContent = "Flight Paused (Standby)";
+                        statusLbl.className = "typo-metadata text-[10px] text-amber-400 font-semibold block animate-pulse";
+                        if (recIcon) recIcon.className = "w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse inline-block shrink-0 shadow-sm shadow-amber-950";
+                    } else {
+                        statusLbl.textContent = "Recording flight...";
+                        statusLbl.className = "typo-metadata text-[10px] text-emerald-400 font-semibold block animate-pulse";
+                        if (recIcon) recIcon.className = "w-2.5 h-2.5 rounded-full bg-red-400 animate-pulse inline-block shrink-0 shadow-sm shadow-red-950";
+                    }
                 } else if (!isBlackboxRunning) {
                     statusLbl.textContent = "Ready to record";
                     statusLbl.className = "typo-metadata text-[10px] text-slate-400 block";
+                    if (recIcon) recIcon.className = "w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block shrink-0 shadow-sm shadow-emerald-950";
                 }
             }
 
@@ -20787,34 +21268,320 @@ function startBlackboxTelemetryPolling() {
     }, 1000);
 }
 
-async function refreshBenchmarksList() {
+// -------------------------------------------------------------------------
+// RECORDED BENCHMARKS COMBOBOX & VIEWER
+// -------------------------------------------------------------------------
+
+let currentBenchmarksList = [];
+let selectedBenchmarkFilename = '';
+let multiSelectedBenchmarkFiles = new Set();
+let lastClickedBenchmarkIndex = -1;
+
+function clearBenchmarkMultiSelection() {
+    multiSelectedBenchmarkFiles.clear();
+    lastClickedBenchmarkIndex = -1;
+    renderBenchmarksDropdownList();
+}
+
+function toggleBenchmarkDropdown(event) {
+    if (event) {
+        event.stopPropagation();
+        event.preventDefault();
+    }
+    const listEl = document.getElementById('opt-benchmark-dropdown-list');
+    const combobox = document.getElementById('opt-benchmark-universal-combobox');
+    if (!listEl || !combobox) return;
+
+    const isHidden = listEl.classList.contains('hidden');
+    if (typeof closeAllProfileDropdowns === 'function') closeAllProfileDropdowns();
+    if (typeof closeAllSmartLodProfileDropdowns === 'function') closeAllSmartLodProfileDropdowns();
+    closeBenchmarkDropdown();
+
+    if (isHidden) {
+        // Move dropdown to body if not already there to ensure breakout from modal overflow
+        if (listEl.parentElement !== document.body) {
+            document.body.appendChild(listEl);
+        }
+        const rect = combobox.getBoundingClientRect();
+        const spaceBelow = window.innerHeight - rect.bottom;
+        const spaceAbove = rect.top;
+
+        const targetWidth = Math.max(rect.width, Math.min(520, window.innerWidth - rect.left - 20));
+
+        listEl.style.position = 'fixed';
+        listEl.style.left = `${rect.left}px`;
+        listEl.style.width = `${targetWidth}px`;
+        listEl.style.zIndex = '99999';
+
+        if (spaceBelow < 220 && spaceAbove > spaceBelow) {
+            listEl.style.top = 'auto';
+            listEl.style.bottom = `${window.innerHeight - rect.top + 6}px`;
+            listEl.style.maxHeight = `${Math.max(100, Math.min(260, spaceAbove - 20))}px`;
+        } else {
+            listEl.style.bottom = 'auto';
+            listEl.style.top = `${rect.bottom + 6}px`;
+            listEl.style.maxHeight = `${Math.max(100, Math.min(260, spaceBelow - 20))}px`;
+        }
+
+        renderBenchmarksDropdownList();
+        listEl.classList.remove('hidden');
+    }
+}
+
+function closeBenchmarkDropdown() {
+    const listEl = document.getElementById('opt-benchmark-dropdown-list');
+    if (listEl) {
+        listEl.classList.add('hidden');
+        const combobox = document.getElementById('opt-benchmark-universal-combobox');
+        if (combobox && listEl.parentElement !== combobox) {
+            combobox.appendChild(listEl);
+        }
+    }
+    multiSelectedBenchmarkFiles.clear();
+    lastClickedBenchmarkIndex = -1;
+}
+
+function handleBenchmarkRowClick(event, filename, index) {
+    if (event.shiftKey) {
+        event.preventDefault();
+        event.stopPropagation();
+        const start = lastClickedBenchmarkIndex >= 0 ? lastClickedBenchmarkIndex : index;
+        const end = index;
+        const min = Math.min(start, end);
+        const max = Math.max(start, end);
+        for (let i = min; i <= max; i++) {
+            if (currentBenchmarksList[i]) {
+                multiSelectedBenchmarkFiles.add(currentBenchmarksList[i].filename);
+            }
+        }
+        lastClickedBenchmarkIndex = index;
+        renderBenchmarksDropdownList();
+        return;
+    }
+
+    if (event.altKey || event.ctrlKey || event.metaKey) {
+        event.preventDefault();
+        event.stopPropagation();
+        if (multiSelectedBenchmarkFiles.has(filename)) {
+            multiSelectedBenchmarkFiles.delete(filename);
+        } else {
+            multiSelectedBenchmarkFiles.add(filename);
+        }
+        lastClickedBenchmarkIndex = index;
+        renderBenchmarksDropdownList();
+        return;
+    }
+
+    // Normal click: if multi-selection active, clear it; otherwise select single benchmark item
+    if (multiSelectedBenchmarkFiles.size > 0) {
+        multiSelectedBenchmarkFiles.clear();
+        renderBenchmarksDropdownList();
+    }
+    lastClickedBenchmarkIndex = index;
+    selectBenchmarkItem(filename);
+}
+
+function renderBenchmarksDropdownList() {
+    const listEl = document.getElementById('opt-benchmark-dropdown-list');
+    if (!listEl) return;
+
+    if (!currentBenchmarksList || currentBenchmarksList.length === 0) {
+        listEl.innerHTML = '<div class="p-3 text-xs text-slate-400 italic text-center">No recorded flight benchmarks yet</div>';
+        return;
+    }
+
+    const hasMultiSelection = multiSelectedBenchmarkFiles.size > 0;
+
+    let toolbarHtml = '';
+    if (hasMultiSelection) {
+        toolbarHtml = `
+            <div class="sticky top-0 z-20 px-3 py-1.5 bg-slate-900 border-b border-slate-700/80 flex items-center justify-between text-xs backdrop-blur-md">
+                <div class="flex items-center gap-2">
+                    <span class="text-cyan-400 font-semibold text-[11px]">${multiSelectedBenchmarkFiles.size} selected</span>
+                    <button onclick="event.stopPropagation(); clearBenchmarkMultiSelection();" class="text-slate-400 hover:text-white underline text-[10px] cursor-pointer">Clear</button>
+                </div>
+                <button onclick="event.stopPropagation(); requestDeleteMultiSelectedBenchmarks();"
+                        title="Delete selected benchmarks"
+                        class="px-2.5 py-1 rounded-md bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-[11px] flex items-center gap-1.5 cursor-pointer shadow-sm uppercase tracking-wider transition-all">
+                    <i class="fa-solid fa-trash-can text-[10px]"></i>
+                    <span>Delete (${multiSelectedBenchmarkFiles.size})</span>
+                </button>
+            </div>
+        `;
+    }
+
+    const itemsHtml = currentBenchmarksList.map((item, index) => {
+        const isMultiSelected = multiSelectedBenchmarkFiles.has(item.filename);
+        const isCurrentActive = selectedBenchmarkFilename === item.filename;
+
+        let rowBgClass = 'hover:bg-slate-800/80';
+        if (isMultiSelected) {
+            rowBgClass = 'bg-cyan-600/25 border-l-2 border-cyan-400 hover:bg-cyan-600/30';
+        } else if (isCurrentActive) {
+            rowBgClass = 'bg-slate-800/60 hover:bg-slate-800';
+        }
+
+        const checkboxIcon = hasMultiSelection
+            ? (isMultiSelected
+                ? `<i class="fa-solid fa-square-check text-cyan-400 text-sm shrink-0 mr-2"></i>`
+                : `<i class="fa-regular fa-square text-slate-500 text-sm shrink-0 mr-2"></i>`)
+            : '';
+
+        return `
+            <div onclick="handleBenchmarkRowClick(event, '${escapeJsStr(item.filename)}', ${index})"
+                 class="px-3.5 py-2 flex items-center justify-between cursor-pointer transition-colors group select-none ${rowBgClass}">
+                <div class="flex items-center min-w-0 pr-2">
+                    ${checkboxIcon}
+                    <i class="fa-solid fa-file-chart-column text-cyan-400 text-xs shrink-0 mr-2"></i>
+                    <div class="flex flex-col min-w-0">
+                        <span class="typo-input-val font-semibold text-xs text-slate-100 truncate group-hover:text-cyan-300 font-mono">${escapeHtml(item.filename)}</span>
+                        <span class="typo-metadata tabular-nums text-[10px] text-slate-400">${item.mtime} • ${item.size_kb} KB</span>
+                    </div>
+                </div>
+                <div class="shrink-0 flex items-center gap-1.5">
+                    <button onclick="event.stopPropagation(); openBenchmarkFile('${escapeJsStr(item.filename)}')"
+                            title="Open report in browser"
+                            class="px-2 py-0.5 rounded text-[10px] font-semibold text-cyan-400 bg-cyan-950/60 hover:bg-cyan-900 border border-cyan-800/50 hover:border-cyan-600 transition-all cursor-pointer">
+                        OPEN ↗
+                    </button>
+                    <button onclick="event.stopPropagation(); requestDeleteBenchmarkByFilename('${escapeJsStr(item.filename)}')"
+                            title="Delete '${escapeHtml(item.filename)}'"
+                            class="w-6 h-6 flex items-center justify-center rounded-md hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer border-0 bg-transparent">
+                        <i class="fa-solid fa-trash-can text-xs pointer-events-none"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    listEl.innerHTML = toolbarHtml + itemsHtml;
+}
+
+function selectBenchmarkItem(filename) {
+    selectedBenchmarkFilename = filename;
+    const input = document.getElementById('opt-benchmark-universal-input');
+    if (input) input.value = filename;
+    closeBenchmarkDropdown();
+}
+
+function openSelectedBenchmark() {
+    const input = document.getElementById('opt-benchmark-universal-input');
+    const filename = (input && input.value ? input.value : selectedBenchmarkFilename) || (currentBenchmarksList.length > 0 ? currentBenchmarksList[0].filename : '');
+    if (!filename) {
+        if (typeof showToast === 'function') showToast("Please select a benchmark first.", "warning");
+        return;
+    }
+    openBenchmarkFile(filename);
+}
+
+function requestDeleteBenchmarkByFilename(filename) {
+    if (!filename) return;
+
+    showCustomModal({
+        title: 'DELETE BENCHMARK',
+        message: `Do you want to delete "${filename}"?`,
+        type: 'warning',
+        showCancel: true,
+        confirmText: 'YES',
+        cancelText: 'NO',
+        confirmClass: 'px-5 py-1.5 text-center rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white typo-action-btn font-semibold text-xs uppercase transition-all border-0 cursor-pointer shadow-md',
+        cancelClass: 'px-5 py-1.5 text-center rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 hover:text-white typo-action-btn text-xs font-semibold uppercase transition-all cursor-pointer',
+        onConfirm: async () => {
+            await deleteSelectedBenchmarks(filename);
+            multiSelectedBenchmarkFiles.delete(filename);
+        }
+    });
+}
+
+function requestDeleteMultiSelectedBenchmarks() {
+    const count = multiSelectedBenchmarkFiles.size;
+    if (count === 0) return;
+    const files = Array.from(multiSelectedBenchmarkFiles);
+
+    showCustomModal({
+        title: 'DELETE BENCHMARKS',
+        message: `Do you want to delete the "${count}" files selected ?`,
+        type: 'warning',
+        showCancel: true,
+        confirmText: 'YES',
+        cancelText: 'NO',
+        confirmClass: 'px-5 py-1.5 text-center rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white typo-action-btn font-semibold text-xs uppercase transition-all border-0 cursor-pointer shadow-md',
+        cancelClass: 'px-5 py-1.5 text-center rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 hover:text-white typo-action-btn text-xs font-semibold uppercase transition-all cursor-pointer',
+        onConfirm: async () => {
+            await deleteSelectedBenchmarks(files.join(','));
+            multiSelectedBenchmarkFiles.clear();
+        }
+    });
+}
+
+function confirmDeleteCurrentBenchmark() {
+    if (multiSelectedBenchmarkFiles.size > 0) {
+        requestDeleteMultiSelectedBenchmarks();
+    } else {
+        const input = document.getElementById('opt-benchmark-universal-input');
+        const fn = (input && input.value ? input.value : selectedBenchmarkFilename);
+        if (fn) {
+            requestDeleteBenchmarkByFilename(fn);
+        } else {
+            if (typeof showToast === 'function') showToast("Please select a benchmark to delete.", "warning");
+        }
+    }
+}
+
+async function deleteSelectedBenchmarks(filesToDelete) {
+    if (!filesToDelete) return;
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.delete_flight_benchmark) return;
+
+    try {
+        const resStr = await window.pywebview.api.delete_flight_benchmark(filesToDelete);
+        const res = typeof resStr === 'string' ? JSON.parse(resStr) : resStr;
+        if (res && res.status === 'success') {
+            const count = res.deleted_count || 1;
+            if (typeof showToast === 'function') {
+                showToast(`Benchmark file${count > 1 ? 's' : ''} deleted successfully.`, "info");
+            }
+            const deletedList = filesToDelete.split(',').map(s => s.trim());
+            const input = document.getElementById('opt-benchmark-universal-input');
+            if (input && deletedList.includes(input.value)) {
+                input.value = '';
+                selectedBenchmarkFilename = '';
+            }
+            multiSelectedBenchmarkFiles.clear();
+            closeBenchmarkDropdown();
+            await refreshBenchmarksList();
+        } else {
+            if (typeof showToast === 'function') {
+                showToast(`Delete failed: ${res && res.message ? res.message : 'Unknown error'}`, "error");
+            }
+        }
+    } catch (e) {
+        console.error("Error deleting benchmark(s):", e);
+    }
+}
+
+async function refreshBenchmarksList(preferredFilename = null) {
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.list_flight_benchmarks) return;
     try {
         const resStr = await window.pywebview.api.list_flight_benchmarks();
-        const list = JSON.parse(resStr);
-        const container = document.getElementById('opt-benchmarks-list');
-        if (!container) return;
+        currentBenchmarksList = JSON.parse(resStr) || [];
+        renderBenchmarksDropdownList();
 
-        if (!list || list.length === 0) {
-            container.innerHTML = '<p class="text-xs text-slate-500 italic p-2">No flight recorded yet.</p>';
-            return;
+        const input = document.getElementById('opt-benchmark-universal-input');
+        if (input) {
+            if (preferredFilename && currentBenchmarksList.some(b => b.filename === preferredFilename)) {
+                selectedBenchmarkFilename = preferredFilename;
+                input.value = preferredFilename;
+            } else if (selectedBenchmarkFilename && currentBenchmarksList.some(b => b.filename === selectedBenchmarkFilename)) {
+                input.value = selectedBenchmarkFilename;
+            } else if (currentBenchmarksList.length > 0) {
+                input.value = currentBenchmarksList[0].filename;
+                selectedBenchmarkFilename = currentBenchmarksList[0].filename;
+            } else {
+                input.value = '';
+                selectedBenchmarkFilename = '';
+                input.placeholder = "No recorded flight benchmarks yet";
+            }
         }
-
-        container.innerHTML = list.map(item => `
-            <div class="p-2.5 rounded-xl bg-slate-950/70 border border-slate-800 hover:border-slate-700 flex items-center justify-between text-xs transition-all">
-                <div class="flex items-center gap-2.5 truncate pr-2">
-                    <i class="fa-solid fa-file-chart-column text-cyan-400 text-sm"></i>
-                    <div class="truncate">
-                        <span class="typo-input-val font-semibold text-xs text-white block truncate">${item.filename}</span>
-                        <span class="typo-metadata tabular-nums">${item.mtime} • ${item.size_kb} KB</span>
-                    </div>
-                </div>
-                <button onclick="openBenchmarkFile('${item.filename}')" class="px-3 py-1 rounded-lg bg-cyan-600/80 hover:bg-cyan-500 text-white typo-action-btn font-semibold text-xs transition-all cursor-pointer shrink-0 flex items-center gap-1.5">
-                    <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
-                    <span>Open</span>
-                </button>
-            </div>
-        `).join('');
     } catch (e) {
         console.error("Error loading benchmarks list:", e);
     }
@@ -21710,3 +22477,40 @@ async function toggleIngamePanelInstall() {
         console.error("Error toggling in-game panel install:", e);
     }
 }
+
+// ==============================================================================
+// GLOBAL BREADCRUMBS & CLIENT-SIDE ERROR INTERCEPTOR
+// ==============================================================================
+
+window.addEventListener('error', function(event) {
+    try {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.log_client_error) {
+            window.pywebview.api.log_client_error(
+                event.message || 'Unknown JS Error',
+                event.filename || '',
+                event.lineno || 0,
+                event.colno || 0,
+                event.error ? (event.error.stack || '') : ''
+            );
+        }
+    } catch(e) {}
+});
+
+window.addEventListener('unhandledrejection', function(event) {
+    try {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.log_client_error) {
+            const reason = event.reason;
+            const msg = reason ? (reason.message || String(reason)) : 'Unhandled Promise Rejection';
+            const stack = (reason && reason.stack) ? reason.stack : '';
+            window.pywebview.api.log_client_error(msg, 'Promise', 0, 0, stack);
+        }
+    } catch(e) {}
+});
+
+// Raccourci clavier universel F11 ou Ctrl+Shift+B pour ouvrir le panneau d'assistance
+window.addEventListener('keydown', function(e) {
+    if (e.key === 'F11' || (e.ctrlKey && e.shiftKey && (e.key === 'B' || e.key === 'b'))) {
+        e.preventDefault();
+        openBugReportModal();
+    }
+});

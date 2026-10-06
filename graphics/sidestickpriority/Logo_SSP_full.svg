@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Full" xmlns="http://www.w3.org/2000/svg" width="477.17" height="351.85" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 477.17 351.85"><metadata><?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?><x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="XMP Core 6.0.0"><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"><rdf:Description rdf:about="" xmlns:xmp="http://ns.adobe.com/xap/1.0/" xmlns:xmpMM="http://ns.adobe.com/xap/1.0/mm/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmpMM:DocumentID="xmp.did:cb9f5498-bb58-4572-8043-8c369e6bfb9b" xmpMM:InstanceID="xmp.iid:cb9f5498-bb58-4572-8043-8c369e6bfb9b" dcterms:provenance="https://cai-manifests.adobe.com/manifests/urn-c2pa-2c51a790-2cd2-48bd-b67e-db42b8b7a573-adobe"> </rdf:Description></rdf:RDF></x:xmpmeta>
+<?xpacket end="w"?></metadata>
+  <defs>
+    <style>
+      .cls-1 {
+        fill: url(#Sky_6);
+      }
+
+      .cls-2 {
+        fill: url(#Sky_6-2);
+      }
+    </style>
+    <linearGradient id="Sky_6" data-name="Sky 6" x1="145.19" y1="329.79" x2="172.51" y2="329.79" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#87a9d7"/>
+      <stop offset=".11" stop-color="#9bb6da"/>
+      <stop offset=".22" stop-color="#b2c0db"/>
+      <stop offset=".33" stop-color="#cfc9dd"/>
+      <stop offset=".44" stop-color="#d2cbde"/>
+      <stop offset=".56" stop-color="#ddd1e2"/>
+      <stop offset=".67" stop-color="#d0c7e3"/>
+      <stop offset=".78" stop-color="#c4bcde"/>
+      <stop offset=".89" stop-color="#9ca8d6"/>
+      <stop offset="1" stop-color="#768ec8"/>
+    </linearGradient>
+    <linearGradient id="Sky_6-2" data-name="Sky 6" x1="2.52" y1="165.68" x2="477.17" y2="165.68" xlink:href="#Sky_6"/>
+  </defs>
+  <line class="cls-1" x1="172.51" y1="329.87" x2="145.19" y2="329.72"/>
+  <path class="cls-2" d="M222.31,329.87c-12.07,0-207.92-1.8-219.78-2.15l10.39-3.43c6.94-2.29,12.42-6.31,18.23-11.06,17.41-14.21,33.64-30.03,49.09-46.91l113.39-123.97,33.07-36.94,48.68-56.69,13.15-14.74C311.5,10.54,337.14,2.74,368.05.97l39.29-.69c23.4.32,46.35,1.65,69.83,3.67-26.91,70.83-54.26,140.01-83.06,209.3-16.54,39.8-33.61,78.99-51.6,117.84l-84.27-.06"/>
+</svg>

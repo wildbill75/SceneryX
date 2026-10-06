@@ -394,10 +394,10 @@ def check_autofps_cloud_events():
             if "Reducing Cloud Quality" in l:
                 reduced = True
         if reduced:
-            return f"Réductions automatiques déclenchées en vol (Initial : {initial_q})"
-        return f"Qualité nominale maintenue ({initial_q}) - Aucun décrochage nuages"
+            return f"Automatic reductions triggered during flight (Initial: {initial_q})"
+        return f"Nominal quality maintained ({initial_q}) - No cloud drops"
     except Exception:
-        return "Qualité nominale maintenue"
+        return "Nominal quality maintained"
 
 _AIRPORT_GEO_CACHE = None
 
@@ -449,6 +449,223 @@ def find_nearest_airport(lat, lon):
     nm_dist = (min_d_sq ** 0.5) * 60.0
     return best_icao, best_name, nm_dist
 
+def sanitize_aircraft_slug(aircraft_title):
+    if not aircraft_title or str(aircraft_title).lower() in ('not detected', 'aircraft not detected', 'aircraft', 'flight', 'none'):
+        return 'Aircraft'
+    s = re.sub(r'\(.*?\)|\[.*?\]', '', str(aircraft_title)).strip()
+    patterns = [
+        (r'\b(A318|A319|A320neo|A320|A321neo|A321|A330|A340|A350|A380)\b', r'\1'),
+        (r'\b(B737|B747|B777|B787|737[-\s]?\d+|747[-\s]?\d+|777[-\s]?\d+|787[-\s]?\d+)\b', r'\1'),
+        (r'\b(CRJ[-\s]?\d+|ATR[-\s]?\d+|Dash[-\s]?8|Q400|ERJ[-\s]?\d+|E\d{3})\b', r'\1'),
+        (r'\b(C172|C152|C208|DA40|DA62|SR22|KingAir|Baron|Bonanza)\b', r'\1'),
+    ]
+    for pat, rep in patterns:
+        m = re.search(pat, s, re.IGNORECASE)
+        if m:
+            return re.sub(r'[\s\-]+', '', m.group(1).upper())
+    words = [w for w in re.split(r'[^a-zA-Z0-9]', s) if w]
+    if words:
+        slug = '_'.join(words[:2])
+        return slug[:16]
+    return 'Aircraft'
+
+def get_simbrief_flight_plan():
+    """
+    Tente de récupérer le plan de vol SimBrief actif :
+    1. Depuis settings.json (flight_mode.simbrief_flight ou latest_simbrief_flight).
+    2. En interrogeant l'API SimBrief si un username ou pilot_id est configuré.
+    """
+    appdata = os.getenv('APPDATA', '')
+    settings_path = os.path.join(appdata, 'SceneryX', 'settings.json')
+    if not os.path.exists(settings_path):
+        return None
+
+    try:
+        with open(settings_path, 'r', encoding='utf-8') as f:
+            st = json.load(f)
+    except Exception:
+        return None
+
+    # Source 1 : flight_mode.simbrief_flight
+    fm = st.get('flight_mode', {})
+    if isinstance(fm, dict):
+        sb_fm = fm.get('simbrief_flight')
+        if isinstance(sb_fm, dict) and sb_fm.get('origin', {}).get('icao') and sb_fm.get('destination', {}).get('icao'):
+            return sb_fm
+
+    # Source 2 : latest_simbrief_flight
+    latest_sb = st.get('latest_simbrief_flight')
+    if isinstance(latest_sb, dict) and latest_sb.get('origin', {}).get('icao') and latest_sb.get('destination', {}).get('icao'):
+        return latest_sb
+
+    # Source 3 : interrogation directe SimBrief API si un identifiant est configuré
+    uid = str(st.get('simbrief_userid') or '').strip()
+    uname = str(st.get('simbrief_username') or '').strip()
+    ident = uid or uname
+    if ident:
+        try:
+            import urllib.request
+            param = f"userid={ident}" if ident.isdigit() else f"username={ident}"
+            url = f"https://www.simbrief.com/api/xml.fetcher.php?{param}&json=1"
+            req = urllib.request.Request(url, headers={'User-Agent': 'SceneryX/1.0'})
+            with urllib.request.urlopen(req, timeout=3.5) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+                if isinstance(data, dict) and 'origin' in data and 'destination' in data:
+                    orig_icao = data.get('origin', {}).get('icao_code', '').upper()
+                    dest_icao = data.get('destination', {}).get('icao_code', '').upper()
+                    if orig_icao and dest_icao:
+                        sb_obj = {
+                            "origin": {
+                                "icao": orig_icao,
+                                "name": data.get('origin', {}).get('name', orig_icao),
+                                "lat": float(data.get('origin', {}).get('pos_lat', 0)) if data.get('origin', {}).get('pos_lat') else None,
+                                "lon": float(data.get('origin', {}).get('pos_long', 0)) if data.get('origin', {}).get('pos_long') else None
+                            },
+                            "destination": {
+                                "icao": dest_icao,
+                                "name": data.get('destination', {}).get('name', dest_icao),
+                                "lat": float(data.get('destination', {}).get('pos_lat', 0)) if data.get('destination', {}).get('pos_lat') else None,
+                                "lon": float(data.get('destination', {}).get('pos_long', 0)) if data.get('destination', {}).get('pos_long') else None
+                            },
+                            "aircraft": data.get('aircraft', {}).get('name', ''),
+                            "route": data.get('general', {}).get('route', ''),
+                            "fetched_at": time.time()
+                        }
+                        try:
+                            st['latest_simbrief_flight'] = sb_obj
+                            with open(settings_path, 'w', encoding='utf-8') as out_f:
+                                json.dump(st, out_f, indent=2, ensure_ascii=False)
+                        except Exception:
+                            pass
+                        return sb_obj
+        except Exception:
+            pass
+
+    return None
+
+def match_simbrief_plan(sb_flight, ref_lat=None, ref_lon=None, arr_lat=None, arr_lon=None):
+    if not sb_flight or not isinstance(sb_flight, dict):
+        return None, None, None, None
+    orig = sb_flight.get('origin', {})
+    dest = sb_flight.get('destination', {})
+    orig_icao = orig.get('icao', '').upper().strip()
+    dest_icao = dest.get('icao', '').upper().strip()
+    if not orig_icao or not dest_icao or len(orig_icao) != 4 or len(dest_icao) != 4:
+        return None, None, None, None
+
+    orig_name = orig.get('name') or orig_icao
+    dest_name = dest.get('name') or dest_icao
+
+    # Vérification géographique départ si ref_lat/lon sont disponibles
+    if ref_lat is not None and ref_lon is not None and (abs(ref_lat) > 0.01 or abs(ref_lon) > 0.01):
+        orig_lat = orig.get('lat')
+        orig_lon = orig.get('lon')
+        if orig_lat is None or orig_lon is None:
+            cache = get_airport_geo_cache()
+            for icao, name, alat, alon in cache:
+                if icao == orig_icao:
+                    orig_lat, orig_lon = alat, alon
+                    break
+        if orig_lat is not None and orig_lon is not None:
+            dist_nm = (((ref_lat - float(orig_lat))**2 + (ref_lon - float(orig_lon))**2)**0.5) * 60.0
+            if dist_nm > 120.0:
+                return None, None, None, None
+
+    # Vérification géographique arrivée : si l'avion a atterri ailleurs que la destination SimBrief (ex: vol libre ou nouveau vol non re-généré sur SimBrief)
+    if arr_lat is not None and arr_lon is not None and (abs(arr_lat) > 0.01 or abs(arr_lon) > 0.01):
+        dest_lat = dest.get('lat')
+        dest_lon = dest.get('lon')
+        if dest_lat is None or dest_lon is None:
+            cache = get_airport_geo_cache()
+            for icao, name, alat, alon in cache:
+                if icao == dest_icao:
+                    dest_lat, dest_lon = alat, alon
+                    break
+        if dest_lat is not None and dest_lon is not None:
+            dest_dist_nm = (((arr_lat - float(dest_lat))**2 + (arr_lon - float(dest_lon))**2)**0.5) * 60.0
+            if dest_dist_nm > 80.0:
+                # L'arrivée réelle ne correspond pas à la destination SimBrief : conserver le départ SimBrief mais laisser le GPS déterminer l'arrivée réelle
+                return orig_icao, None, orig_name, None
+
+    return orig_icao, dest_icao, orig_name, dest_name
+
+def detect_flight_airports(samples=None, first_valid_gps=None, last_valid_gps=None,
+                           first_ground_gps=None, last_ground_gps=None,
+                           initial_dep=None, initial_arr=None):
+    """
+    Résout les aéroports de départ et d'arrivée selon la règle métier :
+    1. Si un plan SimBrief est disponible et correspond au vol (départ ET arrivée), on le récupère.
+    2. Si le départ correspond à SimBrief mais que l'arrivée est différente, départ = SimBrief et arrivée = GPS réel.
+    3. Sinon (pas de SimBrief ou vol libre ailleurs), détection automatique par GPS sol/arrêt.
+    """
+    samples = samples or []
+    
+    # 1. Priorité SimBrief avec validation de l'arrivée réelle
+    sb = get_simbrief_flight_plan()
+    ref_start = first_ground_gps or first_valid_gps
+    ref_end = last_ground_gps or last_valid_gps
+    dep_icao, dep_name = None, ""
+    arr_icao, arr_name = None, ""
+    det_source = "Auto-GPS"
+
+    if sb:
+        s_dep, s_arr, s_dep_name, s_arr_name = match_simbrief_plan(
+            sb,
+            ref_start[0] if ref_start else None,
+            ref_start[1] if ref_start else None,
+            ref_end[0] if ref_end else None,
+            ref_end[1] if ref_end else None
+        )
+        if s_dep and s_arr:
+            return s_dep, s_arr, s_dep_name, s_arr_name, "SimBrief OFP"
+        elif s_dep:
+            dep_icao, dep_name = s_dep, s_dep_name
+            det_source = "SimBrief + GPS Arr"
+
+    # 2. Détection par GPS (si pas de SimBrief pour le départ)
+    if not dep_icao:
+        dep_pt = first_ground_gps or first_valid_gps
+        if not dep_pt and samples:
+            for s in samples:
+                if s.get('lat') is not None and s.get('lon') is not None and (abs(s['lat']) > 0.01 or abs(s['lon']) > 0.01):
+                    dep_pt = (s['lat'], s['lon'])
+                    break
+
+        if dep_pt:
+            icao, name, dist = find_nearest_airport(dep_pt[0], dep_pt[1])
+            if icao:
+                dep_icao, dep_name = icao, name
+
+        if not dep_icao:
+            if initial_dep and len(initial_dep) == 4 and initial_dep != 'DEP':
+                dep_icao = initial_dep
+                dep_name = initial_dep
+            else:
+                dep_icao = "DEP"
+
+    # Arrivée au moment précis de l'arrêt de la télémétrie
+    arr_icao, arr_name = None, ""
+    arr_pt = last_valid_gps or last_ground_gps
+    if not arr_pt and samples:
+        for s in reversed(samples):
+            if s.get('lat') is not None and s.get('lon') is not None and (abs(s['lat']) > 0.01 or abs(s['lon']) > 0.01):
+                arr_pt = (s['lat'], s['lon'])
+                break
+
+    if arr_pt:
+        icao, name, dist = find_nearest_airport(arr_pt[0], arr_pt[1])
+        if icao:
+            arr_icao, arr_name = icao, name
+
+    if not arr_icao:
+        if initial_arr and len(initial_arr) == 4 and initial_arr != 'ARR':
+            arr_icao = initial_arr
+            arr_name = initial_arr
+        else:
+            arr_icao = "ARR"
+
+    return dep_icao, arr_icao, dep_name, arr_name, det_source
+
 def resolve_flight_context(lat=None, lon=None, on_ground=False):
     """
     Détermine automatiquement l'appareil, la route, le point de départ
@@ -462,30 +679,38 @@ def resolve_flight_context(lat=None, lon=None, on_ground=False):
 
     if is_corridor and dep and arr:
         if prof_slug == 'direct':
-            mode_display = f"A ➔ B DIRECT ({dis_count} scènes isolées)"
+            mode_display = f"A ➔ B DIRECT ({dis_count} isolated sceneries)"
             route_display = f"{dep} ➔ {arr}"
         elif prof_slug == 'simbrief':
-            mode_display = f"SIMBRIEF ({dis_count} scènes isolées)"
+            mode_display = f"SIMBRIEF ({dis_count} isolated sceneries)"
             route_display = f"{dep} ➔ {arr}"
         else:
-            mode_display = f"COULOIR ({dis_count} scènes isolées)"
+            mode_display = f"CORRIDOR ({dis_count} isolated sceneries)"
             route_display = f"{dep} ➔ {arr}"
     else:
-        if lat is not None and lon is not None:
-            # Handle possible radians conversion
-            if abs(lat) <= 3.14159 and abs(lon) <= 3.14159 and (lat != 0.0 or lon != 0.0):
-                lat = math.degrees(lat)
-                lon = math.degrees(lon)
-            near_icao, near_name, dist_nm = find_nearest_airport(lat, lon)
-            if near_icao:
-                if on_ground or dist_nm <= 4.0:
-                    route_display = f"Départ : {near_icao} ({near_name})"
+        # Vérification si un plan SimBrief est actif même sans mode corridor
+        sb = get_simbrief_flight_plan()
+        if sb:
+            sb_dep, sb_arr, sb_dname, sb_aname = match_simbrief_plan(sb, lat, lon)
+            if sb_dep and sb_arr:
+                dep = sb_dep
+                arr = sb_arr
+                mode_display = "BASELINE (SimBrief OFP • No Scenery Isolation)"
+                route_display = f"{sb_dep} ➔ {sb_arr}"
+
+        if not route_display:
+            if lat is not None and lon is not None:
+                near_icao, near_name, dist_nm = find_nearest_airport(lat, lon)
+                if near_icao:
+                    if on_ground or dist_nm <= 4.0:
+                        route_display = f"Departure: {near_icao} ({near_name})"
+                        dep = near_icao
+                    else:
+                        route_display = f"In flight ~{int(round(dist_nm))} NM from {near_icao}"
                 else:
-                    route_display = f"En vol à ~{int(round(dist_nm))} NM de {near_icao}"
+                    route_display = "Free flight"
             else:
-                route_display = "Vol libre"
-        else:
-            route_display = "Vol libre (GPS en attente)"
+                route_display = "Waiting for flight"
 
     return {
         "route_display": route_display,
@@ -499,9 +724,25 @@ def resolve_flight_context(lat=None, lon=None, on_ground=False):
 
 def get_current_lod_data(autofps_data=None):
     """
-    Retrieves current TLOD and OLOD, prioritizing SceneryX Smart LOD if active,
-    falling back to external AutoFPS if present.
+    Retrieves current TLOD and OLOD directly from MSFS memory or active controllers.
+    Priority:
+    1. Direct MSFS RAM via FlightMemoryEngine (exact ground truth in memory).
+    2. SceneryX Smart LOD setpoints if active.
+    3. External AutoFPS if present.
     """
+    try:
+        import flight_memory_engine
+        mem = flight_memory_engine.get_memory_engine()
+        if not mem.is_attached:
+            mem.attach()
+        if mem.is_attached:
+            t = mem.read_tlod()
+            o = mem.read_olod()
+            if t is not None and t > 0:
+                return round(t), round(o) if o is not None else None, True
+    except Exception:
+        pass
+
     try:
         from flight_lod_controller import get_smart_lod_controller
         s_ctrl = get_smart_lod_controller()
@@ -592,7 +833,7 @@ def analyze_smart_lod_performance(samples, session_info=None):
             'fps_color': '#10b981' if fps_diff >= 0 else '#f43f5e',
             'mt_delta': f"{mt_sign} ms",
             'mt_color': '#10b981' if mt_diff <= 0 else '#f59e0b',
-            'verdict': 'Qualité visuelle maximale atteinte avec fluidité stable' if fps_diff >= -3 else 'Ajustement dynamique recommandé si saccades'
+            'verdict': 'Maximum visual quality achieved with stable smoothness' if fps_diff >= -3 else 'Dynamic adjustment recommended if stuttering occurs'
         })
 
     # Récupérer les événements Smart LOD spécifiques s'ils existent
@@ -609,10 +850,10 @@ def analyze_smart_lod_performance(samples, session_info=None):
 
 def analyze_flight_milestones(samples, session_info=None):
     """
-    Analyse chronologique complète des phases de vol :
-    Taxi-Out (Départ), Montée Initiale, Montée/Plafond TLOD, Croisière,
-    Descente, Approche Finale & Toucher, Taxi-In (Arrivée).
-    Mesure les impacts de scène d'aéroports et du trafic sol.
+    Chronological analysis of flight phases:
+    Taxi-Out (Departure), Initial Climb, Climb/TLOD Ceiling, Cruise,
+    Descent, Final Approach & Touchdown, Taxi-In (Arrival).
+    Measures airport scenery impacts and ground traffic.
     """
     if not samples:
         return []
@@ -631,8 +872,7 @@ def analyze_flight_milestones(samples, session_info=None):
         dep = session_info.get('dep') or session_info.get('cur_dep') or ""
         arr = session_info.get('arr') or session_info.get('cur_arr') or ""
 
-    # Détection des échantillons en vol (airborne)
-    # Un point est considéré en l'air si on_ground == False et agl > 40, ou si agl >= 80 ft
+    # Detection of airborne samples
     airborne_indices = [
         i for i, s in enumerate(samples)
         if (s.get('on_ground') is False and (s.get('agl_ft') is None or s.get('agl_ft') > 40))
@@ -641,47 +881,47 @@ def analyze_flight_milestones(samples, session_info=None):
 
     milestones = []
 
-    # CAS 1 : Aucun échantillon en l'air (Vol entièrement au sol / Test Taxi sur aéroport)
+    # CASE 1: No airborne samples (Flight entirely on ground / Taxi test)
     if not airborne_indices:
         taxi_samples = [s for s in samples if s.get('agl_ft') is None or s.get('agl_ft') < 200]
         if taxi_samples:
             milestones.append({
-                'phase': f"Roulage au Sol ({dep})" if dep else "Roulage au Sol (Taxi)",
-                'alt': 'Sol (0 - 50 ft)',
+                'phase': f"Ground Taxi ({dep})" if dep else "Ground Taxi",
+                'alt': 'Ground (0 - 50 ft)',
                 'tlod': str(mode_val(taxi_samples, 'tlod')),
                 'olod': str(mode_val(taxi_samples, 'olod')),
                 'fps': str(avg(taxi_samples, 'disp_fps')) + ' FPS',
                 'mt': str(avg(taxi_samples, 'main_thread_ms')) + ' ms',
-                'notes': 'Test de scène aéroportuaire & trafic au sol (Stationnaire / Roulage)'
+                'notes': 'Airport scenery & ground traffic test (Stationary / Taxi)'
             })
         return milestones
 
-    # CAS 2 : Le vol comporte des phases en l'air
+    # CASE 2: Flight has airborne phases
     idx_takeoff = airborne_indices[0]
     idx_touchdown = airborne_indices[-1]
 
-    # --- 1. TAXI-OUT (Roulage au sol avant décollage) ---
+    # --- 1. TAXI-OUT ---
     if idx_takeoff > 0:
         taxi_out_samples = [
             samples[i] for i in range(idx_takeoff)
             if samples[i].get('on_ground', True) and (samples[i].get('agl_ft') is None or samples[i].get('agl_ft') < 80)
         ]
         if len(taxi_out_samples) >= 3:
-            taxi_out_title = f"Taxi Out ({dep})" if dep else "Taxi Out (Roulage Départ)"
+            taxi_out_title = f"Taxi Out ({dep})" if dep else "Taxi Out"
             milestones.append({
                 'phase': taxi_out_title,
-                'alt': 'Sol (0 ft)',
+                'alt': 'Ground (0 ft)',
                 'tlod': str(mode_val(taxi_out_samples, 'tlod')),
                 'olod': str(mode_val(taxi_out_samples, 'olod')),
                 'fps': str(avg(taxi_out_samples, 'disp_fps')) + ' FPS',
                 'mt': str(avg(taxi_out_samples, 'main_thread_ms')) + ' ms',
-                'notes': 'Impact scène aéroport de départ, bâtiments & trafic sol'
+                'notes': 'Departure airport scenery impact, terminal buildings & ground traffic'
             })
 
-    # Analyse des données en vol (entre décollage et atterrissage)
+    # In-flight data
     flight_samples = samples[idx_takeoff : idx_touchdown + 1]
     
-    # Trouver le pic d'altitude et son index
+    # Peak altitude
     max_agl = 0
     idx_peak = idx_takeoff
     for i in range(idx_takeoff, idx_touchdown + 1):
@@ -690,57 +930,57 @@ def analyze_flight_milestones(samples, session_info=None):
             max_agl = cur_agl
             idx_peak = i
 
-    # --- 2. MONTÉE INITIALE (0 - 3 000 ft) ---
+    # --- 2. INITIAL CLIMB (0 - 3,000 ft) ---
     climb_init_samples = [
         samples[i] for i in range(idx_takeoff, idx_peak + 1)
         if (samples[i].get('agl_ft') is not None and samples[i].get('agl_ft') < 3000)
     ]
     if climb_init_samples:
         milestones.append({
-            'phase': 'Montée Initiale',
-            'alt': '0 - 3 000 ft',
+            'phase': 'Initial Climb',
+            'alt': '0 - 3,000 ft',
             'tlod': str(mode_val(climb_init_samples, 'tlod')),
             'olod': str(mode_val(climb_init_samples, 'olod')),
             'fps': str(avg(climb_init_samples, 'disp_fps')) + ' FPS',
             'mt': str(avg(climb_init_samples, 'main_thread_ms')) + ' ms',
-            'notes': 'Dégagement sol et escalade progressive du TLOD'
+            'notes': 'Ground clearance and progressive TLOD ramp'
         })
 
-    # --- 3. MONTÉE & PLAFOND TLOD (3 000 - 10 000 ft) ---
+    # --- 3. CLIMB & TLOD CEILING (3,000 - 10,000 ft) ---
     climb_mid_samples = [
         samples[i] for i in range(idx_takeoff, idx_peak + 1)
         if (samples[i].get('agl_ft') is not None and 3000 <= samples[i].get('agl_ft') < 10000)
     ]
     if climb_mid_samples:
         milestones.append({
-            'phase': 'Plafond TLOD',
-            'alt': '3 000 - 10 000 ft',
+            'phase': 'TLOD Peak / Transition',
+            'alt': '3,000 - 10,000 ft',
             'tlod': str(mode_val(climb_mid_samples, 'tlod')),
             'olod': str(mode_val(climb_mid_samples, 'olod')),
             'fps': str(avg(climb_mid_samples, 'disp_fps')) + ' FPS',
             'mt': str(avg(climb_mid_samples, 'main_thread_ms')) + ' ms',
-            'notes': 'LOD max atteint en montée'
+            'notes': 'Maximum climb LOD attained'
         })
 
-    # --- 4. CROISIÈRE HAUTE ALTITUDE (Altitude croisière ou > 10 000 ft) ---
+    # --- 4. CRUISE (> 10,000 ft or cruise level) ---
     if max_agl >= 10000:
         cruise_samples = [
             s for s in flight_samples
             if s.get('agl_ft') is not None and s.get('agl_ft') >= 10000
         ]
-        cruise_label = 'Croisière Haute Altitude'
-        cruise_alt_str = '> 10 000 ft'
+        cruise_label = 'High Altitude Cruise'
+        cruise_alt_str = '> 10,000 ft'
     elif max_agl >= 2000:
         threshold = max_agl * 0.85
         cruise_samples = [
             s for s in flight_samples
             if (s.get('agl_ft') or 0) >= threshold and abs(s.get('fpm') or 0) < 500
         ]
-        cruise_label = 'Palier de Croisière'
+        cruise_label = 'Cruise Level'
         cruise_alt_str = f'~{mode_val(cruise_samples, "agl_ft")} ft' if cruise_samples else f'{max_agl} ft'
     else:
         cruise_samples = []
-        cruise_label = 'Croisière'
+        cruise_label = 'Cruise'
         cruise_alt_str = ''
 
     if cruise_samples:
@@ -751,57 +991,57 @@ def analyze_flight_milestones(samples, session_info=None):
             'olod': str(mode_val(cruise_samples, 'olod')),
             'fps': str(avg(cruise_samples, 'disp_fps')) + ' FPS',
             'mt': str(avg(cruise_samples, 'main_thread_ms')) + ' ms',
-            'notes': 'Rendu horizon étendu et stabilité FPS'
+            'notes': 'Extended horizon rendering & FPS stability'
         })
 
-    # --- 5. DESCENTE (après le pic, altitude >= 3 000 ft) ---
+    # --- 5. DESCENT (after peak, altitude >= 3,000 ft) ---
     descent_samples = [
         samples[i] for i in range(idx_peak + 1, idx_touchdown + 1)
         if (samples[i].get('agl_ft') is not None and samples[i].get('agl_ft') >= 3000 and (samples[i].get('fpm') or 0) <= 200)
     ]
     if descent_samples:
         milestones.append({
-            'phase': 'Descente',
-            'alt': '> 3 000 ft',
+            'phase': 'Descent',
+            'alt': '> 3,000 ft',
             'tlod': str(mode_val(descent_samples, 'tlod')),
             'olod': str(mode_val(descent_samples, 'olod')),
             'fps': str(avg(descent_samples, 'disp_fps')) + ' FPS',
             'mt': str(avg(descent_samples, 'main_thread_ms')) + ' ms',
-            'notes': 'Descente d\'altitude & chargement scènes d\'arrivée'
+            'notes': 'Altitude descent & arrival scenery streaming'
         })
 
-    # --- 6. APPROCHE FINALE & TOUCHER (après le pic, altitude < 3 000 ft) ---
+    # --- 6. FINAL APPROACH & TOUCHDOWN (after peak, altitude < 3,000 ft) ---
     approach_samples = [
         samples[i] for i in range(idx_peak + 1, idx_touchdown + 1)
         if (samples[i].get('agl_ft') is not None and samples[i].get('agl_ft') < 3000)
     ]
     if approach_samples:
         milestones.append({
-            'phase': 'Approche Finale & Toucher',
-            'alt': '3 000 - 0 ft',
+            'phase': 'Final Approach & Touchdown',
+            'alt': '3,000 - 0 ft',
             'tlod': str(mode_val(approach_samples, 'tlod')),
             'olod': str(mode_val(approach_samples, 'olod')),
             'fps': str(avg(approach_samples, 'disp_fps')) + ' FPS',
             'mt': str(avg(approach_samples, 'main_thread_ms')) + ' ms',
-            'notes': 'Alignement, capture piste & décors d\'approche'
+            'notes': 'Runway alignment, capture & final approach scenery'
         })
 
-    # --- 7. TAXI-IN (Roulage au sol après atterrissage) ---
+    # --- 7. TAXI-IN ---
     if idx_touchdown < len(samples) - 1:
         taxi_in_samples = [
             samples[i] for i in range(idx_touchdown + 1, len(samples))
             if samples[i].get('on_ground', True) and (samples[i].get('agl_ft') is None or samples[i].get('agl_ft') < 80)
         ]
         if len(taxi_in_samples) >= 3:
-            taxi_in_title = f"Taxi In ({arr})" if arr else "Taxi In (Roulage Arrivée)"
+            taxi_in_title = f"Taxi In ({arr})" if arr else "Taxi In"
             milestones.append({
                 'phase': taxi_in_title,
-                'alt': 'Sol (0 ft)',
+                'alt': 'Ground (0 ft)',
                 'tlod': str(mode_val(taxi_in_samples, 'tlod')),
                 'olod': str(mode_val(taxi_in_samples, 'olod')),
                 'fps': str(avg(taxi_in_samples, 'disp_fps')) + ' FPS',
                 'mt': str(avg(taxi_in_samples, 'main_thread_ms')) + ' ms',
-                'notes': 'Impact scène aéroport d\'arrivée, taxiways & parking gate'
+                'notes': 'Arrival airport scenery impact, taxiways & gate parking'
             })
 
     return milestones
@@ -815,6 +1055,7 @@ class SimConnectTelemetryClient:
     def __init__(self):
         self._lock = threading.RLock()
         self.connected = False
+        self.in_flight = False
         self.sc = None
         self.simdata_dd = None
         self.frame_rate = None
@@ -829,6 +1070,8 @@ class SimConnectTelemetryClient:
         self.aircraft_title = None
         self.lat = None
         self.lon = None
+        self.sim_rate = 1.0
+        self.is_paused = False
         self._stop_event = threading.Event()
         self._thread = None
         self._accum_fps = 0.0
@@ -851,6 +1094,8 @@ class SimConnectTelemetryClient:
     def _cleanup(self):
         with self._lock:
             self.connected = False
+            self.in_flight = False
+            self.is_paused = False
             self.frame_rate = None
             self.base_fps = None
             self.displayed_fps = None
@@ -863,6 +1108,7 @@ class SimConnectTelemetryClient:
             self.aircraft_title = None
             self.lat = None
             self.lon = None
+            self.sim_rate = 1.0
             self._accum_fps = 0.0
             self._frame_count = 0
             self._latest_instant_fps = None
@@ -886,6 +1132,35 @@ class SimConnectTelemetryClient:
             pass
         return True
 
+    def _on_quit(self, recv):
+        with self._lock:
+            self.connected = False
+            self.in_flight = False
+            self.is_paused = False
+        return True
+
+    def _on_event(self, recv):
+        try:
+            ev_id = getattr(recv, 'uEventID', None)
+            ev_data = getattr(recv, 'dwData', None)
+            with self._lock:
+                if ev_id in (5, 6):  # EVENT_ID_PAUSE, EVENT_ID_PAUSE_EX1
+                    self.is_paused = bool(ev_data == 1)
+                elif ev_id == 4:  # EVENT_ID_SIMSTOP
+                    self.is_paused = True
+                elif ev_id == 3:  # EVENT_ID_SIMSTART
+                    self.is_paused = False
+                    self.in_flight = True
+                elif ev_id == 2:  # EVENT_ID_SIM
+                    if ev_data == 1:
+                        self.is_paused = False
+                        self.in_flight = True
+                    elif ev_data == 0:
+                        self.is_paused = True
+        except Exception:
+            pass
+        return True
+
     def _run_loop(self):
         while not self._stop_event.is_set():
             if not HAS_SIMCONNECT:
@@ -897,8 +1172,32 @@ class SimConnectTelemetryClient:
                 try:
                     sc = SimConnect(name='SceneryX_Telemetry', poll_interval_seconds=0.02)
                     sc.add_receiver(RECV_EVENT_FRAME, self._on_frame)
+                    if scdefs and hasattr(scdefs, 'RECV_QUIT'):
+                        try:
+                            sc.add_receiver(scdefs.RECV_QUIT, self._on_quit)
+                        except Exception:
+                            pass
+                    if scdefs and hasattr(scdefs, 'RECV_EVENT'):
+                        try:
+                            sc.add_receiver(scdefs.RECV_EVENT, self._on_event)
+                        except Exception:
+                            pass
+
                     EVENT_ID_FRAME = 1
+                    EVENT_ID_SIM = 2
+                    EVENT_ID_SIMSTART = 3
+                    EVENT_ID_SIMSTOP = 4
+                    EVENT_ID_PAUSE = 5
+                    EVENT_ID_PAUSE_EX1 = 6
                     sc.SubscribeToSystemEvent(EVENT_ID_FRAME, "Frame")
+                    try:
+                        sc.SubscribeToSystemEvent(EVENT_ID_SIM, "Sim")
+                        sc.SubscribeToSystemEvent(EVENT_ID_SIMSTART, "SimStart")
+                        sc.SubscribeToSystemEvent(EVENT_ID_SIMSTOP, "SimStop")
+                        sc.SubscribeToSystemEvent(EVENT_ID_PAUSE, "Pause")
+                        sc.SubscribeToSystemEvent(EVENT_ID_PAUSE_EX1, "Pause_EX1")
+                    except Exception:
+                        pass
 
                     # Souscription aux SimVars de vol
                     try:
@@ -908,6 +1207,7 @@ class SimConnectTelemetryClient:
                             {"name": "AIRSPEED INDICATED", "units": "knots"},
                             {"name": "GROUND VELOCITY", "units": "knots"},
                             {"name": "SIM ON GROUND", "units": "bool"},
+                            {"name": "SIMULATION RATE", "units": "number"},
                             {"name": "PLANE LATITUDE", "units": "degrees"},
                             {"name": "PLANE LONGITUDE", "units": "degrees"},
                             {"name": "TITLE"}
@@ -979,20 +1279,23 @@ class SimConnectTelemetryClient:
                                     self.ground_speed_kts = round(float(sdata['GROUND VELOCITY']))
                                 if 'SIM ON GROUND' in sdata and sdata['SIM ON GROUND'] is not None:
                                     self.on_ground = bool(sdata['SIM ON GROUND'])
+                                if 'SIMULATION RATE' in sdata and sdata['SIMULATION RATE'] is not None:
+                                    try:
+                                        self.sim_rate = round(float(sdata['SIMULATION RATE']), 2)
+                                    except Exception:
+                                        pass
                                 if 'PLANE LATITUDE' in sdata and sdata['PLANE LATITUDE'] is not None:
-                                    lat_val = float(sdata['PLANE LATITUDE'])
-                                    if abs(lat_val) <= 3.14159 and lat_val != 0.0:
-                                        lat_val = math.degrees(lat_val)
-                                    self.lat = lat_val
+                                    self.lat = float(sdata['PLANE LATITUDE'])
                                 if 'PLANE LONGITUDE' in sdata and sdata['PLANE LONGITUDE'] is not None:
-                                    lon_val = float(sdata['PLANE LONGITUDE'])
-                                    if abs(lon_val) <= 3.14159 and lon_val != 0.0:
-                                        lon_val = math.degrees(lon_val)
-                                    self.lon = lon_val
+                                    self.lon = float(sdata['PLANE LONGITUDE'])
                                 if 'TITLE' in sdata and sdata['TITLE']:
                                     t_str = str(sdata['TITLE']).strip()
                                     if t_str and t_str.lower() != 'none':
                                         self.aircraft_title = t_str
+                                        self.in_flight = True
+                                    else:
+                                        self.aircraft_title = None
+                                        self.in_flight = False
 
                         last_calc_time = now
 
@@ -1004,6 +1307,8 @@ class SimConnectTelemetryClient:
         with self._lock:
             return {
                 "connected": self.connected,
+                "in_flight": self.in_flight,
+                "is_paused": self.is_paused,
                 "base_fps": self.base_fps,
                 "displayed_fps": self.displayed_fps,
                 "frame_time_ms": self.frame_time_ms,
@@ -1013,6 +1318,7 @@ class SimConnectTelemetryClient:
                 "ground_speed_kts": self.ground_speed_kts,
                 "on_ground": self.on_ground,
                 "aircraft": self.aircraft_title,
+                "sim_rate": self.sim_rate,
                 "lat": self.lat,
                 "lon": self.lon
             }
@@ -1032,20 +1338,122 @@ def get_sceneryx_flight_mode():
                     dep = fm.get('dep_icao', 'DEP')
                     arr = fm.get('arr_icao', 'ARR')
                     dis = fm.get('disabled_count', 0)
-                    alts_raw = fm.get('alternates', [])
-                    alts = [a if isinstance(a, str) else a.get('icao', '') for a in alts_raw]
-                    alts = [a for a in alts if a]
-                    profile = fm.get('profile', 'CORRIDOR').upper()
-                    alt_str = f" [Alts: {','.join(alts)}]" if alts else ""
-                    if profile == 'DIRECT':
-                        return f"SCENERYX DIRECT A->B ({dep} -> {arr} | {dis} scènes isolées)", True, dep, arr, dis, 'direct'
-                    elif profile == 'SIMBRIEF':
-                        return f"SCENERYX SIMBRIEF ({dep} -> {arr}{alt_str} | {dis} scènes isolées)", True, dep, arr, dis, 'simbrief'
-                    else:
-                        return f"SCENERYX COULOIR ({dep} -> {arr}{alt_str} | {dis} scènes isolées)", True, dep, arr, dis, 'corridor'
+                    dis_folders = fm.get('disabled_folders', [])
+                    dis_xml = fm.get('disabled_xml_packages', [])
+                    total_dis = dis if dis > 0 else (len(dis_folders) + len(dis_xml))
+                    if total_dis > 0:
+                        alts_raw = fm.get('alternates', [])
+                        alts = [a if isinstance(a, str) else a.get('icao', '') for a in alts_raw]
+                        alts = [a for a in alts if a]
+                        profile = fm.get('profile', 'CORRIDOR').upper()
+                        alt_str = f" [Alts: {','.join(alts)}]" if alts else ""
+                        if profile == 'DIRECT':
+                            return f"SCENERYX DIRECT A->B ({dep} -> {arr} | {total_dis} isolated sceneries)", True, dep, arr, total_dis, 'direct'
+                        elif profile == 'SIMBRIEF':
+                            return f"SCENERYX SIMBRIEF ({dep} -> {arr}{alt_str} | {total_dis} isolated sceneries)", True, dep, arr, total_dis, 'simbrief'
+                        else:
+                            return f"SCENERYX CORRIDOR ({dep} -> {arr}{alt_str} | {total_dis} isolated sceneries)", True, dep, arr, total_dis, 'corridor'
         except Exception:
             pass
-    return "BASELINE STANDARD (Toutes scènes actives)", False, "", "", 0, "baseline_full"
+    return "BASELINE STANDARD (All sceneries active)", False, "", "", 0, "baseline_full"
+
+
+def detect_route_optimization_state(session_info=None):
+    """
+    Détecte précisément l'état de l'optimisation de route / isolation de scènes SceneryX.
+    Distingue rigoureusement :
+    - Route Isolation Active (Packages de scènes désactivés hors couloir/trajectoire, disabled_count > 0)
+    - Mode Baseline / Sans Isolation (Tous les packages actifs, même si un plan SimBrief est suivi)
+    """
+    # 1. Vérification contextuelle depuis session_info si fourni
+    if session_info and isinstance(session_info, dict):
+        is_corr = bool(session_info.get('is_corridor'))
+        dis_cnt = session_info.get('disabled_count', 0)
+        mode_str = str(session_info.get('mode_str', ''))
+        detection_source = str(session_info.get('detection_source', ''))
+        mode_display = str(session_info.get('mode_display', ''))
+        has_sb = "SimBrief" in detection_source or "SIMBRIEF" in mode_display.upper() or "SIMBRIEF" in mode_str.upper()
+
+        if is_corr and dis_cnt > 0:
+            profile = "CORRIDOR"
+            if "DIRECT" in mode_str.upper() or "DIRECT" in mode_display.upper():
+                profile = "DIRECT"
+            elif "SIMBRIEF" in mode_str.upper() or "SIMBRIEF" in mode_display.upper():
+                profile = "SIMBRIEF"
+            return {
+                "is_optimized": True,
+                "isolation_active": True,
+                "disabled_count": dis_cnt,
+                "profile": profile,
+                "has_simbrief": profile == "SIMBRIEF" or has_sb,
+                "badge_text": "SCENERYX OPTIMIZED",
+                "badge_bg": "#059669",
+                "mode_display": f"SCENERYX {profile} ({dis_cnt} isolated sceneries)",
+                "status_desc": f"Route isolation active ({dis_cnt} sceneries disabled outside flight corridor)",
+                "reason": f"Active flight corridor with {dis_cnt} isolated packages"
+            }
+        else:
+            return {
+                "is_optimized": False,
+                "isolation_active": False,
+                "disabled_count": 0,
+                "profile": "BASELINE",
+                "has_simbrief": has_sb,
+                "badge_text": "BASELINE STANDARD",
+                "badge_bg": "#d97706",
+                "mode_display": "BASELINE (SimBrief OFP • No Scenery Isolation)" if has_sb else "BASELINE STANDARD (All sceneries active)",
+                "status_desc": "No scenery isolation active (Baseline library)",
+                "reason": "Flight performed without SceneryX scenery isolation"
+            }
+
+    # 2. Lecture directe depuis settings.json
+    appdata = os.getenv('APPDATA', '')
+    settings_path = os.path.join(appdata, 'SceneryX', 'settings.json')
+    has_simbrief = False
+    if os.path.exists(settings_path):
+        try:
+            with open(settings_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                fm = data.get('flight_mode', {})
+                sb = data.get('latest_simbrief_flight') or (fm.get('simbrief_flight') if isinstance(fm, dict) else None)
+                has_simbrief = bool(sb)
+
+                if isinstance(fm, dict) and fm.get('active'):
+                    dis = fm.get('disabled_count', 0)
+                    dis_folders = fm.get('disabled_folders', [])
+                    dis_xml = fm.get('disabled_xml_packages', [])
+                    total_dis = dis if dis > 0 else (len(dis_folders) + len(dis_xml))
+                    profile = str(fm.get('profile', 'CORRIDOR')).upper()
+
+                    if total_dis > 0:
+                        return {
+                            "is_optimized": True,
+                            "isolation_active": True,
+                            "disabled_count": total_dis,
+                            "profile": profile,
+                            "has_simbrief": profile == "SIMBRIEF" or has_simbrief,
+                            "badge_text": "SCENERYX OPTIMIZED",
+                            "badge_bg": "#059669",
+                            "mode_display": f"SCENERYX {profile} ({total_dis} isolated sceneries)",
+                            "status_desc": f"Route isolation active ({total_dis} sceneries disabled outside corridor)",
+                            "reason": f"Active flight corridor with {total_dis} isolated packages"
+                        }
+        except Exception as e:
+            print(f"[detect_route_optimization_state] Error reading settings: {e}")
+
+    return {
+        "is_optimized": False,
+        "isolation_active": False,
+        "disabled_count": 0,
+        "profile": "BASELINE",
+        "has_simbrief": has_simbrief,
+        "badge_text": "BASELINE STANDARD",
+        "badge_bg": "#d97706",
+        "mode_display": "BASELINE (SimBrief OFP • No Scenery Isolation)" if has_simbrief else "BASELINE STANDARD (All sceneries active)",
+        "status_desc": "No scenery isolation active (Baseline library)",
+        "reason": "Flight performed without SceneryX scenery isolation"
+    }
+
 
 def format_time_delta(seconds):
     m, s = divmod(int(seconds), 60)
@@ -1061,20 +1469,124 @@ def get_benchmarks_directory():
     return benchmarks_dir
 
 
+def get_flight_network_info():
+    """Safely retrieves cached or live network/internet telemetry diagnostics."""
+    try:
+        from flight_rig_optimizer import detect_network_info
+        return detect_network_info()
+    except Exception:
+        return {}
+
+
+def get_flight_graphics_profile():
+    """Safely retrieves active MSFS graphics profile snapshot for telemetry reports."""
+    try:
+        import flight_rig_optimizer
+        return flight_rig_optimizer.get_active_profile_snapshot()
+    except Exception:
+        return None
+
+
+def generate_graphics_profile_section(session_info):
+    """
+    Generates a sleek, structured HTML section displaying the active MSFS graphics profile,
+    mode, headline parameter highlights, and a collapsible accordion containing all engine settings.
+    """
+    prof_data = (session_info or {}).get('graphics_profile')
+    if not prof_data:
+        prof_data = get_flight_graphics_profile()
+    if not prof_data or not prof_data.get('name'):
+        return ""
+
+    prof_name = prof_data.get('name', 'Active Profile')
+    prof_mode = prof_data.get('mode', 'Standard Mode')
+    highlights = prof_data.get('highlights', {})
+    settings = prof_data.get('settings', [])
+
+    color_map = {
+        'emerald': '#10b981',
+        'amber': '#f59e0b',
+        'orange': '#f97316',
+        'rose': '#f43f5e',
+        'cyan': '#06b6d4',
+        'slate': '#94a3b8'
+    }
+
+    # Top headline cards (clean, prominent, easy to read at a glance)
+    hl_cards_html = ""
+    for hl_label, hl_val in highlights.items():
+        hl_cards_html += f"""
+        <div style="background:#0b0f19; border:1px solid rgba(51,65,85,0.6); border-radius:10px; padding:12px 14px;">
+            <div style="color:#64748b; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">{hl_label}</div>
+            <div style="color:#f8fafc; font-size:15px; font-weight:800; margin-top:4px; font-family:monospace;">{hl_val}</div>
+        </div>
+        """
+
+    # Collapsible list of all detailed engine settings
+    all_settings_html = ""
+    for s in settings:
+        s_name = s.get('name', 'Setting')
+        s_val = s.get('value', '')
+        s_lbl = s.get('rating_label', '')
+        s_color = color_map.get(s.get('rating_color', ''), '#94a3b8')
+        s_tag = f"""<span style="display:inline-flex; align-items:center; gap:4px; font-size:10px; font-weight:700; color:{s_color}; background:#0f172a; border:1px solid rgba(51,65,85,0.8); border-radius:4px; padding:2px 6px; text-transform:uppercase;"><span style="width:5px; height:5px; border-radius:50%; background:{s_color};"></span>{s_lbl}</span>""" if s_lbl else ""
+        
+        all_settings_html += f"""
+        <div style="background:#0b0f19; border:1px solid rgba(51,65,85,0.6); border-radius:8px; padding:10px 12px; display:flex; flex-direction:column; justify-content:space-between; gap:6px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+                <span style="color:#94a3b8; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="{s_name}">{s_name}</span>
+                {s_tag}
+            </div>
+            <div style="color:#f8fafc; font-size:13px; font-weight:700; word-break:break-word;">{s_val}</div>
+        </div>
+        """
+
+    return f"""
+        <!-- ACTIVE GRAPHICS PROFILE & CALIBRATION -->
+        <div class="chart-box" style="padding: 20px; margin-bottom: 24px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+                <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                    <div class="chart-title" style="margin-bottom:0; letter-spacing:0.5px;">ACTIVE GRAPHICS PROFILE & CALIBRATION</div>
+                    <span style="padding:4px 10px; border-radius:6px; background:#065f46; color:#a7f3d0; border:1px solid #059669; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">{prof_name}</span>
+                </div>
+                <div style="font-size:11px; color:#94a3b8; font-weight:700; text-transform:uppercase; background:#0b0f19; border:1px solid rgba(51,65,85,0.6); border-radius:6px; padding:4px 10px;">
+                    {prof_mode}
+                </div>
+            </div>
+            
+            <!-- KEY HEADLINE SETTINGS -->
+            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:14px;">
+                {hl_cards_html}
+            </div>
+
+            <!-- COLLAPSIBLE FULL PARAMETERS ACCORDION -->
+            <details style="background:#080c14; border:1px solid rgba(51,65,85,0.4); border-radius:10px; padding:12px 16px;">
+                <summary style="cursor:pointer; user-select:none; font-size:11px; font-weight:700; color:#94a3b8; outline:none; display:flex; align-items:center; justify-content:space-between;">
+                    <span>FULL ENGINE PARAMETERS & DIRECTIVES ({len(settings)} SETTINGS)</span>
+                    <span style="color:#38bdf8; font-family:monospace; font-size:10px; text-transform:uppercase;">[ CLICK TO EXPAND / COLLAPSE ]</span>
+                </summary>
+                <div style="margin-top:14px; display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:10px;">
+                    {all_settings_html}
+                </div>
+            </details>
+        </div>
+    """
+
+
 def generate_automated_flight_narrative(samples, session_info):
     """
-    Génère un diagnostic textuel expert et automatisé du vol
-    expliquant les goulots d'étranglement, la VRAM et l'activité cache.
+    Generates an expert automated textual diagnostic of the flight,
+    explaining bottlenecks, VRAM pressure, and cache streaming activity.
     """
     if not samples:
-        return "<p>Aucune donnée suffisante pour générer un diagnostic.</p>"
+        return "<p>Insufficient telemetry data to generate a diagnostic.</p>"
 
-    vrams = [s['vram_used'] for s in samples]
-    commits = [s['msfs_commit'] for s in samples]
-    fps_list = [s['disp_fps'] for s in samples if s.get('disp_fps') is not None]
-    mt_list = [s['main_thread_ms'] for s in samples if s.get('main_thread_ms') is not None]
-    gpus = [s['gpu_util'] for s in samples]
-    tlods = [s['tlod'] for s in samples if s.get('tlod') is not None]
+    vrams = [s.get('vram_used', s.get('vram_used_mb', 0)) for s in samples]
+    commits = [s.get('msfs_commit', s.get('msfs_commit_mb', 0)) for s in samples]
+    fps_list = [s.get('disp_fps', s.get('displayed_fps')) for s in samples if s.get('disp_fps') is not None or s.get('displayed_fps') is not None]
+    mt_list = [s.get('main_thread_ms') for s in samples if s.get('main_thread_ms') is not None]
+    gpus = [s.get('gpu_util', s.get('gpu_util_pct', 0)) for s in samples]
+    tlods = [s.get('tlod') for s in samples if s.get('tlod') is not None]
     io_reads = [s.get('cache_read_mbps', 0) for s in samples]
 
     peak_vram = max(vrams) if vrams else 0
@@ -1088,64 +1600,118 @@ def generate_automated_flight_narrative(samples, session_info):
     avg_tlod = round(sum(tlods) / len(tlods), 0) if tlods else "Fixe"
     peak_io = round(max(io_reads), 1) if io_reads else 0.0
 
-    # AutoFPS Info
+    # Route Optimization state detection
+    opt_state = detect_route_optimization_state(session_info)
+    is_optimized = opt_state.get('is_optimized', False)
+    dis_count = opt_state.get('disabled_count', 0)
+
+    # LOD Engine Info (Smart LOD / AutoFPS)
+    smart_lod_info = session_info.get('smart_lod') or {}
+    smart_lod_active = bool(smart_lod_info.get('enabled'))
+    smart_lod_cfg = smart_lod_info.get('config', {})
+
     autofps_active = session_info.get('autofps_active', False)
     autofps_cfg = session_info.get('autofps_config', {})
-    cloud_status = session_info.get('cloud_events', 'Nominale')
+    cloud_status = session_info.get('cloud_events', 'Nominal')
 
     autofps_diag = ""
-    if autofps_active and autofps_cfg:
+    if smart_lod_active:
+        st_mode = smart_lod_info.get('mode', 'IFR').lower()
+        t_fps = smart_lod_cfg.get(f'{st_mode}_target_fps', 40)
+        min_tlod = smart_lod_cfg.get(f'{st_mode}_tlod_ground', 100)
+        max_tlod = smart_lod_cfg.get(f'{st_mode}_tlod_cruise', 250)
+        autofps_diag = f"<li><strong>LOD Management:</strong> Smart LOD Dynamic Engine Active (Target <strong>{t_fps} FPS</strong> • TLOD {min_tlod} ➔ {max_tlod}, average TLOD: <strong>{avg_tlod}</strong>).</li>"
+    elif autofps_active and autofps_cfg:
         tfps = autofps_cfg.get('target_fps_fg') or autofps_cfg.get('targetFps', '--')
         min_t = autofps_cfg.get('min_tlod') or autofps_cfg.get('minTLod', '--')
         max_t = autofps_cfg.get('max_tlod') or autofps_cfg.get('maxTLod', '--')
-        autofps_diag = f"<li><strong>Intégration AutoFPS Active :</strong> Cible de {tfps} FPS, plage TLOD configurée de {min_t} à {max_t}. TLOD moyen effectif mesuré à <strong>{avg_tlod}</strong>. État nuages : <em>{cloud_status}</em>.</li>"
+        autofps_diag = f"<li><strong>Active AutoFPS Integration:</strong> Target {tfps} FPS, configured TLOD range {min_t} to {max_t}. Effective average TLOD measured at <strong>{avg_tlod}</strong>. Cloud state: <em>{cloud_status}</em>.</li>"
     elif autofps_active:
-        autofps_diag = f"<li><strong>Intégration AutoFPS Active :</strong> Ajustements dynamiques du TLOD détectés (TLOD moyen en vol : <strong>{avg_tlod}</strong>). État nuages : <em>{cloud_status}</em>.</li>"
+        autofps_diag = f"<li><strong>Active AutoFPS Integration:</strong> Dynamic TLOD adjustments detected (average in-flight TLOD: <strong>{avg_tlod}</strong>). Cloud state: <em>{cloud_status}</em>.</li>"
     else:
-        autofps_diag = f"<li><strong>Gestion LOD :</strong> AutoFPS non actif (valeurs statiques ou fixes, TLOD moyen : <strong>{avg_tlod}</strong>).</li>"
+        autofps_diag = f"<li><strong>LOD Management:</strong> Dynamic LOD engine inactive (static or fixed values, average TLOD: <strong>{avg_tlod}</strong>).</li>"
 
-    # Diagnostic du goulot d'étranglement principal
+    # Main bottleneck diagnostic
     if avg_gpu >= 96 and (avg_mt != "N/A" and avg_mt <= 25.0):
-        bottleneck_diag = "<strong>Profil GPU-Bound équilibré :</strong> La carte graphique RTX a tourné à plein régime avec une fluidité optimale, sans blocage sévère du MainThread."
+        bottleneck_diag = "<strong>Balanced GPU-Bound Profile:</strong> GPU ran at full capacity with optimal smoothness, without severe MainThread bottlenecks."
     elif avg_mt != "N/A" and avg_mt > 30.0:
-        bottleneck_diag = f"<strong>Profil MainThread Limité ({avg_mt} ms en moyenne) :</strong> Le fil processeur principal a été le facteur limitant, typique des phases au sol avec avionique complexe et décors denses."
+        bottleneck_diag = f"<strong>MainThread Limited Profile ({avg_mt} ms avg):</strong> The main CPU thread was the limiting factor, typical of ground phases with complex avionics and dense scenery."
     else:
-        bottleneck_diag = "<strong>Profil Mixte Équilibré :</strong> Répartition harmonieuse entre la charge de calcul CPU et le rendu graphique."
+        bottleneck_diag = "<strong>Balanced Mixed Profile:</strong> Harmonious balance between CPU computation and graphics rendering."
 
-    # Diagnostic VRAM & Paging
+    # VRAM & Paging Diagnostic
     if vram_peak_pct >= 92.0:
-        vram_diag = f"<span style='color:#ef4444;'><strong>Alerte Risque de Paging :</strong> La VRAM a culminé à {peak_vram:,.0f} Mo ({vram_peak_pct}%). Proche du seuil de débordement vers la RAM système, pouvant causer des micro-saccades en vue externe.</span>"
+        vram_diag = f"<span style='color:#ef4444;'><strong>Paging Risk Alert:</strong> VRAM peaked at {peak_vram:,.0f} MB ({vram_peak_pct}%). Close to system RAM spillover threshold, potentially causing micro-stutters in external view.</span>"
     elif vram_peak_pct >= 85.0:
-        vram_diag = f"<span style='color:#f59e0b;'><strong>Zone Haute Maîtrisée :</strong> VRAM crête à {peak_vram:,.0f} Mo ({vram_peak_pct}%). Marge de sécurité suffisante sans déclenchement de mémoire paginée.</span>"
+        vram_diag = f"<span style='color:#f59e0b;'><strong>Controlled High Zone:</strong> Peak VRAM at {peak_vram:,.0f} MB ({vram_peak_pct}%). Sufficient safety headroom without triggering paged memory.</span>"
     else:
-        vram_diag = f"<span style='color:#10b981;'><strong>Excellente Marge Vidéo :</strong> VRAM crête contenue à {peak_vram:,.0f} Mo ({vram_peak_pct}%). L'isolation SceneryX a éliminé les textures en surplus.</span>"
+        if is_optimized and dis_count > 0:
+            vram_diag = f"<span style='color:#10b981;'><strong>Excellent Video Headroom:</strong> Peak VRAM contained at {peak_vram:,.0f} MB ({vram_peak_pct}%). SceneryX route isolation eliminated {dis_count} out-of-corridor scenery packages.</span>"
+        else:
+            vram_diag = f"<span style='color:#10b981;'><strong>Adequate Video Headroom:</strong> Peak VRAM contained at {peak_vram:,.0f} MB ({vram_peak_pct}%). VRAM footprint was maintained within safe limits despite running all installed sceneries.</span>"
 
-    # Diagnostic spécifique des impacts au sol & aéroports
+    # Ground & airport impact diagnostic
     milestones = analyze_flight_milestones(samples, session_info)
     ground_notes = []
     for m in milestones:
         if 'Taxi Out' in m['phase'] or 'Taxi In' in m['phase']:
-            ground_notes.append(f"{m['phase']} : <strong>{m['fps']}</strong> (MainThread <strong>{m['mt']}</strong>)")
-        elif 'Approche' in m['phase']:
-            ground_notes.append(f"Approche Finale : <strong>{m['fps']}</strong> (MainThread <strong>{m['mt']}</strong>)")
+            ground_notes.append(f"{m['phase']}: <strong>{m['fps']}</strong> (MainThread <strong>{m['mt']}</strong>)")
+        elif 'Approach' in m['phase'] or 'Approche' in m['phase']:
+            ground_notes.append(f"Final Approach: <strong>{m['fps']}</strong> (MainThread <strong>{m['mt']}</strong>)")
 
     ground_diag = ""
     if ground_notes:
-        ground_diag = f"<li><strong>Comportement Sol & Aéroports :</strong> {' • '.join(ground_notes)}.</li>"
+        ground_diag = f"<li><strong>Ground & Airport Behavior:</strong> {' • '.join(ground_notes)}.</li>"
+
+    monitoring_duration = session_info.get('duration') or "00:00"
+
+    # Network Streaming Diagnostic
+    net_info = session_info.get('network')
+    if not net_info:
+        net_info = get_flight_network_info()
+
+    net_diag = ""
+    if net_info and net_info.get('is_connected'):
+        net_spd = net_info.get('link_speed_str', '')
+        ping_val = net_info.get('ping_ms')
+        ping_txt = f" ({ping_val} ms ping)" if ping_val is not None else ""
+        if net_info.get('is_wifi'):
+            sig = net_info.get('wifi_signal_pct')
+            sig_txt = f", {sig}% signal" if sig is not None else ""
+            net_diag = f" Online photogrammetry & cloud scenery streaming served via <strong>Wi-Fi {net_spd}{sig_txt}{ping_txt}</strong>."
+        else:
+            net_diag = f" Online photogrammetry & thin-client world data secured via ultra-low latency <strong>Ethernet {net_spd}{ping_txt}</strong>."
+    elif net_info and not net_info.get('is_connected'):
+        net_diag = " <span style='color:#ef4444;'>No active internet connection detected during flight (offline mode).</span>"
+
+    # Dynamic recommendation based on Route Optimization state
+    if is_optimized and dis_count > 0:
+        recommendation_text = (
+            f"Route corridor isolation was actively engaged during this flight (<strong>{dis_count} out-of-corridor sceneries unloaded</strong>), "
+            "preserving VRAM headroom and eliminating asset-streaming hitches. "
+            "Keep corridor or direct route isolation active on subsequent flights to sustain smooth performance at complex airport hubs."
+        )
+    else:
+        recommendation_text = (
+            "This flight was conducted in <strong>Baseline mode without Scenery Isolation</strong> (all airport sceneries remained active in MSFS). "
+            f"To free up VRAM ({vram_peak_pct}% peak observed) and minimize MainThread stuttering on approach into dense areas, "
+            "consider activating <strong>SceneryX Route Corridor</strong> or <strong>Direct Isolation</strong> before your next flight."
+        )
 
     narrative = f"""
     <div style="background:#0f172a; border:1px solid #1e293b; border-radius:16px; padding:20px; margin-bottom:24px; line-height:1.6; font-size:13px; color:#cbd5e1;">
-        <h3 style="margin-top:0; color:#38bdf8; font-size:16px;">📝 Compte-Rendu d'Analyse du Vol</h3>
+        <h3 style="margin-top:0; color:#38bdf8; font-size:16px;">Flight Analysis Summary</h3>
         <ul style="padding-left:20px; margin-bottom:12px;">
-            <li><strong>Comportement Système & Goulot d'Étranglement :</strong> {bottleneck_diag}</li>
-            <li><strong>Empreinte Mémoire Vidéo (VRAM) :</strong> {vram_diag}</li>
-            <li><strong>Fluidité & Affichage :</strong> Moyenne globale de <strong>{avg_fps} FPS</strong> avec un MainThread moyen de <strong>{avg_mt} ms</strong>.</li>
+            <li><strong>Flight Monitoring Duration:</strong> Total recorded monitoring time of <strong>{monitoring_duration}</strong> ({len(samples)} logged telemetry samples).</li>
+            <li><strong>System Behavior & Primary Bottleneck:</strong> {bottleneck_diag}</li>
+            <li><strong>Video Memory Footprint (VRAM):</strong> {vram_diag}</li>
+            <li><strong>Smoothness & Frame Pacing:</strong> Global average of <strong>{avg_fps} FPS</strong> with average MainThread of <strong>{avg_mt} ms</strong>.</li>
             {ground_diag}
             {autofps_diag}
-            <li><strong>Activité Rolling Cache / Débit Disque :</strong> Pics d'accès aux textures et modèles de <strong>{peak_io} Mbps</strong> enregistrés lors des changements de zone géographique.</li>
+            <li><strong>Rolling Cache / Disk IO & Network Streaming:</strong> Peak texture & model streaming access of <strong>{peak_io} Mbps</strong> logged during area transitions.{net_diag}</li>
         </ul>
-        <div style="background:rgba(56, 189, 248, 0.08); border-left:3px solid #38bdf8; padding:8px 14px; border-radius:4px; font-size:12px;">
-            <strong>Recommandation pour le prochain vol :</strong> Maintenir l'isolation active sur le corridor ou mode direct pour pérenniser l'économie de VRAM et la stabilité du MainThread sur les aéroports d'arrivée.
+        <div style="background:#0b0f19; border:1px solid #1e293b; padding:12px 16px; border-radius:8px; font-size:12px; color:#cbd5e1; margin-top:14px;">
+            <strong style="color:#f8fafc;">Recommendation for next flight:</strong> {recommendation_text}
         </div>
     </div>
     """
@@ -1156,11 +1722,11 @@ def generate_html_report(csv_path, session_info, samples):
     html_path = csv_path.replace('.csv', '.html')
     os.makedirs(os.path.dirname(os.path.abspath(html_path)), exist_ok=True)
     
-    times = [s['elapsed'] for s in samples]
-    vram_vals = [s['vram_used'] for s in samples]
-    msfs_ram_vals = [s['msfs_ram'] for s in samples]
-    msfs_commit_vals = [s['msfs_commit'] for s in samples]
-    gpu_power_vals = [s.get('gpu_power_w', 0) for s in samples]
+    times = [s.get('elapsed') or s.get('time_str') or str(s.get('elapsed_sec', '')) for s in samples]
+    vram_vals = [s.get('vram_used', s.get('vram_used_mb', 0)) for s in samples]
+    msfs_ram_vals = [s.get('msfs_ram', s.get('msfs_ram_mb', 0)) for s in samples]
+    msfs_commit_vals = [s.get('msfs_commit', s.get('msfs_commit_mb', 0)) for s in samples]
+    gpu_power_vals = [s.get('gpu_power', s.get('gpu_power_w', 0)) for s in samples]
     io_reads_mbps = [s.get('cache_read_mbps', 0) for s in samples]
 
     # Smart LOD Trigger points overlay for lodChart
@@ -1210,6 +1776,136 @@ def generate_html_report(csv_path, session_info, samples):
     peak_vram_gb = round(peak_vram_mb / 1024.0, 1)
     total_vram_gb = round(total_vram_mb / 1024.0, 1)
 
+    # MSFS Process Dedicated VRAM (PDH counter)
+    msfs_vram_vals = [s.get('msfs_vram', s.get('msfs_vram_mb', 0)) or 0.0 for s in samples]
+    has_msfs_vram = any(v > 0 for v in msfs_vram_vals)
+    if has_msfs_vram:
+        valid_msfs_vram = [v for v in msfs_vram_vals if v > 0]
+        avg_msfs_vram_mb = round(sum(valid_msfs_vram) / len(valid_msfs_vram), 1)
+        peak_msfs_vram_mb = max(valid_msfs_vram)
+        min_msfs_vram_mb = min(valid_msfs_vram)
+        avg_msfs_vram_gb = round(avg_msfs_vram_mb / 1024.0, 1)
+        peak_msfs_vram_gb = round(peak_msfs_vram_mb / 1024.0, 1)
+    else:
+        avg_msfs_vram_gb = None
+        peak_msfs_vram_gb = None
+
+    # Track dynamic flight events, VR periods, and Pauses
+    tlod_vals = [s.get('tlod') for s in samples]
+    olod_vals = [s.get('olod') for s in samples]
+    sim_rate_vals = [round(float(s.get('sim_rate', 1.0) or 1.0), 2) for s in samples]
+    has_sim_compression = any(r > 1.0 for r in sim_rate_vals)
+    has_olod = any(o is not None for o in olod_vals)
+
+    flight_events = []
+    vr_intervals = []
+    pause_intervals = []
+    vr_start_idx = None
+    pause_start_idx = None
+    last_tlod = None
+    last_olod = None
+    last_rate = None
+    last_vr = None
+
+    for i, s in enumerate(samples):
+        t_str = s.get('time_str') or str(s.get('elapsed', ''))
+        cur_t = s.get('tlod')
+        cur_o = s.get('olod')
+        cur_r = round(float(s.get('sim_rate', 1.0) or 1.0), 2)
+        cur_vr = bool(s.get('is_vr', False))
+        cur_paused = bool(s.get('is_paused', False))
+
+        # VR interval tracking
+        if cur_vr and vr_start_idx is None:
+            vr_start_idx = i
+        elif not cur_vr and vr_start_idx is not None:
+            vr_intervals.append({"startIdx": vr_start_idx, "endIdx": i})
+            vr_start_idx = None
+
+        # Pause interval tracking
+        if cur_paused and pause_start_idx is None:
+            pause_start_idx = i
+        elif not cur_paused and pause_start_idx is not None:
+            pause_intervals.append({"startIdx": pause_start_idx, "endIdx": i})
+            pause_start_idx = None
+
+        # TLOD changes (step >= 5)
+        if cur_t is not None:
+            if last_tlod is not None and abs(cur_t - last_tlod) >= 5:
+                flight_events.append({
+                    "idx": i,
+                    "time": t_str,
+                    "type": "TLOD",
+                    "badge": "TLOD STEP",
+                    "badge_color": "#ec4899",
+                    "label": f"TLOD {int(last_tlod)} ➔ {int(cur_t)}",
+                    "alt": s.get('agl_ft'),
+                    "color": "#ec4899"
+                })
+            last_tlod = cur_t
+
+        # OLOD changes (step >= 10)
+        if cur_o is not None:
+            if last_olod is not None and abs(cur_o - last_olod) >= 10:
+                flight_events.append({
+                    "idx": i,
+                    "time": t_str,
+                    "type": "OLOD",
+                    "badge": "OLOD STEP",
+                    "badge_color": "#a855f7",
+                    "label": f"OLOD {int(last_olod)} ➔ {int(cur_o)}",
+                    "alt": s.get('agl_ft'),
+                    "color": "#a855f7"
+                })
+            last_olod = cur_o
+
+        # Sim Rate changes
+        if cur_r is not None:
+            if last_rate is not None and cur_r != last_rate:
+                flight_events.append({
+                    "idx": i,
+                    "time": t_str,
+                    "type": "SIM_RATE",
+                    "badge": "SIM RATE",
+                    "badge_color": "#f59e0b",
+                    "label": f"Sim Rate x{cur_r:g}",
+                    "alt": s.get('agl_ft'),
+                    "color": "#f59e0b"
+                })
+            last_rate = cur_r
+
+        # VR transitions
+        if last_vr is not None and cur_vr != last_vr:
+            flight_events.append({
+                "idx": i,
+                "time": t_str,
+                "type": "VR_MODE",
+                "badge": "VR MODE",
+                "badge_color": "#38bdf8" if cur_vr else "#94a3b8",
+                "label": "VR Headset Active" if cur_vr else "2D Desktop Active",
+                "alt": s.get('agl_ft'),
+                "color": "#38bdf8" if cur_vr else "#94a3b8"
+            })
+        last_vr = cur_vr
+
+    if vr_start_idx is not None:
+        vr_intervals.append({"startIdx": vr_start_idx, "endIdx": len(samples) - 1})
+    if pause_start_idx is not None:
+        pause_intervals.append({"startIdx": pause_start_idx, "endIdx": len(samples) - 1})
+
+    for p in session_info.get('pause_events', []):
+        dur_str = p.get('duration_str') or f"{p.get('duration_sec', 0)}s"
+        flight_events.append({
+            "idx": 0,
+            "time": p.get('time_str', '--'),
+            "type": "PAUSE",
+            "badge": "PAUSE",
+            "badge_color": "#eab308",
+            "label": f"Simulator Paused ({dur_str})",
+            "alt": None,
+            "color": "#eab308"
+        })
+
     # RAM Working Set (exprimée en Go)
     peak_ram_mb = max(msfs_ram_vals) if msfs_ram_vals else 0
     avg_ram_mb = round(sum(msfs_ram_vals) / len(msfs_ram_vals), 1) if msfs_ram_vals else 0
@@ -1233,36 +1929,53 @@ def generate_html_report(csv_path, session_info, samples):
     peak_power = round(max(gpu_power_vals), 1) if gpu_power_vals else 0
     min_power = round(min(gpu_power_vals), 1) if gpu_power_vals else 0
 
-    mode_title = session_info['mode_str']
-    is_corridor = session_info['is_corridor']
-    badge_color = "#10b981" if is_corridor else "#f59e0b"
-    badge_text = "OPTIMISÉ SCENERYX" if is_corridor else "BASELINE STANDARD"
+    opt_state = detect_route_optimization_state(session_info)
+    is_corridor = opt_state['is_optimized']
+    badge_bg = opt_state['badge_bg']
+    badge_text = opt_state['badge_text']
 
-    aircraft_display = session_info.get('aircraft') or "Non détecté / Générique"
-    route_display = session_info.get('route_display') or "Non spécifiée"
-    mode_display = session_info.get('mode_display') or session_info.get('mode_str', 'BASELINE STANDARD')
+    aircraft_display = session_info.get('aircraft') or "Not detected / Generic"
+    route_display = session_info.get('route_display') or "Not specified"
+    mode_display = session_info.get('mode_display') or opt_state['mode_display']
+    mode_color = "#10b981" if is_corridor else "#f59e0b"
     autofps_active = session_info.get('autofps_active', False)
     autofps_cfg = session_info.get('autofps_config', {})
-    cloud_status = session_info.get('cloud_events', 'Nominale')
+    cloud_status = session_info.get('cloud_events', 'Nominal')
 
     smart_lod_info = session_info.get('smart_lod') or {}
     smart_lod_active = bool(smart_lod_info.get('enabled'))
     smart_lod_cfg = smart_lod_info.get('config', {})
 
     if smart_lod_active:
-        st_mode = smart_lod_info.get('mode', 'IFR').lower()
-        t_fps = smart_lod_cfg.get(f'{st_mode}_target_fps', 40)
-        min_tlod = smart_lod_cfg.get(f'{st_mode}_tlod_ground', 100)
-        max_tlod = smart_lod_cfg.get(f'{st_mode}_tlod_cruise', 250)
-        lod_engine_badge = f'<span style="color:#06b6d4; font-weight:bold; font-family:monospace; background:rgba(6,182,212,0.15); border:1px solid #06b6d4; padding:3px 8px; border-radius:6px; font-size:11px;">SMART LOD ACTIF (Cible {t_fps} FPS • TLOD {min_tlod} ➔ {max_tlod})</span>'
+        lod_badge_text = "SMART LOD ACTIVE"
+        lod_badge_bg = "#059669"
     elif autofps_active:
-        tfps = autofps_cfg.get('target_fps_fg') or autofps_cfg.get('targetFps', '--') if autofps_cfg else '--'
-        min_t = autofps_cfg.get('min_tlod') or autofps_cfg.get('minTLod', '--') if autofps_cfg else '--'
-        max_t = autofps_cfg.get('max_tlod') or autofps_cfg.get('maxTLod', '--') if autofps_cfg else '--'
-        cfg_sub = f" (Cible {tfps} FPS | TLOD {min_t}-{max_t})" if autofps_cfg else ""
-        lod_engine_badge = f'<span style="color:#38bdf8; font-weight:bold; font-family:monospace; background:rgba(56,189,248,0.15); border:1px solid #38bdf8; padding:3px 8px; border-radius:6px; font-size:11px;">AUTOFPS LIVE{cfg_sub}</span>'
+        lod_badge_text = "AUTOFPS LIVE"
+        lod_badge_bg = "#059669"
     else:
-        lod_engine_badge = '<span style="color:#94a3b8; font-size:11px; background:rgba(148,163,184,0.1); border:1px solid #334155; padding:3px 8px; border-radius:6px;">Inactif / Non Détecté</span>'
+        lod_badge_text = "LOD ENGINE INACTIVE"
+        lod_badge_bg = "#475569"
+
+    # Network Connection Badge for Contextual Header
+    net_info = session_info.get('network')
+    if not net_info:
+        net_info = get_flight_network_info()
+
+    if net_info and net_info.get('is_connected'):
+        net_spd = str(net_info.get('link_speed_str') or '').upper().strip()
+        if net_info.get('is_wifi'):
+            sig = net_info.get('wifi_signal_pct')
+            if sig is not None:
+                net_badge_text = f"WI-FI ({sig}%)" if not net_spd else f"WI-FI {net_spd}"
+            else:
+                net_badge_text = f"WI-FI {net_spd}".strip() if net_spd else "WI-FI"
+            net_badge_bg = "#059669" if (sig is None or sig >= 60) else "#d97706"
+        else:
+            net_badge_text = f"ETHERNET {net_spd}".strip() if net_spd else "ETHERNET"
+            net_badge_bg = "#059669"
+    else:
+        net_badge_text = "OFFLINE"
+        net_badge_bg = "#dc2626"
 
     # Build Smart LOD Performance & Threshold Analysis section
     smart_lod_perf = analyze_smart_lod_performance(samples, session_info)
@@ -1295,15 +2008,15 @@ def generate_html_report(csv_path, session_info, samples):
                 """
             events_table_html = f"""
             <div style="margin-top:16px; border-top:1px solid #1e293b; padding-top:12px;">
-                <div style="font-size:12px; font-weight:bold; color:#38bdf8; margin-bottom:8px;">⚡ Journal des Déclenchements & Régulations Dynamiques :</div>
+                <div style="font-size:12px; font-weight:bold; color:#38bdf8; margin-bottom:8px;">⚡ Dynamic Regulation & Trigger Log:</div>
                 <table style="width:100%; border-collapse:collapse; text-align:left;">
                     <thead>
                         <tr style="color:#64748b; font-size:11px; text-transform:uppercase;">
-                            <th style="padding:6px 12px;">Heure</th>
+                            <th style="padding:6px 12px;">Time</th>
                             <th style="padding:6px 12px;">Altitude</th>
-                            <th style="padding:6px 12px;">Consigne TLOD</th>
-                            <th style="padding:6px 12px;">Cadence Mesurée</th>
-                            <th style="padding:6px 12px;">Motif de Déclenchement</th>
+                            <th style="padding:6px 12px;">TLOD Target</th>
+                            <th style="padding:6px 12px;">Measured FPS</th>
+                            <th style="padding:6px 12px;">Trigger Reason</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1318,18 +2031,18 @@ def generate_html_report(csv_path, session_info, samples):
         smart_lod_section = f"""
         <div class="chart-box" style="padding: 20px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
-                <div class="chart-title" style="margin-bottom:0;">⚡ Analyse Déclenchements Smart LOD & Efficacité Paliers</div>
-                <div style="font-size:12px; color:#06b6d4; font-weight:bold;">Régulation Dynamique MSFS</div>
+                <div class="chart-title" style="margin-bottom:0;">⚡ Smart LOD Trigger Analysis & Step Efficiency</div>
+                <div style="font-size:12px; color:#06b6d4; font-weight:bold;">Dynamic MSFS Regulation</div>
             </div>
             <div style="overflow-x:auto;">
                 <table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">
                     <thead>
                         <tr style="border-bottom:1px solid #334155; color:#94a3b8; font-size:11px; text-transform:uppercase;">
-                            <th style="padding:8px 12px;">Seuil / Transition</th>
-                            <th style="padding:8px 12px;">Variation TLOD</th>
-                            <th style="padding:8px 12px;">Delta FPS (Gain/Perte)</th>
-                            <th style="padding:8px 12px;">Delta MainThread (ms)</th>
-                            <th style="padding:8px 12px;">Bénéfice & Impact Réel</th>
+                            <th style="padding:8px 12px;">Threshold / Transition</th>
+                            <th style="padding:8px 12px;">TLOD Step</th>
+                            <th style="padding:8px 12px;">FPS Delta (Gain/Loss)</th>
+                            <th style="padding:8px 12px;">MainThread Delta (ms)</th>
+                            <th style="padding:8px 12px;">Benefit & Real Impact</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1360,20 +2073,20 @@ def generate_html_report(csv_path, session_info, samples):
         milestones_section = f"""
         <div class="chart-box" style="padding: 20px;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
-                <div class="chart-title" style="margin-bottom:0;">🛫 Analyse des Phases de Vol, Paliers d'Altitude & Impacts Sol/LOD</div>
-                <div style="font-size:12px; color:#94a3b8;">Qualité Nuages AutoFPS : <span style="color:#38bdf8; font-weight:bold;">{cloud_status}</span></div>
+                <div class="chart-title" style="margin-bottom:0;">Flight Phases Analysis, Altitude Steps & Ground/LOD Impacts</div>
+                <div style="font-size:12px; color:#94a3b8;">AutoFPS Cloud Quality: <span style="color:#38bdf8; font-weight:bold;">{cloud_status}</span></div>
             </div>
             <div style="overflow-x:auto;">
                 <table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">
                     <thead>
                         <tr style="border-bottom:1px solid #334155; color:#94a3b8; font-size:11px; text-transform:uppercase;">
-                            <th style="padding:8px 12px;">Phase de Vol</th>
+                            <th style="padding:8px 12px;">Flight Phase</th>
                             <th style="padding:8px 12px;">Altitude (AGL)</th>
-                            <th style="padding:8px 12px;">TLOD Moyen</th>
-                            <th style="padding:8px 12px;">OLOD Moyen</th>
-                            <th style="padding:8px 12px;">FPS Moyen</th>
-                            <th style="padding:8px 12px;">MainThread CPU</th>
-                            <th style="padding:8px 12px;">Comportement & Impact</th>
+                            <th style="padding:8px 12px;">Avg TLOD</th>
+                            <th style="padding:8px 12px;">Avg OLOD</th>
+                            <th style="padding:8px 12px;">Avg FPS</th>
+                            <th style="padding:8px 12px;">CPU MainThread</th>
+                            <th style="padding:8px 12px;">Behavior & Impact</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1387,42 +2100,104 @@ def generate_html_report(csv_path, session_info, samples):
         milestones_section = ""
 
     narrative_section = generate_automated_flight_narrative(samples, session_info)
+    profile_section = generate_graphics_profile_section(session_info)
 
-    # Formatage des Cartes KPI (Moyenne en gros, Min/Pic en petit, Go pour mémoire)
+    # Format KPI Cards
     if is_fg_used and avg_base_fps != "N/A":
-        card_fps_title = "FPS Moyens (Frame Gen)"
+        card_fps_title = "Average FPS (Frame Gen)"
         card_fps_val = f'{avg_fps} <span style="font-size:16px;">FPS</span> <span style="font-size:15px; color:#38bdf8; font-weight:normal;">({avg_base_fps} base)</span>'
-        card_fps_sub = f"Pic : {max_fps} FPS ({max_base_fps} base) • Min : {min_fps} FPS ({min_base_fps} base)"
+        card_fps_sub = f"Peak: {max_fps} FPS ({max_base_fps} base) • Min: {min_fps} FPS ({min_base_fps} base)"
     else:
-        card_fps_title = "FPS Moyens (Natif)"
+        card_fps_title = "Average FPS (Native)"
         card_fps_val = f'{avg_fps} <span style="font-size:16px;">FPS</span>'
-        card_fps_sub = f"Pic : {max_fps} FPS • Min : {min_fps} FPS"
+        card_fps_sub = f"Peak: {max_fps} FPS • Min: {min_fps} FPS"
 
-    card_mt_title = "MainThread CPU Moyen"
+    card_mt_title = "Average CPU MainThread"
     card_mt_val = f'{avg_mt} <span style="font-size:16px;">ms</span>'
-    card_mt_sub = f"Meilleur : {min_mt} ms • Pic : {max_mt} ms"
+    card_mt_sub = f"Best: {min_mt} ms • Peak: {max_mt} ms"
 
-    card_vram_title = "VRAM GPU Moyenne"
-    card_vram_val = f'{avg_vram_gb} <span style="font-size:16px;">Go</span>'
-    card_vram_sub = f"Pic : {peak_vram_gb} Go ({peak_vram_pct}% de {total_vram_gb} Go) • Min : {min_vram_gb} Go"
+    if avg_msfs_vram_gb:
+        card_vram_title = "Average GPU VRAM (MSFS / Total)"
+        card_vram_val = f'{avg_msfs_vram_gb} <span style="font-size:16px;">GB MSFS</span> <span style="font-size:14px; color:#38bdf8; font-weight:normal;">({avg_vram_gb} GB Rig)</span>'
+        card_vram_sub = f"MSFS Peak: {peak_msfs_vram_gb} GB • Rig GPU Total Peak: {peak_vram_gb} GB ({peak_vram_pct}% of {total_vram_gb} GB)"
+    else:
+        card_vram_title = "Average GPU VRAM"
+        card_vram_val = f'{avg_vram_gb} <span style="font-size:16px;">GB</span>'
+        card_vram_sub = f"Peak: {peak_vram_gb} GB ({peak_vram_pct}% of {total_vram_gb} GB) • Min: {min_vram_gb} GB"
 
-    card_ram_title = "RAM MSFS Moyenne (Physique)"
-    card_ram_val = f'{avg_ram_gb} <span style="font-size:16px;">Go</span>'
-    card_ram_sub = f"Pic : {peak_ram_gb} Go • Min : {min_ram_gb} Go"
+    card_ram_title = "Average MSFS RAM (Physical)"
+    card_ram_val = f'{avg_ram_gb} <span style="font-size:16px;">GB</span>'
+    card_ram_sub = f"Peak: {peak_ram_gb} GB • Min: {min_ram_gb} GB"
 
-    card_commit_title = "RAM Allouée Moyenne (Commit)"
-    card_commit_val = f'{avg_commit_gb} <span style="font-size:16px;">Go</span>'
-    card_commit_sub = f"Pic : {peak_commit_gb} Go • Min : {min_commit_gb} Go"
+    card_commit_title = "Average Committed RAM"
+    card_commit_val = f'{avg_commit_gb} <span style="font-size:16px;">GB</span>'
+    card_commit_sub = f"Peak: {peak_commit_gb} GB • Min: {min_commit_gb} GB"
 
-    card_power_title = "Puissance GPU Moyenne"
+    card_power_title = "Average GPU Power"
     card_power_val = f'{avg_power} <span style="font-size:16px;">W</span>'
-    card_power_sub = f"Pic : {peak_power} W • Min : {min_power} W"
+    card_power_sub = f"Peak: {peak_power} W • Min: {min_power} W"
+
+    dep_hdr = session_info.get('dep') or 'DEP'
+    arr_hdr = session_info.get('arr') or 'ARR'
+    route_hdr_title = f"{dep_hdr} ➔ {arr_hdr}"
+
+    # Build Events Timeline section
+    events_table_section = ""
+    if flight_events:
+        event_rows = ""
+        for ev in flight_events:
+            alt_disp = f"{int(ev['alt']):,} ft" if ev.get('alt') is not None else "--"
+            event_rows += f"""
+            <tr style="border-bottom:1px solid rgba(255,255,255,0.05); font-size:13px;">
+                <td style="padding:10px 12px; color:#94a3b8; font-family:monospace; font-weight:bold;">{ev['time']}</td>
+                <td style="padding:10px 12px;">
+                    <span style="display:inline-block; padding:3px 8px; border-radius:6px; font-size:10px; font-weight:800; background:#1e293b; color:{ev['badge_color']}; border:1px solid rgba(51, 65, 85, 0.6);">{ev['badge']}</span>
+                </td>
+                <td style="padding:10px 12px; color:#f8fafc; font-weight:bold;">{ev['label']}</td>
+                <td style="padding:10px 12px; color:#06b6d4; font-family:monospace;">{alt_disp}</td>
+            </tr>
+            """
+        events_table_section = f"""
+        <div class="chart-box" style="padding: 20px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:8px;">
+                <div class="chart-title" style="margin-bottom:0;">Dynamic Flight Events, Transitions & Pause Timeline</div>
+                <div style="font-size:12px; color:#94a3b8;">Recorded changes during session ({len(flight_events)} event(s))</div>
+            </div>
+            <div style="overflow-x:auto;">
+                <table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">
+                    <thead>
+                        <tr style="border-bottom:1px solid #334155; color:#94a3b8; font-size:11px; text-transform:uppercase;">
+                            <th style="padding:8px 12px;">Time</th>
+                            <th style="padding:8px 12px;">Event Type</th>
+                            <th style="padding:8px 12px;">Transition / Setting</th>
+                            <th style="padding:8px 12px;">Altitude AGL</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {event_rows}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        """
+
+    tot_pause = session_info.get('total_paused_sec', 0)
+    pause_str = session_info.get('total_paused_str', '00:00')
+    if tot_pause > 0:
+        time_display_full = f"{session_info['duration']} (Active) • {pause_str} (Paused)"
+        hdr_duration_sub = f"Flight recorded on {session_info['start_time']} • Active Flight: {session_info['duration']} • Paused: {pause_str}"
+    else:
+        time_display_full = session_info['duration']
+        hdr_duration_sub = f"Flight recorded on {session_info['start_time']} • Monitoring Duration: {session_info['duration']}"
+
+    is_vr_flight = session_info.get('has_vr') or any(s.get('is_vr') for s in samples)
+    vr_badge_html = '<span class="badge" style="background:#0284c7;">VR HEADSET</span>' if is_vr_flight else '<span class="badge" style="background:#334155;">2D DESKTOP</span>'
 
     html = f"""<!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Rapport de Performance - {session_info['start_time']}</title>
+    <title>SceneryX Telemetry Report - {route_hdr_title} ({session_info['start_time']})</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         body {{
@@ -1445,15 +2220,20 @@ def generate_html_report(csv_path, session_info, samples):
             margin-bottom: 24px;
         }}
         .badge {{
-            display: inline-block;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             padding: 6px 14px;
             border-radius: 9999px;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 800;
-            letter-spacing: 1px;
-            background: rgba(16, 185, 129, 0.15);
-            color: {badge_color};
-            border: 1px solid {badge_color};
+            letter-spacing: 0.6px;
+            text-transform: uppercase;
+            color: #ffffff;
+            border: none;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+            white-space: nowrap;
+            line-height: 1.2;
         }}
         .grid {{
             display: grid;
@@ -1506,42 +2286,51 @@ def generate_html_report(csv_path, session_info, samples):
     <div class="container">
         <div class="header">
             <div>
-                <h1 style="margin:0 0 6px 0; font-size:24px;">Rapport de Télémétrie de Vol SceneryX Pro</h1>
-                <div style="color:#94a3b8; font-size:13px;">Vol enregistré le {session_info['start_time']} • Durée : {session_info['duration']}</div>
+                <h1 style="margin:0 0 6px 0; font-size:24px; font-weight:800; letter-spacing:0.5px; text-transform:uppercase;">SCENERYX FLIGHT TELEMETRY REPORT</h1>
+                <div style="color:#94a3b8; font-size:13px;">{hdr_duration_sub}</div>
             </div>
-            <div>
-                <span class="badge">{badge_text}</span>
-            </div>
-        </div>
-
-        <!-- EN-TETE CONTEXTUELLE DE VOL (Appareil, Route, Mode, AutoFPS) -->
-        <div style="background:#0f172a; border:1px solid #1e293b; border-radius:16px; padding:16px 20px; margin-bottom:20px; display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:16px; font-size:13px;">
-            <div>
-                <div style="color:#64748b; font-size:11px; font-weight:bold; text-transform:uppercase;">Appareil</div>
-                <div style="color:#f8fafc; font-weight:bold; font-size:15px; margin-top:2px;">{aircraft_display}</div>
-            </div>
-            <div>
-                <div style="color:#64748b; font-size:11px; font-weight:bold; text-transform:uppercase;">Route / Origine</div>
-                <div style="color:#38bdf8; font-weight:bold; font-size:15px; margin-top:2px;">{route_display}</div>
-            </div>
-            <div>
-                <div style="color:#64748b; font-size:11px; font-weight:bold; text-transform:uppercase;">Mode SceneryX</div>
-                <div style="color:#10b981; font-weight:bold; font-size:14px; margin-top:2px;">{mode_display}</div>
-            </div>
-            <div>
-                <div style="color:#64748b; font-size:11px; font-weight:bold; text-transform:uppercase;">Régulation LOD</div>
-                <div style="margin-top:2px;">{lod_engine_badge}</div>
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                {vr_badge_html}
+                <span class="badge" style="background:{net_badge_bg};">{net_badge_text}</span>
+                <span class="badge" style="background:{lod_badge_bg};">{lod_badge_text}</span>
+                <span class="badge" style="background:{badge_bg};">{badge_text}</span>
             </div>
         </div>
 
-        <!-- DIAGNOSTIC TEXTUEL EXPERT -->
+        <!-- CONTEXTUAL FLIGHT HEADER (Aircraft, Route, Mode, Monitoring Duration) -->
+        <div style="background:#0f172a; border:1px solid #1e293b; border-radius:16px; padding:20px 24px; margin-bottom:24px; display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:20px;">
+            <div>
+                <div style="color:#64748b; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px;">Aircraft</div>
+                <div style="color:#f8fafc; font-weight:800; font-size:17px; margin-top:4px;">{aircraft_display}</div>
+            </div>
+            <div>
+                <div style="color:#64748b; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px;">Route / Origin</div>
+                <div style="color:#38bdf8; font-weight:800; font-size:17px; margin-top:4px;">{route_display}</div>
+            </div>
+            <div>
+                <div style="color:#64748b; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px;">SceneryX Flight Mode</div>
+                <div style="color:{mode_color}; font-weight:800; font-size:17px; margin-top:4px;">{mode_display}</div>
+            </div>
+            <div>
+                <div style="color:#64748b; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px;">Monitoring Time</div>
+                <div style="color:#f8fafc; font-weight:800; font-size:17px; margin-top:4px; font-family:monospace;">{time_display_full}</div>
+            </div>
+        </div>
+
+        <!-- ACTIVE GRAPHICS PROFILE & CALIBRATION -->
+        {profile_section}
+
+        <!-- EXPERT TEXTUAL DIAGNOSTIC -->
         {narrative_section}
 
-        <!-- PALIERS D'ALTITUDE & IMPACTS LOD -->
+        <!-- ALTITUDE STEPS & LOD IMPACTS -->
         {milestones_section}
 
-        <!-- ANALYSE DECLENCHEMENTS SMART LOD & DELTAS -->
+        <!-- SMART LOD TRIGGER & STEP ANALYSIS -->
         {smart_lod_section}
+
+        <!-- DYNAMIC FLIGHT EVENTS & TRANSITIONS TIMELINE -->
+        {events_table_section}
 
         <div class="grid">
             <div class="card">
@@ -1583,7 +2372,7 @@ def generate_html_report(csv_path, session_info, samples):
 
         <!-- GRAPH 1 : FPS & MainThread -->
         <div class="chart-box">
-            <div class="chart-title">1. Fluidité & Latence : FPS Affichés vs MainThread (ms)</div>
+            <div class="chart-title">1. Smoothness & Latency: Displayed FPS vs MainThread (ms)</div>
             <div style="height: 320px;">
                 <canvas id="fpsChart"></canvas>
             </div>
@@ -1591,7 +2380,7 @@ def generate_html_report(csv_path, session_info, samples):
 
         <!-- GRAPH 2 : VRAM & RAM MSFS -->
         <div class="chart-box">
-            <div class="chart-title">2. Empreinte Mémoire : VRAM GPU & RAM MSFS au fil du vol (Mo)</div>
+            <div class="chart-title">2. Memory Footprint: GPU VRAM & MSFS RAM over flight (MB)</div>
             <div style="height: 320px;">
                 <canvas id="perfChart"></canvas>
             </div>
@@ -1599,27 +2388,105 @@ def generate_html_report(csv_path, session_info, samples):
 
         <!-- GRAPH 3 : Altitude & TLOD -->
         <div class="chart-box">
-            <div class="chart-title">3. Profil de Vol & Dynamique : Altitude AGL (ft) et Terrain LOD (TLOD)</div>
+            <div class="chart-title">3. Flight Profile & Dynamics: AGL Altitude (ft) and Terrain LOD (TLOD)</div>
             <div style="height: 300px;">
                 <canvas id="lodChart"></canvas>
             </div>
         </div>
 
-        <!-- GRAPH 4 : Rolling Cache & Débit Disque -->
+        <!-- GRAPH 4 : Rolling Cache & Disk Read -->
         <div class="chart-box">
-            <div class="chart-title">4. Streaming & Rolling Cache : Débit de Lecture Disque / Cache MSFS (Mbps)</div>
+            <div class="chart-title">4. Streaming & Rolling Cache: MSFS Cache / Disk Read Throughput (Mbps)</div>
             <div style="height: 260px;">
                 <canvas id="ioChart"></canvas>
             </div>
         </div>
 
         <div style="text-align:center; color:#64748b; font-size:12px; margin-top:24px;">
-            Fichier source : {csv_path}
+            Source file: {csv_path}
         </div>
     </div>
 
     <script>
         const times = {json.dumps(times)};
+        const vrIntervals = {json.dumps(vr_intervals)};
+        const pauseIntervals = {json.dumps(pause_intervals)};
+        const chartEvents = {json.dumps(flight_events)};
+
+        // Universal Chart.js annotation plugin for VR bands, pause intervals, and event markers
+        const flightAnnotationsPlugin = {{
+            id: 'flightAnnotations',
+            beforeDraw(chart) {{
+                const {{ ctx, chartArea, scales }} = chart;
+                if (!chartArea || !scales.x) return;
+                const {{ top, bottom, left, right }} = chartArea;
+                const x = scales.x;
+
+                // Draw VR shaded intervals
+                vrIntervals.forEach(iv => {{
+                    const startX = Math.max(left, x.getPixelForValue(iv.startIdx));
+                    const endX = Math.min(right, x.getPixelForValue(iv.endIdx));
+                    if (endX > startX) {{
+                        ctx.save();
+                        ctx.fillStyle = 'rgba(56, 189, 248, 0.07)';
+                        ctx.fillRect(startX, top, endX - startX, bottom - top);
+                        ctx.restore();
+                    }}
+                }});
+
+                // Draw Pause shaded intervals
+                pauseIntervals.forEach(iv => {{
+                    const startX = Math.max(left, x.getPixelForValue(iv.startIdx));
+                    const endX = Math.min(right, x.getPixelForValue(iv.endIdx));
+                    if (endX > startX) {{
+                        ctx.save();
+                        ctx.fillStyle = 'rgba(234, 179, 8, 0.14)';
+                        ctx.fillRect(startX, top, endX - startX, bottom - top);
+                        ctx.restore();
+                    }}
+                }});
+            }},
+            afterDraw(chart) {{
+                const {{ ctx, chartArea, scales }} = chart;
+                if (!chartArea || !scales.x) return;
+                const {{ top, bottom, left, right }} = chartArea;
+                const x = scales.x;
+
+                chartEvents.forEach(ev => {{
+                    if (ev.idx === undefined || ev.idx < 0) return;
+                    const posX = x.getPixelForValue(ev.idx);
+                    if (posX >= left && posX <= right) {{
+                        ctx.save();
+                        ctx.beginPath();
+                        ctx.setLineDash([4, 4]);
+                        ctx.strokeStyle = ev.color || '#94a3b8';
+                        ctx.lineWidth = 1;
+                        ctx.moveTo(posX, top);
+                        ctx.lineTo(posX, bottom);
+                        ctx.stroke();
+
+                        ctx.setLineDash([]);
+                        ctx.font = 'bold 9px sans-serif';
+                        const textW = ctx.measureText(ev.label).width;
+                        const bw = textW + 8;
+                        const bh = 15;
+                        const bx = Math.min(right - bw, Math.max(left, posX - bw / 2));
+                        const by = top + 3;
+
+                        ctx.fillStyle = '#0f172a';
+                        ctx.fillRect(bx, by, bw, bh);
+                        ctx.strokeStyle = ev.color || 'rgba(51, 65, 85, 0.6)';
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(bx, by, bw, bh);
+
+                        ctx.fillStyle = '#f8fafc';
+                        ctx.fillText(ev.label, bx + 4, by + 10);
+                        ctx.restore();
+                    }}
+                }});
+            }}
+        }};
+        Chart.register(flightAnnotationsPlugin);
 
         // 1. FPS & MainThread Chart
         new Chart(document.getElementById('fpsChart').getContext('2d'), {{
@@ -1628,7 +2495,7 @@ def generate_html_report(csv_path, session_info, samples):
                 labels: times,
                 datasets: [
                     {{
-                        label: 'FPS Affichés (Frame Gen)',
+                        label: 'Displayed FPS',
                         data: {json.dumps([s.get('disp_fps') for s in samples])},
                         borderColor: '#10b981',
                         backgroundColor: 'rgba(16, 185, 129, 0.1)',
@@ -1645,16 +2512,27 @@ def generate_html_report(csv_path, session_info, samples):
                         tension: 0.2,
                         yAxisID: 'yMs',
                         pointRadius: 0
-                    }}
+                    }},
+                    {f'''{{
+                        label: 'Simulation Rate (x)',
+                        data: {json.dumps(sim_rate_vals)},
+                        borderColor: '#eab308',
+                        borderWidth: 1.5,
+                        borderDash: [3, 3],
+                        stepped: true,
+                        yAxisID: 'yRate',
+                        pointRadius: 0
+                    }},''' if has_sim_compression else ''}
                 ]
             }},
             options: {{
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {{
-                    x: {{ title: {{ display: true, text: 'Temps écoulé', color: '#94a3b8' }}, grid: {{ color: 'rgba(255,255,255,0.05)' }}, ticks: {{ color: '#94a3b8', maxTicksLimit: 12 }} }},
+                    x: {{ title: {{ display: true, text: 'Elapsed Time', color: '#94a3b8' }}, grid: {{ color: 'rgba(255,255,255,0.05)' }}, ticks: {{ color: '#94a3b8', maxTicksLimit: 12 }} }},
                     yFps: {{ type: 'linear', position: 'left', title: {{ display: true, text: 'FPS', color: '#10b981' }}, grid: {{ color: 'rgba(255,255,255,0.05)' }}, ticks: {{ color: '#10b981' }} }},
-                    yMs: {{ type: 'linear', position: 'right', title: {{ display: true, text: 'MainThread (ms)', color: '#f59e0b' }}, grid: {{ drawOnChartArea: false }}, ticks: {{ color: '#f59e0b' }} }}
+                    yMs: {{ type: 'linear', position: 'right', title: {{ display: true, text: 'MainThread (ms)', color: '#f59e0b' }}, grid: {{ drawOnChartArea: false }}, ticks: {{ color: '#f59e0b' }} }},
+                    {f'''yRate: {{ type: 'linear', position: 'right', min: 1, max: 8, title: {{ display: true, text: 'Sim Rate (x)', color: '#eab308' }}, grid: {{ drawOnChartArea: false }}, ticks: {{ color: '#eab308', stepSize: 1 }} }},''' if has_sim_compression else ''}
                 }},
                 plugins: {{ legend: {{ labels: {{ color: '#f8fafc', font: {{ weight: 'bold' }} }} }} }}
             }}
@@ -1667,7 +2545,7 @@ def generate_html_report(csv_path, session_info, samples):
                 labels: times,
                 datasets: [
                     {{
-                        label: 'VRAM GPU Occupée (Mo)',
+                        label: 'Rig GPU VRAM Total Used (MB)',
                         data: {json.dumps(vram_vals)},
                         borderColor: '#38bdf8',
                         backgroundColor: 'rgba(56, 189, 248, 0.1)',
@@ -1676,8 +2554,17 @@ def generate_html_report(csv_path, session_info, samples):
                         fill: true,
                         pointRadius: 0
                     }},
+                    {f'''{{
+                        label: 'MSFS 2024 Dedicated VRAM (MB)',
+                        data: {json.dumps(msfs_vram_vals)},
+                        borderColor: '#06b6d4',
+                        borderWidth: 1.8,
+                        borderDash: [5, 5],
+                        tension: 0.2,
+                        pointRadius: 0
+                    }},''' if has_msfs_vram else ''}
                     {{
-                        label: 'RAM MSFS Physique (Mo)',
+                        label: 'MSFS Physical RAM (MB)',
                         data: {json.dumps(msfs_ram_vals)},
                         borderColor: '#a855f7',
                         borderWidth: 2,
@@ -1685,7 +2572,7 @@ def generate_html_report(csv_path, session_info, samples):
                         pointRadius: 0
                     }},
                     {{
-                        label: 'RAM MSFS Allouée/Commit (Mo)',
+                        label: 'MSFS Committed RAM (MB)',
                         data: {json.dumps(msfs_commit_vals)},
                         borderColor: '#f59e0b',
                         borderWidth: 1.5,
@@ -1699,8 +2586,8 @@ def generate_html_report(csv_path, session_info, samples):
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {{
-                    x: {{ title: {{ display: true, text: 'Temps écoulé', color: '#94a3b8' }}, grid: {{ color: 'rgba(255,255,255,0.05)' }}, ticks: {{ color: '#94a3b8', maxTicksLimit: 12 }} }},
-                    y: {{ title: {{ display: true, text: 'Mémoire (Mo)', color: '#94a3b8' }}, grid: {{ color: 'rgba(255,255,255,0.05)' }}, ticks: {{ color: '#94a3b8' }} }}
+                    x: {{ title: {{ display: true, text: 'Elapsed Time', color: '#94a3b8' }}, grid: {{ color: 'rgba(255,255,255,0.05)' }}, ticks: {{ color: '#94a3b8', maxTicksLimit: 12 }} }},
+                    y: {{ title: {{ display: true, text: 'Memory (MB)', color: '#94a3b8' }}, grid: {{ color: 'rgba(255,255,255,0.05)' }}, ticks: {{ color: '#94a3b8' }} }}
                 }},
                 plugins: {{ legend: {{ labels: {{ color: '#f8fafc', font: {{ weight: 'bold' }} }} }} }}
             }}
@@ -1713,7 +2600,7 @@ def generate_html_report(csv_path, session_info, samples):
                 labels: times,
                 datasets: [
                     {{
-                        label: 'Altitude AGL (ft)',
+                        label: 'AGL Altitude (ft)',
                         data: {json.dumps([s.get('agl_ft') for s in samples])},
                         borderColor: '#06b6d4',
                         backgroundColor: 'rgba(6, 182, 212, 0.08)',
@@ -1725,15 +2612,25 @@ def generate_html_report(csv_path, session_info, samples):
                     }},
                     {{
                         label: 'Terrain LOD (TLOD)',
-                        data: {json.dumps([s.get('tlod') for s in samples])},
+                        data: {json.dumps(tlod_vals)},
                         borderColor: '#ec4899',
                         borderWidth: 2,
                         tension: 0.2,
                         yAxisID: 'yLod',
                         pointRadius: 0
                     }},
+                    {f'''{{
+                        label: 'Objects LOD (OLOD)',
+                        data: {json.dumps(olod_vals)},
+                        borderColor: '#a855f7',
+                        borderWidth: 2,
+                        borderDash: [4, 4],
+                        tension: 0.2,
+                        yAxisID: 'yLod',
+                        pointRadius: 0
+                    }},''' if has_olod else ''}
                     {{
-                        label: '⚡ Déclencheur Smart LOD',
+                        label: '⚡ Smart LOD Trigger',
                         data: {json.dumps(smart_triggers)},
                         borderColor: '#38bdf8',
                         backgroundColor: '#38bdf8',
@@ -1752,9 +2649,9 @@ def generate_html_report(csv_path, session_info, samples):
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {{
-                    x: {{ title: {{ display: true, text: 'Temps écoulé', color: '#94a3b8' }}, grid: {{ color: 'rgba(255,255,255,0.05)' }}, ticks: {{ color: '#94a3b8', maxTicksLimit: 12 }} }},
-                    yAlt: {{ type: 'linear', position: 'left', title: {{ display: true, text: 'Altitude AGL (ft)', color: '#06b6d4' }}, grid: {{ color: 'rgba(255,255,255,0.05)' }}, ticks: {{ color: '#06b6d4' }} }},
-                    yLod: {{ type: 'linear', position: 'right', title: {{ display: true, text: 'TLOD', color: '#ec4899' }}, grid: {{ drawOnChartArea: false }}, ticks: {{ color: '#ec4899' }} }}
+                    x: {{ title: {{ display: true, text: 'Elapsed Time', color: '#94a3b8' }}, grid: {{ color: 'rgba(255,255,255,0.05)' }}, ticks: {{ color: '#94a3b8', maxTicksLimit: 12 }} }},
+                    yAlt: {{ type: 'linear', position: 'left', title: {{ display: true, text: 'AGL Altitude (ft)', color: '#06b6d4' }}, grid: {{ color: 'rgba(255,255,255,0.05)' }}, ticks: {{ color: '#06b6d4' }} }},
+                    yLod: {{ type: 'linear', position: 'right', title: {{ display: true, text: 'LOD (TLOD / OLOD)', color: '#ec4899' }}, grid: {{ drawOnChartArea: false }}, ticks: {{ color: '#ec4899' }} }}
                 }},
                 plugins: {{ legend: {{ labels: {{ color: '#f8fafc', font: {{ weight: 'bold' }} }} }} }}
             }}
@@ -1767,7 +2664,7 @@ def generate_html_report(csv_path, session_info, samples):
                 labels: times,
                 datasets: [
                     {{
-                        label: 'Débit Lecture Cache / Disque (Mbps)',
+                        label: 'Cache / Disk Read Speed (Mbps)',
                         data: {json.dumps(io_reads_mbps)},
                         borderColor: '#3b82f6',
                         backgroundColor: 'rgba(59, 130, 246, 0.1)',
@@ -1782,7 +2679,7 @@ def generate_html_report(csv_path, session_info, samples):
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {{
-                    x: {{ title: {{ display: true, text: 'Temps écoulé', color: '#94a3b8' }}, grid: {{ color: 'rgba(255,255,255,0.05)' }}, ticks: {{ color: '#94a3b8', maxTicksLimit: 12 }} }},
+                    x: {{ title: {{ display: true, text: 'Elapsed Time', color: '#94a3b8' }}, grid: {{ color: 'rgba(255,255,255,0.05)' }}, ticks: {{ color: '#94a3b8', maxTicksLimit: 12 }} }},
                     y: {{ title: {{ display: true, text: 'Mbps', color: '#3b82f6' }}, grid: {{ color: 'rgba(255,255,255,0.05)' }}, ticks: {{ color: '#3b82f6' }} }}
                 }},
                 plugins: {{ legend: {{ labels: {{ color: '#f8fafc', font: {{ weight: 'bold' }} }} }} }}
@@ -1799,6 +2696,207 @@ def generate_html_report(csv_path, session_info, samples):
     except Exception as e:
         print("Erreur génération HTML:", e)
         return None
+
+
+def recover_orphan_benchmarks(benchmarks_dir=None):
+    """
+    Scans the benchmarks directory for CSV logs that do not have a matching HTML report
+    (e.g. due to simulator crash, sudden exit, or power interruption).
+    Reconstructs the telemetry samples and generates the missing HTML benchmark report.
+    Returns a list of paths to newly generated reports.
+    """
+    if benchmarks_dir is None:
+        benchmarks_dir = get_benchmarks_directory()
+
+    if not os.path.exists(benchmarks_dir):
+        return []
+
+    recovered = []
+    try:
+        csv_files = [f for f in os.listdir(benchmarks_dir) if f.startswith('benchmark_') and f.endswith('.csv')]
+    except Exception as e:
+        print(f"[Telemetry] Error scanning benchmarks dir: {e}")
+        return []
+
+    for csv_file in csv_files:
+        csv_path = os.path.join(benchmarks_dir, csv_file)
+        html_file = csv_file[:-4] + '.html'
+        html_path = os.path.join(benchmarks_dir, html_file)
+
+        if os.path.exists(html_path):
+            continue
+
+        try:
+            with open(csv_path, 'r', encoding='utf-8', errors='ignore') as f:
+                lines = [line.strip() for line in f if line.strip()]
+
+            # Require header + at least 6 telemetry data rows (same standard as live sessions)
+            if len(lines) < 7:
+                continue
+
+            reader = csv.DictReader(lines)
+            samples = []
+            pause_events = []
+            total_paused_sec = 0.0
+            was_paused = False
+            pause_start_time = 0.0
+
+            for row in reader:
+                try:
+                    el_sec = float(row.get('elapsed_sec') or 0.0)
+                except Exception:
+                    el_sec = 0.0
+
+                t_str = row.get('time_str') or format_time_delta(el_sec)
+
+                def _safe_float(val, default=None):
+                    try:
+                        return float(val) if val is not None and str(val).strip() != '' else default
+                    except Exception:
+                        return default
+
+                def _safe_int(val, default=None):
+                    try:
+                        return int(float(val)) if val is not None and str(val).strip() != '' else default
+                    except Exception:
+                        return default
+
+                def _safe_bool(val):
+                    return str(val or '').strip().lower() in ('true', '1', 'yes')
+
+                cur_paused = _safe_bool(row.get('is_paused'))
+                if cur_paused and not was_paused:
+                    was_paused = True
+                    pause_start_time = el_sec
+                    pause_events.append({
+                        "event": "pause_start",
+                        "elapsed_sec": el_sec,
+                        "time_str": t_str
+                    })
+                elif not cur_paused and was_paused:
+                    was_paused = False
+                    p_dur = max(0.0, el_sec - pause_start_time)
+                    total_paused_sec += p_dur
+                    pause_events.append({
+                        "event": "pause_resume",
+                        "elapsed_sec": el_sec,
+                        "time_str": t_str,
+                        "duration_sec": round(p_dur, 1)
+                    })
+
+                s_dict = {
+                    'timestamp': row.get('timestamp', ''),
+                    'elapsed': el_sec,
+                    'elapsed_sec': el_sec,
+                    'time_str': t_str,
+                    'mode': row.get('mode', 'BASELINE STANDARD (All sceneries active)'),
+                    'disp_fps': _safe_int(row.get('displayed_fps')),
+                    'base_fps': _safe_int(row.get('base_fps')),
+                    'main_thread_ms': _safe_float(row.get('main_thread_ms')),
+                    'tlod': _safe_float(row.get('tlod')),
+                    'olod': _safe_float(row.get('olod')),
+                    'agl': _safe_float(row.get('agl_ft')),
+                    'agl_ft': _safe_float(row.get('agl_ft')),
+                    'fpm': _safe_float(row.get('fpm')),
+                    'fg_mode': row.get('fg_mode', ''),
+                    'cache_read_mbps': _safe_float(row.get('cache_read_mbps'), 0.0),
+                    'cache_read_mbs': _safe_float(row.get('cache_read_mbs'), 0.0),
+                    'vram_used': _safe_float(row.get('vram_used_mb'), 0.0),
+                    'vram_used_mb': _safe_float(row.get('vram_used_mb'), 0.0),
+                    'vram_total': _safe_float(row.get('vram_total_mb'), 16376.0),
+                    'vram_total_mb': _safe_float(row.get('vram_total_mb'), 16376.0),
+                    'vram_pct': _safe_float(row.get('vram_pct'), 0.0),
+                    'msfs_vram': _safe_float(row.get('msfs_vram_mb'), 0.0),
+                    'gpu_util': _safe_float(row.get('gpu_util_pct'), 0.0),
+                    'gpu_util_pct': _safe_float(row.get('gpu_util_pct'), 0.0),
+                    'gpu_temp': _safe_float(row.get('gpu_temp_c'), 0.0),
+                    'gpu_power': _safe_float(row.get('gpu_power_w'), 0.0),
+                    'gpu_clock': _safe_float(row.get('gpu_clock_mhz'), 0.0),
+                    'gpu_bus': _safe_float(row.get('gpu_mem_bus_pct'), 0.0),
+                    'msfs_ram': _safe_float(row.get('msfs_ram_mb'), 0.0),
+                    'msfs_ram_mb': _safe_float(row.get('msfs_ram_mb'), 0.0),
+                    'msfs_commit': _safe_float(row.get('msfs_commit_mb'), 0.0),
+                    'msfs_commit_mb': _safe_float(row.get('msfs_commit_mb'), 0.0),
+                    'sys_ram_used': _safe_float(row.get('sys_ram_used_mb'), 0.0),
+                    'sys_ram_total': _safe_float(row.get('sys_ram_total_mb'), 0.0),
+                    'sim_rate': _safe_float(row.get('sim_rate'), 1.0),
+                    'is_vr': _safe_bool(row.get('is_vr')),
+                    'is_paused': cur_paused
+                }
+                samples.append(s_dict)
+
+            if len(samples) < 6:
+                continue
+
+            stem = csv_file[:-4]
+            raw_core = stem[10:] if stem.startswith('benchmark_') else stem
+            parts = raw_core.split('_')
+            start_date_str = ""
+            dep = "DEP"
+            arr = "ARR"
+            aircraft = "Aircraft"
+
+            if len(parts) >= 3 and len(parts[-2]) == 10 and '-' in parts[-2]:
+                time_token = parts[-1].replace('-', ':')
+                date_token = parts[-2]
+                start_date_str = f"{date_token} {time_token}"
+                prefix_tokens = parts[:-2]
+            else:
+                prefix_tokens = parts
+
+            if len(prefix_tokens) >= 2 and prefix_tokens[0].lower() != 'baseline':
+                dep = prefix_tokens[0]
+                arr = prefix_tokens[1]
+                if len(prefix_tokens) > 2:
+                    aircraft = "_".join(prefix_tokens[2:])
+            elif len(prefix_tokens) >= 1 and prefix_tokens[0].lower() == 'baseline':
+                dep = "BASELINE"
+                arr = "SESSION"
+                aircraft = "MSFS"
+
+            if not start_date_str:
+                start_date_str = samples[0].get('timestamp') or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+            first_mode = samples[0].get('mode') or 'BASELINE STANDARD (All sceneries active)'
+            is_corridor = 'CORRIDOR' in first_mode.upper() or 'SCENERYX' in first_mode.upper()
+            max_elapsed = max((s.get('elapsed_sec', 0.0) for s in samples), default=0.0)
+
+            session_info = {
+                'mode_str': first_mode,
+                'is_corridor': is_corridor,
+                'disabled_count': 0,
+                'start_time': start_date_str,
+                'duration': format_time_delta(round(max_elapsed, 1)),
+                'aircraft': aircraft,
+                'route_display': f"{dep} ➔ {arr}" if dep != arr else dep,
+                'mode_display': first_mode,
+                'dep': dep,
+                'arr': arr,
+                'dep_name': '',
+                'arr_name': '',
+                'detection_source': 'Orphan Recovery / Auto-saved log',
+                'autofps_config': {},
+                'autofps_active': False,
+                'cloud_events': 'Nominal',
+                'smart_lod': {},
+                'network': get_flight_network_info(),
+                'graphics_profile': get_flight_graphics_profile(),
+                'pause_events': pause_events,
+                'total_paused_sec': round(total_paused_sec, 1),
+                'total_paused_str': format_time_delta(round(total_paused_sec, 1)),
+                'has_vr': any(s.get('is_vr') for s in samples),
+                'max_sim_rate': max(((s.get('sim_rate') or 1.0) for s in samples), default=1.0)
+            }
+
+            rep_path = generate_html_report(csv_path, session_info, samples)
+            if rep_path and os.path.exists(rep_path):
+                print(f"[Telemetry] Successfully recovered orphan benchmark: {os.path.basename(rep_path)}")
+                recovered.append(rep_path)
+        except Exception as err:
+            print(f"[Telemetry] Error recovering orphan benchmark {csv_file}: {err}")
+
+    return recovered
+
 
 def main():
     if sys.platform == 'win32':
@@ -1835,11 +2933,11 @@ def main():
     print("=" * 84)
     print("           SCENERYX - FLIGHT PERFORMANCE TRACKER (STANDALONE PRO)")
     print("=" * 84)
-    print(f" Mode détecté   : {mode_str}")
-    print(f" Journal CSV    : {csv_path}")
-    print(f" Télémétrie     : FPS, MainThread, TLOD, Cache Read (Mbps), VRAM, RAM, GPU (W)")
+    print(f" Detected Mode  : {mode_str}")
+    print(f" CSV Log        : {csv_path}")
+    print(f" Telemetry      : FPS, MainThread, TLOD, Cache Read (Mbps), VRAM, RAM, GPU (W)")
     print("=" * 84)
-    print(" En attente du simulateur de vol...")
+    print(" Waiting for flight simulator...")
 
     samples = []
     start_time = None
@@ -1869,7 +2967,7 @@ def main():
                 now_tick = time.time()
                 if start_time is None:
                     start_time = now_tick
-                    print("\n>> MSFS 2024 DÉTECTÉ ET ACTIF ! Démarrage du tracking en direct...\n")
+                    print("\n>> MSFS 2024 DETECTED AND ACTIVE! Starting live tracking...\n")
 
                 elapsed = round(now_tick - start_time, 1)
                 time_formatted = format_time_delta(elapsed)
@@ -2015,15 +3113,15 @@ def main():
         avg_mt_str = f"{round(sum(valid_mt)/len(valid_mt), 1)} ms" if valid_mt else "N/A"
 
         print("\n" + "=" * 80)
-        print("               RÉSUMÉ DU VOL & BENCHMARK DE PERFORMANCE PRO")
+        print("               FLIGHT SUMMARY & PRO PERFORMANCE BENCHMARK")
         print("=" * 80)
-        print(f" Mode Testé       : {mode_str}")
-        print(f" Durée Enregistrée: {total_duration} ({len(samples)} échantillons)")
+        print(f" Tested Mode      : {mode_str}")
+        print(f" Recorded Duration: {total_duration} ({len(samples)} samples)")
         print("-" * 80)
-        print(f" FPS Moyen        : {avg_fps_str}  (MainThread moyen : {avg_mt_str})")
-        print(f" VRAM GPU Crête   : {peak_vram:,.0f} Mo  (Moyenne : {avg_vram:,.0f} Mo)")
-        print(f" RAM MSFS Crête   : {peak_msfs_ram:,.0f} Mo  (Moyenne : {avg_ram:,.0f} Mo)")
-        print(f" RAM Allouée Max  : {peak_msfs_commit:,.0f} Mo")
+        print(f" Average FPS      : {avg_fps_str}  (Average MainThread: {avg_mt_str})")
+        print(f" Peak GPU VRAM    : {peak_vram:,.0f} MB  (Average: {avg_vram:,.0f} MB)")
+        print(f" Peak MSFS RAM    : {peak_msfs_ram:,.0f} MB  (Average: {avg_ram:,.0f} MB)")
+        print(f" Max Committed RAM: {peak_msfs_commit:,.0f} MB")
         print("=" * 80)
 
         last_sc = SIMCONNECT_CLIENT.get_data() if SIMCONNECT_CLIENT else {}
@@ -2031,7 +3129,7 @@ def main():
         final_lon = last_sc.get('lon')
         final_ground = last_sc.get('on_ground', False)
         ctx = resolve_flight_context(final_lat, final_lon, final_ground)
-        final_aircraft = last_sc.get('aircraft') or "Avion générique"
+        final_aircraft = last_sc.get('aircraft') or "Generic aircraft"
         cloud_status = check_autofps_cloud_events()
         autofps_cfg = get_autofps_config()
         autofps_active = is_autofps_active()
@@ -2048,7 +3146,8 @@ def main():
 
         session_info = {
             'mode_str': mode_str,
-            'is_corridor': is_corridor,
+            'is_corridor': is_corridor and (dis_count > 0),
+            'disabled_count': dis_count if is_corridor else 0,
             'start_time': timestamp_str,
             'duration': total_duration,
             'aircraft': final_aircraft,
@@ -2057,16 +3156,18 @@ def main():
             'autofps_config': autofps_cfg,
             'autofps_active': autofps_active,
             'cloud_events': cloud_status,
-            'smart_lod': smart_lod_info
+            'smart_lod': smart_lod_info,
+            'network': get_flight_network_info(),
+            'graphics_profile': get_flight_graphics_profile()
         }
         html_file = generate_html_report(csv_path, session_info, samples)
         if html_file and os.path.exists(html_file):
-            print(f"\n📊 Rapport graphique complet généré : {html_file}")
-            print("Ouverture du rapport dans votre navigateur...")
+            print(f"\n📊 Full graphical report generated: {html_file}")
+            print("Opening report in your browser...")
             webbrowser.open(f"file:///{os.path.abspath(html_file)}")
-        print(f"📄 Journal CSV complet : {csv_path}\n")
+        print(f"📄 Full CSV log: {csv_path}\n")
     else:
-        print("\nAucune donnée n'a été enregistrée (MSFS n'était pas actif).")
+        print("\nNo data recorded (MSFS was not active).")
 
 
 class BlackboxSession:
@@ -2079,6 +3180,7 @@ class BlackboxSession:
         self.last_report_path = None
         self.latest_telemetry = {
             "is_tracking": False,
+            "is_paused": False,
             "flight_name": "",
             "displayed_fps": None,
             "base_fps": None,
@@ -2101,12 +3203,12 @@ class BlackboxSession:
             "autofps_active": False
         }
 
-    def start(self, flight_name="flight", dep="LFPO", arr="EGKK", aircraft="Airliner"):
+    def start(self, flight_name="flight", dep=None, arr=None, aircraft=None):
         if self.is_running:
             return {"status": "already_running", "flight_name": self.current_flight_name}
         self._stop_event.clear()
         self.is_running = True
-        self.current_flight_name = flight_name or f"{dep}_{arr}_{aircraft}"
+        self.current_flight_name = flight_name or f"{dep or 'DEP'}_{arr or 'ARR'}_{aircraft or 'Flight'}"
         self.thread = threading.Thread(target=self._worker, args=(flight_name, dep, arr, aircraft), daemon=True)
         self.thread.start()
         return {"status": "started", "flight_name": self.current_flight_name}
@@ -2116,9 +3218,12 @@ class BlackboxSession:
             return {"status": "not_running", "report_path": self.last_report_path}
         self._stop_event.set()
         if self.thread and self.thread.is_alive():
-            self.thread.join(timeout=3.0)
+            self.thread.join(timeout=10.0)
         self.is_running = False
         self.latest_telemetry["is_tracking"] = False
+        self.latest_telemetry["is_paused"] = False
+        self.latest_telemetry["elapsed_sec"] = 0
+        self.latest_telemetry["elapsed_str"] = "00:00"
         return {
             "status": "stopped",
             "report_path": self.last_report_path,
@@ -2135,6 +3240,10 @@ class BlackboxSession:
         
         telemetry = dict(self.latest_telemetry)
         telemetry["is_tracking"] = self.is_running
+        telemetry["is_paused"] = sc_data.get("is_paused", False)
+        if not self.is_running:
+            telemetry["elapsed_sec"] = 0
+            telemetry["elapsed_str"] = "00:00"
         telemetry["msfs_active"] = msfs is not None
         telemetry["simconnect_connected"] = sc_connected
         telemetry["autofps_active"] = is_autofps_active()
@@ -2144,8 +3253,11 @@ class BlackboxSession:
         lon = sc_data.get("lon")
         on_ground = sc_data.get("on_ground", False)
         ctx = resolve_flight_context(lat, lon, on_ground)
-        telemetry["aircraft"] = sc_data.get("aircraft") or "Non détecté"
-        telemetry["route_display"] = ctx["route_display"]
+        telemetry["aircraft"] = sc_data.get("aircraft") or "Not detected"
+        route_text = ctx["route_display"]
+        if telemetry.get("is_paused") and self.is_running:
+            route_text = f"[PAUSED] {route_text}"
+        telemetry["route_display"] = route_text
         telemetry["mode_display"] = ctx["mode_display"]
 
         if gpu:
@@ -2167,6 +3279,7 @@ class BlackboxSession:
             telemetry["main_thread_ms"] = autofps.get("main_thread_ms")
             telemetry["tlod"] = autofps.get("tlod")
             telemetry["olod"] = autofps.get("olod")
+
         if msfs:
             telemetry["msfs_ram_mb"] = msfs.get("ram_mb", 0)
             telemetry["msfs_vram_mb"] = msfs.get("vram_mb", 0.0)
@@ -2181,7 +3294,21 @@ class BlackboxSession:
         autofps_cfg = get_autofps_config()
         autofps_is_active = is_autofps_active()
 
-        prefix = f"{dep or cur_dep}_{arr or cur_arr}_{aircraft or 'Flight'}"
+        # Priorité SimBrief initiale si départ/arrivée non spécifiés ou placeholders
+        initial_dep = dep or cur_dep
+        initial_arr = arr or cur_arr
+        if not initial_dep or initial_dep == 'DEP' or not initial_arr or initial_arr == 'ARR':
+            sb_init = get_simbrief_flight_plan()
+            if sb_init:
+                s_orig = sb_init.get('origin', {}).get('icao')
+                s_dest = sb_init.get('destination', {}).get('icao')
+                if s_orig and (not initial_dep or initial_dep == 'DEP'):
+                    initial_dep = s_orig
+                if s_dest and (not initial_arr or initial_arr == 'ARR'):
+                    initial_arr = s_dest
+
+        initial_aircraft_slug = sanitize_aircraft_slug(aircraft)
+        prefix = f"{initial_dep or 'DEP'}_{initial_arr or 'ARR'}_{initial_aircraft_slug}"
         csv_filename = f"benchmark_{prefix}_{timestamp_str}.csv"
         csv_path = os.path.join(benchmarks_dir, csv_filename)
         self.current_csv_path = csv_path
@@ -2196,26 +3323,50 @@ class BlackboxSession:
                 'vram_used_mb', 'vram_total_mb', 'vram_pct',
                 'gpu_util_pct', 'gpu_temp_c', 'gpu_power_w', 'gpu_clock_mhz', 'gpu_mem_bus_pct',
                 'msfs_ram_mb', 'msfs_commit_mb', 'msfs_cpu_pct',
-                'sys_ram_used_mb', 'sys_ram_total_mb'
+                'sys_ram_used_mb', 'sys_ram_total_mb',
+                'msfs_vram_mb', 'sim_rate', 'is_vr', 'is_paused'
             ])
 
         samples = []
         start_time = time.time()
+        last_worker_time = start_time
+        elapsed_active_sec = 0.0
+        total_paused_sec = 0.0
+        was_paused = False
+        pause_start_tick = None
+        pause_events = []
         last_read_bytes = None
         last_tick_time = None
+        had_msfs = False
+        had_flight = False
+        no_flight_ticks = 0
+
+        # Suivi GPS continu et détection appareil
+        first_valid_gps = None
+        first_ground_gps = None
+        last_valid_gps = None
+        last_ground_gps = None
+        best_detected_aircraft = None
 
         while not self._stop_event.is_set():
+            now_tick = time.time()
+            dt = now_tick - last_worker_time
+            last_worker_time = now_tick
+            if dt < 0 or dt > 5.0:
+                dt = 0.5
+
             msfs = get_msfs_process()
             gpu = get_nvidia_gpu_telemetry()
             sys_ram_used, sys_ram_total = get_system_ram()
             autofps = get_latest_autofps_data()
 
-            now_tick = time.time()
-            elapsed = round(now_tick - start_time, 1)
-            time_formatted = format_time_delta(elapsed)
-
             sc_data = SIMCONNECT_CLIENT.get_data() if SIMCONNECT_CLIENT else {}
             sc_connected = sc_data.get("connected", False)
+            in_flight = sc_data.get("in_flight", False)
+            is_paused = sc_data.get("is_paused", False)
+            detected_aircraft = sc_data.get("aircraft")
+            if detected_aircraft and detected_aircraft not in ("Not detected", "None", ""):
+                best_detected_aircraft = detected_aircraft
 
             cur_tlod, cur_olod, _ = get_current_lod_data(autofps)
             tlod = cur_tlod
@@ -2236,6 +3387,43 @@ class BlackboxSession:
                 fpm = autofps.get('fpm') if autofps else None
                 fg_mode = autofps.get('fg_mode') if autofps else None
 
+            # Track simulator & flight lifecycle
+            if msfs is not None or sc_connected:
+                had_msfs = True
+
+            if (sc_connected and (in_flight or (detected_aircraft and detected_aircraft != "Not detected"))) or (agl is not None and agl > 0):
+                had_flight = True
+
+            # -----------------------------------------------------------------
+            # AUTO-STOP CONDITIONS
+            # 1. MSFS quit completely
+            # 2. Player quit flight (returned to main menu) - ONLY when NOT paused!
+            # -----------------------------------------------------------------
+            if had_msfs and (msfs is None and not sc_connected):
+                print("[Telemetry] Auto-stopping: MSFS process completely closed.")
+                break
+
+            if had_flight:
+                if not sc_connected:
+                    print("[Telemetry] Auto-stopping: SimConnect disconnected after flight.")
+                    break
+                elif is_paused and (detected_aircraft and detected_aircraft != "Not detected"):
+                    # SIMULATOR IS PAUSED during active flight: NEVER auto-stop during pause!
+                    no_flight_ticks = 0
+                elif not in_flight or not detected_aircraft or detected_aircraft == "Not detected":
+                    no_flight_ticks += 1
+                    if no_flight_ticks >= 12:  # 6 seconds grace period
+                        print("[Telemetry] Auto-stopping: Flight ended / returned to main menu.")
+                        break
+                else:
+                    no_flight_ticks = 0
+
+            # Accumulation du temps de vol réel actif (uniquement hors pause)
+            if not is_paused:
+                elapsed_active_sec += dt
+            elapsed = round(elapsed_active_sec, 1)
+            time_formatted = format_time_delta(elapsed)
+
             # Rolling Cache I/O
             cur_read_bytes = msfs.get('read_bytes', 0) if msfs else 0
             cache_read_mbps = 0.0
@@ -2249,6 +3437,17 @@ class BlackboxSession:
             last_read_bytes = cur_read_bytes
             last_tick_time = now_tick
 
+            # Simulation Rate & VR mode tracking
+            sim_rate = sc_data.get("sim_rate", 1.0) or 1.0
+            is_vr = False
+            try:
+                import flight_memory_engine
+                mem = flight_memory_engine.get_memory_engine()
+                if mem.is_attached:
+                    is_vr = mem.is_vr_active()
+            except Exception:
+                is_vr = False
+
             v_used = gpu.get('vram_used_mb', 0)
             v_total = gpu.get('vram_total_mb', 16376)
             v_pct = gpu.get('vram_pct', 0)
@@ -2259,11 +3458,28 @@ class BlackboxSession:
             lat = sc_data.get("lat")
             lon = sc_data.get("lon")
             on_ground = sc_data.get("on_ground", False)
+
+            # Enregistrement des coordonnées GPS valides (uniquement hors pause et > 0.001)
+            if not is_paused and lat is not None and lon is not None and (abs(lat) > 0.001 or abs(lon) > 0.001):
+                if first_valid_gps is None:
+                    first_valid_gps = (lat, lon)
+                last_valid_gps = (lat, lon)
+
+                if on_ground or (agl is not None and agl < 200):
+                    if first_ground_gps is None:
+                        first_ground_gps = (lat, lon)
+                    last_ground_gps = (lat, lon)
+
             ctx = resolve_flight_context(lat, lon, on_ground)
-            detected_aircraft = sc_data.get("aircraft") or aircraft or "Non détecté"
+            final_detected_aircraft = best_detected_aircraft or detected_aircraft or aircraft or "Not detected"
+
+            route_str = ctx["route_display"]
+            if is_paused:
+                route_str = f"[PAUSED] {route_str}"
 
             self.latest_telemetry = {
                 "is_tracking": True,
+                "is_paused": is_paused,
                 "flight_name": self.current_flight_name,
                 "displayed_fps": disp_fps,
                 "base_fps": base_fps,
@@ -2281,11 +3497,59 @@ class BlackboxSession:
                 "elapsed_str": time_formatted,
                 "msfs_active": msfs is not None,
                 "simconnect_connected": sc_connected,
-                "aircraft": detected_aircraft,
-                "route_display": ctx["route_display"],
+                "aircraft": final_detected_aircraft,
+                "route_display": route_str,
                 "mode_display": ctx["mode_display"],
-                "autofps_active": is_autofps_active()
+                "autofps_active": is_autofps_active(),
+                "sim_rate": sim_rate,
+                "is_vr": is_vr
             }
+
+            if is_paused:
+                if not was_paused:
+                    was_paused = True
+                    pause_start_tick = time.time()
+                    pause_events.append({
+                        "elapsed_at_pause": elapsed,
+                        "time_str": time_formatted,
+                        "start_iso": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        "duration_sec": 0,
+                        "duration_str": "00:00"
+                    })
+                    # Log pause start row in CSV so timeline records the transition
+                    row = [
+                        datetime.now().strftime("%Y-%m-%d %H:%M:%S"), elapsed, time_formatted, mode_str,
+                        disp_fps if disp_fps is not None else '',
+                        base_fps if base_fps is not None else '',
+                        mt_ms if mt_ms is not None else '',
+                        tlod if tlod is not None else '',
+                        olod if olod is not None else '',
+                        agl if agl is not None else '',
+                        fpm if fpm is not None else '',
+                        fg_mode or '',
+                        cache_read_mbps, cache_read_mbs,
+                        v_used, v_total, v_pct,
+                        gpu.get('gpu_util_pct', 0), gpu.get('gpu_temp_c', 0), gpu.get('gpu_power_w', 0), gpu.get('gpu_clock_mhz', 0), gpu.get('gpu_mem_bus_pct', 0),
+                        msfs.get('ram_mb', 0) if msfs else 0, msfs.get('commit_mb', 0) if msfs else 0, 0,
+                        sys_ram_used, sys_ram_total,
+                        msfs_vram, sim_rate, int(is_vr), 1
+                    ]
+                    try:
+                        with open(csv_path, 'a', newline='', encoding='utf-8') as f:
+                            csv.writer(f).writerow(row)
+                    except Exception:
+                        pass
+                self._stop_event.wait(0.5)
+                continue
+            else:
+                if was_paused and pause_start_tick is not None:
+                    p_dur = max(0.0, time.time() - pause_start_tick)
+                    total_paused_sec += p_dur
+                    if pause_events:
+                        pause_events[-1]["duration_sec"] = round(p_dur, 1)
+                        pause_events[-1]["duration_str"] = format_time_delta(round(p_dur, 1))
+                    was_paused = False
+                    pause_start_tick = None
 
             row = [
                 datetime.now().strftime("%Y-%m-%d %H:%M:%S"), elapsed, time_formatted, mode_str,
@@ -2301,7 +3565,8 @@ class BlackboxSession:
                 v_used, v_total, v_pct,
                 gpu.get('gpu_util_pct', 0), gpu.get('gpu_temp_c', 0), gpu.get('gpu_power_w', 0), gpu.get('gpu_clock_mhz', 0), gpu.get('gpu_mem_bus_pct', 0),
                 msfs.get('ram_mb', 0) if msfs else 0, msfs.get('commit_mb', 0) if msfs else 0, 0,
-                sys_ram_used, sys_ram_total
+                sys_ram_used, sys_ram_total,
+                msfs_vram, sim_rate, int(is_vr), 0
             ]
             try:
                 with open(csv_path, 'a', newline='', encoding='utf-8') as f:
@@ -2335,18 +3600,69 @@ class BlackboxSession:
                 'msfs_ram': msfs.get('ram_mb', 0) if msfs else 0,
                 'msfs_commit': msfs.get('commit_mb', 0) if msfs else 0,
                 'sys_ram_used': sys_ram_used,
-                'sys_ram_total': sys_ram_total
+                'sys_ram_total': sys_ram_total,
+                'lat': lat,
+                'lon': lon,
+                'sim_rate': sim_rate,
+                'is_vr': is_vr,
+                'is_paused': False
             })
 
             self._stop_event.wait(0.5)
 
-        if samples:
+        if samples and len(samples) >= 6:
             last_sc = SIMCONNECT_CLIENT.get_data() if SIMCONNECT_CLIENT else {}
-            final_lat = last_sc.get('lat')
-            final_lon = last_sc.get('lon')
-            final_ground = last_sc.get('on_ground', False)
-            ctx = resolve_flight_context(final_lat, final_lon, final_ground)
-            final_aircraft = last_sc.get('aircraft') or aircraft or "Avion non détecté"
+            final_aircraft = best_detected_aircraft or last_sc.get('aircraft') or aircraft or "Aircraft not detected"
+
+            # -------------------------------------------------------------
+            # DÉTECTION FINALE DU DÉPART ET DE L'ARRIVÉE
+            # Si SimBrief existe, on le récupère. Sinon, détection GPS à l'arrêt.
+            # -------------------------------------------------------------
+            final_dep, final_arr, dep_name, arr_name, source = detect_flight_airports(
+                samples=samples,
+                first_valid_gps=first_valid_gps,
+                last_valid_gps=last_valid_gps,
+                first_ground_gps=first_ground_gps,
+                last_ground_gps=last_ground_gps,
+                initial_dep=initial_dep,
+                initial_arr=initial_arr
+            )
+
+            final_aircraft_slug = sanitize_aircraft_slug(final_aircraft)
+            final_prefix = f"{final_dep}_{final_arr}_{final_aircraft_slug}"
+            final_csv_filename = f"benchmark_{final_prefix}_{timestamp_str}.csv"
+            final_csv_path = os.path.join(benchmarks_dir, final_csv_filename)
+
+            # Renommer le fichier CSV avec les aéroports réels et l'appareil détecté
+            if csv_path != final_csv_path and os.path.exists(csv_path):
+                try:
+                    if os.path.exists(final_csv_path):
+                        os.remove(final_csv_path)
+                    os.rename(csv_path, final_csv_path)
+                    csv_path = final_csv_path
+                    self.current_csv_path = final_csv_path
+                    print(f"[Telemetry] Benchmark CSV finalized as: {final_csv_filename} ({source})")
+                except Exception as e:
+                    print(f"[Telemetry] Could not rename benchmark CSV: {e}")
+
+            # Route & mode formatting
+            if dep_name and arr_name:
+                route_display = f"{final_dep} ({dep_name}) ➔ {final_arr} ({arr_name})"
+            elif dep_name:
+                route_display = f"{final_dep} ({dep_name}) ➔ {final_arr}"
+            elif arr_name:
+                route_display = f"{final_dep} ➔ {final_arr} ({arr_name})"
+            else:
+                route_display = f"{final_dep} ➔ {final_arr}"
+
+            opt_state = detect_route_optimization_state()
+            if is_corridor and dis_count > 0:
+                mode_disp = ctx.get('mode_display', mode_str)
+            elif "SimBrief" in source or opt_state.get('has_simbrief'):
+                mode_disp = "BASELINE (SimBrief OFP • No Scenery Isolation)"
+            else:
+                mode_disp = f"BASELINE ({source})"
+
             cloud_status = check_autofps_cloud_events()
 
             smart_lod_info = {}
@@ -2361,24 +3677,63 @@ class BlackboxSession:
 
             session_info = {
                 'mode_str': mode_str,
-                'is_corridor': is_corridor,
+                'is_corridor': is_corridor and (dis_count > 0),
+                'disabled_count': dis_count if is_corridor else 0,
                 'start_time': timestamp_str,
-                'duration': format_time_delta(round(time.time() - start_time, 1)),
+                'duration': format_time_delta(round(elapsed_active_sec, 1)),
                 'aircraft': final_aircraft,
-                'route_display': ctx['route_display'],
-                'mode_display': ctx['mode_display'],
-                'dep': dep or cur_dep or ctx.get('dep'),
-                'arr': arr or cur_arr or ctx.get('arr'),
+                'route_display': route_display,
+                'mode_display': mode_disp,
+                'dep': final_dep,
+                'arr': final_arr,
+                'dep_name': dep_name,
+                'arr_name': arr_name,
+                'detection_source': source,
                 'autofps_config': autofps_cfg,
                 'autofps_active': autofps_is_active or is_autofps_active(),
                 'cloud_events': cloud_status,
-                'smart_lod': smart_lod_info
+                'smart_lod': smart_lod_info,
+                'network': get_flight_network_info(),
+                'graphics_profile': get_flight_graphics_profile(),
+                'pause_events': pause_events,
+                'total_paused_sec': round(total_paused_sec, 1),
+                'total_paused_str': format_time_delta(round(total_paused_sec, 1)),
+                'has_vr': any(s.get('is_vr') for s in samples),
+                'max_sim_rate': max(((s.get('sim_rate') or 1.0) for s in samples), default=1.0)
             }
-            html_file = generate_html_report(csv_path, session_info, samples)
-            self.last_report_path = html_file
+            try:
+                html_file = generate_html_report(csv_path, session_info, samples)
+                self.last_report_path = html_file
+            except Exception as e:
+                print(f"[Telemetry] Error generating HTML report: {e}")
+        else:
+            try:
+                if os.path.exists(csv_path):
+                    os.remove(csv_path)
+            except Exception:
+                pass
+            self.current_csv_path = None
+
+        self.is_running = False
+        self.latest_telemetry["is_tracking"] = False
+        self.latest_telemetry["is_paused"] = False
+        self.latest_telemetry["elapsed_sec"] = 0
+        self.latest_telemetry["elapsed_str"] = "00:00"
 
 
 BLACKBOX = BlackboxSession()
+
+import atexit
+
+def _on_perf_tracker_exit():
+    if BLACKBOX.is_running:
+        try:
+            print("[Telemetry] Application exit detected, auto-saving blackbox report...")
+            BLACKBOX.stop()
+        except Exception:
+            pass
+
+atexit.register(_on_perf_tracker_exit)
 
 if __name__ == '__main__':
     main()

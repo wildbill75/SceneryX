@@ -28,7 +28,7 @@ const LOCALES = {
         "rescan.sub_gsx": "Scanning GSX profile files in %APPDATA%\Virtuali\GSX\MSFS...",
         "rescan.detail_checking_gsx": "Checking profile matches and conflicts...",
         "rescan.gsx_profile_pill": "GSX Profile",
-        "gsx.audit_modal_title": "GSX Profiles Details",
+        "gsx.audit_modal_title": "GSX PROFILES DETAILS",
         "gsx.issue_single": "1 Issue",
         "gsx.issues_plural": "{count} Issues",
         "gsx.tab_all": "ALL",

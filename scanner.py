@@ -273,7 +273,9 @@ NON_AIRPORT_KEYWORDS = [
     'assetpack', 'asset-pack', 'sdr-pack', 'windy-things', 'palm_trees_library', 'vegetation-library',
     'totof-aircraft-library', 'dave-3d-people', 'seismic-library', 'vertical-obstructions', 'verticalobstructions', 'crowds', 'gliders',
     'asobo-aircraft', 'fs20-asobo-aircraft', 'fs24-asobo-aircraft', 'fnx-aircraft', 'flybywire-aircraft',
-    'fbw-a20n', 'fnx-livery', 'livery', 'aircraft', 'utility', 'toolbar', 'disastertracker',
+    'fbw-a20n', 'fnx-livery', 'livery', 'aircraft', 'utility', 'toolbar', 'disastertracker', 'fenix', 'fnx',
+    'pmdg', 'a220', 'a320', 'a319', 'a321', 'a350', 'b737', 'b747', 'b777', 'b787', 'crj', 'blackbox', 'maddog', 'tfdi',
+    'fleet', 'fleetpack', 'repaint', 'texturepack', 'soundpack',
     'fsdreamteam-gsx', 'gsx-pro', 'kt-gsx', 'papadelta-', 'navigraph', 'fsltl', 'airrace', 'redbull',
     'landmarks', 'landmark', 'aerial', 'cityscape', 'photogrammetry', 'seasons', 'biomes',
     'vfr-landmarks', 'vfr_landmarks', 'vfr-city', 'poilocalisation', 'worldupdate', 'world-update',
@@ -506,37 +508,176 @@ def get_world_update_name(icao, folder_name=""):
     if "worldupdate" in fn: return "Asobo World Update"
     return "Asobo Sim Update"
 
-SPECIAL_BUNDLE_MAP = {
-    # France VFR Paris VFR Airports (LFPB Le Bourget & LFPG are Asobo, remaining 7 are France VFR Payware)
-    'francevfr-airport-pidf-parisvfrairports': ['LFPN', 'LFPV', 'LFPQ', 'LFPT', 'LFPK', 'LFPL', 'LFPM'],
-    'fs20-francevfr-airport-pidf-parisvfrairports': ['LFPN', 'LFPV', 'LFPQ', 'LFPT', 'LFPK', 'LFPL', 'LFPM'],
+# Exhaustive France VFR Regional & Commercial Airport Packs Catalog
+FRANCE_VFR_BUNDLES = {
+    # 1. Airport FRANCE Pack 1 (Commercial Hubs: Bordeaux, Clermont-Ferrand, Brest, Strasbourg, Montpellier)
+    'apt1': ['LFBD', 'LFLC', 'LFRB', 'LFST', 'LFMT'],
+    'apt1-airportfrance-pack1': ['LFBD', 'LFLC', 'LFRB', 'LFST', 'LFMT'],
+    'airport-apt1-airportfrance-pack1': ['LFBD', 'LFLC', 'LFRB', 'LFST', 'LFMT'],
+    'airportfrance-pack1': ['LFBD', 'LFLC', 'LFRB', 'LFST', 'LFMT'],
 
-    # France VFR Airport FRANCE Pack 1
-    'francevfr-airport-apt1-airportfrance-pack1': ['LFBD', 'LFMT', 'LFRB'],
-    'fs20-francevfr-airport-apt1-airportfrance-pack1': ['LFBD', 'LFMT', 'LFRB'],
+    # 2. Airport FRANCE Pack 2 (Commercial Hubs: Beauvais, Chambery, Lille, Perpignan, Rennes)
+    'apt2': ['LFOB', 'LFLB', 'LFQQ', 'LFMP', 'LFRN'],
+    'apt2-airportfrance-pack2': ['LFOB', 'LFLB', 'LFQQ', 'LFMP', 'LFRN'],
+    'airport-apt2-airportfrance-pack2': ['LFOB', 'LFLB', 'LFQQ', 'LFMP', 'LFRN'],
+    'airportfrance-pack2': ['LFOB', 'LFLB', 'LFQQ', 'LFMP', 'LFRN'],
 
-    # France VFR Sud Est Airports Bundle
-    'francevfr-800-sevfrairports': [
+    # 3. Airport FRANCE Pack 3 (Commercial Hubs: Marseille, Bale-Mulhouse, Tarbes-Lourdes, Metz-Nancy, Caen)
+    'apt3': ['LFML', 'LFSB', 'LFBT', 'LFJL', 'LFRK'],
+    'apt3-airportfrance-pack3': ['LFML', 'LFSB', 'LFBT', 'LFJL', 'LFRK'],
+    'airport-apt3-airportfrance-pack3': ['LFML', 'LFSB', 'LFBT', 'LFJL', 'LFRK'],
+    'airportfrance-pack3': ['LFML', 'LFSB', 'LFBT', 'LFJL', 'LFRK'],
+
+    # 4. Airport FRANCE Pack 4 (Commercial Hubs: La Rochelle, Pau, Calvi, Ajaccio, Nantes)
+    'apt4': ['LFBH', 'LFBP', 'LFKC', 'LFKJ', 'LFRS'],
+    'apt4-airportfrance-pack4': ['LFBH', 'LFBP', 'LFKC', 'LFKJ', 'LFRS'],
+    'airport-apt4-airportfrance-pack4': ['LFBH', 'LFBP', 'LFKC', 'LFKJ', 'LFRS'],
+    'airportfrance-pack4': ['LFBH', 'LFBP', 'LFKC', 'LFKJ', 'LFRS'],
+
+    # 5. Paris VFR Airports (Ile-de-France regional aerodromes)
+    'pidf-parisvfrairports': ['LFPN', 'LFPV', 'LFPQ', 'LFPT', 'LFPK', 'LFPL', 'LFPM'],
+    'airport-pidf-parisvfrairports': ['LFPN', 'LFPV', 'LFPQ', 'LFPT', 'LFPK', 'LFPL', 'LFPM'],
+    'parisvfrairports': ['LFPN', 'LFPV', 'LFPQ', 'LFPT', 'LFPK', 'LFPL', 'LFPM'],
+
+    # 6. Sud-Est VFR Airports
+    'sevfrairports': [
         'LFHH', 'LFHN', 'LFHS', 'LFHV', 'LFKA', 'LFKO', 'LFKS', 'LFKT', 'LFLG', 'LFLI', 'LFLP', 'LFLQ', 
         'LFLU', 'LFLY', 'LFMA', 'LFMC', 'LFMD', 'LFME', 'LFMH', 'LFMI', 'LFMO', 'LFMQ', 'LFMR', 'LFMV', 
         'LFMY', 'LFMZ', 'LFNB', 'LFNF', 'LFNR', 'LFNT', 'LFTH', 'LFTZ', 'LFYS'
     ],
-    'francevfr-800-marseille': ['LFML'],
+    '800-sevfrairports': [
+        'LFHH', 'LFHN', 'LFHS', 'LFHV', 'LFKA', 'LFKO', 'LFKS', 'LFKT', 'LFLG', 'LFLI', 'LFLP', 'LFLQ', 
+        'LFLU', 'LFLY', 'LFMA', 'LFMC', 'LFMD', 'LFME', 'LFMH', 'LFMI', 'LFMO', 'LFMQ', 'LFMR', 'LFMV', 
+        'LFMY', 'LFMZ', 'LFNB', 'LFNF', 'LFNR', 'LFNT', 'LFTH', 'LFTZ', 'LFYS'
+    ],
 
-    # iniBuilds Skydive Dubai & Landmarks
+    # 7. Sud-Ouest VFR Airports
+    'sovfrairports': [
+        'LFBA', 'LFBC', 'LFBE', 'LFBF', 'LFBG', 'LFBM', 'LFBS', 'LFBU', 'LFBX', 'LFBY', 'LFCA', 'LFCB', 
+        'LFCC', 'LFCD', 'LFCH', 'LFCI', 'LFCK', 'LFCL', 'LFCN', 'LFCR', 'LFCY', 'LFCZ', 'LFDM', 'LFDN', 
+        'LFDP', 'LFDT', 'LFDX', 'LFES', 'LFIT', 'LFSL', 'LFSM', 'LFTM'
+    ],
+    '800-sovfrairports': [
+        'LFBA', 'LFBC', 'LFBE', 'LFBF', 'LFBG', 'LFBM', 'LFBS', 'LFBU', 'LFBX', 'LFBY', 'LFCA', 'LFCB', 
+        'LFCC', 'LFCD', 'LFCH', 'LFCI', 'LFCK', 'LFCL', 'LFCN', 'LFCR', 'LFCY', 'LFCZ', 'LFDM', 'LFDN', 
+        'LFDP', 'LFDT', 'LFDX', 'LFES', 'LFIT', 'LFSL', 'LFSM', 'LFTM'
+    ],
+
+    # 8. Nord-Ouest VFR Airports
+    'novfrairports': [
+        'LFAB', 'LFAE', 'LFAL', 'LFAU', 'LFEA', 'LFEB', 'LFEC', 'LFED', 'LFEQ', 'LFES', 'LFEY', 'LFJR', 
+        'LFOE', 'LFOD', 'LFOO', 'LFOS', 'LFOV', 'LFRC', 'LFRD', 'LFRF', 'LFRG', 'LFRH', 'LFRI', 'LFRJ', 
+        'LFRM', 'LFRO', 'LFRT', 'LFRU', 'LFRV', 'LFRW', 'LFRZ', 'LFTQ'
+    ],
+    '800-novfrairports': [
+        'LFAB', 'LFAE', 'LFAL', 'LFAU', 'LFEA', 'LFEB', 'LFEC', 'LFED', 'LFEQ', 'LFES', 'LFEY', 'LFJR', 
+        'LFOE', 'LFOD', 'LFOO', 'LFOS', 'LFOV', 'LFRC', 'LFRD', 'LFRF', 'LFRG', 'LFRH', 'LFRI', 'LFRJ', 
+        'LFRM', 'LFRO', 'LFRT', 'LFRU', 'LFRV', 'LFRW', 'LFRZ', 'LFTQ'
+    ],
+
+    # 9. Nord-Est VFR Airports
+    'nevfrairports': [
+        'LFAC', 'LFAD', 'LFAQ', 'LFAT', 'LFGA', 'LFGB', 'LFGC', 'LFGD', 'LFGE', 'LFGJ', 'LFGK', 'LFGO', 
+        'LFGP', 'LFGQ', 'LFGV', 'LFGY', 'LFHJ', 'LFHQ', 'LFHY', 'LFIG', 'LFIH', 'LFIK', 'LFJL', 'LFJS', 
+        'LFJY', 'LFOB', 'LFOJ', 'LFOR', 'LFOV', 'LFQK', 'LFQT', 'LFQU', 'LFQV', 'LFQW', 'LFQX', 'LFQY', 'LFQZ'
+    ],
+    '800-nevfrairports': [
+        'LFAC', 'LFAD', 'LFAQ', 'LFAT', 'LFGA', 'LFGB', 'LFGC', 'LFGD', 'LFGE', 'LFGJ', 'LFGK', 'LFGO', 
+        'LFGP', 'LFGQ', 'LFGV', 'LFGY', 'LFHJ', 'LFHQ', 'LFHY', 'LFIG', 'LFIH', 'LFIK', 'LFJL', 'LFJS', 
+        'LFJY', 'LFOB', 'LFOJ', 'LFOR', 'LFOV', 'LFQK', 'LFQT', 'LFQU', 'LFQV', 'LFQW', 'LFQX', 'LFQY', 'LFQZ'
+    ],
+
+    # 10. Centre VFR Airports
+    'centrevfrairports': [
+        'LFBJ', 'LFBK', 'LFCE', 'LFEF', 'LFEM', 'LFFV', 'LFGF', 'LFGI', 'LFGZ', 'LFHA', 'LFHP', 'LFHQ', 
+        'LFHR', 'LFHX', 'LFHY', 'LFJO', 'LFOA', 'LFOI', 'LFOP', 'LFOT', 'LFOX', 'LFPI', 'LFRU', 'LFSU', 'LFTL', 'LFTU'
+    ],
+    '800-centrevfrairports': [
+        'LFBJ', 'LFBK', 'LFCE', 'LFEF', 'LFEM', 'LFFV', 'LFGF', 'LFGI', 'LFGZ', 'LFHA', 'LFHP', 'LFHQ', 
+        'LFHR', 'LFHX', 'LFHY', 'LFJO', 'LFOA', 'LFOI', 'LFOP', 'LFOT', 'LFOX', 'LFPI', 'LFRU', 'LFSU', 'LFTL', 'LFTU'
+    ],
+    'vfrcentrairports': [
+        'LFBJ', 'LFBK', 'LFCE', 'LFEF', 'LFEM', 'LFFV', 'LFGF', 'LFGI', 'LFGZ', 'LFHA', 'LFHP', 'LFHQ', 
+        'LFHR', 'LFHX', 'LFHY', 'LFJO', 'LFOA', 'LFOI', 'LFOP', 'LFOT', 'LFOX', 'LFPI', 'LFRU', 'LFSU', 'LFTL', 'LFTU'
+    ],
+    '800-vfrcentrairports': [
+        'LFBJ', 'LFBK', 'LFCE', 'LFEF', 'LFEM', 'LFFV', 'LFGF', 'LFGI', 'LFGZ', 'LFHA', 'LFHP', 'LFHQ', 
+        'LFHR', 'LFHX', 'LFHY', 'LFJO', 'LFOA', 'LFOI', 'LFOP', 'LFOT', 'LFOX', 'LFPI', 'LFRU', 'LFSU', 'LFTL', 'LFTU'
+    ],
+
+    # 11. Corse VFR Airports
+    'corsevfrairports': ['LFKB', 'LFKF', 'LFKC', 'LFKJ', 'LFKS'],
+    '800-corsevfrairports': ['LFKB', 'LFKF', 'LFKC', 'LFKJ', 'LFKS'],
+    'vfrcorseairports': ['LFKB', 'LFKF', 'LFKC', 'LFKJ', 'LFKS'],
+    'airport-lfkb-bastia': ['LFKB'],
+    'lfkb-bastia': ['LFKB'],
+
+    # 12. Marseille Provence
+    '800-marseille': ['LFML'],
+    'marseille': ['LFML'],
+
+    # 13. iniBuilds Skydive Dubai
     'inibuilds-airport-omdu-skydive-dubai': ['OMDU'],
-    'fs24-inibuilds-airport-omdu-skydive-dubai': ['OMDU'],
-    'fs20-inibuilds-airport-omdu-skydive-dubai': ['OMDU'],
-    'airport-omdu-skydive-dubai': ['OMDU']
+    'airport-omdu-skydive-dubai': ['OMDU'],
+    'omdu-skydive-dubai': ['OMDU']
 }
+
+SPECIAL_BUNDLE_MAP = {}
+for base_k, icaos in FRANCE_VFR_BUNDLES.items():
+    SPECIAL_BUNDLE_MAP[base_k] = icaos
+    clean_k = base_k[4:] if base_k.startswith('800-') else base_k
+    prefixes = [
+        "", "francevfr-", "fs20-francevfr-", "fs24-francevfr-",
+        "community-francevfr-", "communityfs20-francevfr-", "communityfs24-francevfr-",
+        "official-francevfr-", "officialfs20-francevfr-", "officialfs24-francevfr-",
+        "francevfr-800-", "fs20-francevfr-800-", "fs24-francevfr-800-",
+        "community-francevfr-800-", "communityfs20-francevfr-800-", "communityfs24-francevfr-800-",
+        "official-francevfr-800-", "officialfs20-francevfr-800-", "officialfs24-francevfr-800-"
+    ]
+    for pfx in prefixes:
+        SPECIAL_BUNDLE_MAP[f"{pfx}{base_k}"] = icaos
+        SPECIAL_BUNDLE_MAP[f"{pfx}{clean_k}"] = icaos
 
 BUNDLE_PACKAGE_PRICES = {
     'francevfr-airport-pidf-parisvfrairports': {'price': 29.90, 'name': 'France VFR - Paris VFR Airports Pack'},
     'fs20-francevfr-airport-pidf-parisvfrairports': {'price': 29.90, 'name': 'France VFR - Paris VFR Airports Pack'},
+    'fs24-francevfr-airport-pidf-parisvfrairports': {'price': 29.90, 'name': 'France VFR - Paris VFR Airports Pack'},
     'francevfr-airport-apt1-airportfrance-pack1': {'price': 29.90, 'name': 'France VFR - Airport France Pack 1'},
     'fs20-francevfr-airport-apt1-airportfrance-pack1': {'price': 29.90, 'name': 'France VFR - Airport France Pack 1'},
+    'fs24-francevfr-airport-apt1-airportfrance-pack1': {'price': 29.90, 'name': 'France VFR - Airport France Pack 1'},
+    'francevfr-airport-apt2-airportfrance-pack2': {'price': 29.90, 'name': 'France VFR - Airport France Pack 2'},
+    'fs20-francevfr-airport-apt2-airportfrance-pack2': {'price': 29.90, 'name': 'France VFR - Airport France Pack 2'},
+    'fs24-francevfr-airport-apt2-airportfrance-pack2': {'price': 29.90, 'name': 'France VFR - Airport France Pack 2'},
+    'francevfr-airport-apt3-airportfrance-pack3': {'price': 29.90, 'name': 'France VFR - Airport France Pack 3'},
+    'fs20-francevfr-airport-apt3-airportfrance-pack3': {'price': 29.90, 'name': 'France VFR - Airport France Pack 3'},
+    'fs24-francevfr-airport-apt3-airportfrance-pack3': {'price': 29.90, 'name': 'France VFR - Airport France Pack 3'},
+    'francevfr-airport-apt4-airportfrance-pack4': {'price': 29.90, 'name': 'France VFR - Airport France Pack 4'},
+    'fs20-francevfr-airport-apt4-airportfrance-pack4': {'price': 29.90, 'name': 'France VFR - Airport France Pack 4'},
+    'fs24-francevfr-airport-apt4-airportfrance-pack4': {'price': 29.90, 'name': 'France VFR - Airport France Pack 4'},
     'francevfr-800-sevfrairports': {'price': 24.90, 'name': 'France VFR - Sud-Est VFR Airports Pack'},
-    'francevfr-800-marseille': {'price': 14.99, 'name': 'France VFR - Marseille Airport'},
+    'fs20-francevfr-800-sevfrairports': {'price': 24.90, 'name': 'France VFR - Sud-Est VFR Airports Pack'},
+    'fs24-francevfr-800-sevfrairports': {'price': 24.90, 'name': 'France VFR - Sud-Est VFR Airports Pack'},
+    'francevfr-800-sovfrairports': {'price': 24.90, 'name': 'France VFR - Sud-Ouest VFR Airports Pack'},
+    'fs20-francevfr-800-sovfrairports': {'price': 24.90, 'name': 'France VFR - Sud-Ouest VFR Airports Pack'},
+    'fs24-francevfr-800-sovfrairports': {'price': 24.90, 'name': 'France VFR - Sud-Ouest VFR Airports Pack'},
+    'francevfr-800-novfrairports': {'price': 24.90, 'name': 'France VFR - Nord-Ouest VFR Airports Pack'},
+    'fs20-francevfr-800-novfrairports': {'price': 24.90, 'name': 'France VFR - Nord-Ouest VFR Airports Pack'},
+    'fs24-francevfr-800-novfrairports': {'price': 24.90, 'name': 'France VFR - Nord-Ouest VFR Airports Pack'},
+    'francevfr-800-nevfrairports': {'price': 24.90, 'name': 'France VFR - Nord-Est VFR Airports Pack'},
+    'fs20-francevfr-800-nevfrairports': {'price': 24.90, 'name': 'France VFR - Nord-Est VFR Airports Pack'},
+    'fs24-francevfr-800-nevfrairports': {'price': 24.90, 'name': 'France VFR - Nord-Est VFR Airports Pack'},
+    'francevfr-800-centrevfrairports': {'price': 24.90, 'name': 'France VFR - Centre VFR Airports Pack'},
+    'fs20-francevfr-800-centrevfrairports': {'price': 24.90, 'name': 'France VFR - Centre VFR Airports Pack'},
+    'fs24-francevfr-800-centrevfrairports': {'price': 24.90, 'name': 'France VFR - Centre VFR Airports Pack'},
+    'francevfr-800-corsevfrairports': {'price': 19.90, 'name': 'France VFR - Corse VFR Airports Pack'},
+    'fs20-francevfr-800-corsevfrairports': {'price': 19.90, 'name': 'France VFR - Corse VFR Airports Pack'},
+    'fs24-francevfr-800-corsevfrairports': {'price': 19.90, 'name': 'France VFR - Corse VFR Airports Pack'},
+    'francevfr-800-marseille': {'price': 14.99, 'name': 'France VFR - Marseille Provence Airport'},
+    'fs20-francevfr-800-marseille': {'price': 14.99, 'name': 'France VFR - Marseille Provence Airport'},
+    'fs24-francevfr-800-marseille': {'price': 14.99, 'name': 'France VFR - Marseille Provence Airport'},
+    'francevfr-airport-lfkb-bastia': {'price': 14.99, 'name': 'France VFR - Bastia Poretta Airport'},
+    'fs20-francevfr-airport-lfkb-bastia': {'price': 14.99, 'name': 'France VFR - Bastia Poretta Airport'},
+    'fs24-francevfr-airport-lfkb-bastia': {'price': 14.99, 'name': 'France VFR - Bastia Poretta Airport'},
 }
 
 # Known Real Retail Prices Catalog in EUR (€)
@@ -1998,6 +2139,9 @@ def run_scan():
     custom_prices = load_custom_prices()
     folder_size_cache = load_folder_size_cache()
     scan_paths_cfg = settings.get("scan_paths", [])
+    flight_mode_cfg = settings.get("flight_mode", {})
+    flight_mode_active = bool(flight_mode_cfg.get("active", False))
+    flight_keep_icaos = set(k.upper() for k in flight_mode_cfg.get("icaos", []))
 
     content_xml_status = {}
     content_xml_packages = []
@@ -2134,11 +2278,69 @@ def run_scan():
             or os.path.isdir(os.path.join(full_path, 'Scenery.disabled'))
         )
 
+        # ABSOLUTE IMMUNITY: Non-scenery packages (Aircraft, Liveries, Tools, Avionics, Core)
+        # must NEVER be registered or treated as airports, regardless of folder name or title tokens.
+        if manifest_ctype in ['AIRCRAFT', 'LIVERY', 'TOOL', 'MISC', 'INSTRUMENT', 'CORE', 'LIBRARY', 'AVIONICS', 'MODEL', 'TEXTURE']:
+            continue
+
+        # Structural check: Any package containing aircraft, rotorcraft or boat SimObjects is strictly immune
+        has_simobjects_aircraft = (
+            os.path.isdir(os.path.join(full_path, 'SimObjects', 'Airplanes'))
+            or os.path.isdir(os.path.join(full_path, 'SimObjects', 'Rotorcraft'))
+            or os.path.isdir(os.path.join(full_path, 'SimObjects', 'Airplanes.disabled'))
+            or os.path.isdir(os.path.join(full_path, 'SimObjects', 'Rotorcraft.disabled'))
+            or os.path.isdir(os.path.join(full_path, 'SimObjects', 'Boats'))
+            or os.path.isdir(os.path.join(full_path, 'SimObjects', 'Boats.disabled'))
+        )
+        if has_simobjects_aircraft:
+            continue
+
+        # Check if package is streamed, dynamically discovered from Content.xml, or packaged in .fsarchive containers
+        is_streamed = 'streamed' in cat.lower() or 'streamed' in full_path.lower() or not full_path
+        has_fsarchive = False
+        if full_path and os.path.isdir(full_path):
+            try:
+                has_fsarchive = any(f.endswith('.fsarchive') for f in os.listdir(full_path) if os.path.isfile(os.path.join(full_path, f)))
+                if not has_fsarchive and os.path.isdir(os.path.join(full_path, 'content')):
+                    has_fsarchive = any(f.endswith('.fsarchive') for f in os.listdir(os.path.join(full_path, 'content')))
+            except Exception:
+                pass
+
+        # A loose scenery package in Community MUST have a scenery directory or compiled scenery .bgl files
+        if not is_streamed and not has_fsarchive:
+            if not has_scenery_dir:
+                has_bgl = False
+                lpath_check = os.path.join(full_path, 'layout.json')
+                if not os.path.exists(lpath_check):
+                    lpath_check = os.path.join(full_path, 'layout.json.disabled')
+                if os.path.exists(lpath_check):
+                    try:
+                        with open(lpath_check, 'r', encoding='utf-8', errors='ignore') as f:
+                            ld = json.load(f)
+                            has_bgl = any(c.get('path', '').lower().endswith('.bgl') for c in ld.get('content', []))
+                    except Exception:
+                        pass
+                if not has_bgl:
+                    for root, dirs, files in os.walk(full_path):
+                        if any(fl.lower().endswith(('.bgl', '.bgl.disabled')) for fl in files):
+                            has_bgl = True
+                            break
+                if not has_bgl:
+                    continue
+
         tokens = re.split(r'[-_ ]+', fn_lower)
-        has_explicit_icao = any(len(t) == 4 and t.isalpha() and t.upper() in airports and t.lower() not in EXCLUDE_WORDS for t in tokens)
+        # Never match ICAO on tokens that indicate aircraft models or liveries (e.g. fnxa320 -> FNXA)
+        safe_tokens = [
+            t for t in tokens
+            if not any(k in t.lower() for k in [
+                'fnx', 'fenix', 'a320', 'a319', 'a321', 'a350', 'a220', 'b737', 'b747',
+                'b777', 'b787', 'crj', 'pmdg', 'fslabs', 'fleet', 'livery', 'liveries'
+            ])
+        ]
+        has_explicit_icao = any(len(t) == 4 and t.isalpha() and t.upper() in airports and t.lower() not in EXCLUDE_WORDS for t in safe_tokens)
 
         if not has_explicit_icao:
-            for t in tokens:
+            for t in safe_tokens:
                 m = re.match(r'^([a-zA-Z]{4})(?:light|fix|lighting|night|scene|patch|jetway|taxiway|rwy|runway|\d)', t)
                 if m and m.group(1).upper() in airports and m.group(1).lower() not in EXCLUDE_WORDS:
                     has_explicit_icao = True
@@ -2148,10 +2350,6 @@ def run_scan():
             m_tokens = re.findall(r'(?:^|[-_ \d])([A-Za-z]{4})(?=$|[-_ \d])', manifest_title)
             if any(tok.upper() in airports and tok.lower() not in EXCLUDE_WORDS for tok in m_tokens):
                 has_explicit_icao = True
-
-        if manifest_ctype in ['AIRCRAFT', 'LIVERY', 'TOOL', 'MISC', 'INSTRUMENT', 'CORE', 'LIBRARY']:
-            if not has_explicit_icao and not has_scenery_dir:
-                continue
 
         # Filter out generic global asset libraries that have no ICAO code in folder name
         if any(k in fn_lower for k in ['assetpack', 'vegetation-library', 'windy-things', 'palm_trees_library', 'fly-in-library', 'libraryv14', 'object-library', 'objects-library']):
@@ -2182,15 +2380,14 @@ def run_scan():
         )
         is_addon_package = (not is_official_asobo_base and fn_lower not in MAIN_SCENERY_EXCEPTIONS) and (is_fix_patch or any(k in fn_lower for k in ADDON_LIBRARY_KEYWORDS))
 
-        if fn_lower in SPECIAL_BUNDLE_MAP:
-            bundle_icaos = SPECIAL_BUNDLE_MAP[fn_lower]
+        bundle_icaos = SPECIAL_BUNDLE_MAP.get(fn_lower) or SPECIAL_BUNDLE_MAP.get(fn_norm)
+        if bundle_icaos:
             for icao in bundle_icaos:
                 if icao in airports:
                     found_ap_list.append((airports[icao], f"Special Bundle Map ({icao})"))
 
         # Primary token matching on folder name
-        tokens = re.split(r'[-_ ]+', fn_lower)
-        for t in tokens:
+        for t in safe_tokens:
             t_upper = t.upper()
             if len(t_upper) == 4 and t_upper in airports and t.lower() not in EXCLUDE_WORDS:
                 found_ap_list.append((airports[t_upper], f"Folder ICAO ({t_upper})"))
@@ -2198,11 +2395,16 @@ def run_scan():
 
         # Folder prefix matching (e.g. lirflightfix20 -> LIRF)
         if not found_ap_list:
-            for t in tokens:
+            for t in safe_tokens:
                 m = re.match(r'^([a-zA-Z]{4})(?:light|fix|lighting|night|scene|patch|jetway|taxiway|rwy|runway|\d)', t)
                 if m:
                     cand = m.group(1).upper()
-                    if cand in airports and cand.lower() not in EXCLUDE_WORDS:
+                    if (
+                        cand in airports
+                        and cand.lower() not in EXCLUDE_WORDS
+                        and not any(k in t.lower() for k in ['fnx', 'fenix', 'a320', 'a319', 'a321', 'a350', 'a220', 'b737', 'b738', 'fleet', 'livery'])
+                        and not any(k in cand.lower() for k in ['fnx', 'fen'])
+                    ):
                         found_ap_list.append((airports[cand], f"Folder Prefix ICAO ({cand})"))
                         break
 
@@ -2216,7 +2418,8 @@ def run_scan():
                     break
 
         # Layout BGL path matching (only inspect actual compiled .bgl files)
-        if not found_ap_list:
+        is_bundle_candidate = any(k in fn_lower for k in ['vfr', 'airports', 'pack', 'bundle', 'francevfr', 'fvfr'])
+        if not found_ap_list or is_bundle_candidate:
             lpath = os.path.join(full_path, 'layout.json')
             if not os.path.exists(lpath):
                 lpath = os.path.join(full_path, 'layout.json.disabled')
@@ -2228,14 +2431,36 @@ def run_scan():
                         bgl_entries = [c.get('path', '') for c in entries if c.get('path', '').lower().endswith('.bgl')]
                         bgl_icaos = set()
                         for bpath in bgl_entries:
-                            m = re.findall(r'(?:^|[/\-_])([a-zA-Z]{4})(?:[-_.](?:airport|scenery|ap|runway|fix|patch))?\.bgl', bpath, re.IGNORECASE)
+                            m = re.findall(r'(?:^|[/\-_]|obj_)([a-zA-Z]{4})(?:[-_.](?:airport|scenery|ap|runway|fix|patch))?\.bgl', bpath, re.IGNORECASE)
                             bgl_icaos.update(m)
+                            m_obj = re.findall(r'obj_([a-zA-Z]{4})\.bgl', bpath, re.IGNORECASE)
+                            bgl_icaos.update(m_obj)
                             m2 = re.findall(r'scenery[/\\](?:airports[/\\])?(?:world[/\\]scenery[/\\])?(?:airport-)?([A-Za-z]{4})[._/\\]', bpath, re.IGNORECASE)
                             bgl_icaos.update(m2)
                         for tok in bgl_icaos:
                             tok_u = tok.upper()
                             if tok_u in airports and tok.lower() not in EXCLUDE_WORDS:
-                                found_ap_list.append((airports[tok_u], f"Layout BGL ({tok_u})"))
+                                if not any(ap_item[0]['ident'] == tok_u for ap_item in found_ap_list):
+                                    found_ap_list.append((airports[tok_u], f"Layout BGL ({tok_u})"))
+                except Exception:
+                    pass
+
+            # Physical directory scan fallback for multi-airport packs on disk without or alongside layout.json
+            if is_bundle_candidate and os.path.isdir(full_path):
+                try:
+                    disk_bgl_icaos = set()
+                    for root, dirs, files in os.walk(full_path):
+                        dirs[:] = [d for d in dirs if d.lower() not in ('texture', 'textures', 'materiallibs', 'sound', 'modellib', 'html_ui', 'model', 'effects', 'weather', 'visualeffects', 'ai')]
+                        for f in files:
+                            f_l = f.lower()
+                            if f_l.endswith('.bgl') or f_l.endswith('.bgl.disabled'):
+                                m_d = re.findall(r'(?:^|[/\-_]|obj_)([a-zA-Z]{4})(?:[-_.].*)?\.bgl', f_l)
+                                disk_bgl_icaos.update(m_d)
+                    for tok in disk_bgl_icaos:
+                        tok_u = tok.upper()
+                        if tok_u in airports and tok.lower() not in EXCLUDE_WORDS:
+                            if not any(ap_item[0]['ident'] == tok_u for ap_item in found_ap_list):
+                                found_ap_list.append((airports[tok_u], f"Disk BGL Scan ({tok_u})"))
                 except Exception:
                     pass
 
@@ -2587,14 +2812,19 @@ def run_scan():
         # Active sources calculation
         active_sources = [s for s in item['all_sources'] if not s.get('is_disabled')]
 
-        # If all installed custom/Asobo packages are disabled, fallback to Default MSFS
-        if len(active_sources) == 0:
-            item['pricing_type'] = 'Default'
-            item['vendor'] = 'Microsoft Flight Simulator (Default)'
-            item['is_addon'] = False
-            item['is_disabled'] = False
+        if flight_mode_active and flight_keep_icaos:
+            if item['icao'].upper() not in flight_keep_icaos:
+                item['is_disabled'] = True
+                for s in item['all_sources']:
+                    s['is_disabled'] = True
+            else:
+                item['is_disabled'] = False
         else:
-            item['is_disabled'] = False
+            non_default_sources = [s for s in item['all_sources'] if not (s.get('is_default') or (s.get('folder_name') and s.get('folder_name', '').startswith('msfs-default-')))]
+            if non_default_sources and all(s.get('is_disabled') for s in non_default_sources):
+                item['is_disabled'] = True
+            else:
+                item['is_disabled'] = False
 
         # Detect TRUE Scenery Conflicts (multiple active PRIMARY main scenery packages)
         active_primary_installs = [s for s in item['all_sources'] if not s.get('is_disabled') and not s.get('is_addon') and not s.get('is_fix_patch')]
