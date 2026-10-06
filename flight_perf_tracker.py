@@ -1325,6 +1325,7 @@ class SimConnectTelemetryClient:
 
 SIMCONNECT_CLIENT = SimConnectTelemetryClient()
 SIMCONNECT_CLIENT.start()
+_last_telemetry_cache = None
 
 def get_sceneryx_flight_mode():
     appdata = os.getenv('APPDATA', '')
@@ -3286,6 +3287,11 @@ class BlackboxSession:
             telemetry["msfs_ram_mb"] = msfs.get("ram_mb", 0)
             telemetry["msfs_vram_mb"] = msfs.get("vram_mb", 0.0)
             telemetry["msfs_cpu_pct"] = msfs.get("cpu_pct", 0)
+
+        telemetry["agl_ft"] = sc_data.get("agl_ft")
+        telemetry["on_ground"] = sc_data.get("on_ground", False if (sc_data.get("agl_ft") is not None and sc_data.get("agl_ft") > 80) else True)
+        global _last_telemetry_cache
+        _last_telemetry_cache = telemetry
         return telemetry
 
 

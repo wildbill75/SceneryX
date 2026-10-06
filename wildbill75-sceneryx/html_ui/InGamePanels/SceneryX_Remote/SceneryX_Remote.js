@@ -184,7 +184,8 @@ checkAutoload();
             axis: axis,
             base: baseVal,
             target: targetVal,
-            altitude: altVal
+            altitude: altVal,
+            enabled: true
         }));
     }
 
@@ -584,6 +585,10 @@ checkAutoload();
         }
 
         if (floorRange) {
+            floorRange.addEventListener("mousedown", function () {
+                floorRange.style.zIndex = "30";
+                if (cruiseRange) cruiseRange.style.zIndex = "10";
+            });
             floorRange.addEventListener("input", function () {
                 let fVal = parseInt(floorRange.value, 10);
                 let cVal = parseInt(cruiseRange.value, 10);
@@ -607,6 +612,10 @@ checkAutoload();
         }
 
         if (cruiseRange) {
+            cruiseRange.addEventListener("mousedown", function () {
+                cruiseRange.style.zIndex = "30";
+                if (floorRange) floorRange.style.zIndex = "10";
+            });
             cruiseRange.addEventListener("input", function () {
                 let fVal = parseInt(floorRange.value, 10);
                 let cVal = parseInt(cruiseRange.value, 10);

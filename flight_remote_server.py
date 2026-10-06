@@ -15,7 +15,7 @@ from typing import Optional, Dict, Any
 SERVER_PORT = 8383
 _server_instance: Optional[HTTPServer] = None
 _server_thread: Optional[threading.Thread] = None
-_LAST_MANUAL_LOD: Dict[str, float] = {"tlod": 100.0, "olod": 100.0}
+_LAST_MANUAL_LOD: Dict[str, float] = {}
 
 
 class ThreadingSimpleServer(socketserver.ThreadingMixIn, HTTPServer):
@@ -45,11 +45,11 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         clean_path = parsed.path
-        if clean_path == "/api/telemetry":
+        if clean_path in ("/api/telemetry", "/telemetry"):
             self._handle_get_telemetry()
-        elif clean_path == "/api/status":
+        elif clean_path in ("/api/status", "/status"):
             self._send_json(200, {"status": "ok", "app": "SceneryX"})
-        elif clean_path == "/api/smart_lod/set_lod":
+        elif clean_path in ("/api/smart_lod/set_lod", "/smart_lod/set_lod"):
             query_params = urllib.parse.parse_qs(parsed.query)
             params = {}
             if "tlod" in query_params:
@@ -152,6 +152,8 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
         lod_status = {}
         cur_tlod = None
         cur_olod = None
+        lod_ctrl = None
+        mem = None
         try:
             import flight_lod_controller
             lod_ctrl = flight_lod_controller.get_smart_lod_controller()
@@ -219,11 +221,11 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
         cache_mbps = telem.get("cache_read_mbps", 0.0) or 0.0
         is_tracking = bool(telem.get("is_tracking", False))
 
-        tlod_is_manual = bool(getattr(lod_ctrl, "manual_tlod", None) is not None or "tlod" in _LAST_MANUAL_LOD)
-        olod_is_manual = bool(getattr(lod_ctrl, "manual_olod", None) is not None or "olod" in _LAST_MANUAL_LOD)
+        tlod_is_manual = bool((lod_ctrl and getattr(lod_ctrl, "manual_tlod", None) is not None) or "tlod" in _LAST_MANUAL_LOD)
+        olod_is_manual = bool((lod_ctrl and getattr(lod_ctrl, "manual_olod", None) is not None) or "olod" in _LAST_MANUAL_LOD)
         is_vr_mode = False
         try:
-            if mem.is_attached:
+            if mem and mem.is_attached:
                 is_vr_mode = mem.is_vr_active()
         except Exception:
             pass
@@ -245,6 +247,7 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
             "sim_connected": bool(telem.get("simconnect_connected", False)),
             "msfs_active": bool(telem.get("msfs_active", False)),
             "is_vr": is_vr_mode,
+            "agl_ft": telem.get("agl_ft") or 0,
             "perf": {
                 "displayed_fps": disp_fps,
                 "fps": base_fps,

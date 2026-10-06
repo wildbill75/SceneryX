@@ -157,13 +157,30 @@ class SmartLodController:
         except Exception as e:
             print(f"[SmartLOD] Erreur lecture snapshot profil actif: {e}")
 
+        is_vr = False
+        try:
+            if self.engine.is_attached:
+                is_vr = self.engine.is_vr_active()
+        except Exception:
+            pass
+        pfx = "vr" if is_vr else "2d"
+
         with self._lock:
             if axis in ("tlod", "all"):
                 self.manual_tlod = None
                 self.current_tlod_setpoint = float(nom_tlod)
+                self.config[f"{pfx}_tlod_base"] = int(nom_tlod)
+                self.config[f"{pfx}_tlod_target"] = min(400, max(int(nom_tlod), int(nom_tlod * 2 if pfx == "2d" else nom_tlod * 1.6)))
             if axis in ("olod", "all"):
                 self.manual_olod = None
                 self.current_olod_setpoint = float(nom_olod)
+                self.config[f"{pfx}_olod_base"] = int(nom_olod)
+                self.config[f"{pfx}_olod_target"] = int(nom_olod)
+            try:
+                with open(CONFIG_FILE_PATH, "w", encoding="utf-8") as f:
+                    json.dump(self.config, f, indent=4)
+            except Exception as e:
+                print(f"[SmartLOD] Erreur sauvegarde config reset: {e}")
 
         if not self.engine.is_attached:
             self.engine.attach()
@@ -432,21 +449,25 @@ class SmartLodController:
             if getattr(self, "manual_tlod", None) is not None:
                 self.current_tlod_setpoint = float(self.manual_tlod)
             else:
-                if on_ground or agl < 500:
+                min_alt = min(500.0, alt_trans)
+                if on_ground or agl < min_alt:
                     altitude_target_tlod = float(tlod_ground)
                 elif agl >= alt_trans:
                     altitude_target_tlod = float(tlod_cruise)
                 else:
-                    ratio = max(0.0, min(1.0, (agl - 500) / max(1.0, alt_trans - 500)))
+                    alt_span = max(1.0, alt_trans - min_alt)
+                    ratio = max(0.0, min(1.0, (agl - min_alt) / alt_span))
                     altitude_target_tlod = tlod_ground + ratio * (tlod_cruise - tlod_ground)
 
                 target_tlod = altitude_target_tlod
+                min_tlod = min(tlod_ground, tlod_cruise)
+                max_tlod = max(tlod_ground, tlod_cruise)
                 if base_fps > 0 and agl >= 1000:
                     if base_fps < (target_fps - deadband):
                         deficit = (target_fps - base_fps)
-                        target_tlod = max(tlod_ground, self.current_tlod_setpoint - (step * (deficit / 3.0)))
+                        target_tlod = max(min_tlod, self.current_tlod_setpoint - (step * (deficit / 3.0)))
                     elif base_fps > (target_fps + deadband):
-                        target_tlod = min(altitude_target_tlod, self.current_tlod_setpoint + step)
+                        target_tlod = min(max_tlod, self.current_tlod_setpoint + step)
 
                 delta = target_tlod - self.current_tlod_setpoint
                 if abs(delta) > step:
@@ -470,7 +491,13 @@ class SmartLodController:
                 else:
                     ratio = max(0.0, min(1.0, agl / max(1.0, alt_trans_olod)))
                     target_olod = olod_ground + ratio * (olod_cruise - olod_ground)
-                self.current_olod_setpoint = max(0.0, min(300.0, target_olod))
+
+                # Rate-limiting / step smoothing anti-stutter for OLOD
+                delta_olod = target_olod - self.current_olod_setpoint
+                if abs(delta_olod) > step:
+                    delta_olod = step if delta_olod > 0 else -step
+                self.current_olod_setpoint += delta_olod
+                self.current_olod_setpoint = max(0.0, min(300.0, self.current_olod_setpoint))
 
             ok_olod = self.engine.write_olod(self.current_olod_setpoint)
 
@@ -488,7 +515,24 @@ class SmartLodController:
         """Extrait la télémétrie courante de SimConnect ou du tracker de SceneryX."""
         try:
             import flight_perf_tracker
-            # Récupération depuis le cache du tracker si disponible
+            # 1. Direct from live SimConnect client if active
+            if hasattr(flight_perf_tracker, 'SIMCONNECT_CLIENT') and flight_perf_tracker.SIMCONNECT_CLIENT:
+                sc_data = flight_perf_tracker.SIMCONNECT_CLIENT.get_data()
+                if sc_data.get("connected"):
+                    agl = sc_data.get("agl_ft")
+                    on_ground = sc_data.get("on_ground")
+                    if on_ground is None:
+                        on_ground = (agl is None or agl < 50)
+                    base_fps = sc_data.get("base_fps") or sc_data.get("displayed_fps") or 0
+                    disp_fps = sc_data.get("displayed_fps") or 0
+                    return {
+                        "agl_ft": agl or 0,
+                        "on_ground": bool(on_ground),
+                        "base_fps": base_fps,
+                        "displayed_fps": disp_fps
+                    }
+
+            # 2. Direct from cache or Blackbox tracker
             if hasattr(flight_perf_tracker, '_last_telemetry_cache') and flight_perf_tracker._last_telemetry_cache:
                 c = flight_perf_tracker._last_telemetry_cache
                 return {
@@ -497,6 +541,17 @@ class SmartLodController:
                     "base_fps": c.get("base_fps") or c.get("displayed_fps") or 0,
                     "displayed_fps": c.get("displayed_fps") or 0
                 }
+            if hasattr(flight_perf_tracker, 'BLACKBOX') and flight_perf_tracker.BLACKBOX:
+                telem = flight_perf_tracker.BLACKBOX.get_telemetry()
+                if telem:
+                    agl = telem.get("agl_ft") or telem.get("agl") or 0
+                    on_ground = telem.get("on_ground", agl < 50)
+                    return {
+                        "agl_ft": agl,
+                        "on_ground": bool(on_ground),
+                        "base_fps": telem.get("base_fps") or telem.get("displayed_fps") or 0,
+                        "displayed_fps": telem.get("displayed_fps") or 0
+                    }
         except Exception:
             pass
         return {"agl_ft": 0, "on_ground": True, "base_fps": 0, "displayed_fps": 0}

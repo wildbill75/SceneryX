@@ -549,7 +549,7 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    shrink: 0;
+    flex-shrink: 0;
     display: inline-block;
 }
 
@@ -840,14 +840,38 @@ ingame-ui#SceneryX_Remote .ingameUiContent {
     opacity: 1 !important;
 }
 
-.dual-slider-input:hover::-webkit-slider-thumb {
+.dual-slider-input:hover::-webkit-slider-thumb,
+.dual-slider-input:focus::-webkit-slider-thumb {
     transform: scale(1.18) !important;
     border-color: #38bdf8 !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    opacity: 1 !important;
+}
+
+.dual-slider-input:hover::-moz-range-thumb,
+.dual-slider-input:focus::-moz-range-thumb {
+    transform: scale(1.18) !important;
+    border-color: #38bdf8 !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    opacity: 1 !important;
 }
 
 .dual-slider-input:active::-webkit-slider-thumb {
     transform: scale(1.22) !important;
     border-color: #0ea5e9 !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    opacity: 1 !important;
+}
+
+.dual-slider-input:active::-moz-range-thumb {
+    transform: scale(1.22) !important;
+    border-color: #0ea5e9 !important;
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    opacity: 1 !important;
 }
 
 .dual-slider-labels {
@@ -1225,7 +1249,8 @@ checkAutoload();
             axis: axis,
             base: baseVal,
             target: targetVal,
-            altitude: altVal
+            altitude: altVal,
+            enabled: true
         }));
     }
 
@@ -1625,6 +1650,10 @@ checkAutoload();
         }
 
         if (floorRange) {
+            floorRange.addEventListener("mousedown", function () {
+                floorRange.style.zIndex = "30";
+                if (cruiseRange) cruiseRange.style.zIndex = "10";
+            });
             floorRange.addEventListener("input", function () {
                 let fVal = parseInt(floorRange.value, 10);
                 let cVal = parseInt(cruiseRange.value, 10);
@@ -1648,6 +1677,10 @@ checkAutoload();
         }
 
         if (cruiseRange) {
+            cruiseRange.addEventListener("mousedown", function () {
+                cruiseRange.style.zIndex = "30";
+                if (floorRange) floorRange.style.zIndex = "10";
+            });
             cruiseRange.addEventListener("input", function () {
                 let fVal = parseInt(floorRange.value, 10);
                 let cVal = parseInt(cruiseRange.value, 10);

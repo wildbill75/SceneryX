@@ -1896,6 +1896,13 @@ def activate_custom_profile(profile_id: str, user_cfg_path: Optional[str] = None
         set_active_profile_id(profile_id)
         clear_staged_settings()
 
+        # Resynchronize live MSFS memory and Smart LOD controller setpoints if active
+        try:
+            import flight_lod_controller
+            flight_lod_controller.get_smart_lod_controller().reset_to_active_profile("all")
+        except Exception as e:
+            print(f"[Optimizer] Smart LOD sync on activation notice: {e}")
+
         return {
             "status": "success",
             "message": f"Profile '{profile_data.get('name')}' activated in MSFS!",

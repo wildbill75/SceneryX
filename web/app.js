@@ -21655,7 +21655,7 @@ function startBlackboxTelemetryPolling() {
             const fpsVal = document.getElementById('live-fps-val');
             const fpsBase = document.getElementById('live-fps-base');
             if (fpsVal) fpsVal.textContent = telem.displayed_fps !== null ? `${telem.displayed_fps}` : '--';
-            if (fpsBase) fpsBase.textContent = telem.base_fps !== null ? `(${telem.base_fps} base)` : '(-- base)';
+            if (fpsBase) fpsBase.textContent = telem.base_fps !== null ? `${telem.base_fps}` : '--';
 
             const mtVal = document.getElementById('live-mt-val');
             if (mtVal) {

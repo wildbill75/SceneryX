@@ -3638,17 +3638,17 @@
             <div class="p-4 rounded-lg bg-slate-800/85 border border-slate-700/80 space-y-3.5 shadow-sm">
                 <div class="flex items-center justify-between">
                     <span class="typo-section-title text-slate-200">Flight Recorder &amp; Telemetry Controls</span>
-                    <div class="flex items-center gap-2">
-                        <span id="opt-simconnect-badge" class="hidden px-2.5 py-0.5 rounded-full typo-action-btn text-[10px] font-semibold pill-soft-emerald flex items-center gap-1.5 uppercase tracking-[0.02em]">
-                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <div class="flex items-center gap-3">
+                        <span id="opt-simconnect-badge" class="hidden px-2.5 py-1 rounded-md typo-action-btn text-[10px] font-semibold bg-slate-800 border border-slate-700/60 text-slate-300 flex items-center gap-2 uppercase tracking-[0.02em]">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
                             SIMCONNECT LIVE
                         </span>
-                        <span id="opt-autofps-badge" class="hidden px-2.5 py-0.5 rounded-full typo-action-btn text-[10px] font-semibold pill-soft-sky flex items-center gap-1.5 uppercase tracking-[0.02em]">
-                            <span class="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse"></span>
+                        <span id="opt-autofps-badge" class="hidden px-2.5 py-1 rounded-md typo-action-btn text-[10px] font-semibold bg-slate-800 border border-slate-700/60 text-slate-300 flex items-center gap-2 uppercase tracking-[0.02em]">
+                            <span class="w-1.5 h-1.5 rounded-full bg-sky-400"></span>
                             AUTOFPS LIVE
                         </span>
-                        <span id="opt-smartlod-badge" class="hidden px-2.5 py-0.5 rounded-full typo-action-btn text-[10px] font-semibold bg-sky-500/10 border border-sky-500/30 text-sky-400 flex items-center gap-1.5 uppercase tracking-[0.02em]">
-                            <span class="w-1.5 h-1.5 rounded-full bg-sky-400 animate-pulse"></span>
+                        <span id="opt-smartlod-badge" class="hidden px-2.5 py-1 rounded-md typo-action-btn text-[10px] font-semibold bg-slate-800 border border-slate-700/60 text-slate-300 flex items-center gap-2 uppercase tracking-[0.02em]">
+                            <span class="w-1.5 h-1.5 rounded-full bg-sky-400"></span>
                             SMART LOD LIVE
                         </span>
                     </div>
@@ -3693,32 +3693,38 @@
                     <span class="typo-section-title text-slate-200">Live Performance HUD</span>
                 </div>
                 <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div class="p-3.5 rounded-lg bg-slate-900/70 border border-slate-700/80 space-y-1 shadow-inner">
-                        <span class="typo-metadata text-[10px] text-slate-400 uppercase font-medium block tracking-normal">Displayed FPS</span>
-                        <div class="flex items-baseline gap-1.5">
-                            <span id="live-fps-val" class="typo-metric text-2xl font-semibold text-emerald-400 tabular-nums">--</span>
-                            <span id="live-fps-base" class="typo-metadata text-xs text-slate-400">(-- base)</span>
+                    <div class="p-3.5 rounded-lg bg-slate-900/70 border border-slate-700/80 space-y-1.5 shadow-inner">
+                        <div class="flex items-center justify-between">
+                            <span class="typo-metadata text-[10px] text-slate-400 uppercase font-medium block tracking-normal">Displayed FPS</span>
+                            <span id="live-fps-base-pill" class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-800 border border-slate-700/60 text-slate-200 text-[10px] font-bold" title="Native Base FPS before Frame Generation">
+                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                                <span>BASE <span id="live-fps-base" class="text-white font-mono">--</span> FPS</span>
+                            </span>
+                        </div>
+                        <div class="flex items-baseline gap-2">
+                            <span id="live-fps-val" class="typo-metric text-3xl font-bold text-emerald-400 tabular-nums">--</span>
+                            <span class="text-xs text-slate-400 font-semibold">FPS</span>
                         </div>
                     </div>
-                    <div class="p-3.5 rounded-lg bg-slate-900/70 border border-slate-700/80 space-y-1 shadow-inner">
+                    <div class="p-3.5 rounded-lg bg-slate-900/70 border border-slate-700/80 space-y-1.5 shadow-inner">
                         <span class="typo-metadata text-[10px] text-slate-400 uppercase font-medium block tracking-normal">Frame Pacing</span>
-                        <div class="flex items-baseline gap-1.5">
-                            <span id="live-mt-val" class="typo-metric text-2xl font-semibold text-emerald-400 tabular-nums">--</span>
-                            <span class="typo-metadata text-xs text-slate-400">ms</span>
+                        <div class="flex items-baseline gap-2">
+                            <span id="live-mt-val" class="typo-metric text-3xl font-bold text-emerald-400 tabular-nums">--</span>
+                            <span class="text-xs text-slate-400 font-semibold">ms</span>
                         </div>
                     </div>
-                    <div class="p-3.5 rounded-lg bg-slate-900/70 border border-slate-700/80 space-y-1 shadow-inner">
+                    <div class="p-3.5 rounded-lg bg-slate-900/70 border border-slate-700/80 space-y-1.5 shadow-inner">
                         <span class="typo-metadata text-[10px] text-slate-400 uppercase font-medium block tracking-normal">MSFS VRAM</span>
-                        <div class="flex items-baseline gap-1.5">
-                            <span id="live-msfs-vram-val" class="typo-metric text-xl font-semibold text-sky-400 tabular-nums">--</span>
-                            <span id="live-vram-val" class="typo-metadata text-[11px] text-slate-400">(-- total)</span>
+                        <div class="flex items-baseline gap-2">
+                            <span id="live-msfs-vram-val" class="typo-metric text-2xl font-bold text-sky-400 tabular-nums">--</span>
+                            <span id="live-vram-val" class="text-xs text-slate-400 font-semibold">/ -- GB</span>
                         </div>
                     </div>
-                    <div class="p-3.5 rounded-lg bg-slate-900/70 border border-slate-700/80 space-y-1 shadow-inner">
+                    <div class="p-3.5 rounded-lg bg-slate-900/70 border border-slate-700/80 space-y-1.5 shadow-inner">
                         <span class="typo-metadata text-[10px] text-slate-400 uppercase font-medium block tracking-normal">Rolling Cache</span>
-                        <div class="flex items-baseline gap-1.5">
-                            <span id="live-cache-val" class="typo-metric text-xl font-semibold text-amber-400 tabular-nums">--</span>
-                            <span class="typo-metadata text-xs text-slate-400">Mbps</span>
+                        <div class="flex items-baseline gap-2">
+                            <span id="live-cache-val" class="typo-metric text-2xl font-bold text-amber-400 tabular-nums">--</span>
+                            <span class="text-xs text-slate-400 font-semibold">MB/s</span>
                         </div>
                     </div>
                 </div>
