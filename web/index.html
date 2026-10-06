@@ -1607,15 +1607,10 @@
             </div>
         </div>
 
-        <!-- RIGHT: SCENERY CONFLICT NAVIGATOR & SUPPORT / BUG REPORT -->
+        <!-- RIGHT: SCENERY CONFLICT NAVIGATOR -->
         <div class="flex items-center gap-2.5 shrink-0 z-10">
-            <!-- SUPPORT & BUG REPORT BUTTON -->
-            <button id="btn-header-bug-report" onclick="openBugReportModal()" class="flex items-center bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white px-3 py-1.5 rounded-full typo-action-btn text-xs font-semibold shadow-sm transition-all cursor-pointer active:scale-95" title="Report Bug / Diagnostics">
-                <span class="uppercase tracking-[0.02em] text-[10.5px]">Report Bug</span>
-            </button>
-
             <!-- SCENERY CONFLICT ALERT BUTTON (OPENS CONFLICT RESOLUTION MODAL) -->
-            <button id="conflict-nav-pill" onclick="openConflictModal()" class="hidden items-center gap-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 px-3 py-1.5 rounded-full typo-action-btn text-xs font-semibold shadow-sm transition-all cursor-pointer active:scale-95 group" title="Click to resolve scenery conflicts">
+            <button id="conflict-nav-pill" onclick="openConflictModal()" class="hidden items-center gap-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700/60 text-slate-200 px-3 py-1.5 rounded-full typo-action-btn text-xs font-semibold shadow-sm transition-all cursor-pointer active:scale-95 group" title="Click to resolve scenery conflicts">
                 <span id="conflict-nav-counter" class="typo-metric font-semibold text-amber-400 tabular-nums">0</span>
                 <span data-i18n="conflict.pill_label" class="uppercase tracking-[0.02em] text-[10px] text-slate-300">Conflict</span>
             </button>
@@ -2489,16 +2484,16 @@
     <!-- SETTINGS MODAL -->
     <div id="settings-modal"
          data-modal-id="settings-modal"
-         class="sceneryx-modal absolute hidden flex-col bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden z-[2000] select-none"
+         class="sceneryx-modal absolute hidden flex-col bg-slate-900 border border-slate-700/60 rounded-xl shadow-2xl overflow-hidden z-[2000] select-none"
          style="min-width: 480px; width: 680px; height: auto; max-width: 95vw; max-height: 85vh;">
         <!-- Drag Handle Header -->
-        <div class="modal-header h-[42px] px-4 bg-slate-900/60 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
+        <div class="modal-header h-[42px] px-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2">
                 <h3 class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase" data-i18n="settings.title">FOLDER LOCATIONS &amp; GSX</h3>
             </div>
             <div class="flex items-center gap-1">
-                <button onclick="closeSettingsModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity">
-                    <i class="fa-solid fa-xmark text-sm"></i>
+                <button onclick="closeSettingsModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white text-base transition-opacity">
+                    ✕
                 </button>
             </div>
         </div>
@@ -2507,14 +2502,14 @@
         <div class="modal-body flex-1 p-4 overflow-y-auto custom-scrollbar space-y-4">
                 <div class="flex items-center justify-between">
                     <label data-i18n="settings.auto_scan" class="typo-setting-label text-slate-300">Auto Scan on Startup</label>
-                    <input type="checkbox" id="cfg-auto-scan" class="w-4 h-4 accent-cyan-500 rounded">
+                    <input type="checkbox" id="cfg-auto-scan" class="w-4 h-4 accent-slate-400 rounded">
                 </div>
 
                 <div class="space-y-2">
                     <div class="flex items-center justify-between">
                         <label data-i18n="settings.scenery_paths" class="typo-section-title text-slate-400">Configured Scenery Paths</label>
-                        <button onclick="addCustomPathRow()" class="px-2.5 py-1 rounded-md bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold typo-action-btn flex items-center gap-1 transition-colors border-0 cursor-pointer shadow-sm">
-                            <i class="fa-solid fa-plus"></i> <span data-i18n="settings.add_path">Add Path</span>
+                        <button onclick="addCustomPathRow()" class="px-3 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700/60 font-semibold typo-action-btn flex items-center gap-1 transition-colors cursor-pointer shadow-sm">
+                            <span data-i18n="settings.add_path">Add Path</span>
                         </button>
                     </div>
 
@@ -2527,12 +2522,12 @@
                 <div class="pt-3 border-t border-slate-800/80 space-y-2">
                     <label data-i18n="settings.gsx_directory" class="typo-section-title text-slate-400 block">GSX Profile Directory (.ini)</label>
                     <div class="flex items-center gap-2">
-                        <input type="text" id="cfg-gsx-path" placeholder="C:\Users\...\AppData\Roaming\Virtuali\GSX\MSFS" class="flex-1 bg-slate-900/85 border border-slate-700/60 rounded-md px-3.5 py-2 typo-input-val text-slate-200 input-dark">
-                        <button onclick="browseGsxFolder()" class="px-3.5 py-2 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/80 typo-action-btn font-semibold transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer group" title="Browse / Change Folder">
-                            <span data-icon="folder" class="w-4 h-4 text-slate-400 group-hover:text-white transition-colors"></span> <span data-i18n="settings.browse">Browse</span>
+                        <input type="text" id="cfg-gsx-path" placeholder="C:\Users\...\AppData\Roaming\Virtuali\GSX\MSFS" class="flex-1 bg-slate-900 border border-slate-700/60 rounded-md px-3.5 py-2 typo-input-val text-slate-200 focus:outline-none focus:border-slate-400 focus:bg-slate-800">
+                        <button onclick="browseGsxFolder()" class="px-3.5 py-2 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/60 typo-action-btn font-semibold transition-colors flex items-center shrink-0 cursor-pointer" title="Browse / Change Folder">
+                            <span data-i18n="settings.browse">Browse</span>
                         </button>
-                        <button onclick="openGsxFolderInExplorer()" class="px-3 py-2 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/80 text-xs font-bold transition-colors flex items-center justify-center shrink-0 cursor-pointer group" title="Open in Windows Explorer">
-                            <i class="fa-solid fa-arrow-up-right-from-square text-slate-400 group-hover:text-white transition-colors"></i>
+                        <button onclick="openGsxFolderInExplorer()" class="px-3 py-2 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/60 text-xs font-semibold transition-colors flex items-center justify-center shrink-0 cursor-pointer" title="Open in Windows Explorer">
+                            Explorer
                         </button>
                     </div>
                 </div>
@@ -2541,9 +2536,9 @@
                 <div class="pt-3 border-t border-slate-800/80 space-y-2">
                     <label data-i18n="settings.simbrief_section" class="typo-section-title text-slate-400 block">SimBrief</label>
                     <div class="relative flex items-center">
-                        <input type="text" id="cfg-simbrief-id" data-i18n-placeholder="settings.simbrief_placeholder" placeholder="Pilot name or id" class="w-full bg-slate-900/85 border border-slate-700/60 rounded-md pl-3.5 pr-28 py-2 typo-input-val text-slate-200 input-dark transition-colors">
+                        <input type="text" id="cfg-simbrief-id" data-i18n-placeholder="settings.simbrief_placeholder" placeholder="Pilot name or id" class="w-full bg-slate-900 border border-slate-700/60 rounded-md pl-3.5 pr-28 py-2 typo-input-val text-slate-200 focus:outline-none focus:border-slate-400 focus:bg-slate-800 transition-colors">
                         <div id="sb-status-indicator" class="absolute right-3.5 flex items-center gap-1.5 pointer-events-none select-none">
-                            <span id="sb-status-dot" class="hidden w-1.5 h-1.5 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.7)]"></span>
+                            <span id="sb-status-dot" class="hidden w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
                             <span id="sb-status-text" class="typo-metadata"></span>
                         </div>
                     </div>
@@ -2552,18 +2547,18 @@
                 <!-- MAP AIRPORT LABELS SETTINGS -->
                 <div class="pt-4 border-t border-slate-800/80 space-y-3">
                     <label data-i18n="settings.map_labels_section" class="typo-section-title text-slate-400 block">Map Airport Labels</label>
-                    <div class="space-y-2.5 bg-slate-950/60 p-3 rounded-lg border border-slate-700/60">
+                    <div class="space-y-2.5 bg-slate-950/80 p-3 rounded-lg border border-slate-700/60">
                         <div class="flex items-center justify-between">
                             <label data-i18n="settings.label_icao" for="cfg-label-icao" class="typo-setting-label text-slate-300 cursor-pointer">Show ICAO Code</label>
-                            <input type="checkbox" id="cfg-label-icao" class="w-4 h-4 accent-cyan-500 rounded cursor-pointer">
+                            <input type="checkbox" id="cfg-label-icao" class="w-4 h-4 accent-slate-400 rounded cursor-pointer">
                         </div>
                         <div class="flex items-center justify-between">
                             <label data-i18n="settings.label_name" for="cfg-label-name" class="typo-setting-label text-slate-300 cursor-pointer">Show Airport Name</label>
-                            <input type="checkbox" id="cfg-label-name" class="w-4 h-4 accent-cyan-500 rounded cursor-pointer">
+                            <input type="checkbox" id="cfg-label-name" class="w-4 h-4 accent-slate-400 rounded cursor-pointer">
                         </div>
                         <div class="flex items-center justify-between">
                             <label data-i18n="settings.label_city" for="cfg-label-city" class="typo-setting-label text-slate-300 cursor-pointer">Show City</label>
-                            <input type="checkbox" id="cfg-label-city" class="w-4 h-4 accent-cyan-500 rounded cursor-pointer">
+                            <input type="checkbox" id="cfg-label-city" class="w-4 h-4 accent-slate-400 rounded cursor-pointer">
                         </div>
                     </div>
                 </div>
@@ -2572,8 +2567,7 @@
                 <div class="pt-4 border-t border-slate-800/80 space-y-4">
                     <div class="flex items-center justify-between">
                         <label data-i18n="settings.camera_section" class="typo-section-title text-slate-400">Camera Settings</label>
-                        <button onclick="resetCameraSettingsToDefault()" type="button" class="px-3 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white typo-action-btn font-semibold transition-colors border border-slate-700/80 cursor-pointer flex items-center gap-1.5">
-                            <i class="fa-solid fa-rotate-left text-[10px]"></i>
+                        <button onclick="resetCameraSettingsToDefault()" type="button" class="px-3 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white typo-action-btn font-semibold transition-colors border border-slate-700/60 cursor-pointer">
                             <span data-i18n="settings.reset_default">Reset to Default</span>
                         </button>
                     </div>
@@ -2584,12 +2578,12 @@
                             <label data-i18n="settings.startup_region" class="typo-setting-label text-slate-300">Default Startup Region</label>
                             <span data-i18n="settings.initial_viewport" class="typo-metadata">Initial viewport</span>
                         </div>
-                        <select id="cfg-camera-region" class="w-full bg-slate-900/85 border border-slate-700/60 rounded-md px-3.5 py-2 typo-input-val text-slate-200 input-dark cursor-pointer">
+                        <select id="cfg-camera-region" class="w-full bg-slate-900 border border-slate-700/60 rounded-md px-3.5 py-2 typo-input-val text-slate-200 cursor-pointer focus:outline-none focus:border-slate-400">
                             <option value="world">World (Default)</option>
                             <option value="weurope">Western Europe</option>
                             <option value="eeurope">Eastern Europe</option>
                             <option value="namerica">North America</option>
-                            <option value="camerica_caribbean">Central America & Caribbean</option>
+                            <option value="camerica_caribbean">Central America &amp; Caribbean</option>
                             <option value="samerica">South America</option>
                             <option value="asia">Asia</option>
                             <option value="middleeast">Middle East</option>
@@ -2604,9 +2598,9 @@
                     <div class="space-y-1.5">
                         <div class="flex items-center justify-between">
                             <label data-i18n="settings.airport_zoom" class="typo-setting-label text-slate-300">Airport Selection Zoom</label>
-                            <span id="cfg-zoom-display" class="typo-metric font-semibold text-cyan-400">6.0</span>
+                            <span id="cfg-zoom-display" class="typo-metric font-semibold text-slate-200">6.0</span>
                         </div>
-                        <input type="range" id="cfg-camera-zoom" min="4.0" max="12.0" step="0.5" value="6.0" oninput="updateCameraSettingsPreview()" class="w-full accent-cyan-500 cursor-pointer">
+                        <input type="range" id="cfg-camera-zoom" min="4.0" max="12.0" step="0.5" value="6.0" oninput="updateCameraSettingsPreview()" class="w-full accent-slate-400 cursor-pointer">
                         <div class="flex justify-between">
                             <span data-i18n="settings.zoom_wide" class="typo-metadata">Wide (4.0)</span>
                             <span data-i18n="settings.zoom_regional" class="typo-metadata">Regional (6.0)</span>
@@ -2618,9 +2612,9 @@
                     <div class="space-y-1.5">
                         <div class="flex items-center justify-between">
                             <label data-i18n="settings.pan_duration" class="typo-setting-label text-slate-300">Camera Pan Duration</label>
-                            <span id="cfg-duration-display" class="typo-metric font-semibold text-cyan-400">0.8s</span>
+                            <span id="cfg-duration-display" class="typo-metric font-semibold text-slate-200">0.8s</span>
                         </div>
-                        <input type="range" id="cfg-camera-duration" min="0.2" max="2.0" step="0.1" value="0.8" oninput="updateCameraSettingsPreview()" class="w-full accent-cyan-500 cursor-pointer">
+                        <input type="range" id="cfg-camera-duration" min="0.2" max="2.0" step="0.1" value="0.8" oninput="updateCameraSettingsPreview()" class="w-full accent-slate-400 cursor-pointer">
                         <div class="flex justify-between">
                             <span data-i18n="settings.speed_fast" class="typo-metadata">Fast (0.2s)</span>
                             <span data-i18n="settings.speed_smooth" class="typo-metadata">Smooth (0.8s)</span>
@@ -2636,11 +2630,11 @@
                         <div class="flex items-center justify-between">
                             <label data-i18n="settings.language_label" class="typo-setting-label text-slate-300">Application Language</label>
                         </div>
-                        <select id="cfg-app-language" onchange="previewAppLanguage(this.value)" class="w-full bg-slate-900/85 border border-slate-700/60 rounded-md px-3.5 py-2 typo-input-val text-slate-200 input-dark cursor-pointer">
+                        <select id="cfg-app-language" onchange="previewAppLanguage(this.value)" class="w-full bg-slate-900 border border-slate-700/60 rounded-md px-3.5 py-2 typo-input-val text-slate-200 cursor-pointer focus:outline-none focus:border-slate-400">
                             <option value="en">English (Default)</option>
-                            <option value="fr">FranÃ§ais</option>
-                            <option value="de">Deutsch</option>
-                            <option value="es">EspaÃ±ol</option>
+                            <option value="fr">French (Français)</option>
+                            <option value="de">German (Deutsch)</option>
+                            <option value="es">Spanish (Español)</option>
                         </select>
                     </div>
                 </div>
@@ -2652,10 +2646,10 @@
                         <div class="flex items-center justify-between">
                             <label data-i18n="settings.currency_label" class="typo-setting-label text-slate-300">Display Currency</label>
                         </div>
-                        <select id="cfg-app-currency" onchange="previewAppCurrency(this.value)" class="w-full bg-slate-900/85 border border-slate-700/60 rounded-md px-3.5 py-2 typo-input-val text-slate-200 input-dark cursor-pointer">
+                        <select id="cfg-app-currency" onchange="previewAppCurrency(this.value)" class="w-full bg-slate-900 border border-slate-700/60 rounded-md px-3.5 py-2 typo-input-val text-slate-200 cursor-pointer focus:outline-none focus:border-slate-400">
                             <option value="USD">USD ($ - US Dollar)</option>
-                            <option value="EUR">EUR (â‚¬ - Euro)</option>
-                            <option value="GBP">GBP (Â£ - British Pound)</option>
+                            <option value="EUR">EUR (€ - Euro)</option>
+                            <option value="GBP">GBP (£ - British Pound)</option>
                             <option value="AUD">AUD (A$ - Australian Dollar)</option>
                         </select>
                     </div>
@@ -2663,73 +2657,107 @@
 
                 <!-- WINDOW CLOSE BEHAVIOR / SYSTRAY -->
                 <div class="pt-4 border-t border-slate-800/80 space-y-3">
-                    <div class="flex items-center gap-2">
-                        <i class="fa-solid fa-window-restore text-cyan-400 text-xs"></i>
-                        <label class="typo-section-title text-slate-400 block">Bouton Fermer &amp; Zone de notification</label>
+                    <div class="flex items-center justify-between">
+                        <label class="typo-section-title text-slate-400 block">Close Button &amp; System Tray</label>
                     </div>
                     <div class="space-y-1.5">
                         <div class="flex items-center justify-between">
-                            <label class="typo-setting-label text-slate-300">Action du bouton Fermer ([X])</label>
+                            <label class="typo-setting-label text-slate-300">Close Button Action ([X])</label>
                             <span class="typo-metadata">System Tray</span>
                         </div>
-                        <select id="cfg-close-action" class="w-full bg-slate-900/85 border border-slate-700/60 rounded-md px-3.5 py-2 typo-input-val text-slate-200 input-dark cursor-pointer">
-                            <option value="quit">Quitter complÃ¨tement l'application</option>
-                            <option value="minimize_to_tray">RÃ©duire dans la zone de notification (Icon Tray / Systray)</option>
+                        <select id="cfg-close-action" class="w-full bg-slate-900 border border-slate-700/60 rounded-md px-3.5 py-2 typo-input-val text-slate-200 cursor-pointer focus:outline-none focus:border-slate-400">
+                            <option value="quit">Quit application completely</option>
+                            <option value="minimize_to_tray">Minimize to system tray (Notification Area)</option>
                         </select>
                     </div>
                 </div>
 
                 <!-- DYNAMIC LOD & PERFORMANCE ENGINE SETTINGS -->
                 <div class="pt-4 border-t border-slate-800/80 space-y-3">
-                    <div class="flex items-center gap-2">
-                        <span data-icon="stopwatch" class="w-4 h-4 text-cyan-400"></span>
-                        <label class="typo-section-title text-slate-400 block">Dynamic LOD &amp; Performance</label>
+                    <div class="flex items-center justify-between">
+                        <label class="typo-section-title text-slate-400 block">Dynamic LOD &amp; Performance Engine</label>
                     </div>
                     
                     <div class="space-y-1.5">
                         <div class="flex items-center justify-between">
-                            <label class="typo-setting-label text-slate-300">Moteur Dynamic LOD PrÃ©fÃ©rÃ©</label>
+                            <label class="typo-setting-label text-slate-300">Preferred Dynamic LOD Engine</label>
                             <span class="typo-metadata">MSFS 2020 / 2024</span>
                         </div>
-                        <select id="cfg-dynamic-lod-engine" class="w-full bg-slate-900/85 border border-slate-700/60 rounded-md px-3.5 py-2 typo-input-val text-slate-200 input-dark cursor-pointer">
-                            <option value="smart_lod">Smart LOD (Moteur intÃ©grÃ© SceneryX - RecommandÃ©)</option>
-                            <option value="external_autofps">AutoFPS Externe (MSFS_AutoFPS.exe)</option>
-                            <option value="disabled">DÃ©sactivÃ© (Gestion manuelle fixe)</option>
+                        <select id="cfg-dynamic-lod-engine" class="w-full bg-slate-900 border border-slate-700/60 rounded-md px-3.5 py-2 typo-input-val text-slate-200 cursor-pointer focus:outline-none focus:border-slate-400">
+                            <option value="smart_lod">Smart LOD (Built-in SceneryX Engine - Recommended)</option>
+                            <option value="external_autofps">External AutoFPS (MSFS_AutoFPS.exe)</option>
+                            <option value="disabled">Disabled (Manual fixed LOD)</option>
                         </select>
                     </div>
 
-                    <div class="flex items-center justify-between bg-slate-950/60 p-3 rounded-lg border border-slate-700/60">
+                    <div class="flex items-center justify-between bg-slate-950/80 p-3 rounded-lg border border-slate-700/60">
                         <div>
-                            <label for="cfg-autofps-autokill" class="typo-setting-label text-slate-300 cursor-pointer block">Fermer AutoFPS externe au dÃ©marrage</label>
-                            <span class="typo-metadata text-slate-500 block">Ã‰vite les conflits d'asservissement mÃ©moire en fermant MSFS_AutoFPS si Smart LOD est sÃ©lectionnÃ©</span>
+                            <label for="cfg-autofps-autokill" class="typo-setting-label text-slate-300 cursor-pointer block">Close external AutoFPS on startup</label>
+                            <span class="typo-metadata text-slate-500 block">Avoids memory hook conflicts by closing MSFS_AutoFPS when Smart LOD is active</span>
                         </div>
-                        <input type="checkbox" id="cfg-autofps-autokill" class="w-4 h-4 accent-cyan-500 rounded cursor-pointer shrink-0">
+                        <input type="checkbox" id="cfg-autofps-autokill" class="w-4 h-4 accent-slate-400 rounded cursor-pointer shrink-0">
                     </div>
                 </div>
 
                 <!-- MSFS IN-GAME TOOLBAR PANEL -->
                 <div class="pt-4 border-t border-slate-800/80 flex items-center justify-between">
-                    <div class="flex items-center gap-2" title="In-flight HUD remote toolbar panel for MSFS (2D &amp; VR)">
-                        <span data-icon="monitor" class="w-4 h-4 text-sky-400"></span>
-                        <label class="typo-section-title text-slate-300 block cursor-help">In-Game Toolbar Panel</label>
+                    <div>
+                        <label class="typo-section-title text-slate-300 block">In-Game Toolbar Panel</label>
+                        <span class="typo-metadata text-slate-500 block">In-flight HUD remote toolbar panel for MSFS (2D &amp; VR)</span>
                     </div>
-                    <button type="button" id="cfg-ingame-panel-btn" onclick="toggleIngamePanelInstall()" class="px-4 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700/80 typo-action-btn font-semibold transition-colors cursor-pointer">
+                    <button type="button" id="cfg-ingame-panel-btn" onclick="toggleIngamePanelInstall()" class="px-4 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700/60 typo-action-btn font-semibold transition-colors cursor-pointer">
                         INSTALL
                     </button>
+                </div>
+
+                <!-- CRASH REPORTING & DIAGNOSTIC PRIVACY -->
+                <div class="pt-4 border-t border-slate-800/80 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <span class="typo-section-title text-slate-300 block">Crash Reporting &amp; Diagnostic Privacy</span>
+                            <span class="typo-metadata text-slate-500 block">Help improve SceneryX reliability with zero personal data collection</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button type="button" onclick="openBugReportModal()" class="px-3 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700/60 text-xs font-semibold transition-colors cursor-pointer" title="Open Bug Report &amp; Diagnostic Assistant">
+                                Report an Issue...
+                            </button>
+                            <button type="button" onclick="openCrashReportsFolder()" class="px-2.5 py-1.5 rounded-md bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700/60 text-[11px] font-semibold transition-colors cursor-pointer" title="Open persistent crash reports folder">
+                                History
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="space-y-2.5 bg-slate-950/80 p-3.5 rounded-lg border border-slate-700/60">
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <label for="cfg-privacy-crash-reports" class="typo-setting-label text-slate-300 cursor-pointer block">Send Crash Reports Automatically</label>
+                                <span class="typo-metadata text-slate-400 block text-[11px] leading-relaxed">Captures unhandled exceptions, call stacks, and anonymized hardware specs (GPU, driver, VRAM) upon fatal errors. No usernames, personal file paths, or credentials are ever collected.</span>
+                            </div>
+                            <input type="checkbox" id="cfg-privacy-crash-reports" checked class="w-4 h-4 accent-slate-400 rounded cursor-pointer shrink-0 mt-0.5">
+                        </div>
+
+                        <div class="flex items-start justify-between gap-3 pt-2.5 border-t border-slate-800/60">
+                            <div>
+                                <label for="cfg-privacy-telemetry-stats" class="typo-setting-label text-slate-300 cursor-pointer block">Share Anonymized Flight Statistics</label>
+                                <span class="typo-metadata text-slate-400 block text-[11px] leading-relaxed">Submits high-level flight performance aggregates (aircraft type, average FPS, peak VRAM usage) to help optimize default presets and LOD tuning across GPU tiers.</span>
+                            </div>
+                            <input type="checkbox" id="cfg-privacy-telemetry-stats" checked class="w-4 h-4 accent-slate-400 rounded cursor-pointer shrink-0 mt-0.5">
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <!-- Pinned Footer -->
-            <div class="flex items-center justify-between border-t border-slate-800/80 px-4 py-3 shrink-0 bg-slate-950/60">
-                <button data-i18n="settings.reset_db" onclick="resetFullDatabase()" title="Reset All Sceneries & Restore Database" class="px-3.5 py-1.5 rounded-md bg-slate-800 text-slate-200 border border-slate-700/80 hover:bg-red-500/20 hover:text-red-300 hover:border-red-500/40 typo-action-btn font-semibold transition-colors cursor-pointer">
+            <div class="flex items-center justify-between border-t border-slate-800/80 px-4 py-3 shrink-0 bg-slate-950/80">
+                <button data-i18n="settings.reset_db" onclick="resetFullDatabase()" title="Reset All Sceneries &amp; Restore Database" class="px-3.5 py-1.5 rounded-md bg-slate-800 text-slate-200 border border-slate-700/60 hover:bg-red-500/20 hover:text-red-300 hover:border-red-500/40 typo-action-btn font-semibold transition-colors cursor-pointer">
                     Reset Database
                 </button>
 
                 <div class="flex items-center gap-2">
-                    <button data-i18n="settings.cancel" onclick="closeSettingsModal()" class="px-3.5 py-1.5 rounded-md bg-slate-800 text-slate-200 border border-slate-700/80 hover:bg-slate-700 hover:text-white typo-action-btn font-semibold transition-colors cursor-pointer">
+                    <button data-i18n="settings.cancel" onclick="closeSettingsModal()" class="px-3.5 py-1.5 rounded-md bg-slate-800 text-slate-200 border border-slate-700/60 hover:bg-slate-700 hover:text-white typo-action-btn font-semibold transition-colors cursor-pointer">
                         Cancel
                     </button>
-                    <button onclick="saveSettings()" class="px-4 py-1.5 rounded-md bg-cyan-500 text-slate-950 font-semibold hover:bg-cyan-400 active:scale-[0.98] shadow-md shadow-cyan-950/30 typo-action-btn flex items-center gap-2 cursor-pointer transition-all">
+                    <button onclick="saveSettings()" class="px-4 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-100 font-semibold active:scale-[0.98] typo-action-btn flex items-center gap-2 cursor-pointer transition-all">
                         <span data-i18n="settings.save">Save</span>
                     </button>
                 </div>
@@ -3778,89 +3806,124 @@
     </div>
 
     <!-- 7. SUPPORT & BUG REPORT MODAL -->
-    <!-- 7. SUPPORT & BUG REPORT MODAL -->
     <div id="float-win-bug-report"
          data-modal-id="float-win-bug-report"
-         class="sceneryx-modal floating-window absolute hidden flex-col bg-slate-900 border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden z-[2100] select-none font-sans"
-         style="min-width: 440px; width: 560px; height: auto; max-width: 95vw; max-height: 90vh;">
+         class="sceneryx-modal floating-window absolute hidden flex-col bg-slate-900 border border-slate-700/60 rounded-xl shadow-2xl overflow-hidden z-[2100] select-none font-sans"
+         style="min-width: 480px; width: 620px; height: auto; max-width: 95vw; max-height: 90vh;">
         <!-- Header -->
         <div class="modal-header floating-win-header h-[42px] px-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between cursor-move select-none shrink-0">
-            <h3 class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">BUG REPORT &amp; DIAGNOSTICS</h3>
-            <button onclick="closeBugReportModal()" title="Close" class="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white text-sm font-semibold transition-colors">✕</button>
+            <h3 class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">BUG REPORT &amp; DIAGNOSTIC ASSISTANT</h3>
+            <button onclick="closeBugReportModal()" title="Close" class="w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white text-sm font-semibold transition-colors cursor-pointer">✕</button>
         </div>
 
         <!-- Body -->
         <div class="modal-body flex-1 p-5 overflow-y-auto custom-scrollbar space-y-4">
+            <!-- System / Incident Status Badge -->
+            <div id="bug-report-status-badge" class="flex items-center justify-between px-3.5 py-2 rounded-lg bg-slate-800 border border-slate-700/60 text-xs">
+                <div class="flex items-center gap-2">
+                    <span id="bug-report-status-dot" class="w-2 h-2 rounded-full bg-emerald-400 inline-block shrink-0"></span>
+                    <span id="bug-report-status-title" class="font-semibold text-slate-200">System Nominal</span>
+                    <span id="bug-report-status-desc" class="text-slate-400 text-[11px]">• Blackbox &amp; Engine Active</span>
+                </div>
+                <span id="bug-report-machine-badge" class="font-mono text-[10.5px] text-slate-400">ID: --</span>
+            </div>
+
             <!-- Category -->
             <div class="space-y-1.5">
                 <label class="text-[11px] font-semibold text-slate-300 uppercase tracking-wider block">Category</label>
-                <select id="bug-report-category" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-200 font-medium focus:outline-none focus:border-slate-500">
-                    <option value="UI & Display">UI &amp; Display</option>
-                    <option value="Profiles & Graphics">Profiles &amp; Graphics</option>
-                    <option value="Telemetry & SimLink">Telemetry &amp; SimLink</option>
-                    <option value="Crash & Freezes">Crash &amp; Freezes</option>
-                    <option value="Feedback & Other">Feedback &amp; Other</option>
+                <select id="bug-report-category" onchange="updateBugReportPreview()" class="w-full bg-slate-800 border border-slate-700/60 rounded-lg px-3 py-2 text-xs text-slate-200 font-medium focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400/25 cursor-pointer">
+                    <option value="Crash & Freezes">Crash &amp; Freezes (Simulator CTD or Application Halt)</option>
+                    <option value="Smart LOD & Profiles">Smart LOD &amp; Dynamic Engine (Setpoints, Transitions)</option>
+                    <option value="Telemetry & Blackbox">Telemetry &amp; Blackbox (SimConnect, Charts, CSV Log)</option>
+                    <option value="Profile & Graphics Optimizer">Profile &amp; Graphics Optimizer (Directives, UserCfg.opt)</option>
+                    <option value="UI & Visual Glitch">UI &amp; Visual Glitch (Display, Styling, Layout)</option>
+                    <option value="Feature Request & Feedback">Feature Request &amp; General Feedback</option>
                 </select>
             </div>
 
             <!-- Description -->
             <div class="space-y-1.5">
                 <label class="text-[11px] font-semibold text-slate-300 uppercase tracking-wider block">Description</label>
-                <textarea id="bug-report-desc" rows="3" class="w-full bg-slate-950 border border-slate-700/80 rounded-lg p-3 text-xs text-slate-200 font-sans focus:outline-none focus:border-slate-500 resize-none placeholder-slate-500" placeholder="Briefly describe what happened..."></textarea>
+                <textarea id="bug-report-desc" rows="3" oninput="updateBugReportPreview()" class="w-full bg-slate-950/80 border border-slate-700/60 rounded-lg p-3 text-xs text-slate-200 font-sans focus:outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-400/25 resize-none placeholder-slate-500" placeholder="Describe the steps that led to the incident, observed behavior, or expectations..."></textarea>
             </div>
 
             <!-- Options Checkboxes -->
-            <div class="p-3 rounded-lg bg-slate-800/80 border border-slate-700/80 space-y-2">
+            <div class="p-3 rounded-lg bg-slate-950/60 border border-slate-700/60 space-y-2">
                 <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer select-none">
-                    <input id="bug-report-inc-screenshot" type="checkbox" checked class="w-4 h-4 rounded bg-slate-900 border-slate-700 text-blue-500 focus:ring-0 cursor-pointer">
-                    <span>Include application screenshot</span>
+                    <input id="bug-report-inc-screenshot" type="checkbox" checked class="w-4 h-4 rounded bg-slate-900 border-slate-700/60 text-slate-300 accent-slate-500 cursor-pointer">
+                    <span>Include application window screenshot (anonymized)</span>
                 </label>
                 <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer select-none">
-                    <input id="bug-report-inc-logs" type="checkbox" checked class="w-4 h-4 rounded bg-slate-900 border-slate-700 text-blue-500 focus:ring-0 cursor-pointer">
-                    <span>Include runtime logs &amp; action breadcrumbs</span>
+                    <input id="bug-report-inc-logs" type="checkbox" checked class="w-4 h-4 rounded bg-slate-900 border-slate-700/60 text-slate-300 accent-slate-500 cursor-pointer">
+                    <span>Include runtime logs &amp; user action breadcrumbs (scrubbed of personal paths)</span>
                 </label>
             </div>
 
-            <!-- Post-Generation Card (Hidden until submitted) -->
-            <div id="bug-report-status-banner" class="hidden p-4 rounded-xl bg-slate-800 border border-slate-700 space-y-3 shadow-lg">
+            <!-- Diagnostic Data Transparency Accordion -->
+            <details id="bug-report-preview-details" class="bg-slate-950/80 border border-slate-700/60 rounded-lg p-3 text-xs text-slate-300">
+                <summary class="cursor-pointer font-semibold text-slate-400 select-none flex items-center justify-between text-[11px] uppercase tracking-wider">
+                    <span>Diagnostic Data Transparency Preview</span>
+                    <span class="text-slate-500 font-mono text-[10px]">[ CLICK TO EXPAND ]</span>
+                </summary>
+                <div class="mt-2.5 pt-2 border-t border-slate-800/80">
+                    <p class="text-[11px] text-slate-400 mb-2">The following scrubbed technical data will be bundled with your report. Zero usernames, personal files, or private passwords are ever collected.</p>
+                    <pre id="bug-report-preview-text" class="text-[10px] font-mono text-slate-400 max-h-40 overflow-y-auto custom-scrollbar p-2.5 bg-slate-900 rounded border border-slate-800 whitespace-pre-wrap select-text leading-relaxed">Loading diagnostic preview...</pre>
+                </div>
+            </details>
+
+            <!-- Post-Generation Status Banner (Visible after report generation) -->
+            <div id="bug-report-status-banner" class="hidden p-4 rounded-xl bg-slate-800 border border-slate-700/60 space-y-3 shadow-lg">
                 <div class="flex items-center justify-between">
-                    <span class="text-xs font-semibold text-emerald-400">Archive created on Desktop</span>
-                    <span id="bug-report-file-badge" class="font-mono text-[10px] text-slate-300 px-2 py-0.5 rounded bg-slate-900 border border-slate-700"></span>
+                    <div class="flex items-center gap-2">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 inline-block shrink-0"></span>
+                        <span class="text-xs font-semibold text-slate-200">Incident Report Generated &amp; Saved</span>
+                    </div>
+                    <span id="bug-report-file-badge" class="font-mono text-[10px] text-slate-300 px-2 py-0.5 rounded bg-slate-900 border border-slate-700/60"></span>
                 </div>
 
                 <div class="text-[11.5px] text-slate-300 leading-normal">
-                    A diagnostic ZIP archive has been created on your Desktop. Attach it to your email or copy the report summary.
+                    Your diagnostic archive has been compiled on your Desktop and archived locally in SceneryX reports. Anonymized telemetry is ready for review.
                 </div>
 
-                <!-- Action Buttons: Open in Browser & Copy Report -->
+                <!-- Action Buttons -->
                 <div class="grid grid-cols-2 gap-2 pt-1">
-                    <button type="button" onclick="openBugReportInBrowser()" class="px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-100 text-xs font-medium transition-colors cursor-pointer text-center">
-                        Open in Browser
+                    <button type="button" onclick="copyIncidentId()" class="px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-100 text-xs font-medium transition-colors cursor-pointer text-center">
+                        Copy Incident ID
                     </button>
                     <button type="button" onclick="copyBugReportSummary()" class="px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-100 text-xs font-medium transition-colors cursor-pointer text-center">
-                        Copy Report
+                        Copy Markdown Report
                     </button>
                 </div>
 
-                <!-- Secondary Actions: Copy Email & Reveal File -->
                 <div class="grid grid-cols-2 gap-2">
-                    <button type="button" onclick="copyBugEmailAddress()" class="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-850 border border-slate-700 text-slate-300 text-[11px] transition-colors cursor-pointer text-center">
-                        Copy Email
+                    <button type="button" onclick="openBugReportInBrowser()" class="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700/60 text-slate-300 text-[11px] transition-colors cursor-pointer text-center">
+                        Send Email to Support
                     </button>
-                    <button type="button" onclick="revealBugReportFile()" class="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-850 border border-slate-700 text-slate-300 text-[11px] transition-colors cursor-pointer text-center">
-                        Reveal File
+                    <button type="button" onclick="revealBugReportFile()" class="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700/60 text-slate-300 text-[11px] transition-colors cursor-pointer text-center">
+                        Reveal Desktop ZIP
                     </button>
                 </div>
             </div>
 
             <!-- Footer Action Buttons -->
-            <div class="pt-2 flex items-center justify-end gap-2.5">
-                <button type="button" onclick="closeBugReportModal()" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer border border-slate-700">
-                    Cancel
-                </button>
-                <button type="button" id="btn-submit-bug-report" onclick="submitBugReport()" class="px-5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 active:scale-[0.98] text-white text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer shadow-md shadow-blue-900/30">
-                    Generate Report
-                </button>
+            <div class="pt-2 flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="simulateTestBug('key_error')" class="px-3 py-1.5 rounded-lg bg-slate-950/80 hover:bg-slate-800 text-slate-400 hover:text-slate-200 text-[11px] font-semibold border border-slate-700/60 transition-colors cursor-pointer" title="Simulate a test error in the pipeline">
+                        Self-Test Error
+                    </button>
+                    <button type="button" onclick="openCrashReportsFolder()" class="px-3 py-1.5 rounded-lg bg-slate-950/80 hover:bg-slate-800 text-slate-400 hover:text-slate-200 text-[11px] font-semibold border border-slate-700/60 transition-colors cursor-pointer" title="Open persistent incident archives folder">
+                        History Folder
+                    </button>
+                </div>
+
+                <div class="flex items-center gap-2.5">
+                    <button type="button" onclick="closeBugReportModal()" class="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer border border-slate-700/60">
+                        Cancel
+                    </button>
+                    <button type="button" id="btn-submit-bug-report" onclick="submitBugReport()" class="px-5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 active:scale-[0.98] text-slate-100 border border-slate-600 text-xs font-semibold uppercase tracking-wider transition-all cursor-pointer shadow-md">
+                        Submit Diagnostic Report
+                    </button>
+                </div>
             </div>
         </div>
     </div>

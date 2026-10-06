@@ -1150,13 +1150,47 @@ class Api:
         try:
             payload = json.loads(payload_json) if isinstance(payload_json, str) else (payload_json or {})
             desc = payload.get("description", "")
-            cat = payload.get("category", "Général")
+            cat = payload.get("category", "General")
             inc_screen = payload.get("include_screenshot", True)
             inc_logs = payload.get("include_logs", True)
             res = flight_bug_reporter.build_bug_report_package(desc, cat, inc_screen, inc_logs)
             return json.dumps(res, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+
+    def get_bug_reporter_status(self):
+        try:
+            res = flight_bug_reporter.get_bug_reporter_status()
+            return json.dumps(res, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"error": str(e)}, ensure_ascii=False)
+
+    def preview_bug_report(self, payload_json="{}"):
+        try:
+            payload = json.loads(payload_json) if isinstance(payload_json, str) else (payload_json or {})
+            desc = payload.get("description", "")
+            cat = payload.get("category", "General")
+            preview = flight_bug_reporter.get_diagnostic_preview(desc, cat)
+            return json.dumps({"status": "ok", "preview": preview}, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    def open_crash_reports_folder(self):
+        try:
+            res = flight_bug_reporter.open_crash_reports_folder()
+            return json.dumps(res, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    def save_bug_reporter_privacy(self, payload_json="{}"):
+        try:
+            payload = json.loads(payload_json) if isinstance(payload_json, str) else (payload_json or {})
+            auto_send = bool(payload.get("auto_send_crash_reports", True))
+            telemetry = bool(payload.get("send_anonymous_telemetry", True))
+            ok = flight_bug_reporter.save_privacy_settings(auto_send, telemetry)
+            return json.dumps({"status": "ok" if ok else "error"}, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
 
     def simulate_test_bug(self, bug_type="key_error"):
         try:

@@ -14399,6 +14399,15 @@ async function openSettingsModal() {
         closeActionSelect.value = currentSettings.close_action || 'quit';
     }
 
+    const chkPrivacyCrash = document.getElementById('cfg-privacy-crash-reports');
+    if (chkPrivacyCrash) {
+        chkPrivacyCrash.checked = currentSettings.auto_send_crash_reports !== false;
+    }
+    const chkPrivacyTelem = document.getElementById('cfg-privacy-telemetry-stats');
+    if (chkPrivacyTelem) {
+        chkPrivacyTelem.checked = currentSettings.send_anonymous_telemetry !== false;
+    }
+
     loadSimBriefSettingsUI();
     renderSettingsPathsList();
     if (typeof refreshIngamePanelStatus === 'function') {
@@ -14434,12 +14443,12 @@ function renderSettingsPathsList() {
 
     paths.forEach((item, index) => {
         const row = document.createElement('div');
-        row.className = "p-3 rounded-2xl bg-slate-950/70 border border-slate-800 flex items-center justify-between gap-3";
+        row.className = "p-3 rounded-lg bg-slate-950/80 border border-slate-700/60 flex items-center justify-between gap-3";
 
         row.innerHTML = `
             <div class="space-y-1.5 flex-1">
                 <div class="flex items-center justify-between pb-0.5 select-none">
-                    <span class="text-xs font-bold text-cyan-400 tracking-wide truncate" title="${escapeHtml(item.name || 'MSFS Scenery Path')}">
+                    <span class="text-xs font-semibold text-slate-200 tracking-wide truncate" title="${escapeHtml(item.name || 'MSFS Scenery Path')}">
                         ${escapeHtml(item.name || 'MSFS Scenery Path')}
                     </span>
                 </div>
@@ -14447,12 +14456,12 @@ function renderSettingsPathsList() {
                 <div class="flex items-center gap-2">
                     <input type="text" value="${item.path || ''}" 
                            oninput="updatePathValue(${index}, this.value)"
-                           class="w-full bg-slate-900 border border-slate-800 rounded-xl px-3 py-1.5 text-xs font-mono text-slate-300 focus:outline-none focus:border-cyan-500">
-                    <button onclick="browsePathFolder(${index})" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs transition-colors flex items-center gap-1.5 border-0 cursor-pointer" title="Browse / Change Folder">
-                        ${getIcon('folder', 'w-3.5 h-3.5 text-slate-400 group-hover:text-white transition-colors')}
+                           class="w-full bg-slate-900 border border-slate-700/60 rounded-md px-3 py-1.5 text-xs font-mono text-slate-300 focus:outline-none focus:border-slate-400 focus:bg-slate-800">
+                    <button onclick="browsePathFolder(${index})" class="px-2.5 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700/60 text-slate-300 hover:text-white text-xs font-semibold transition-colors flex items-center shrink-0 cursor-pointer" title="Browse / Change Folder">
+                        Browse
                     </button>
-                    <button onclick="openPathInExplorer(${index})" class="px-2.5 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white text-xs transition-colors flex items-center justify-center border-0 cursor-pointer" title="Open in Windows Explorer">
-                        <i class="fa-solid fa-arrow-up-right-from-square text-slate-400 group-hover:text-white transition-colors"></i>
+                    <button onclick="openPathInExplorer(${index})" class="px-2.5 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700/60 text-slate-300 hover:text-white text-xs font-semibold transition-colors flex items-center justify-center shrink-0 cursor-pointer" title="Open in Windows Explorer">
+                        Explorer
                     </button>
                 </div>
             </div>
@@ -14460,11 +14469,11 @@ function renderSettingsPathsList() {
             <div class="flex items-center gap-3 self-center pl-2">
                 <label class="relative inline-flex items-center cursor-pointer" title="Enable/Disable Path Scan">
                     <input type="checkbox" ${item.enabled ? 'checked' : ''} onchange="togglePathEnabled(${index}, this.checked)" class="sr-only peer">
-                    <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-cyan-500"></div>
+                    <div class="w-9 h-5 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-slate-400"></div>
                 </label>
 
-                <button onclick="removePathRow(${index})" class="w-8 h-8 rounded-xl bg-slate-800 hover:bg-red-600 text-slate-400 hover:text-white transition-colors flex items-center justify-center border-0 cursor-pointer" title="Remove Path">
-                    <i class="fa-solid fa-trash text-xs"></i>
+                <button onclick="removePathRow(${index})" class="w-7 h-7 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700/60 text-slate-400 hover:text-red-400 transition-colors flex items-center justify-center cursor-pointer" title="Remove Path">
+                    ✕
                 </button>
             </div>
         `;
@@ -14556,9 +14565,9 @@ async function addCustomPathRow() {
         container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
         const lastRow = container.lastElementChild;
         if (lastRow) {
-            lastRow.classList.add('ring-2', 'ring-cyan-400', 'transition-all');
+            lastRow.classList.add('ring-1', 'ring-slate-400', 'transition-all');
             setTimeout(() => {
-                lastRow.classList.remove('ring-2', 'ring-cyan-400');
+                lastRow.classList.remove('ring-1', 'ring-slate-400');
             }, 2000);
         }
     }
@@ -14618,6 +14627,22 @@ async function saveSettings() {
     if (closeActionSelect) {
         currentSettings.close_action = closeActionSelect.value;
     }
+
+    const chkPrivacyCrash = document.getElementById('cfg-privacy-crash-reports');
+    if (chkPrivacyCrash) {
+        currentSettings.auto_send_crash_reports = chkPrivacyCrash.checked;
+    }
+    const chkPrivacyTelem = document.getElementById('cfg-privacy-telemetry-stats');
+    if (chkPrivacyTelem) {
+        currentSettings.send_anonymous_telemetry = chkPrivacyTelem.checked;
+    }
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.save_bug_reporter_privacy) {
+        window.pywebview.api.save_bug_reporter_privacy(JSON.stringify({
+            auto_send_crash_reports: currentSettings.auto_send_crash_reports !== false,
+            send_anonymous_telemetry: currentSettings.send_anonymous_telemetry !== false
+        })).catch(() => {});
+    }
+
     if (window.pywebview && window.pywebview.api && window.pywebview.api.save_smart_lod_config) {
         window.pywebview.api.save_smart_lod_config(JSON.stringify({
             "source": lodSelect ? (lodSelect.value === 'external_autofps' ? 'external_autofps' : (lodSelect.value === 'disabled' ? 'manual' : 'native')) : 'native',
@@ -16481,67 +16506,132 @@ function closeFloatingWindow(winKey) {
 // GESTIONNAIRE D'ASSISTANCE TECHNIQUE ET DE RAPPORT DE BUG
 // ==============================================================================
 
-function openBugReportModal() {
+let currentBugReportResult = null;
+let bugReportPreviewTimeout = null;
+
+async function openBugReportModal() {
     const win = document.getElementById('float-win-bug-report');
     if (!win) return;
     openFloatingWindow('bug_report');
     if (window.windowManager) {
         window.windowManager.centerModal(win);
     }
-    const feedbackEl = document.getElementById('bug-report-sim-feedback');
-    if (feedbackEl) feedbackEl.classList.add('hidden');
     const banner = document.getElementById('bug-report-status-banner');
     if (banner) banner.classList.add('hidden');
 
     try {
-        if (window.pywebview && window.pywebview.api && window.pywebview.api.add_client_breadcrumb) {
-            window.pywebview.api.add_client_breadcrumb('UI_MODAL', 'Ouverture de la modale Assistance & Rapport de Bug');
+        if (window.pywebview && window.pywebview.api) {
+            if (window.pywebview.api.add_client_breadcrumb) {
+                window.pywebview.api.add_client_breadcrumb('UI_MODAL', 'Opened Bug Report & Diagnostic Assistant');
+            }
+            if (window.pywebview.api.get_bug_reporter_status) {
+                const raw = await window.pywebview.api.get_bug_reporter_status();
+                const st = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                const dot = document.getElementById('bug-report-status-dot');
+                const title = document.getElementById('bug-report-status-title');
+                const desc = document.getElementById('bug-report-status-desc');
+                const machBadge = document.getElementById('bug-report-machine-badge');
+
+                if (machBadge && st.machine_id) {
+                    machBadge.textContent = st.machine_id;
+                }
+
+                if (st && st.has_exception && st.last_exception) {
+                    if (dot) {
+                        dot.className = "w-2 h-2 rounded-full bg-amber-400 inline-block shrink-0 animate-pulse";
+                    }
+                    if (title) {
+                        title.textContent = `Exception: ${st.last_exception.type}`;
+                        title.className = "font-semibold text-amber-300";
+                    }
+                    if (desc) {
+                        desc.textContent = `• in ${st.last_exception.culprit_file}#${st.last_exception.culprit_line}`;
+                    }
+                    const catEl = document.getElementById('bug-report-category');
+                    if (catEl) catEl.value = 'Crash & Freezes';
+                } else {
+                    if (dot) {
+                        dot.className = "w-2 h-2 rounded-full bg-emerald-400 inline-block shrink-0";
+                    }
+                    if (title) {
+                        title.textContent = "System Nominal";
+                        title.className = "font-semibold text-slate-200";
+                    }
+                    if (desc) {
+                        desc.textContent = "• Blackbox & Engine Active";
+                    }
+                }
+            }
         }
-    } catch(e) {}
+    } catch(e) {
+        console.warn("[BugReporter] Failed to fetch live status:", e);
+    }
+
+    updateBugReportPreview();
 }
 
 function closeBugReportModal() {
     closeFloatingWindow('bug_report');
 }
 
+function updateBugReportPreview() {
+    if (bugReportPreviewTimeout) clearTimeout(bugReportPreviewTimeout);
+    bugReportPreviewTimeout = setTimeout(async () => {
+        const previewEl = document.getElementById('bug-report-preview-text');
+        if (!previewEl) return;
+        const descEl = document.getElementById('bug-report-desc');
+        const catEl = document.getElementById('bug-report-category');
+        const desc = descEl ? descEl.value.trim() : '';
+        const cat = catEl ? catEl.value : 'General';
+
+        try {
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.preview_bug_report) {
+                const raw = await window.pywebview.api.preview_bug_report(JSON.stringify({ description: desc, category: cat }));
+                const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                if (res && res.preview) {
+                    previewEl.textContent = res.preview;
+                }
+            }
+        } catch(e) {
+            previewEl.textContent = "Unable to generate preview: " + e.message;
+        }
+    }, 250);
+}
+
 async function simulateTestBug(type = 'key_error') {
-    const feedbackEl = document.getElementById('bug-report-sim-feedback');
     const descEl = document.getElementById('bug-report-desc');
     const catEl = document.getElementById('bug-report-category');
     
-    if (feedbackEl) {
-        feedbackEl.classList.remove('hidden');
-        feedbackEl.className = 'text-xs text-amber-400 font-medium';
-        feedbackEl.textContent = 'Simulating...';
-    }
-
     try {
         if (window.pywebview && window.pywebview.api && window.pywebview.api.simulate_test_bug) {
             const raw = await window.pywebview.api.simulate_test_bug(type);
             const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
-            if (feedbackEl) {
-                feedbackEl.className = 'text-xs text-emerald-400 font-medium';
-                feedbackEl.textContent = 'Captured';
-            }
             if (descEl) {
-                descEl.value = "[TEST INCIDENT] Simulated KeyError during VR profile optimization to verify the diagnostic pipeline.";
+                descEl.value = "[SELF-TEST INCIDENT] Simulated KeyError during VR profile optimization to verify the diagnostic pipeline.";
             }
             if (catEl) {
                 catEl.value = 'Crash & Freezes';
             }
             if (typeof showToastNotification === 'function') {
-                showToastNotification("Test error simulated and captured in blackbox.", "info");
+                showToastNotification("Self-test error captured in diagnostic ring buffer.", "info");
             }
+            // Refresh modal live status and preview
+            openBugReportModal();
         }
     } catch(err) {
-        if (feedbackEl) {
-            feedbackEl.className = 'text-xs text-rose-400 font-medium';
-            feedbackEl.textContent = 'Error: ' + err.message;
-        }
+        alert("Simulation error: " + err.message);
     }
 }
 
-let currentBugReportResult = null;
+function openCrashReportsFolder() {
+    try {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.open_crash_reports_folder) {
+            window.pywebview.api.open_crash_reports_folder();
+        }
+    } catch(e) {
+        console.error("Open crash reports folder error:", e);
+    }
+}
 
 function openBugReportInBrowser() {
     if (!currentBugReportResult) return;
@@ -16555,12 +16645,23 @@ function openBugReportInBrowser() {
     }
 }
 
+function copyIncidentId() {
+    const incId = (currentBugReportResult && currentBugReportResult.incident_id) ? currentBugReportResult.incident_id : '';
+    if (incId && navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(incId).then(() => {
+            if (typeof showToastNotification === 'function') {
+                showToastNotification(`Incident ID #${incId} copied!`, "success");
+            }
+        });
+    }
+}
+
 function copyBugReportSummary() {
     const text = (currentBugReportResult && currentBugReportResult.summary_md) ? currentBugReportResult.summary_md : '';
     if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text).then(() => {
             if (typeof showToastNotification === 'function') {
-                showToastNotification("Report copied to clipboard!", "success");
+                showToastNotification("Markdown report copied to clipboard!", "success");
             }
         });
     }
@@ -16595,12 +16696,12 @@ async function submitBugReport() {
     const fileBadge = document.getElementById('bug-report-file-badge');
 
     const desc = descEl ? descEl.value.trim() : '';
-    const cat = catEl ? catEl.value : 'UI & Display';
+    const cat = catEl ? catEl.value : 'General';
     const incScreen = incScreenEl ? incScreenEl.checked : true;
     const incLogs = incLogsEl ? incLogsEl.checked : true;
 
     if (!desc) {
-        alert("Please enter a brief description of the issue.");
+        alert("Please enter a brief description of the issue or observed behavior.");
         if (descEl) descEl.focus();
         return;
     }
@@ -16608,7 +16709,7 @@ async function submitBugReport() {
     if (btn) {
         btn.disabled = true;
         btn.classList.add('opacity-70', 'pointer-events-none');
-        btn.innerHTML = '<span>Generating report...</span>';
+        btn.innerHTML = '<span>Submitting report...</span>';
     }
 
     try {
@@ -16628,13 +16729,13 @@ async function submitBugReport() {
                     statusBanner.classList.remove('hidden');
                 }
                 if (fileBadge) {
-                    fileBadge.textContent = res.filename || 'SceneryX_BugReport.zip';
+                    fileBadge.textContent = res.filename || `SceneryX_BugReport_${res.incident_id}.zip`;
                 }
                 if (typeof showToastNotification === 'function') {
-                    showToastNotification("Archive created on Desktop.", "success");
+                    showToastNotification(`Report #${res.incident_id} logged successfully!`, "success");
                 }
             } else {
-                alert("Error generating report: " + (res.error || 'Unknown error'));
+                alert("Error submitting diagnostic report: " + (res.error || 'Unknown error'));
             }
         }
     } catch(err) {
@@ -16643,7 +16744,7 @@ async function submitBugReport() {
         if (btn) {
             btn.disabled = false;
             btn.classList.remove('opacity-70', 'pointer-events-none');
-            btn.innerHTML = '<span>Generate Report</span>';
+            btn.innerHTML = '<span>Submit Diagnostic Report</span>';
         }
     }
 }
