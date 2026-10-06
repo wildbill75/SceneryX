@@ -14685,9 +14685,25 @@ async function saveSettings() {
         if (window.pywebview) {
             await window.pywebview.api.save_settings(JSON.stringify(currentSettings));
         }
-        closeSettingsModal();
+        if (typeof showToast === 'function') {
+            showToast('Settings saved successfully.', 'success');
+        }
+        const saveBtn = document.getElementById('settings-save-btn');
+        const saveBtnText = document.getElementById('settings-save-btn-text');
+        if (saveBtnText) {
+            const origText = saveBtnText.textContent;
+            saveBtnText.textContent = 'Saved ✓';
+            if (saveBtn) saveBtn.classList.add('text-emerald-400', 'border-emerald-600/60');
+            setTimeout(() => {
+                if (saveBtnText) saveBtnText.textContent = origText;
+                if (saveBtn) saveBtn.classList.remove('text-emerald-400', 'border-emerald-600/60');
+            }, 1600);
+        }
     } catch (e) {
         console.error("Failed to save settings:", e);
+        if (typeof showToast === 'function') {
+            showToast('Failed to save settings: ' + e, 'error');
+        }
     }
 }
 
@@ -17875,24 +17891,24 @@ async function toggleMaxFrameRateSwitch(key) {
 
     const inputElem = document.getElementById(`opt-combo-input-${key}`);
     const inputVal = inputElem ? parseInt(inputElem.value.replace(/[^0-9]/g, '')) : 0;
-    const curNum = inputVal || parseInt(String(item.raw_value || item.value).replace(/[^0-9]/g, '')) || item._lastActiveFps || (item.target_fps ? parseInt(item.target_fps) : 0) || (modeNorm === 'VR' ? 45 : 82);
+    const curNum = inputVal || parseInt(String(item.raw_value || item.value).replace(/[^0-9]/g, '')) || item._lastActiveFps || (item.target_fps ? parseInt(item.target_fps) : 0) || (modeNorm === 'VR' ? 36 : 82);
     const isCurActive = (item.is_active !== undefined) ? item.is_active : (curNum > 0 && item.raw_value !== '0' && !String(item.value || '').toUpperCase().includes('OFF'));
 
     if (isCurActive) {
-        item._lastActiveFps = curNum;
+        if (curNum > 0) item._lastActiveFps = curNum;
         item.is_active = false;
         if (inputElem) {
-            inputElem.value = String(curNum);
-            inputElem.classList.remove('text-emerald-400', 'text-amber-400', 'text-orange-400', 'text-rose-400');
+            inputElem.value = 'OFF';
+            inputElem.classList.remove('text-emerald-400', 'text-[#2ce586]', 'text-amber-400', 'text-orange-400', 'text-rose-400');
             inputElem.classList.add('text-slate-500', 'opacity-60');
-            inputElem.title = 'Frame limiter is disabled (OFF) - Target preserved';
+            inputElem.title = 'Frame limiter is disabled (OFF) - Click switch to enable';
         }
         await onMsfsManualSettingSubmitted(key, 'OFF', 0, 240);
     } else {
         item.is_active = true;
-        let restoreVal = item._lastActiveFps || curNum;
+        let restoreVal = item._lastActiveFps || (item.target_fps ? parseInt(item.target_fps) : 0) || (modeNorm === 'VR' ? 36 : 82);
         if (!restoreVal || restoreVal <= 0) {
-            restoreVal = (modeNorm === 'VR') ? 45 : 82;
+            restoreVal = (modeNorm === 'VR') ? 36 : 82;
         }
         if (inputElem) {
             inputElem.value = String(restoreVal);
@@ -19116,13 +19132,12 @@ function renderMsfsSettingsMatrix() {
             let displayVal = item.raw_value;
             if (item.key === 'max_frame_rate') {
                 const isOff = (item.is_active === false) || item.raw_value === '0' || item.value === '0' || String(item.value).toUpperCase() === 'OFF' || String(item.value).toLowerCase().includes('unlocked');
-                const defaultTargetFps = (String(currentMsfsGraphicsMode || '2D').toUpperCase() === 'VR') ? '45' : '82';
+                const defaultTargetFps = (String(currentMsfsGraphicsMode || '2D').toUpperCase() === 'VR') ? '36' : '82';
                 if (isOff) {
-                    displayVal = item._lastActiveFps || (item.target_fps ? String(item.target_fps) : '') || (item.raw_value && item.raw_value !== '0' ? item.raw_value : defaultTargetFps);
-                    if (!item._lastActiveFps) item._lastActiveFps = displayVal;
+                    displayVal = 'OFF';
                 } else {
                     displayVal = item.raw_value || String(item.value).replace(/[^0-9]/g, '') || defaultTargetFps;
-                    item._lastActiveFps = displayVal;
+                    item._lastActiveFps = parseInt(displayVal) || parseInt(defaultTargetFps);
                 }
             } else if (item.key === 'sharpen_amount_vr') {
                 const flt = parseFloat(item.value !== undefined ? item.value : (item.raw_value || 0));
@@ -19189,13 +19204,12 @@ function renderMsfsSettingsMatrix() {
                                    id="opt-combo-input-${item.key}"
                                    value="${displayVal}"
                                    style="color-scheme: dark;"
-                                   onclick="toggleComboboxDropdown('${item.key}', event)"
                                    onfocus="this.select();"
                                    onkeydown="if(event.key==='Enter'){this.blur();}"
                                    onchange="onMsfsManualSettingSubmitted('${item.key}', this.value, ${item.min_val ?? 0}, ${item.max_val ?? 400})"
-                                   class="w-full bg-slate-950 border border-slate-700/80 focus:border-cyan-400 rounded-xl pl-3 pr-10 py-2 typo-input-val text-xs ${fpsInputColor} font-semibold tabular-nums focus:outline-none cursor-pointer transition-colors"
-                                   placeholder="Select or enter value..."
-                                   title="${isFpsActive ? 'Target frame rate active' : 'Frame limiter is disabled (OFF) - Target preserved'}">
+                                   class="w-full bg-slate-950 border border-slate-700/80 focus:border-slate-400 focus:ring-1 focus:ring-slate-400/25 focus:bg-slate-900 rounded-xl pl-3 pr-10 py-2 typo-input-val text-xs ${fpsInputColor} font-semibold tabular-nums focus:outline-none transition-colors"
+                                   placeholder="Enter FPS (e.g. 72, 60 or OFF)"
+                                   title="${isFpsActive ? 'Target frame rate active - Enter numeric value or select from dropdown' : 'Frame limiter is disabled (OFF) - Click switch to enable'}">
                             <div class="cursor-pointer absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-white"
                                  onclick="toggleComboboxDropdown('${item.key}', event)">
                                 <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
@@ -19210,7 +19224,7 @@ function renderMsfsSettingsMatrix() {
                                     ${presetListItems}
                                 </div>
                                 <div id="opt-combo-preview-${item.key}"
-                                     class="px-3 py-2 text-[10.5px] leading-tight bg-slate-950/95 border-t border-slate-800 text-slate-300 min-h-[38px] flex items-center gap-1.5 shrink-0 rounded-b-xl">
+                                 class="px-3 py-2 text-[10.5px] leading-tight bg-slate-950/95 border-t border-slate-800 text-slate-300 min-h-[38px] flex items-center gap-1.5 shrink-0 rounded-b-xl">
                                     ${defaultComboPreviewHtml}
                                 </div>
                             </div>
@@ -19232,11 +19246,10 @@ function renderMsfsSettingsMatrix() {
                                id="opt-combo-input-${item.key}"
                                value="${displayVal}"
                                style="color-scheme: dark;"
-                               onclick="toggleComboboxDropdown('${item.key}', event)"
                                onfocus="this.select();"
                                onkeydown="if(event.key==='Enter'){this.blur();}"
                                onchange="onMsfsManualSettingSubmitted('${item.key}', this.value, ${item.min_val ?? 0}, ${item.max_val ?? 400})"
-                               class="w-full bg-slate-950 border border-slate-700/80 focus:border-cyan-400 rounded-xl pl-3 pr-10 py-2 typo-input-val text-xs ${valColorClass} font-semibold tabular-nums focus:outline-none cursor-pointer"
+                               class="w-full bg-slate-950 border border-slate-700/80 focus:border-slate-400 focus:ring-1 focus:ring-slate-400/25 focus:bg-slate-900 rounded-xl pl-3 pr-10 py-2 typo-input-val text-xs ${valColorClass} font-semibold tabular-nums focus:outline-none transition-colors"
                                placeholder="Select or enter value..."
                                title="Select a preset from dropdown or enter custom value">
                         <div class="cursor-pointer absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-white"
@@ -19464,10 +19477,13 @@ async function onMsfsSettingChanged(settingKey, newValue) {
             } else {
                 if (settingKey === 'max_frame_rate') {
                     found.is_active = true;
-                    found._lastActiveFps = parseInt(String(newValue).replace(/[^0-9]/g, '')) || 82;
+                    found._lastActiveFps = parseInt(String(newValue).replace(/[^0-9]/g, '')) || (String(currentMsfsGraphicsMode || '2D').toUpperCase() === 'VR' ? 36 : 82);
+                    found.value = `${found._lastActiveFps} FPS`;
+                    found.raw_value = String(found._lastActiveFps);
+                } else {
+                    found.value = newValue;
+                    found.raw_value = newValue;
                 }
-                found.value = newValue;
-                found.raw_value = newValue;
             }
 
             let optInfo = null;
@@ -19570,11 +19586,10 @@ async function onMsfsSettingChanged(settingKey, newValue) {
                         inputEl.classList.add(cleanTag === 'SWEET SPOT' ? 'text-[#2ce586]' : 'text-emerald-400');
                         inputEl.title = 'Target frame rate active';
                     } else {
-                        const fallbackVal = found._lastActiveFps || inputEl.value.replace(/[^0-9]/g, '') || (String(currentMsfsGraphicsMode || '2D').toUpperCase() === 'VR' ? '45' : '82');
-                        inputEl.value = fallbackVal;
+                        inputEl.value = 'OFF';
                         inputEl.classList.remove('text-emerald-400', 'text-[#2ce586]', 'text-amber-400', 'text-orange-400', 'text-rose-400');
                         inputEl.classList.add('text-slate-500', 'opacity-60');
-                        inputEl.title = 'Frame limiter is disabled (OFF) - Target preserved';
+                        inputEl.title = 'Frame limiter is disabled (OFF) - Click switch to enable';
                     }
                 } else {
                     inputEl.value = newValue;
@@ -19808,18 +19823,6 @@ async function checkAndPromptCadenceCalibration(det, data) {
     const isVrHzChanged = Boolean(hasVr && savedVrHz && String(savedVrHz) !== String(vrHz));
 
     if (isFirstTime || isScreenHzChanged || isVrHzChanged) {
-        // Automatically stage/apply the optimal target frame rates
-        try {
-            if (window.pywebview && window.pywebview.api && window.pywebview.api.update_msfs_setting) {
-                if (hasVr) {
-                    await window.pywebview.api.update_msfs_setting('VR', 'max_frame_rate', String(vrTargetFps));
-                }
-                await window.pywebview.api.update_msfs_setting('2D', 'max_frame_rate', String(screenTargetFps));
-            }
-        } catch (e) {
-            console.error("Error auto-calibrating target frame rate:", e);
-        }
-
         // Save new state to localStorage so it doesn't pop up again unless hardware Hz changes
         localStorage.setItem('sceneryx_cadence_screen_hz', String(screenHz));
         localStorage.setItem('sceneryx_cadence_vr_hz', String(vrHz));

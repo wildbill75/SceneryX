@@ -2202,15 +2202,13 @@ def apply_setting_to_content(content: str, mode: str, setting_key: str, new_valu
     elif setting_key in ['max_frame_rate', 'TargetFrameRate']:
         k = 'TargetFrameRate' if mode == '2D' else 'TargetFrameRateVR'
         clean_val = str(new_value).replace('FPS', '').replace('Unlocked', '0').replace('OFF', '0').replace('off', '0').strip()
-        content = re.sub(rf'({k}\s+)[^\r\n]+', rf'\g<1>{clean_val}', content, flags=re.IGNORECASE)
+        if re.search(rf'({k}\s+)[^\r\n]+', content, flags=re.IGNORECASE):
+            content = re.sub(rf'({k}\s+)[^\r\n]+', rf'\g<1>{clean_val}', content, flags=re.IGNORECASE)
+        else:
+            content = re.sub(r'(\{Video[^\}]*)(\})', rf'\g<1>\t{k} {clean_val}\n\g<2>', content, count=1)
+
         # Always synchronize engine-level FrameLimiter in UserCfg.opt with active mode's target (2D or VR)
         limiter_val = clean_val
-        if limiter_val == '0':
-            other_k = 'TargetFrameRateVR' if mode == '2D' else 'TargetFrameRate'
-            m_other = re.search(rf'{other_k}\s+([-\d]+)', content, flags=re.IGNORECASE)
-            other_val = m_other.group(1) if m_other else '0'
-            if other_val != '0':
-                limiter_val = other_val
         if re.search(r'(FrameLimiter\s+)[^\r\n]+', content, flags=re.IGNORECASE):
             content = re.sub(r'(FrameLimiter\s+)[^\r\n]+', rf'\g<1>{limiter_val}', content, flags=re.IGNORECASE)
         else:
@@ -8495,6 +8493,22 @@ def update_msfs_user_cfg_setting(mode: str, setting_key: str, new_value: Any, us
         with open(path, 'w', encoding='utf-8') as f:
             f.write(content)
 
+        active_id = get_active_profile_id()
+        if active_id:
+            profiles_dir = get_custom_profiles_dir()
+            for pdir in [profiles_dir, r"D:\SceneryX\custom_profiles"]:
+                pfile = os.path.join(pdir, f"{active_id}.profile.json")
+                if os.path.exists(pfile):
+                    try:
+                        with open(pfile, "r", encoding="utf-8") as pf:
+                            pdata = json.load(pf)
+                        pdata["content"] = content
+                        pdata["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        with open(pfile, "w", encoding="utf-8") as pf:
+                            json.dump(pdata, pf, indent=2)
+                    except Exception:
+                        pass
+
         return {
             "status": "success",
             "message": f"Updated {setting_key} to {new_value} for {mode} mode.",
@@ -8929,9 +8943,6 @@ def get_full_rig_diagnostics(flight_profile: str = 'LINER', vr_refresh_rate: int
         target_p = next((p for p in profiles if p.get("id") == profile_id), None)
         if target_p and target_p.get("content"):
             custom_cfg_content = target_p.get("content")
-    else:
-        # Strictly ensure saved active profile is synchronized to UserCfg.opt
-        ensure_active_profile_applied(cfg.get("path"))
 
     effective_vr_hz = vr_headset["refresh_rate_hz"] if (vr_headset.get("detected") and vr_headset.get("refresh_rate_hz")) else 72
 
