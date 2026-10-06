@@ -168,21 +168,21 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
             pass
 
         # Check module-level manual LOD cache as persistent safety net
-        if cur_olod is None and _LAST_MANUAL_LOD.get("olod") is not None:
-            cur_olod = _LAST_MANUAL_LOD["olod"]
-        if cur_tlod is None and _LAST_MANUAL_LOD.get("tlod") is not None:
+        if _LAST_MANUAL_LOD.get("tlod") is not None:
             cur_tlod = _LAST_MANUAL_LOD["tlod"]
+        if _LAST_MANUAL_LOD.get("olod") is not None:
+            cur_olod = _LAST_MANUAL_LOD["olod"]
 
-        # Try direct memory engine read if available and not manually set
+        # Try direct memory engine read if available and not actively regulated
         try:
             import flight_memory_engine
             mem = flight_memory_engine.get_memory_engine()
             if mem.is_attached and not mem.safe_read_only:
                 mem_tlod = mem.read_tlod()
                 mem_olod = mem.read_olod()
-                if mem_tlod is not None and cur_tlod is None:
+                if mem_tlod is not None and "tlod" not in _LAST_MANUAL_LOD and not (lod_status.get("enabled") and lod_status.get("is_running")):
                     cur_tlod = mem_tlod
-                if mem_olod is not None and cur_olod is None:
+                if mem_olod is not None and "olod" not in _LAST_MANUAL_LOD and not (lod_status.get("enabled") and lod_status.get("is_running")):
                     cur_olod = mem_olod
         except Exception:
             pass
@@ -306,6 +306,21 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
             lod_ctrl = flight_lod_controller.get_smart_lod_controller()
             current_status = lod_ctrl.get_status()
             _LAST_MANUAL_LOD.clear()
+
+            # Read optional body or toggle current state
+            length = int(self.headers.get("Content-Length", 0))
+            new_state = None
+            if length > 0:
+                try:
+                    body = self.rfile.read(length).decode("utf-8")
+                    data = json.loads(body)
+                    if "enabled" in data:
+                        new_state = bool(data["enabled"])
+                except Exception:
+                    pass
+            if new_state is None:
+                new_state = not bool(current_status.get("enabled", False))
+
             res = lod_ctrl.set_enabled(new_state, force_kill_autofps=True)
             self._send_json(200, res)
         except Exception as e:
