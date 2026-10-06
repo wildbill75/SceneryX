@@ -17402,10 +17402,37 @@ async function fetchSmartLodAxisState() {
             if (data.axis_state_vr) {
                 smartLodAxisState['vr'] = Object.assign(smartLodAxisState['vr'], data.axis_state_vr);
             }
+            syncSmartLodCardSliders();
         }
     } catch (e) {
         console.warn('[SmartLOD] Error fetching axis state:', e);
     }
+}
+
+function syncSmartLodCardSliders() {
+    const modeKey = (String(currentMsfsGraphicsMode || '2D').toUpperCase() === 'VR') ? 'vr' : '2d';
+    ['tlod', 'olod'].forEach(axis => {
+        const state = smartLodAxisState[modeKey];
+        if (!state) return;
+        const base = state[`${axis}_base`];
+        const target = state[`${axis}_target`];
+        const alt = state[`${axis}_altitude`];
+
+        const baseInput = document.getElementById(`smart-lod-base-range-${axis}`);
+        const targetInput = document.getElementById(`smart-lod-target-range-${axis}`);
+        const altInput = document.getElementById(`smart-lod-alt-${axis}`);
+        const baseValEl = document.getElementById(`smart-lod-base-val-${axis}`);
+        const targetValEl = document.getElementById(`smart-lod-target-val-${axis}`);
+
+        if (base !== undefined && baseInput) baseInput.value = base;
+        if (target !== undefined && targetInput) targetInput.value = target;
+        if (alt !== undefined && altInput) altInput.value = alt;
+        if (base !== undefined && baseValEl) baseValEl.textContent = base;
+        if (target !== undefined && targetValEl) targetValEl.textContent = target;
+        if (base !== undefined && target !== undefined) {
+            updateDualSliderTrack(axis, base, target);
+        }
+    });
 }
 
 function toggleSmartLodAxis(axis) {
@@ -17441,6 +17468,7 @@ function updateDualSliderTrack(axis, base, target) {
 }
 
 function onDualSliderMouseMove(e, axis) {
+    if (e.buttons === 1) return; // Prevent switching z-index while dragging
     const rect = e.currentTarget.getBoundingClientRect();
     if (!rect.width) return;
     const x = e.clientX - rect.left;
@@ -19381,9 +19409,9 @@ function renderMsfsSettingsMatrix() {
                     </div>
                     <div class="dual-slider-container" onmousemove="onDualSliderMouseMove(event, '${axis}')">
                         <!-- Full Track Background -->
-                        <div class="w-full h-1.5 bg-slate-800 rounded-lg absolute pointer-events-none"></div>
+                        <div class="w-full h-1.5 bg-slate-800 rounded-lg absolute pointer-events-none z-0"></div>
                         <!-- Active Range Highlight Bar -->
-                        <div id="smart-lod-track-highlight-${axis}" class="absolute h-1.5 bg-sky-500 rounded-lg pointer-events-none transition-all duration-75" style="left: ${leftPct}%; width: ${widthPct}%;"></div>
+                        <div id="smart-lod-track-highlight-${axis}" class="absolute h-1.5 bg-sky-500 rounded-lg pointer-events-none transition-all duration-75 z-[1]" style="left: ${leftPct}%; width: ${widthPct}%;"></div>
                         <!-- Floor Input Slider (Left Thumb) -->
                         <input type="range"
                                id="smart-lod-base-range-${axis}"
@@ -22153,6 +22181,7 @@ function updateSmartLodUIFromStatus(status) {
     if (status.external_autofps !== undefined) {
         smartLodAxisState.external_autofps = !!status.external_autofps;
     }
+    syncSmartLodCardSliders();
 
     // Indicator Dot on Button
     const dot = document.getElementById('opt-smart-lod-indicator-dot');
