@@ -4301,17 +4301,21 @@ class Api:
 
     def start_flight_blackbox(self, flight_name, dep_icao, arr_icao, aircraft):
         try:
-            # Si départ ou arrivée sont non spécifiés ou 'DEP'/'ARR', vérifier SimBrief
-            if not dep_icao or dep_icao == 'DEP' or not arr_icao or arr_icao == 'ARR':
-                st = get_settings()
-                sb = st.get('flight_mode', {}).get('simbrief_flight') or st.get('latest_simbrief_flight')
-                if sb and isinstance(sb, dict):
-                    sb_orig = sb.get('origin', {}).get('icao')
-                    sb_dest = sb.get('destination', {}).get('icao')
-                    if sb_orig and (not dep_icao or dep_icao == 'DEP'):
-                        dep_icao = sb_orig
-                    if sb_dest and (not arr_icao or arr_icao == 'ARR'):
-                        arr_icao = sb_dest
+            # Vérification et rafraîchissement automatique de SimBrief
+            sb = flight_perf_tracker.get_simbrief_flight_plan(force_refresh=True)
+            st = get_settings()
+            fm = st.get('flight_mode', {})
+            is_corridor = bool(fm.get('active') and fm.get('profile') in ('DIRECT', 'CORRIDOR'))
+
+            if sb and isinstance(sb, dict):
+                sb_orig = sb.get('origin', {}).get('icao')
+                sb_dest = sb.get('destination', {}).get('icao')
+                if not is_corridor:
+                    if sb_orig: dep_icao = sb_orig
+                    if sb_dest: arr_icao = sb_dest
+                else:
+                    if sb_orig and (not dep_icao or dep_icao == 'DEP'): dep_icao = sb_orig
+                    if sb_dest and (not arr_icao or arr_icao == 'ARR'): arr_icao = sb_dest
 
             res = flight_perf_tracker.BLACKBOX.start(flight_name=flight_name, dep=dep_icao, arr=arr_icao, aircraft=aircraft)
             return json.dumps(res, ensure_ascii=False)
@@ -4384,6 +4388,14 @@ class Api:
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
 
+    def get_flight_report_data(self, filename_or_path):
+        try:
+            import flight_perf_tracker
+            data = flight_perf_tracker.load_report_payload(filename_or_path)
+            return json.dumps(data, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
     def delete_flight_benchmark(self, filename):
         try:
             base_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
@@ -4399,6 +4411,7 @@ class Api:
                 html_p = os.path.join(bench_dir, safe_name)
                 stem = os.path.splitext(safe_name)[0]
                 csv_p = os.path.join(bench_dir, f"{stem}.csv")
+                json_p = os.path.join(bench_dir, f"{stem}.json")
 
                 file_deleted = False
                 if os.path.exists(html_p):
@@ -4410,6 +4423,12 @@ class Api:
                 if os.path.exists(csv_p):
                     try:
                         os.remove(csv_p)
+                        file_deleted = True
+                    except Exception:
+                        pass
+                if os.path.exists(json_p):
+                    try:
+                        os.remove(json_p)
                         file_deleted = True
                     except Exception:
                         pass
@@ -4476,6 +4495,15 @@ class Api:
         except Exception as e:
             return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
 
+    def set_smart_lod_cloud_recovery(self, enabled):
+        try:
+            import flight_lod_controller
+            ctrl = flight_lod_controller.get_smart_lod_controller()
+            res = ctrl.set_cloud_recovery(bool(enabled))
+            return json.dumps({"success": res, "cloud_recovery": bool(enabled)}, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+
     def save_smart_lod_config(self, config_json_str):
         try:
             import flight_lod_controller
@@ -4525,6 +4553,227 @@ class Api:
             return json.dumps({"success": ok}, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+
+    def check_background_tools(self):
+        try:
+            from flight_memory_engine import FlightMemoryEngine
+            from scanner import get_settings
+            import flight_rig_optimizer
+            
+            af_running, af_pid = FlightMemoryEngine.is_autofps_running()
+            ofxr_running, ofxr_pid = FlightMemoryEngine.is_ofxr_running()
+            
+            st = get_settings()
+            remember = bool(st.get("background_tools_remembered", False))
+            if remember and st.get("autofps_autokill", False) and af_running:
+                FlightMemoryEngine.kill_autofps_process()
+                af_running = False
+                af_pid = None
+
+            # Detect VR Headset refresh rate (Pimax, Meta, Index, etc.)
+            det_vr = flight_rig_optimizer.detect_vr_headset()
+            vr_hz = int(det_vr.get("refresh_rate_hz", 90)) if det_vr.get("detected") else 90
+
+            fps_2x = max(20, vr_hz // 2)
+            fps_3x = max(20, round(vr_hz / 3))
+            is_3x_disabled = (fps_3x < 30) or (vr_hz <= 75)
+
+            default_mode = "2X" if is_3x_disabled else "3X"
+            ofxr_mode = str(st.get("ofxr_mode", default_mode if ofxr_running else "OFF")).upper()
+            if ofxr_mode not in ["OFF", "2X", "3X"] or (is_3x_disabled and ofxr_mode == "3X"):
+                ofxr_mode = default_mode if ofxr_running else "OFF"
+                if is_3x_disabled and st.get("ofxr_mode") == "3X":
+                    st["ofxr_mode"] = "2X"
+                    st["ofxr_target_fps"] = fps_2x
+                    save_settings(st)
+
+            default_target = fps_2x if (is_3x_disabled or ofxr_mode == "2X") else fps_3x
+            try:
+                ofxr_target_fps = int(st.get("ofxr_target_fps", default_target))
+                if is_3x_disabled and ofxr_target_fps < 30:
+                    ofxr_target_fps = fps_2x
+                    st["ofxr_target_fps"] = fps_2x
+                    save_settings(st)
+            except Exception:
+                ofxr_target_fps = default_target
+
+            ofxr_sync = bool(st.get("ofxr_sync_smart_lod", True))
+            ext_af = bool(st.get("external_autofps", False))
+
+            return json.dumps({
+                "autofps_running": af_running,
+                "autofps_pid": af_pid,
+                "ofxr_running": ofxr_running,
+                "ofxr_pid": ofxr_pid,
+                "remember_choice": remember,
+                "ofxr_mode": ofxr_mode,
+                "ofxr_target_fps": ofxr_target_fps,
+                "ofxr_sync_smart_lod": ofxr_sync,
+                "external_autofps": ext_af,
+                "vr_hz": vr_hz,
+                "fps_2x": fps_2x,
+                "fps_3x": fps_3x
+            }, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"error": str(e)}, ensure_ascii=False)
+
+    def resolve_background_tools(self, action_json_str):
+        try:
+            from flight_memory_engine import FlightMemoryEngine
+            import flight_lod_controller
+            import flight_rig_optimizer
+            from scanner import get_settings, save_settings
+
+            payload = json.loads(action_json_str) if isinstance(action_json_str, str) else action_json_str
+            st = get_settings()
+
+            det_vr = flight_rig_optimizer.detect_vr_headset()
+            vr_hz = int(det_vr.get("refresh_rate_hz", 90)) if det_vr.get("detected") else 90
+            fps_2x = max(20, vr_hz // 2)
+            fps_3x = max(20, round(vr_hz / 3))
+            is_3x_disabled = (fps_3x < 30) or (vr_hz <= 75)
+
+            remember = bool(payload.get("remember", False))
+            af_action = payload.get("autofps_action", "ignore")
+            if af_action == "kill":
+                FlightMemoryEngine.kill_autofps_process()
+                flight_lod_controller.set_external_autofps(False)
+                st["autofps_autokill"] = remember
+                st["background_tools_remembered"] = remember
+                st["external_autofps"] = False
+            elif af_action == "keep":
+                flight_lod_controller.set_external_autofps(True)
+                st["autofps_autokill"] = False
+                st["background_tools_remembered"] = remember
+                st["external_autofps"] = True
+
+            if "ofxr_mode" in payload:
+                mode = str(payload.get("ofxr_mode", "OFF")).upper()
+                if mode in ["OFF", "2X", "3X"]:
+                    if is_3x_disabled and mode == "3X":
+                        mode = "2X"
+                    st["ofxr_mode"] = mode
+
+            if "ofxr_target_fps" in payload:
+                try:
+                    fps = int(payload.get("ofxr_target_fps", 36))
+                    if is_3x_disabled and fps < 30:
+                        fps = fps_2x
+                    st["ofxr_target_fps"] = fps
+                except Exception:
+                    pass
+
+            if "ofxr_sync_smart_lod" in payload:
+                sync = bool(payload.get("ofxr_sync_smart_lod", True))
+                st["ofxr_sync_smart_lod"] = sync
+
+            # Automatically sync Max Frame Rate (VR) in UserCfg.opt with OFXR target
+            if st.get("ofxr_mode") in ["2X", "3X"]:
+                fps = int(st.get("ofxr_target_fps", 36))
+                path = flight_rig_optimizer.get_user_cfg_path()
+                if path and os.path.exists(path):
+                    try:
+                        with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+                            content = f.read()
+                        current_fps_vr = flight_rig_optimizer.get_block_val(r'TargetFrameRateVR\s+(\d+)', content, '0')
+                        if current_fps_vr and current_fps_vr not in ['0', str(fps)]:
+                            if not st.get("ofxr_prev_max_frame_rate"):
+                                st["ofxr_prev_max_frame_rate"] = current_fps_vr
+                    except Exception:
+                        pass
+                flight_rig_optimizer.update_msfs_user_cfg_setting("VR", "max_frame_rate", str(fps), path, create_backup=False)
+
+                if st.get("ofxr_sync_smart_lod", True):
+                    flight_lod_controller.set_vr_target_fps(fps)
+
+            st["background_tools_remembered"] = remember
+
+            save_settings(st)
+            return json.dumps({"success": True, "settings": st}, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
+
+    def save_ofxr_settings(self, mode, target_fps, sync_smart_lod):
+        try:
+            from scanner import get_settings, save_settings
+            import flight_lod_controller
+            import flight_rig_optimizer
+            import os
+            st = get_settings()
+
+            det_vr = flight_rig_optimizer.detect_vr_headset()
+            vr_hz = int(det_vr.get("refresh_rate_hz", 90)) if det_vr.get("detected") else 90
+            fps_2x = max(20, vr_hz // 2)
+            fps_3x = max(20, round(vr_hz / 3))
+            is_3x_disabled = (fps_3x < 30) or (vr_hz <= 75)
+
+            mode_str = str(mode).upper().strip()
+            if mode_str in ["OFF", "2X", "3X"]:
+                if is_3x_disabled and mode_str == "3X":
+                    mode_str = "2X"
+                st["ofxr_mode"] = mode_str
+
+            try:
+                fps = int(target_fps)
+                if is_3x_disabled and fps < 30:
+                    fps = fps_2x
+                st["ofxr_target_fps"] = fps
+            except Exception:
+                fps = fps_2x if is_3x_disabled else 36
+
+            sync_bool = bool(sync_smart_lod)
+            st["ofxr_sync_smart_lod"] = sync_bool
+
+            path = flight_rig_optimizer.get_user_cfg_path()
+            restored_fps = None
+
+            if mode_str in ["2X", "3X"]:
+                # 1. Capture current UserCfg.opt TargetFrameRateVR before changing, if not already saved
+                if path and os.path.exists(path):
+                    try:
+                        with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+                            content = f.read()
+                        current_fps_vr = flight_rig_optimizer.get_block_val(r'TargetFrameRateVR\s+(\d+)', content, '0')
+                        if current_fps_vr and current_fps_vr not in ['0', str(fps)]:
+                            if not st.get("ofxr_prev_max_frame_rate"):
+                                st["ofxr_prev_max_frame_rate"] = current_fps_vr
+                    except Exception:
+                        pass
+
+                # 2. Automatically update TargetFrameRateVR in UserCfg.opt to match OFXR base target
+                flight_rig_optimizer.update_msfs_user_cfg_setting("VR", "max_frame_rate", str(fps), path, create_backup=False)
+
+                # 3. If synced, update Smart LOD target
+                if sync_bool:
+                    flight_lod_controller.set_vr_target_fps(fps)
+
+            elif mode_str == "OFF":
+                # Revert max frame rate back to previous value
+                prev_fps = st.get("ofxr_prev_max_frame_rate")
+                if not prev_fps:
+                    det = flight_rig_optimizer.detect_vr_headset()
+                    hz = int(det.get("refresh_rate_hz", 90)) if det.get("detected") else 90
+                    prev_fps = str(max(30, hz // 2))
+
+                flight_rig_optimizer.update_msfs_user_cfg_setting("VR", "max_frame_rate", str(prev_fps), path, create_backup=False)
+                restored_fps = prev_fps
+                st.pop("ofxr_prev_max_frame_rate", None)
+
+                try:
+                    flight_lod_controller.set_vr_target_fps(int(prev_fps))
+                except Exception:
+                    pass
+
+            save_settings(st)
+            return json.dumps({
+                "status": "ok",
+                "ofxr_mode": mode_str,
+                "ofxr_target_fps": fps,
+                "ofxr_sync_smart_lod": sync_bool,
+                "restored_fps": restored_fps
+            }, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
 
     def get_smart_lod_profiles(self):
         try:
@@ -4603,7 +4852,7 @@ class Api:
             if not all_paths:
                 return json.dumps({"available": False, "installed": False, "message": "Dossier Community non détecté."})
             primary = self._get_primary_community_path()
-            target_dir = os.path.join(primary, "sceneryx-ingame-panel")
+            target_dir = os.path.join(primary, "wildbill75-sceneryx")
             installed = os.path.exists(os.path.join(target_dir, "manifest.json"))
             return json.dumps({
                 "available": True,
@@ -4621,19 +4870,26 @@ class Api:
             if not all_paths:
                 return json.dumps({"success": False, "message": "Dossier Community non détecté."})
             
-            # Locate sceneryx-ingame-panel source folder
+            # Locate wildbill75-sceneryx source folder
             base_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
-            src_dir = os.path.join(base_dir, "sceneryx-ingame-panel")
+            src_dir = os.path.join(base_dir, "wildbill75-sceneryx")
             if not os.path.exists(src_dir):
-                src_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sceneryx-ingame-panel")
+                src_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wildbill75-sceneryx")
             if not os.path.exists(src_dir):
-                src_dir = os.path.join(os.getcwd(), "sceneryx-ingame-panel")
+                src_dir = os.path.join(os.getcwd(), "wildbill75-sceneryx")
             
             if not os.path.exists(src_dir):
                 return json.dumps({"success": False, "message": f"Dossier source introuvable: {src_dir}"})
             
-            targets = ["sceneryx-ingame-panel", "wildbill75-sceneryx"]
+            targets = ["wildbill75-sceneryx"]
             for c_path in all_paths:
+                # Clean up legacy duplicate if present
+                old_legacy = os.path.join(c_path, "sceneryx-ingame-panel")
+                if os.path.exists(old_legacy):
+                    try:
+                        shutil.rmtree(old_legacy)
+                    except Exception:
+                        pass
                 for tname in targets:
                     target_dir = os.path.join(c_path, tname)
                     shutil.copytree(src_dir, target_dir, dirs_exist_ok=True)
@@ -4755,7 +5011,12 @@ def main():
     if not ensure_single_instance():
         sys.exit(0)
 
-    web_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'web')
+    exe_dir = os.path.dirname(os.path.abspath(sys.executable)) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+    local_web = os.path.join(exe_dir, 'web')
+    if os.path.exists(os.path.join(local_web, 'index.html')):
+        web_dir = local_web
+    else:
+        web_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'web')
     html_file = os.path.join(web_dir, 'index.html')
 
     # Dynamically detect monitor resolution & center the window in the usable workspace
@@ -4876,6 +5137,10 @@ def main():
         except Exception:
             pass
         try:
+            flight_rig_optimizer.ensure_active_profile_applied()
+        except Exception as e:
+            print(f"[Optimizer] Closing active profile sync notice: {e}")
+        try:
             import flight_remote_server
             flight_remote_server.stop_remote_server()
         except Exception:
@@ -4961,6 +5226,14 @@ def main():
 
     cache_dir = os.path.join(USER_DATA_DIR, 'web_cache')
     os.makedirs(cache_dir, exist_ok=True)
+    try:
+        import shutil
+        for sub in ['EBWebView/Default/Cache', 'EBWebView/Default/Code Cache']:
+            sub_path = os.path.join(cache_dir, os.path.normpath(sub))
+            if os.path.exists(sub_path):
+                shutil.rmtree(sub_path, ignore_errors=True)
+    except Exception as e:
+        print(f"[Cache] Disk cache clean warning: {e}")
 
     if os.path.exists(icon_path):
         webview.start(debug=False, private_mode=False, storage_path=cache_dir, icon=icon_path)

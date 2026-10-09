@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>SceneryX - MSFS Scenery & Investment Manager</title>
     <!-- App Favicon -->
     <link rel="icon" type="image/x-icon" href="favicon.ico">
@@ -30,6 +33,10 @@
     <link rel="stylesheet" href="vendor/MarkerCluster.css" />
     <link rel="stylesheet" href="vendor/MarkerCluster.Default.css" />
     <script src="vendor/leaflet.markercluster.js"></script>
+    <!-- Chart.js & Interactive Zoom / Pan Plugin -->
+    <script src="vendor/chart.min.js"></script>
+    <script src="vendor/hammer.min.js"></script>
+    <script src="vendor/chartjs-plugin-zoom.min.js"></script>
     <!-- FontAwesome Local & CDN Fallback -->
     <link rel="stylesheet" href="vendor/fontawesome.all.min.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
@@ -229,6 +236,64 @@
             letter-spacing: 0 !important;
         }
 
+        /* Switch Toggle Button (Unified for In-Game Panel & Desktop Modals) */
+        .switch-btn {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            width: 54px;
+            height: 24px;
+            padding: 0 3px;
+            border-radius: 9999px;
+            cursor: pointer;
+            border: 1px solid #475569;
+            background: #334155;
+            transition: background-color 0.2s ease, border-color 0.2s ease;
+            user-select: none;
+            box-sizing: border-box;
+            outline: none;
+            flex-shrink: 0;
+        }
+        .switch-btn.switch-off {
+            background: #334155 !important;
+            border-color: #475569 !important;
+            flex-direction: row;
+            justify-content: space-between;
+        }
+        .switch-btn.switch-on {
+            background: #059669 !important;
+            border-color: #10b981 !important;
+            flex-direction: row-reverse;
+            justify-content: space-between;
+        }
+        .switch-btn .switch-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 9999px;
+            background: #ffffff;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+            flex-shrink: 0;
+            pointer-events: none;
+        }
+        .switch-btn .switch-label {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            line-height: 1;
+            text-transform: uppercase;
+            padding: 0 4px;
+            pointer-events: none;
+        }
+        .switch-btn.switch-off .switch-label {
+            color: #cbd5e1;
+        }
+        .switch-btn.switch-on .switch-label {
+            color: #ffffff;
+        }
+        .switch-btn:hover {
+            filter: brightness(1.08);
+        }
+
         /* Standard SceneryX Window Manager Rules */
         .sceneryx-modal {
             position: fixed !important;
@@ -242,6 +307,19 @@
             display: flex !important;
             flex-direction: column !important;
             box-sizing: border-box !important;
+        }
+
+        #background-tools-modal {
+            background: #0f172a !important; /* solid slate-900, zero glass */
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            border: 1px solid #334155 !important;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8) !important;
+        }
+
+        #background-tools-modal .modal-header {
+            background: #0f172a !important;
+            border-bottom: 1px solid #1e293b !important;
         }
 
         .sceneryx-modal.hidden {
@@ -1286,6 +1364,40 @@
             text-shadow: none !important;
         }
 
+        /* Sector locked by external AutoFPS (Dark, completely disabled, no hover) */
+        .radial-flight-sector.is-sector-locked-autofps {
+            opacity: 0.40 !important;
+            pointer-events: none !important;
+            cursor: not-allowed !important;
+        }
+        .radial-flight-sector.is-sector-locked-autofps .radial-flight-sector-path {
+            fill: rgba(15, 23, 42, 0.90) !important;
+            stroke: rgba(148, 163, 184, 0.25) !important;
+            stroke-width: 1.5px !important;
+            cursor: not-allowed !important;
+        }
+        .radial-flight-sector.is-sector-locked-autofps span {
+            color: rgba(148, 163, 184, 0.50) !important;
+            text-shadow: none !important;
+        }
+
+        .radial-flight-sector.is-sector-disabled:hover .radial-flight-sector-path,
+        .radial-flight-sector.is-sector-locked-autofps:hover .radial-flight-sector-path {
+            fill: rgba(15, 23, 42, 0.85) !important;
+            stroke: rgba(148, 163, 184, 0.40) !important;
+            stroke-width: 1.75px !important;
+        }
+        .radial-flight-sector.is-sector-locked-autofps:hover .radial-flight-sector-path {
+            fill: rgba(15, 23, 42, 0.90) !important;
+            stroke: rgba(148, 163, 184, 0.25) !important;
+            stroke-width: 1.5px !important;
+        }
+        .radial-flight-sector.is-sector-disabled:hover span,
+        .radial-flight-sector.is-sector-locked-autofps:hover span {
+            color: rgba(148, 163, 184, 0.60) !important;
+            text-shadow: none !important;
+        }
+
         /* Snappy Bounce Animations for Filter Radial Menu */
         @keyframes filterRadialWheelBounce {
             0% {
@@ -1642,7 +1754,7 @@
         <div class="flex items-center shrink-0 z-10">
             <div class="flex items-center gap-2.5">
                 <img src="header_logo.png?v=2" alt="SceneryX" class="h-8 lg:h-9 w-auto object-contain select-none pointer-events-none" />
-                <span class="typo-metadata text-xs font-medium text-slate-400" title="SceneryX v1.0.1">v1.0.1</span>
+                <span class="typo-metadata text-xs font-medium text-slate-400" title="SceneryX v1.0.2">v1.0.2</span>
             </div>
         </div>
 
@@ -1715,7 +1827,8 @@
         </div>
 
         <!-- RIGHT: SCENERY CONFLICT NAVIGATOR -->
-        <div class="flex items-center gap-2.5 shrink-0 z-10">
+        <div class="relative flex items-center gap-2.5 shrink-0 z-20">
+
             <!-- SCENERY CONFLICT ALERT BUTTON (OPENS CONFLICT RESOLUTION MODAL) -->
             <button id="conflict-nav-pill" onclick="openConflictModal()" class="hidden items-center gap-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700/60 text-slate-200 px-3 py-1.5 rounded-full typo-action-btn text-xs font-semibold shadow-sm transition-all cursor-pointer active:scale-95 group" title="Click to resolve scenery conflicts">
                 <span id="conflict-nav-counter" class="typo-metric font-semibold text-amber-400 tabular-nums">0</span>
@@ -3399,8 +3512,9 @@
                                        onfocus="handleProfileInputFocus()"
                                        onblur="handleProfileInputBlur()"
                                        oninput="handleProfileInputChange()"
-                                       class="w-full h-8 bg-slate-900/85 border border-slate-700/60 rounded-md px-3 pr-8 typo-input-val text-xs text-white font-medium input-dark placeholder:text-slate-500 transition-colors leading-none"
+                                       class="w-full h-8 bg-slate-900/85 border border-slate-700/60 rounded-md px-3 pr-24 typo-input-val text-xs text-white font-medium input-dark placeholder:text-slate-500 transition-colors leading-none"
                                        autocomplete="off">
+                                <span id="opt-profile-active-tag" class="hidden absolute right-8 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-emerald-600 text-white select-none pointer-events-none">ACTIVE</span>
                                 <button type="button"
                                         id="opt-profile-dropdown-btn"
                                         onclick="toggleProfileDropdown(event)"
@@ -3424,9 +3538,6 @@
                         <!-- Action Buttons with uniform h-8 height -->
                         <button onclick="saveCurrentCustomProfile()" class="h-8 px-3 rounded-md bg-slate-800 text-slate-200 border border-slate-700/80 hover:bg-slate-700 hover:text-white typo-action-btn text-xs font-semibold tracking-[0.02em] transition-colors cursor-pointer shadow-sm uppercase shrink-0 whitespace-nowrap inline-flex items-center justify-center leading-none" title="Save current settings as profile">
                             SAVE PROFILE
-                        </button>
-                        <button id="opt-profile-activate-btn" onclick="activateSelectedCustomProfile()" class="h-8 px-3 rounded-md bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-bold border border-emerald-500/50 typo-action-btn text-xs tracking-[0.02em] uppercase shrink-0 whitespace-nowrap inline-flex items-center justify-center leading-none transition-all cursor-pointer shadow-sm select-none" title="This profile is currently active in MSFS">
-                            ACTIVE IN MSFS
                         </button>
                         <button onclick="restoreOriginalUserCfgTarget()" class="h-8 px-3 rounded-md bg-slate-800 text-slate-200 border border-slate-700/80 hover:bg-slate-700 hover:text-white typo-action-btn text-xs font-semibold tracking-[0.02em] transition-colors cursor-pointer uppercase shrink-0 whitespace-nowrap inline-flex items-center justify-center leading-none" title="Restore pristine original UserCfg.opt">
                             RESTORE ORIGINAL CFG
@@ -3462,25 +3573,21 @@
         </div>
 
         <div class="modal-body flex-1 p-4 overflow-y-auto custom-scrollbar space-y-3.5">
-            <!-- Engine Status Card -->
-            <div class="p-4 rounded-lg bg-slate-800/85 border border-slate-700/80 space-y-3.5 shadow-sm">
+            <!-- External AutoFPS Locked Banner: Flat solid bg-slate-950, zero border/liseres, no icons, concise, yellow typo -->
+            <div id="smart-lod-autofps-lock-banner" class="hidden p-3 rounded-lg bg-slate-950 text-xs text-amber-400 font-semibold select-none leading-relaxed">
+                Smart LOD verrouillé : MSFS AutoFPS est actif en arrière-plan. Désactivez ou fermez AutoFPS pour réactiver Smart LOD.
+            </div>
+
+            <!-- Controls Wrapper (Locked / Grayed out when AutoFPS is running) -->
+            <div id="smart-lod-controls-wrapper" class="space-y-3.5">
+                <!-- Engine Status Card -->
+            <div class="p-3.5 rounded-lg bg-slate-800/85 border border-slate-700/80 space-y-2.5 shadow-sm">
                 <div class="flex items-center justify-between">
                     <span class="typo-section-title text-slate-200">Smart Dynamic Terrain LOD Engine</span>
-                    <span class="typo-metadata text-[10px] text-slate-400">MSFS 2020 &amp; 2024</span>
-                </div>
-                <div class="flex items-center justify-between flex-wrap gap-2 pt-0.5">
-                    <div class="flex items-center gap-3">
-                        <span id="smart-lod-active-badge" class="px-2.5 py-0.5 rounded-full pill-soft-slate typo-action-btn text-[11px] font-semibold uppercase tracking-[0.02em]">INACTIF</span>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <div class="h-8 px-3 rounded-md bg-slate-900/70 border border-slate-700/80 text-xs text-slate-300 inline-flex items-center gap-2">
-                            <span class="typo-metadata text-slate-500 text-[10px] uppercase font-bold">LIVE TLOD:</span>
-                            <span id="smart-lod-live-tlod" class="typo-metric text-sky-400 font-semibold tabular-nums text-xs">--</span>
-                        </div>
-                        <button id="smart-lod-main-toggle" onclick="toggleSmartLodActive()" class="h-8 px-4 rounded-md bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold typo-action-btn text-xs tracking-[0.02em] transition-all cursor-pointer inline-flex items-center justify-center leading-none shadow-md shadow-cyan-950/30">
-                            <span id="smart-lod-toggle-text">ACTIVER</span>
-                        </button>
-                    </div>
+                    <button type="button" id="smart-lod-main-toggle" onclick="toggleSmartLodActive()" class="switch-btn switch-off" role="switch" aria-checked="false" title="Toggle Smart Dynamic Terrain LOD Engine">
+                        <span class="switch-thumb"></span>
+                        <span id="smart-lod-main-toggle-lbl" class="switch-label">OFF</span>
+                    </button>
                 </div>
 
                 <!-- AutoFPS Conflict Alert Banner -->
@@ -3529,7 +3636,7 @@
                                 <span class="text-slate-400 font-medium" title="Transition / cruise altitude in feet AGL">Alt:</span>
                                 <input type="number"
                                        id="smart-lod-alt-tlod"
-                                       value="5000"
+                                       value="3000"
                                        step="500"
                                        min="500"
                                        max="45000"
@@ -3610,14 +3717,14 @@
                             </div>
                             <div class="flex items-center gap-1.5" title="Cruise LOD setting above transition altitude">
                                 <span class="text-slate-400 font-medium">Cruise:</span>
-                                <span id="smart-lod-target-val-olod" class="font-bold text-sky-400 tabular-nums">100</span>
+                                <span id="smart-lod-target-val-olod" class="font-bold text-sky-400 tabular-nums">200</span>
                             </div>
                         </div>
                         <div class="dual-slider-container" onmousemove="onDualSliderMouseMove(event, 'olod')">
                             <!-- Full Track Background -->
                             <div class="w-full h-1.5 bg-slate-800 rounded-lg absolute pointer-events-none z-0"></div>
                             <!-- Active Range Highlight Bar -->
-                            <div id="smart-lod-track-highlight-olod" class="absolute h-1.5 bg-sky-500 rounded-lg pointer-events-none transition-all duration-75 z-[1]" style="left: 33.3%; width: 0%;"></div>
+                            <div id="smart-lod-track-highlight-olod" class="absolute h-1.5 bg-sky-500 rounded-lg pointer-events-none transition-all duration-75 z-[1]" style="left: 33.33%; width: 33.34%;"></div>
                             <!-- Floor Input Slider (Left Thumb) -->
                             <input type="range"
                                    id="smart-lod-base-range-olod"
@@ -3636,12 +3743,12 @@
                                    min="0"
                                    max="300"
                                    step="5"
-                                   value="100"
+                                   value="200"
                                    oninput="onSmartLodTargetInput('olod', this.value)"
                                    onchange="onSmartLodDualSliderChange('olod')"
                                    onmousedown="this.style.zIndex = 25;"
                                    class="dual-slider-input"
-                                   title="Cruise LOD: 100">
+                                   title="Cruise LOD: 200">
                         </div>
                         <div class="flex justify-between text-[10px] text-slate-400 font-mono select-none px-0.5">
                             <span>0</span>
@@ -3663,15 +3770,11 @@
                                     <button type="button" onclick="adjustSmartLodFps(1)" class="w-7 h-7 rounded-md bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-slate-200 hover:text-white flex items-center justify-center font-bold text-sm transition-colors cursor-pointer select-none" title="+1 FPS">
                                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
                                     </button>
-                                    <button type="button" onclick="syncSmartLodTargetFpsFromSettings()" class="h-7 px-2.5 rounded-md bg-slate-800/90 hover:bg-slate-700 text-cyan-400 hover:text-cyan-300 text-[10px] font-semibold tracking-wide uppercase transition-colors cursor-pointer inline-flex items-center gap-1 border border-slate-700/80" title="Synchroniser avec le Target FPS des Graphics Settings">
-                                        <svg class="w-3 h-3 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                                        <span>SYNC</span>
-                                    </button>
                                 </div>
                             </div>
                             <div class="flex items-center gap-2">
                                 <label for="smart-lod-cloud-recovery" class="typo-setting-label text-xs text-slate-300 cursor-pointer">Auto Cloud Recovery</label>
-                                <input type="checkbox" id="smart-lod-cloud-recovery" checked onchange="updatePerformanceCockpitGauges()" class="w-4 h-4 accent-cyan-500 rounded cursor-pointer">
+                                <input type="checkbox" id="smart-lod-cloud-recovery" checked onchange="window.onDesktopCloudRecoveryChange && window.onDesktopCloudRecoveryChange(this.checked); updatePerformanceCockpitGauges()" class="w-4 h-4 accent-cyan-500 rounded cursor-pointer">
                             </div>
                         </div>
                         <span class="typo-metadata text-[10px] text-slate-500 block leading-tight">Dynamic LOD governor setpoint &amp; adaptive cloud reduction under heavy frame strain</span>
@@ -3694,8 +3797,9 @@
                                        placeholder="Enter profile name (e.g. Balanced Airliner)..."
                                        onfocus="handleSmartLodProfileInputFocus()"
                                        onblur="handleSmartLodProfileInputBlur()"
-                                       class="w-full h-8 bg-slate-900/85 border border-slate-700/60 rounded-md px-3 pr-8 typo-input-val text-xs text-white font-medium input-dark placeholder:text-slate-500 transition-colors leading-none"
+                                       class="w-full h-8 bg-slate-900/85 border border-slate-700/60 rounded-md px-3 pr-24 typo-input-val text-xs text-white font-medium input-dark placeholder:text-slate-500 transition-colors leading-none"
                                        autocomplete="off">
+                                <span id="smart-lod-profile-active-tag" class="hidden absolute right-8 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded text-[10px] font-bold tracking-wider uppercase bg-emerald-600 text-white select-none pointer-events-none">ACTIVE</span>
                                 <button type="button"
                                         id="smart-lod-profile-dropdown-btn"
                                         onclick="toggleSmartLodProfileDropdown(event)"
@@ -3716,11 +3820,9 @@
                         <button onclick="saveCurrentSmartLodProfile()" class="h-8 px-3 rounded-md bg-slate-800 text-slate-200 border border-slate-700/80 hover:bg-slate-700 hover:text-white typo-action-btn text-xs font-semibold tracking-[0.02em] transition-colors cursor-pointer shadow-sm uppercase shrink-0 whitespace-nowrap inline-flex items-center justify-center leading-none" title="Save current settings as profile">
                             SAVE PROFILE
                         </button>
-                        <button onclick="activateSelectedSmartLodProfile()" class="h-8 px-3 rounded-md bg-cyan-500 text-slate-950 font-semibold hover:bg-cyan-400 active:scale-[0.98] shadow-md shadow-cyan-950/30 typo-action-btn text-xs tracking-[0.02em] transition-all cursor-pointer uppercase shrink-0 whitespace-nowrap inline-flex items-center justify-center leading-none" title="Activate selected profile">
-                            ACTIVATE
-                        </button>
                     </div>
                 </div>
+            </div>
             </div>
         </div>
 
@@ -3750,126 +3852,140 @@
         </div>
 
         <div class="modal-body flex-1 p-4 overflow-y-auto custom-scrollbar space-y-3.5">
-            <!-- Flight Recorder Card -->
+            <!-- 1. FLIGHT TELEMETRY CONTROLS -->
             <div class="p-4 rounded-lg bg-slate-800/85 border border-slate-700/80 space-y-3.5 shadow-sm">
                 <div class="flex items-center justify-between">
-                    <span class="typo-section-title text-slate-200">Flight Recorder &amp; Telemetry Controls</span>
-                    <div class="flex items-center gap-3">
-                        <span id="opt-simconnect-badge" class="hidden px-2.5 py-1 rounded-md typo-action-btn text-[10px] font-semibold bg-slate-800 border border-slate-700/60 text-slate-300 flex items-center gap-2 uppercase tracking-[0.02em]">
-                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                    <span class="typo-section-title text-slate-200 uppercase font-semibold text-xs tracking-wider">FLIGHT TELEMETRY CONTROLS</span>
+                </div>
+
+                <!-- Record Action Bar: START MONITORING + Prominent Timer + Right-Aligned Badges -->
+                <div class="p-3.5 rounded-lg bg-slate-900/70 border border-slate-700/80 flex items-center justify-between shadow-inner">
+                    <div class="flex items-center gap-4">
+                        <button onclick="toggleBlackboxRecording()" id="opt-btn-record" class="h-9 px-4 rounded-md bg-cyan-600 hover:bg-cyan-500 text-white font-bold tracking-wider text-xs transition-all cursor-pointer active:scale-95 inline-flex items-center justify-center shadow-md shadow-cyan-950/30 btn-elevate uppercase leading-none select-none">
+                            <span id="opt-rec-btn-text">START MONITORING</span>
+                        </button>
+                        <div class="flex items-center">
+                            <span id="opt-blackbox-timer" class="text-2xl sm:text-3xl font-extrabold text-white font-mono tracking-wider leading-none select-none">00:00</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2.5">
+                        <span id="opt-simconnect-badge" class="px-2.5 py-1 rounded-md text-[10px] font-mono font-bold tracking-wider uppercase border border-slate-700/60 bg-slate-800 text-slate-400 select-none transition-colors">
                             SIMCONNECT LIVE
                         </span>
-                        <span id="opt-autofps-badge" class="hidden px-2.5 py-1 rounded-md typo-action-btn text-[10px] font-semibold bg-slate-800 border border-slate-700/60 text-slate-300 flex items-center gap-2 uppercase tracking-[0.02em]">
-                            <span class="w-1.5 h-1.5 rounded-full bg-sky-400"></span>
-                            AUTOFPS LIVE
-                        </span>
-                        <span id="opt-smartlod-badge" class="hidden px-2.5 py-1 rounded-md typo-action-btn text-[10px] font-semibold bg-slate-800 border border-slate-700/60 text-slate-300 flex items-center gap-2 uppercase tracking-[0.02em]">
-                            <span class="w-1.5 h-1.5 rounded-full bg-sky-400"></span>
+                        <span id="opt-smartlod-badge" class="px-2.5 py-1 rounded-md text-[10px] font-mono font-bold tracking-wider uppercase border border-slate-700/60 bg-slate-800 text-slate-400 select-none transition-colors">
                             SMART LOD LIVE
                         </span>
                     </div>
                 </div>
 
-                <!-- Record Action Bar -->
-                <div class="p-3.5 rounded-lg bg-slate-900/70 border border-slate-700/80 flex items-center justify-between shadow-inner">
-                    <div class="flex items-center gap-3.5">
-                        <button onclick="toggleBlackboxRecording()" id="opt-btn-record" class="h-9 px-4 rounded-md bg-cyan-600 hover:bg-cyan-500 text-white font-bold tracking-wider text-xs transition-all cursor-pointer active:scale-95 inline-flex items-center gap-2 shadow-md shadow-cyan-950/30 btn-elevate uppercase leading-none">
-                            <span id="opt-rec-icon" class="w-2.5 h-2.5 rounded-full bg-emerald-400 inline-block shrink-0 shadow-sm shadow-emerald-950"></span>
-                            <span id="opt-rec-btn-text">Start Flight</span>
-                        </button>
-                        <div class="flex items-center">
-                            <span id="opt-blackbox-timer" class="typo-metric text-3xl sm:text-4xl font-extrabold text-white tabular-nums tracking-wider leading-none">00:00</span>
-                        </div>
+                <!-- Context Info Bar: Origin/Route & Pure Grey Mode Tags (NO BASELINE) -->
+                <div class="p-3.5 rounded-lg bg-slate-900/70 border border-slate-700/80 flex flex-wrap items-center justify-between text-sm gap-3 font-mono">
+                    <div class="flex items-center gap-2 min-w-0 max-w-[36%]">
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider shrink-0">AIRCRAFT:</span>
+                        <span id="opt-live-aircraft" class="text-sm sm:text-base font-extrabold text-white truncate">Not detected</span>
                     </div>
-                    <button onclick="openLatestBenchmarkReport()" id="opt-btn-view-last-report" class="hidden h-8.5 px-3.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-xs font-semibold tracking-wider uppercase transition-all cursor-pointer inline-flex items-center justify-center border border-slate-700/60 shadow-sm active:scale-95">
-                        <span>View Debriefing</span>
-                    </button>
-                </div>
-
-                <!-- Context Info Bar -->
-                <div class="p-3 rounded-lg bg-slate-900/70 border border-slate-700/80 flex flex-wrap items-center justify-between text-xs gap-2 font-mono">
-                    <div class="flex items-center gap-2 truncate max-w-[40%]">
-                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">AIRCRAFT:</span>
-                        <span id="opt-live-aircraft" class="font-bold text-white truncate">Not detected</span>
-                    </div>
-                    <div class="flex items-center gap-2 truncate max-w-[40%]">
-                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">ROUTE:</span>
-                        <span id="opt-live-route" class="font-bold text-white truncate">Waiting for flight</span>
+                    <div class="flex items-center gap-2 min-w-0 max-w-[36%]">
+                        <span id="opt-live-route-lbl" class="text-xs font-bold text-slate-400 uppercase tracking-wider shrink-0">ORIGIN:</span>
+                        <span id="opt-live-route" class="text-sm sm:text-base font-extrabold text-white truncate">Waiting for flight</span>
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
-                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">MODE:</span>
-                        <span id="opt-live-mode" class="px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase pill-soft-slate text-white shadow-sm">BASELINE STANDARD</span>
+                        <span class="text-xs font-bold text-slate-400 uppercase tracking-wider mr-1">MODE:</span>
+                        <span id="opt-mode-flight-tag" class="px-3 py-1 rounded text-xs font-bold uppercase bg-slate-800 border border-slate-700/70 text-slate-200">FREE FLIGHT</span>
+                        <span id="opt-mode-opt-tag" class="px-3 py-1 rounded text-xs font-bold uppercase bg-slate-800 border border-slate-700/70 text-slate-200">NO SCENERY OPTIMIZATION</span>
                     </div>
                 </div>
             </div>
 
-            <!-- HUD 4-Card Telemetry Grid Card -->
-            <div class="p-4 rounded-lg bg-slate-800/85 border border-slate-700/80 space-y-3.5 shadow-sm">
+            <!-- 2. PERFORMANCE MONITORING (HUD + Sparkline) -->
+            <div class="p-4 rounded-lg bg-slate-800/85 border border-slate-700/80 space-y-3 shadow-sm">
                 <div class="flex items-center justify-between">
-                    <span class="typo-section-title text-slate-200">Live Performance HUD</span>
+                    <span class="typo-section-title text-slate-200 uppercase font-semibold text-xs tracking-wider">PERFORMANCE MONITORING</span>
+                    <span id="opt-pacing-status" class="px-2.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-[#059669] text-white">OPTIMAL</span>
                 </div>
-                <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div class="p-3.5 rounded-lg bg-slate-900/70 border border-slate-700/80 space-y-1.5 shadow-inner">
-                        <div class="flex items-center justify-between">
-                            <span class="typo-metadata text-[10px] text-slate-400 uppercase font-medium block tracking-normal">Displayed FPS</span>
-                            <span id="live-fps-base-pill" class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded bg-slate-800 border border-slate-700/60 text-slate-200 text-[10px] font-bold" title="Native Base FPS before Frame Generation">
-                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                                <span>BASE <span id="live-fps-base" class="text-white font-mono">--</span> FPS</span>
-                            </span>
-                        </div>
-                        <div class="flex items-baseline gap-2">
-                            <span id="live-fps-val" class="typo-metric text-3xl font-bold text-emerald-400 tabular-nums">--</span>
-                            <span class="text-xs text-slate-400 font-semibold">FPS</span>
+                <!-- Row 1: Displayed FPS & CPU Main Thread -->
+                <div class="grid grid-cols-2 gap-2.5">
+                    <div class="p-2.5 rounded-lg bg-slate-900/70 border border-slate-700/80 flex flex-col items-center justify-center">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">DISPLAYED FPS</span>
+                        <div class="flex items-baseline gap-1.5">
+                            <span id="live-fps-val" class="text-2xl font-black text-white font-mono leading-none">--</span>
+                            <span class="text-xs text-slate-500 font-bold">/ BASE</span>
+                            <span id="live-fps-base" class="text-base font-black text-slate-300 font-mono leading-none">--</span>
+                            <span class="text-[10px] text-slate-400 font-bold">FPS</span>
                         </div>
                     </div>
-                    <div class="p-3.5 rounded-lg bg-slate-900/70 border border-slate-700/80 space-y-1.5 shadow-inner">
-                        <span class="typo-metadata text-[10px] text-slate-400 uppercase font-medium block tracking-normal">Frame Pacing</span>
-                        <div class="flex items-baseline gap-2">
-                            <span id="live-mt-val" class="typo-metric text-3xl font-bold text-emerald-400 tabular-nums">--</span>
-                            <span class="text-xs text-slate-400 font-semibold">ms</span>
+                    <div class="p-2.5 rounded-lg bg-slate-900/70 border border-slate-700/80 flex flex-col items-center justify-center">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">CPU MAIN THREAD</span>
+                        <div class="flex items-baseline gap-1">
+                            <span id="live-mt-val" class="text-2xl font-black text-white font-mono leading-none">--</span>
+                            <span class="text-xs text-slate-400 font-bold">ms</span>
                         </div>
                     </div>
-                    <div class="p-3.5 rounded-lg bg-slate-900/70 border border-slate-700/80 space-y-1.5 shadow-inner">
-                        <span class="typo-metadata text-[10px] text-slate-400 uppercase font-medium block tracking-normal">MSFS VRAM</span>
-                        <div class="flex items-baseline gap-2">
-                            <span id="live-msfs-vram-val" class="typo-metric text-2xl font-bold text-sky-400 tabular-nums">--</span>
-                            <span id="live-vram-val" class="text-xs text-slate-400 font-semibold">/ -- GB</span>
+                </div>
+                <!-- Row 2: GPU, CPU, VRAM, CACHE -->
+                <div class="grid grid-cols-4 gap-2.5">
+                    <div class="p-2 rounded-lg bg-slate-900/70 border border-slate-700/80 flex flex-col items-center justify-center min-h-[46px]">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">GPU</span>
+                        <div class="flex items-baseline gap-1 font-mono font-bold text-sm text-white">
+                            <span id="live-gpu-val">--</span><span class="text-[10px] text-slate-400 font-normal">%</span>
+                            <span class="text-slate-600 font-normal mx-0.5">-</span>
+                            <span id="live-gpu-temp">--</span><span class="text-[10px] text-slate-400 font-normal">°C</span>
                         </div>
                     </div>
-                    <div class="p-3.5 rounded-lg bg-slate-900/70 border border-slate-700/80 space-y-1.5 shadow-inner">
-                        <span class="typo-metadata text-[10px] text-slate-400 uppercase font-medium block tracking-normal">Rolling Cache</span>
-                        <div class="flex items-baseline gap-2">
-                            <span id="live-cache-val" class="typo-metric text-2xl font-bold text-amber-400 tabular-nums">--</span>
-                            <span class="text-xs text-slate-400 font-semibold">MB/s</span>
+                    <div class="p-2 rounded-lg bg-slate-900/70 border border-slate-700/80 flex flex-col items-center justify-center min-h-[46px]">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">CPU</span>
+                        <div class="flex items-baseline gap-1 font-mono font-bold text-sm text-white">
+                            <span id="live-cpu-val">--</span><span class="text-[10px] text-slate-400 font-normal">%</span>
+                            <span class="text-slate-600 font-normal mx-0.5">-</span>
+                            <span id="live-cpu-temp">--</span><span class="text-[10px] text-slate-400 font-normal">°C</span>
                         </div>
                     </div>
+                    <div class="p-2 rounded-lg bg-slate-900/70 border border-slate-700/80 flex flex-col items-center justify-center min-h-[46px]">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">VRAM</span>
+                        <div class="flex items-baseline gap-1 font-mono font-bold text-sm text-white">
+                            <span id="live-msfs-vram-val">--</span>
+                            <span class="text-slate-600 font-normal text-xs">/</span>
+                            <span id="live-vram-total-val" class="text-slate-300 text-xs">-- GB</span>
+                        </div>
+                    </div>
+                    <div class="p-2 rounded-lg bg-slate-900/70 border border-slate-700/80 flex flex-col items-center justify-center min-h-[46px]">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">CACHE</span>
+                        <div class="flex items-baseline gap-1 font-mono font-bold text-sm text-white">
+                            <span id="live-cache-val">0.0</span>
+                            <span class="text-[10px] text-slate-400 font-normal">GB</span>
+                        </div>
+                    </div>
+                </div>
+                <!-- Row 3: 30S TREND Live Sparkline -->
+                <div class="p-2.5 rounded-lg bg-slate-900/70 border border-slate-700/80 space-y-1">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider font-mono">30S TREND</span>
+                        <span id="opt-trend-delta" class="text-[10px] font-mono font-bold text-slate-400">STANDBY</span>
+                    </div>
+                    <canvas id="opt-sparkline-canvas" class="w-full h-[28px] block rounded"></canvas>
                 </div>
             </div>
 
-            <!-- Recorded Flight Benchmarks Card -->
+            <!-- 3. RECORDED FLIGHT REPORTS -->
             <div class="p-4 rounded-lg bg-slate-800/85 border border-slate-700/80 space-y-3.5 shadow-sm">
                 <div class="flex items-center justify-between">
-                    <span class="typo-section-title text-slate-200">Recorded Flight Benchmarks</span>
-                    <button type="button" onclick="refreshBenchmarksList()" title="Refresh benchmarks list" class="h-7 px-3 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white text-[11px] font-semibold tracking-wider uppercase border border-slate-700/70 shadow-sm transition-all cursor-pointer active:scale-95 leading-none">
-                        Refresh
-                    </button>
+                    <span class="typo-section-title text-slate-200 uppercase font-semibold text-xs tracking-wider">RECORDED FLIGHT REPORTS</span>
                 </div>
-                <!-- Benchmark Universal Combobox Field & Action Buttons -->
+                <!-- Report Combobox & Clean VIEW Button (No icons, No Refresh/Delete) -->
                 <div class="flex items-center gap-2.5 flex-nowrap w-full">
                     <div class="relative flex-1 min-w-[200px]" id="opt-benchmark-universal-combobox">
                         <div class="relative flex items-center">
                             <input type="text"
                                    id="opt-benchmark-universal-input"
-                                   placeholder="Select a recorded benchmark to view in browser..."
+                                   placeholder="Select a recorded report..."
                                    readonly
                                    onclick="toggleBenchmarkDropdown(event)"
-                                   class="w-full h-10 bg-slate-900/90 border border-slate-700/80 hover:border-slate-600 rounded-lg px-3.5 pr-10 typo-input-val text-xs text-white font-medium input-dark placeholder:text-slate-400 transition-all cursor-pointer select-none leading-none"
+                                   class="w-full h-10 bg-slate-900/90 border border-slate-700/80 hover:border-slate-600 rounded-lg px-3.5 pr-10 typo-input-val text-xs text-white font-medium input-dark placeholder:text-slate-400 transition-all cursor-pointer select-none leading-none font-mono"
                                    autocomplete="off">
                             <button type="button"
                                     id="opt-benchmark-dropdown-btn"
                                     onclick="toggleBenchmarkDropdown(event)"
                                     class="absolute right-1.5 top-1/2 -translate-y-1/2 w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-colors cursor-pointer border-0 bg-transparent"
-                                    title="View recorded flight benchmarks">
+                                    title="View recorded flight reports">
                                 <svg class="w-4 h-4 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
                             </button>
                         </div>
@@ -3877,21 +3993,51 @@
                         <div id="opt-benchmark-dropdown-list"
                              onwheel="event.stopPropagation();"
                              style="overscroll-behavior: contain;"
-                             class="hidden fixed max-h-60 overflow-y-auto custom-scrollbar bg-slate-900/95 backdrop-blur-md border border-slate-700 rounded-lg shadow-2xl z-[99999] py-1 typo-input-val text-xs divide-y divide-slate-800">
+                             class="hidden fixed max-h-60 overflow-y-auto custom-scrollbar bg-slate-900/95 border border-slate-700 rounded-lg shadow-2xl z-[99999] py-1 typo-input-val text-xs divide-y divide-slate-800">
                         </div>
                     </div>
 
-                    <!-- Action Buttons matching Profiles Management style -->
-                    <button type="button" onclick="openSelectedBenchmark()" title="View selected benchmark report in browser" class="h-10 px-3.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-semibold text-xs transition-all cursor-pointer shrink-0 flex items-center gap-1.5 shadow-sm active:scale-95 leading-none">
-                        <i class="fa-solid fa-arrow-up-right-from-square text-[11px]"></i>
-                        <span>VIEW</span>
-                    </button>
-                    <button type="button" onclick="confirmDeleteCurrentBenchmark()" id="opt-btn-delete-benchmark" title="Delete selected benchmark" class="h-10 px-3.5 rounded-lg bg-slate-800 hover:bg-rose-600 border border-slate-700/80 text-slate-300 hover:text-white font-semibold text-xs transition-all cursor-pointer shrink-0 flex items-center gap-1.5 shadow-sm active:scale-95 leading-none">
-                        <i class="fa-solid fa-trash-can text-[11px]"></i>
-                        <span>DELETE</span>
+                    <!-- Clean VIEW Button: Opens Interactive Modal on the Right -->
+                    <button type="button" onclick="openSelectedReportModal()" title="View interactive report in SceneryX" class="h-10 px-5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-xs tracking-wider uppercase transition-all cursor-pointer shrink-0 flex items-center justify-center shadow-sm active:scale-95 leading-none">
+                        VIEW
                     </button>
                 </div>
             </div>
+        </div>
+
+        <!-- Resize Handle -->
+        <div class="modal-resize-handle absolute bottom-0 right-0 w-4 h-4 cursor-se-resize flex items-end justify-end p-1">
+            <svg class="w-2.5 h-2.5 text-slate-600 pointer-events-none" viewBox="0 0 6 6" fill="currentColor">
+                <circle cx="5" cy="5" r="0.8"/>
+                <circle cx="3" cy="5" r="0.8"/>
+                <circle cx="5" cy="3" r="0.8"/>
+            </svg>
+        </div>
+    </div>
+
+    <!-- 4B. INTERACTIVE FLIGHT REPORT VIEWER MODAL (Positioned on the Right) -->
+    <div id="float-win-report-viewer"
+         data-modal-id="float-win-report-viewer"
+         class="sceneryx-modal floating-window absolute hidden flex-col bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden z-[1250] select-none"
+         style="min-width: 600px; min-height: 400px; width: 1360px; height: 860px; max-width: 96vw; max-height: 94vh;">
+        <!-- Drag Handle Header -->
+        <div class="modal-header floating-win-header h-[42px] px-4 bg-slate-900/80 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
+            <div class="flex items-center gap-2.5 truncate">
+                <h3 id="report-viewer-title" class="typo-window-header text-slate-100 text-xs font-bold tracking-wider uppercase font-mono truncate">
+                    FLIGHT REPORT
+                </h3>
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="closeFloatingWindow('report-viewer')" title="Close report" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity">
+                    <i class="fa-solid fa-xmark text-sm"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Report Content Body -->
+        <div id="report-viewer-body" class="modal-body flex-1 p-5 overflow-y-auto custom-scrollbar space-y-4 font-sans select-text">
+            <!-- Dynamically injected report content with interactive Chart.js -->
+            <div class="p-6 text-center text-slate-400 text-sm italic font-mono">Select a report to view details...</div>
         </div>
 
         <!-- Resize Handle -->
@@ -4096,14 +4242,14 @@
             <div id="bug-report-status-banner" class="hidden p-4 rounded-xl bg-slate-800 border border-slate-700/60 space-y-3 shadow-lg">
                 <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
-                        <span class="w-2 h-2 rounded-full bg-emerald-400 inline-block shrink-0"></span>
-                        <span class="text-xs font-semibold text-slate-200">Incident Report Generated &amp; Saved</span>
+                        <span id="bug-report-status-dot" class="w-2 h-2 rounded-full bg-emerald-400 inline-block shrink-0"></span>
+                        <span id="bug-report-status-title" class="text-xs font-semibold text-slate-200">Incident Report Generated &amp; Saved</span>
                     </div>
                     <span id="bug-report-file-badge" class="font-mono text-[10px] text-slate-300 px-2 py-0.5 rounded bg-slate-900 border border-slate-700/60"></span>
                 </div>
 
-                <div class="text-[11.5px] text-slate-300 leading-normal">
-                    Your diagnostic archive has been compiled on your Desktop and archived locally in SceneryX reports. Anonymized telemetry is ready for review.
+                <div id="bug-report-status-desc" class="text-[11.5px] text-slate-300 leading-normal">
+                    Your diagnostic report has been sent directly to contact@sidestickpriority.com with the ZIP package attached. Diagnostic files (.txt and .md) are archived in SceneryX reports.
                 </div>
 
                 <!-- Action Buttons -->
@@ -4118,10 +4264,10 @@
 
                 <div class="grid grid-cols-2 gap-2">
                     <button type="button" onclick="openBugReportInBrowser()" class="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700/60 text-slate-300 text-[11px] transition-colors cursor-pointer text-center">
-                        Send Email to Support
+                        Open in Gmail / Webmail
                     </button>
-                    <button type="button" onclick="revealBugReportFile()" class="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700/60 text-slate-300 text-[11px] transition-colors cursor-pointer text-center">
-                        Reveal Desktop ZIP
+                    <button type="button" onclick="openCrashReportsFolder()" class="px-3 py-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700/60 text-slate-300 text-[11px] transition-colors cursor-pointer text-center">
+                        Open Reports Folder
                     </button>
                 </div>
             </div>
@@ -4129,7 +4275,7 @@
             <!-- Footer Action Buttons -->
             <div class="pt-2 flex items-center justify-between">
                 <div class="flex items-center gap-2">
-                    <button type="button" onclick="simulateTestBug('key_error')" class="px-3 py-1.5 rounded-lg bg-slate-950/80 hover:bg-slate-800 text-slate-400 hover:text-slate-200 text-[11px] font-semibold border border-slate-700/60 transition-colors cursor-pointer" title="Simulate a test error in the pipeline">
+                    <button type="button" onclick="simulateTestBug('key_error')" class="hidden px-3 py-1.5 rounded-lg bg-slate-950/80 hover:bg-slate-800 text-slate-400 hover:text-slate-200 text-[11px] font-semibold border border-slate-700/60 transition-colors cursor-pointer" title="Simulate a test error in the pipeline">
                         Self-Test Error
                     </button>
                     <button type="button" onclick="openCrashReportsFolder()" class="px-3 py-1.5 rounded-lg bg-slate-950/80 hover:bg-slate-800 text-slate-400 hover:text-slate-200 text-[11px] font-semibold border border-slate-700/60 transition-colors cursor-pointer" title="Open persistent incident archives folder">
@@ -4146,6 +4292,36 @@
                     </button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- 7. IN-GAME PANEL PREVIEW (REMOTE TOOLBAR) -->
+    <div id="float-win-remote-panel"
+         data-modal-id="float-win-remote-panel"
+         class="sceneryx-modal floating-window absolute hidden flex-col bg-slate-900 border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden z-[1200] select-none"
+         style="width: 810px; min-width: 480px; height: auto; max-width: 95vw; max-height: 90vh;">
+        <!-- Drag Handle Header -->
+        <div class="modal-header floating-win-header h-[42px] px-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between cursor-move select-none">
+            <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-sky-400"></span>
+                <h3 class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">IN-GAME TOOLBAR PANEL (PREVIEW)</h3>
+            </div>
+            <button onclick="closeFloatingWindow('remote_panel')" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity cursor-pointer border-0 bg-transparent">
+                <i class="fa-solid fa-xmark text-sm"></i>
+            </button>
+        </div>
+
+        <div class="modal-body flex-1 p-0 overflow-hidden bg-slate-950 flex flex-col items-center">
+            <iframe id="remote-panel-preview-frame" src="in_game_panel/index.html" class="w-full border-0" style="width: 100%; min-width: 480px; height: 410px; border: none; overflow: hidden; background: #162032;" scrolling="no"></iframe>
+        </div>
+
+        <!-- Resize Handle -->
+        <div class="modal-resize-handle absolute bottom-0 right-0 w-4 h-4 cursor-se-resize flex items-end justify-end p-1">
+            <svg class="w-2.5 h-2.5 text-slate-600 pointer-events-none" viewBox="0 0 6 6" fill="currentColor">
+                <circle cx="5" cy="5" r="0.8"/>
+                <circle cx="3" cy="5" r="0.8"/>
+                <circle cx="5" cy="3" r="0.8"/>
+            </svg>
         </div>
     </div>
 
@@ -4691,6 +4867,88 @@
         </div>
     </div>
 
+    <!-- BACKGROUND TOOLS DETECTION & CONFLICT MODAL -->
+    <div id="background-tools-modal"
+         data-modal-id="background-tools-modal"
+         class="sceneryx-modal absolute hidden flex-col bg-slate-900 border border-slate-800 rounded-xl shadow-2xl overflow-hidden z-[2600] select-none font-sans"
+         style="min-width: 440px; width: 560px; max-width: 95vw; height: auto; max-height: 90vh;">
+        <!-- Drag Handle Header -->
+        <div class="modal-header h-[42px] px-4 bg-slate-900 border-b border-slate-800 flex items-center justify-between cursor-move select-none shrink-0 gap-3">
+            <span class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase truncate">EXTERNAL TOOLS DETECTED</span>
+            <button onclick="closeBackgroundToolsModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity">
+                <i class="fa-solid fa-xmark text-sm"></i>
+            </button>
+        </div>
+
+        <!-- Modal Body -->
+        <div class="modal-body flex-1 p-5 overflow-y-auto custom-scrollbar space-y-4 text-xs text-slate-200">
+            <!-- AutoFPS Conflict Block (Shown if AutoFPS is running) -->
+            <div id="bg-tools-autofps-section" class="space-y-3 hidden">
+                <div class="flex items-center justify-between">
+                    <span class="font-semibold text-slate-100 text-xs uppercase tracking-wide">MSFS AutoFPS Active</span>
+                    <span id="bg-tools-autofps-pid" class="text-[11px] font-mono text-slate-400">PID --</span>
+                </div>
+                <p class="text-slate-300 text-xs leading-relaxed">
+                    AutoFPS directly conflicts with SceneryX Smart LOD memory offsets. Running both concurrently causes write collisions and stutter.
+                </p>
+                <div class="grid grid-cols-2 gap-2.5 pt-1">
+                    <button type="button" id="bg-tools-btn-kill-autofps" onclick="selectModalAutoFpsAction('kill')" title="Recommended: SceneryX Smart LOD dynamic governor active" class="h-10 px-3 rounded-lg bg-emerald-600 text-white font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer border-0 flex items-center justify-center text-center">
+                        CLOSE AUTO FPS
+                    </button>
+                    <button type="button" id="bg-tools-btn-keep-autofps" onclick="selectModalAutoFpsAction('keep')" title="SceneryX Smart LOD will be deactivated" class="h-10 px-3 rounded-lg bg-slate-800 hover:bg-slate-750 text-slate-300 font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer border-0 flex items-center justify-center text-center">
+                        KEEP AUTO FPS
+                    </button>
+                </div>
+            </div>
+
+            <!-- OFXR Block (Shown if OFXR is running) -->
+            <div id="bg-tools-ofxr-section" class="space-y-3 hidden">
+                <div class="flex items-center justify-between">
+                    <span class="font-semibold text-slate-100 text-xs uppercase tracking-wide">OFXR Frame Gen Bridge Active</span>
+                    <span id="bg-tools-ofxr-pid" class="text-[11px] font-mono text-slate-400">PID --</span>
+                </div>
+                <p class="text-slate-300 text-xs leading-relaxed">
+                    Optical flow frame generation active. Select multiplier mode to align VR frame pacing:
+                </p>
+                <!-- Multiplier pills: Flat solid without strokes -->
+                <div class="flex items-center gap-2 pt-1">
+                    <span class="text-slate-400 text-[11px] uppercase tracking-wider font-semibold shrink-0">Mode:</span>
+                    <div class="grid grid-cols-3 gap-2 flex-1">
+                        <button type="button" onclick="setModalOfxrMode('OFF')" id="bg-modal-ofxr-mode-off" class="px-3 py-2 rounded-lg text-center text-xs font-semibold uppercase text-slate-300 bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer border-0">OFF</button>
+                        <button type="button" onclick="setModalOfxrMode('2X')" id="bg-modal-ofxr-mode-2x" class="px-3 py-2 rounded-lg text-center text-xs font-semibold uppercase text-slate-300 bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer border-0">2X</button>
+                        <button type="button" onclick="setModalOfxrMode('3X')" id="bg-modal-ofxr-mode-3x" class="px-3 py-2 rounded-lg text-center text-xs font-bold uppercase text-slate-950 bg-cyan-500 transition-colors cursor-pointer border-0">3X</button>
+                    </div>
+                </div>
+                <!-- Base Target FPS and Sync row -->
+                <div class="flex items-center justify-between pt-2 gap-3 text-xs">
+                    <label id="bg-modal-ofxr-sync-label" class="flex items-center gap-2 cursor-pointer select-none text-[11px] text-slate-300">
+                        <input type="checkbox" id="bg-modal-ofxr-sync" checked class="rounded bg-slate-800 border-slate-700 text-cyan-500 focus:ring-0">
+                        <span id="bg-modal-ofxr-sync-text">Sync Smart LOD VR Target (<span id="bg-modal-ofxr-fps-label">36</span> FPS)</span>
+                    </label>
+                    <span class="text-[11px] text-slate-400 font-mono">MSFS Reprojection: <span class="text-emerald-400 font-semibold">OFF</span></span>
+                </div>
+                <!-- 72 Hz & Base FPS Context Notice / Warning -->
+                <div id="bg-modal-ofxr-warning" class="hidden"></div>
+            </div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="px-5 py-3 bg-slate-900 border-t border-slate-800 flex items-center justify-between gap-3 shrink-0">
+            <label class="flex items-center gap-2 cursor-pointer select-none text-xs text-slate-400 hover:text-slate-300">
+                <input type="checkbox" id="bg-tools-remember" class="rounded bg-slate-800 border-slate-700 text-cyan-500 focus:ring-0">
+                <span>Remember my choice</span>
+            </label>
+            <div class="flex items-center gap-2">
+                <button onclick="closeBackgroundToolsModal()" class="px-4 py-1.5 rounded-md bg-slate-800 text-slate-300 hover:bg-slate-700 hover:text-white typo-action-btn text-xs font-semibold uppercase transition-colors cursor-pointer border-0">
+                    Dismiss
+                </button>
+                <button onclick="confirmBackgroundToolsModal()" class="px-6 py-1.5 rounded-md bg-cyan-500 hover:bg-cyan-400 text-slate-950 typo-action-btn text-xs font-bold uppercase transition-colors cursor-pointer border-0">
+                    APPLY
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- GLOBAL TOAST NOTIFICATION CONTAINER (CENTERED ABOVE BOTTOM SEARCH TOOLBAR) -->
     <div id="toast-container" class="fixed bottom-28 left-1/2 -translate-x-1/2 z-[99999] pointer-events-none flex flex-col items-center gap-2 max-w-[92vw] px-4 transition-all duration-200">
         <div id="sceneryx-toast" class="opacity-0 translate-y-2 pointer-events-none transition-all duration-300 transform bg-slate-900 border border-slate-700/60 rounded-lg shadow-2xl px-4 py-2.5 flex items-center gap-2.5 select-none max-w-full text-left"></div>
@@ -4703,6 +4961,6 @@
     <!-- WORLD CAPITALS DATABASE SCRIPT -->
     <script src="capitals_data.js?v=1.0.5"></script>
     <!-- MAIN APP JS SCRIPT -->
-    <script src="app.js?v=1.0.5"></script>
+    <script src="app.js?v=1.0.10"></script>
 </body>
 </html>

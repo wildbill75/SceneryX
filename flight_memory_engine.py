@@ -210,6 +210,31 @@ class FlightMemoryEngine:
             return False
 
     @staticmethod
+    def is_ofxr_running() -> Tuple[bool, Optional[int]]:
+        """Détecte si l'application OFXR Bridge (OFXRBridgeTray.exe) est en cours d'exécution."""
+        snapshot = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+        if snapshot == -1 or not snapshot:
+            return False, None
+
+        entry = PROCESSENTRY32()
+        entry.dwSize = ctypes.sizeof(PROCESSENTRY32)
+        found = False
+        pid = None
+
+        if kernel32.Process32First(snapshot, ctypes.byref(entry)):
+            while True:
+                name = entry.szExeFile.decode('utf-8', errors='ignore').lower()
+                if 'ofxrbridgetray' in name or 'ofxrbridge' in name or 'ofxr.exe' in name:
+                    found = True
+                    pid = entry.th32ProcessID
+                    break
+                if not kernel32.Process32Next(snapshot, ctypes.byref(entry)):
+                    break
+
+        kernel32.CloseHandle(snapshot)
+        return found, pid
+
+    @staticmethod
     def find_msfs_process() -> Tuple[bool, str, Optional[int]]:
         """Trouve le processus MSFS actif (2024 en priorité puis 2020)."""
         snapshot = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
@@ -581,6 +606,7 @@ class FlightMemoryEngine:
     def get_status(self) -> Dict[str, Any]:
         """Retourne un dictionnaire complet sur l'état du moteur mémoire."""
         is_autofps_up, autofps_pid = self.is_autofps_running()
+        is_ofxr_up, ofxr_pid = self.is_ofxr_running()
         is_vr = self.is_vr_active() if self.is_attached else False
         return {
             "is_attached": self.is_attached,
@@ -599,6 +625,8 @@ class FlightMemoryEngine:
             "is_vr": is_vr,
             "autofps_conflict": is_autofps_up,
             "autofps_pid": autofps_pid,
+            "ofxr_running": is_ofxr_up,
+            "ofxr_pid": ofxr_pid,
             "last_error": self.last_attach_error
         }
 

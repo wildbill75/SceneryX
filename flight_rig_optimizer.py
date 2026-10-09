@@ -1519,19 +1519,43 @@ def get_active_profile_id() -> str:
     """Returns the ID of the currently active profile. If none active, defaults to newest."""
     profiles_dir = get_custom_profiles_dir()
     _sync_and_recover_custom_profiles(profiles_dir)
+    ws_dir = r"D:\SceneryX\custom_profiles"
+
     state_file = os.path.join(profiles_dir, "active_profile.json")
+    ws_state = os.path.join(ws_dir, "active_profile.json")
+
+    candidates = []
     if os.path.exists(state_file):
         try:
-            with open(state_file, "r", encoding="utf-8") as f:
+            candidates.append((state_file, os.path.getmtime(state_file)))
+        except Exception:
+            pass
+    if os.path.exists(ws_state):
+        try:
+            candidates.append((ws_state, os.path.getmtime(ws_state)))
+        except Exception:
+            pass
+
+    candidates.sort(key=lambda x: x[1], reverse=True)
+
+    for sf, _ in candidates:
+        try:
+            with open(sf, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 active_id = data.get("active_id", "")
                 if active_id:
                     target_file = os.path.join(profiles_dir, f"{active_id}.profile.json")
-                    if os.path.exists(target_file):
+                    ws_file = os.path.join(ws_dir, f"{active_id}.profile.json")
+                    if os.path.exists(target_file) or os.path.exists(ws_file):
+                        set_active_profile_id(active_id)
                         return active_id
         except Exception:
             pass
+
     all_profiles = glob.glob(os.path.join(profiles_dir, "*.profile.json"))
+    if not all_profiles and os.path.exists(ws_dir):
+        all_profiles = glob.glob(os.path.join(ws_dir, "*.profile.json"))
+
     if all_profiles:
         newest = max(all_profiles, key=os.path.getmtime)
         base = os.path.basename(newest)
@@ -1597,6 +1621,7 @@ def ensure_active_profile_applied(user_cfg_path: Optional[str] = None) -> Dict[s
         else:
             print(f"[Optimizer] Active profile '{pdata.get('name')}' is already synchronized with UserCfg.opt.")
 
+        set_active_profile_id(active_id)
         clear_staged_settings()
         return {
             "status": "success",
@@ -1889,6 +1914,19 @@ def activate_custom_profile(profile_id: str, user_cfg_path: Optional[str] = None
 
         # Ensure pristine original backup exists before overwriting
         ensure_original_user_cfg_backup(path)
+
+        # Critical safeguard: strictly preserve the active InstalledPackagesPath of this machine
+        if os.path.exists(path):
+            try:
+                with open(path, "r", encoding="utf-8", errors="ignore") as cur_f:
+                    for line in cur_f:
+                        if line.strip().startswith("InstalledPackagesPath"):
+                            cur_pkg = line.strip()
+                            if cur_pkg and "InstalledPackagesPath" in content:
+                                content = re.sub(r'InstalledPackagesPath\s+.*', cur_pkg, content)
+                            break
+            except Exception:
+                pass
 
         with open(path, "w", encoding="utf-8") as f:
             f.write(content)
@@ -2656,6 +2694,9 @@ def generate_default_rig_profiles(user_cfg_path: Optional[str] = None) -> List[D
     target_vr_fps = max(30, vr_hz // 2)
 
     if not base_content:
+        fallback_pkg_dir = os.path.expandvars(r"%LOCALAPPDATA%\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache\Packages")
+        if not os.path.exists(fallback_pkg_dir):
+            fallback_pkg_dir = os.path.expandvars(r"%APPDATA%\Microsoft Flight Simulator 2024\Packages")
         base_content = (
             "Version 66\n"
             "{\tVideo\n"
@@ -2677,7 +2718,7 @@ def generate_default_rig_profiles(user_cfg_path: Optional[str] = None) -> List[D
             "\tVersion 2.1.0\n"
             "\tPreset Custom\n"
             "}\n"
-            "InstalledPackagesPath \"\"\n"
+            f'InstalledPackagesPath "{fallback_pkg_dir}"\n'
         )
 
     # 1. Optimal Shared (COMMON) Settings
@@ -3277,6 +3318,19 @@ SETTING_INFO_DATABASE = {
             ("1/2 REPROJECTION", "Locks sim to 1/2 headset refresh rate for consistent cinematic pacing on heavy airliners", "Slight motion warping around propeller and canopy frames")
         ]
     },
+    "ofxr_frame_gen": {
+        "title": "OFXR Frame Generation (VR)",
+        "desc": "OpenXR Toolkit / OFXR Bridge optical flow frame multiplier for VR headsets.",
+        "cpu_impact": "Zero CPU MainThread impact. Optical flow interpolation is computed asynchronously on GPU tensor/optical flow hardware.",
+        "gpu_impact": "Generates 1 (2X) or 2 (3X) intermediate frames per rendered frame. Requires sufficient GPU headroom to maintain base framerate stability.",
+        "liner_advice": "3X (with 36 FPS base for 108 Hz headsets) or 2X (with 45 FPS base for 90 Hz headsets). Reprojection in MSFS must be OFF.",
+        "ga_advice": "3X or 2X with stable base framerate lock.",
+        "tradeoffs": [
+            ("3X (Recommended)", "Triples visual fluidity (e.g. 36 FPS -> 108 Hz cadence) with silky smooth head motion", "Requires locked 36 FPS base render"),
+            ("2X", "Doubles visual fluidity (e.g. 45 FPS -> 90 Hz cadence)", "Requires locked 45 FPS base render"),
+            ("OFF", "Native frame rendering with zero interpolation latency", "Requires higher native GPU/CPU framerate to match headset refresh rate")
+        ]
+    },
     "cubemap_reflections": {
         "title": "Cubemap Reflections",
         "desc": "Texture resolution of local reflection probes capturing cockpit canopy glass, dials, and chrome throttle levers.",
@@ -3680,6 +3734,20 @@ def calculate_option_ratings(key: str, options: List[str], is_liner: bool, is_vr
             except Exception:
                 r, c = "acceptable", "amber"
                 reason = "Display resolution setting."
+
+        elif key == "ofxr_frame_gen":
+            if "3X" in o_up:
+                r, c = "optimum", "emerald"
+                tag = "SWEET SPOT"
+                reason = "Triples perceived visual fluidity (36 FPS -> 108 Hz cadence) with silky smooth head motion."
+            elif "2X" in o_up:
+                r, c = "optimum", "emerald"
+                tag = "OPTIMUM"
+                reason = "Doubles perceived visual fluidity (45 FPS -> 90 Hz cadence) with low motion artifacting."
+            else:
+                r, c = "acceptable", "slate"
+                tag = "OFF"
+                reason = "Native frame presentation without optical flow frame generation."
 
         elif key == "texture_resolution":
             opt_lead = o_up.split("(")[0].strip()
@@ -6390,6 +6458,18 @@ def calculate_dynamic_hardware_impact(
             c_note = f"On your {cpu_name}: Dynamic OpenXR reprojection ({c_score}/12 load). Automatically kicks in whenever MainThread misses headset v-blank."
             g_note = f"On your {gpu_name}: Seamless fallback during intense airport scenes ({g_score}/12 load)."
 
+    elif key == "ofxr_frame_gen":
+        if "3X" in v_up or "2X" in v_up:
+            c_score = 3
+            g_score = 5
+            c_note = f"On your {cpu_name}: Zero MainThread cost ({c_score}/12 load). Optical flow frames are generated independently by the GPU."
+            g_note = f"On your {gpu_name}: Optical flow motion estimation pass ({g_score}/12 load). Light tensor/optical flow workload."
+        else:
+            c_score = 6
+            g_score = 7
+            c_note = f"On your {cpu_name}: Native frame rendering ({c_score}/12 load). CPU MainThread must pace all frames natively."
+            g_note = f"On your {gpu_name}: Native stereo rasterization ({g_score}/12 load). GPU must render every VR frame natively."
+
     elif key == "sharpen_amount_vr":
         c_score, g_score = 1, 1
         c_note = f"On your {cpu_name}: Zero MainThread impact ({c_score}/12 load)."
@@ -6617,6 +6697,14 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
             else:
                 return ("+ REPROJECTION ACTIVE", "Motion vector synthesis enabled.",
                         "- HIGH COMPOSITOR LOAD", "Increased compositor overhead in headset runtime.")
+
+        if key == "ofxr_frame_gen":
+            if v_upper in ["2X", "3X"]:
+                return (f"+ {v_upper} FLUIDITY", f"Optical flow triples or doubles perceived fluidity to headset refresh rate with zero MainThread cost.",
+                        "- BASE PACING", "Requires a rock-solid base framerate lock (e.g. 36 FPS) to prevent optical flow tears.")
+            else:
+                return ("+ NATIVE LATENCY", "Pure 1:1 motion-to-photon latency without frame interpolation delay.",
+                        "- RAW WORKLOAD", "Demands pure native hardware framerate to meet headset refresh rate.")
 
         if key == "vsync":
             if "ON" in v_upper:
@@ -8210,13 +8298,110 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
     cld_vr_color = "emerald" if cld_vr_is_opt else ("orange" if cld_vr_rating == "suboptimal" else "amber")
     cld_vr_lbl = "SWEET SPOT" if cld_vr_is_opt else cld_vr_rating.upper()
 
+    try:
+        from flight_memory_engine import FlightMemoryEngine
+        ofxr_running, ofxr_pid = FlightMemoryEngine.is_ofxr_running()
+    except Exception:
+        ofxr_running, ofxr_pid = False, None
+
+    try:
+        from scanner import get_settings
+        st_opt = get_settings()
+    except Exception:
+        st_opt = {}
+
+    if not ofxr_running:
+        ofxr_mode = "OFF"
+        # If OFXR was stopped, restore previous max frame rate if preserved
+        prev_fps = st_opt.get("ofxr_prev_max_frame_rate")
+        if prev_fps and path and os.path.exists(path):
+            try:
+                curr_target = str(st_opt.get("ofxr_target_fps", 36))
+                if str(fps_vr) == curr_target:
+                    update_msfs_user_cfg_setting("VR", "max_frame_rate", str(prev_fps), path, create_backup=False)
+                    fps_vr = str(prev_fps)
+                    is_vr_fps_opt = (fps_vr == str(target_vr_fps))
+                    is_vr_fps_off = (fps_vr == '0' or str(fps_vr).upper() == 'OFF')
+                    vr_fps_rating = "optimum" if is_vr_fps_opt else ("acceptable" if is_vr_fps_off else "suboptimal")
+                    vr_fps_color = "emerald" if is_vr_fps_opt else ("slate" if is_vr_fps_off else "orange")
+                    vr_fps_label = "OPTIMUM" if is_vr_fps_opt else ("OFF" if is_vr_fps_off else "SUBOPTIMAL")
+            except Exception:
+                pass
+    else:
+        is_3x_disabled = (vr_hz <= 75) or (round(vr_hz / 3) < 30)
+        ofxr_mode = str(st_opt.get("ofxr_mode", "2X" if is_3x_disabled else "3X")).upper()
+        if ofxr_mode not in ["OFF", "2X", "3X"]:
+            ofxr_mode = "2X" if is_3x_disabled else "3X"
+        if is_3x_disabled and ofxr_mode == "3X":
+            ofxr_mode = "2X"
+
+    is_3x_disabled = (vr_hz <= 75) or (round(vr_hz / 3) < 30)
+    try:
+        default_fps = max(30, vr_hz // 2) if (is_3x_disabled or ofxr_mode == "2X") else max(30, round(vr_hz / 3))
+        ofxr_target_fps = int(st_opt.get("ofxr_target_fps", default_fps))
+        if is_3x_disabled and ofxr_target_fps < 30:
+            ofxr_target_fps = max(30, vr_hz // 2)
+    except Exception:
+        ofxr_target_fps = max(30, vr_hz // 2)
+
+    ofxr_sync_smart_lod = bool(st_opt.get("ofxr_sync_smart_lod", True))
+
+    ofxr_is_active = (ofxr_mode in ["2X", "3X"]) and ofxr_running
+    is_72hz_3x_incompatible = (is_3x_disabled and ofxr_mode == "3X" and ofxr_running)
+
+    if is_72hz_3x_incompatible:
+        ofxr_rating = "suboptimal"
+        ofxr_color = "orange"
+        ofxr_lbl = "SUBOPTIMAL (72Hz)"
+        ofxr_tooltip = (
+            f"Description: OpenXR Toolkit / OFXR Bridge Frame Generation.\n"
+            f"WARNING: At {vr_hz}Hz refresh rate, Mode 3X forces a {ofxr_target_fps} FPS base ({round(1000.0/max(1, ofxr_target_fps), 1)}ms frame time).\n"
+            f"In VR, base framerates below 30 FPS induce ~85ms motion-to-photon latency and optical flow warping.\n"
+            f"Recommendation: Switch to Mode 2X ({vr_hz//2} FPS base -> {vr_hz} FPS smooth) or set headset to 90Hz in Pimax Play."
+        )
+        ofxr_tag_reason = (
+            f"72Hz + 3X forces a {ofxr_target_fps} FPS base (41.7ms). Framerates < 30 FPS cause ~85ms motion latency and optical flow warping. Use 2X (36 FPS) or set headset to 90Hz."
+        )
+        ofxr_rec_guidance = f"72 Hz Sweet Spot: 2X ({vr_hz//2} FPS base -> {vr_hz} FPS smooth) • 3X (24 FPS) causes head-tracking lag"
+    elif ofxr_mode == "2X" and vr_hz <= 75:
+        ofxr_rating = "optimum"
+        ofxr_color = "emerald"
+        ofxr_lbl = "2X SWEET SPOT" if ofxr_running else "2X OPTIMAL"
+        ofxr_tooltip = (
+            f"Description: OpenXR Toolkit / OFXR Bridge Frame Generation.\n"
+            f"Current: Mode 2X ({ofxr_target_fps} FPS Target Base -> {vr_hz} FPS Headset Displayed).\n"
+            f"Status: Calibrated VR Sweet Spot for 72 Hz headsets. Low latency (27.7ms) and zero optical warping.\n"
+            f"Recommendation: Reprojection in MSFS must be OFF when using OFXR."
+        )
+        ofxr_tag_reason = (
+            f"Optimal 72Hz VR Sweet Spot: 2X (36 FPS base -> 72 FPS smooth). Low latency (27.7ms) and zero optical flow warping."
+        )
+        ofxr_rec_guidance = "2X (36 FPS base -> 72 Hz) • Reprojection OFF mandatory"
+    else:
+        ofxr_rating = "optimum" if ofxr_is_active else "acceptable"
+        ofxr_color = "emerald" if ofxr_is_active else "slate"
+        ofxr_lbl = f"{ofxr_mode} ACTIVE" if ofxr_is_active else ("STANDBY" if ofxr_running else "OFF")
+        ofxr_tooltip = (
+            f"Description: OpenXR Toolkit / OFXR Bridge Frame Generation.\n"
+            f"Current: Mode {ofxr_mode} ({ofxr_target_fps} FPS Target Base).\n"
+            f"Status: {'Process detected (Running)' if ofxr_running else 'Not running (Bridge Standby)'}.\n"
+            f"Recommendation: Reprojection in MSFS must be OFF when using OFXR."
+        )
+        ofxr_tag_reason = (
+            f"Optical flow frame generation ({ofxr_mode}) interpolates frames to headset refresh rate ({ofxr_target_fps} FPS base)."
+            if ofxr_mode in ["2X", "3X"] else
+            "OFXR frame generation inactive. Native frames sent directly to headset."
+        )
+        ofxr_rec_guidance = "3X (36 FPS base -> 108 Hz) or 2X (45 FPS base -> 90 Hz) • Reprojection OFF mandatory"
+
     matrix_vr = [
-        # PAGE 1: VR HEADSET & SYNC (5)
+        # PAGE 1: VR HEADSET & SYNC (6)
         make_setting_item("primary_scaling_vr", "VR Render Scale", scale_vr_pct, scale_vr_raw, False, scale_vr_rating, scale_vr_color, scale_vr_lbl, scale_vr_tooltip, scale_vr_options, page=1, tag_reason=scale_vr_reason, rec_guidance="100% • Native 1:1 render scale for crystal clear gauges", is_vr=True),
         make_setting_item("max_frame_rate", "Max Frame Rate (VR)", f"{fps_vr} FPS" if not is_vr_fps_off else "OFF", fps_vr, False, vr_fps_rating, vr_fps_color, vr_fps_label, vr_fps_tooltip, fps_options, page=1, is_numeric=True, min_val=0, max_val=240, step=1, tag_reason=vr_fps_reason, rec_guidance=f"{target_vr_fps} FPS • Headset refresh rate divided by 2 ({vr_hz}Hz / 2)", is_vr=True, is_active=not is_vr_fps_off, target_fps=target_vr_fps),
         make_setting_item("reprojection_mode", "Reprojection Mode", reproj_vr_val, reproj_vr_raw, False, "optimum" if reproj_is_opt else "acceptable", "emerald" if reproj_is_opt else "amber", "OPTIMUM" if reproj_is_opt else "ACCEPTABLE", f"Description: Motion reprojection mode for VR headset.\nCurrent: {reproj_vr_val}.\nRecommendation: OFF (zero warping & pure latency, mandatory with OFXR Bridge) or AUTO / 1/2 REPROJECTION (cadence smoothing).", reproj_options, page=1, tag_reason=reproj_reason_desc, rec_guidance="OFF (pure latency & zero warping) or 1/2 REPROJ (locked sync)", is_vr=True),
         make_setting_item("reflex", "NVIDIA Reflex (VR)", reflex_vr, reflex_vr, False, reflex_vr_rating, reflex_vr_color, reflex_vr_label, f"Description: NVIDIA Reflex low-latency GPU queue pacing in VR. Synchronizes headset frame pacing and eliminates control lag. Has 0 GB impact on VRAM allocation (acts purely on MainThread and motion-to-photon latency).\nCurrent: {reflex_vr}.\nRecommendation: Set to ON to minimize VR motion-to-photon latency and eliminate control lag.", ["ON", "ON+BOOST", "OFF"], page=1, tag_reason=reflex_vr_reason, rec_guidance="ON • Minimizes headset motion-to-photon latency", is_vr=True),
         make_setting_item("sharpen_amount_vr", "VR Sharpening", sharpen_vr_val, sharpen_vr_raw, False, "optimum" if abs(float(sharpen_vr_val) - 0.20) < 0.05 else "acceptable", "emerald" if abs(float(sharpen_vr_val) - 0.20) < 0.05 else "amber", "OPTIMUM" if abs(float(sharpen_vr_val) - 0.20) < 0.05 else "ACCEPTABLE", f"Description: Post-processing sharpening filter in VR headset.\nCurrent: {sharpen_vr_val}.\nRecommendation: Set to 0.20 when using DLSS. Excessive values (>1.0) cause harsh shimmering on runway lines and horizon.", sharpen_vr_options, page=1, is_numeric=True, min_val=0.0, max_val=2.0, step=0.1, tag_reason="Subtle sharpening without shimmering." if abs(float(sharpen_vr_val) - 0.20) < 0.05 else "High sharpening causes noise and shimmering in VR.", rec_guidance="0.20 • Clean clarity without noise or horizon shimmering", is_vr=True),
+        make_setting_item("ofxr_frame_gen", "OFXR Frame Generation (VR)", ofxr_mode, ofxr_mode, False, ofxr_rating, ofxr_color, ofxr_lbl, ofxr_tooltip, ["OFF", "2X", "3X"], page=1, tag_reason=ofxr_tag_reason, rec_guidance=ofxr_rec_guidance, is_vr=True, is_active=ofxr_is_active),
 
         # PAGE 2: VR OPTIMIZATIONS & DLSS (4)
         make_setting_item("anti_aliasing", "Anti-Aliasing & Upscaling (VR)", format_aa_display(val_aa_vr, True), aa_vr, False, aa_vr_rating, aa_vr_color, aa_vr_lbl, f"Description: Anti-aliasing and upscaling mode in VR stereo.\nCurrent: {val_aa_vr}.\nRecommendation: DLSS Quality balances sharp flight decks with high framerate in VR stereo. TAA eliminates AI gauge ghosting.", aa_options_vr, page=2, tag_reason="67% Render Scale (~45% native pixels) • AI Tensor Reconstruction: The calibrated VR Sweet Spot. Crystal-clear EFIS flight displays and runway lines while slashing pixel shading times by ~55%." if "QUALITY" in val_aa_vr.upper() else ("100% Native Stereo Rasterization • Zero AI Ghosting: Eliminates temporal ghosting on digital glass avionics and needles." if "TAA" in val_aa_vr.upper() else ("58% Render Scale • AI Upscaling: Massive GPU frame time relief (+45-50% FPS) to lock 72/80/90 Hz." if "BALANCED" in val_aa_vr.upper() else ("50% Render Scale • Maximum Fillrate Relief (+60% FPS): Ultimate performance mode for high-PPD headsets." if "PERFORMANCE" in val_aa_vr.upper() else ("100% Native AI Workload: HAZARD in VR (causes reprojection collapse)." if "DLAA" in val_aa_vr.upper() else "Anti-aliasing evaluated for VR.")))), rec_guidance="DLSS Quality for balanced clarity • TAA for zero-ghosting avionics • Performance for max FPS", is_vr=True),
@@ -8306,12 +8491,32 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
         make_setting_item("motion_blur", "Motion Blur (VR)", mb_vr_val, "OFF" if mb_vr_val == "OFF" else mb_vr_raw, False, "optimum" if mb_vr_val == "OFF" else "suboptimal", "emerald" if mb_vr_val == "OFF" else "orange", "OPTIMUM" if mb_vr_val == "OFF" else "SUBOPTIMAL", f"Description: Camera motion smearing in VR.\nCurrent: {mb_vr_val}.\nRecommendation: Keep strictly OFF in VR to eliminate VR motion sickness and smearing during head movements.", mb_options, page=6, tag_reason="Disabled motion blur prevents simulator sickness in headset." if mb_vr_val == "OFF" else "Motion blur in VR causes severe motion disorientation.", rec_guidance="OFF • Eliminates VR motion sickness and rotation smearing", is_vr=True),
     ]
 
+    for it in matrix_vr:
+        if it.get("key") == "ofxr_frame_gen":
+            it["ofxr_running"] = ofxr_running
+            it["ofxr_pid"] = ofxr_pid
+            it["ofxr_mode"] = ofxr_mode
+            it["ofxr_target_fps"] = ofxr_target_fps
+            it["ofxr_sync_smart_lod"] = ofxr_sync_smart_lod
+            break
 
     # Cross-Settings Interdependences Analysis
     synergies_2d = []
     conflicts_2d = []
     synergies_vr = []
     conflicts_vr = []
+
+    # OFXR Frame Generation & Reprojection Synergy
+    if ofxr_running or ofxr_mode in ["2X", "3X"]:
+        if reproj_vr_val == "OFF":
+            if is_72hz_3x_incompatible:
+                conflicts_vr.append(f"OFXR 3X at {vr_hz}Hz forces a {ofxr_target_fps} FPS base (41.7ms). In VR, base framerates < 30 FPS induce ~85ms motion latency and optical flow warping. Switch to 2X ({vr_hz//2} FPS base) or set headset to 90Hz.")
+            elif ofxr_mode == "2X" and vr_hz <= 75:
+                synergies_vr.append(f"OFXR 2X at {vr_hz}Hz: Calibrated VR Sweet Spot (36 FPS base -> 72 FPS smooth with 27.7ms low latency and zero warping).")
+            else:
+                synergies_vr.append(f"OFXR Bridge Active ({ofxr_mode} @ {ofxr_target_fps} FPS base) + Reprojection OFF: Optimal optical flow frame pacing.")
+        else:
+            conflicts_vr.append(f"OFXR Bridge Active with MSFS Reprojection {reproj_vr_val}: Conflict hazard. Set Reprojection to OFF.")
 
     # 1. Frame Gen & V-Sync
     is_fg_2d = any(fg_2d.startswith(k) for k in ["DLSSG", "FSR3"])
@@ -8371,6 +8576,11 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
         "matrix_common": matrix_common,
         "matrix_2d": matrix_2d,
         "matrix_vr": matrix_vr,
+        "ofxr_running": ofxr_running,
+        "ofxr_pid": ofxr_pid,
+        "ofxr_mode": ofxr_mode,
+        "ofxr_target_fps": ofxr_target_fps,
+        "ofxr_sync_smart_lod": ofxr_sync_smart_lod,
         "all_displays": all_displays,
         "active_display": active_disp,
         "target_pacing_2d": {
@@ -8485,6 +8695,20 @@ def get_active_profile_snapshot() -> Dict[str, Any]:
 
 
 def update_msfs_user_cfg_setting(mode: str, setting_key: str, new_value: Any, user_cfg_path: Optional[str] = None, create_backup: bool = True) -> Dict[str, Any]:
+    if setting_key == "ofxr_frame_gen":
+        try:
+            from scanner import get_settings, save_settings
+            st = get_settings()
+            st["ofxr_mode"] = str(new_value).upper()
+            save_settings(st)
+        except Exception:
+            pass
+        return {
+            "status": "success",
+            "message": f"Updated OFXR frame generation mode to {new_value}.",
+            "backup_created": None
+        }
+
     path = user_cfg_path or get_user_cfg_path()
     if not path or not os.path.exists(path):
         return {"status": "error", "message": "UserCfg.opt file not found."}

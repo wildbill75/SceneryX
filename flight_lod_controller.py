@@ -12,6 +12,7 @@ import time
 import json
 import threading
 import glob
+import re
 from datetime import datetime
 from typing import List
 from typing import Dict, Any, Optional
@@ -39,21 +40,21 @@ DEFAULT_CONFIG = {
     "2d_tlod_active": False,
     "2d_tlod_base": 100,
     "2d_tlod_target": 200,
-    "2d_tlod_altitude": 5000,
+    "2d_tlod_altitude": 3000,
     "2d_olod_active": False,
     "2d_olod_base": 100,
-    "2d_olod_target": 100,
+    "2d_olod_target": 200,
     "2d_olod_altitude": 3000,
     
     # VR Independent LOD Axis
     "vr_tlod_active": False,
-    "vr_tlod_base": 90,
-    "vr_tlod_target": 150,
-    "vr_tlod_altitude": 4000,
+    "vr_tlod_base": 100,
+    "vr_tlod_target": 200,
+    "vr_tlod_altitude": 3000,
     "vr_olod_active": False,
-    "vr_olod_base": 80,
-    "vr_olod_target": 80,
-    "vr_olod_altitude": 2500,
+    "vr_olod_base": 100,
+    "vr_olod_target": 200,
+    "vr_olod_altitude": 3000,
     
     # Paramètres IFR
     "ifr_tlod_ground": 100,      # TLOD au sol / approche (Min)
@@ -86,6 +87,81 @@ DEFAULT_CONFIG = {
 }
 
 
+def get_active_profile_nominal_values(is_vr: Optional[bool] = None) -> Dict[str, Any]:
+    """
+    Lecture directe ultra-rapide (<1ms) des valeurs nominales TLOD, OLOD et Nuages
+    du profil graphique actif sans bloquer avec build_msfs_settings_matrix().
+    Isole la section {GraphicsVR en mode VR et {Graphics en mode 2D.
+    """
+    res = {"name": "Active Profile", "tlod": 100.0, "olod": 100.0, "clouds": 2, "is_vr": False}
+    try:
+        if is_vr is None:
+            try:
+                import flight_memory_engine
+                mem = flight_memory_engine.get_memory_engine()
+                if mem and mem.is_attached:
+                    is_vr = mem.is_vr_active()
+            except Exception:
+                is_vr = False
+
+        res["is_vr"] = bool(is_vr)
+
+        import flight_rig_optimizer
+        ws_dir = flight_rig_optimizer.get_custom_profiles_dir()
+        state_file = os.path.join(ws_dir, "active_profile.json")
+        if not os.path.exists(state_file):
+            alt_state = r"D:\SceneryX\custom_profiles\active_profile.json"
+            if os.path.exists(alt_state):
+                state_file = alt_state
+        if os.path.exists(state_file):
+            with open(state_file, "r", encoding="utf-8") as f:
+                sdata = json.load(f)
+            aid = sdata.get("active_id")
+            if aid:
+                pfile = os.path.join(ws_dir, f"{aid}.profile.json")
+                if not os.path.exists(pfile):
+                    alt_pfile = os.path.join(r"D:\SceneryX\custom_profiles", f"{aid}.profile.json")
+                    if os.path.exists(alt_pfile):
+                        pfile = alt_pfile
+                if os.path.exists(pfile):
+                    with open(pfile, "r", encoding="utf-8") as pf:
+                        pjson = json.load(pf)
+                    res["name"] = pjson.get("name", aid)
+                    content = pjson.get("content", "")
+
+                    # Isolate section: GraphicsVR for VR, Graphics for 2D
+                    if is_vr and "{GraphicsVR" in content:
+                        section = content.split("{GraphicsVR", 1)[1]
+                    elif "{Graphics" in content:
+                        section = content.split("{Graphics", 1)[1]
+                        if "{GraphicsVR" in section:
+                            section = section.split("{GraphicsVR", 1)[0]
+                    else:
+                        section = content
+
+                    m_cloud = re.search(r"\{VolumetricClouds\s+Enabled\s+\d+\s+Quality\s+(\d+)", section)
+                    if m_cloud:
+                        res["clouds"] = int(m_cloud.group(1))
+                    m_tlod = re.search(r"\{Terrain\s+LoDFactor\s+([\d\.]+)", section)
+                    if m_tlod:
+                        res["tlod"] = round(float(m_tlod.group(1)) * 100.0, 1)
+                    m_olod = re.search(r"\{ObjectsLoD\s+LoDFactor\s+([\d\.]+)", section)
+                    if m_olod:
+                        res["olod"] = round(float(m_olod.group(1)) * 100.0, 1)
+                    return res
+    except Exception as e:
+        print(f"[SmartLOD] Notice fast active profile reader: {e}")
+    return res
+
+
+def get_nominal_cloud_quality() -> int:
+    """
+    Retourne la qualite des nuages nominale (0=Low, 1=Medium, 2=High, 3=Ultra)
+    extraite ultra-rapidement du profil graphique MSFS actuellement actif dans SceneryX.
+    """
+    return int(get_active_profile_nominal_values().get("clouds", 2))
+
+
 class SmartLodController:
     """
     Contrôleur daemon gérant l'algorithme d'asservissement de Smart LOD.
@@ -114,13 +190,85 @@ class SmartLodController:
         self._last_logged_tlod: Optional[float] = None
         self._last_phase: str = "ground"
 
+        # Synchroniser et appliquer le profil Smart LOD actif dès l'allumage
+        self.load_active_profile_into_config()
+
         if self.config.get("enabled", False):
-            if self.config.get("auto_kill_autofps", False):
-                is_af_running, _ = self.engine.is_autofps_running()
-                if is_af_running:
-                    print("[SmartLOD] Auto-terminating external AutoFPS based on user preference...")
-                    self.engine.kill_autofps_process()
             self.start()
+
+    def load_active_profile_into_config(self):
+        """Charge et applique le profil Smart LOD actif dans self.config au démarrage ou au rechargement."""
+        try:
+            aid = get_active_smart_lod_profile_id()
+            if not aid:
+                profs = get_smart_lod_profiles()
+                if profs:
+                    aid = profs[0].get("id", "")
+            if aid:
+                pdir = get_smart_lod_profiles_dir()
+                pfile = os.path.join(pdir, f"{aid}.lodprofile.json")
+                if os.path.exists(pfile):
+                    with open(pfile, "r", encoding="utf-8") as f:
+                        pdata = json.load(f)
+                    pdata = _sanitize_smart_lod_profile_data(pdata)
+                    with self._lock:
+                        self.config.update({
+                            "cloud_recovery": pdata["cloud_recovery"],
+                            "2d_tlod_base": pdata["ground_tlod"],
+                            "2d_tlod_target": pdata["cruise_tlod"],
+                            "2d_tlod_altitude": pdata["alt_trans"],
+                            "2d_olod_base": pdata["ground_olod"],
+                            "2d_olod_target": pdata["cruise_olod"],
+                            "2d_olod_altitude": pdata["alt_trans_olod"],
+                            "vr_tlod_base": pdata["vr_ground_tlod"],
+                            "vr_tlod_target": pdata["vr_cruise_tlod"],
+                            "vr_tlod_altitude": pdata["vr_alt_trans"],
+                            "vr_olod_base": pdata["vr_ground_olod"],
+                            "vr_olod_target": pdata["vr_cruise_olod"],
+                            "vr_olod_altitude": pdata["vr_alt_trans_olod"],
+                            "vr_cloud_recovery": pdata["vr_cloud_recovery"],
+                            # Legacy mirror
+                            "ifr_tlod_ground": pdata["ground_tlod"],
+                            "ifr_tlod_cruise": pdata["cruise_tlod"],
+                            "ifr_alt_transition": pdata["alt_trans"],
+                            "ifr_olod_ground": pdata["ground_olod"],
+                            "ifr_olod_cruise": pdata["cruise_olod"],
+                            "vfr_tlod_ground": pdata["ground_tlod"],
+                            "vfr_tlod_cruise": pdata["cruise_tlod"],
+                            "vfr_alt_transition": pdata["alt_trans"],
+                            "vfr_olod_ground": pdata["ground_olod"],
+                            "vfr_olod_cruise": pdata["cruise_olod"],
+                        })
+                    print(f"[SmartLOD] Initialized active profile '{pdata.get('name', aid)}' (TLOD {pdata['ground_tlod']}-{pdata['cruise_tlod']}, OLOD {pdata['ground_olod']}-{pdata['cruise_olod']})")
+        except Exception as e:
+            print(f"[SmartLOD] Notice initializing active profile: {e}")
+
+    def set_cloud_recovery(self, enabled: bool) -> bool:
+        """Active ou désactive la récupération automatique des nuages et restaure silencieusement la valeur nominale."""
+        with self._lock:
+            self.config["cloud_recovery"] = bool(enabled)
+            self.config["vr_cloud_recovery"] = bool(enabled)
+            self.config["2d_cloud_recovery"] = bool(enabled)
+            try:
+                with open(CONFIG_FILE_PATH, "w", encoding="utf-8") as f:
+                    json.dump(self.config, f, indent=4)
+            except Exception as e:
+                print(f"[SmartLOD] Erreur sauvegarde config cloud_recovery: {e}")
+
+        if not enabled:
+            self.in_cloud_reduction = False
+            def _async_restore():
+                try:
+                    nom_q = get_nominal_cloud_quality()
+                    if not self.engine.is_attached:
+                        self.engine.attach()
+                    if self.engine.is_attached and not self.engine.safe_read_only:
+                        self.engine.write_cloud_quality(nom_q)
+                        print(f"[SmartLOD] Auto Cloud Recovery turned OFF -> silently restored MSFS cloud quality to nominal ({nom_q})")
+                except Exception as e:
+                    print(f"[SmartLOD] Warning restoring cloud quality: {e}")
+            threading.Thread(target=_async_restore, daemon=True, name="AsyncCloudRestore").start()
+        return True
 
     def get_trigger_events(self, clear: bool = False) -> List[Dict[str, Any]]:
         with self._lock:
@@ -134,53 +282,20 @@ class SmartLodController:
         Recalibre immédiatement les curseurs et la mémoire MSFS sur les valeurs nominales du profil actif,
         en supprimant tout débrayage manuel ou temporaire.
         """
-        nom_tlod = 100.0
-        nom_olod = 100.0
-        profile_name = "Active Profile"
-        try:
-            import flight_rig_optimizer
-            snap = flight_rig_optimizer.get_active_profile_snapshot()
-            profile_name = snap.get("name", "Active Profile")
-            hl = snap.get("highlights", {})
-            if "Terrain LOD (TLOD)" in hl:
-                val_str = str(hl["Terrain LOD (TLOD)"]).replace("%", "").strip()
-                try:
-                    nom_tlod = float(val_str)
-                except ValueError:
-                    pass
-            if "Objects LOD (OLOD)" in hl:
-                val_str = str(hl["Objects LOD (OLOD)"]).replace("%", "").strip()
-                try:
-                    nom_olod = float(val_str)
-                except ValueError:
-                    pass
-        except Exception as e:
-            print(f"[SmartLOD] Erreur lecture snapshot profil actif: {e}")
-
-        is_vr = False
-        try:
-            if self.engine.is_attached:
-                is_vr = self.engine.is_vr_active()
-        except Exception:
-            pass
-        pfx = "vr" if is_vr else "2d"
+        nom_vals = get_active_profile_nominal_values()
+        nom_tlod = nom_vals.get("tlod", 100.0)
+        nom_olod = nom_vals.get("olod", 100.0)
+        nom_cloud = nom_vals.get("clouds", 2)
+        profile_name = nom_vals.get("name", "Active Profile")
 
         with self._lock:
             if axis in ("tlod", "all"):
                 self.manual_tlod = None
                 self.current_tlod_setpoint = float(nom_tlod)
-                self.config[f"{pfx}_tlod_base"] = int(nom_tlod)
-                self.config[f"{pfx}_tlod_target"] = min(400, max(int(nom_tlod), int(nom_tlod * 2 if pfx == "2d" else nom_tlod * 1.6)))
             if axis in ("olod", "all"):
                 self.manual_olod = None
                 self.current_olod_setpoint = float(nom_olod)
-                self.config[f"{pfx}_olod_base"] = int(nom_olod)
-                self.config[f"{pfx}_olod_target"] = int(nom_olod)
-            try:
-                with open(CONFIG_FILE_PATH, "w", encoding="utf-8") as f:
-                    json.dump(self.config, f, indent=4)
-            except Exception as e:
-                print(f"[SmartLOD] Erreur sauvegarde config reset: {e}")
+            self.in_cloud_reduction = False
 
         if not self.engine.is_attached:
             self.engine.attach()
@@ -190,8 +305,10 @@ class SmartLodController:
                 self.engine.write_tlod(nom_tlod)
             if axis in ("olod", "all"):
                 self.engine.write_olod(nom_olod)
+            if axis in ("clouds", "all"):
+                self.engine.write_cloud_quality(nom_cloud)
 
-        print(f"[SmartLOD] Reset to active profile '{profile_name}': TLOD={nom_tlod}, OLOD={nom_olod}")
+        print(f"[SmartLOD] Reset to active profile '{profile_name}': TLOD={nom_tlod}, OLOD={nom_olod}, Clouds={nom_cloud}")
         return {
             "success": True,
             "axis": axis,
@@ -200,7 +317,8 @@ class SmartLodController:
             "manual_tlod": False,
             "manual_olod": False,
             "current_tlod": round(self.current_tlod_setpoint, 1),
-            "current_olod": round(self.current_olod_setpoint, 1)
+            "current_olod": round(self.current_olod_setpoint, 1),
+            "cloud_quality": nom_cloud
         }
 
     def reset_manual_override(self, axis: str = "all") -> Dict[str, Any]:
@@ -210,17 +328,28 @@ class SmartLodController:
     def get_axis_state(self, mode: str = "2D") -> Dict[str, Any]:
         with self._lock:
             pfx = "vr" if str(mode).upper() == "VR" else "2d"
+            if self.config.get("enabled", False) and self.is_running:
+                tlod_base = int(round(getattr(self, "dynamic_tlod_floor", self.config.get(f"{pfx}_tlod_base", 100))))
+                tlod_target = int(round(getattr(self, "dynamic_tlod_cruise", self.config.get(f"{pfx}_tlod_target", 200))))
+                olod_base = int(round(getattr(self, "dynamic_olod_floor", self.config.get(f"{pfx}_olod_base", 100))))
+                olod_target = int(round(getattr(self, "dynamic_olod_cruise", self.config.get(f"{pfx}_olod_target", 200))))
+            else:
+                tlod_base = int(self.config.get(f"{pfx}_tlod_base", 100))
+                tlod_target = int(self.config.get(f"{pfx}_tlod_target", 200))
+                olod_base = int(self.config.get(f"{pfx}_olod_base", 100))
+                olod_target = int(self.config.get(f"{pfx}_olod_target", 200))
+
             return {
                 "mode": pfx.upper(),
                 "external_autofps": bool(self.config.get("external_autofps", False)),
                 "tlod_active": bool(self.config.get(f"{pfx}_tlod_active", False)),
-                "tlod_base": int(self.config.get(f"{pfx}_tlod_base", 100 if pfx == "2d" else 90)),
-                "tlod_target": int(self.config.get(f"{pfx}_tlod_target", 200 if pfx == "2d" else 150)),
-                "tlod_altitude": int(self.config.get(f"{pfx}_tlod_altitude", 5000 if pfx == "2d" else 4000)),
+                "tlod_base": tlod_base,
+                "tlod_target": tlod_target,
+                "tlod_altitude": int(self.config.get(f"{pfx}_tlod_altitude", 3000)),
                 "olod_active": bool(self.config.get(f"{pfx}_olod_active", False)),
-                "olod_base": int(self.config.get(f"{pfx}_olod_base", 100 if pfx == "2d" else 80)),
-                "olod_target": int(self.config.get(f"{pfx}_olod_target", 100 if pfx == "2d" else 80)),
-                "olod_altitude": int(self.config.get(f"{pfx}_olod_altitude", 3000 if pfx == "2d" else 2500)),
+                "olod_base": olod_base,
+                "olod_target": olod_target,
+                "olod_altitude": int(self.config.get(f"{pfx}_olod_altitude", 3000)),
             }
 
     def set_axis_state(self, mode: str, axis: str, enabled: Optional[bool] = None, target: Optional[int] = None, altitude: Optional[int] = None, base: Optional[int] = None) -> Dict[str, Any]:
@@ -231,12 +360,19 @@ class SmartLodController:
             if enabled is not None:
                 self.config[f"{pfx}_{ax}_active"] = bool(enabled)
             max_v = 400 if ax == "tlod" else 300
+            other_pfx = "2d" if pfx == "vr" else "vr"
             if base is not None:
-                self.config[f"{pfx}_{ax}_base"] = max(0, min(int(base), max_v))
+                b_val = max(0, min(int(base), max_v))
+                self.config[f"{pfx}_{ax}_base"] = b_val
+                self.config[f"{other_pfx}_{ax}_base"] = b_val
             if target is not None:
-                self.config[f"{pfx}_{ax}_target"] = max(0, min(int(target), max_v))
+                t_val = max(0, min(int(target), max_v))
+                self.config[f"{pfx}_{ax}_target"] = t_val
+                self.config[f"{other_pfx}_{ax}_target"] = t_val
             if altitude is not None:
-                self.config[f"{pfx}_{ax}_altitude"] = max(0, int(altitude))
+                a_val = max(0, int(altitude))
+                self.config[f"{pfx}_{ax}_altitude"] = a_val
+                self.config[f"{other_pfx}_{ax}_altitude"] = a_val
                 
             any_active = any([
                 self.config.get("2d_tlod_active", False),
@@ -355,6 +491,23 @@ class SmartLodController:
                 self.config["vr_tlod_active"] = True
                 self.config["vr_olod_active"] = True
 
+                # S'assurer d'une plage dynamique floor -> cruise valide pour la régulation automatique
+                if self.config.get("2d_tlod_base", 100) >= self.config.get("2d_tlod_target", 200):
+                    self.config["2d_tlod_target"] = min(400, max(200, self.config.get("2d_tlod_base", 100) + 100))
+                if self.config.get("vr_tlod_base", 90) >= self.config.get("vr_tlod_target", 150):
+                    self.config["vr_tlod_target"] = min(400, max(150, self.config.get("vr_tlod_base", 90) + 80))
+                if self.config.get("2d_olod_base", 100) >= self.config.get("2d_olod_target", 200):
+                    self.config["2d_olod_target"] = min(300, max(150, self.config.get("2d_olod_base", 100) + 50))
+                if self.config.get("vr_olod_base", 100) >= self.config.get("vr_olod_target", 150):
+                    self.config["vr_olod_target"] = min(300, max(120, self.config.get("vr_olod_base", 100) + 50))
+
+                is_vr = self.engine.is_vr_active() if self.engine.is_attached else False
+                pfx = "vr" if is_vr else "2d"
+                self.dynamic_tlod_floor = float(self.config.get(f"{pfx}_tlod_base", 100))
+                self.dynamic_tlod_cruise = float(self.config.get(f"{pfx}_tlod_target", 200))
+                self.dynamic_olod_floor = float(self.config.get(f"{pfx}_olod_base", 100))
+                self.dynamic_olod_cruise = float(self.config.get(f"{pfx}_olod_target", 200))
+
             # Vérifier si AutoFPS externe tourne
             af_running, pid = self.engine.is_autofps_running()
             if af_running:
@@ -380,7 +533,15 @@ class SmartLodController:
                 "2d_tlod_active": True,
                 "2d_olod_active": True,
                 "vr_tlod_active": True,
-                "vr_olod_active": True
+                "vr_olod_active": True,
+                "2d_tlod_base": self.config.get("2d_tlod_base", 100),
+                "2d_tlod_target": self.config.get("2d_tlod_target", 200),
+                "vr_tlod_base": self.config.get("vr_tlod_base", 90),
+                "vr_tlod_target": self.config.get("vr_tlod_target", 150),
+                "2d_olod_base": self.config.get("2d_olod_base", 100),
+                "2d_olod_target": self.config.get("2d_olod_target", 200),
+                "vr_olod_base": self.config.get("vr_olod_base", 100),
+                "vr_olod_target": self.config.get("vr_olod_target", 150),
             })
             self.start()
             # Forcer un premier tick de régulation immédiat
@@ -390,6 +551,12 @@ class SmartLodController:
                 pass
             return {"success": True, "conflict": False, "enabled": True}
         else:
+            nom_vals = get_active_profile_nominal_values()
+            nom_tlod = int(round(float(nom_vals.get("tlod", 100.0))))
+            nom_olod = int(round(float(nom_vals.get("olod", 100.0))))
+            cruise_tlod = min(400, nom_tlod + 50)
+            cruise_olod = min(300, nom_olod + 50)
+
             with self._lock:
                 self.manual_tlod = None
                 self.manual_olod = None
@@ -398,18 +565,51 @@ class SmartLodController:
                 self.config["2d_olod_active"] = False
                 self.config["vr_tlod_active"] = False
                 self.config["vr_olod_active"] = False
+                self.config["2d_tlod_base"] = nom_tlod
+                self.config["2d_tlod_target"] = cruise_tlod
+                self.config["vr_tlod_base"] = nom_tlod
+                self.config["vr_tlod_target"] = cruise_tlod
+                self.config["2d_olod_base"] = nom_olod
+                self.config["2d_olod_target"] = cruise_olod
+                self.config["vr_olod_base"] = nom_olod
+                self.config["vr_olod_target"] = cruise_olod
+                self.dynamic_tlod_floor = float(nom_tlod)
+                self.dynamic_tlod_cruise = float(cruise_tlod)
+                self.dynamic_olod_floor = float(nom_olod)
+                self.dynamic_olod_cruise = float(cruise_olod)
 
             self.save_config({
                 "enabled": False,
                 "2d_tlod_active": False,
                 "2d_olod_active": False,
                 "vr_tlod_active": False,
-                "vr_olod_active": False
+                "vr_olod_active": False,
+                "2d_tlod_base": nom_tlod,
+                "2d_tlod_target": cruise_tlod,
+                "vr_tlod_base": nom_tlod,
+                "vr_tlod_target": cruise_tlod,
+                "2d_olod_base": nom_olod,
+                "2d_olod_target": cruise_olod,
+                "vr_olod_base": nom_olod,
+                "vr_olod_target": cruise_olod,
             })
             self.stop(detach=False)
             reset_res = self.reset_to_active_profile("all")
-            self.status_message = "Off (Nominal Active Profile)"
-            return {"success": True, "conflict": False, "enabled": False, "reset_info": reset_res}
+            self.status_message = "MAN"
+            return {
+                "success": True,
+                "conflict": False,
+                "enabled": False,
+                "nominal_tlod": nom_tlod,
+                "nominal_olod": nom_olod,
+                "tlod": nom_tlod,
+                "olod": nom_olod,
+                "tlod_base": nom_tlod,
+                "tlod_target": cruise_tlod,
+                "olod_base": nom_olod,
+                "olod_target": cruise_olod,
+                "reset_info": reset_res
+            }
 
     # ================= REGULATION ALGORITHM =================
 
@@ -420,7 +620,7 @@ class SmartLodController:
                 self._tick()
             except Exception as e:
                 self.status_message = f"Erreur régulation: {e}"
-            time.sleep(1.0)
+            self._stop_event.wait(1.0)
 
     def _tick(self):
         if not self.config.get("enabled", False) or self.config.get("external_autofps", False):
@@ -430,11 +630,8 @@ class SmartLodController:
         # 1. Vérifier la présence d'AutoFPS externe
         af_running, _ = self.engine.is_autofps_running()
         if af_running:
-            if self.config.get("auto_kill_autofps", False):
-                self.engine.kill_autofps_process()
-            else:
-                self.status_message = "En pause (AutoFPS externe détecté en arrière-plan)"
-                return
+            self.status_message = "En pause (AutoFPS externe détecté en arrière-plan)"
+            return
 
         # 2. Vérifier l'attachement à MSFS
         if not self.engine.is_attached:
@@ -462,74 +659,166 @@ class SmartLodController:
         agl = telemetry.get("agl_ft", 0) or 0
         on_ground = telemetry.get("on_ground", False)
         base_fps = telemetry.get("base_fps", 0) or telemetry.get("displayed_fps", 0) or 0
+        main_thread_ms = telemetry.get("main_thread_ms")
+        vram_pct = telemetry.get("vram_pct", 0.0) or 0.0
 
-        target_fps = self.config.get("vr_target_fps", 36) if is_vr else self.config.get("2d_target_fps", self.config.get("ifr_target_fps", 40))
-        deadband = self.config.get("deadband_fps", 2)
-        step = self.config.get("step_size", 5)
+        target_fps = float(self.config.get("vr_target_fps", 36) if is_vr else self.config.get("2d_target_fps", self.config.get("ifr_target_fps", 40)))
+        target_mt_ms = 1000.0 / max(15.0, target_fps)
+        deadband = float(self.config.get("deadband_fps", 2))
+        step = float(self.config.get("step_size", 5))
+
+        # Calcul des pressions et marges de performance
+        fps_deficit = (target_fps - base_fps) if (base_fps > 0 and base_fps < (target_fps - deadband)) else 0.0
+        fps_surplus = (base_fps - (target_fps + deadband)) if (base_fps > (target_fps + deadband)) else 0.0
+
+        mt_excess_ms = (main_thread_ms - target_mt_ms) if (main_thread_ms and main_thread_ms > (target_mt_ms + 1.0)) else 0.0
+        mt_headroom_ms = (target_mt_ms - 2.0 - main_thread_ms) if (main_thread_ms and main_thread_ms < (target_mt_ms - 2.0)) else 0.0
+
+        vram_saturated = (vram_pct >= 0.88)
 
         ok_tlod = True
         ok_olod = True
 
-        # 4. Gestion indépendante du Terrain LOD (TLOD) si activé
+        # 4. Gestion intelligente du Terrain LOD (TLOD) si activé
         if tlod_is_active:
             tlod_cruise = float(self.config.get(f"{pfx}_tlod_target", 200 if pfx == "2d" else 150))
             tlod_ground = float(self.config.get(f"{pfx}_tlod_base", 100 if pfx == "2d" else 90))
             alt_trans = float(self.config.get(f"{pfx}_tlod_altitude", 5000 if pfx == "2d" else 4000))
 
+            if not hasattr(self, "dynamic_tlod_floor") or self.dynamic_tlod_floor is None:
+                self.dynamic_tlod_floor = tlod_ground
+            if not hasattr(self, "dynamic_tlod_cruise") or self.dynamic_tlod_cruise is None:
+                self.dynamic_tlod_cruise = tlod_cruise
+
             if getattr(self, "manual_tlod", None) is not None:
                 self.current_tlod_setpoint = float(self.manual_tlod)
+                self.dynamic_tlod_floor = float(self.manual_tlod)
+                self.dynamic_tlod_cruise = min(400.0, float(self.manual_tlod) + 50.0)
             else:
+                # 1. Calcul du ratio d'altitude AGL
                 min_alt = min(500.0, alt_trans)
+                alt_span = max(1.0, alt_trans - min_alt)
                 if on_ground or agl < min_alt:
-                    altitude_target_tlod = float(tlod_ground)
+                    ratio = 0.0
                 elif agl >= alt_trans:
-                    altitude_target_tlod = float(tlod_cruise)
+                    ratio = 1.0
                 else:
-                    alt_span = max(1.0, alt_trans - min_alt)
                     ratio = max(0.0, min(1.0, (agl - min_alt) / alt_span))
-                    altitude_target_tlod = tlod_ground + ratio * (tlod_cruise - tlod_ground)
 
-                target_tlod = altitude_target_tlod
-                min_tlod = min(tlod_ground, tlod_cruise)
-                max_tlod = max(tlod_ground, tlod_cruise)
-                if base_fps > 0 and agl >= 1000:
-                    if base_fps < (target_fps - deadband):
-                        deficit = (target_fps - base_fps)
-                        target_tlod = max(min_tlod, self.current_tlod_setpoint - (step * (deficit / 3.0)))
-                    elif base_fps > (target_fps + deadband):
-                        target_tlod = min(max_tlod, self.current_tlod_setpoint + step)
+                # 2. Régulation adaptative des bornes Floor et Cruise selon la performance
+                if mt_excess_ms > 0 or fps_deficit > 0:
+                    strain_factor = max(mt_excess_ms / max(1.0, target_mt_ms), fps_deficit / max(1.0, target_fps))
+                    reduction = step * (1.0 + min(2.5, strain_factor * 3.0))
+                    # Au sol / basse altitude, réduire le Floor vers la gauche pour libérer la charge
+                    if ratio < 0.5:
+                        min_flr = max(20.0, tlod_ground * 0.45)
+                        self.dynamic_tlod_floor = max(min_flr, self.dynamic_tlod_floor - reduction)
+                        if self.dynamic_tlod_cruise > tlod_cruise:
+                            self.dynamic_tlod_cruise = max(self.dynamic_tlod_floor + 20.0, self.dynamic_tlod_cruise - reduction)
+                    else:
+                        # En vol / croisière, réduire Cruise vers la gauche
+                        min_cru = max(self.dynamic_tlod_floor + 10.0, tlod_cruise * 0.55)
+                        self.dynamic_tlod_cruise = max(min_cru, self.dynamic_tlod_cruise - reduction)
+                elif vram_saturated:
+                    if self.dynamic_tlod_cruise > tlod_cruise:
+                        self.dynamic_tlod_cruise = max(tlod_cruise, self.dynamic_tlod_cruise - step)
+                elif fps_surplus > 0 or mt_headroom_ms > 0 or (base_fps == 0 and main_thread_ms is None):
+                    # Capital performance disponible :
+                    # 1. Rétablir Floor vers la valeur nominale
+                    if self.dynamic_tlod_floor < tlod_ground:
+                        self.dynamic_tlod_floor = min(tlod_ground, self.dynamic_tlod_floor + step)
+                    # 2. Augmenter Cruise vers la droite si surplus de perf et pas de saturation VRAM
+                    if (fps_surplus > 0 or mt_headroom_ms > 0) and (not vram_saturated):
+                        max_cruise_headroom = min(400.0, max(tlod_cruise, tlod_cruise + 100.0))
+                        self.dynamic_tlod_cruise = min(max_cruise_headroom, self.dynamic_tlod_cruise + step)
 
-                delta = target_tlod - self.current_tlod_setpoint
-                if abs(delta) > step:
-                    delta = step if delta > 0 else -step
-                self.current_tlod_setpoint += delta
-                self.current_tlod_setpoint = max(0.0, min(400.0, self.current_tlod_setpoint))
+                # Garantir bornes cohérentes
+                self.dynamic_tlod_floor = max(10.0, min(400.0, self.dynamic_tlod_floor))
+                self.dynamic_tlod_cruise = max(self.dynamic_tlod_floor, min(400.0, self.dynamic_tlod_cruise))
+
+                # Setpoint injecté dans MSFS selon l'altitude actuelle
+                target_tlod = self.dynamic_tlod_floor + ratio * (self.dynamic_tlod_cruise - self.dynamic_tlod_floor)
+                self.current_tlod_setpoint = max(10.0, min(400.0, round(target_tlod)))
 
             ok_tlod = self.engine.write_tlod(self.current_tlod_setpoint)
 
-        # 5. Gestion indépendante de l'Object LOD (OLOD) si activé
+        # 5. Gestion intelligente de l'Object LOD (OLOD) si activé
         if olod_is_active:
             olod_cruise = float(self.config.get(f"{pfx}_olod_target", 100 if pfx == "2d" else 80))
             olod_ground = float(self.config.get(f"{pfx}_olod_base", 100 if pfx == "2d" else 80))
             alt_trans_olod = float(self.config.get(f"{pfx}_olod_altitude", 3000 if pfx == "2d" else 2500))
 
+            if not hasattr(self, "dynamic_olod_floor") or self.dynamic_olod_floor is None:
+                self.dynamic_olod_floor = olod_ground
+            if not hasattr(self, "dynamic_olod_cruise") or self.dynamic_olod_cruise is None:
+                self.dynamic_olod_cruise = olod_cruise
+
             if getattr(self, "manual_olod", None) is not None:
                 self.current_olod_setpoint = float(self.manual_olod)
+                self.dynamic_olod_floor = float(self.manual_olod)
+                self.dynamic_olod_cruise = min(300.0, float(self.manual_olod) + 50.0)
             else:
-                if agl >= alt_trans_olod:
-                    target_olod = float(olod_cruise)
+                # 1. Calcul du ratio d'altitude AGL
+                if on_ground or agl < 500:
+                    ratio_olod = 0.0
+                elif agl >= alt_trans_olod:
+                    ratio_olod = 1.0
                 else:
-                    ratio = max(0.0, min(1.0, agl / max(1.0, alt_trans_olod)))
-                    target_olod = olod_ground + ratio * (olod_cruise - olod_ground)
+                    ratio_olod = max(0.0, min(1.0, agl / max(1.0, alt_trans_olod)))
 
-                # Rate-limiting / step smoothing anti-stutter for OLOD
-                delta_olod = target_olod - self.current_olod_setpoint
-                if abs(delta_olod) > step:
-                    delta_olod = step if delta_olod > 0 else -step
-                self.current_olod_setpoint += delta_olod
-                self.current_olod_setpoint = max(0.0, min(300.0, self.current_olod_setpoint))
+                # 2. Régulation adaptative Floor & Cruise
+                if mt_excess_ms > 0 or fps_deficit > 0:
+                    strain_factor = max(mt_excess_ms / max(1.0, target_mt_ms), fps_deficit / max(1.0, target_fps))
+                    reduction = step * (1.0 + min(2.0, strain_factor * 2.5))
+                    if ratio_olod < 0.5:
+                        min_flr_o = max(20.0, olod_ground * 0.45)
+                        self.dynamic_olod_floor = max(min_flr_o, self.dynamic_olod_floor - reduction)
+                        if self.dynamic_olod_cruise > olod_cruise:
+                            self.dynamic_olod_cruise = max(self.dynamic_olod_floor + 15.0, self.dynamic_olod_cruise - reduction)
+                    else:
+                        min_cru_o = max(self.dynamic_olod_floor + 10.0, olod_cruise * 0.55)
+                        self.dynamic_olod_cruise = max(min_cru_o, self.dynamic_olod_cruise - reduction)
+                elif fps_surplus > 0 or mt_headroom_ms > 0 or (base_fps == 0 and main_thread_ms is None):
+                    if self.dynamic_olod_floor < olod_ground:
+                        self.dynamic_olod_floor = min(olod_ground, self.dynamic_olod_floor + step)
+                    if (fps_surplus > 0 or mt_headroom_ms > 0):
+                        max_olod_headroom = min(300.0, max(olod_cruise, olod_cruise + 80.0))
+                        self.dynamic_olod_cruise = min(max_olod_headroom, self.dynamic_olod_cruise + step)
+
+                self.dynamic_olod_floor = max(10.0, min(300.0, self.dynamic_olod_floor))
+                self.dynamic_olod_cruise = max(self.dynamic_olod_floor, min(300.0, self.dynamic_olod_cruise))
+
+                target_olod = self.dynamic_olod_floor + ratio_olod * (self.dynamic_olod_cruise - self.dynamic_olod_floor)
+                self.current_olod_setpoint = max(10.0, min(300.0, round(target_olod)))
 
             ok_olod = self.engine.write_olod(self.current_olod_setpoint)
+
+        # 6. Auto Cloud Recovery (si active)
+        cloud_rec_enabled = bool(self.config.get(f"{pfx}_cloud_recovery", self.config.get("cloud_recovery", True)))
+        if cloud_rec_enabled:
+            nom_q = get_nominal_cloud_quality()
+            if base_fps > 0 and base_fps < (target_fps - 5):
+                if not self.in_cloud_reduction:
+                    cur_q = self.engine.read_cloud_quality()
+                    if cur_q is None:
+                        cur_q = nom_q
+                    self.original_cloud_quality = cur_q
+                    if cur_q > 0:
+                        new_q = max(0, cur_q - 1)
+                        if self.engine.write_cloud_quality(new_q):
+                            self.in_cloud_reduction = True
+                            print(f"[SmartLOD] Cloud Recovery triggered: lowered cloud quality {cur_q} -> {new_q} (FPS: {round(base_fps)} < {target_fps - 5})")
+            elif base_fps >= target_fps:
+                if self.in_cloud_reduction:
+                    restore_q = self.original_cloud_quality if self.original_cloud_quality is not None else nom_q
+                    if self.engine.write_cloud_quality(restore_q):
+                        self.in_cloud_reduction = False
+                        print(f"[SmartLOD] Cloud Recovery restored: back to nominal cloud quality {restore_q} (FPS: {round(base_fps)} >= {target_fps})")
+        else:
+            if self.in_cloud_reduction:
+                nom_q = get_nominal_cloud_quality()
+                self.engine.write_cloud_quality(nom_q)
+                self.in_cloud_reduction = False
 
         if ok_tlod and ok_olod:
             status_parts = []
@@ -543,9 +832,36 @@ class SmartLodController:
 
     def _get_live_flight_telemetry(self) -> Dict[str, Any]:
         """Extrait la télémétrie courante de SimConnect ou du tracker de SceneryX."""
+        res = {
+            "agl_ft": 0,
+            "on_ground": True,
+            "base_fps": 0,
+            "displayed_fps": 0,
+            "main_thread_ms": None,
+            "vram_pct": 0.0,
+            "vram_used_mb": 0,
+            "vram_total_mb": 16376,
+            "cache_read_mbps": 0.0
+        }
         try:
             import flight_perf_tracker
-            # 1. Direct from live SimConnect client if active
+            # 1. Direct from Blackbox tracker if active
+            if hasattr(flight_perf_tracker, 'BLACKBOX') and flight_perf_tracker.BLACKBOX:
+                telem = flight_perf_tracker.BLACKBOX.get_telemetry()
+                if telem:
+                    agl = telem.get("agl_ft") or telem.get("agl") or 0
+                    res["agl_ft"] = agl
+                    res["on_ground"] = bool(telem.get("on_ground", agl < 50))
+                    res["base_fps"] = telem.get("base_fps") or telem.get("displayed_fps") or 0
+                    res["displayed_fps"] = telem.get("displayed_fps") or 0
+                    res["main_thread_ms"] = telem.get("main_thread_ms")
+                    res["vram_pct"] = telem.get("vram_pct") or 0.0
+                    res["vram_used_mb"] = telem.get("vram_used_mb") or 0
+                    res["vram_total_mb"] = telem.get("vram_total_mb") or 16376
+                    res["cache_read_mbps"] = telem.get("cache_read_mbps") or 0.0
+                    return res
+
+            # 2. Direct from live SimConnect client if active
             if hasattr(flight_perf_tracker, 'SIMCONNECT_CLIENT') and flight_perf_tracker.SIMCONNECT_CLIENT:
                 sc_data = flight_perf_tracker.SIMCONNECT_CLIENT.get_data()
                 if sc_data.get("connected"):
@@ -553,38 +869,26 @@ class SmartLodController:
                     on_ground = sc_data.get("on_ground")
                     if on_ground is None:
                         on_ground = (agl is None or agl < 50)
-                    base_fps = sc_data.get("base_fps") or sc_data.get("displayed_fps") or 0
-                    disp_fps = sc_data.get("displayed_fps") or 0
-                    return {
-                        "agl_ft": agl or 0,
-                        "on_ground": bool(on_ground),
-                        "base_fps": base_fps,
-                        "displayed_fps": disp_fps
-                    }
+                    res["agl_ft"] = agl or 0
+                    res["on_ground"] = bool(on_ground)
+                    res["base_fps"] = sc_data.get("base_fps") or sc_data.get("displayed_fps") or 0
+                    res["displayed_fps"] = sc_data.get("displayed_fps") or 0
+                    res["main_thread_ms"] = sc_data.get("main_thread_ms")
+                    return res
 
-            # 2. Direct from cache or Blackbox tracker
+            # 3. Direct from cache
             if hasattr(flight_perf_tracker, '_last_telemetry_cache') and flight_perf_tracker._last_telemetry_cache:
                 c = flight_perf_tracker._last_telemetry_cache
-                return {
-                    "agl_ft": c.get("agl_ft") or c.get("agl") or 0,
-                    "on_ground": (c.get("agl_ft") or 0) < 50,
-                    "base_fps": c.get("base_fps") or c.get("displayed_fps") or 0,
-                    "displayed_fps": c.get("displayed_fps") or 0
-                }
-            if hasattr(flight_perf_tracker, 'BLACKBOX') and flight_perf_tracker.BLACKBOX:
-                telem = flight_perf_tracker.BLACKBOX.get_telemetry()
-                if telem:
-                    agl = telem.get("agl_ft") or telem.get("agl") or 0
-                    on_ground = telem.get("on_ground", agl < 50)
-                    return {
-                        "agl_ft": agl,
-                        "on_ground": bool(on_ground),
-                        "base_fps": telem.get("base_fps") or telem.get("displayed_fps") or 0,
-                        "displayed_fps": telem.get("displayed_fps") or 0
-                    }
+                agl = c.get("agl_ft") or c.get("agl") or 0
+                res["agl_ft"] = agl
+                res["on_ground"] = bool(agl < 50)
+                res["base_fps"] = c.get("base_fps") or c.get("displayed_fps") or 0
+                res["displayed_fps"] = c.get("displayed_fps") or 0
+                res["main_thread_ms"] = c.get("main_thread_ms")
+                return res
         except Exception:
             pass
-        return {"agl_ft": 0, "on_ground": True, "base_fps": 0, "displayed_fps": 0}
+        return res
 
     # ================= STATUS API =================
 
@@ -592,14 +896,21 @@ class SmartLodController:
         """Retourne l'état complet pour l'UI Web."""
         mem_status = self.engine.get_status()
         is_af_running, af_pid = self.engine.is_autofps_running()
+        nom_vals = get_active_profile_nominal_values()
+        is_vr = self.engine.is_vr_active() if self.engine.is_attached else False
+        is_ext = bool(self.config.get("external_autofps", False) or (self.config.get("source") == "external_autofps") or is_af_running)
         
         return {
-            "enabled": self.config.get("enabled", False),
-            "external_autofps": bool(self.config.get("external_autofps", False)),
-            "is_running": self.is_running,
-            "status_message": self.status_message,
+            "enabled": (self.config.get("enabled", False) and not is_ext),
+            "external_autofps": is_ext,
+            "is_running": (self.is_running and not is_ext),
+            "status_message": "Verrouillé (AutoFPS externe actif)" if is_ext else self.status_message,
             "current_tlod_setpoint": round(self.current_tlod_setpoint, 1),
             "current_olod_setpoint": round(self.current_olod_setpoint, 1),
+            "nominal_tlod": nom_vals.get("tlod", 100.0),
+            "nominal_olod": nom_vals.get("olod", 100.0),
+            "nominal_profile": nom_vals.get("name", "Active Profile"),
+            "is_vr": is_vr,
             "manual_tlod": self.manual_tlod is not None,
             "manual_olod": self.manual_olod is not None,
             "axis_state_2d": self.get_axis_state("2D"),
@@ -608,8 +919,12 @@ class SmartLodController:
             "source": self.config.get("source", "native"),
             "autofps_conflict": is_af_running,
             "autofps_pid": af_pid,
+            "ofxr_running": mem_status.get("ofxr_running", False),
+            "ofxr_pid": mem_status.get("ofxr_pid"),
             "memory": mem_status,
             "config": self.config,
+            "cloud_recovery": bool(self.config.get("cloud_recovery", True)),
+            "in_cloud_reduction": self.in_cloud_reduction,
             "trigger_events_count": len(self.trigger_events),
             "last_trigger": self.trigger_events[-1] if self.trigger_events else None
         }
@@ -642,61 +957,98 @@ def get_smart_lod_profiles_dir() -> str:
     return profiles_dir
 
 
+def _sanitize_smart_lod_profile_data(data: Dict[str, Any]) -> Dict[str, Any]:
+    """Ensures Smart LOD profile strictly contains only TLOD/OLOD floor, cruise, altitude, and cloud recovery for 2D & VR. Strips target_fps."""
+    data.pop("target_fps", None)
+    data.pop("ifr_target_fps", None)
+    data.pop("vfr_target_fps", None)
+    data.pop("mode", None)
+    data.pop("flight_mode", None)
+
+    # 2D fallbacks (100 - 200 at 3000 ft)
+    data["ground_tlod"] = int(data.get("ground_tlod", 100))
+    data["cruise_tlod"] = int(data.get("cruise_tlod", 200))
+    data["alt_trans"] = int(data.get("alt_trans", 3000))
+    data["ground_olod"] = int(data.get("ground_olod", 100))
+    data["cruise_olod"] = int(data.get("cruise_olod", 200))
+    data["alt_trans_olod"] = int(data.get("alt_trans_olod", 3000))
+    data["cloud_recovery"] = bool(data.get("cloud_recovery", True))
+
+    # VR fallbacks
+    data["vr_ground_tlod"] = int(data.get("vr_ground_tlod", data["ground_tlod"]))
+    data["vr_cruise_tlod"] = int(data.get("vr_cruise_tlod", data["cruise_tlod"]))
+    data["vr_alt_trans"] = int(data.get("vr_alt_trans", data["alt_trans"]))
+    data["vr_ground_olod"] = int(data.get("vr_ground_olod", data["ground_olod"]))
+    data["vr_cruise_olod"] = int(data.get("vr_cruise_olod", data["cruise_olod"]))
+    data["vr_alt_trans_olod"] = int(data.get("vr_alt_trans_olod", data["alt_trans_olod"]))
+    data["vr_cloud_recovery"] = bool(data.get("vr_cloud_recovery", data["cloud_recovery"]))
+
+    return data
+
+
 def generate_default_smart_lod_profiles() -> List[Dict[str, Any]]:
     """Generates standard calibrated Smart LOD profiles for flight simmers."""
     profiles_dir = get_smart_lod_profiles_dir()
     defaults = [
         {
             "id": "lod_prof_balanced_airliner",
-            "name": "Balanced Airliner (IFR)",
-            "description": "Standard IFR setpoint: TLOD 100 on ground, smooth climb to 250 in cruise.",
-            "mode": "2D",
-            "flight_mode": "IFR",
+            "name": "Balanced Airliner",
+            "description": "Standard setpoint: TLOD 100-200, OLOD 100-200 at 3000 ft transition.",
             "ground_tlod": 100,
-            "cruise_tlod": 250,
-            "alt_trans": 5000,
-            "target_fps": 45,
+            "cruise_tlod": 200,
+            "alt_trans": 3000,
+            "ground_olod": 100,
+            "cruise_olod": 200,
+            "alt_trans_olod": 3000,
             "cloud_recovery": True,
+            "vr_ground_tlod": 100,
+            "vr_cruise_tlod": 200,
+            "vr_alt_trans": 3000,
+            "vr_ground_olod": 100,
+            "vr_cruise_olod": 200,
+            "vr_alt_trans_olod": 3000,
+            "vr_cloud_recovery": True,
             "created_at": "2026-01-01T00:00:00"
         },
         {
             "id": "lod_prof_heavy_hub_optimizer",
-            "name": "Heavy Hub & Megacity (EGLL / KJFK)",
-            "description": "Maximum FPS protection at congested payware hubs: TLOD 80 on ground, 200 cruise.",
-            "mode": "2D",
-            "flight_mode": "IFR",
+            "name": "Heavy Hub & Megacity",
+            "description": "Maximum FPS protection at congested payware hubs: TLOD 80-180, OLOD 80-150.",
             "ground_tlod": 80,
-            "cruise_tlod": 200,
-            "alt_trans": 4000,
-            "target_fps": 40,
+            "cruise_tlod": 180,
+            "alt_trans": 3000,
+            "ground_olod": 80,
+            "cruise_olod": 150,
+            "alt_trans_olod": 3000,
             "cloud_recovery": True,
+            "vr_ground_tlod": 80,
+            "vr_cruise_tlod": 160,
+            "vr_alt_trans": 3000,
+            "vr_ground_olod": 80,
+            "vr_cruise_olod": 150,
+            "vr_alt_trans_olod": 3000,
+            "vr_cloud_recovery": True,
             "created_at": "2026-01-01T00:01:00"
         },
         {
             "id": "lod_prof_vfr_bush_sightseeing",
-            "name": "VFR Bush & Mountain Sightseeing",
-            "description": "Pristine terrain relief: TLOD 150 ground, 350 cruise for backcountry exploration.",
-            "mode": "2D",
-            "flight_mode": "VFR",
-            "ground_tlod": 150,
-            "cruise_tlod": 350,
+            "name": "VFR Bush & Mountains",
+            "description": "Pristine terrain relief: TLOD 120-250, OLOD 100-200 at 3000 ft.",
+            "ground_tlod": 120,
+            "cruise_tlod": 250,
             "alt_trans": 3000,
-            "target_fps": 60,
+            "ground_olod": 100,
+            "cruise_olod": 200,
+            "alt_trans_olod": 3000,
             "cloud_recovery": True,
+            "vr_ground_tlod": 100,
+            "vr_cruise_tlod": 200,
+            "vr_alt_trans": 3000,
+            "vr_ground_olod": 100,
+            "vr_cruise_olod": 200,
+            "vr_alt_trans_olod": 3000,
+            "vr_cloud_recovery": True,
             "created_at": "2026-01-01T00:02:00"
-        },
-        {
-            "id": "lod_prof_vr_headset_pacing",
-            "name": "VR Headset Locked Stereo Cadence",
-            "description": "Tailored for VR stereo reprojection: TLOD 90 ground, 220 cruise with locked 45 FPS.",
-            "mode": "VR",
-            "flight_mode": "IFR",
-            "ground_tlod": 90,
-            "cruise_tlod": 220,
-            "alt_trans": 4500,
-            "target_fps": 45,
-            "cloud_recovery": True,
-            "created_at": "2026-01-01T00:03:00"
         }
     ]
     for d in defaults:
@@ -754,6 +1106,7 @@ def get_smart_lod_profiles() -> List[Dict[str, Any]]:
         try:
             with open(f, "r", encoding="utf-8") as pf:
                 data = json.load(pf)
+                data = _sanitize_smart_lod_profile_data(data)
                 data["is_active"] = (data.get("id") == active_id)
                 profiles.append(data)
         except Exception:
@@ -785,20 +1138,24 @@ def save_smart_lod_profile(name: str, config_data: Dict[str, Any], overwrite_id:
         import uuid
         target_id = f"lod_prof_{uuid.uuid4().hex[:10]}"
 
-    pfx = "vr" if str(config_data.get("mode", "2D")).upper() == "VR" else "2d"
+    sanitized = _sanitize_smart_lod_profile_data(config_data.copy())
     profile_obj = {
         "id": target_id,
         "name": clean_name,
-        "mode": config_data.get("mode", "2D"),
-        "flight_mode": config_data.get("flight_mode", "IFR"),
-        "ground_tlod": int(config_data.get("ground_tlod", 100)),
-        "cruise_tlod": int(config_data.get("cruise_tlod", 250)),
-        "alt_trans": int(config_data.get("alt_trans", 5000)),
-        "ground_olod": int(config_data.get("ground_olod", 100)),
-        "cruise_olod": int(config_data.get("cruise_olod", 100)),
-        "alt_trans_olod": int(config_data.get("alt_trans_olod", 3000)),
-        "target_fps": int(config_data.get("target_fps", 40)),
-        "cloud_recovery": bool(config_data.get("cloud_recovery", True)),
+        "ground_tlod": sanitized["ground_tlod"],
+        "cruise_tlod": sanitized["cruise_tlod"],
+        "alt_trans": sanitized["alt_trans"],
+        "ground_olod": sanitized["ground_olod"],
+        "cruise_olod": sanitized["cruise_olod"],
+        "alt_trans_olod": sanitized["alt_trans_olod"],
+        "cloud_recovery": sanitized["cloud_recovery"],
+        "vr_ground_tlod": sanitized["vr_ground_tlod"],
+        "vr_cruise_tlod": sanitized["vr_cruise_tlod"],
+        "vr_alt_trans": sanitized["vr_alt_trans"],
+        "vr_ground_olod": sanitized["vr_ground_olod"],
+        "vr_cruise_olod": sanitized["vr_cruise_olod"],
+        "vr_alt_trans_olod": sanitized["vr_alt_trans_olod"],
+        "vr_cloud_recovery": sanitized["vr_cloud_recovery"],
         "created_at": datetime.now().isoformat()
     }
 
@@ -808,27 +1165,34 @@ def save_smart_lod_profile(name: str, config_data: Dict[str, Any], overwrite_id:
             json.dump(profile_obj, f, indent=2, ensure_ascii=False)
         set_active_smart_lod_profile_id(target_id)
         
-        # Also apply to live smart lod controller config
+        # Apply to live smart lod controller without touching target_fps
         ctrl = get_smart_lod_controller()
         cfg_update = {
             "cloud_recovery": profile_obj["cloud_recovery"],
-            f"{pfx}_tlod_base": profile_obj["ground_tlod"],
-            f"{pfx}_tlod_target": profile_obj["cruise_tlod"],
-            f"{pfx}_tlod_altitude": profile_obj["alt_trans"],
-            f"{pfx}_olod_base": profile_obj["ground_olod"],
-            f"{pfx}_olod_target": profile_obj["cruise_olod"],
-            f"{pfx}_olod_altitude": profile_obj["alt_trans_olod"],
+            "2d_tlod_base": profile_obj["ground_tlod"],
+            "2d_tlod_target": profile_obj["cruise_tlod"],
+            "2d_tlod_altitude": profile_obj["alt_trans"],
+            "2d_olod_base": profile_obj["ground_olod"],
+            "2d_olod_target": profile_obj["cruise_olod"],
+            "2d_olod_altitude": profile_obj["alt_trans_olod"],
+            "vr_tlod_base": profile_obj["vr_ground_tlod"],
+            "vr_tlod_target": profile_obj["vr_cruise_tlod"],
+            "vr_tlod_altitude": profile_obj["vr_alt_trans"],
+            "vr_olod_base": profile_obj["vr_ground_olod"],
+            "vr_olod_target": profile_obj["vr_cruise_olod"],
+            "vr_olod_altitude": profile_obj["vr_alt_trans_olod"],
+            # Legacy mirror
+            "ifr_tlod_ground": profile_obj["ground_tlod"],
+            "ifr_tlod_cruise": profile_obj["cruise_tlod"],
+            "ifr_alt_transition": profile_obj["alt_trans"],
+            "ifr_olod_ground": profile_obj["ground_olod"],
+            "ifr_olod_cruise": profile_obj["cruise_olod"],
+            "vfr_tlod_ground": profile_obj["ground_tlod"],
+            "vfr_tlod_cruise": profile_obj["cruise_tlod"],
+            "vfr_alt_transition": profile_obj["alt_trans"],
+            "vfr_olod_ground": profile_obj["ground_olod"],
+            "vfr_olod_cruise": profile_obj["cruise_olod"],
         }
-        if profile_obj["flight_mode"] == "IFR":
-            cfg_update["ifr_tlod_ground"] = profile_obj["ground_tlod"]
-            cfg_update["ifr_tlod_cruise"] = profile_obj["cruise_tlod"]
-            cfg_update["ifr_alt_transition"] = profile_obj["alt_trans"]
-            cfg_update["ifr_target_fps"] = profile_obj["target_fps"]
-        else:
-            cfg_update["vfr_tlod_ground"] = profile_obj["ground_tlod"]
-            cfg_update["vfr_tlod_cruise"] = profile_obj["cruise_tlod"]
-            cfg_update["vfr_alt_transition"] = profile_obj["alt_trans"]
-            cfg_update["vfr_target_fps"] = profile_obj["target_fps"]
         ctrl.save_config(cfg_update)
 
         return {"status": "success", "profile": profile_obj}
@@ -844,17 +1208,24 @@ def check_smart_lod_profile_changes(profile_id: str, current_data: Dict[str, Any
     try:
         with open(pfile, "r", encoding="utf-8") as f:
             pdata = json.load(f)
+        pdata = _sanitize_smart_lod_profile_data(pdata)
+        curr = _sanitize_smart_lod_profile_data(current_data)
         
         has_changes = (
-            int(pdata.get("ground_tlod", 100)) != int(current_data.get("ground_tlod", 100)) or
-            int(pdata.get("cruise_tlod", 250)) != int(current_data.get("cruise_tlod", 250)) or
-            int(pdata.get("alt_trans", 5000)) != int(current_data.get("alt_trans", 5000)) or
-            int(pdata.get("ground_olod", 100)) != int(current_data.get("ground_olod", 100)) or
-            int(pdata.get("cruise_olod", 100)) != int(current_data.get("cruise_olod", 100)) or
-            int(pdata.get("alt_trans_olod", 3000)) != int(current_data.get("alt_trans_olod", 3000)) or
-            int(pdata.get("target_fps", 40)) != int(current_data.get("target_fps", 40)) or
-            bool(pdata.get("cloud_recovery", True)) != bool(current_data.get("cloud_recovery", True)) or
-            str(pdata.get("mode", "2D")) != str(current_data.get("mode", "2D"))
+            pdata["ground_tlod"] != curr["ground_tlod"] or
+            pdata["cruise_tlod"] != curr["cruise_tlod"] or
+            pdata["alt_trans"] != curr["alt_trans"] or
+            pdata["ground_olod"] != curr["ground_olod"] or
+            pdata["cruise_olod"] != curr["cruise_olod"] or
+            pdata["alt_trans_olod"] != curr["alt_trans_olod"] or
+            pdata["cloud_recovery"] != curr["cloud_recovery"] or
+            pdata["vr_ground_tlod"] != curr["vr_ground_tlod"] or
+            pdata["vr_cruise_tlod"] != curr["vr_cruise_tlod"] or
+            pdata["vr_alt_trans"] != curr["vr_alt_trans"] or
+            pdata["vr_ground_olod"] != curr["vr_ground_olod"] or
+            pdata["vr_cruise_olod"] != curr["vr_cruise_olod"] or
+            pdata["vr_alt_trans_olod"] != curr["vr_alt_trans_olod"] or
+            pdata["vr_cloud_recovery"] != curr["vr_cloud_recovery"]
         )
         return {
             "status": "success",
@@ -898,29 +1269,52 @@ def activate_smart_lod_profile(profile_id: str) -> Dict[str, Any]:
     try:
         with open(pfile, "r", encoding="utf-8") as f:
             pdata = json.load(f)
+        pdata = _sanitize_smart_lod_profile_data(pdata)
         set_active_smart_lod_profile_id(profile_id)
-        pfx = "vr" if str(pdata.get("mode", "2D")).upper() == "VR" else "2d"
         ctrl = get_smart_lod_controller()
+
+        g_tlod_2d = pdata["ground_tlod"]
+        c_tlod_2d = pdata["cruise_tlod"]
+        a_tlod_2d = pdata["alt_trans"]
+        g_olod_2d = pdata["ground_olod"]
+        c_olod_2d = pdata["cruise_olod"]
+        a_olod_2d = pdata["alt_trans_olod"]
+        cloud_rec_2d = pdata["cloud_recovery"]
+
+        g_tlod_vr = pdata["vr_ground_tlod"]
+        c_tlod_vr = pdata["vr_cruise_tlod"]
+        a_tlod_vr = pdata["vr_alt_trans"]
+        g_olod_vr = pdata["vr_ground_olod"]
+        c_olod_vr = pdata["vr_cruise_olod"]
+        a_olod_vr = pdata["vr_alt_trans_olod"]
+        cloud_rec_vr = pdata["vr_cloud_recovery"]
+
         cfg_update = {
-            "cloud_recovery": pdata.get("cloud_recovery", True),
-            f"{pfx}_tlod_base": int(pdata.get("ground_tlod", 100)),
-            f"{pfx}_tlod_target": int(pdata.get("cruise_tlod", 250)),
-            f"{pfx}_tlod_altitude": int(pdata.get("alt_trans", 5000)),
-            f"{pfx}_olod_base": int(pdata.get("ground_olod", 100)),
-            f"{pfx}_olod_target": int(pdata.get("cruise_olod", 100)),
-            f"{pfx}_olod_altitude": int(pdata.get("alt_trans_olod", 3000)),
+            "cloud_recovery": cloud_rec_2d,
+            "2d_tlod_base": g_tlod_2d,
+            "2d_tlod_target": c_tlod_2d,
+            "2d_tlod_altitude": a_tlod_2d,
+            "2d_olod_base": g_olod_2d,
+            "2d_olod_target": c_olod_2d,
+            "2d_olod_altitude": a_olod_2d,
+            "vr_tlod_base": g_tlod_vr,
+            "vr_tlod_target": c_tlod_vr,
+            "vr_tlod_altitude": a_tlod_vr,
+            "vr_olod_base": g_olod_vr,
+            "vr_olod_target": c_olod_vr,
+            "vr_olod_altitude": a_olod_vr,
+            # Legacy mirror
+            "ifr_tlod_ground": g_tlod_2d,
+            "ifr_tlod_cruise": c_tlod_2d,
+            "ifr_alt_transition": a_tlod_2d,
+            "ifr_olod_ground": g_olod_2d,
+            "ifr_olod_cruise": c_olod_2d,
+            "vfr_tlod_ground": g_tlod_2d,
+            "vfr_tlod_cruise": c_tlod_2d,
+            "vfr_alt_transition": a_tlod_2d,
+            "vfr_olod_ground": g_olod_2d,
+            "vfr_olod_cruise": c_olod_2d,
         }
-        f_mode = pdata.get("flight_mode", "IFR")
-        if f_mode == "IFR":
-            cfg_update["ifr_tlod_ground"] = pdata.get("ground_tlod", 100)
-            cfg_update["ifr_tlod_cruise"] = pdata.get("cruise_tlod", 250)
-            cfg_update["ifr_alt_transition"] = pdata.get("alt_trans", 5000)
-            cfg_update["ifr_target_fps"] = pdata.get("target_fps", 40)
-        else:
-            cfg_update["vfr_tlod_ground"] = pdata.get("ground_tlod", 100)
-            cfg_update["vfr_tlod_cruise"] = pdata.get("cruise_tlod", 250)
-            cfg_update["vfr_alt_transition"] = pdata.get("alt_trans", 5000)
-            cfg_update["vfr_target_fps"] = pdata.get("target_fps", 40)
         ctrl.save_config(cfg_update)
         return {"status": "success", "profile": pdata}
     except Exception as e:
@@ -958,4 +1352,13 @@ def set_external_autofps(enabled: bool) -> bool:
 
 def reset_smart_lod_to_profile(axis: str = "all") -> Dict[str, Any]:
     return get_smart_lod_controller().reset_to_active_profile(axis)
+
+
+def set_vr_target_fps(fps: int) -> bool:
+    try:
+        ctrl = get_smart_lod_controller()
+        return ctrl.save_config({"vr_target_fps": int(fps)})
+    except Exception as e:
+        print(f"[SmartLOD] Error setting vr_target_fps: {e}")
+        return False
 

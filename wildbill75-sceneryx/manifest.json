@@ -4,11 +4,11 @@
   "title": "SCENERY X",
   "manufacturer": "SceneryX",
   "creator": "wildbill75",
-  "package_version": "1.0.3",
+  "package_version": "1.0.7",
   "minimum_game_version": "1.0.0",
   "release_notes": {
     "neutral": {
-      "LastUpdate": "SceneryX In-Game Panel V1.0.3 - Live Telemetry & Smart LOD Remote",
+      "LastUpdate": "SceneryX In-Game Panel V1.0.7 - Calibrated Height (25.5% snug fit)",
       "OlderHistory": ""
     }
   }

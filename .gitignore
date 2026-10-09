@@ -1,5 +1,6 @@
 # Build outputs
 build/
+dist/
 __pycache__/
 *.pyc
 

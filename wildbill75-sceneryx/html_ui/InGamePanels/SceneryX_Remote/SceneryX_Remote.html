@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <title>SCENERY X</title>
     <link rel="stylesheet" href="/SCSS/common.css" />
-    <link rel="stylesheet" href="SceneryX_Remote.css" />
+    <link rel="stylesheet" href="SceneryX_Remote.css?v=117" />
     <script type="text/javascript" src="/JS/coherent.js"></script>
     <script type="text/javascript" src="/JS/common.js"></script>
     <script type="text/javascript" src="/JS/buttons.js"></script>
@@ -16,14 +16,14 @@
     <link rel="import" href="/templates/tabMenu/tabMenu.html" />
     <link rel="import" href="/templates/ingameUi/ingameUi.html" />
     <link rel="import" href="/templates/ingameUiHeader/ingameUiHeader.html" />
-    <script type="text/javascript" src="SceneryX_Remote.js"></script>
+    <script type="text/javascript" src="SceneryX_Remote.js?v=117"></script>
 </head>
 <body class="border-box">
     <ingamepanel-sceneryx>
         <ingame-ui id="SceneryX_Remote" panel-id="PANEL_SCENERYX" title="SCENERY X"
                    class="ingameUiFrame panelInvisible"
                    content-fit="true" resize="both"
-                   min-width="380" min-height="340">
+                   min-width="440" min-height="200">
 
             <!-- OFFLINE VIEW -->
             <div id="disconnected-view" class="offline-box">
@@ -33,94 +33,125 @@
             <!-- ONLINE VIEW -->
             <div id="connected-view" class="main-content hidden">
                 <!-- SECTION 1: SMART LOD REGULATION -->
-                <div class="panel-section">
+                <div class="panel-section" id="smart-lod-section">
                     <div class="section-header">
                         <span class="section-title">SMART LOD REGULATION</span>
-                        <button type="button" id="smart-lod-toggle-btn" class="msfs-btn-inline btn-primary">
-                            <span id="smart-lod-btn-label">ENGAGE</span>
+                        <button type="button" id="smart-lod-toggle-btn" class="switch-btn switch-on" role="switch" aria-checked="true" title="Toggle Smart Dynamic LOD" onclick="window.onSmartLodClick && window.onSmartLodClick(event)">
+                            <span class="switch-thumb"></span>
+                            <span id="smart-lod-btn-label" class="switch-label">ON</span>
                         </button>
                     </div>
 
+                    <!-- AutoFPS Lock Notice (Flat solid, no borders, no icons, yellow text) -->
+                    <div id="smart-lod-autofps-lock-msg" class="hidden" style="padding: 6px 10px; margin-bottom: 8px; background: #020617; border-radius: 4px; font-size: 10px; font-weight: 700; color: #fbbf24; text-align: center; text-transform: uppercase; letter-spacing: 0.5px;">
+                        LOCKED: MSFS AUTOFPS ACTIVE IN BACKGROUND
+                    </div>
+
                     <!-- DUAL SLIDERS BOX (OPTION B) -->
-                    <div class="lod-controls-box">
+                    <div class="lod-controls-box" id="lod-controls-box">
                         <!-- TLOD AXIS CARD -->
-                        <div class="lod-axis-card" id="tlod-card">
+                        <div class="lod-axis-card auto-locked mode-auto" id="tlod-card">
                             <div class="lod-axis-header">
                                 <div class="lod-title-group">
-                                    <span class="lod-axis-title" id="tlod-name-label" title="Terrain LOD (Double-click to reset to Auto)">TLOD</span>
-                                    <span class="lod-live-tag" title="Real-time in-sim TLOD setpoint">LIVE: <span id="tlod-live-val" class="live-num">100</span></span>
+                                    <span class="lod-axis-title" id="tlod-name-label" title="Terrain LOD">TLOD</span>
                                 </div>
-                                <span class="badge-tag tag-neutral" id="tlod-mode-badge" title="Double-click slider or click badge to reset to Auto">
+                                <span class="badge-tag badge-auto" id="tlod-mode-badge" title="Smart LOD Mode (AUTO / MAN)">
                                     <span id="tlod-badge-text">AUTO</span>
                                 </span>
                             </div>
                             <div class="lod-values-group">
                                 <div class="lod-param" title="Floor LOD below transition altitude">
-                                    <span class="param-lbl">Floor:</span>
+                                    <span class="param-lbl">Floor :</span>
                                     <span id="tlod-floor-val" class="param-val">100</span>
                                 </div>
                                 <div class="lod-param alt-param" title="Transition altitude in feet AGL">
-                                    <span class="param-lbl">Alt:</span>
-                                    <input type="number" id="tlod-alt-input" class="alt-input" value="5000" step="500" min="500" max="45000" />
+                                    <span class="param-lbl">Alt :</span>
+                                    <button type="button" class="alt-chevron-btn" id="tlod-alt-down" title="Decrease altitude (-100 ft)">
+                                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                            <polyline points="15.5 5 8.5 12 15.5 19"></polyline>
+                                        </svg>
+                                    </button>
+                                    <input type="number" id="tlod-alt-input" class="alt-input" value="3000" step="100" min="500" max="45000" />
+                                    <button type="button" class="alt-chevron-btn" id="tlod-alt-up" title="Increase altitude (+100 ft)">
+                                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                            <polyline points="8.5 5 15.5 12 8.5 19"></polyline>
+                                        </svg>
+                                    </button>
                                     <span class="param-unit">ft AGL</span>
                                 </div>
                                 <div class="lod-param" title="Cruise LOD at or above transition altitude">
-                                    <span class="param-lbl">Cruise:</span>
+                                    <span class="param-lbl">Cruise :</span>
                                     <span id="tlod-cruise-val" class="param-val">200</span>
                                 </div>
                             </div>
-                            <!-- Track Container -->
-                            <div class="dual-slider-container" id="tlod-dual-container">
-                                <div class="dual-slider-track-bg"></div>
-                                <div id="tlod-track-highlight" class="dual-slider-track-highlight"></div>
-                                <input type="range" class="dual-slider-input" id="tlod-floor-range" min="0" max="400" step="5" value="100" title="Floor LOD: 100" />
-                                <input type="range" class="dual-slider-input" id="tlod-cruise-range" min="0" max="400" step="5" value="200" title="Cruise LOD: 200" />
-                            </div>
+                            <!-- Pure HTML/CSS Track & Handles (100% Centered) -->
+                                <div class="dual-slider-container" id="tlod-dual-container">
+                                    <div class="dual-slider-track-bg"></div>
+                                    <div id="tlod-track-highlight" class="dual-slider-track-highlight" style="left: 25%; width: 25%;"></div>
+                                    <div id="tlod-floor-handle" class="slider-handle" style="left: 25%;" title="Floor LOD: 100"></div>
+                                    <div id="tlod-cruise-handle" class="slider-handle" style="left: 50%;" title="Cruise LOD: 200"></div>
+                                </div>
                             <div class="dual-slider-labels">
                                 <span>0</span>
-                                <span class="range-sub">Dynamic Range (Floor to Cruise)</span>
                                 <span>400</span>
                             </div>
                         </div>
 
                         <!-- OLOD AXIS CARD -->
-                        <div class="lod-axis-card" id="olod-card">
+                        <div class="lod-axis-card auto-locked mode-auto" id="olod-card">
                             <div class="lod-axis-header">
                                 <div class="lod-title-group">
-                                    <span class="lod-axis-title" id="olod-name-label" title="Object LOD (Double-click to reset to Auto)">OLOD</span>
-                                    <span class="lod-live-tag" title="Real-time in-sim OLOD setpoint">LIVE: <span id="olod-live-val" class="live-num">100</span></span>
+                                    <span class="lod-axis-title" id="olod-name-label" title="Object LOD">OLOD</span>
                                 </div>
-                                <span class="badge-tag tag-neutral" id="olod-mode-badge" title="Double-click slider or click badge to reset to Auto">
+                                <span class="badge-tag badge-auto" id="olod-mode-badge" title="Smart LOD Mode (AUTO / MAN)">
                                     <span id="olod-badge-text">AUTO</span>
                                 </span>
                             </div>
                             <div class="lod-values-group">
                                 <div class="lod-param" title="Floor LOD below transition altitude">
-                                    <span class="param-lbl">Floor:</span>
+                                    <span class="param-lbl">Floor :</span>
                                     <span id="olod-floor-val" class="param-val">100</span>
                                 </div>
                                 <div class="lod-param alt-param" title="Transition altitude in feet AGL">
-                                    <span class="param-lbl">Alt:</span>
-                                    <input type="number" id="olod-alt-input" class="alt-input" value="3000" step="500" min="500" max="45000" />
+                                    <span class="param-lbl">Alt :</span>
+                                    <button type="button" class="alt-chevron-btn" id="olod-alt-down" title="Decrease altitude (-100 ft)">
+                                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                            <polyline points="15.5 5 8.5 12 15.5 19"></polyline>
+                                        </svg>
+                                    </button>
+                                    <input type="number" id="olod-alt-input" class="alt-input" value="3000" step="100" min="500" max="45000" />
+                                    <button type="button" class="alt-chevron-btn" id="olod-alt-up" title="Increase altitude (+100 ft)">
+                                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                            <polyline points="8.5 5 15.5 12 8.5 19"></polyline>
+                                        </svg>
+                                    </button>
                                     <span class="param-unit">ft AGL</span>
                                 </div>
                                 <div class="lod-param" title="Cruise LOD at or above transition altitude">
-                                    <span class="param-lbl">Cruise:</span>
-                                    <span id="olod-cruise-val" class="param-val">100</span>
+                                    <span class="param-lbl">Cruise :</span>
+                                    <span id="olod-cruise-val" class="param-val">200</span>
                                 </div>
                             </div>
-                            <!-- Track Container -->
-                            <div class="dual-slider-container" id="olod-dual-container">
-                                <div class="dual-slider-track-bg"></div>
-                                <div id="olod-track-highlight" class="dual-slider-track-highlight"></div>
-                                <input type="range" class="dual-slider-input" id="olod-floor-range" min="0" max="300" step="5" value="100" title="Floor LOD: 100" />
-                                <input type="range" class="dual-slider-input" id="olod-cruise-range" min="0" max="300" step="5" value="100" title="Cruise LOD: 100" />
-                            </div>
+                            <!-- Pure HTML/CSS Track & Handles (100% Centered) -->
+                                <div class="dual-slider-container" id="olod-dual-container">
+                                    <div class="dual-slider-track-bg"></div>
+                                    <div id="olod-track-highlight" class="dual-slider-track-highlight" style="left: 33.33%; width: 33.34%;"></div>
+                                    <div id="olod-floor-handle" class="slider-handle" style="left: 33.33%;" title="Floor LOD: 100"></div>
+                                    <div id="olod-cruise-handle" class="slider-handle" style="left: 66.67%;" title="Cruise LOD: 200"></div>
+                                </div>
                             <div class="dual-slider-labels">
                                 <span>0</span>
-                                <span class="range-sub">Dynamic Range (Floor to Cruise)</span>
                                 <span>300</span>
                             </div>
+                        </div>
+
+                        <!-- AUTO CLOUD RECOVERY BAR -->
+                        <div class="cloud-recovery-bar" id="cloud-recovery-bar" title="Temporarily reduces volumetric clouds under heavy GPU strain to recover FPS, then silently restores nominal profile setting">
+                            <span class="cloud-recovery-title">AUTO CLOUD RECOVERY</span>
+                            <button type="button" id="cloud-recovery-toggle-btn" class="switch-btn switch-on" role="switch" aria-checked="true" onclick="window.onCloudRecoveryClick && window.onCloudRecoveryClick(event)">
+                                <span class="switch-thumb"></span>
+                                <span id="cloud-recovery-btn-label" class="switch-label">ON</span>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -129,74 +160,78 @@
                 <div class="panel-section">
                     <div class="section-header">
                         <span class="section-title">PERFORMANCE MONITORING</span>
-                        <span id="live-pacing-status" class="badge-tag tag-neutral">
-                            <span id="pacing-badge-text">OPTIMAL</span>
-                        </span>
+                        <span id="live-pacing-status" class="badge-tag badge-optimal">OPTIMAL</span>
                     </div>
                     <div class="perf-row">
                         <div class="perf-metric">
                             <span class="metric-label">DISPLAYED FPS</span>
-                            <div class="metric-val-wrap">
-                                <span id="live-fps-val" class="metric-number">--</span>
+                            <div class="fps-line">
+                                <span id="live-fps-val" class="metric-number fps-val">--</span>
+                                <span class="fps-sep">/</span>
+                                <span class="fps-base-lbl">BASE</span>
+                                <span id="live-fps-base" class="metric-number fps-base-val">--</span>
                                 <span class="metric-unit">FPS</span>
-                            </div>
-                            <div id="live-fps-base-wrap" class="metric-base-badge" title="Native Frame Rate without Frame Generation">
-                                <span class="base-label">BASE</span>
-                                <span id="live-fps-base" class="base-val">--</span>
-                                <span class="base-unit">FPS</span>
                             </div>
                         </div>
                         <div class="perf-metric">
                             <span class="metric-label">CPU MAIN THREAD</span>
-                            <div class="metric-val-wrap">
-                                <span id="live-mt-val" class="metric-number">--</span>
+                            <div class="mt-line">
+                                <span id="live-mt-val" class="metric-number mt-val">--</span>
                                 <span class="metric-unit">ms</span>
-                            </div>
-                            <div class="metric-base-badge metric-frametime-badge">
-                                <span class="base-label">FRAMETIME</span>
                             </div>
                         </div>
                     </div>
-                    <!-- Sparkline -->
+
+                    <!-- SYSTEM METRICS (GPU, CPU, VRAM, CACHE) -->
+                    <div class="metrics-grid">
+                        <div class="metric-compact">
+                            <span class="compact-label">GPU</span>
+                            <div class="compact-val-wrap">
+                                <span id="live-gpu-val" class="compact-val">--</span>
+                                <span class="compact-unit">%</span>
+                                <span class="compact-sep">-</span>
+                                <span class="compact-subval"><span id="live-gpu-temp">--</span><span class="temp-unit">&deg;C</span></span>
+                            </div>
+                        </div>
+                        <div class="metric-compact">
+                            <span class="compact-label">CPU</span>
+                            <div class="compact-val-wrap">
+                                <span id="live-cpu-val" class="compact-val">--</span>
+                                <span class="compact-unit">%</span>
+                                <span class="compact-sep">-</span>
+                                <span class="compact-subval"><span id="live-cpu-temp">--</span><span class="temp-unit">&deg;C</span></span>
+                            </div>
+                        </div>
+                        <div class="metric-compact">
+                            <span class="compact-label">VRAM</span>
+                            <div class="compact-val-wrap">
+                                <span id="live-vram-val" class="compact-val">--</span>
+                                <span class="compact-unit">GB</span>
+                            </div>
+                        </div>
+                        <div class="metric-compact">
+                            <span class="compact-label">CACHE</span>
+                            <div class="compact-val-wrap">
+                                <span id="live-cache-val" class="compact-val">--</span>
+                                <span class="compact-unit">GB</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Sparkline Trend Graph -->
                     <div class="sparkline-box">
                         <div class="sparkline-top">
                             <span class="sparkline-title">30S TREND</span>
-                            <span id="fps-delta-label" class="delta-label delta-neutral">0 FPS</span>
+                            <span id="fps-delta-label" class="delta-label delta-neutral">STANDBY</span>
                         </div>
-                        <canvas id="fps-sparkline-canvas" class="sparkline-canvas" width="340" height="32"></canvas>
+                        <canvas id="fps-sparkline-canvas" class="sparkline-canvas" width="340" height="28"></canvas>
                     </div>
                 </div>
 
-                <!-- SECTION 3: SYSTEM METRICS -->
-                <div class="panel-section">
-                    <div class="metrics-grid">
-                        <div class="metric-compact">
-                            <span class="compact-label">GPU:</span>
-                            <span id="live-gpu-val" class="compact-val">--</span>
-                            <span class="compact-unit">%</span>
-                        </div>
-                        <div class="metric-compact">
-                            <span class="compact-label">CPU:</span>
-                            <span id="live-cpu-val" class="compact-val">--</span>
-                            <span class="compact-unit">%</span>
-                        </div>
-                        <div class="metric-compact">
-                            <span class="compact-label">VRAM:</span>
-                            <span id="live-vram-val" class="compact-val">--</span>
-                            <span class="compact-unit">GB</span>
-                        </div>
-                        <div class="metric-compact">
-                            <span class="compact-label">CACHE:</span>
-                            <span id="live-cache-val" class="compact-val">--</span>
-                            <span class="compact-unit">MB/s</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- SECTION 4: BLACKBOX RECORDER -->
-                <div class="panel-section section-rec">
-                    <button type="button" id="blackbox-toggle-btn" class="msfs-btn btn-primary">
-                        <span id="rec-btn-label">START RECORDING</span>
+                <!-- RECORDER FOOTER -->
+                <div class="recorder-footer">
+                    <button type="button" id="blackbox-toggle-btn" class="msfs-btn btn-rec-start">
+                        <span id="rec-btn-label">START MONITORING</span>
                     </button>
                 </div>
             </div>

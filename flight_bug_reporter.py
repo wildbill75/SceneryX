@@ -239,6 +239,7 @@ def record_exception(exc_type, exc_value, exc_tb, context: str = "Standard Excep
             with open(dump_file, "w", encoding="utf-8") as f:
                 json.dump(anonymize_data(incident_payload), f, indent=2, ensure_ascii=False)
             add_breadcrumb("CRASH_DUMP", f"Emergency crash dump saved: {os.path.basename(dump_file)}")
+            _dispatch_auto_crash_report(exc_data, incident_id, dump_file)
         except Exception as e:
             log_event("WARNING", f"Failed to save emergency crash dump: {e}")
 
@@ -430,18 +431,127 @@ def get_diagnostic_preview(user_description: str, category: str = "General") -> 
     return generate_diagnostic_summary_markdown(user_description, category)
 
 
+def send_bug_report_email_direct(zip_path: str, incident_id: str, subject: str, body: str) -> Dict[str, Any]:
+    """
+    Directly dispatches the incident report and the ZIP package via SMTP with STARTTLS
+    to contact@sidestickpriority.com. Complies with RFC 5322 (Message-ID, Date, MIME).
+    """
+    import smtplib
+    from email.message import EmailMessage
+    from email.utils import make_msgid, formatdate
+
+    recipient = CONTACT_EMAIL
+    sender = "SceneryX Diagnostic Assistant <sceneryx-reporter@sidestickpriority.com>"
+
+    msg = EmailMessage()
+    msg['Subject'] = subject
+    msg['From'] = sender
+    msg['To'] = recipient
+    msg['Date'] = formatdate(localtime=True)
+    msg['Message-ID'] = make_msgid(domain='sidestickpriority.com')
+    msg.set_content(body)
+
+    if os.path.exists(zip_path):
+        try:
+            with open(zip_path, 'rb') as f:
+                zip_data = f.read()
+            msg.add_attachment(
+                zip_data,
+                maintype='application',
+                subtype='zip',
+                filename=os.path.basename(zip_path)
+            )
+        except Exception as e:
+            log_event("WARNING", f"Could not read ZIP file for attachment: {e}")
+
+    # Standard MX hosts for sidestickpriority.com (Google Workspace)
+    mx_hosts = ["smtp.google.com", "aspmx.l.google.com", "alt1.aspmx.l.google.com"]
+    last_err = None
+
+    for host in mx_hosts:
+        try:
+            log_event("INFO", f"Attempting direct SMTP delivery of #{incident_id} to {host}:25...")
+            with smtplib.SMTP(host, 25, timeout=12) as server:
+                server.ehlo()
+                server.starttls()
+                server.ehlo()
+                server.send_message(msg)
+            log_event("INFO", f"Bug report #{incident_id} successfully delivered to {recipient} via {host}!")
+            return {
+                "sent": True,
+                "host": host,
+                "recipient": recipient,
+                "message": f"Report package #{incident_id} successfully sent directly to {recipient}"
+            }
+        except Exception as e:
+            last_err = e
+            log_event("WARNING", f"SMTP delivery to {host} failed: {e}")
+            continue
+
+    return {
+        "sent": False,
+        "error": str(last_err) if last_err else "All MX hosts unreachable",
+        "message": "Direct email delivery failed. Fallback available via default mail client."
+    }
+
+
+_sent_crash_signatures = set()
+
+def _dispatch_auto_crash_report(exc_data: Dict[str, Any], incident_id: str, dump_file: str):
+    """
+    Expédie automatiquement le rapport de crash par email en arrière-plan (avec limitation anti-spam).
+    Déclenché uniquement lorsque 'auto_send_crash_reports' est actif.
+    """
+    global _sent_crash_signatures
+    sig = f"{exc_data.get('culprit_file')}:{exc_data.get('culprit_line')}:{exc_data.get('type')}"
+    with _lock:
+        if sig in _sent_crash_signatures:
+            return
+        _sent_crash_signatures.add(sig)
+
+    def _worker():
+        try:
+            subject = f"[SceneryX Auto-Crash #{incident_id}] [{exc_data.get('type', 'Error')} in {exc_data.get('culprit_file', 'unknown')}]"
+            body = (
+                f"Automated Crash Report intercepted by SceneryX.\n\n"
+                f"Incident ID : #{incident_id}\n"
+                f"Type        : {exc_data.get('type')}\n"
+                f"Message     : {exc_data.get('message')}\n"
+                f"Location    : {exc_data.get('culprit_file')} line {exc_data.get('culprit_line')} in {exc_data.get('culprit_func')}()\n"
+                f"Context     : {exc_data.get('context')}\n\n"
+                f"Code Line   : {exc_data.get('code_context')}\n\n"
+                f"--- TRACEBACK ---\n{exc_data.get('traceback')}\n\n"
+                f"Anonymized hardware snapshot and logs are saved in the attached crash bundle."
+            )
+            crash_zip = os.path.join(CRASH_REPORTS_DIR, f"SceneryX_Crash_{incident_id}.zip")
+            with zipfile.ZipFile(crash_zip, 'w', compression=zipfile.ZIP_DEFLATED) as z:
+                if os.path.exists(dump_file):
+                    z.write(dump_file, arcname=f"crash_{incident_id}.json")
+                with _lock:
+                    log_text = "\n".join([f"[{l['timestamp']}] [{l['level']}] {l['message']}" for l in _log_buffer])
+                z.writestr("app_runtime.txt", log_text.encode('utf-8'))
+                z.writestr("app_runtime.md", f"# Runtime Logs\n\n```text\n{log_text}\n```".encode('utf-8'))
+
+            res = send_bug_report_email_direct(crash_zip, incident_id, subject, body)
+            if res.get("sent"):
+                log_event("INFO", f"Automatic crash report #{incident_id} dispatched to {CONTACT_EMAIL}")
+            else:
+                log_event("WARNING", f"Auto-crash dispatch to {CONTACT_EMAIL} failed: {res.get('error')}")
+        except Exception as e:
+            log_event("WARNING", f"Failed to dispatch auto-crash report: {e}")
+
+    threading.Thread(target=_worker, name="AutoCrashReporter", daemon=True).start()
+
+
 def build_bug_report_package(user_description: str, category: str = "General", include_screenshot: bool = True, include_logs: bool = True) -> Dict[str, Any]:
     """Compile diagnostic data, save incident JSON, write ZIP bundle on Desktop, open Explorer and prepare mail."""
     incident_id = generate_incident_id()
     report_zip_filename = f"SceneryX_BugReport_{incident_id}.zip"
 
-    # 1. Target directory: User Desktop
-    desktop_dir = os.path.join(os.path.expanduser('~'), 'Desktop')
-    if not os.path.exists(desktop_dir):
-        desktop_dir = os.path.join(os.environ.get('APPDATA', os.path.expanduser('~')), 'SceneryX', 'Reports')
-        os.makedirs(desktop_dir, exist_ok=True)
-
-    zip_path = os.path.join(desktop_dir, report_zip_filename)
+    # 1. Target directory: persistent internal crash_reports directory (avoid cluttering user desktop)
+    target_dir = CRASH_REPORTS_DIR
+    os.makedirs(target_dir, exist_ok=True)
+    zip_path = os.path.join(target_dir, report_zip_filename)
 
     # 2. Generate markdown summary
     summary_md = generate_diagnostic_summary_markdown(user_description, category, incident_id=incident_id)
@@ -451,9 +561,20 @@ def build_bug_report_package(user_description: str, category: str = "General", i
     if include_screenshot:
         screenshot_img = capture_window_screenshot()
 
-    # 4. Save local incident JSON in persistent crash_reports/ directory
+    # 4. Save local incident JSON and files in persistent crash_reports/ directory
     try:
         local_incident_file = os.path.join(CRASH_REPORTS_DIR, f"incident_{incident_id}.json")
+        summary_md_file = os.path.join(CRASH_REPORTS_DIR, f"incident_{incident_id}_summary.md")
+        logs_txt_file = os.path.join(CRASH_REPORTS_DIR, f"incident_{incident_id}_logs.txt")
+
+        with open(summary_md_file, "w", encoding="utf-8") as f:
+            f.write(summary_md)
+
+        with _lock:
+            log_text = "\n".join([f"[{l['timestamp']}] [{l['level']}] {l['message']}" for l in _log_buffer])
+        with open(logs_txt_file, "w", encoding="utf-8") as f:
+            f.write(log_text)
+
         incident_data = {
             "incident_id": incident_id,
             "created_at": datetime.now().isoformat(),
@@ -471,7 +592,7 @@ def build_bug_report_package(user_description: str, category: str = "General", i
     except Exception as e:
         log_event("WARNING", f"Failed to save local incident JSON: {e}")
 
-    # 5. Assemble ZIP archive (contains everything inside)
+    # 5. Assemble ZIP archive (cleanly named .txt and .md to avoid Antigravity file upload restrictions)
     try:
         with zipfile.ZipFile(zip_path, 'w', compression=zipfile.ZIP_DEFLATED) as z:
             z.writestr("diagnostic_summary.md", summary_md.encode('utf-8'))
@@ -487,7 +608,9 @@ def build_bug_report_package(user_description: str, category: str = "General", i
             if include_logs:
                 with _lock:
                     log_text = "\n".join([f"[{l['timestamp']}] [{l['level']}] {l['message']}" for l in _log_buffer])
-                z.writestr("app_runtime.log", log_text.encode('utf-8'))
+                # Using .txt and .md so Antigravity and mail systems allow attachments without restriction
+                z.writestr("app_runtime.txt", log_text.encode('utf-8'))
+                z.writestr("app_runtime.md", f"# Runtime Execution Logs\n\n```text\n{log_text}\n```".encode('utf-8'))
 
             if screenshot_img:
                 from io import BytesIO
@@ -503,13 +626,7 @@ def build_bug_report_package(user_description: str, category: str = "General", i
             "error": str(e)
         }
 
-    # 6. Highlight the ZIP file in Windows Explorer
-    try:
-        subprocess.Popen(f'explorer.exe /select,"{os.path.abspath(zip_path)}"')
-    except Exception as e:
-        log_event("WARNING", f"Could not highlight file in explorer: {e}")
-
-    # 7. Prepare mail links
+    # 6. Prepare email links and dispatch directly via SMTP
     exc = _last_exception
     err_subj = f"[{exc['type']} in {exc['culprit_file']}]" if exc else f"[{category}]"
     subject = f"[SceneryX Issue #{incident_id}] {err_subj} - {user_description[:45]}"
@@ -537,7 +654,22 @@ def build_bug_report_package(user_description: str, category: str = "General", i
     mailto_url = f"mailto:{CONTACT_EMAIL}?subject={urllib.parse.quote(subject)}&body={urllib.parse.quote(body)}"
     browser_mail_url = f"https://mail.google.com/mail/?view=cm&fs=1&to={urllib.parse.quote(CONTACT_EMAIL)}&su={urllib.parse.quote(subject)}&body={urllib.parse.quote(body)}"
 
-    add_breadcrumb("REPORT_GENERATED", f"Bug report package generated: #{incident_id}", {"zip": report_zip_filename})
+    # Attempt direct SMTP dispatch with attached ZIP package
+    dispatch_res = send_bug_report_email_direct(zip_path, incident_id, subject, body)
+    email_sent = dispatch_res.get("sent", False)
+
+    # Fallback: if direct SMTP delivery failed, launch default mail client
+    if not email_sent:
+        try:
+            import webbrowser
+            webbrowser.open(mailto_url)
+        except Exception as e:
+            log_event("WARNING", f"Could not launch fallback mail client: {e}")
+
+    add_breadcrumb("REPORT_GENERATED", f"Bug report package generated: #{incident_id}", {
+        "zip": report_zip_filename,
+        "email_sent": email_sent
+    })
 
     return {
         "success": True,
@@ -550,7 +682,11 @@ def build_bug_report_package(user_description: str, category: str = "General", i
         "mailto_url": mailto_url,
         "browser_mail_url": browser_mail_url,
         "has_exception": bool(exc),
-        "summary_md": summary_md
+        "summary_md": summary_md,
+        "email_sent": email_sent,
+        "email_status": dispatch_res.get("message", ""),
+        "email_host": dispatch_res.get("host", None),
+        "email_error": dispatch_res.get("error", None)
     }
 
 
