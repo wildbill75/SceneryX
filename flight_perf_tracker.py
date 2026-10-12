@@ -711,8 +711,10 @@ def get_simbrief_flight_plan(force_refresh=False):
     else:
         is_stale = True
 
-    # 1. Si force_refresh demandé ou cache expiré, interrogation directe API SimBrief
-    if (force_refresh or is_stale) and ident:
+    # 1. Si force_refresh explicitement demandé ou profil SimBrief actif avec cache expiré
+    fm_check = st.get('flight_mode', {})
+    is_sb_mode = isinstance(fm_check, dict) and fm_check.get('active') and fm_check.get('profile') == 'SIMBRIEF'
+    if (force_refresh or (is_sb_mode and is_stale)) and ident:
         try:
             import urllib.request
             param = f"userid={ident}" if ident.isdigit() else f"username={ident}"
@@ -897,15 +899,18 @@ def resolve_flight_context(lat=None, lon=None, on_ground=False):
     """
     mode_str, is_corridor, dep, arr, dis_count, prof_slug = get_sceneryx_flight_mode()
 
-    # 1. Vérification si un plan SimBrief est actif
-    sb = get_simbrief_flight_plan()
+    # 1. Vérification si un plan SimBrief est actif (uniquement si explicitement activé dans SceneryX)
     has_simbrief = False
-    if sb:
-        sb_dep, sb_arr, sb_dname, sb_aname = match_simbrief_plan(sb, lat, lon)
-        if sb_dep and sb_arr:
-            dep = sb_dep
-            arr = sb_arr
-            has_simbrief = True
+    sb_dep, sb_arr, sb_dname, sb_aname = None, None, None, None
+
+    if is_corridor and prof_slug == 'simbrief':
+        sb = get_simbrief_flight_plan()
+        if sb:
+            sb_dep, sb_arr, sb_dname, sb_aname = match_simbrief_plan(sb, lat, lon)
+            if sb_dep and sb_arr:
+                dep = sb_dep
+                arr = sb_arr
+                has_simbrief = True
 
     # 2. Détection GPS de l'aéroport le plus proche dans MSFS
     near_icao, near_name, dist_nm = find_nearest_airport(lat, lon) if (lat is not None and lon is not None) else (None, "", 999999.0)
@@ -924,7 +929,7 @@ def resolve_flight_context(lat=None, lon=None, on_ground=False):
             route_display = format_airport_route_item(near_icao, near_name)
             dep = near_icao
         else:
-            route_display = "---"
+            route_display = "Waiting for flight"
 
     # 4. Tag Optimisation Scènes
     if is_corridor and dis_count > 0:
@@ -937,7 +942,7 @@ def resolve_flight_context(lat=None, lon=None, on_ground=False):
     else:
         scenery_opt_tag = "NO SCENERY OPTIMIZATION"
 
-    mode_display = f"{flight_type_tag} • {scenery_opt_tag}"
+    mode_display = f"{flight_type_tag} - {scenery_opt_tag}"
 
     return {
         "route_display": route_display,
@@ -1662,7 +1667,7 @@ def detect_route_optimization_state(session_info=None):
                 "has_simbrief": has_sb,
                 "badge_text": "BASELINE STANDARD",
                 "badge_bg": "#d97706",
-                "mode_display": "BASELINE (SimBrief OFP • No Scenery Isolation)" if has_sb else "BASELINE STANDARD (All sceneries active)",
+                "mode_display": "BASELINE (SimBrief OFP - No Scenery Isolation)" if has_sb else "BASELINE STANDARD (All sceneries active)",
                 "status_desc": "No scenery isolation active (Baseline library)",
                 "reason": "Flight performed without SceneryX scenery isolation"
             }
@@ -1710,7 +1715,7 @@ def detect_route_optimization_state(session_info=None):
         "has_simbrief": has_simbrief,
         "badge_text": "BASELINE STANDARD",
         "badge_bg": "#d97706",
-        "mode_display": "BASELINE (SimBrief OFP • No Scenery Isolation)" if has_simbrief else "BASELINE STANDARD (All sceneries active)",
+        "mode_display": "BASELINE (SimBrief OFP - No Scenery Isolation)" if has_simbrief else "BASELINE STANDARD (All sceneries active)",
         "status_desc": "No scenery isolation active (Baseline library)",
         "reason": "Flight performed without SceneryX scenery isolation"
     }
@@ -1779,7 +1784,7 @@ def generate_graphics_profile_section(session_info):
         hl_cards_html += f"""
         <div style="background:#0b0f19; border:1px solid rgba(51,65,85,0.6); border-radius:10px; padding:12px 14px;">
             <div style="color:#64748b; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px;">{hl_label}</div>
-            <div style="color:#f8fafc; font-size:15px; font-weight:800; margin-top:4px; font-family:monospace;">{hl_val}</div>
+            <div style="color:#f8fafc; font-size:15px; font-weight:800; margin-top:4px;">{hl_val}</div>
         </div>
         """
 
@@ -1824,7 +1829,7 @@ def generate_graphics_profile_section(session_info):
             <details style="background:#080c14; border:1px solid rgba(51,65,85,0.4); border-radius:10px; padding:12px 16px;">
                 <summary style="cursor:pointer; user-select:none; font-size:11px; font-weight:700; color:#94a3b8; outline:none; display:flex; align-items:center; justify-content:space-between;">
                     <span>FULL ENGINE PARAMETERS & DIRECTIVES ({len(settings)} SETTINGS)</span>
-                    <span style="color:#38bdf8; font-family:monospace; font-size:10px; text-transform:uppercase;">[ CLICK TO EXPAND / COLLAPSE ]</span>
+                    <span style="color:#38bdf8; font-size:10px; text-transform:uppercase;">[ CLICK TO EXPAND / COLLAPSE ]</span>
                 </summary>
                 <div style="margin-top:14px; display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:10px;">
                     {all_settings_html}
@@ -1962,7 +1967,7 @@ def generate_automated_flight_narrative(samples, session_info):
     narrative = f"""
     <div style="background:#0f172a; border:1px solid #1e293b; border-radius:12px; padding:18px 20px; margin-bottom:20px; line-height:1.65; font-size:13px; color:#f8fafc;">
         <ul style="list-style:none; padding-left:0; margin:0 0 14px 0;">
-            <li style="margin-bottom:6px;"><strong style="color:#ffffff;">Flight Duration:</strong> Total recorded monitoring time of <strong style="color:#e2e8f0; font-family:monospace;">{monitoring_duration}</strong> ({len(samples)} logged telemetry samples).</li>
+            <li style="margin-bottom:6px;"><strong style="color:#ffffff;">Flight Duration:</strong> Total recorded monitoring time of <strong style="color:#e2e8f0;">{monitoring_duration}</strong> ({len(samples)} logged telemetry samples).</li>
             <li style="margin-bottom:6px;"><strong style="color:#ffffff;">System Behavior & Bottleneck:</strong> {bottleneck_diag}</li>
             <li style="margin-bottom:6px;"><strong style="color:#ffffff;">Video Memory Footprint:</strong> {vram_diag}</li>
             <li style="margin-bottom:6px;"><strong style="color:#ffffff;">Smoothness & Pacing:</strong> Global average of <strong style="color:#10b981;">{avg_fps} FPS</strong> with average MainThread of <strong style="color:#f59e0b;">{avg_mt} ms</strong>.</li>
@@ -2261,9 +2266,9 @@ def generate_html_report(csv_path, session_info, samples):
             delta_rows += f"""
             <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
                 <td style="padding:10px 12px; font-weight:bold; color:#f8fafc;">{d['label']}</td>
-                <td style="padding:10px 12px; color:#38bdf8; font-family:monospace; font-weight:bold;">{d['tlod_trans']}</td>
-                <td style="padding:10px 12px; color:{d['fps_color']}; font-family:monospace; font-weight:bold;">{d['fps_delta']}</td>
-                <td style="padding:10px 12px; color:{d['mt_color']}; font-family:monospace; font-weight:bold;">{d['mt_delta']}</td>
+                <td style="padding:10px 12px; color:#38bdf8; font-weight:bold;">{d['tlod_trans']}</td>
+                <td style="padding:10px 12px; color:{d['fps_color']}; font-weight:bold;">{d['fps_delta']}</td>
+                <td style="padding:10px 12px; color:{d['mt_color']}; font-weight:bold;">{d['mt_delta']}</td>
                 <td style="padding:10px 12px; color:#cbd5e1; font-size:12px;">{d['verdict']}</td>
             </tr>
             """
@@ -2274,10 +2279,10 @@ def generate_html_report(csv_path, session_info, samples):
             for ev in events[-8:]:
                 event_rows += f"""
                 <tr style="border-bottom:1px solid rgba(255,255,255,0.03); font-size:12px;">
-                    <td style="padding:6px 12px; color:#94a3b8; font-family:monospace;">{ev.get('time_str')}</td>
-                    <td style="padding:6px 12px; color:#06b6d4; font-family:monospace;">{ev.get('agl_ft')} ft</td>
-                    <td style="padding:6px 12px; color:#ec4899; font-family:monospace; font-weight:bold;">TLOD {ev.get('old_tlod')} ➔ {ev.get('new_tlod')}</td>
-                    <td style="padding:6px 12px; color:#10b981; font-family:monospace;">{ev.get('fps')} FPS</td>
+                    <td style="padding:6px 12px; color:#94a3b8;">{ev.get('time_str')}</td>
+                    <td style="padding:6px 12px; color:#06b6d4;">{ev.get('agl_ft')} ft</td>
+                    <td style="padding:6px 12px; color:#ec4899; font-weight:bold;">TLOD {ev.get('old_tlod')} ➔ {ev.get('new_tlod')}</td>
+                    <td style="padding:6px 12px; color:#10b981;">{ev.get('fps')} FPS</td>
                     <td style="padding:6px 12px; color:#cbd5e1;">{ev.get('reason')}</td>
                 </tr>
                 """
@@ -2336,21 +2341,21 @@ def generate_html_report(csv_path, session_info, samples):
         c_str = str(cloud_status or "Nominal quality maintained")
         cloud_tags = []
         if "nominal" in c_str.lower():
-            cloud_tags.append('<span style="background:#1e293b; border:1px solid #334155; padding:3px 10px; border-radius:6px; font-size:11px; font-family:monospace; font-weight:bold; color:#f8fafc; text-transform:uppercase;">AUTOFPS CLOUD: NOMINAL QUALITY</span>')
+            cloud_tags.append('<span style="background:#1e293b; border:1px solid #334155; padding:3px 10px; border-radius:6px; font-size:11px; font-weight:bold; color:#f8fafc; text-transform:uppercase;">AUTOFPS CLOUD: NOMINAL QUALITY</span>')
             import re
             m_paren = re.search(r'\((.*?)\)', c_str)
             if m_paren:
-                cloud_tags.append(f'<span style="background:#1e293b; border:1px solid #334155; padding:3px 10px; border-radius:6px; font-size:11px; font-family:monospace; font-weight:bold; color:#38bdf8; text-transform:uppercase;">{m_paren.group(1)}</span>')
+                cloud_tags.append(f'<span style="background:#1e293b; border:1px solid #334155; padding:3px 10px; border-radius:6px; font-size:11px; font-weight:bold; color:#38bdf8; text-transform:uppercase;">{m_paren.group(1)}</span>')
             else:
-                cloud_tags.append('<span style="background:#1e293b; border:1px solid #334155; padding:3px 10px; border-radius:6px; font-size:11px; font-family:monospace; font-weight:bold; color:#38bdf8; text-transform:uppercase;">PC HIGH / VR HIGH</span>')
-            cloud_tags.append('<span style="background:#1e293b; border:1px solid #334155; padding:3px 10px; border-radius:6px; font-size:11px; font-family:monospace; font-weight:bold; color:#10b981; text-transform:uppercase;">NO CLOUD DROPS</span>')
+                cloud_tags.append('<span style="background:#1e293b; border:1px solid #334155; padding:3px 10px; border-radius:6px; font-size:11px; font-weight:bold; color:#38bdf8; text-transform:uppercase;">PC HIGH / VR HIGH</span>')
+            cloud_tags.append('<span style="background:#1e293b; border:1px solid #334155; padding:3px 10px; border-radius:6px; font-size:11px; font-weight:bold; color:#10b981; text-transform:uppercase;">NO CLOUD DROPS</span>')
         else:
-            cloud_tags.append('<span style="background:#1e293b; border:1px solid #334155; padding:3px 10px; border-radius:6px; font-size:11px; font-family:monospace; font-weight:bold; color:#f59e0b; text-transform:uppercase;">AUTOFPS CLOUD: REDUCTION ACTIVE</span>')
+            cloud_tags.append('<span style="background:#1e293b; border:1px solid #334155; padding:3px 10px; border-radius:6px; font-size:11px; font-weight:bold; color:#f59e0b; text-transform:uppercase;">AUTOFPS CLOUD: REDUCTION ACTIVE</span>')
             import re
             m_init = re.search(r'Initial:\s*([^)]+)', c_str, re.I)
             if m_init:
-                cloud_tags.append(f'<span style="background:#1e293b; border:1px solid #334155; padding:3px 10px; border-radius:6px; font-size:11px; font-family:monospace; font-weight:bold; color:#f8fafc; text-transform:uppercase;">INITIAL: {m_init.group(1)}</span>')
-            cloud_tags.append('<span style="background:#1e293b; border:1px solid #334155; padding:3px 10px; border-radius:6px; font-size:11px; font-family:monospace; font-weight:bold; color:#ef4444; text-transform:uppercase;">QUALITY DROPPED</span>')
+                cloud_tags.append(f'<span style="background:#1e293b; border:1px solid #334155; padding:3px 10px; border-radius:6px; font-size:11px; font-weight:bold; color:#f8fafc; text-transform:uppercase;">INITIAL: {m_init.group(1)}</span>')
+            cloud_tags.append('<span style="background:#1e293b; border:1px solid #334155; padding:3px 10px; border-radius:6px; font-size:11px; font-weight:bold; color:#ef4444; text-transform:uppercase;">QUALITY DROPPED</span>')
         cloud_tags_html = f'<div style="display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:12px;">{" ".join(cloud_tags)}</div>'
 
         rows_html = ""
@@ -2372,11 +2377,11 @@ def generate_html_report(csv_path, session_info, samples):
             rows_html += f"""
             <tr style="border-bottom:1px solid rgba(255,255,255,0.06);">
                 <td style="padding:10px 14px; font-weight:bold; color:#f8fafc; font-size:13px; white-space:nowrap;">{m['phase']}</td>
-                <td style="padding:10px 14px; color:#38bdf8; font-family:monospace; font-size:13px; font-weight:bold; white-space:nowrap;">{m['alt']}</td>
-                <td style="padding:10px 14px; color:#c084fc; font-family:monospace; font-size:14px; font-weight:bold; white-space:nowrap;">{m['tlod']}</td>
-                <td style="padding:10px 14px; color:#c084fc; font-family:monospace; font-size:14px; font-weight:bold; white-space:nowrap;">{m['olod']}</td>
-                <td style="padding:10px 14px; color:{fps_color}; font-family:monospace; font-size:15px; font-weight:extrabold; white-space:nowrap;">{m['fps']}</td>
-                <td style="padding:10px 14px; color:{mt_color}; font-family:monospace; font-size:15px; font-weight:extrabold; white-space:nowrap;">{m['mt']}</td>
+                <td style="padding:10px 14px; color:#38bdf8; font-size:13px; font-weight:bold; white-space:nowrap;">{m['alt']}</td>
+                <td style="padding:10px 14px; color:#c084fc; font-size:14px; font-weight:bold; white-space:nowrap;">{m['tlod']}</td>
+                <td style="padding:10px 14px; color:#c084fc; font-size:14px; font-weight:bold; white-space:nowrap;">{m['olod']}</td>
+                <td style="padding:10px 14px; color:{fps_color}; font-size:15px; font-weight:extrabold; white-space:nowrap;">{m['fps']}</td>
+                <td style="padding:10px 14px; color:{mt_color}; font-size:15px; font-weight:extrabold; white-space:nowrap;">{m['mt']}</td>
                 <td style="padding:10px 14px; color:#cbd5e1; font-size:13px;">{m['notes']}</td>
             </tr>
             """
@@ -2387,13 +2392,13 @@ def generate_html_report(csv_path, session_info, samples):
                 <table style="width:100%; border-collapse:collapse; font-size:13px; text-align:left;">
                     <thead>
                         <tr style="border-bottom:1px solid #334155; color:#94a3b8; font-size:11px; text-transform:uppercase;">
-                            <th style="padding:8px 14px; white-space:nowrap; font-family:monospace;">Flight Phase</th>
-                            <th style="padding:8px 14px; white-space:nowrap; font-family:monospace;">Altitude (AGL)</th>
-                            <th style="padding:8px 14px; white-space:nowrap; font-family:monospace;">Avg TLOD</th>
-                            <th style="padding:8px 14px; white-space:nowrap; font-family:monospace;">Avg OLOD</th>
-                            <th style="padding:8px 14px; white-space:nowrap; font-family:monospace;">Avg FPS</th>
-                            <th style="padding:8px 14px; white-space:nowrap; font-family:monospace;">CPU MainThread</th>
-                            <th style="padding:8px 14px; white-space:nowrap; font-family:monospace;">Behavior & Impact</th>
+                            <th style="padding:8px 14px; white-space:nowrap;">Flight Phase</th>
+                            <th style="padding:8px 14px; white-space:nowrap;">Altitude (AGL)</th>
+                            <th style="padding:8px 14px; white-space:nowrap;">Avg TLOD</th>
+                            <th style="padding:8px 14px; white-space:nowrap;">Avg OLOD</th>
+                            <th style="padding:8px 14px; white-space:nowrap;">Avg FPS</th>
+                            <th style="padding:8px 14px; white-space:nowrap;">CPU MainThread</th>
+                            <th style="padding:8px 14px; white-space:nowrap;">Behavior & Impact</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -2470,12 +2475,12 @@ def generate_html_report(csv_path, session_info, samples):
             alt_disp = f"{int(ev['alt']):,} ft" if ev.get('alt') is not None else "--"
             event_rows += f"""
             <tr style="border-bottom:1px solid rgba(255,255,255,0.05); font-size:13px;">
-                <td style="padding:10px 12px; color:#94a3b8; font-family:monospace; font-weight:bold;">{ev['time']}</td>
+                <td style="padding:10px 12px; color:#94a3b8; font-weight:bold;">{ev['time']}</td>
                 <td style="padding:10px 12px;">
                     <span style="display:inline-block; padding:3px 8px; border-radius:6px; font-size:10px; font-weight:800; background:#1e293b; color:{ev['badge_color']}; border:1px solid rgba(51, 65, 85, 0.6);">{ev['badge']}</span>
                 </td>
                 <td style="padding:10px 12px; color:#f8fafc; font-weight:bold;">{ev['label']}</td>
-                <td style="padding:10px 12px; color:#06b6d4; font-family:monospace;">{alt_disp}</td>
+                <td style="padding:10px 12px; color:#06b6d4;">{alt_disp}</td>
             </tr>
             """
         events_table_section = f"""
@@ -2581,7 +2586,6 @@ def generate_html_report(csv_path, session_info, samples):
         .card-val {{
             font-size: 26px;
             font-weight: 900;
-            font-family: monospace;
             color: #38bdf8;
         }}
         .card-sub {{
@@ -2665,21 +2669,21 @@ def generate_html_report(csv_path, session_info, samples):
         <!-- CONTEXTUAL FLIGHT HEADER (Aircraft, Route, Mode, Monitoring Duration) -->
         <div style="background:#0f172a; border:1px solid #1e293b; border-radius:16px; padding:20px 24px; margin-bottom:24px; display:grid; grid-template-columns: 3fr 4fr 3fr 2fr; gap:20px; align-items:start;">
             <div>
-                <div style="color:#64748b; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; font-family:monospace; height:16px; line-height:16px;">Aircraft</div>
-                <div style="color:#f8fafc; font-weight:900; font-size:22px; margin-top:4px; font-family:monospace; line-height:1.1;">{aircraft_model}</div>
+                <div style="color:#64748b; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; height:16px; line-height:16px;">Aircraft</div>
+                <div style="color:#f8fafc; font-weight:900; font-size:22px; margin-top:4px; line-height:1.1;">{aircraft_model}</div>
                 <div style="color:#94a3b8; font-size:12px; margin-top:3px; font-weight:500;">{aircraft_developer}</div>
             </div>
             <div>
-                <div style="color:#64748b; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; font-family:monospace; height:16px; line-height:16px;">Route / Origin</div>
-                <div style="color:#38bdf8; font-weight:900; font-size:22px; margin-top:4px; font-family:monospace; line-height:1.1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{route_display}</div>
+                <div style="color:#64748b; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; height:16px; line-height:16px;">Route / Origin</div>
+                <div style="color:#38bdf8; font-weight:900; font-size:22px; margin-top:4px; line-height:1.1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{route_display}</div>
             </div>
             <div>
-                <div style="color:#64748b; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; font-family:monospace; height:16px; line-height:16px;">Flight Mode</div>
-                <div style="color:{mode_color}; font-weight:800; font-size:13px; margin-top:4px; font-family:monospace; line-height:1.3;">{mode_display}</div>
+                <div style="color:#64748b; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; height:16px; line-height:16px;">Flight Mode</div>
+                <div style="color:{mode_color}; font-weight:800; font-size:13px; margin-top:4px; line-height:1.3;">{mode_display}</div>
             </div>
             <div style="text-align:right;">
-                <div style="color:#64748b; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; font-family:monospace; height:16px; line-height:16px;">Monitoring Time</div>
-                <div style="color:#f8fafc; font-weight:900; font-size:22px; margin-top:4px; font-family:monospace; line-height:1.1; white-space:nowrap;">{time_display_full}</div>
+                <div style="color:#64748b; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:0.8px; height:16px; line-height:16px;">Monitoring Time</div>
+                <div style="color:#f8fafc; font-weight:900; font-size:22px; margin-top:4px; line-height:1.1; white-space:nowrap;">{time_display_full}</div>
             </div>
         </div>
 
@@ -3902,6 +3906,14 @@ class BlackboxSession:
         self.latest_telemetry["is_paused"] = False
         self.latest_telemetry["elapsed_sec"] = 0
         self.latest_telemetry["elapsed_str"] = "00:00"
+        self.latest_telemetry["aircraft"] = "Not detected"
+        self.latest_telemetry["route_display"] = "Waiting for flight"
+        self.latest_telemetry["route_label"] = "ORIGIN :"
+        self.latest_telemetry["flight_type_tag"] = "FREE FLIGHT"
+        self.latest_telemetry["scenery_opt_tag"] = "NO SCENERY OPTIMIZATION"
+        self.latest_telemetry["mode_display"] = "FREE FLIGHT - NO SCENERY OPTIMIZATION"
+        self.latest_telemetry["origin_icao"] = None
+        self.latest_telemetry["has_simbrief"] = False
         return {
             "status": "stopped",
             "report_path": self.last_report_path,
@@ -3931,15 +3943,26 @@ class BlackboxSession:
         lon = sc_data.get("lon")
         on_ground = sc_data.get("on_ground", False)
         ctx = resolve_flight_context(lat, lon, on_ground)
-        telemetry["aircraft"] = sc_data.get("aircraft") or "Not detected"
-        route_text = ctx["route_display"]
-        telemetry["route_display"] = route_text
-        telemetry["route_label"] = ctx.get("route_label", "ROUTE :")
-        telemetry["mode_display"] = ctx["mode_display"]
-        telemetry["flight_type_tag"] = ctx.get("flight_type_tag", "FREE FLIGHT")
-        telemetry["scenery_opt_tag"] = ctx.get("scenery_opt_tag", "NO SCENERY OPTIMIZATION")
-        telemetry["origin_icao"] = ctx.get("origin_icao")
-        telemetry["has_simbrief"] = ctx.get("has_simbrief", False)
+
+        if not sc_connected:
+            telemetry["aircraft"] = "Not detected"
+            telemetry["route_display"] = "Waiting for flight"
+            telemetry["route_label"] = "ORIGIN :"
+            telemetry["mode_display"] = "FREE FLIGHT - NO SCENERY OPTIMIZATION"
+            telemetry["flight_type_tag"] = "FREE FLIGHT"
+            telemetry["scenery_opt_tag"] = "NO SCENERY OPTIMIZATION"
+            telemetry["origin_icao"] = None
+            telemetry["has_simbrief"] = False
+        else:
+            telemetry["aircraft"] = sc_data.get("aircraft") or "Not detected"
+            route_text = ctx["route_display"]
+            telemetry["route_display"] = route_text
+            telemetry["route_label"] = ctx.get("route_label", "ROUTE :")
+            telemetry["mode_display"] = ctx["mode_display"]
+            telemetry["flight_type_tag"] = ctx.get("flight_type_tag", "FREE FLIGHT")
+            telemetry["scenery_opt_tag"] = ctx.get("scenery_opt_tag", "NO SCENERY OPTIMIZATION")
+            telemetry["origin_icao"] = ctx.get("origin_icao")
+            telemetry["has_simbrief"] = ctx.get("has_simbrief", False)
 
         if gpu:
             telemetry["vram_used_mb"] = gpu.get("vram_used_mb", 0)
@@ -4395,9 +4418,9 @@ class BlackboxSession:
             if is_corridor and dis_count > 0:
                 mode_disp = ctx.get('mode_display', mode_str)
             elif "SimBrief" in source or opt_state.get('has_simbrief'):
-                mode_disp = "SIMBRIEF OFP • NO SCENERY OPTIMIZATION"
+                mode_disp = "SIMBRIEF OFP - NO SCENERY OPTIMIZATION"
             else:
-                mode_disp = "FREE FLIGHT • NO SCENERY OPTIMIZATION"
+                mode_disp = "FREE FLIGHT - NO SCENERY OPTIMIZATION"
 
             cloud_status = check_autofps_cloud_events()
 

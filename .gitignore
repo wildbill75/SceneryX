@@ -15,3 +15,5 @@ scratch_*
 sceneryx_err.txt
 sceneryx_out.txt
 scratch/
+*.bak*
+verify_tour.js

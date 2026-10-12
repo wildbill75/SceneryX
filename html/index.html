@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SceneryX — Smart Flight Optimization & Scenery Hub for MSFS</title>
+  <meta name="description" content="Next-generation flight performance suite for Microsoft Flight Simulator 2020 & 2024. Dynamic Smart LOD, SimBrief route corridor isolation, unified 2D/VR settings, and instant GSX Pro matching." />
+  
+  <!-- Open Graph / Social Meta -->
+  <meta property="og:title" content="SceneryX — Smart Flight Optimization for MSFS" />
+  <meta property="og:description" content="Immersive flight optimization for Microsoft Flight Simulator 2020 & 2024. Dynamic Smart LOD, route-based scenery isolation, and live diagnostics. €8.99 early access." />
+  <meta property="og:type" content="website" />
+  <meta property="og:image" content="assets/hero-panel-global.webp" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="SceneryX — Smart Flight Optimization for MSFS" />
+  <meta name="twitter:description" content="Immersive flight optimization for Microsoft Flight Simulator 2020 & 2024. Dynamic Smart LOD, route-based scenery isolation, and live diagnostics." />
+  <meta name="twitter:image" content="assets/hero-panel-global.webp" />
+
+  <!-- App Favicons -->
+  <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  <link rel="icon" type="image/webp" href="assets/logo-icon.webp" />
+
+  <!-- Preload Priority Assets -->
+  <link rel="preload" as="image" href="assets/hero-panel-global.webp" type="image/webp" />
+
+  <!-- Google Fonts: IBM Plex Sans & IBM Plex Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="anonymous" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Sans:ital,wght@0,400;0,450;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+
+  <!-- Core Stylesheet (Apple Light Theme & Continuous Scrollytelling) -->
+  <link rel="stylesheet" href="css/style.css" />
+
+  <!-- GSAP & ScrollTrigger Libraries -->
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+
+  <!-- Application Logic -->
+  <script defer src="js/main.js"></script>
+</head>
+<body>
+
+  <!-- Global Apple-Style Scroll Progress Bar -->
+  <div class="global-scroll-bar" aria-hidden="true">
+    <span class="global-scroll-fill"></span>
+  </div>
+
+  <!-- ======================================================================
+       1. NAVIGATION BAR
+       ====================================================================== -->
+  <header class="site-header">
+    <div class="header-inner">
+      <a href="#" class="brand" aria-label="SceneryX Home">
+        <img src="assets/logo-header.png" alt="SceneryX" class="brand-logo" />
+      </a>
+
+      <nav class="navigation" aria-label="Main Navigation">
+        <a href="#features">Features</a>
+        <a href="#settings-unified">Settings Unified</a>
+        <a href="#scenery-hub">Scenery Hub &amp; GSX</a>
+        <a href="#optimizer">Flight Optimizer</a>
+        <a href="#ingame-panel">In-Game Panel</a>
+        <a href="#faq">FAQ</a>
+        <a href="#legal">Legal</a>
+      </nav>
+
+      <div class="header-actions">
+        <a class="button small primary" href="#download">
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 17V3"></path>
+            <path d="m6 11 6 6 6-6"></path>
+            <path d="M19 21H5"></path>
+          </svg>
+          Get Early Access &mdash; &euro;8.99
+        </a>
+        <button class="menu-button" aria-label="Toggle navigation menu" aria-expanded="false">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="4" x2="20" y1="12" y2="12"></line>
+            <line x1="4" x2="20" y1="6" y2="6"></line>
+            <line x1="4" x2="20" y1="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Mobile Drawer -->
+  <div class="mobile-nav" aria-label="Mobile Navigation Drawer">
+    <a href="#features">Features</a>
+    <a href="#settings-unified">Settings Unified (2D &amp; VR)</a>
+    <a href="#scenery-hub">Scenery Hub &amp; GSX Pro</a>
+    <a href="#optimizer">Flight Optimizer</a>
+    <a href="#ingame-panel">In-Game Cockpit Panel</a>
+    <a href="#architecture">Architecture</a>
+    <a href="#download">Get SceneryX &mdash; &euro;8.99</a>
+    <a href="#faq">FAQ</a>
+    <a href="#legal">Legal &amp; Compliance</a>
+  </div>
+
+  <main>
+    <!-- ====================================================================
+         2. HERO SECTION & SCROLLYTELLING PANELS (Full Screen Apple Showcase)
+         ==================================================================== -->
+    <section class="scrolly" id="features" aria-label="SceneryX Immersive Product Story">
+      <div class="scrolly-pin">
+        
+        <!-- Live Progress Indicator -->
+        <div class="scrolly-progress" aria-hidden="true">
+          <span class="scrolly-progress-bar"></span>
+        </div>
+        <div class="scrolly-step" aria-live="polite">01 / 03</div>
+
+        <!-- PANEL 1: Global Map & Discovery -->
+        <div class="panel panel-1">
+          <img class="panel-bg" src="assets/msfs-aerial-hub.webp" alt="Microsoft Flight Simulator 4K Aerial Hub" loading="eager" />
+          <div class="panel-scrim"></div>
+          <div class="panel-content">
+            <span class="kicker">
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path>
+                <path d="M2 12h20"></path>
+              </svg>
+              SCENERYX &middot; SMART FLIGHT OPTIMIZER &amp; SCENERY HUB
+            </span>
+            <h1>Take Control of Your Simulator.</h1>
+            <p class="panel-sub">
+              Stop digging through buried in-game menus, deciphering cryptic config files, and watching contradictory setup guides. SceneryX unifies MSFS’s most tedious, scattered performance and graphic settings into one coherent dashboard—engineered specifically to optimize both standard 2D displays and VR headsets without endless rebooting.
+            </p>
+            <div class="panel-tags">
+              <span class="pill pill-cyan">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"></path><path d="M2 12h20"></path></svg>
+                19,450 Airports Cataloged
+              </span>
+              <span class="pill pill-emerald">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
+                36 / 166 Capitals Owned (22%)
+              </span>
+              <span class="pill">
+                MSFS 2020 &amp; 2024 Ready
+              </span>
+            </div>
+            <div class="panel-cta-group">
+              <a href="#download" class="button primary">Get Early Access &mdash; &euro;8.99</a>
+              <a href="#settings-unified" class="button secondary">Explore Features</a>
+            </div>
+            <div class="scroll-hint">
+              <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 5v14"></path>
+                <path d="m19 12-7 7-7-7"></path>
+              </svg>
+              Scroll to explore flight optimization
+            </div>
+          </div>
+        </div>
+
+        <!-- PANEL 2: SimBrief Route Isolation -->
+        <div class="panel panel-2">
+          <img class="panel-bg" src="assets/msfs-ramp-ryanair.webp" alt="MSFS Apron &amp; Ramp Operations" loading="lazy" />
+          <div class="panel-scrim"></div>
+          <div class="panel-content">
+            <span class="kicker">
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="6" cy="19" r="3"></circle>
+                <path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"></path>
+                <circle cx="18" cy="5" r="3"></circle>
+              </svg>
+              ROUTE OPTIMIZATION &amp; ISOLATION
+            </span>
+            <h2>Zero Bloat. Instant Loading.</h2>
+            <p class="panel-sub">
+              Import your SimBrief flight plan and isolate only the departure, destination, alternate, and route-relevant scenery. Gigabytes of unused addons stay parked—halving initial boot times and freeing critical system RAM and VRAM for an ultra-smooth flight.
+            </p>
+            <div class="panel-tags">
+              <span class="pill pill-cyan">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path><path d="M16 21h5v-5"></path></svg>
+                SimBrief OFP Sync
+              </span>
+              <span class="pill pill-emerald">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"></path></svg>
+                +1.56 GB Memory Reclaimed
+              </span>
+              <span class="pill pill-amber">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                -54% Sim Load Time
+              </span>
+            </div>
+
+            <!-- Floating Route Corridor Status Overlay -->
+            <div class="panel-floating-corridor">
+              <div class="pfc-head">
+                <div class="pfc-title">
+                  <span class="pfc-dot"></span>
+                  <span>SIMBRIEF OFP &middot; EN-ROUTE CORRIDOR</span>
+                </div>
+                <div class="pfc-route-code">KJFK &harr; LFPG</div>
+              </div>
+              <div class="pfc-grid">
+                <div class="pfc-item">
+                  <span class="pfc-val cyan">294</span>
+                  <span class="pfc-lbl">Isolated Addons</span>
+                </div>
+                <div class="pfc-item">
+                  <span class="pfc-val emerald">+1.56 GB</span>
+                  <span class="pfc-lbl">RAM Freed</span>
+                </div>
+                <div class="pfc-item">
+                  <span class="pfc-val emerald">+368 MB</span>
+                  <span class="pfc-lbl">VRAM Freed</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PANEL 3: Dynamic Smart LOD & Dual 4K/VR -->
+        <div class="panel panel-3">
+          <img class="panel-bg" src="assets/msfs-palma-approach.webp" alt="SceneryX Smart LOD Dynamic Cockpit View" loading="lazy" />
+          <div class="panel-scrim"></div>
+          <div class="panel-content">
+            <span class="kicker">
+              <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m12 14 4-4"></path>
+                <path d="M3.34 19a10 10 0 1 1 17.32 0"></path>
+              </svg>
+              DYNAMIC SMART LOD &amp; DUAL DISPLAY
+            </span>
+            <h2>Butter-smooth landings in 4K &amp; VR</h2>
+            <p class="panel-sub">
+              Real-time SimConnect automation scales Terrain and Object LOD progressively through every flight phase. Enjoy crisp draw distances at cruise, while automatically backing off polygon load on short final to relieve the CPU MainThread bottleneck right before touchdown.
+            </p>
+            <div class="panel-tags">
+              <span class="pill pill-emerald">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"></path><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                60 FPS Target Locked
+              </span>
+              <span class="pill pill-cyan">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 14 4-4"></path><path d="M3.34 19a10 10 0 1 1 17.32 0"></path></svg>
+                Native Dynamic Smart LOD
+              </span>
+              <span class="pill pill-cyan">
+                <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+                SimConnect Live Telemetry
+              </span>
+              <span class="pill">
+                2D &amp; OpenXR VR Dedicated
+              </span>
+            </div>
+            <div class="panel-cta-group">
+              <a href="#download" class="button primary">Get SceneryX &mdash; &euro;8.99</a>
+              <a href="#optimizer" class="button secondary">See Performance Engine</a>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         3. UNIFIED SETTINGS ENGINE (2D & VR) — CONTINUOUS SCROLLY STAGE 1
+         ==================================================================== -->
+    <section class="settings-section section-padding" id="settings-unified">
+      <div class="container">
+        
+        <div class="section-header">
+          <span class="kicker">UNIFIED SETTINGS ENGINE</span>
+          <h2>One Centralized Dashboard for 2D Cockpits and VR Headsets</h2>
+          <p>
+            End the configuration nightmare. Eliminate contradictory YouTube setup tutorials, avoid manual edits to <code>UserCfg.opt</code>, and stop restarting your simulator four times just to test a single shadow setting.
+          </p>
+        </div>
+
+        <!-- Apple-Style Pinned Scrollytelling Stage -->
+        <div class="scrolly-stage-container">
+          
+          <!-- Sticky Visual: Software Window Frame -->
+          <div class="scrolly-stage-sticky">
+            <div class="window-frame">
+              <div class="window-header">
+                <div class="window-dots">
+                  <span class="dot red"></span>
+                  <span class="dot yellow"></span>
+                  <span class="dot green"></span>
+                </div>
+                <span class="window-title">SceneryX &middot; Unified Graphic Engine v1.0.4</span>
+              </div>
+
+              <!-- Interactive Toolbar Switcher -->
+              <div class="showcase-toolbar">
+                <div class="showcase-tabs" role="tablist" aria-label="Profile selector">
+                  <button class="showcase-tab active" data-view="graphics" data-mode="vr" role="tab" aria-selected="true">
+                    GRAPHICS ENGINE (2D &amp; VR)
+                  </button>
+                  <button class="showcase-tab" data-view="settings" role="tab" aria-selected="false">
+                    SCENERY PATHS &amp; SIMBRIEF
+                  </button>
+                </div>
+                <div class="pill pill-emerald">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"></path></svg>
+                  UserCfg.opt Auto-Sync &middot; Zero Reboot
+                </div>
+              </div>
+
+              <div class="window-content">
+                <img id="settings-stage-img" src="assets/visuel-win-graphics.webp" alt="SceneryX MSFS Graphic Settings Interface" loading="lazy" />
+              </div>
+
+              <!-- Dynamic Live Telemetry Metrics -->
+              <div class="live-profile-metrics">
+                <div class="metric-box">
+                  <div class="metric-label">Max Frame Rate (VR)</div>
+                  <div class="metric-value emerald" id="metric-target">30 / 90 Hz Cadence</div>
+                </div>
+                <div class="metric-box">
+                  <div class="metric-label">Dynamic Terrain LOD</div>
+                  <div class="metric-value cyan" id="metric-tlod">70 Floor &rarr; 155 Cruise</div>
+                </div>
+                <div class="metric-box">
+                  <div class="metric-label">VR Render Scale</div>
+                  <div class="metric-value" id="metric-render">100% Native (Sweet Spot)</div>
+                </div>
+                <div class="metric-box">
+                  <div class="metric-label">MainThread CPU Load</div>
+                  <div class="metric-value emerald" id="metric-latency">55% (Balanced)</div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+          <!-- Scrolling Story Steps -->
+          <div class="scrolly-stage-steps">
+            
+            <div class="story-step active" data-step="1">
+              <div class="step-num">STEP 01 / CONSOLIDATION</div>
+              <h3>One Centralized Dashboard</h3>
+              <p>
+                Replace dozens of clunky simulator sub-menus and fragile config file edits with clean, instant, responsive toggles. Everything from DLSS/FSR presets, DirectX 12 optimizations, rolling cache controls, to photogrammetry streaming is consolidated into one coherent panel.
+              </p>
+            </div>
+
+            <div class="story-step" data-step="2">
+              <div class="step-num">STEP 02 / DUAL HARDWARE FOCUS</div>
+              <h3>Tailored Dual Profiles (2D vs. VR)</h3>
+              <p>
+                Maintain separate, optimized profiles for 4K desktop flying and immersive VR sessions. Switch configurations in a single click without messing up your field of view, render scale, or OpenXR frame-timing.
+              </p>
+            </div>
+
+            <div class="story-step" data-step="3">
+              <div class="step-num">STEP 03 / AI RIG ANALYSIS</div>
+              <h3>"My Rig" Smart Auto-Tuning</h3>
+              <p>
+                Hardware-aware profiling analyzes your CPU core topology, GPU VRAM limits, and storage throughput. It dynamically balances CPU draw calls against GPU rasterization based on your exact hardware, eliminating guesswork.
+              </p>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         4. THE NEXT-GEN SCENERY HUB — CONTINUOUS SCROLLY STAGE 2
+         ==================================================================== -->
+    <section class="hub-section section-padding" id="scenery-hub">
+      <div class="container">
+        
+        <div class="section-header">
+          <span class="kicker">LIBRARY INTELLIGENCE &amp; ADDON TOOLS</span>
+          <h2>The Next-Gen Scenery Hub &amp; GSX Pro Engine</h2>
+          <p>
+            Bypass the sluggish native Content Manager. Manage your Community folders, Official packages, and cloud assets with total clarity and zero conflict.
+          </p>
+        </div>
+
+        <div class="scrolly-stage-container reverse">
+          
+          <!-- Scrolling Story Steps (Left) -->
+          <div class="scrolly-stage-steps">
+            
+            <div class="story-step active" data-step="1">
+              <div class="step-num">FEATURE 01 / VISIBILITY</div>
+              <h3>Marketplace vs. Local Package De-anonymization</h3>
+              <p>
+                Cut through the opaque simulator Content Manager. SceneryX establishes a clear visual distinction between physical packages (<code>Community</code>, <code>Official</code>) and encrypted/streamed MSFS 2024 assets (<code>StreamedPackages</code>). Gain instant visibility into what is installed locally, cached on NVMe, or streaming over your connection.
+              </p>
+            </div>
+
+            <div class="story-step" data-step="2">
+              <div class="step-num">FEATURE 02 / AUTOMATION</div>
+              <h3>Instant Drag-and-Drop GSX Pro Engine</h3>
+              <p>
+                Drag and drop <code>.ini</code> files or <code>.zip</code> archives directly into SceneryX. Our heuristic parser automatically identifies the matching airport and publisher variant (distinguishing default Asobo from Flightbeam or iniBuilds), auto-placing it into <code>%APPDATA%\Virtuali\GSX</code>. It audits and cleans corrupted profiles automatically.
+              </p>
+            </div>
+
+            <div class="story-step" data-step="3">
+              <div class="step-num">FEATURE 03 / STABILITY</div>
+              <h3>Conflict &amp; Duplicate Airport Detector</h3>
+              <p>
+                Continuous real-time scanning catches overlapping BGL files, duplicate ICAO codes, and competing airport boundaries (such as default World Update scenery colliding with payware). Flashing visual warning badges and 1-click conflict arbitration permanently eliminate elevation tears, flickering textures, and double runways.
+              </p>
+            </div>
+
+            <div class="story-step" data-step="4">
+              <div class="step-num">FEATURE 04 / CONVENIENCE</div>
+              <h3>Direct Store &amp; Community Gateways</h3>
+              <p>
+                Access 1-click direct links to the original Flightsim.to download pages (for freeware) or official publisher stores (simMarket, Orbx, Flightbeam, iniBuilds, Aerosoft, Contrail) straight from the airport card. Review release notes and inspect pricing effortlessly.
+              </p>
+            </div>
+
+          </div>
+
+          <!-- Sticky Visual Window (Right) -->
+          <div class="scrolly-stage-sticky">
+            <div class="window-frame hub-showcase-window">
+              <div class="window-header">
+                <div class="window-dots">
+                  <span class="dot red"></span>
+                  <span class="dot yellow"></span>
+                  <span class="dot green"></span>
+                </div>
+                <span class="window-title">SceneryX &middot; Scenery Hub &amp; Addon Radar</span>
+              </div>
+
+              <!-- View Switcher -->
+              <div class="showcase-toolbar">
+                <div class="showcase-tabs" role="tablist" aria-label="Scenery Hub View">
+                  <button class="showcase-tab active hub-tab" data-hub-view="inspector" role="tab" aria-selected="true">
+                    AIRPORT INSPECTOR &amp; GSX
+                  </button>
+                  <button class="showcase-tab hub-tab" data-hub-view="radial" role="tab" aria-selected="false">
+                    RADIAL FILTER WHEEL
+                  </button>
+                </div>
+                <div class="pill pill-cyan">
+                  GSX Heuristic Matcher
+                </div>
+              </div>
+
+              <!-- VIEW 1: Airport Inspector & GSX Composite -->
+              <div class="window-content hub-view-content" id="hub-view-inspector">
+                <div class="hub-composite-stage">
+                  <img src="assets/visuel-country-france.webp" alt="SceneryX Regional Country Map" class="hub-bg-map" loading="lazy" />
+                  
+                  <!-- Overlapping Card 1: Airport Details & GSX Drag-and-drop -->
+                  <div class="hub-overlay-card hub-card-details">
+                    <img src="assets/visuel-win-airport-details.webp" alt="Airport Details &amp; GSX Profile Matcher" loading="lazy" />
+                  </div>
+                  
+                  <!-- Overlapping Card 2: Addons & StreamedPackages vs Store -->
+                  <div class="hub-overlay-card hub-card-addons">
+                    <img src="assets/visuel-win-addons.webp" alt="Available Addons and Marketplace distinction" loading="lazy" />
+                  </div>
+                </div>
+              </div>
+
+              <!-- VIEW 2: Radial Multi-Criteria Filter Wheel -->
+              <div class="window-content hub-view-content" id="hub-view-radial" style="display: none;">
+                <div class="radial-grid-stage">
+                  <div class="radial-card">
+                    <div class="radial-label">AIRPORT CLASSIFICATION WHEEL</div>
+                    <img src="assets/visuel-radial-types.webp" alt="Radial Airport Type Filter" loading="lazy" />
+                  </div>
+                  <div class="radial-card">
+                    <div class="radial-label">PRICING &amp; SOURCE MODEL WHEEL</div>
+                    <img src="assets/visuel-radial-pricing.webp" alt="Radial Pricing &amp; Source Filter" loading="lazy" />
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         5. FLIGHT OPTIMIZER & PERFORMANCE ENGINE — CONTINUOUS SCROLLY STAGE 3
+         ==================================================================== -->
+    <section class="optimizer-section section-padding" id="optimizer">
+      <div class="container">
+        
+        <div class="section-header">
+          <span class="kicker">PERFORMANCE ENGINE &middot; HARDWARE EFFICIENCY</span>
+          <h2>Cure the MainThread CPU Bottleneck for Good</h2>
+          <p>
+            Why GPU upgrades don't fix landing stutters—and how SceneryX dynamically restores CPU headroom when you need it most.
+          </p>
+        </div>
+
+        <div class="scrolly-stage-container">
+          
+          <!-- Sticky Visual Window (Left) -->
+          <div class="scrolly-stage-sticky">
+            <div class="window-frame">
+              <div class="window-header">
+                <div class="window-dots">
+                  <span class="dot red"></span>
+                  <span class="dot yellow"></span>
+                  <span class="dot green"></span>
+                </div>
+                <span class="window-title">SceneryX &middot; Transatlantic Route Corridor &amp; SimBrief Isolation</span>
+              </div>
+              <div class="window-content optimizer-stage-content">
+                <img src="assets/visuel-flight-optimization.webp" alt="SceneryX Flight Route Optimization KJFK to LFPG" loading="lazy" />
+              </div>
+              <div class="live-profile-metrics optimizer-metrics">
+                <div class="metric-box">
+                  <div class="metric-label">Route Corridor</div>
+                  <div class="metric-value cyan">KJFK &harr; LFPG</div>
+                </div>
+                <div class="metric-box">
+                  <div class="metric-label">Scenery Isolation</div>
+                  <div class="metric-value emerald">294 Addons Active</div>
+                </div>
+                <div class="metric-box">
+                  <div class="metric-label">Memory Reclaimed</div>
+                  <div class="metric-value emerald">+1.56 GB RAM</div>
+                </div>
+                <div class="metric-box">
+                  <div class="metric-label">Touchdown Framerate</div>
+                  <div class="metric-value emerald">60 FPS Locked</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Scrolling Story Steps (Right) -->
+          <div class="scrolly-stage-steps">
+            
+            <div class="story-step active" data-step="1">
+              <div class="step-num">PILLAR 01 / CPU HEADROOM</div>
+              <h3>MainThread CPU Bottleneck Solution</h3>
+              <p>
+                When approaching dense international hubs, thousands of airport buildings, ground traffic assets, and terrain meshes flood a single CPU thread with draw calls. Even on an RTX 4090, if the MainThread latency spikes above 16.6ms, your frames drop to a stuttering halt. SceneryX dynamically relieves this burden before the bottleneck can form.
+              </p>
+            </div>
+
+            <div class="story-step" data-step="2">
+              <div class="step-num">PILLAR 02 / SMART MEMORY</div>
+              <h3>SimBrief Flight Corridor Isolation</h3>
+              <p>
+                Why load 300 gigabytes of sceneries in Tokyo and Sydney when you are flying London to Paris? SceneryX imports your active SimBrief OFP, draws a tactical virtual buffer around your route, and isolates only the departure, arrival, alternate, and en-route scenery packages. Unused addons remain parked, reclaiming up to 14+ GB of system memory.
+              </p>
+            </div>
+
+            <div class="story-step" data-step="3">
+              <div class="step-num">PILLAR 03 / SIMCONNECT AUTOMATION</div>
+              <h3>Smart Dynamic LOD (Level of Detail)</h3>
+              <p>
+                Through real-time SimConnect altitude automation, SceneryX dynamically governs Terrain LOD (TLOD) and Object LOD (OLOD). Enjoy crisp, sweeping 300+ TLOD draw distances at FL370 cruise altitude. As you descend through 3,000 ft AGL towards short final, SceneryX gently reduces draw distance, guaranteeing smooth 60 FPS touchdowns.
+              </p>
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         6. IN-GAME PANEL & LIVE TELEMETRY — CONTINUOUS SCROLLY STAGE 4
+         ==================================================================== -->
+    <section class="panel-section section-padding" id="ingame-panel">
+      <div class="container">
+        
+        <div class="section-header">
+          <span class="kicker">IN-GAME TOOLBAR WIDGET</span>
+          <h2>Cockpit Telemetry and Controls. Zero Alt-Tabbing.</h2>
+          <p>
+            Native integration into the MSFS Top Toolbar. Monitor simulator performance, override dynamic LOD values, and switch profiles right from the captain's seat in both 2D monitors and VR headsets.
+          </p>
+        </div>
+
+        <div class="scrolly-stage-container reverse">
+          
+          <!-- Scrolling Story Steps (Left) -->
+          <div class="scrolly-stage-steps">
+            
+            <div class="story-step active" data-step="1">
+              <div class="step-num">WIDGET 01 / DUAL IMMERSION</div>
+              <h3>Native Toolbar Widget (2D &amp; VR)</h3>
+              <p>
+                Designed for full immersion. Operates cleanly in standard desktop windows or floating inside your VR headset cockpit with direct VR controller interaction and zero need to take off your headset.
+              </p>
+            </div>
+
+            <div class="story-step" data-step="2">
+              <div class="step-num">WIDGET 02 / IN-FLIGHT OVERRIDE</div>
+              <h3>Live Smart LOD Adjustments</h3>
+              <p>
+                Inspect real-time AGL altitude and make immediate LOD adjustments inside the cockpit. Switch presets on the fly: Cruise, Approach, Short Final, or Locked 60 FPS.
+              </p>
+            </div>
+
+            <div class="story-step" data-step="3">
+              <div class="step-num">WIDGET 03 / DIAGNOSTICS</div>
+              <h3>Interactive Telemetry Dashboard</h3>
+              <p>
+                Live frametime oscilloscope tracking CPU MainThread latency against GPU render intervals, live frame rates, and micro-stutter occurrence count with absolute precision.
+              </p>
+            </div>
+
+          </div>
+
+          <!-- Sticky Visual Window (Right) -->
+          <div class="scrolly-stage-sticky">
+            <div class="window-frame telemetry-window-frame">
+              <div class="window-header">
+                <div class="window-dots">
+                  <span class="dot red"></span>
+                  <span class="dot yellow"></span>
+                  <span class="dot green"></span>
+                </div>
+                <span class="window-title">MSFS Flight Telemetry &middot; KEWR &rarr; KJFK (A220-300)</span>
+              </div>
+
+              <!-- Interactive Telemetry Tabs -->
+              <div class="showcase-toolbar">
+                <div class="showcase-tabs" role="tablist" aria-label="Telemetry View">
+                  <button class="showcase-tab active report-tab" data-report-view="1" role="tab" aria-selected="true">
+                    TELEMETRY REPORT
+                  </button>
+                  <button class="showcase-tab report-tab" data-report-view="2" role="tab" aria-selected="false">
+                    DEEP BENCHMARK OSCILLOSCOPE
+                  </button>
+                </div>
+                <div class="pill pill-amber">
+                  SimConnect Real-Time Log
+                </div>
+              </div>
+
+              <div class="window-content telemetry-content-wrap">
+                <img id="telemetry-stage-img" src="assets/visuel-win-report1.webp" alt="SceneryX Flight Report and Telemetry" loading="lazy" />
+              </div>
+
+              <!-- Live Profile Metrics -->
+              <div class="live-profile-metrics">
+                <div class="metric-box">
+                  <div class="metric-label">Detected Bottleneck</div>
+                  <div class="metric-value amber">MainThread Limited (33.5ms)</div>
+                </div>
+                <div class="metric-box">
+                  <div class="metric-label">VRAM Peak Load</div>
+                  <div class="metric-value amber">15.4 GB (94.1% Paging Risk)</div>
+                </div>
+                <div class="metric-box">
+                  <div class="metric-label">Average Framerate</div>
+                  <div class="metric-value emerald">59.7 FPS Locked</div>
+                </div>
+                <div class="metric-box">
+                  <div class="metric-label">GPU / CPU Thermals</div>
+                  <div class="metric-value">69.0&deg;C / 52.4&deg;C</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         7. UNDER THE HOOD: 100% NON-DESTRUCTIVE ARCHITECTURE
+         ==================================================================== -->
+    <section class="architecture-section section-padding" id="architecture">
+      <div class="container">
+        
+        <div class="section-header">
+          <span class="kicker">UNDER THE HOOD &middot; INTEGRITY FIRST</span>
+          <h2>100% Non-Destructive Architecture</h2>
+          <p>
+            Your simulator installation is sacred. SceneryX operates with complete architectural safety—no permanent file tampering, no folder renaming risks, and zero background baggage.
+          </p>
+        </div>
+
+        <div class="arch-pipeline">
+          
+          <div class="arch-card">
+            <div class="arch-step-badge">STEP 01</div>
+            <h3>Zero Folder Renaming</h3>
+            <p>
+              Unlike legacy addon managers that rename physical folders (risking orphaned dependencies or broken symlinks), SceneryX leaves your file system and directories 100% untouched.
+            </p>
+          </div>
+
+          <div class="arch-card">
+            <div class="arch-step-badge">STEP 02</div>
+            <h3>Dedicated Session Manifest</h3>
+            <p>
+              SceneryX orchestrates scenery activation via safe, dedicated session <code>Content.xml</code> manifests. The official simulator core configuration remains untouched and read-only.
+            </p>
+          </div>
+
+          <div class="arch-card">
+            <div class="arch-step-badge">STEP 03</div>
+            <h3>SimConnect In-Memory Scaling</h3>
+            <p>
+              LOD transitions and graphics scaling occur dynamically in runtime memory through official SimConnect APIs. No binary patching or persistent file alterations.
+            </p>
+          </div>
+
+          <div class="arch-card">
+            <div class="arch-step-badge">STEP 04</div>
+            <h3>1-Click Instant Reset</h3>
+            <p>
+              Close SceneryX after setup with settings persisting, or click "Restore All" at any time to instantly revert your entire library to its original state in under one second.
+            </p>
+          </div>
+
+        </div>
+
+        <div class="window-frame">
+          <div class="window-header">
+            <div class="window-dots">
+              <span class="dot red"></span>
+              <span class="dot yellow"></span>
+              <span class="dot green"></span>
+            </div>
+            <span class="window-title">SceneryX &middot; Non-Destructive Scenery Paths &amp; SimBrief Configuration</span>
+          </div>
+          <div class="window-content architecture-window-content">
+            <div class="arch-split-view">
+              <div class="arch-split-text">
+                <span class="kicker">ISOLATED SESSION MANAGEMENT</span>
+                <h3>Preserving Your Simulator Root Integrity</h3>
+                <p>
+                  SceneryX reads and organizes sceneries across five independent storage roots: Community, Community2024, StreamedPackages, Official2020, and Official2024. Your physical game folders and binaries remain completely untouched and read-only.
+                </p>
+                <div class="arch-features-list">
+                  <div class="arch-feat-item">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"></path></svg>
+                    <span>Automatic package scan on startup without simulator reboots</span>
+                  </div>
+                  <div class="arch-feat-item">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"></path></svg>
+                    <span>SimBrief API token synchronization with live connected status</span>
+                  </div>
+                  <div class="arch-feat-item">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"></path></svg>
+                    <span>1-click "Reset Database" emergency safety fallback</span>
+                  </div>
+                </div>
+              </div>
+              <div class="arch-split-img">
+                <img src="assets/visuel-win-settings.webp" alt="SceneryX Settings &amp; Configuration Window" loading="lazy" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         7B. MSFS 4K IN-SIM SCENERY SHOWCASE
+         ==================================================================== -->
+    <section class="gallery-section section-padding" id="gallery">
+      <div class="container">
+        
+        <div class="section-header">
+          <span class="kicker">REAL IN-SIM PERFORMANCE &middot; 4K &amp; VR</span>
+          <h2>Tested on Flight Simulation's Most Demanding Sceneries</h2>
+          <p>
+            From dense international hubs with hundreds of jetways to heavy photogrammetry cities, SceneryX sustains 60 FPS locked where vanilla MSFS stutters.
+          </p>
+        </div>
+
+        <div class="scenery-gallery-grid">
+          
+          <div class="scenery-card">
+            <div class="scenery-card-img-wrap">
+              <img src="assets/msfs-dubai-emirates.webp" alt="Dubai OMDB SceneryX Optimization" loading="lazy" />
+              <span class="scenery-badge">OMDB &middot; DUBAI INT'L</span>
+            </div>
+            <div class="scenery-card-body">
+              <h4>Dubai International (OMDB)</h4>
+              <p>Locked 60 FPS under massive terminal polygon loads, dynamic jetways, and AI heavy traffic.</p>
+              <div class="scenery-meta">
+                <span class="pill pill-emerald">0 MainThread Stutters</span>
+                <span class="pill pill-cyan">4K Ultra DLSS</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="scenery-card">
+            <div class="scenery-card-img-wrap">
+              <img src="assets/msfs-palma-approach.webp" alt="Palma de Mallorca LEPA SceneryX Optimization" loading="lazy" />
+              <span class="scenery-badge">LEPA &middot; PALMA DE MALLORCA</span>
+            </div>
+            <div class="scenery-card-body">
+              <h4>Palma de Mallorca (LEPA)</h4>
+              <p>Dynamic Smart LOD reduces terrain draw calls on short final for a silky-smooth touchdown.</p>
+              <div class="scenery-meta">
+                <span class="pill pill-emerald">14.2 ms Frame Timing</span>
+                <span class="pill pill-cyan">Dynamic Smart LOD</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="scenery-card">
+            <div class="scenery-card-img-wrap">
+              <img src="assets/msfs-ramp-ryanair.webp" alt="Busy European Hub Ramp Operations" loading="lazy" />
+              <span class="scenery-badge">RAMP &middot; GSX PRO READY</span>
+            </div>
+            <div class="scenery-card-body">
+              <h4>Busy Apron &amp; Concourse Ramp</h4>
+              <p>Automated GSX Pro profile matching and isolated route sceneries eliminate apron frame drops.</p>
+              <div class="scenery-meta">
+                <span class="pill pill-emerald">GSX Profile Matched</span>
+                <span class="pill pill-cyan">-54% Sim Load Time</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="scenery-card">
+            <div class="scenery-card-img-wrap">
+              <img src="assets/msfs-heraklion-terminal.webp" alt="Heraklion LGIR SceneryX Optimization" loading="lazy" />
+              <span class="scenery-badge">LGIR &middot; HERAKLION CRETE</span>
+            </div>
+            <div class="scenery-card-body">
+              <h4>Heraklion N. Kazantzakis (LGIR)</h4>
+              <p>Crisp terminal architecture and ground textures rendered without memory leaks.</p>
+              <div class="scenery-meta">
+                <span class="pill pill-emerald">+1.56 GB RAM Freed</span>
+                <span class="pill pill-cyan">Zero VRAM Paging</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         8. PRICING & EARLY ACCESS (Conversion Section — Apple Style)
+         ==================================================================== -->
+    <section class="pricing" id="download">
+      <div class="pricing-card">
+        
+        <div class="pricing-emblem">
+          <svg xmlns="http://www.w3.org/2000/svg" width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect width="20" height="14" x="2" y="3" rx="2"></rect>
+            <line x1="8" x2="16" y1="21" y2="21"></line>
+            <line x1="12" x2="12" y1="17" y2="21"></line>
+          </svg>
+          <strong>SceneryX</strong>
+          <span>WINDOWS DESKTOP UTILITY</span>
+        </div>
+
+        <span class="kicker">YOUR NEXT FLIGHT STARTS HERE</span>
+        <h2>Provisional Early Access Launch Price: &euro;8.99</h2>
+        
+        <p class="pricing-sub">
+          Built for Windows 10 / 11. 100% non-destructive. Full lifetime access to the desktop application, in-game cockpit panel, and the complete Flight Optimizer suite, with ongoing updates and no mandatory monthly subscription.
+        </p>
+
+        <div class="pricing-badge">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"></path>
+            <circle cx="7.5" cy="7.5" r=".5" fill="currentColor"></circle>
+          </svg>
+          Provisional Launch Price: &euro;8.99 on Lemon Squeezy &middot; Instant Windows License
+        </div>
+
+        <a class="button primary pricing-cta" href="mailto:contact.sidestickpriority@gmail.com?subject=SceneryX%20Early%20Access%20Purchase%20Inquiry">
+          Get SceneryX &mdash; &euro;8.99
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M5 12h14"></path>
+            <path d="m12 5 7 7-7 7"></path>
+          </svg>
+        </a>
+
+        <p class="pricing-note">
+          Secure checkout via Lemon Squeezy. Instant Windows license delivered straight to your email.
+        </p>
+
+        <div class="pricing-trust">
+          <span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"></path><path d="m9 12 2 2 4-4"></path></svg>
+            100% Non-Destructive
+          </span>
+          <span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="3" rx="2"></rect><line x1="8" x2="16" y1="21" y2="21"></line><line x1="12" x2="12" y1="17" y2="21"></line></svg>
+            MSFS 2020 &amp; 2024 Ready
+          </span>
+          <span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"></path><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"></circle></svg>
+            &euro;8.99 Lifetime License
+          </span>
+          <span>
+            <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path><path d="M16 21h5v-5"></path></svg>
+            Free Updates Included
+          </span>
+        </div>
+
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         9. FAQ (Frequently Asked Questions)
+         ==================================================================== -->
+    <section class="faq-section section-padding" id="faq">
+      <div class="container">
+        
+        <div class="section-header">
+          <span class="kicker">QUESTIONS &amp; ANSWERS</span>
+          <h2>Frequently Asked Questions</h2>
+          <p>
+            Detailed, technical answers to common questions about SceneryX architecture, performance optimizations, and simulator compatibility.
+          </p>
+        </div>
+
+        <div class="faq-list">
+          
+          <!-- Q1 -->
+          <div class="faq-item">
+            <button class="faq-question" aria-expanded="false">
+              <span>How does SceneryX unify MSFS settings for both 2D displays and VR?</span>
+              <span class="faq-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+              </span>
+            </button>
+            <div class="faq-answer">
+              <div class="faq-answer-inner">
+                MSFS natively combines desktop and VR rendering parameters into buried sub-menus, requiring pilots to manually edit the <code>UserCfg.opt</code> file or endure multiple simulator restarts. SceneryX introduces an independent dual-profile system. You can establish crisp 4K desktop parameters (DLSS Quality, ultra shadows, high TLOD) for standard monitor flying, while maintaining a dedicated OpenXR configuration (foveated rendering, custom per-eye render resolution, motion reprojection toggles) for your VR headset. SceneryX synchronizes these settings safely with zero risk of config corruption and without requiring repeated simulator reboots.
+              </div>
+            </div>
+          </div>
+
+          <!-- Q2 -->
+          <div class="faq-item">
+            <button class="faq-question" aria-expanded="false">
+              <span>How does SceneryX manage MSFS 2024 streamed packages versus local sceneries?</span>
+              <span class="faq-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+              </span>
+            </button>
+            <div class="faq-answer">
+              <div class="faq-answer-inner">
+                Microsoft Flight Simulator 2024 stores streamed assets in cloud-managed <code>StreamedPackages</code> containers labeled with cryptic cryptographic GUIDs. The native simulator Content Manager gives you no clear distinction between what is cached on disk and what streams over the wire. SceneryX de-anonymizes these packages by inspecting simulator manifest caches. It clearly displays whether an airport is hosted on your local NVMe drive (<code>Community</code> or <code>Official</code>) or streamed from the cloud. This gives you absolute control to prioritize high-fidelity local payware over low-resolution streamed photogrammetry and prevents duplicate scenery collisions.
+              </div>
+            </div>
+          </div>
+
+          <!-- Q3 -->
+          <div class="faq-item">
+            <button class="faq-question" aria-expanded="false">
+              <span>How does the automatic GSX Pro profile matching work?</span>
+              <span class="faq-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+              </span>
+            </button>
+            <div class="faq-answer">
+              <div class="faq-answer-inner">
+                SceneryX includes a specialized heuristic parser for GSX Pro configuration files. When you drag and drop any <code>.ini</code> or <code>.zip</code> profile into SceneryX, the engine reads the airport ICAO, terminal gates, parking positions, and author signature. It automatically differentiates between default Asobo airports and third-party payware editions (e.g. Flightbeam, Pyreegue, or iniBuilds), moving the profile into the exact folder path at <code>%APPDATA%\Virtuali\GSX\MSFS</code>. Furthermore, SceneryX runs a health audit to identify and eliminate obsolete, duplicate, or corrupted GSX profile files.
+              </div>
+            </div>
+          </div>
+
+          <!-- Q4 -->
+          <div class="faq-item">
+            <button class="faq-question" aria-expanded="false">
+              <span>Why doesn't SceneryX include flight planning or airport charts?</span>
+              <span class="faq-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+              </span>
+            </button>
+            <div class="faq-answer">
+              <div class="faq-answer-inner">
+                We believe in doing one thing with world-class excellence rather than building mediocre imitations of established platforms. Tools like SimBrief and Navigraph already provide industry-leading navdata, flight dispatching, and georeferenced airport charts. Instead of bloating our binary with redundant charting code, SceneryX connects directly to your existing SimBrief account via API. We import your active Operational Flight Plan (OFP) to build the scenery flight corridor and telemetry benchmarks, keeping SceneryX ultra-lightweight, lightning-fast, and focused on scenery management and real-time simulator performance.
+              </div>
+            </div>
+          </div>
+
+          <!-- Q5 -->
+          <div class="faq-item">
+            <button class="faq-question" aria-expanded="false">
+              <span>Does SceneryX modify my simulator installation files permanently?</span>
+              <span class="faq-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+              </span>
+            </button>
+            <div class="faq-answer">
+              <div class="faq-answer-inner">
+                No, absolutely not. SceneryX is built from the ground up on a 100% non-destructive architecture. We never modify core simulator game files, alter official binaries, or rename folders on your storage drives. Scenery prioritization is managed via isolated session <code>Content.xml</code> manifests, while Dynamic Smart LOD scaling operates exclusively in runtime memory through official SimConnect APIs. Closing SceneryX or clicking the "Restore All" button instantly restores your simulator to its factory configuration in under one second.
+              </div>
+            </div>
+          </div>
+
+          <!-- Q6 -->
+          <div class="faq-item">
+            <button class="faq-question" aria-expanded="false">
+              <span>Is SceneryX fully compatible with complex airliners?</span>
+              <span class="faq-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"></path></svg>
+              </span>
+            </button>
+            <div class="faq-answer">
+              <div class="faq-answer-inner">
+                Yes, study-level airliners (such as the Fenix A320/A321, PMDG 737/777, FlyByWire A380X, iniBuilds A300/A350, and TFDi MD-11) are where SceneryX provides the most dramatic benefits. High-fidelity airliners place heavy demands on your CPU MainThread for complex avionics, custom fly-by-wire physics, and dual EFBs. By dynamically scaling back Terrain LOD on short final and parking unneeded sceneries via SimBrief isolation, SceneryX frees crucial CPU headroom right when you disconnect the autopilot for manual flare and touchdown.
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </section>
+  </main>
+
+  <!-- ======================================================================
+       10. FOOTER & LEGAL DISCLAIMER (Apple Style)
+       ====================================================================== -->
+  <footer class="site-footer" id="legal">
+    <div class="footer-grid">
+      
+      <!-- Brand & Summary -->
+      <div class="footer-brand-col">
+        <a href="#" class="brand" aria-label="SceneryX Home">
+          <img src="assets/logo-header.png" alt="SceneryX" class="footer-brand-logo" />
+        </a>
+        <p>
+          Smart scenery. Smoother skies.<br />
+          Your flight, without the friction.
+        </p>
+        <small>&copy; 2026 SceneryX / SideStick Priority.<br />All rights reserved.</small>
+      </div>
+
+      <!-- Flight Operations Links -->
+      <div class="footer-col">
+        <h3>FLIGHT OPERATIONS</h3>
+        <a href="#features">Features Overview</a>
+        <a href="#settings-unified">Settings Unified (2D &amp; VR)</a>
+        <a href="#scenery-hub">Scenery Hub &amp; GSX Engine</a>
+        <a href="#optimizer">Flight Optimizer</a>
+        <a href="#ingame-panel">In-Game Cockpit Panel</a>
+        <a href="#architecture">Architecture &amp; Safety</a>
+        <a href="#faq">Frequently Asked Questions</a>
+      </div>
+
+      <!-- Legal & Compliance Links -->
+      <div class="footer-col">
+        <h3>LEGAL &amp; COMPLIANCE</h3>
+        <a href="#legal">Privacy Policy</a>
+        <a href="#legal">Terms of Service</a>
+        <a href="#legal">End User License Agreement (EULA)</a>
+        <a href="mailto:contact.sidestickpriority@gmail.com">Contact: contact.sidestickpriority@gmail.com</a>
+        <div class="footer-status">
+          <i></i> MSFS 2020 &amp; 2024 Compatible &middot; SimConnect Live
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Prominent Non-Affiliation Disclaimer -->
+    <div class="disclaimer">
+      SceneryX is an independent third-party companion utility developed by SideStick Priority. SceneryX is not affiliated with, endorsed by, authorized, or sponsored by Microsoft Corporation, Asobo Studio, FSDreamTeam, Navigraph, or any aircraft or scenery publisher. Microsoft Flight Simulator and MSFS are registered trademarks of Microsoft Corporation. All third-party trademarks and trade names are the property of their respective owners. For flight simulation and entertainment use only.
+    </div>
+  </footer>
+
+</body>
+</html>

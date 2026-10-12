@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SceneryX - Privacy Policy & Local Data Commitment</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #0b0f19; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(15, 23, 42, 0.6); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(51, 65, 85, 0.8); border-radius: 9999px; }
+    </style>
+</head>
+<body class="text-slate-300 font-sans p-6 md:p-10 max-w-4xl mx-auto custom-scrollbar leading-relaxed">
+    <header class="border-b border-slate-800 pb-5 mb-8 flex items-center justify-between">
+        <div>
+            <div class="flex items-center gap-2 mb-1">
+                <span class="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-slate-800 text-slate-300 border border-slate-700 uppercase tracking-wider">Privacy &amp; Data</span>
+                <span class="text-slate-400 text-xs font-mono font-normal">Last Updated: October 2026</span>
+            </div>
+            <h1 class="text-2xl font-bold text-slate-100 tracking-tight">Privacy Policy &amp; Local Data Commitment</h1>
+            <p class="text-xs text-slate-400 font-mono font-normal mt-0.5">Author &amp; Licensor: Sidestick Priority • Software: SceneryX</p>
+        </div>
+    </header>
+
+    <div class="p-4 rounded-xl bg-slate-900 border border-slate-800 text-xs text-slate-300 mb-8 space-y-2">
+        <p class="font-bold text-slate-100">OUR CORE COMMITMENT: ABSOLUTE PRIVACY FOR FLIGHT SIMULATOR PILOTS.</p>
+        <p class="font-normal text-slate-300">SceneryX operates on a strict <strong class="text-slate-100 font-bold">Local-First, Zero-Surveillance</strong> architecture. We do not track, collect, monetize, or sell your personal data or flight simulator habits.</p>
+    </div>
+
+    <main class="space-y-6 text-sm">
+        <section class="space-y-2">
+            <h2 class="text-base font-bold text-slate-100 uppercase tracking-wide">1. Zero Personal Data Collection</h2>
+            <ul class="list-disc list-inside space-y-1.5 pl-2 text-slate-300 font-normal">
+                <li><strong class="text-slate-100 font-bold">No Data Harvesting:</strong> SceneryX does not collect, scrape, store, or sell any personal data, email addresses, or system identifiers.</li>
+                <li><strong class="text-slate-100 font-bold">No Hardware Fingerprinting:</strong> No unique device IDs or Windows registry user profiles are transmitted to any central tracking servers.</li>
+                <li><strong class="text-slate-100 font-bold">No Behavioral Analytics:</strong> Zero telemetry trackers, zero tracking pixels, and zero third-party advertising SDKs are embedded in the application.</li>
+            </ul>
+        </section>
+
+        <section class="space-y-2">
+            <h2 class="text-base font-bold text-slate-100 uppercase tracking-wide">2. Local Data Storage Architecture</h2>
+            <p class="font-normal text-slate-300">All configuration files, scanned sceneries, and ratings are stored exclusively on your local disk:</p>
+            <div class="space-y-2 my-2 font-mono text-xs">
+                <div class="p-2.5 rounded bg-slate-950 border border-slate-800 flex items-center justify-between">
+                    <span class="text-slate-200 font-semibold">%APPDATA%\SceneryX\settings.json</span>
+                    <span class="text-slate-400 font-normal">UI preferences, camera speeds, startup region</span>
+                </div>
+                <div class="p-2.5 rounded bg-slate-950 border border-slate-800 flex items-center justify-between">
+                    <span class="text-slate-200 font-semibold">%APPDATA%\SceneryX\installed_airports.json</span>
+                    <span class="text-slate-400 font-normal">Local scenery index cache</span>
+                </div>
+                <div class="p-2.5 rounded bg-slate-950 border border-slate-800 flex items-center justify-between">
+                    <span class="text-slate-200 font-semibold">%APPDATA%\SceneryX\ratings.json</span>
+                    <span class="text-slate-400 font-normal">User star ratings (1 to 5 stars)</span>
+                </div>
+                <div class="p-2.5 rounded bg-slate-950 border border-slate-800 flex items-center justify-between">
+                    <span class="text-slate-200 font-semibold">%APPDATA%\SceneryX\custom_prices.json</span>
+                    <span class="text-slate-400 font-normal">Manual price overrides</span>
+                </div>
+                <div class="p-2.5 rounded bg-slate-950 border border-slate-800 flex items-center justify-between">
+                    <span class="text-slate-200 font-semibold">%APPDATA%\SceneryX\library_snapshot.json</span>
+                    <span class="text-slate-400 font-normal">Delta tracking hashes for fast startup</span>
+                </div>
+            </div>
+            <p class="text-xs text-slate-400 font-mono font-normal">None of these files are ever synced to external servers or cloud repositories.</p>
+        </section>
+
+        <section class="space-y-2">
+            <h2 class="text-base font-bold text-slate-100 uppercase tracking-wide">3. Third-Party APIs &amp; External Services</h2>
+            <p><strong class="text-slate-100 font-bold">3.1. SimBrief (Navigraph):</strong> <span class="font-normal text-slate-300">SceneryX connects to SimBrief's public API strictly using your public </span><strong class="text-slate-100 font-bold">Pilot ID or Username</strong><span class="font-normal text-slate-300"> to download active Operational Flight Plan (OFP) routes. We never request, process, or store your account password.</span></p>
+            <p><strong class="text-slate-100 font-bold">3.2. Lemon Squeezy (License Activation):</strong> <span class="font-normal text-slate-300">When verifying software activation keys, SceneryX communicates directly with Lemon Squeezy over encrypted HTTPS (</span><code class="text-slate-200 font-mono font-semibold text-xs px-1 py-0.5 rounded bg-slate-950 border border-slate-800">api.lemonsqueezy.com</code><span class="font-normal text-slate-300">). SceneryX never collects, handles, or stores any credit cards, banking details, or billing addresses.</span></p>
+            <p><strong class="text-slate-100 font-bold">3.3. Store Lookups (Flightsim.to, Orbx, Contrail):</strong> <span class="font-normal text-slate-300">Clicking store links opens search URLs directly inside your default web browser without passing telemetry.</span></p>
+        </section>
+
+        <section class="space-y-2">
+            <h2 class="text-base font-bold text-slate-100 uppercase tracking-wide">4. User Rights &amp; Complete Data Deletion</h2>
+            <p class="font-normal text-slate-300">You maintain 100% ownership and control over your data. To permanently erase all SceneryX data, simply delete the local folder:</p>
+            <div class="p-3 rounded bg-slate-950 border border-slate-800 font-mono text-xs text-slate-200 font-semibold">
+                %APPDATA%\SceneryX\
+            </div>
+            <p class="text-xs text-slate-400 font-normal">Deleting this folder immediately and permanently purges all local settings, indexes, ratings, and snapshots from your computer.</p>
+        </section>
+    </main>
+
+    <footer class="mt-12 pt-5 border-t border-slate-800 text-xs text-slate-500 flex items-center justify-between font-mono font-normal">
+        <span>© 2026 Sidestick Priority. All Rights Reserved.</span>
+        <span>SceneryX Privacy Architecture</span>
+    </footer>
+</body>
+</html>

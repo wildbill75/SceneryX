@@ -23,6 +23,23 @@ SETTINGS_JSON_PATH = os.path.join(USER_DATA_DIR, "settings.json")
 RATINGS_JSON_PATH = os.path.join(USER_DATA_DIR, "ratings.json")
 CUSTOM_PRICES_JSON_PATH = os.path.join(USER_DATA_DIR, "custom_prices.json")
 SNAPSHOT_JSON_PATH = os.path.join(USER_DATA_DIR, "library_snapshot.json")
+LEGAL_DIR = os.path.join(USER_DATA_DIR, "legal")
+os.makedirs(LEGAL_DIR, exist_ok=True)
+
+def sync_legal_documents():
+    try:
+        bundled_legal = get_resource_file_path("legal")
+        if os.path.exists(bundled_legal) and os.path.isdir(bundled_legal):
+            import shutil
+            for fname in os.listdir(bundled_legal):
+                src = os.path.join(bundled_legal, fname)
+                dst = os.path.join(LEGAL_DIR, fname)
+                if os.path.isfile(src):
+                    shutil.copy2(src, dst)
+    except Exception as e:
+        pass
+
+sync_legal_documents()
 
 _CACHED_CONTENT_XML_PATH = None
 
@@ -1954,6 +1971,10 @@ def get_settings():
                         item["name"] = f"MSFS 2024 - {sub}"
                 if not settings.get("gsx_profile_path"):
                     settings["gsx_profile_path"] = get_default_gsx_path()
+                if "navigation_style" not in settings:
+                    settings["navigation_style"] = "radial"
+                if "has_seen_onboarding" not in settings:
+                    settings["has_seen_onboarding"] = False
                 return settings
         except Exception:
             pass
@@ -1964,6 +1985,8 @@ def get_settings():
         "auto_scan_on_startup": True,
         "scan_paths": default_paths,
         "gsx_profile_path": get_default_gsx_path(),
+        "navigation_style": "radial",
+        "has_seen_onboarding": False,
         "disclaimer_accepted": True if has_existing_db else False
     }
     save_settings(settings)

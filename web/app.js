@@ -56,6 +56,11 @@ let lastFocusedIcao = null;
 let lastFocusedCountryCode = null;
 window.gsxAuditData = null;
 
+function isClassicNavMode() {
+    return !!(typeof currentSettings !== 'undefined' && currentSettings && currentSettings.navigation_style === 'classic');
+}
+window.isClassicNavMode = isClassicNavMode;
+
 // Performance Caches & Indexing Engine
 const airportMarkerCache = new Map();
 const customDivIconCache = new Map();
@@ -458,6 +463,7 @@ function updateCountryFilterButtonsUI() {
 // Flight Optimizer Engine State
 let flightOriginAirport = null;
 let flightDestAirport = null;
+let flightDestinationAirport = null;
 let isFlightOptimizerActive = false;
 let flightRouteLineGroup = null;
 
@@ -885,9 +891,15 @@ function triggerMapPanicReset() {
         clearSearch(false);
     }
 
-    // 5. Ensure all radial wheels and inspection modals are closed
+    // 5. Ensure all radial wheels, route badges and inspection modals are closed
+    if (typeof clearRouteAirportBadges === 'function') {
+        clearRouteAirportBadges();
+    }
     if (typeof closeAirportRadialMenu === 'function') {
         closeAirportRadialMenu();
+    }
+    if (typeof closeClassicAirportView === 'function') {
+        closeClassicAirportView();
     }
     if (typeof closeFilterRadialMenu === 'function') {
         closeFilterRadialMenu();
@@ -930,6 +942,8 @@ function initMap() {
     });
 
     L.control.zoom({ position: 'topright' }).addTo(map);
+    window.leafletMap = map;
+    window.map = map;
 
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
         attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ',
@@ -973,8 +987,21 @@ function initMap() {
         }
     });
 
-    // Hierarchical progressive disclosure of airport labels by zoom (triggered on zoomend only)
-    map.on('zoomend', updateMapZoomTier);
+    // Hierarchical progressive disclosure of airport labels by zoom (and dynamic route badge scaling)
+    map.on('zoom zoomend zoomanim viewreset move moveend', (e) => {
+        const targetZoom = (e && typeof e.zoom === 'number') ? e.zoom : undefined;
+        if (typeof updateRouteAirportBadgesZoomScale === 'function') {
+            updateRouteAirportBadgesZoomScale(targetZoom);
+        }
+    });
+    map.on('zoomend', () => {
+        updateMapZoomTier();
+    });
+    map.on('moveend', () => {
+        if (typeof syncRouteBadgesWrapping === 'function') {
+            syncRouteBadgesWrapping();
+        }
+    });
     updateMapZoomTier();
 
     // Map drag tracking to distinguish panning from clean left-clicks
@@ -1003,6 +1030,13 @@ function initMap() {
             return;
         }
 
+        // Classic Mode Navigation: Deselect airport on background map click
+        if (isClassicNavMode()) {
+            if (typeof closeClassicAirportView === 'function') {
+                closeClassicAirportView();
+            }
+        }
+
         // Strict Flight Planning Mode Protection:
         if (isFlightPlanningMode) {
             closeAirportRadialMenu();
@@ -1025,12 +1059,13 @@ function initMap() {
         }
     });
 
-    // Right-Click event on map: opens the floating Contextual Filter Radial Menu
+    // Right-Click event on map: opens the floating Contextual Filter Radial Menu (Radial mode only)
     map.on('contextmenu', (e) => {
         if (e.originalEvent) {
             e.originalEvent.preventDefault();
             e.originalEvent.stopPropagation();
         }
+        if (isClassicNavMode()) return;
         openFilterRadialMenu(e.originalEvent.clientX, e.originalEvent.clientY);
     });
 
@@ -1065,7 +1100,7 @@ function initMap() {
     // High-performance RAF-throttled radial menu updates during pan/zoom
     let radialMenuMoveRaf = null;
     function onMapMoveUpdateRadial() {
-        if (!currentRadialAirport && !isAirlinesModalOpen() && !isDetailsModalOpen() && !isFlightOptimizerModalOpen()) return;
+        if (!currentRadialAirport && !isAirlinesModalOpen() && !isDetailsModalOpen() && !isSceneriesExtensionOpen() && !isFlightOptimizerModalOpen()) return;
         if (!radialMenuMoveRaf) {
             radialMenuMoveRaf = requestAnimationFrame(() => {
                 radialMenuMoveRaf = null;
@@ -1304,6 +1339,7 @@ async function loadCountryOverlays() {
                             e.originalEvent.preventDefault();
                             e.originalEvent.stopPropagation();
                         }
+                        if (isClassicNavMode()) return;
                         openFilterRadialMenu(e.originalEvent.clientX, e.originalEvent.clientY);
                     },
                     dblclick: (e) => {
@@ -2160,6 +2196,12 @@ function updateSplashProgress(percent, text, folder) {
     if (pText) pText.innerText = `${percent}%`;
     if (sText && text) sText.innerText = text;
     if (fText && folder) fText.innerText = folder;
+
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.update_splash_progress) {
+        try {
+            window.pywebview.api.update_splash_progress(percent, text || "Scanning...");
+        } catch (e) {}
+    }
 }
 
 function applyStartupCameraSettings() {
@@ -2174,18 +2216,18 @@ function applyStartupCameraSettings() {
 function hideSplashScreen() {
     return new Promise((resolve) => {
         const splash = document.getElementById('splash-screen');
-        if (!splash) {
-            resolve();
-            return;
-        }
-        updateSplashProgress(100, "Ready!", "Scan Complete");
-        setTimeout(() => {
+        if (splash) {
             splash.style.opacity = '0';
-            setTimeout(() => {
-                splash.style.display = 'none';
-                resolve();
-            }, 700);
-        }, 300);
+            splash.style.display = 'none';
+        }
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.finish_splash_and_show_main) {
+            try {
+                window.pywebview.api.finish_splash_and_show_main();
+            } catch (e) {
+                console.warn("finish_splash_and_show_main warning:", e);
+            }
+        }
+        setTimeout(resolve, 200);
     });
 }
 
@@ -2216,6 +2258,9 @@ async function loadAirportsData() {
                     const st = currentSettings.settings || currentSettings;
                     if (st && st.flight_mode) {
                         updateFlightModeBannerUI(st.flight_mode);
+                    }
+                    if (typeof applyNavigationStyle === 'function') {
+                        applyNavigationStyle(currentSettings.navigation_style || 'radial');
                     }
                 }
             } catch(e) {
@@ -2355,11 +2400,26 @@ async function loadAirportsData() {
         applyStartupCameraSettings();
         await hideSplashScreen();
         restoreFlightPlanningStateOnStartup();
+        if (typeof applyNavigationStyle === 'function') {
+            applyNavigationStyle((currentSettings && currentSettings.navigation_style) || 'radial');
+        }
         const isAccepted = await checkFirstLaunchDisclaimer();
         if (isAccepted) {
             await new Promise(r => setTimeout(r, 200));
             await checkStartupChanges();
-            await checkBackgroundToolsOnStartup();
+
+            let hasCompletedOnboarding = false;
+            if (window.onboardingTour && typeof window.onboardingTour.isOnboardingCompleted === 'function') {
+                hasCompletedOnboarding = await window.onboardingTour.isOnboardingCompleted();
+            }
+            if (!hasCompletedOnboarding) {
+                pendingBackgroundToolsCheck = true;
+                if (window.onboardingTour && typeof window.onboardingTour.checkAutoPrompt === 'function') {
+                    setTimeout(() => window.onboardingTour.checkAutoPrompt(), 400);
+                }
+            } else {
+                await checkBackgroundToolsOnStartup();
+            }
         }
     } catch (err) {
         console.error("Failed to load airports:", err);
@@ -2368,7 +2428,19 @@ async function loadAirportsData() {
         if (isAccepted) {
             await new Promise(r => setTimeout(r, 200));
             await checkStartupChanges();
-            await checkBackgroundToolsOnStartup();
+
+            let hasCompletedOnboarding = false;
+            if (window.onboardingTour && typeof window.onboardingTour.isOnboardingCompleted === 'function') {
+                hasCompletedOnboarding = await window.onboardingTour.isOnboardingCompleted();
+            }
+            if (!hasCompletedOnboarding) {
+                pendingBackgroundToolsCheck = true;
+                if (window.onboardingTour && typeof window.onboardingTour.checkAutoPrompt === 'function') {
+                    setTimeout(() => window.onboardingTour.checkAutoPrompt(), 400);
+                }
+            } else {
+                await checkBackgroundToolsOnStartup();
+            }
         }
     }
 }
@@ -2394,12 +2466,7 @@ async function checkFirstLaunchDisclaimer() {
                 return true;
             }
         }
-
-        const modal = document.getElementById('disclaimer-modal');
-        if (modal) {
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
-        }
+        openDisclaimerModal();
         return false;
     } catch (e) {
         console.error("Disclaimer check failed:", e);
@@ -2416,6 +2483,8 @@ async function agreeAndContinueApp() {
     } catch (e) {
         console.error("Error saving disclaimer acceptance:", e);
     }
+    const backdrop = document.getElementById('disclaimer-backdrop');
+    if (backdrop) backdrop.classList.add('hidden');
     const modal = document.getElementById('disclaimer-modal');
     if (modal) {
         modal.classList.add('hidden');
@@ -2427,12 +2496,120 @@ async function agreeAndContinueApp() {
 }
 
 function disagreeAndExitApp() {
+    const backdrop = document.getElementById('disclaimer-backdrop');
+    if (backdrop) backdrop.classList.add('hidden');
+    const modal = document.getElementById('disclaimer-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
     if (window.pywebview && window.pywebview.api && window.pywebview.api.close_app) {
         window.pywebview.api.close_app();
     } else {
         window.close();
     }
 }
+
+function openDisclaimerModal() {
+    const backdrop = document.getElementById('disclaimer-backdrop');
+    if (backdrop) {
+        backdrop.classList.remove('hidden');
+        backdrop.style.zIndex = '5999';
+    }
+    const modal = document.getElementById('disclaimer-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        modal._hasBeenDragged = false;
+        modal.style.left = '50%';
+        modal.style.top = '50%';
+        modal.style.transform = 'translate(-50%, -50%)';
+        modal.style.right = 'auto';
+        modal.style.bottom = 'auto';
+        modal.style.zIndex = '6000';
+        if (window.windowManager) {
+            window.windowManager.bringToFront(modal);
+        }
+    }
+}
+window.openDisclaimerModal = openDisclaimerModal;
+
+function openLegalModal(tabName = 'eula') {
+    const backdrop = document.getElementById('legal-backdrop');
+    if (backdrop) {
+        backdrop.classList.remove('hidden');
+        backdrop.style.zIndex = '6999';
+    }
+    const modal = document.getElementById('legal-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        modal._hasBeenDragged = false;
+        modal.style.left = '50%';
+        modal.style.top = '50%';
+        modal.style.transform = 'translate(-50%, -50%)';
+        modal.style.right = 'auto';
+        modal.style.bottom = 'auto';
+        modal.style.zIndex = '7000';
+        if (window.windowManager) {
+            window.windowManager.bringToFront(modal);
+            window.windowManager.registerModal(modal);
+        }
+    }
+    const body = document.getElementById('legal-modal-body');
+    if (body) body.scrollTop = 0;
+    switchLegalTab(tabName);
+}
+window.openLegalModal = openLegalModal;
+
+function closeLegalModal() {
+    const backdrop = document.getElementById('legal-backdrop');
+    if (backdrop) backdrop.classList.add('hidden');
+    const modal = document.getElementById('legal-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+}
+window.closeLegalModal = closeLegalModal;
+
+function switchLegalTab(tabName) {
+    const tabs = ['eula', 'privacy', 'licenses'];
+    tabs.forEach(t => {
+        const pane = document.getElementById(`legal-pane-${t}`);
+        const btn = document.getElementById(`tab-legal-btn-${t}`);
+        if (pane) {
+            if (t === tabName) {
+                pane.classList.remove('hidden');
+            } else {
+                pane.classList.add('hidden');
+            }
+        }
+        if (btn) {
+            if (t === tabName) {
+                btn.className = 'px-3 py-1.5 rounded-md bg-slate-800 text-slate-100 font-semibold typo-action-btn transition-colors flex items-center cursor-pointer text-xs';
+            } else {
+                btn.className = 'px-3 py-1.5 rounded-md text-slate-400 hover:text-white font-normal hover:bg-slate-900/60 typo-action-btn transition-colors flex items-center cursor-pointer text-xs';
+            }
+        }
+    });
+    const body = document.getElementById('legal-modal-body');
+    if (body) body.scrollTop = 0;
+}
+window.switchLegalTab = switchLegalTab;
+
+function openLegalFolder() {
+    try {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.open_legal_folder) {
+            window.pywebview.api.open_legal_folder();
+        } else if (window.pywebview && window.pywebview.api && window.pywebview.api.open_folder) {
+            window.pywebview.api.open_folder("%APPDATA%\\SceneryX\\legal");
+        }
+    } catch (e) {
+        console.error("Error opening legal folder:", e);
+    }
+}
+window.openLegalFolder = openLegalFolder;
 
 function openExternalUrl(url) {
     if (!url) return;
@@ -3007,7 +3184,7 @@ function computeFunStats(airports) {
         const cleanName = getCleanAirportName(highestAp.name, highestAp.city) || highestAp.icao;
         stats.push({
             id: 'highest_airport',
-            html: t('funstats.highest_airport', 'HIGHEST ELEVATION: <span class="text-amber-300 font-black text-base lg:text-xl font-mono mx-1.5">{name} ({icao})</span> AT {elevation} FT !', {
+            html: t('funstats.highest_airport', 'HIGHEST ELEVATION: <span class="text-amber-300 font-black text-base lg:text-xl font-sans mx-1.5">{name} ({icao})</span> AT {elevation} FT !', {
                 name: cleanName,
                 icao: highestAp.icao,
                 elevation: maxElevation.toLocaleString()
@@ -3261,8 +3438,8 @@ async function openGsxAuditModal(filter = 'ALL') {
 
     if (window.windowManager) {
         window.windowManager.bringToFront(modal);
-        if (!modal._hasBeenDragged && (!modal.style.left || modal.style.left === 'auto')) {
-            window.windowManager.centerModal(modal);
+        if (!modal._hasBeenDragged) {
+            window.windowManager.autoTileWindows();
         }
     }
 
@@ -3279,9 +3456,9 @@ async function openGsxAuditModal(filter = 'ALL') {
     }
 
     // Refresh and invalidate map size so the map renders fully and immediately under the floating window
-    if (window.map) {
+    if (typeof map !== 'undefined' && map && typeof map.invalidateSize === 'function') {
         setTimeout(() => {
-            window.map.invalidateSize();
+            map.invalidateSize();
         }, 80);
     }
 }
@@ -3376,9 +3553,9 @@ function openMapFromGsxAudit() {
     }
 
     // Refresh and invalidate map size so the map renders fully and immediately under the floating window
-    if (window.map) {
+    if (typeof map !== 'undefined' && map && typeof map.invalidateSize === 'function') {
         setTimeout(() => {
-            window.map.invalidateSize();
+            map.invalidateSize();
         }, 80);
     }
 
@@ -3394,11 +3571,17 @@ function closeGsxAuditModal() {
     if (modal) {
         modal.classList.add('hidden');
         modal.classList.remove('flex');
+        modal._hasBeenDragged = false;
     }
 
     gsxAuditFloatingMode = false;
     isGsxAuditOpen = false;
     window.isGsxAuditOpen = false;
+
+    if (window.windowManager) {
+        window.windowManager.activeModals.delete(modal);
+        window.windowManager.autoTileWindows();
+    }
 
     // Restore map markers to strictly match user's active filters (hides temporary default markers)
     if (typeof filterAirports === 'function') {
@@ -3431,9 +3614,9 @@ function setGsxAuditFilter(filter) {
         const el = document.getElementById(b.id);
         if (!el) return;
         if (b.key === currentGsxAuditFilter) {
-            el.className = 'px-2.5 py-1 rounded-full text-xs typo-action-btn font-semibold leading-tight pill-soft-cyan cursor-pointer transition-colors';
+            el.className = 'px-2.5 py-1 rounded-full text-xs font-sans font-semibold leading-tight pill-soft-cyan cursor-pointer transition-colors';
         } else {
-            el.className = 'px-2.5 py-1 rounded-full text-xs typo-action-btn font-semibold leading-tight pill-soft-slate hover:text-white cursor-pointer transition-colors';
+            el.className = 'px-2.5 py-1 rounded-full text-xs font-sans font-semibold leading-tight pill-soft-slate hover:text-white cursor-pointer transition-colors';
         }
     });
 
@@ -3487,7 +3670,7 @@ function renderGsxAuditModal() {
     if (totalBadge) {
         if (totalIssues > 0) {
             totalBadge.innerText = totalIssues === 1 ? t('gsx.issue_single', '1 Issue', { count: 1 }) : t('gsx.issues_plural', '{count} Issues', { count: totalIssues });
-            totalBadge.className = 'text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-amber-500 text-slate-950 border-0';
+            totalBadge.className = 'text-[10px] font-sans font-bold px-2 py-0.5 rounded leading-tight bg-amber-500 text-slate-950 border-0';
             totalBadge.classList.remove('hidden');
         } else {
             totalBadge.classList.add('hidden');
@@ -3514,7 +3697,7 @@ function renderGsxAuditModal() {
 
     const footerSummary = document.getElementById('gsx-audit-footer-summary');
     if (footerSummary) {
-        footerSummary.className = 'text-sm font-bold text-white';
+        footerSummary.className = 'text-xs font-sans font-semibold text-[#CBD5E1]';
         footerSummary.innerText = totalIssues > 0
             ? `${totalIssues} issue${totalIssues !== 1 ? 's' : ''} detected (${duplicateCount} duplicate${duplicateCount !== 1 ? 's' : ''}, ${mismatchCount} mismatch${mismatchCount !== 1 ? 'es' : ''}, ${orphanCount} orphan${orphanCount !== 1 ? 's' : ''}) • ${missingAddons} custom addon${missingAddons !== 1 ? 's' : ''} missing GSX profile.`
             : `All active profiles aligned. ${missingAddons} custom addon${missingAddons !== 1 ? 's' : ''} missing GSX profile.`;
@@ -3543,10 +3726,10 @@ function renderGsxAuditModal() {
         if (missingList.length === 0) {
             container.innerHTML = `
                 <div class="py-12 px-6 text-center space-y-2">
-                    <div class="text-base sm:text-lg font-bold text-white tracking-wide">
+                    <div class="text-base sm:text-lg font-sans font-bold text-white tracking-wide">
                         ${t('gsx.empty_all_title', 'All addons have GSX profiles')}
                     </div>
-                    <p class="text-xs font-mono text-slate-400">${t('gsx.empty_all_desc', 'All scanned custom airport sceneries currently have an active GSX profile.')}</p>
+                    <p class="text-xs font-sans text-[#94A3B8]">${t('gsx.empty_all_desc', 'All scanned custom airport sceneries currently have an active GSX profile.')}</p>
                 </div>
             `;
             return;
@@ -3558,11 +3741,11 @@ function renderGsxAuditModal() {
             const location = [item.city, item.country].filter(Boolean).join(', ');
             let pricingBadge = '';
             if (item.pricing_type === 'Payware') {
-                pricingBadge = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-purple-600 text-white border-0">${t('pricing.payware_caps', 'PAYWARE')}</span>`;
+                pricingBadge = `<span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded leading-tight bg-purple-600 text-white border-0">${t('pricing.payware_caps', 'PAYWARE')}</span>`;
             } else if (item.pricing_type === 'Asobo') {
-                pricingBadge = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-amber-500 text-slate-950 border-0">ASOBO</span>`;
+                pricingBadge = `<span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded leading-tight bg-amber-500 text-slate-950 border-0">ASOBO</span>`;
             } else {
-                pricingBadge = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-cyan-600 text-white border-0">${t('pricing.freeware_caps', 'FREEWARE')}</span>`;
+                pricingBadge = `<span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded leading-tight bg-cyan-600 text-white border-0">${t('pricing.freeware_caps', 'FREEWARE')}</span>`;
             }
 
             const clickAttr = `onclick="panCameraToGsxAirport('${icao}')"`;
@@ -3571,45 +3754,45 @@ function renderGsxAuditModal() {
             const underlineClass = 'group-hover/hdr:underline';
             const hoverTextClass = 'group-hover/hdr:text-cyan-300';
             const iconHtml = `
-                <svg class="w-3 h-3 text-cyan-400 opacity-0 group-hover/hdr:opacity-100 transition-opacity shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-3 h-3 text-[#38BDF8] opacity-0 group-hover/hdr:opacity-100 transition-opacity shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <circle cx="12" cy="12" r="3" stroke-width="2"/>
                     <circle cx="12" cy="12" r="8" stroke-width="2" stroke-dasharray="2 2"/>
                 </svg>`;
 
             html += `
-                <div id="gsx-card-${icao}" class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2 transition-all duration-500">
+                <div id="gsx-card-${icao}" class="p-3 rounded-lg bg-[#181E2B] border border-[#253046] hover:border-[#38BDF8]/40 space-y-2 transition-all duration-300 font-sans">
                     <div class="flex items-start justify-between gap-3">
                         <div ${clickAttr} class="min-w-0 flex-1 ${cursorClass} transition-all select-none" title="${titleAttr}">
                             <div class="flex items-center gap-2">
-                                <span class="text-xs font-mono font-bold text-cyan-400 ${underlineClass}">${escapeHtml(icao)}</span>
-                                <span class="text-xs font-bold text-white truncate ${hoverTextClass} transition-colors">${escapeHtml(item.name || icao)}</span>
+                                <span class="text-xs font-sans font-bold text-[#38BDF8] ${underlineClass}">${escapeHtml(icao)}</span>
+                                <span class="text-xs font-sans font-bold text-white truncate ${hoverTextClass} transition-colors">${escapeHtml(item.name || icao)}</span>
                                 ${iconHtml}
                             </div>
-                            <div class="text-[11px] font-mono text-slate-400 truncate">${escapeHtml(location)}</div>
+                            <div class="text-[11px] font-sans text-[#94A3B8] truncate mt-0.5">${escapeHtml(location)}</div>
                         </div>
                         <div class="flex items-center gap-1.5 shrink-0">
                             ${pricingBadge}
-                            <span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-slate-800 text-slate-300 border-0">NO PROFILE</span>
+                            <span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded leading-tight bg-[#0E121A] text-[#94A3B8] border border-[#2D3A54]">NO PROFILE</span>
                         </div>
                     </div>
 
-                    <div class="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-800 flex-wrap sm:flex-nowrap">
-                        <div class="text-[11px] font-mono text-slate-400 truncate min-w-0 flex-1">
+                    <div class="flex items-center justify-between gap-2 pt-1.5 border-t border-[#1E2638] flex-wrap sm:flex-nowrap">
+                        <div class="text-[11px] font-sans text-[#94A3B8] truncate min-w-0 flex-1">
                             ${escapeHtml(item.vendor ? `Studio: ${item.vendor}` : 'Custom MSFS Scenery')}
                         </div>
                         <div class="flex items-center gap-2 shrink-0">
-                            <!-- Drop zone enlarged for easy dragging -->
+                            <!-- Drop zone -->
                             <div id="gsx-dropzone-${icao}"
                                  ondragover="handleGsxAuditDragOver(event, '${icao}')"
                                  ondragleave="handleGsxAuditDragLeave(event, '${icao}')"
                                  ondrop="handleGsxAuditDrop(event, '${icao}')"
                                  onclick="installGsxProfileFromModal('${icao}')"
-                                 class="px-4 py-2 min-w-[130px] h-10 rounded-xl bg-slate-950 border-2 border-dashed border-slate-700 hover:border-cyan-400 hover:bg-slate-900 flex flex-col items-center justify-center text-center cursor-pointer transition-all group shrink-0"
+                                 class="px-3.5 py-1.5 min-w-[125px] h-9 rounded-lg bg-[#0E121A] border-2 border-dashed border-[#2D3A54] hover:border-cyan-400 hover:bg-[#181E2B] flex flex-col items-center justify-center text-center cursor-pointer transition-all group shrink-0"
                                  title="Drop .ini or archive (.zip) here, or click to browse">
-                                <span class="text-[10px] font-mono font-bold text-slate-200 group-hover:text-cyan-300 transition-colors pointer-events-none leading-none">
+                                <span class="text-[10px] font-sans font-bold text-[#CBD5E1] group-hover:text-cyan-300 transition-colors pointer-events-none leading-none">
                                     DROP .INI / .ZIP
                                 </span>
-                                <span class="text-[8px] font-mono text-slate-400 group-hover:text-slate-300 transition-colors pointer-events-none leading-tight mt-0.5">
+                                <span class="text-[8px] font-sans text-[#94A3B8] group-hover:text-slate-300 transition-colors pointer-events-none leading-tight mt-0.5">
                                     or browse file
                                 </span>
                             </div>
@@ -3618,14 +3801,14 @@ function renderGsxAuditModal() {
                                 const bProf = item.bundled_gsx_profile || (((typeof allAirportsData !== 'undefined' && Array.isArray(allAirportsData)) ? allAirportsData.find(a => a.icao === icao) : (window.allAirports || []).find(a => a.icao === icao)) || {}).bundled_gsx_profile;
                                 if (bProf && bProf.ini_path && !bProf.is_installed) {
                                     return `
-                                        <button onclick="installBundledGsxProfile('${icao}')" class="text-[10px] font-mono font-bold px-3 py-2.5 h-10 rounded-xl leading-tight bg-emerald-600 hover:bg-emerald-500 text-white border-0 cursor-pointer transition-colors shrink-0 flex items-center justify-center">
-                                            <span>${t('gsx.install_bundled', 'Installer le profil officiel')}</span>
+                                        <button onclick="installBundledGsxProfile('${icao}')" class="text-[10px] font-sans font-bold px-3 py-2 h-9 rounded-lg leading-tight bg-emerald-600 hover:bg-emerald-500 text-white border-0 cursor-pointer transition-colors shrink-0 flex items-center justify-center">
+                                            <span>${t('gsx.install_bundled', 'Install Official Profile')}</span>
                                         </button>
                                     `;
                                 }
                                 return '';
                             })()}
-                            <button onclick="searchGsxProfileFromModal('${icao}')" class="text-[10px] font-mono font-bold px-3.5 py-2.5 h-10 rounded-xl leading-tight bg-cyan-700 hover:bg-cyan-600 text-white border-0 cursor-pointer transition-colors shrink-0 flex items-center justify-center" title="Search on Flightsim.to">
+                            <button onclick="searchGsxProfileFromModal('${icao}')" class="text-[10px] font-sans font-bold px-3 py-2 h-9 rounded-lg leading-tight bg-cyan-600 hover:bg-cyan-500 text-white border-0 cursor-pointer transition-colors shrink-0 flex items-center justify-center" title="Search on Flightsim.to">
                                 <span>Search on Flightsim.to</span>
                             </button>
                         </div>
@@ -3654,19 +3837,19 @@ function renderGsxAuditModal() {
             if ((audit.disabled_profiles || []).length === 0) {
                 container.innerHTML = `
                     <div class="py-12 px-6 text-center space-y-2">
-                        <div class="text-base sm:text-lg font-bold text-white tracking-wide">
+                        <div class="text-base sm:text-lg font-sans font-bold text-white tracking-wide">
                             ${t('gsx.empty_disabled_title', 'No disabled profiles')}
                         </div>
-                        <p class="text-xs font-mono text-slate-400">${t('gsx.empty_disabled_desc', "You don't have any disabled GSX profiles in your directory.")}</p>
+                        <p class="text-xs font-sans text-[#94A3B8]">${t('gsx.empty_disabled_desc', "You don't have any disabled GSX profiles in your directory.")}</p>
                     </div>
                 `;
             } else {
                 container.innerHTML = `
                     <div class="py-12 px-6 text-center space-y-2">
-                        <div class="text-base sm:text-lg font-bold text-white tracking-wide">
+                        <div class="text-base sm:text-lg font-sans font-bold text-white tracking-wide">
                             ${t('gsx.empty_search_title', 'No results matching filter')}
                         </div>
-                        <p class="text-xs font-mono text-slate-400">${t('gsx.empty_search_desc', 'Try clearing your search term.')}</p>
+                        <p class="text-xs font-sans text-[#94A3B8]">${t('gsx.empty_search_desc', 'Try clearing your search term.')}</p>
                     </div>
                 `;
             }
@@ -3675,12 +3858,12 @@ function renderGsxAuditModal() {
 
         const totalDisabled = (audit.disabled_profiles || []).length;
         let html = `
-            <div class="flex items-center justify-between pb-1.5 px-1 border-b border-slate-800">
-                <span class="text-[11px] font-mono text-slate-400">
+            <div class="flex items-center justify-between pb-2 px-1 border-b border-[#1E2638]">
+                <span class="text-[11px] font-sans text-[#94A3B8]">
                     ${disabledList.length} disabled profile${disabledList.length > 1 ? 's' : ''}${query ? ` (filtered from ${totalDisabled})` : ''}
                 </span>
                 <button onclick="confirmDeleteAllDisabledProfiles()"
-                        class="text-[10px] font-mono font-bold px-2.5 py-1 rounded-xl bg-rose-900 hover:bg-rose-800 text-white cursor-pointer transition-all flex items-center gap-1.5 active:scale-98 border-0"
+                        class="text-[10px] font-sans font-bold px-2.5 py-1 rounded-md bg-rose-900/80 hover:bg-rose-800 text-white cursor-pointer transition-all flex items-center gap-1.5 active:scale-98 border border-rose-800/80"
                         title="Permanently delete all disabled profiles from hard disk">
                     <svg class="w-3 h-3 text-rose-300 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -3700,7 +3883,7 @@ function renderGsxAuditModal() {
             const underlineClass = 'group-hover/hdr:underline';
             const hoverTextClass = 'group-hover/hdr:text-cyan-300';
             const iconHtml = `
-                <svg class="w-3 h-3 text-cyan-400 opacity-0 group-hover/hdr:opacity-100 transition-opacity shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-3 h-3 text-[#38BDF8] opacity-0 group-hover/hdr:opacity-100 transition-opacity shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <circle cx="12" cy="12" r="3" stroke-width="2"/>
                     <circle cx="12" cy="12" r="8" stroke-width="2" stroke-dasharray="2 2"/>
                 </svg>`;
@@ -3708,41 +3891,41 @@ function renderGsxAuditModal() {
             const safeId = 'gsx-dis-' + String(item.filename).replace(/[^a-zA-Z0-9_-]/g, '_');
 
             html += `
-                <div id="${safeId}" class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2 transition-all duration-300">
+                <div id="${safeId}" class="p-3 rounded-lg bg-[#181E2B] border border-[#253046] hover:border-[#38BDF8]/40 space-y-2 transition-all duration-300 font-sans">
                     <div class="flex items-start justify-between gap-3">
                         <div ${clickAttr} class="min-w-0 flex-1 ${cursorClass} transition-all select-none" title="${titleAttr}">
                             <div class="flex items-center gap-2">
-                                <span class="text-xs font-mono font-bold text-cyan-400 ${underlineClass}">${escapeHtml(icao || '----')}</span>
-                                <span class="text-xs font-bold text-white truncate ${hoverTextClass} transition-colors">${escapeHtml(item.name || icao || item.filename)}</span>
+                                <span class="text-xs font-sans font-bold text-[#38BDF8] ${underlineClass}">${escapeHtml(icao || '----')}</span>
+                                <span class="text-xs font-sans font-bold text-white truncate ${hoverTextClass} transition-colors">${escapeHtml(item.name || icao || item.filename)}</span>
                                 ${iconHtml}
                             </div>
-                            ${location ? `<div class="text-[11px] font-mono text-slate-400 truncate">${escapeHtml(location)}</div>` : ''}
+                            ${location ? `<div class="text-[11px] font-sans text-[#94A3B8] truncate mt-0.5">${escapeHtml(location)}</div>` : ''}
                         </div>
                         <div class="shrink-0">
-                            <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-slate-900 text-slate-400 border border-slate-700">DISABLED</span>
+                            <span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded leading-tight bg-[#0E121A] text-[#94A3B8] border border-[#2D3A54]">DISABLED</span>
                         </div>
                     </div>
 
-                    <div class="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-800 flex-wrap sm:flex-nowrap">
+                    <div class="flex items-center justify-between gap-2 pt-1.5 border-t border-[#1E2638] flex-wrap sm:flex-nowrap">
                         <div class="min-w-0 flex-1">
-                            <div class="text-xs font-mono font-bold text-slate-300 truncate" title="${escapeHtml(item.filename)}">
+                            <div class="text-xs font-sans font-semibold text-[#CBD5E1] truncate" title="${escapeHtml(item.filename)}">
                                 ${escapeHtml(item.filename)}
                             </div>
-                            ${item.mtime ? `<div class="text-[10px] font-mono text-slate-500">Updated ${escapeHtml(item.mtime)}</div>` : ''}
+                            ${item.mtime ? `<div class="text-[10px] font-sans text-[#64748B]">Updated ${escapeHtml(item.mtime)}</div>` : ''}
                         </div>
                         <div class="flex items-center gap-1.5 shrink-0">
                             <button onclick="enableGsxProfileFromAudit('${icao}', '${escapeJsStr(item.filename)}')"
-                                    class="text-[10px] font-mono font-bold px-3 py-1.5 rounded-xl bg-cyan-900 hover:bg-cyan-800 text-cyan-200 border border-cyan-700 cursor-pointer transition-colors shadow-sm"
+                                    class="text-[10px] font-sans font-bold px-3 py-1.5 rounded-md bg-cyan-900/70 hover:bg-cyan-800 text-cyan-200 border border-cyan-700/80 cursor-pointer transition-colors shadow-sm"
                                     title="Re-enable this profile">
                                 Enable
                             </button>
                             <button onclick="confirmDeleteGsxProfile('${icao}', '${escapeJsStr(item.filename)}')"
-                                    class="text-[10px] font-mono font-bold px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 border border-slate-700 hover:border-rose-800 cursor-pointer transition-colors"
+                                    class="text-[10px] font-sans font-bold px-3 py-1.5 rounded-md bg-[#12161F] hover:bg-rose-950 text-[#94A3B8] hover:text-rose-300 border border-[#253046] hover:border-rose-800 cursor-pointer transition-colors"
                                     title="Permanently delete from disk">
                                 Delete
                             </button>
                             <button onclick="revealGsxFileInExplorer('${escapeJsStr(item.path || item.filename)}')"
-                                    class="text-[10px] font-mono font-bold px-2 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 cursor-pointer transition-colors"
+                                    class="text-[10px] font-sans font-bold px-2.5 py-1.5 rounded-md bg-[#12161F] hover:bg-[#253046] text-[#94A3B8] hover:text-white border border-[#253046] cursor-pointer transition-colors"
                                     title="Reveal in Windows Explorer">
                                 Reveal
                             </button>
@@ -3926,23 +4109,23 @@ function renderGsxAuditModal() {
 
         let badgeHtml = '';
         if (entry.status === 'DUPLICATE') {
-            badgeHtml = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-amber-600 text-white border-0">DUPLICATE</span>`;
+            badgeHtml = `<span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded leading-tight bg-amber-600 text-white border-0">DUPLICATE</span>`;
         } else if (entry.status === 'MISMATCH_DEFAULT') {
-            badgeHtml = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-rose-600 text-white border-0">MISMATCH DEFAULT</span>`;
+            badgeHtml = `<span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded leading-tight bg-rose-600 text-white border-0">MISMATCH DEFAULT</span>`;
         } else if (entry.status === 'MISMATCH_STUDIO' || entry.status === 'MISMATCH_VERSION') {
-            badgeHtml = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-rose-600 text-white border-0">MISMATCH VERSION</span>`;
+            badgeHtml = `<span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded leading-tight bg-rose-600 text-white border-0">MISMATCH VERSION</span>`;
         } else if (entry.status === 'ORPHAN') {
-            badgeHtml = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-slate-800 text-slate-400 border-0">ORPHAN</span>`;
+            badgeHtml = `<span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded leading-tight bg-[#0E121A] text-[#94A3B8] border border-[#2D3A54]">ORPHAN</span>`;
         } else if (entry.status === 'MATCHED') {
-            badgeHtml = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-emerald-600 text-white border-0">MATCHED</span>`;
+            badgeHtml = `<span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded leading-tight bg-emerald-600 text-white border-0">MATCHED</span>`;
         } else if (entry.status === 'GENERIC' || entry.status === 'UNVERIFIED') {
-            badgeHtml = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-indigo-950 text-indigo-200 border border-indigo-700/80">GENERIC</span>`;
+            badgeHtml = `<span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded leading-tight bg-indigo-950 text-indigo-200 border border-indigo-700/80">GENERIC</span>`;
         } else if (entry.status === 'NO_PROFILE') {
-            badgeHtml = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-slate-800 text-slate-300 border-0">NO PROFILE</span>`;
+            badgeHtml = `<span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded leading-tight bg-[#0E121A] text-[#94A3B8] border border-[#2D3A54]">NO PROFILE</span>`;
         } else if (entry.status === 'DISABLED') {
-            badgeHtml = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-slate-900 text-slate-400 border border-slate-700">DISABLED</span>`;
+            badgeHtml = `<span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded leading-tight bg-[#0E121A] text-[#94A3B8] border border-[#2D3A54]">DISABLED</span>`;
         } else {
-            badgeHtml = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-slate-800 text-slate-300 border-0">${escapeHtml(entry.status)}</span>`;
+            badgeHtml = `<span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded leading-tight bg-[#0E121A] text-[#94A3B8] border border-[#2D3A54]">${escapeHtml(entry.status)}</span>`;
         }
 
         let pricingBadge = '';
@@ -3953,11 +4136,11 @@ function renderGsxAuditModal() {
         const isFreeware = !!((ap && ap.is_freeware) || entry.is_freeware || pt.toLowerCase().includes('freeware'));
 
         if (isPayware) {
-            pricingBadge = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-purple-600 text-white border-0">${t('pricing.payware_caps', 'PAYWARE')}</span>`;
+            pricingBadge = `<span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded leading-tight bg-purple-600 text-white border-0">${t('pricing.payware_caps', 'PAYWARE')}</span>`;
         } else if (isAsobo) {
-            pricingBadge = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-amber-500 text-slate-950 border-0">ASOBO</span>`;
+            pricingBadge = `<span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded leading-tight bg-amber-500 text-slate-950 border-0">ASOBO</span>`;
         } else if (isFreeware) {
-            pricingBadge = `<span class="text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-lg leading-tight bg-cyan-600 text-white border-0">${t('pricing.freeware_caps', 'FREEWARE')}</span>`;
+            pricingBadge = `<span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded leading-tight bg-cyan-600 text-white border-0">${t('pricing.freeware_caps', 'FREEWARE')}</span>`;
         }
 
         const clickAttr = `onclick="panCameraToGsxAirport('${icao}')"`;
@@ -3966,22 +4149,22 @@ function renderGsxAuditModal() {
         const underlineClass = 'group-hover/hdr:underline';
         const hoverTextClass = 'group-hover/hdr:text-cyan-300';
         const iconHtml = `
-            <svg class="w-3 h-3 text-cyan-400 opacity-0 group-hover/hdr:opacity-100 transition-opacity shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-3 h-3 text-[#38BDF8] opacity-0 group-hover/hdr:opacity-100 transition-opacity shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <circle cx="12" cy="12" r="3" stroke-width="2"/>
                 <circle cx="12" cy="12" r="8" stroke-width="2" stroke-dasharray="2 2"/>
             </svg>`;
 
-        html += `<div id="gsx-card-${icao}" class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 space-y-2 transition-all duration-500">`;
+        html += `<div id="gsx-card-${icao}" class="p-3 rounded-lg bg-[#181E2B] border border-[#253046] hover:border-[#38BDF8]/40 space-y-2 transition-all duration-300 font-sans">`;
 
         html += `
             <div class="flex items-start justify-between gap-3">
                 <div ${clickAttr} class="min-w-0 flex-1 ${cursorClass} transition-all select-none" title="${titleAttr}">
                     <div class="flex items-center gap-2">
-                        <span class="text-xs font-mono font-bold text-cyan-400 ${underlineClass}">${escapeHtml(icao)}</span>
-                        <span class="text-xs font-bold text-white truncate ${hoverTextClass} transition-colors">${escapeHtml(apName)}</span>
+                        <span class="text-xs font-sans font-bold text-[#38BDF8] ${underlineClass}">${escapeHtml(icao)}</span>
+                        <span class="text-xs font-sans font-bold text-white truncate ${hoverTextClass} transition-colors">${escapeHtml(apName)}</span>
                         ${iconHtml}
                     </div>
-                    <div class="text-[11px] font-mono text-slate-400 truncate mt-0.5">${escapeHtml(location)}</div>
+                    <div class="text-[11px] font-sans text-[#94A3B8] truncate mt-0.5">${escapeHtml(location)}</div>
                 </div>
                 <div class="flex items-center gap-1.5 shrink-0">
                     ${pricingBadge}
@@ -3991,8 +4174,8 @@ function renderGsxAuditModal() {
         `;
 
         if (entry.reason && entry.status !== 'MATCHED') {
-            const reasonClass = entry.status.startsWith('MISMATCH') ? 'text-rose-300' : 'text-slate-400';
-            html += `<p class="text-xs font-mono ${reasonClass} leading-relaxed">${escapeHtml(entry.reason)}</p>`;
+            const reasonClass = entry.status.startsWith('MISMATCH') ? 'text-rose-400' : 'text-[#94A3B8]';
+            html += `<p class="text-xs font-sans ${reasonClass} leading-relaxed">${escapeHtml(entry.reason)}</p>`;
         }
 
         if (entry.status === 'MATCHED') {
@@ -4000,9 +4183,9 @@ function renderGsxAuditModal() {
             const vdgsType = activeFile.vdgs_type;
             let vdgsBadge = '';
             if (vdgsType === 'Aerosoft VDGS') {
-                vdgsBadge = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg leading-tight bg-sky-700 text-white border-0 shrink-0">Aerosoft VDGS</span>`;
+                vdgsBadge = `<span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded leading-tight bg-sky-700 text-white border-0 shrink-0">Aerosoft VDGS</span>`;
             } else if (vdgsType === 'GSX SafeDock') {
-                vdgsBadge = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg leading-tight bg-indigo-600 text-white border-0 shrink-0">GSX SafeDock</span>`;
+                vdgsBadge = `<span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded leading-tight bg-indigo-600 text-white border-0 shrink-0">GSX SafeDock</span>`;
             }
 
             let metaParts = [
@@ -4019,57 +4202,60 @@ function renderGsxAuditModal() {
 
             html += `
                 <div class="space-y-2 pt-1">
-                    <div class="flex items-center justify-between p-2.5 rounded-xl bg-slate-950 border border-slate-800 gap-2">
+                    <div class="flex items-center justify-between p-2.5 rounded-lg bg-[#0E121A] border border-[#2D3A54] gap-2">
                         <div class="min-w-0 flex-1">
                             <div class="flex items-center gap-2 flex-wrap">
-                                <span class="text-xs font-mono font-bold text-slate-200 truncate" title="${escapeHtml(activeFile.filename)}">
+                                <span class="text-xs font-sans font-semibold text-[#CBD5E1] truncate" title="${escapeHtml(activeFile.filename)}">
                                     ${escapeHtml(activeFile.filename)}
                                 </span>
                                 ${activeFile.has_python_script ? `
-                                    <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-cyan-900 text-cyan-200 border-0 shrink-0" title="${t('gsx.includes_python', 'Includes Python dynamic script companion')}">
+                                    <span class="text-[9px] font-sans font-bold px-1.5 py-0.5 rounded bg-cyan-900/70 text-cyan-200 border-0 shrink-0" title="${t('gsx.includes_python', 'Includes Python dynamic script companion')}">
                                         + Python Script
                                     </span>
                                 ` : ''}
                                 ${vdgsBadge}
-                                <span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded-lg leading-tight bg-emerald-600 text-white border-0">ACTIVE</span>
+                                <span class="text-[9px] font-sans font-bold px-2 py-0.5 rounded leading-tight bg-emerald-600 text-white border-0">ACTIVE</span>
                             </div>
-                            ${metaText ? `<div class="text-[11px] font-mono text-slate-400 truncate mt-0.5">${escapeHtml(metaText)}</div>` : ''}
+                            ${metaText ? `<div class="text-[11px] font-sans text-[#94A3B8] truncate mt-0.5">${escapeHtml(metaText)}</div>` : ''}
                         </div>
                         <div class="flex items-center gap-1.5 shrink-0">
                             <button onclick="disableGsxProfileFromModal('${icao}', '${escapeJsStr(activeFile.filename)}')"
-                                    class="text-[10px] font-mono font-bold px-3 py-1.5 rounded-xl leading-tight bg-slate-800 hover:bg-rose-900 text-slate-300 hover:text-white border border-slate-700 hover:border-rose-700 cursor-pointer transition-colors shadow-sm"
+                                    class="text-[10px] font-sans font-bold px-2.5 py-1.5 rounded-md leading-tight bg-[#12161F] hover:bg-rose-950 text-[#94A3B8] hover:text-white border border-[#253046] hover:border-rose-700 cursor-pointer transition-colors shadow-sm"
                                     title="Disable this GSX profile">
                                 Disable
                             </button>
                             <button onclick="revealGsxFileInExplorer('${escapeJsStr(activeFile.path || activeFile.filename)}')"
-                                    class="text-[10px] font-mono font-bold px-2.5 py-1.5 rounded-xl leading-tight bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 cursor-pointer transition-colors"
+                                    class="text-[10px] font-sans font-bold px-2.5 py-1.5 rounded-md leading-tight bg-[#12161F] hover:bg-[#253046] text-[#94A3B8] hover:text-white border border-[#253046] cursor-pointer transition-colors"
                                     title="Reveal in Windows Explorer">
                                 Reveal
                             </button>
                         </div>
                     </div>
-                    <div class="flex items-center justify-end gap-2 pt-1 border-t border-slate-800">
-                        <span class="text-[10px] font-mono text-slate-500">Update profile:</span>
+                    <div class="flex items-center justify-end gap-2 pt-1.5 border-t border-[#1E2638]">
+                        <span class="text-[10px] font-sans text-[#94A3B8]">Update profile:</span>
                         <div id="gsx-dropzone-${icao}"
                              ondragover="handleGsxAuditDragOver(event, '${icao}')"
                              ondragleave="handleGsxAuditDragLeave(event, '${icao}')"
                              ondrop="handleGsxAuditDrop(event, '${icao}')"
                              onclick="installGsxProfileFromModal('${icao}')"
-                             class="px-3 py-1.5 h-8 rounded-xl bg-slate-950 border border-dashed border-slate-700 hover:border-cyan-400 hover:bg-slate-900 flex items-center justify-center text-center cursor-pointer transition-all group shrink-0"
+                             class="px-3.5 py-1.5 min-w-[125px] h-9 rounded-lg bg-[#0E121A] border-2 border-dashed border-[#2D3A54] hover:border-cyan-400 hover:bg-[#181E2B] flex flex-col items-center justify-center text-center cursor-pointer transition-all group shrink-0"
                              title="Drop updated .ini or archive (.zip) here, or click to browse">
-                            <span class="text-[10px] font-mono font-bold text-slate-300 group-hover:text-cyan-300 transition-colors pointer-events-none leading-none">
+                            <span class="text-[10px] font-sans font-bold text-[#CBD5E1] group-hover:text-cyan-300 transition-colors pointer-events-none leading-none">
                                 DROP .INI / .ZIP
+                            </span>
+                            <span class="text-[8px] font-sans text-[#94A3B8] group-hover:text-slate-300 transition-colors pointer-events-none leading-tight mt-0.5">
+                                or browse file
                             </span>
                         </div>
                         <button onclick="searchGsxProfileFromModal('${icao}')"
-                                class="text-[10px] font-mono font-bold px-2.5 py-1.5 h-8 rounded-xl leading-tight bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 cursor-pointer transition-colors shrink-0 flex items-center justify-center"
+                                class="text-[10px] font-sans font-bold px-3 py-1.5 h-9 rounded-md leading-tight bg-[#12161F] hover:bg-[#253046] text-[#CBD5E1] hover:text-white border border-[#253046] cursor-pointer transition-colors shrink-0 flex items-center justify-center"
                                 title="Search updates on Flightsim.to">
                             <span>Search on Flightsim.to</span>
                         </button>
                     </div>
                 </div>
             `;
-                } else if (entry.status === 'DUPLICATE') {
+        } else if (entry.status === 'DUPLICATE') {
             html += `<div class="space-y-2 pt-1">`;
             files.forEach(f => {
                 const isActive = !f.is_disabled;
@@ -4080,25 +4266,25 @@ function renderGsxAuditModal() {
                 let vdgsBadge = '';
                 let vdgsNote = '';
                 if (vdgsType === 'Aerosoft VDGS') {
-                    vdgsBadge = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg leading-tight bg-sky-700 text-white border-0 shrink-0">Aerosoft VDGS</span>`;
-                    vdgsNote = `<span class="text-sky-400 font-mono text-[10px] block mt-0.5">Use if airport has native Aerosoft VDGS docking enabled</span>`;
+                    vdgsBadge = `<span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded leading-tight bg-sky-700 text-white border-0 shrink-0">Aerosoft VDGS</span>`;
+                    vdgsNote = `<span class="text-sky-400 font-sans text-[10px] block mt-0.5">Use if airport has native Aerosoft VDGS docking enabled</span>`;
                 } else if (vdgsType === 'GSX SafeDock') {
-                    vdgsBadge = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg leading-tight bg-indigo-600 text-white border-0 shrink-0">GSX SafeDock</span>`;
-                    vdgsNote = `<span class="text-indigo-300 font-mono text-[10px] block mt-0.5">Uses GSX native SafeDock guidance system</span>`;
+                    vdgsBadge = `<span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded leading-tight bg-indigo-600 text-white border-0 shrink-0">GSX SafeDock</span>`;
+                    vdgsNote = `<span class="text-indigo-300 font-sans text-[10px] block mt-0.5">Uses GSX native SafeDock guidance system</span>`;
                 }
 
                 let statusBadge = '';
                 let statusNote = '';
                 if (isRecommended) {
-                    statusBadge = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg leading-tight bg-emerald-600 text-white border-0 shrink-0 flex items-center gap-1 shadow-sm"><i class="fa-solid fa-star text-[8px]"></i> RECOMMENDED</span>`;
+                    statusBadge = `<span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded leading-tight bg-emerald-600 text-white border-0 shrink-0 flex items-center gap-1 shadow-sm"><i class="fa-solid fa-star text-[8px]"></i> RECOMMENDED</span>`;
                     if (f.recommend_reason) {
-                        statusNote = `<span class="text-emerald-400 font-mono text-[10px] font-bold block mt-0.5">✓ ${escapeHtml(f.recommend_reason)}</span>`;
+                        statusNote = `<span class="text-emerald-400 font-sans text-[10px] font-bold block mt-0.5">✓ ${escapeHtml(f.recommend_reason)}</span>`;
                     }
                 } else if (isMismatch) {
                     const mismatchLabel = f.match_status === 'MISMATCH_DEFAULT' ? 'MISMATCH DEFAULT' : 'MISMATCH VERSION';
-                    statusBadge = `<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg leading-tight bg-rose-600 text-white border-0 shrink-0">${mismatchLabel}</span>`;
+                    statusBadge = `<span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded leading-tight bg-rose-600 text-white border-0 shrink-0">${mismatchLabel}</span>`;
                     if (f.match_reason) {
-                        statusNote = `<span class="text-rose-400/90 font-mono text-[10px] block mt-0.5">${escapeHtml(f.match_reason)}</span>`;
+                        statusNote = `<span class="text-rose-400/90 font-sans text-[10px] block mt-0.5">${escapeHtml(f.match_reason)}</span>`;
                     }
                 }
 
@@ -4113,53 +4299,53 @@ function renderGsxAuditModal() {
                 let meta = metaParts.join(' • ');
 
                 html += `
-                    <div class="flex items-center justify-between p-2.5 rounded-xl ${isRecommended ? 'bg-emerald-950/40 border border-emerald-600/80 shadow-sm shadow-emerald-950/40' : (isMismatch ? 'bg-rose-950/20 border border-rose-900/60' : 'bg-slate-950 border border-slate-800')} gap-2">
+                    <div class="flex items-center justify-between p-2.5 rounded-lg ${isRecommended ? 'bg-[#0E121A] border border-emerald-500/80 shadow-sm shadow-emerald-950/40' : (isMismatch ? 'bg-[#0E121A] border border-rose-800/80' : 'bg-[#0E121A] border border-[#2D3A54]')} gap-2">
                         <div class="min-w-0 flex-1">
                             <div class="flex items-center gap-1.5 flex-wrap">
-                                <span class="text-xs font-mono font-bold text-slate-200 truncate">${escapeHtml(f.filename)}</span>
+                                <span class="text-xs font-sans font-semibold text-[#CBD5E1] truncate">${escapeHtml(f.filename)}</span>
                                 ${f.has_python_script ? `
-                                    <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-cyan-900 text-cyan-200 border-0 shrink-0" title="${t('gsx.includes_python', 'Includes Python dynamic script companion')}">
+                                    <span class="text-[9px] font-sans font-bold px-1.5 py-0.5 rounded bg-cyan-900/70 text-cyan-200 border-0 shrink-0" title="${t('gsx.includes_python', 'Includes Python dynamic script companion')}">
                                         + Python Script
                                     </span>
                                 ` : ''}
                                 ${statusBadge}
                                 ${vdgsBadge}
-                                ${isActive ? `<span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded-lg leading-tight bg-slate-800 text-slate-300 border-0">ACTIVE</span>` : `<span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded-lg leading-tight bg-slate-950 text-slate-600 border-0">DISABLED</span>`}
+                                ${isActive ? `<span class="text-[9px] font-sans font-bold px-2 py-0.5 rounded leading-tight bg-[#181E2B] text-[#CBD5E1] border border-[#253046]">ACTIVE</span>` : `<span class="text-[9px] font-sans font-bold px-2 py-0.5 rounded leading-tight bg-[#0E121A] text-[#64748B] border border-[#2D3A54]">DISABLED</span>`}
                             </div>
-                            <div class="text-[11px] font-mono text-slate-400 truncate mt-0.5">${escapeHtml(meta)}</div>
+                            <div class="text-[11px] font-sans text-[#94A3B8] truncate mt-0.5">${escapeHtml(meta)}</div>
                             ${statusNote}
                             ${vdgsNote}
                         </div>
                         <div class="flex items-center gap-1.5 shrink-0">
                             <button onclick="activateGsxDuplicateFromModal('${icao}', '${escapeJsStr(f.filename)}')"
-                                    class="text-[10px] font-mono font-bold px-3 py-1.5 rounded-xl leading-tight ${isRecommended ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm' : 'bg-cyan-700 hover:bg-cyan-600 text-white border-0'} cursor-pointer transition-colors"
+                                    class="text-[10px] font-sans font-bold px-3 py-1.5 rounded-md leading-tight ${isRecommended ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm' : 'bg-cyan-600 hover:bg-cyan-500 text-white border-0'} cursor-pointer transition-colors"
                                     title="Keep this profile and disable conflicting duplicates">
                                 Keep this
                             </button>
                             ${isActive ? `
-                                <button onclick="disableGsxProfileFromModal('${icao}', '${escapeJsStr(f.filename)}')" class="text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg leading-tight bg-slate-800 hover:bg-rose-600 text-slate-400 hover:text-white border-0 cursor-pointer transition-colors" title="Disable this profile">Disable</button>
+                                <button onclick="disableGsxProfileFromModal('${icao}', '${escapeJsStr(f.filename)}')" class="text-[10px] font-sans font-bold px-2.5 py-1.5 rounded-md leading-tight bg-[#12161F] hover:bg-rose-950 text-[#94A3B8] hover:text-white border border-[#253046] hover:border-rose-700 cursor-pointer transition-colors" title="Disable this profile">Disable</button>
                             ` : ''}
-                            <button onclick="confirmDeleteGsxProfile('${icao}', '${escapeJsStr(f.filename)}')" class="text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg leading-tight bg-slate-800 hover:bg-rose-950 text-slate-400 hover:text-rose-400 border border-slate-700 hover:border-rose-800 cursor-pointer transition-colors" title="Permanently delete from disk"><i class="fa-solid fa-trash text-[10px]"></i></button>
-                            <button onclick="revealGsxFileInExplorer('${escapeJsStr(f.path || f.filename)}')" class="text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg leading-tight bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border-0 cursor-pointer transition-colors" title="Reveal in Windows Explorer">Reveal</button>
+                            <button onclick="confirmDeleteGsxProfile('${icao}', '${escapeJsStr(f.filename)}')" class="text-[10px] font-sans font-bold px-2.5 py-1.5 rounded-md leading-tight bg-[#12161F] hover:bg-rose-950 text-[#94A3B8] hover:text-rose-400 border border-[#253046] hover:border-rose-800 cursor-pointer transition-colors" title="Permanently delete from disk"><i class="fa-solid fa-trash text-[10px]"></i></button>
+                            <button onclick="revealGsxFileInExplorer('${escapeJsStr(f.path || f.filename)}')" class="text-[10px] font-sans font-bold px-2.5 py-1.5 rounded-md leading-tight bg-[#12161F] hover:bg-[#253046] text-[#94A3B8] hover:text-white border border-[#253046] cursor-pointer transition-colors" title="Reveal in Windows Explorer">Reveal</button>
                         </div>
                     </div>
                 `;
             });
             html += `</div>`;
             html += `
-                <div class="flex items-center justify-end gap-2 pt-1 border-t border-slate-800">
-                    <span class="text-[10px] font-mono text-slate-500">Or install new profile:</span>
+                <div class="flex items-center justify-end gap-2 pt-1.5 border-t border-[#1E2638]">
+                    <span class="text-[10px] font-sans text-[#94A3B8]">Or install new profile:</span>
                     <div id="gsx-dropzone-${icao}"
                          ondragover="handleGsxAuditDragOver(event, '${icao}')"
                          ondragleave="handleGsxAuditDragLeave(event, '${icao}')"
                          ondrop="handleGsxAuditDrop(event, '${icao}')"
                          onclick="installGsxProfileFromModal('${icao}')"
-                         class="px-4 py-2 min-w-[130px] h-10 rounded-xl bg-slate-950 border-2 border-dashed border-slate-700 hover:border-cyan-400 hover:bg-slate-900 flex flex-col items-center justify-center text-center cursor-pointer transition-all group shrink-0"
+                         class="px-3.5 py-1.5 min-w-[125px] h-9 rounded-lg bg-[#0E121A] border-2 border-dashed border-[#2D3A54] hover:border-cyan-400 hover:bg-[#181E2B] flex flex-col items-center justify-center text-center cursor-pointer transition-all group shrink-0"
                          title="Drop new profile .ini or archive (.zip) here, or click to browse">
-                        <span class="text-[10px] font-mono font-bold text-slate-200 group-hover:text-cyan-300 transition-colors pointer-events-none leading-none">
+                        <span class="text-[10px] font-sans font-bold text-[#CBD5E1] group-hover:text-cyan-300 transition-colors pointer-events-none leading-none">
                             DROP .INI / .ZIP
                         </span>
-                        <span class="text-[8px] font-mono text-slate-400 group-hover:text-slate-300 transition-colors pointer-events-none leading-tight mt-0.5">
+                        <span class="text-[8px] font-sans text-[#94A3B8] group-hover:text-slate-300 transition-colors pointer-events-none leading-tight mt-0.5">
                             or browse file
                         </span>
                     </div>
@@ -4175,47 +4361,47 @@ function renderGsxAuditModal() {
             html += `<div class="space-y-2 pt-1">`;
             if (activeFile) {
                 html += `
-                    <div class="flex items-center justify-between p-2 rounded-xl bg-slate-950 border border-slate-800 gap-2">
+                    <div class="flex items-center justify-between p-2.5 rounded-lg bg-[#0E121A] border border-[#2D3A54] gap-2">
                         <div class="min-w-0 flex-1">
                             <div class="flex items-center gap-1.5 flex-wrap">
-                                <span class="text-xs font-mono font-bold text-slate-200 truncate">${escapeHtml(activeFile.filename)}</span>
+                                <span class="text-xs font-sans font-semibold text-[#CBD5E1] truncate">${escapeHtml(activeFile.filename)}</span>
                                 ${activeFile.has_python_script ? `
-                                    <span class="text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-cyan-900 text-cyan-200 border-0 shrink-0" title="${t('gsx.includes_python', 'Includes Python dynamic script companion')}">
+                                    <span class="text-[9px] font-sans font-bold px-1.5 py-0.5 rounded bg-cyan-900/70 text-cyan-200 border-0 shrink-0" title="${t('gsx.includes_python', 'Includes Python dynamic script companion')}">
                                         + Python Script
                                     </span>
                                 ` : ''}
                             </div>
-                            <div class="text-[11px] font-mono text-slate-400 truncate mt-0.5">${escapeHtml(activeMeta)}</div>
+                            <div class="text-[11px] font-sans text-[#94A3B8] truncate mt-0.5">${escapeHtml(activeMeta)}</div>
                         </div>
                         <div class="flex items-center gap-1.5 shrink-0">
-                            <button onclick="revealGsxFileInExplorer('${escapeJsStr(activeFile.path || activeFile.filename)}')" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 cursor-pointer transition-colors" title="Reveal in Windows Explorer">Reveal</button>
+                            <button onclick="revealGsxFileInExplorer('${escapeJsStr(activeFile.path || activeFile.filename)}')" class="text-[10px] font-sans font-bold px-2.5 py-1.5 rounded-md leading-tight bg-[#12161F] hover:bg-[#253046] text-[#94A3B8] hover:text-white border border-[#253046] cursor-pointer transition-colors" title="Reveal in Windows Explorer">Reveal</button>
                         </div>
                     </div>
                 `;
             }
             html += `
-                <div class="flex items-center justify-end gap-2 pt-1 border-t border-slate-800 flex-wrap sm:flex-nowrap">
-                    <!-- Drop zone enlarged for easy dragging -->
+                <div class="flex items-center justify-end gap-2 pt-1.5 border-t border-[#1E2638] flex-wrap sm:flex-nowrap">
+                    <!-- Drop zone -->
                     <div id="gsx-dropzone-${icao}"
                          ondragover="handleGsxAuditDragOver(event, '${icao}')"
                          ondragleave="handleGsxAuditDragLeave(event, '${icao}')"
                          ondrop="handleGsxAuditDrop(event, '${icao}')"
                          onclick="installGsxProfileFromModal('${icao}')"
-                         class="px-4 py-2 min-w-[130px] h-10 rounded-xl bg-slate-950 border-2 border-dashed border-slate-700 hover:border-cyan-400 hover:bg-slate-900 flex flex-col items-center justify-center text-center cursor-pointer transition-all group shrink-0"
+                         class="px-3.5 py-1.5 min-w-[125px] h-9 rounded-lg bg-[#0E121A] border-2 border-dashed border-[#2D3A54] hover:border-cyan-400 hover:bg-[#181E2B] flex flex-col items-center justify-center text-center cursor-pointer transition-all group shrink-0"
                          title="Drop replacement .ini or archive (.zip) here, or click to browse">
-                        <span class="text-[10px] font-mono font-bold text-slate-200 group-hover:text-cyan-300 transition-colors pointer-events-none leading-none">
+                        <span class="text-[10px] font-sans font-bold text-[#CBD5E1] group-hover:text-cyan-300 transition-colors pointer-events-none leading-none">
                             DROP .INI / .ZIP
                         </span>
-                        <span class="text-[8px] font-mono text-slate-400 group-hover:text-slate-300 transition-colors pointer-events-none leading-tight mt-0.5">
+                        <span class="text-[8px] font-sans text-[#94A3B8] group-hover:text-slate-300 transition-colors pointer-events-none leading-tight mt-0.5">
                             or browse file
                         </span>
                     </div>
 
-                    <button onclick="searchGsxProfileFromModal('${icao}')" class="text-[10px] font-mono font-bold px-3.5 py-2.5 h-10 rounded-xl leading-tight bg-cyan-700 hover:bg-cyan-600 text-white border-0 cursor-pointer transition-colors shrink-0 flex items-center justify-center" title="Search on Flightsim.to">
+                    <button onclick="searchGsxProfileFromModal('${icao}')" class="text-[10px] font-sans font-bold px-3 py-2 h-9 rounded-lg leading-tight bg-cyan-600 hover:bg-cyan-500 text-white border-0 cursor-pointer transition-colors shrink-0 flex items-center justify-center" title="Search on Flightsim.to">
                         <span>Search on Flightsim.to</span>
                     </button>
                     ${activeFile && !activeFile.is_disabled ? `
-                        <button onclick="disableGsxProfileFromModal('${icao}', '${escapeJsStr(activeFile.filename)}')" class="text-[10px] font-mono font-bold px-3 py-2.5 h-10 rounded-xl leading-tight bg-slate-800 hover:bg-rose-600 text-slate-300 hover:text-white border-0 cursor-pointer transition-colors shrink-0" title="Disable mismatched profile">
+                        <button onclick="disableGsxProfileFromModal('${icao}', '${escapeJsStr(activeFile.filename)}')" class="text-[10px] font-sans font-bold px-3 py-2 h-9 rounded-lg leading-tight bg-[#12161F] hover:bg-rose-950 text-[#94A3B8] hover:text-white border border-[#253046] hover:border-rose-700 cursor-pointer transition-colors shrink-0" title="Disable mismatched profile">
                             Disable Profile
                         </button>
                     ` : ''}
@@ -4226,18 +4412,18 @@ function renderGsxAuditModal() {
             html += `<div class="space-y-1.5 pt-1">`;
             files.forEach(f => {
                 html += `
-                    <div class="flex items-center justify-between p-2 rounded-xl bg-slate-950 border border-slate-800 gap-2">
+                    <div class="flex items-center justify-between p-2.5 rounded-lg bg-[#0E121A] border border-[#2D3A54] gap-2">
                         <div class="min-w-0 flex-1">
-                            <div class="text-xs font-mono font-bold text-slate-200 truncate">${escapeHtml(f.filename)}</div>
-                            <div class="text-[11px] font-mono text-slate-400 truncate">${escapeHtml(f.creator ? `By ${f.creator}` : 'Orphan GSX file')}</div>
+                            <div class="text-xs font-sans font-semibold text-[#CBD5E1] truncate">${escapeHtml(f.filename)}</div>
+                            <div class="text-[11px] font-sans text-[#94A3B8] truncate mt-0.5">${escapeHtml(f.creator ? `By ${f.creator}` : 'Orphan GSX file')}</div>
                         </div>
                         <div class="flex items-center gap-1.5 shrink-0">
                             ${!f.is_disabled ? `
-                                <button onclick="disableGsxProfileFromModal('${icao}', '${escapeJsStr(f.filename)}')" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-slate-800 hover:bg-rose-900 text-slate-300 hover:text-white border border-slate-700 cursor-pointer transition-colors" title="Disable orphan profile">Disable</button>
+                                <button onclick="disableGsxProfileFromModal('${icao}', '${escapeJsStr(f.filename)}')" class="text-[10px] font-sans font-bold px-2.5 py-1.5 rounded-md leading-tight bg-[#12161F] hover:bg-rose-950 text-[#94A3B8] hover:text-white border border-[#253046] hover:border-rose-700 cursor-pointer transition-colors" title="Disable orphan profile">Disable</button>
                             ` : `
-                                <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-slate-900 text-slate-500 border border-slate-800">DISABLED</span>
+                                <span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded leading-tight bg-[#0E121A] text-[#64748B] border border-[#2D3A54]">DISABLED</span>
                             `}
-                            <button onclick="revealGsxFileInExplorer('${escapeJsStr(f.path || f.filename)}')" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded leading-tight bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 cursor-pointer transition-colors" title="Reveal in Windows Explorer">Reveal</button>
+                            <button onclick="revealGsxFileInExplorer('${escapeJsStr(f.path || f.filename)}')" class="text-[10px] font-sans font-bold px-2.5 py-1.5 rounded-md leading-tight bg-[#12161F] hover:bg-[#253046] text-[#94A3B8] hover:text-white border border-[#253046] cursor-pointer transition-colors" title="Reveal in Windows Explorer">Reveal</button>
                         </div>
                     </div>
                 `;
@@ -4246,8 +4432,8 @@ function renderGsxAuditModal() {
         } else if (entry.status === 'NO_PROFILE') {
             const vendorName = entry.vendor || (ap ? ap.vendor : '') || '';
             html += `
-                <div class="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-800 flex-wrap sm:flex-nowrap">
-                    <div class="text-[11px] font-mono text-slate-400 truncate min-w-0 flex-1">
+                <div class="flex items-center justify-between gap-2 pt-1.5 border-t border-[#1E2638] flex-wrap sm:flex-nowrap">
+                    <div class="text-[11px] font-sans text-[#94A3B8] truncate min-w-0 flex-1">
                         ${escapeHtml(vendorName ? `Studio: ${vendorName}` : 'Custom MSFS Scenery')}
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
@@ -4256,17 +4442,17 @@ function renderGsxAuditModal() {
                              ondragleave="handleGsxAuditDragLeave(event, '${icao}')"
                              ondrop="handleGsxAuditDrop(event, '${icao}')"
                              onclick="installGsxProfileFromModal('${icao}')"
-                             class="px-4 py-2 min-w-[130px] h-10 rounded-xl bg-slate-950 border-2 border-dashed border-slate-700 hover:border-cyan-400 hover:bg-slate-900 flex flex-col items-center justify-center text-center cursor-pointer transition-all group shrink-0"
+                             class="px-3.5 py-1.5 min-w-[125px] h-9 rounded-lg bg-[#0E121A] border-2 border-dashed border-[#2D3A54] hover:border-cyan-400 hover:bg-[#181E2B] flex flex-col items-center justify-center text-center cursor-pointer transition-all group shrink-0"
                              title="Drop .ini or archive (.zip) here, or click to browse">
-                            <span class="text-[10px] font-mono font-bold text-slate-200 group-hover:text-cyan-300 transition-colors pointer-events-none leading-none">
+                            <span class="text-[10px] font-sans font-bold text-[#CBD5E1] group-hover:text-cyan-300 transition-colors pointer-events-none leading-none">
                                 DROP .INI / .ZIP
                             </span>
-                            <span class="text-[8px] font-mono text-slate-400 group-hover:text-slate-300 transition-colors pointer-events-none leading-tight mt-0.5">
+                            <span class="text-[8px] font-sans text-[#94A3B8] group-hover:text-slate-300 transition-colors pointer-events-none leading-tight mt-0.5">
                                 or browse file
                             </span>
                         </div>
 
-                        <button onclick="searchGsxProfileFromModal('${icao}')" class="text-[10px] font-mono font-bold px-3.5 py-2.5 h-10 rounded-xl leading-tight bg-cyan-700 hover:bg-cyan-600 text-white border-0 cursor-pointer transition-colors shrink-0 flex items-center justify-center" title="Search on Flightsim.to">
+                        <button onclick="searchGsxProfileFromModal('${icao}')" class="text-[10px] font-sans font-bold px-3 py-2 h-9 rounded-lg leading-tight bg-cyan-600 hover:bg-cyan-500 text-white border-0 cursor-pointer transition-colors shrink-0 flex items-center justify-center" title="Search on Flightsim.to">
                             <span>Search on Flightsim.to</span>
                         </button>
                     </div>
@@ -4277,25 +4463,25 @@ function renderGsxAuditModal() {
             const disFilename = disFile.filename || entry.filename || '';
             const disPath = disFile.path || entry.path || disFilename;
             html += `
-                <div class="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-800 flex-wrap sm:flex-nowrap">
+                <div class="flex items-center justify-between gap-2 pt-1.5 border-t border-[#1E2638] flex-wrap sm:flex-nowrap">
                     <div class="min-w-0 flex-1">
-                        <div class="text-xs font-mono font-bold text-slate-300 truncate" title="${escapeHtml(disFilename)}">
+                        <div class="text-xs font-sans font-semibold text-[#CBD5E1] truncate" title="${escapeHtml(disFilename)}">
                             ${escapeHtml(disFilename)}
                         </div>
                     </div>
                     <div class="flex items-center gap-1.5 shrink-0">
                         <button onclick="enableGsxProfileFromAudit('${icao}', '${escapeJsStr(disFilename)}')"
-                                class="text-[10px] font-mono font-bold px-3 py-1.5 rounded-xl bg-cyan-900 hover:bg-cyan-800 text-cyan-200 border border-cyan-700 cursor-pointer transition-colors shadow-sm"
+                                class="text-[10px] font-sans font-bold px-3 py-1.5 rounded-md bg-cyan-900/70 hover:bg-cyan-800 text-cyan-200 border border-cyan-700/80 cursor-pointer transition-colors shadow-sm"
                                 title="Re-enable this profile">
                             Enable
                         </button>
                         <button onclick="confirmDeleteGsxProfile('${icao}', '${escapeJsStr(disFilename)}')"
-                                class="text-[10px] font-mono font-bold px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-rose-900 text-slate-400 hover:text-white border border-slate-700 hover:border-rose-800 cursor-pointer transition-colors"
+                                class="text-[10px] font-sans font-bold px-3 py-1.5 rounded-md bg-[#12161F] hover:bg-rose-950 text-[#94A3B8] hover:text-white border border-[#253046] hover:border-rose-800 cursor-pointer transition-colors"
                                 title="Permanently delete from disk">
                             Delete
                         </button>
                         <button onclick="revealGsxFileInExplorer('${escapeJsStr(disPath)}')"
-                                class="text-[10px] font-mono font-bold px-2 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 cursor-pointer transition-colors"
+                                class="text-[10px] font-sans font-bold px-2.5 py-1.5 rounded-md bg-[#12161F] hover:bg-[#253046] text-[#94A3B8] hover:text-white border border-[#253046] cursor-pointer transition-colors"
                                 title="Reveal in Windows Explorer">
                             Reveal
                         </button>
@@ -5140,7 +5326,7 @@ async function installBundledGsxProfile(icao) {
             }
 
             if (typeof showToast === 'function') {
-                showToast(t('gsx.bundled_installed_success', 'Profil GSX officiel installé avec succès'), 'success');
+                showToast(t('gsx.bundled_installed_success', 'Official GSX profile installed successfully'), 'success');
             }
         } else {
             if (typeof showToast === 'function') {
@@ -5310,6 +5496,9 @@ function updateStats(airports) {
     updateInvestmentBanner();
     updateConflictNavigator();
     updateGsxSidebarBadge();
+    if (typeof updateClassicPanelUI === 'function') {
+        updateClassicPanelUI();
+    }
 }
 
 let currentFlightMode = { active: false, icaos: [] };
@@ -5419,11 +5608,13 @@ function getCustomIconKey(ap) {
     const labelKey = `${showIcao ? 1 : 0}${showName ? 1 : 0}${showCity ? 1 : 0}`;
 
     const isSimBriefAlt = (flightCorridorProfile === 'SIMBRIEF' && typeof currentSimBriefAlternates !== 'undefined' && Array.isArray(currentSimBriefAlternates) && currentSimBriefAlternates.some(a => a && a.icao === ap.icao));
+    const isRouteBadgeActive = !!((typeof optimizerOrigin !== 'undefined' && optimizerOrigin && optimizerOrigin.icao === ap.icao && (typeof routeDepartureMarker !== 'undefined' && routeDepartureMarker)) ||
+                                  (typeof optimizerDest !== 'undefined' && optimizerDest && optimizerDest.icao === ap.icao && (typeof routeArrivalMarker !== 'undefined' && routeArrivalMarker)));
 
     if (hasAnyLabel) {
-        return `${ap.icao}_${cat}_${isApDisabled ? 1 : 0}_${hasActiveFix ? 1 : 0}_${hasConflict ? 1 : 0}_${isSimBriefAlt ? 1 : 0}_${isSelected ? 1 : 0}_${labelKey}`;
+        return `${ap.icao}_${cat}_${isApDisabled ? 1 : 0}_${hasActiveFix ? 1 : 0}_${hasConflict ? 1 : 0}_${isSimBriefAlt ? 1 : 0}_${isSelected ? 1 : 0}_${isRouteBadgeActive ? 1 : 0}_${labelKey}`;
     }
-    return `${cat}_${isApDisabled ? 1 : 0}_${hasActiveFix ? 1 : 0}_${hasConflict ? 1 : 0}_${isSimBriefAlt ? 1 : 0}_${isSelected ? 1 : 0}_000`;
+    return `${cat}_${isApDisabled ? 1 : 0}_${hasActiveFix ? 1 : 0}_${hasConflict ? 1 : 0}_${isSimBriefAlt ? 1 : 0}_${isSelected ? 1 : 0}_${isRouteBadgeActive ? 1 : 0}_000`;
 }
 
 function createCustomIcon(ap) {
@@ -5566,9 +5757,12 @@ function createCustomIcon(ap) {
         </div>
     `;
 
+    const isRouteBadgeActive = !!((typeof optimizerOrigin !== 'undefined' && optimizerOrigin && optimizerOrigin.icao === ap.icao && (typeof routeDepartureMarker !== 'undefined' && routeDepartureMarker)) ||
+                                  (typeof optimizerDest !== 'undefined' && optimizerDest && optimizerDest.icao === ap.icao && (typeof routeArrivalMarker !== 'undefined' && routeArrivalMarker)));
+
     const icon = L.divIcon({
         html: combinedHtml,
-        className: `custom-map-marker ${isApDisabled && !hasActiveFix ? 'grayscale-[0.5]' : ''}`,
+        className: `custom-map-marker ${isApDisabled && !hasActiveFix ? 'grayscale-[0.5]' : ''} ${isRouteBadgeActive ? 'route-badge-active' : ''}`,
         iconSize: isCircleShape ? [22, 22] : [26, 26],
         iconAnchor: isCircleShape ? [11, 11] : [13, 13]
     });
@@ -5579,23 +5773,23 @@ function createCustomIcon(ap) {
 
 function getAirportPopupHtml(ap) {
     const cat = getAirportCategory(ap);
-    let badgeClass = 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40 shadow-sm';
+    let badgeClass = 'bg-cyan-600 text-white font-bold border-0 shadow-sm';
     let badgeLabel = 'Freeware';
     let icaoColorClass = 'text-cyan-400';
     let publisherColorClass = 'text-cyan-400';
 
     if (cat === 'DEFAULT') {
-        badgeClass = 'bg-blue-500/20 text-blue-300 border-blue-500/40 shadow-sm';
+        badgeClass = 'bg-blue-600 text-white font-bold border-0 shadow-sm';
         badgeLabel = 'Default MSFS';
         icaoColorClass = 'text-blue-400';
         publisherColorClass = 'text-slate-400';
     } else if (cat === 'ASOBO') {
-        badgeClass = 'bg-amber-500/20 text-amber-300 border-amber-500/40 shadow-sm';
+        badgeClass = 'bg-amber-500 text-slate-950 font-black border-0 shadow-sm';
         badgeLabel = 'Asobo';
         icaoColorClass = 'text-amber-400';
         publisherColorClass = 'text-amber-400';
     } else if (cat === 'PAYWARE') {
-        badgeClass = 'bg-purple-500/20 text-purple-300 border-purple-500/40 shadow-sm';
+        badgeClass = 'bg-purple-600 text-white font-bold border-0 shadow-sm';
         badgeLabel = 'Payware Addon';
         icaoColorClass = 'text-purple-400';
         publisherColorClass = 'text-purple-400';
@@ -5610,7 +5804,7 @@ function getAirportPopupHtml(ap) {
     ` : '';
 
     const conflictBadgeHtml = ap.has_conflict ? `
-        <div class="mt-1.5 flex items-center gap-1.5 text-red-400 font-bold text-xs bg-red-500/10 px-2.5 py-1 rounded-lg border border-red-500/30">
+        <div class="mt-1.5 flex items-center gap-1.5 text-white font-bold text-xs bg-rose-600 px-2.5 py-1 rounded-lg border-0 shadow-sm">
             <i class="fa-solid fa-triangle-exclamation"></i>
             <span>Conflict: ${ap.conflict_count} Active Sceneries</span>
         </div>
@@ -5745,15 +5939,23 @@ function renderAirportsOnMap(airports) {
                 } else if (activeDrawerMode === 'COUNTRY') {
                     focusAirportInCountryMode(currentAp);
                 } else {
-                    if (currentRadialAirport && currentRadialAirport.icao === currentAp.icao) {
-                        closeAirportRadialMenu(false);
+                    if (isClassicNavMode()) {
+                        isCameraPanningToRadial = true;
+                        if (map && currentAp.lat && currentAp.lon) {
+                            panMapToAirport(currentAp);
+                        }
+                        showClassicAirportView(currentAp);
                     } else {
-                        openAirportRadialMenu(currentAp, this, e);
+                        if (currentRadialAirport && currentRadialAirport.icao === currentAp.icao) {
+                            closeAirportRadialMenu(false);
+                        } else {
+                            openAirportRadialMenu(currentAp, this, e);
+                        }
                     }
                 }
             });
 
-            // Right-Click event: opens the sleek circular Radial Menu directly
+            // Right-Click event: opens the sleek circular Radial Menu directly (or selects in Classic mode)
             marker.on('contextmenu', function (e) {
                 if (typeof closeFilterRadialMenu === 'function') {
                     closeFilterRadialMenu();
@@ -5763,6 +5965,14 @@ function renderAirportsOnMap(airports) {
                     e.originalEvent.stopPropagation();
                 }
                 const currentAp = this._airportData || ap;
+                if (isClassicNavMode()) {
+                    isCameraPanningToRadial = true;
+                    if (map && currentAp.lat && currentAp.lon) {
+                        panMapToAirport(currentAp);
+                    }
+                    showClassicAirportView(currentAp);
+                    return;
+                }
                 openAirportRadialMenu(currentAp, this, e);
             });
 
@@ -5816,8 +6026,12 @@ function closeAirportRadialMenu(keepModals = false) {
         radialEl.classList.add('hidden');
         radialEl.classList.remove('animate-radial-open');
         radialEl.classList.remove('radial-quadrants-collapsed');
+        radialEl.classList.remove('radial-only-core');
         radialEl.style.transform = 'translate(-50%, -50%)';
         radialEl.style.opacity = '1';
+        radialEl.style.display = 'none';
+        radialEl.style.left = '-9999px';
+        radialEl.style.top = '-9999px';
     }
     const extEl = document.getElementById('radial-sceneries-extension');
     if (extEl) {
@@ -5907,14 +6121,26 @@ function updateRadialMenuPosition(force = false) {
 
     const radialEl = document.getElementById('airport-radial-menu');
     if (!radialEl) return;
+    if (typeof isFlightOptimizerModalOpen === 'function' && isFlightOptimizerModalOpen()) {
+        radialEl.classList.add('hidden');
+        radialEl.style.display = 'none';
+        radialEl.style.left = '-9999px';
+        radialEl.style.top = '-9999px';
+        return;
+    }
     if (!force && radialEl.classList.contains('hidden')) return;
 
     const currentZoom = (typeof map.getZoom === 'function') ? map.getZoom() : 8;
 
     // Disparition automatique quand on est trop dezoome (seuil optimal : zoom 5.0)
-    // Ne jamais fermer automatiquement pendant que la camera est en cours de vol/pan vers l'aeroport
+    // Ne jamais fermer automatiquement :
+    // - si force === true (ouverture / repositionnement explicite)
+    // - si la camera est en cours de vol/pan vers l'aeroport (isCameraPanningToRadial)
+    // - en mode Classic Nav avec aeroport selectionne (pastille d'aeroport selectionne)
+    // - si une modale ou extension est ouverte (Airlines, Details, Sceneries)
     const MIN_RADIAL_ZOOM = 5.0;
-    if (!isCameraPanningToRadial && currentZoom < MIN_RADIAL_ZOOM) {
+    const isClassicPastille = radialEl.classList.contains('radial-only-core') && !!currentClassicAirport;
+    if (!force && !isCameraPanningToRadial && !isClassicPastille && currentZoom < MIN_RADIAL_ZOOM) {
         if (isAirlinesModalOpen() || isDetailsModalOpen() || isSceneriesExtensionOpen()) {
             // In airlines/details/sceneries mode: do not auto-close on zoom out
             return;
@@ -5936,46 +6162,61 @@ function updateRadialMenuPosition(force = false) {
     radialEl.style.top = `${Math.round(point.y)}px`;
 
     // Dynamic scale & opacity curve :
-    // - Plafonne a 1.0 (540px) lors du zoom avant (currentZoom >= 8.0)
-    // - Reduit beaucoup plus rapidement lors du dezoom (zoom 8.0 -> 5.0)
-    //   ex: zoom 8.0 = 1.0 (540px), zoom 7.0 = 0.77 (417px), zoom 6.0 = 0.55 (295px), zoom 5.0 = 0.32 (173px)
-    // - Fondu d'opacite a l'approche du seuil de disparition (5.4 -> 5.0)
     let scale = 1.0;
-    if (currentZoom < 8.0) {
-        const progress = Math.max(0.0, Math.min(1.0, (currentZoom - MIN_RADIAL_ZOOM) / (8.0 - MIN_RADIAL_ZOOM)));
-        scale = 0.32 + progress * 0.68;
-    } else {
-        scale = 1.0;
-    }
-
-    if (currentZoom < 5.4 && !isCameraPanningToRadial) {
-        const opacity = Math.max(0.0, Math.min(1.0, (currentZoom - MIN_RADIAL_ZOOM) / 0.4));
-        radialEl.style.opacity = opacity.toFixed(2);
-    } else {
+    if (isClassicPastille) {
+        // En mode classique : pastille toujours visible et bien lisible sur le marker
+        scale = (currentZoom < 6.0) ? 0.8 : 1.0;
         radialEl.style.opacity = '1';
+    } else {
+        if (currentZoom < 8.0) {
+            const progress = Math.max(0.0, Math.min(1.0, (currentZoom - MIN_RADIAL_ZOOM) / (8.0 - MIN_RADIAL_ZOOM)));
+            scale = 0.32 + progress * 0.68;
+        } else {
+            scale = 1.0;
+        }
+
+        if (isCameraPanningToRadial) {
+            radialEl.style.opacity = '1';
+        } else if (currentZoom < 5.4) {
+            const opacity = Math.max(0.0, Math.min(1.0, (currentZoom - MIN_RADIAL_ZOOM) / 0.4));
+            radialEl.style.opacity = opacity.toFixed(2);
+        } else {
+            radialEl.style.opacity = '1';
+        }
     }
 
     radialEl.style.transform = `translate(-50%, -50%) scale(${scale.toFixed(3)})`;
 
-    // Position Scenery Extension Modal in viewport coordinates (if not dragged by user)
+    // Position Scenery Extension Modal in viewport coordinates (if not dragged by user and NOT in classic mode)
     const extEl = document.getElementById('radial-sceneries-extension');
     if (extEl && !extEl.classList.contains('hidden')) {
-        if (!extEl._hasBeenDragged) {
+        const isClassic = isClassicNavMode() || document.body.classList.contains('classic-nav-active') || (document.getElementById('classic-flight-ops-panel') && !document.getElementById('classic-flight-ops-panel').classList.contains('hidden'));
+        if (!isClassic && !extEl._hasBeenDragged) {
             const mapContainer = (typeof map.getContainer === 'function') ? map.getContainer() : null;
             const mapRect = mapContainer ? mapContainer.getBoundingClientRect() : { left: 0, top: 0 };
             const screenX = mapRect.left + point.x;
             const screenY = mapRect.top + point.y;
-            const extWidth = extEl.offsetWidth || 490;
+            const extWidth = extEl.offsetWidth || 440;
             const extHeight = extEl.offsetHeight || 420;
 
-            let idealLeft = screenX + (270 * scale) + 16;
-            if (idealLeft + extWidth > window.innerWidth - 16) {
-                idealLeft = screenX - (270 * scale) - extWidth - 16;
+            const topBound = 126;
+            const botBound = 84;
+            const minLeft = 16;
+            const maxH = Math.max(200, window.innerHeight - topBound - botBound);
+            extEl.style.maxHeight = `${maxH}px`;
+
+            const radialRadius = 270 * scale;
+            const gap = 16;
+            let idealLeft = screenX - radialRadius - extWidth - gap;
+            if (idealLeft < minLeft) {
+                if (screenX + radialRadius + gap + extWidth <= window.innerWidth - 16) {
+                    idealLeft = screenX + radialRadius + gap;
+                }
             }
-            idealLeft = Math.max(16, Math.min(window.innerWidth - extWidth - 16, idealLeft));
+            idealLeft = Math.max(minLeft, Math.min(window.innerWidth - extWidth - 16, idealLeft));
 
             let idealTop = screenY - (extHeight / 2);
-            idealTop = Math.max(50, Math.min(window.innerHeight - extHeight - 16, idealTop));
+            idealTop = Math.max(topBound, Math.min(window.innerHeight - botBound - extHeight, idealTop));
 
             extEl.style.left = `${Math.round(idealLeft)}px`;
             extEl.style.top = `${Math.round(idealTop)}px`;
@@ -5995,17 +6236,67 @@ function updateRadialAirlinesModalPosition(force = false) {
     if (!modal || (!force && modal.classList.contains('hidden'))) return;
 
     if (!modal._hasBeenDragged && !hasUserDraggedAirlinesModal) {
-        const headerEl = document.querySelector('header');
-        const headerBottom = headerEl ? headerEl.getBoundingClientRect().bottom : 118;
-        const topPos = Math.round(headerBottom + 16);
-        const maxH = Math.max(300, window.innerHeight - topPos - 20);
+        const topBound = 126;
+        const botBound = 84;
+        const isClassic = isClassicNavMode() || document.body.classList.contains('classic-nav-active') || (document.getElementById('classic-flight-ops-panel') && !document.getElementById('classic-flight-ops-panel').classList.contains('hidden'));
+        const minLeft = isClassic ? 304 : 16;
+        const maxH = Math.max(200, window.innerHeight - topBound - botBound);
+        modal.style.maxHeight = `${maxH}px`;
 
-        modal.style.left = '120px';
-        modal.style.top = `${topPos}px`;
+        const w = modal.offsetWidth || 580;
+        const h = modal.offsetHeight || 440;
+
+        if (isClassic) {
+            const availableW = window.innerWidth - minLeft - 16;
+            const left = Math.max(minLeft, Math.min(window.innerWidth - w - 16, Math.floor(minLeft + Math.max(0, (availableW - w) / 2))));
+            modal.style.left = `${left}px`;
+            modal.style.top = `${topBound}px`;
+        } else {
+            // RADIAL MODE: Anchor close and to the left of the radial wheel
+            if (!currentRadialAirport || !map) return;
+            const latLng = getWrappedAirportLatLng(currentRadialAirport, currentRadialMarker);
+            if (!latLng) return;
+            let point = null;
+            try {
+                point = map.latLngToContainerPoint(latLng);
+            } catch (err) {}
+            if (!point) return;
+
+            const mapContainer = (typeof map.getContainer === 'function') ? map.getContainer() : null;
+            const mapRect = mapContainer ? mapContainer.getBoundingClientRect() : { left: 0, top: 0 };
+            const screenX = mapRect.left + point.x;
+            const screenY = mapRect.top + point.y;
+
+            const currentZoom = (typeof map.getZoom === 'function') ? map.getZoom() : 8;
+            const MIN_RADIAL_ZOOM = 4.8;
+            let scale = 1.0;
+            if (currentZoom < 8.0) {
+                const progress = Math.max(0.0, Math.min(1.0, (currentZoom - MIN_RADIAL_ZOOM) / (8.0 - MIN_RADIAL_ZOOM)));
+                scale = 0.32 + progress * 0.68;
+            }
+
+            const radialRadius = 270 * scale;
+            const gap = 16;
+            let idealLeft = screenX - radialRadius - w - gap;
+
+            // If overflowing the left edge of viewport, flip to right if space permits
+            if (idealLeft < minLeft) {
+                if (screenX + radialRadius + gap + w <= window.innerWidth - 16) {
+                    idealLeft = screenX + radialRadius + gap;
+                }
+            }
+            idealLeft = Math.max(minLeft, Math.min(window.innerWidth - w - 16, idealLeft));
+
+            let idealTop = screenY - (h / 2);
+            idealTop = Math.max(topBound, Math.min(window.innerHeight - botBound - h, idealTop));
+
+            modal.style.left = `${Math.round(idealLeft)}px`;
+            modal.style.top = `${Math.round(idealTop)}px`;
+        }
+
         modal.style.bottom = 'auto';
         modal.style.right = 'auto';
         modal.style.height = 'auto';
-        modal.style.maxHeight = `${maxH}px`;
         modal.style.transform = 'none';
     }
 }
@@ -6028,18 +6319,23 @@ function updateRadialDetailsModalPosition(force = false) {
     const screenX = mapRect.left + point.x;
     const screenY = mapRect.top + point.y;
 
+    const topBound = 126;
+    const botBound = 84;
+    const isClassic = document.body.classList.contains('classic-nav-active') || (document.getElementById('classic-flight-ops-panel') && !document.getElementById('classic-flight-ops-panel').classList.contains('hidden'));
+    const minLeft = isClassic ? 304 : 16;
+    const maxH = Math.max(200, window.innerHeight - topBound - botBound);
+    modal.style.maxHeight = `${maxH}px`;
+
     const modalWidth = modal.offsetWidth || 940;
-    const modalHeight = modal.offsetHeight || 640;
+    const modalHeight = Math.min(maxH, modal.offsetHeight || 640);
     const currentZoom = (typeof map.getZoom === 'function') ? map.getZoom() : 8;
     const scale = Math.max(0.65, Math.min(1.05, currentZoom / 8.0));
 
     let desiredLeft = Math.round(screenX - modalWidth / 2);
-    desiredLeft = Math.max(16, Math.min(window.innerWidth - modalWidth - 16, desiredLeft));
+    desiredLeft = Math.max(minLeft, Math.min(window.innerWidth - modalWidth - 16, desiredLeft));
 
     let desiredTop = Math.round(screenY + (270 * scale) + 12);
-    if (desiredTop + modalHeight > window.innerHeight - 16) {
-        desiredTop = Math.max(50, window.innerHeight - modalHeight - 16);
-    }
+    desiredTop = Math.max(topBound, Math.min(window.innerHeight - botBound - modalHeight, desiredTop));
 
     modal.style.left = `${desiredLeft}px`;
     modal.style.top = `${desiredTop}px`;
@@ -6071,8 +6367,13 @@ function panMapToAirport(ap, forcedZoom = null) {
         : 6.0;
 
     let xOffset = 0;
-    // In airlines/details mode: strictly enforce xOffset = 0 so the airport is centered horizontally
-    if (!isAirlinesModalOpen() && !isDetailsModalOpen()) {
+    if (isClassicNavMode()) {
+        const classicPanel = document.getElementById('classic-flight-ops-panel') || document.getElementById('classic-nav-panel');
+        if (classicPanel && !classicPanel.classList.contains('hidden') && classicPanel.style.display !== 'none') {
+            const panelWidth = classicPanel.offsetWidth || 290;
+            xOffset = -Math.round(panelWidth / 2);
+        }
+    } else if (!isAirlinesModalOpen() && !isDetailsModalOpen()) {
         const detailDrawer = document.getElementById('detail-drawer');
         if (detailDrawer && !detailDrawer.classList.contains('translate-x-full') && !detailDrawer.classList.contains('hidden')) {
             const drawerWidth = detailDrawer.offsetWidth || 460;
@@ -6081,8 +6382,8 @@ function panMapToAirport(ap, forcedZoom = null) {
     }
 
     let yOffset = 0;
-    if (isAirlinesModalOpen()) {
-        // En mode Airlines : positionner l'aéroport légèrement décalé vers la droite pour faire place à la modale à gauche
+    if (isAirlinesModalOpen() || isSceneriesExtensionOpen()) {
+        // En mode Airlines / Sceneries : positionner l'aéroport légèrement décalé vers la droite pour faire place à la modale à gauche
         const mapW = (map && typeof map.getSize === 'function') ? map.getSize().x : window.innerWidth;
         const mapH = (map && typeof map.getSize === 'function') ? map.getSize().y : window.innerHeight;
         xOffset = -Math.round(Math.min(220, mapW * 0.15));
@@ -6110,6 +6411,11 @@ function panMapToAirport(ap, forcedZoom = null) {
     if (typeof isFlightOptimizerModalOpen === 'function' && isFlightOptimizerModalOpen() && typeof startOptimizerPanTracking === 'function') {
         startOptimizerPanTracking(Math.round((PAN_DURATION + 0.4) * 1000));
     }
+
+    // Stop any ongoing flyTo or pan cleanly before attaching moveend listener
+    try {
+        map.stop();
+    } catch (e) {}
 
     isCameraPanningToRadial = true;
 
@@ -6177,6 +6483,23 @@ function openAirportRadialMenu(ap, marker, e) {
     }
     if (!ap) return;
     const latestAp = (allAirportsData && allAirportsData.find(a => a.icao === ap.icao)) || ap;
+
+    // Classic Navigation Mode: Route directly to contextual Airport Sheet in sidebar (suppress radial wheel)
+    if (isClassicNavMode()) {
+        closeAirportRadialMenu(false);
+        if (typeof closeFilterRadialMenu === 'function') {
+            closeFilterRadialMenu();
+        }
+        isCameraPanningToRadial = true;
+        if (map && latestAp.lat && latestAp.lon) {
+            panMapToAirport(latestAp);
+        }
+        if (typeof showClassicAirportView === 'function') {
+            showClassicAirportView(latestAp);
+        }
+        return;
+    }
+
     currentRadialAirport = latestAp;
     currentRadialMarker = marker || null;
     stagedRadialScenerySelection = null;
@@ -6188,6 +6511,7 @@ function openAirportRadialMenu(ap, marker, e) {
 
     const radialEl = document.getElementById('airport-radial-menu');
     if (!radialEl) return;
+    radialEl.classList.remove('radial-only-core');
     if (!radialEl._clickPropagationDisabled) {
         L.DomEvent.disableClickPropagation(radialEl);
         L.DomEvent.disableScrollPropagation(radialEl);
@@ -6390,7 +6714,8 @@ function openAirportRadialMenu(ap, marker, e) {
     }
 
     // Reveal Radial Menu with snappy bounce & circular cascade animation
-    radialEl.classList.remove('hidden', 'radial-quadrants-collapsed');
+    radialEl.style.display = '';
+    radialEl.classList.remove('hidden', 'radial-quadrants-collapsed', 'radial-only-core');
     updateRadialMenuPosition(true);
 
     radialEl.classList.remove('animate-radial-open');
@@ -6431,9 +6756,15 @@ function triggerRadialOperatingAirlines() {
     } else {
         operatingAirlinesOriginAirport = currentRadialAirport;
 
-        // Toggle ON: Radial menu wheel of this airport disappears when entering Operating Airlines mode for it
+        // Keep radial menu pastille visible and anchored
         if (radialEl) {
-            radialEl.classList.add('hidden');
+            if (isClassicNavMode()) {
+                radialEl.classList.add('radial-only-core');
+            } else {
+                radialEl.classList.remove('radial-only-core');
+            }
+            radialEl.classList.remove('hidden', 'radial-quadrants-collapsed');
+            radialEl.style.display = '';
         }
 
         hasUserDraggedAirlinesModal = false;
@@ -6446,6 +6777,9 @@ function triggerRadialOperatingAirlines() {
 
         panMapToAirport(currentRadialAirport);
         updateRadialAirlinesModalPosition(true);
+        if (typeof updateRadialMenuPosition === 'function') {
+            updateRadialMenuPosition(true);
+        }
     }
 }
 
@@ -6480,14 +6814,29 @@ function closeRadialAirlinesModal(event) {
         filterAirports();
         updateFilterUI();
     }
-    // Cleanly close radial menu wheel and reset selected airport
-    if (radialEl) {
-        radialEl.classList.add('hidden');
-        radialEl.classList.remove('radial-quadrants-collapsed');
+    // Keep radial menu / pastille visible and airport selected!
+    if (currentRadialAirport) {
+        if (radialEl) {
+            if (isClassicNavMode()) {
+                radialEl.classList.add('radial-only-core');
+            } else {
+                radialEl.classList.remove('radial-only-core');
+            }
+            radialEl.classList.remove('hidden', 'radial-quadrants-collapsed');
+            radialEl.style.display = '';
+        }
+        if (typeof updateRadialMenuPosition === 'function') {
+            updateRadialMenuPosition(true);
+        }
+    } else {
+        if (radialEl) {
+            radialEl.classList.add('hidden');
+            radialEl.classList.remove('radial-quadrants-collapsed');
+        }
+        currentRadialAirport = null;
+        currentRadialMarker = null;
+        selectedAirport = null;
     }
-    currentRadialAirport = null;
-    currentRadialMarker = null;
-    selectedAirport = null;
 }
 
 function initDraggableAirlinesModal() {
@@ -6726,28 +7075,28 @@ function renderAirlineDestAccordionContent(destIcao) {
     const destVendor = (destAp.vendor || destAp.creator || '').toLowerCase().trim();
 
     let html = `
-        <div class="p-3.5 rounded-2xl bg-slate-900/90 border border-slate-700/60 space-y-2.5 mt-2.5" onclick="event.stopPropagation();">
+        <div class="p-3 rounded-lg bg-[#0E121A] border border-[#2D3A54] space-y-2.5 mt-2.5 font-sans" onclick="event.stopPropagation();">
             <!-- 1. Available Freeware Addons -->
             <div class="flex items-center gap-2 px-0.5">
-                <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300">${t('drawer.freeware_addons', 'Available Freeware Addons')}</span>
+                <span class="text-xs font-sans font-bold uppercase tracking-wider text-[#94A3B8]">${t('drawer.freeware_addons', 'Available Freeware Addons')}</span>
             </div>
             <div onclick="event.stopPropagation(); openFreewareScenerySearch('${destIcao}');"
-                 class="py-2.5 px-3.5 rounded-xl border border-slate-700/60 hover:border-cyan-400 bg-slate-950/60 hover:bg-slate-900 transition-all cursor-pointer group flex flex-col gap-1">
+                 class="py-2 px-3 rounded-lg border border-[#253046] hover:border-[#38BDF8]/40 bg-[#181E2B] hover:bg-[#253046] transition-all cursor-pointer group flex flex-col gap-1">
                 <div class="flex items-center justify-between gap-2">
-                    <span class="text-sm font-bold text-white group-hover:text-cyan-300 transition-colors">Flightsim.to</span>
-                    <span class="text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg bg-cyan-600 text-white uppercase leading-tight border-0">${t('pricing.freeware_caps', 'FREEWARE')}</span>
+                    <span class="text-xs font-sans font-bold text-white group-hover:text-cyan-300 transition-colors">Flightsim.to</span>
+                    <span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded bg-cyan-600 text-white uppercase leading-tight border-0">${t('pricing.freeware_caps', 'FREEWARE')}</span>
                 </div>
             </div>
 
             <!-- 2. Available Payware Addons -->
             <div class="flex items-center gap-2 px-0.5 pt-1">
-                <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300">${t('drawer.payware_addons', 'Available Payware Addons')}</span>
+                <span class="text-xs font-sans font-bold uppercase tracking-wider text-[#94A3B8]">${t('drawer.payware_addons', 'Available Payware Addons')}</span>
             </div>
     `;
 
     if (!stores) {
         html += `
-            <div class="p-3 rounded-xl bg-slate-950/40 border border-slate-800 text-center text-xs font-mono text-slate-400">
+            <div class="p-3 rounded-lg bg-[#181E2B] border border-[#253046] text-center text-xs font-sans text-[#94A3B8]">
                 <i class="fa-solid fa-spinner fa-spin mr-1.5"></i> Checking store availability...
             </div>
         `;
@@ -6755,7 +7104,7 @@ function renderAirlineDestAccordionContent(destIcao) {
         const positiveStores = stores.filter(st => st && st.found && st.url);
         if (positiveStores.length === 0) {
             html += `
-                <div class="p-3 rounded-xl bg-slate-950/40 border border-slate-800 text-center text-xs font-mono text-slate-400">
+                <div class="p-3 rounded-lg bg-[#181E2B] border border-[#253046] text-center text-xs font-sans text-[#94A3B8]">
                     No commercial store addons listed for ${destIcao}.
                 </div>
             `;
@@ -6788,8 +7137,8 @@ function renderAirlineDestAccordionContent(destIcao) {
                 const isDev = st.type === 'dev';
                 const safeUrl = (st.url || '').replace(/'/g, "\\'");
                 const badgeHtml = isDev
-                    ? '<span class="text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg bg-amber-500 text-slate-950 uppercase border-0">DEV</span>'
-                    : '<span class="text-[10px] font-mono font-bold px-2.5 py-1 rounded-lg bg-purple-600 text-white uppercase border-0">STORE</span>';
+                    ? '<span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded bg-amber-500 text-slate-950 uppercase border-0">DEV</span>'
+                    : '<span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded bg-purple-600 text-white uppercase border-0">STORE</span>';
 
                 let devSubtitle = '';
                 if (st.developer && typeof st.developer === 'string') {
@@ -6806,23 +7155,23 @@ function renderAirlineDestAccordionContent(destIcao) {
 
                 html += `
                     <div onclick="event.stopPropagation(); openExternalUrl('${safeUrl}');"
-                         class="py-2 px-3.5 rounded-xl border border-slate-700/60 hover:border-purple-500 bg-slate-950/60 hover:bg-slate-900 transition-all cursor-pointer group flex items-center justify-between gap-2.5">
+                         class="py-2 px-3 rounded-lg border border-[#253046] hover:border-purple-500/80 bg-[#181E2B] hover:bg-[#253046] transition-all cursor-pointer group flex items-center justify-between gap-2.5">
                         <div class="min-w-0 flex-1">
-                            <span class="text-sm font-bold text-white group-hover:text-purple-300 transition-colors truncate block">${st.name}</span>
-                            ${devSubtitle ? `<span class="text-xs font-mono text-slate-400 truncate block mt-0.5"><span class="text-slate-500 text-[10px]">by </span><span class="text-cyan-300 font-bold tracking-wide">${devSubtitle}</span></span>` : ''}
+                            <span class="text-xs font-sans font-bold text-white group-hover:text-purple-300 transition-colors truncate block">${st.name}</span>
+                            ${devSubtitle ? `<span class="text-[11px] font-sans text-[#94A3B8] truncate block mt-0.5"><span class="text-[#64748B] text-[10px]">by </span><span class="text-cyan-300 font-bold tracking-wide">${devSubtitle}</span></span>` : ''}
                         </div>
                         <div class="flex items-center gap-2 shrink-0">
                             ${(destVendor && (
                                 st.name.toLowerCase().includes(destVendor) ||
                                 (st.developer && typeof st.developer === 'string' && (st.developer.toLowerCase().includes(destVendor) || destVendor.includes(st.developer.toLowerCase())))
                             )) ? `
-                                <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg bg-emerald-600 text-white uppercase border-0">
+                                <span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded bg-emerald-600 text-white uppercase border-0">
                                     OWNED
                                 </span>
                             ` : ''}
                             ${badgeHtml}
                             ${st.formattedPrice ? `
-                                <span class="text-xs font-mono font-bold px-2.5 py-1 rounded-lg bg-emerald-600 text-white border-0">
+                                <span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded bg-emerald-600 text-white border-0">
                                     ${st.formattedPrice}
                                 </span>
                             ` : ''}
@@ -6959,7 +7308,7 @@ function renderAirlineDestinationsList(originAp) {
     });
 
     if (filteredList.length === 0) {
-        listEl.innerHTML = `<div class="text-xs text-slate-400 italic py-4 text-center">No destinations match the "${currentAirlineDestFilter}" category.</div>`;
+        listEl.innerHTML = `<div class="text-xs font-sans text-[#94A3B8] italic py-4 text-center">No destinations match the "${currentAirlineDestFilter}" category.</div>`;
         return;
     }
 
@@ -6969,7 +7318,7 @@ function renderAirlineDestinationsList(originAp) {
         const isExpanded = expandedAirlineDestIcao === item.icao;
         const isOwned = (cat === 'PAYWARE' || cat === 'FREEWARE' || cat === 'ASOBO') || !!ap.is_custom;
 
-        let badgeClass = 'bg-slate-700 text-slate-300 border-0';
+        let badgeClass = 'bg-[#12161F] text-[#94A3B8] border border-[#253046]';
         let badgeText = 'DEFAULT';
         let packageInfo = 'MSFS Generic';
 
@@ -6990,34 +7339,34 @@ function renderAirlineDestinationsList(originAp) {
         const cityCountry = [ap.city, ap.country].filter(Boolean).join(', ');
 
         return `
-            <div class="rounded-2xl bg-slate-950/50 border border-slate-800/90 p-3.5 hover:border-slate-700 transition-all shadow-sm">
+            <div class="rounded-lg bg-[#181E2B] border border-[#253046] p-3 hover:border-[#38BDF8]/40 transition-all shadow-sm font-sans">
                 <div onclick="toggleAirlineDestAccordion('${item.icao}', event)"
                      class="flex items-center justify-between gap-3 cursor-pointer group">
                     <div class="min-w-0 flex-1">
-                        <div class="flex items-center gap-2.5">
-                            <span class="text-sm font-mono font-black text-white group-hover:text-cyan-300 transition-colors">${item.icao}</span>
-                            <span class="text-sm font-bold text-slate-100 truncate">${ap.name || item.icao}</span>
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs sm:text-sm font-sans font-bold text-[#38BDF8] group-hover:text-cyan-300 transition-colors">${item.icao}</span>
+                            <span class="text-xs sm:text-sm font-sans font-bold text-[#F1F5F9] truncate">${ap.name || item.icao}</span>
                         </div>
-                        <div class="flex items-center gap-2 mt-1 text-xs font-mono text-slate-400">
+                        <div class="flex items-center gap-2 mt-0.5 text-[11px] font-sans text-[#94A3B8]">
                             ${cityCountry ? `<span class="truncate">${cityCountry}</span>` : ''}
-                            ${cityCountry && packageInfo ? `<span class="text-slate-600">•</span>` : ''}
-                            ${packageInfo ? `<span class="text-slate-300 truncate font-sans font-medium">${packageInfo}</span>` : ''}
+                            ${cityCountry && packageInfo ? `<span class="text-[#64748B]">•</span>` : ''}
+                            ${packageInfo ? `<span class="text-[#CBD5E1] truncate font-medium">${packageInfo}</span>` : ''}
                         </div>
                     </div>
 
-                    <div class="flex items-center gap-2 shrink-0">
+                    <div class="flex items-center gap-1.5 shrink-0">
                         ${isOwned ? `
-                            <span class="text-[11px] font-mono font-bold px-2.5 py-1 rounded-lg leading-tight bg-emerald-600 text-white border-0">
+                            <span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded leading-tight bg-emerald-600 text-white border-0">
                                 OWNED
                             </span>
                         ` : ''}
-                        <span class="text-[11px] font-mono font-bold px-2.5 py-1 rounded-lg leading-tight ${badgeClass}">
+                        <span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded leading-tight ${badgeClass}">
                             ${badgeText}
                         </span>
-                        <button onclick="centerMapOnDestination('${item.icao}', event)" title="Locate on map" class="w-8 h-8 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-xs border border-slate-700/60 transition-colors cursor-pointer">
-                            ${getIcon('target', 'w-4 h-4')}
+                        <button onclick="centerMapOnDestination('${item.icao}', event)" title="Locate on map" class="w-7 h-7 rounded-md bg-[#0E121A] hover:bg-[#253046] text-[#94A3B8] hover:text-white flex items-center justify-center text-xs border border-[#2D3A54] transition-colors cursor-pointer">
+                            ${getIcon('target', 'w-3.5 h-3.5')}
                         </button>
-                        <span class="inline-flex items-center ml-0.5">${getIcon(isExpanded ? 'arrow-up' : 'chevron-down', 'w-3 h-3 text-slate-400 group-hover:text-white transition-colors')}</span>
+                        <span class="inline-flex items-center ml-0.5">${getIcon(isExpanded ? 'arrow-up' : 'chevron-down', 'w-3 h-3 text-[#94A3B8] group-hover:text-white transition-colors')}</span>
                     </div>
                 </div>
 
@@ -7120,18 +7469,33 @@ function triggerRadialScenerySelector() {
             const bodyEl = document.getElementById('radial-sceneries-extension-body');
             if (bodyEl) bodyEl.innerHTML = '';
             stagedRadialScenerySelection = null;
+            if (window.windowManager && (isClassicNavMode() || document.body.classList.contains('classic-nav-active'))) {
+                window.windowManager.autoTileWindows();
+            }
         }, 160);
     } else {
         // If Details modal is open, close it but KEEP radial menu intact
         if (isDetailsModalOpen()) {
             closeRadialDetailsModal(null, true);
         }
+        // If Airlines modal is open, close it
+        const airlinesModal = document.getElementById('radial-airlines-modal');
+        if (airlinesModal && !airlinesModal.classList.contains('hidden')) {
+            closeRadialAirlinesModal();
+        }
         // Toggle ON: Render autonomous pills with bounce animation ONLY on opening!
         renderRadialSceneriesExtension(currentRadialAirport, true);
         extEl.style.opacity = '1';
         extEl.classList.remove('hidden');
         if (sectorScenery) sectorScenery.classList.add('active-radial-sector');
+        const isClassic = isClassicNavMode() || document.body.classList.contains('classic-nav-active');
+        if (!isClassic) {
+            panMapToAirport(currentRadialAirport);
+        }
         updateRadialMenuPosition(true);
+        if (window.windowManager && isClassic) {
+            window.windowManager.autoTileWindows();
+        }
     }
 }
 
@@ -7187,19 +7551,19 @@ function renderRadialSceneriesExtension(ap, animate = false) {
         const safePkgName = (src.folder_name || '').replace(/'/g, "\\'");
 
         let badgeBg = 'bg-cyan-600 text-white font-bold';
-        let activeBorderClass = 'border-2 border-cyan-500 shadow-lg shadow-cyan-950/40 bg-slate-950/60 ring-1 ring-cyan-500/30';
+        let activeBorderClass = 'border-2 border-cyan-500 shadow-lg shadow-cyan-950/40 bg-[#181E2B] ring-1 ring-cyan-500/30';
 
         if (isAsoboPkg) {
             badgeBg = 'bg-amber-500 text-slate-950 font-black';
-            activeBorderClass = 'border-2 border-amber-500 shadow-lg shadow-amber-950/40 bg-slate-950/60 ring-1 ring-amber-500/30';
+            activeBorderClass = 'border-2 border-amber-500 shadow-lg shadow-amber-950/40 bg-[#181E2B] ring-1 ring-amber-500/30';
         } else if (pType === 'Payware') {
             badgeBg = 'bg-purple-600 text-white font-bold';
-            activeBorderClass = 'border-2 border-purple-500 shadow-lg shadow-purple-950/40 bg-slate-950/60 ring-1 ring-purple-500/30';
+            activeBorderClass = 'border-2 border-purple-500 shadow-lg shadow-purple-950/40 bg-[#181E2B] ring-1 ring-purple-500/30';
         }
 
         const borderClass = isSelected
             ? activeBorderClass
-            : 'border border-slate-700/50 hover:border-slate-500/70 bg-slate-950/40 hover:bg-slate-900/60 shadow-sm';
+            : 'border border-[#253046] hover:border-[#38BDF8]/40 bg-[#181E2B] shadow-sm';
 
         const animClass = animate ? 'animate-pill-bounce' : '';
         const animDelay = animate ? `style="animation-delay: ${(pillIndex * 0.05).toFixed(2)}s;"` : '';
@@ -7215,30 +7579,30 @@ function renderRadialSceneriesExtension(ap, animate = false) {
                 <!-- Row 1: Switch toggle + Title + Category Badge -->
                 <div class="flex items-center justify-between gap-2">
                     <div class="flex items-center gap-2 min-w-0 flex-1">
-                        <!-- Preflightly-style Switch Toggle -->
+                        <!-- Switch Toggle -->
                         <div class="relative inline-flex items-center shrink-0">
-                            <div class="w-9 h-4.5 rounded-full transition-colors duration-200 ease-in-out p-0.5 ${isSelected ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-slate-700/80'}">
+                            <div class="w-9 h-4.5 rounded-full transition-colors duration-200 ease-in-out p-0.5 ${isSelected ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-[#0E121A] border border-[#2D3A54]'}">
                                 <div class="w-3.5 h-3.5 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out ${isSelected ? 'translate-x-4.5' : 'translate-x-0'}"></div>
                             </div>
                         </div>
 
                         <!-- Title with native mouseover hover tooltip -->
                         <div class="min-w-0 flex-1" title="${safePkgName}">
-                            <span class="text-xs font-bold text-white truncate block hover:text-cyan-300 transition-colors cursor-help" title="${safePkgName}">${titleLabel} ${src.version ? `<span class="text-[10px] font-mono text-cyan-400 font-normal ml-1">(${escapeHtml(src.version)})</span>` : ''}</span>
+                            <span class="text-xs font-sans font-bold text-white truncate block hover:text-cyan-300 transition-colors cursor-help" title="${safePkgName}">${titleLabel} ${src.version ? `<span class="text-[10px] font-sans text-cyan-400 font-normal ml-1">(${escapeHtml(src.version)})</span>` : ''}</span>
                         </div>
 
-                        <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded ${badgeBg} shrink-0 uppercase leading-tight">${getPricingBadgeLabel(pType)}</span>
+                        <span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded ${badgeBg} shrink-0 uppercase leading-tight">${getPricingBadgeLabel(pType)}</span>
                     </div>
                 </div>
 
                 <!-- Row 2: MSFS Version, Location, Size/Streamed & Folder Button -->
-                <div class="flex items-center justify-between text-[10px] font-mono text-slate-400 pl-[44px] leading-tight">
+                <div class="flex items-center justify-between text-[10px] font-sans text-[#94A3B8] pl-[44px] leading-tight">
                     <span class="truncate pr-2">${src.source_folder}</span>
                     <div class="flex items-center gap-1.5 shrink-0">
-                        <span class="text-slate-300 font-semibold">${src.size_str || ''}</span>
+                        <span class="text-[#CBD5E1] font-semibold">${src.size_str || ''}</span>
                         <button onclick="event.stopPropagation(); openSpecificPackageFolderByIndex('${ap.icao}', ${idx})"
                                 title="${t('drawer.open_folder', 'Open Folder')}"
-                                class="w-5 h-5 rounded-md bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-amber-400 flex items-center justify-center text-[10px] transition-colors border border-slate-700/50 shadow-sm">
+                                class="w-5 h-5 rounded-md bg-[#0E121A] hover:bg-[#253046] text-[#94A3B8] hover:text-amber-400 flex items-center justify-center text-[10px] transition-colors border border-[#2D3A54] shadow-sm cursor-pointer">
                             ${getIcon('folder', 'w-3 h-3')}
                         </button>
                     </div>
@@ -7250,8 +7614,8 @@ function renderRadialSceneriesExtension(ap, animate = false) {
     // 2. Default MSFS Base Airport (Clean, no "built-in", no filename sub-box, Sky color liseret)
     const isDefaultSelected = (stagedPkg === 'DEFAULT');
     const defaultBorderClass = isDefaultSelected
-        ? 'border-2 border-sky-500 shadow-lg shadow-sky-950/40 bg-slate-950/60 ring-1 ring-sky-500/30'
-        : 'border border-slate-700/50 hover:border-slate-500/70 bg-slate-950/40 hover:bg-slate-900/60 shadow-sm';
+        ? 'border-2 border-sky-500 shadow-lg shadow-sky-950/40 bg-[#181E2B] ring-1 ring-sky-500/30'
+        : 'border border-[#253046] hover:border-[#38BDF8]/40 bg-[#181E2B] shadow-sm';
 
     const defaultAnimClass = animate ? 'animate-pill-bounce' : '';
     const defaultAnimDelay = animate ? `style="animation-delay: ${(pillIndex * 0.05).toFixed(2)}s;"` : '';
@@ -7269,23 +7633,23 @@ function renderRadialSceneriesExtension(ap, animate = false) {
             <!-- Row 1: Switch toggle + Airport Name + DEFAULT Badge -->
             <div class="flex items-center justify-between gap-2">
                 <div class="flex items-center gap-2 min-w-0 flex-1">
-                    <!-- Preflightly-style Switch Toggle -->
+                    <!-- Switch Toggle -->
                     <div class="relative inline-flex items-center shrink-0">
-                        <div class="w-9 h-4.5 rounded-full transition-colors duration-200 ease-in-out p-0.5 ${isDefaultSelected ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-slate-700/80'}">
+                        <div class="w-9 h-4.5 rounded-full transition-colors duration-200 ease-in-out p-0.5 ${isDefaultSelected ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-[#0E121A] border border-[#2D3A54]'}">
                             <div class="w-3.5 h-3.5 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out ${isDefaultSelected ? 'translate-x-4.5' : 'translate-x-0'}"></div>
                         </div>
                     </div>
 
                     <div class="min-w-0 flex-1" title="${defaultAirportName}">
-                        <span class="text-xs font-bold text-white truncate block hover:text-cyan-300 transition-colors cursor-help" title="${defaultAirportName}">${defaultAirportName}</span>
+                        <span class="text-xs font-sans font-bold text-white truncate block hover:text-cyan-300 transition-colors cursor-help" title="${defaultAirportName}">${defaultAirportName}</span>
                     </div>
 
-                    <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-blue-600 text-white shrink-0 uppercase leading-tight">${t('pricing.default_caps', 'DEFAULT')}</span>
+                    <span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded bg-blue-600 text-white shrink-0 uppercase leading-tight">${t('pricing.default_caps', 'DEFAULT')}</span>
                 </div>
             </div>
 
             <!-- Row 2: Clean Base Scenery Description without 'built-in' -->
-            <div class="flex items-center justify-between text-[10px] font-mono text-slate-400 pl-[44px] leading-tight">
+            <div class="flex items-center justify-between text-[10px] font-sans text-[#94A3B8] pl-[44px] leading-tight">
                 <span class="truncate">${t('drawer.msfs_base_scenery', 'MSFS Base Scenery')}</span>
             </div>
         </div>
@@ -7295,7 +7659,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
     if (fixSources.length > 0) {
         html += `
             <div class="flex items-center gap-2 pt-1 px-1">
-                <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">${t('drawer.fixes_overlays', 'Available Fixes & Overlays')}</span>
+                <span class="text-xs font-sans font-bold uppercase tracking-wider text-[#94A3B8]">${t('drawer.fixes_overlays', 'Available Fixes & Overlays')}</span>
             </div>
         `;
 
@@ -7310,8 +7674,8 @@ function renderRadialSceneriesExtension(ap, animate = false) {
             const isActive = stagedActive;
             const safeCleanName = cleanName.replace(/'/g, "\\'");
             const fixBorderClass = isActive
-                ? 'border-2 border-emerald-500 shadow-lg shadow-emerald-950/40 bg-slate-950/60 ring-1 ring-emerald-500/30'
-                : 'border border-slate-700/50 hover:border-slate-500/70 bg-slate-950/40 hover:bg-slate-900/60 shadow-sm';
+                ? 'border-2 border-emerald-500 shadow-lg shadow-emerald-950/40 bg-[#181E2B] ring-1 ring-emerald-500/30'
+                : 'border border-[#253046] hover:border-[#38BDF8]/40 bg-[#181E2B] shadow-sm';
 
             const fixAnimClass = animate ? 'animate-pill-bounce' : '';
             const fixAnimDelay = animate ? `style="animation-delay: ${(pillIndex * 0.05).toFixed(2)}s;"` : '';
@@ -7328,27 +7692,27 @@ function renderRadialSceneriesExtension(ap, animate = false) {
                     <div class="flex items-center justify-between gap-2">
                         <div class="flex items-center gap-2 min-w-0 flex-1">
                             <div class="relative inline-flex items-center shrink-0">
-                                <div class="w-9 h-4.5 rounded-full transition-colors duration-200 ease-in-out p-0.5 ${isActive ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-slate-700/80'}">
+                                <div class="w-9 h-4.5 rounded-full transition-colors duration-200 ease-in-out p-0.5 ${isActive ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50' : 'bg-[#0E121A] border border-[#2D3A54]'}">
                                     <div class="w-3.5 h-3.5 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out ${isActive ? 'translate-x-4.5' : 'translate-x-0'}"></div>
                                 </div>
                             </div>
 
                             <div class="min-w-0 flex-1" title="${safeCleanName}">
-                                <span class="text-xs font-bold text-white truncate block hover:text-emerald-300 transition-colors cursor-help" title="${safeCleanName}">${cleanName}</span>
+                                <span class="text-xs font-sans font-bold text-white truncate block hover:text-emerald-300 transition-colors cursor-help" title="${safeCleanName}">${cleanName}</span>
                             </div>
 
-                            <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-600 text-white shrink-0 uppercase leading-tight">FIX</span>
+                            <span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded bg-emerald-600 text-white shrink-0 uppercase leading-tight">FIX</span>
                         </div>
                     </div>
 
                     <!-- Row 2: Source Folder, Size & Folder Button -->
-                    <div class="flex items-center justify-between text-[10px] font-mono text-slate-400 pl-[44px] leading-tight">
+                    <div class="flex items-center justify-between text-[10px] font-sans text-[#94A3B8] pl-[44px] leading-tight">
                         <span class="truncate pr-2">${src.source_folder}</span>
                         <div class="flex items-center gap-1.5 shrink-0">
-                            <span class="text-slate-300 font-semibold">${src.size_str || ''}</span>
+                            <span class="text-[#CBD5E1] font-semibold">${src.size_str || ''}</span>
                             <button onclick="event.stopPropagation(); openSpecificPackageFolderByIndex('${ap.icao}', ${idx})"
                                     title="${t('drawer.open_folder', 'Open Folder')}"
-                                    class="w-5 h-5 rounded-md bg-slate-800/80 hover:bg-slate-700 text-slate-400 hover:text-amber-400 flex items-center justify-center text-[10px] transition-colors border border-slate-700/50 shadow-sm">
+                                    class="w-5 h-5 rounded-md bg-[#0E121A] hover:bg-[#253046] text-[#94A3B8] hover:text-amber-400 flex items-center justify-center text-[10px] transition-colors border border-[#2D3A54] shadow-sm cursor-pointer">
                                 ${getIcon('folder', 'w-3 h-3')}
                             </button>
                         </div>
@@ -7365,20 +7729,20 @@ function renderRadialSceneriesExtension(ap, animate = false) {
 
     html += `
         <div class="flex items-center gap-2 pt-1 px-1">
-            <span class="text-xs font-mono font-bold uppercase tracking-wider text-slate-300 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">${t('drawer.freeware_addons', 'Available Freeware Addons')}</span>
+            <span class="text-xs font-sans font-bold uppercase tracking-wider text-[#94A3B8]">${t('drawer.freeware_addons', 'Available Freeware Addons')}</span>
         </div>
         <div onclick="event.stopPropagation(); openFreewareScenerySearch('${ap.icao}');"
              onmousedown="event.stopPropagation();"
              onpointerdown="event.stopPropagation();"
              ${freewareAnimDelay}
-             class="${freewareAnimClass} py-2 px-3 rounded-xl border border-slate-700/50 hover:border-cyan-400/80 bg-slate-950/40 hover:bg-slate-900/60 shadow-sm backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1 w-full">
+             class="${freewareAnimClass} py-2 px-3 rounded-xl border border-[#253046] hover:border-[#38BDF8]/40 bg-[#181E2B] shadow-sm backdrop-blur-2xl transition-all duration-200 cursor-pointer group flex flex-col gap-1 w-full">
             
             <!-- Row 1: Title + FREEWARE Badge -->
             <div class="flex items-center justify-between gap-2">
                 <div class="min-w-0 flex-1" title="Flightsim.to">
-                    <span class="text-xs font-bold text-white truncate block group-hover:text-cyan-300 transition-colors">Flightsim.to</span>
+                    <span class="text-xs font-sans font-bold text-white truncate block group-hover:text-cyan-300 transition-colors">Flightsim.to</span>
                 </div>
-                <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-cyan-600 text-white shrink-0 uppercase leading-tight">${t('pricing.freeware_caps', 'FREEWARE')}</span>
+                <span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded bg-cyan-600 text-white shrink-0 uppercase leading-tight">${t('pricing.freeware_caps', 'FREEWARE')}</span>
             </div>
         </div>
     `;
@@ -7394,7 +7758,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
                     onmousedown="event.stopPropagation();"
                     onpointerdown="event.stopPropagation();"
                     ${hasPendingChange ? '' : 'disabled'}
-                    class="px-5 py-2 rounded-xl text-xs font-mono font-bold transition-all ${hasPendingChange ? 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-md shadow-cyan-600/30 cursor-pointer border-0 active:scale-95' : 'bg-slate-800/80 text-slate-500 cursor-not-allowed opacity-50 border border-slate-700/40 pointer-events-none'}">
+                    class="px-5 py-2 rounded-xl text-xs font-sans font-bold transition-all ${hasPendingChange ? 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-md shadow-cyan-600/30 cursor-pointer border-0 active:scale-95' : 'bg-[#181E2B] text-[#64748B] border border-[#253046] shadow-sm cursor-not-allowed pointer-events-none'}">
                 ${t('common.apply', 'Apply')}
             </button>
         </div>
@@ -7490,12 +7854,12 @@ function renderRadialAddonDownloads(ap, stores, animate = false, basePillIndex =
         pillIdx++;
 
         const badgeHtml = isDev
-            ? '<span class="text-[10px] font-mono font-black px-2 py-0.5 rounded bg-amber-500 text-slate-950 shrink-0 uppercase leading-tight">DEV</span>'
-            : '<span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-purple-600 text-white shrink-0 uppercase leading-tight">STORE</span>';
+            ? '<span class="text-[10px] font-sans font-black px-2 py-0.5 rounded bg-amber-500 text-slate-950 shrink-0 uppercase leading-tight">DEV</span>'
+            : '<span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded bg-purple-600 text-white shrink-0 uppercase leading-tight">STORE</span>';
 
         const borderClass = isDev
-            ? 'border border-slate-700/50 hover:border-amber-400/80 bg-slate-950/40 hover:bg-slate-900/60 shadow-sm'
-            : 'border border-slate-700/50 hover:border-purple-500/80 bg-slate-950/40 hover:bg-slate-900/60 shadow-sm';
+            ? 'border border-[#253046] hover:border-amber-400/80 bg-[#181E2B] shadow-sm'
+            : 'border border-[#253046] hover:border-purple-500/80 bg-[#181E2B] shadow-sm';
 
         const safeUrl = (st.url || '').replace(/'/g, "\\'");
 
@@ -7525,13 +7889,13 @@ function renderRadialAddonDownloads(ap, stores, animate = false, basePillIndex =
                 <!-- Row 1: Store Name + Store/Dev Badge + Price -->
                 <div class="flex items-center justify-between gap-2">
                     <div class="min-w-0 flex-1" title="${st.name}">
-                        <span class="text-xs font-bold text-white truncate block group-hover:text-cyan-300 transition-colors">${st.name}</span>
+                        <span class="text-xs font-sans font-bold text-white truncate block group-hover:text-cyan-300 transition-colors">${st.name}</span>
                     </div>
 
                     <div class="flex items-center gap-1.5 shrink-0">
                         ${badgeHtml}
                         ${st.formattedPrice ? `
-                            <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-600 text-white shrink-0 leading-tight shadow-sm">
+                            <span class="text-[10px] font-sans font-bold px-2 py-0.5 rounded bg-emerald-600 text-white shrink-0 leading-tight shadow-sm">
                                 ${st.formattedPrice}
                             </span>
                         ` : ''}
@@ -7540,8 +7904,8 @@ function renderRadialAddonDownloads(ap, stores, animate = false, basePillIndex =
 
                 ${devSubtitle ? `
                     <!-- Row 2: Developer / Studio -->
-                    <div class="text-[11px] font-mono leading-snug truncate flex items-center gap-1.5 text-slate-400">
-                        <span class="text-slate-500 text-[10px]">by</span>
+                    <div class="text-[11px] font-sans leading-snug truncate flex items-center gap-1.5 text-[#94A3B8]">
+                        <span class="text-[#64748B] text-[10px]">by</span>
                         <span class="text-cyan-300 font-bold truncate tracking-wide">${devSubtitle}</span>
                     </div>
                 ` : ''}
@@ -7734,7 +8098,7 @@ async function applyRadialScenerySelection(e, icao) {
     const btn = document.getElementById('radial-scenery-apply-btn');
     if (btn) {
         btn.disabled = true;
-        btn.className = 'px-5 py-2 rounded-xl text-xs font-mono font-bold transition-all bg-slate-800/80 text-slate-500 cursor-not-allowed opacity-50 border border-slate-700/40 pointer-events-none';
+        btn.className = 'px-5 py-2 rounded-xl text-xs font-mono font-bold transition-all bg-slate-800 text-slate-300 border border-slate-600/80 shadow-sm cursor-not-allowed pointer-events-none';
         btn.innerText = 'Applying...';
     }
 
@@ -7820,8 +8184,8 @@ function triggerRadialFullDetails() {
     }
 
     if (!modal.classList.contains('hidden')) {
-        // Toggle OFF: Close modal and radial menu
-        closeRadialDetailsModal(null, false);
+        // Toggle OFF: Close modal but KEEP radial menu and airport selection intact!
+        closeRadialDetailsModal(null, true);
     } else {
         hasUserDraggedDetailsModal = false;
         detailsModalUserOffset = { x: 0, y: 0 };
@@ -7839,7 +8203,7 @@ function triggerRadialFullDetails() {
     }
 }
 
-function closeRadialDetailsModal(event, keepRadial = false) {
+function closeRadialDetailsModal(event, keepRadial = true) {
     if (event) event.stopPropagation();
     const modal = document.getElementById('radial-details-modal');
     const sectorDetails = document.getElementById('radial-sector-details');
@@ -7857,10 +8221,21 @@ function closeRadialDetailsModal(event, keepRadial = false) {
     if (sectorDetails) {
         sectorDetails.classList.remove('active-radial-sector');
     }
-    if (keepRadial && currentRadialAirport) {
+    if (currentRadialAirport) {
+        if (radialEl) {
+            if (isClassicNavMode()) {
+                radialEl.classList.add('radial-only-core');
+            } else {
+                radialEl.classList.remove('radial-only-core');
+            }
+            radialEl.classList.remove('hidden', 'radial-quadrants-collapsed');
+            radialEl.style.display = '';
+        }
         panMapToAirport(currentRadialAirport);
-        updateRadialMenuPosition(true);
-    } else {
+        if (typeof updateRadialMenuPosition === 'function') {
+            updateRadialMenuPosition(true);
+        }
+    } else if (!keepRadial) {
         if (radialEl) {
             radialEl.classList.add('hidden');
         }
@@ -8833,11 +9208,37 @@ async function resetRadialCustomPrice() {
     await saveRadialCustomPrice();
 }
 
-// Dismiss radial menu ONLY on clean left-click outside
+// Dismiss radial menu ONLY on clean left-click outside on map background
 window.addEventListener('click', function (e) {
     if (e.button !== 0) return; // Strict Left-Click ONLY
     if (isMapDragging) return; // Do NOT dismiss on drag / pan release
     if (!currentRadialAirport) return;
+
+    // 1. Never dismiss if clicking outside the Leaflet map container (e.g. sidebars, headers, floating modals, tools)
+    if (!e.target.closest('#map')) return;
+
+    // 2. Never dismiss if clicking on any UI elements, modals, panels, markers, or controls inside the viewport
+    if (e.target.closest && (
+        e.target.closest('.custom-map-marker') ||
+        e.target.closest('#airport-radial-menu') ||
+        e.target.closest('#filter-radial-menu') ||
+        e.target.closest('#radial-details-modal') ||
+        e.target.closest('#radial-airlines-modal') ||
+        e.target.closest('#radial-sceneries-extension') ||
+        e.target.closest('#settings-modal') ||
+        e.target.closest('#gsx-audit-modal') ||
+        e.target.closest('#conflict-modal') ||
+        e.target.closest('#flight-optimizer-modal') ||
+        e.target.closest('#bottom-map-toolbar') ||
+        e.target.closest('#flight-planning-banner') ||
+        e.target.closest('#classic-flight-ops-panel') ||
+        e.target.closest('#classic-nav-panel') ||
+        e.target.closest('#sidebar-panel') ||
+        e.target.closest('#app-header') ||
+        e.target.closest('.window-manager-window') ||
+        e.target.closest('.glass-panel') ||
+        e.target.closest('.leaflet-control')
+    )) return;
 
     const radialEl = document.getElementById('airport-radial-menu');
     const airlinesModal = document.getElementById('radial-airlines-modal');
@@ -8860,12 +9261,19 @@ window.addEventListener('click', function (e) {
     if (rescanModal && rescanModal.contains(e.target)) return;
     if (exportModal && exportModal.contains(e.target)) return;
     if (bannerEl && bannerEl.contains(e.target)) return;
-    if (e.target.closest && (e.target.closest('.custom-map-marker') || e.target.closest('#filter-radial-menu') || e.target.closest('#settings-modal') || e.target.closest('#bottom-map-toolbar'))) return;
 
     // When in any of the radial inspection sub-modes (Details, Airlines, Sceneries),
     // clicking outside on the map should NEVER dismiss the radial menu nor the window!
     // The radial menu stays visible and anchored.
-    if (isAirlinesModalOpen() || isDetailsModalOpen() || isSceneriesExtensionOpen()) {
+    if (isAirlinesModalOpen() || isDetailsModalOpen() || isSceneriesExtensionOpen() || (typeof isGsxAuditOpen !== 'undefined' && isGsxAuditOpen)) {
+        return;
+    }
+
+    // In classic mode, clicking outside on the map is handled by Leaflet map click (calls closeClassicAirportView)
+    if (isClassicNavMode()) {
+        if (typeof closeClassicAirportView === 'function') {
+            closeClassicAirportView();
+        }
         return;
     }
 
@@ -8884,6 +9292,18 @@ if (radialContainerEl) {
         }
     }, { passive: true });
 }
+
+// Forward wheel events over route airport circles to map container so zooming works smoothly everywhere
+document.addEventListener('wheel', function (e) {
+    if (e.target && e.target.closest && e.target.closest('.route-airport-circle')) {
+        if (map && typeof map.getContainer === 'function') {
+            const container = map.getContainer();
+            if (container) {
+                container.dispatchEvent(new WheelEvent('wheel', e));
+            }
+        }
+    }
+}, { passive: true });
 
 /* ================= FLIGHT CORRIDOR & FLIGHT PLANNING MODE (ALT + CLICK) ================= */
 
@@ -9311,6 +9731,9 @@ async function executeFlightCorridorOptimization() {
                 if (restoreBtn) restoreBtn.classList.remove('hidden');
                 updateOptimizerRouteUI();
                 filterAirports();
+                if (typeof updateRouteAirportBadges === 'function') {
+                    updateRouteAirportBadges();
+                }
 
                 const guideHtml = 
                     `<div class="text-xs text-slate-300 space-y-1.5 py-1">` +
@@ -9392,6 +9815,9 @@ async function restoreFlightCorridorSceneries() {
                 }
                 if (typeof clearFlightCorridor === 'function') {
                     clearFlightCorridor();
+                }
+                if (typeof clearRouteAirportBadges === 'function') {
+                    clearRouteAirportBadges();
                 }
 
                 applyRestoredAirportsData(res.airports);
@@ -9648,6 +10074,9 @@ function closePlanningBannerClean() {
     currentSimBriefAlternates = [];
 
     clearFlightCorridor();
+    if (typeof clearRouteAirportBadges === 'function') {
+        clearRouteAirportBadges();
+    }
     updateFlightPlanningBannerUI();
     updatePersistentFlightBannerUI({ active: false });
     showToast('Flight Optimizer closed', 'info');
@@ -9687,6 +10116,11 @@ function exitFlightPlanningMode(forceRestore = false) {
 // Global keyboard listener to exit modals, Flight Planning Mode or Country Mode on Escape
 window.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' || e.key === 'Esc') {
+        const legalModal = document.getElementById('legal-modal');
+        if (legalModal && !legalModal.classList.contains('hidden')) {
+            closeLegalModal();
+            return;
+        }
         const settingsModal = document.getElementById('settings-modal');
         if (settingsModal && !settingsModal.classList.contains('hidden')) {
             closeSettingsModal();
@@ -10089,6 +10523,23 @@ function renderFlightCorridor() {
 
     // Smoothly zoom map to fit departure, arrival and all alternates
     map.fitBounds(allBoundsPts, { padding: [80, 80], animate: true });
+
+    // Guarantee badge scale and marker labels synchronize during and after animated fitBounds
+    const postFitBoundsSync = () => {
+        if (typeof updateRouteAirportBadgesZoomScale === 'function') {
+            updateRouteAirportBadgesZoomScale();
+        }
+        if (typeof syncRouteBadgesAirportMarkerLabels === 'function') {
+            syncRouteBadgesAirportMarkerLabels();
+        }
+        if (typeof syncRouteBadgesWrapping === 'function') {
+            syncRouteBadgesWrapping();
+        }
+    };
+    map.once('moveend zoomend', postFitBoundsSync);
+    setTimeout(postFitBoundsSync, 150);
+    setTimeout(postFitBoundsSync, 350);
+    setTimeout(postFitBoundsSync, 600);
 }
 
 function createBezierArcPoints(lat1, lon1, lat2, lon2, numPoints = 30) {
@@ -10292,6 +10743,16 @@ function focusAirportWithAnimation(ap) {
     lastFocusedIcao = ap.icao;
     lastFocusedCountryCode = null;
 
+    if (isClassicNavMode()) {
+        if (typeof showClassicAirportView === 'function') {
+            showClassicAirportView(ap);
+        }
+        if (map && ap.lat && ap.lon) {
+            panMapToAirport(ap);
+        }
+        return;
+    }
+
     if (map && ap.lat && ap.lon) {
         centerMapOnAirport(ap);
         showAirportDetails(ap);
@@ -10435,7 +10896,7 @@ function renderUnifiedScenerySelector(ap) {
                         </div>
                         <span class="text-xs font-bold text-slate-200 group-hover:text-white truncate">${t('drawer.default_airport', 'Default MSFS Base Airport')}</span>
                     </div>
-                    <span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30 shrink-0 uppercase">${t('pricing.default_caps', 'DEFAULT')}</span>
+                    <span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-blue-600 text-white border-0 shadow-sm shrink-0 uppercase">${t('pricing.default_caps', 'DEFAULT')}</span>
                 </div>
                 <p class="text-[11px] text-slate-400 pl-[48px]">${t('drawer.default_procedural', 'Built-in Procedural MSFS Base Scenery')}</p>
             </div>
@@ -10467,7 +10928,7 @@ function renderUnifiedScenerySelector(ap) {
                             </div>
                             <span class="text-xs font-bold text-slate-200 group-hover:text-white truncate">${src.folder_name}</span>
                         </div>
-                        <span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 shrink-0 uppercase">FIX</span>
+                        <span class="text-[9px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-600 text-white border-0 shadow-sm shrink-0 uppercase">FIX</span>
                     </div>
                     <div class="flex items-center justify-between text-[10px] font-mono text-slate-400 pl-[48px]">
                         <span>${src.source_folder} ${src.size_str ? `• ${src.size_str}` : ''}</span>
@@ -11213,6 +11674,9 @@ async function toggleSpecificPackage(path, icao) {
 let toastTimeout = null;
 
 function showToast(message, type = 'success', duration = 3200) {
+    if (document.body && document.body.classList.contains('tour-active')) {
+        return;
+    }
     let container = document.getElementById('toast-container');
     if (!container) {
         container = document.createElement('div');
@@ -11246,25 +11710,21 @@ function showToast(message, type = 'success', duration = 3200) {
 
     // Strictly compliant with Scenery X Core UI Directives:
     // - NO SATURATED COLORED BORDERS: All structural borders must stay strictly neutral (border-slate-700/60)
-    // - NO DECORATIVE ICONS: Strip all redundant FontAwesome/SVG icons
-    // - NEUTRAL STATUS: Neutral slate surface paired with a 6px semantic colored dot indicator (emerald, amber, red). Info messages remain clean without colored dot.
-    let dotHtml = '';
-    if (type === 'error') {
-        dotHtml = '<span class="w-1.5 h-1.5 rounded-full bg-rose-400 shrink-0"></span>';
-    } else if (type === 'warning') {
-        dotHtml = '<span class="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0"></span>';
-    } else if (type === 'success') {
-        dotHtml = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0"></span>';
-    }
-
-    toast.className = 'px-4 py-2.5 rounded-lg border border-slate-700/60 bg-slate-900 text-slate-200 shadow-2xl flex items-center gap-2.5 transition-all duration-300 transform opacity-100 scale-100 pointer-events-auto font-medium text-xs tracking-wide select-none max-w-full text-center sm:text-left';
-    toast.innerHTML = `${dotHtml}<span class="leading-relaxed">${message}</span>`;
+    // - NO DECORATIVE ICONS / NO STATUS DOTS: Clean neutral toast text without colored dot indicators
+    toast.className = 'px-4 py-2.5 rounded-lg border border-slate-700/60 bg-slate-900 text-slate-200 shadow-2xl flex items-center justify-center transition-all duration-300 transform opacity-100 scale-100 pointer-events-auto font-medium text-xs tracking-wide select-none max-w-full text-center';
+    toast.innerHTML = `<span class="leading-relaxed">${message}</span>`;
 
     toastTimeout = setTimeout(() => {
         toast.classList.remove('opacity-100', 'scale-100', 'pointer-events-auto');
         toast.classList.add('opacity-0', 'scale-95', 'pointer-events-none');
     }, duration);
 }
+
+function showToastNotification(message, type = 'info', duration = 3200) {
+    return showToast(message, type, duration);
+}
+window.showToast = showToast;
+window.showToastNotification = showToastNotification;
 
 function openSpecificPackageFolder(path) {
     if (window.pywebview) {
@@ -11849,7 +12309,9 @@ function toggleRegionFilter(regionKey, isCumulative = false) {
     if (regionKey === 'all') {
         selectedRegions.clear();
     } else if (isCumulative) {
-        if (selectedRegions.has(regionKey)) {
+        if (selectedRegions.size === 0 || selectedRegions.size === ALL_REGIONS_LIST.length) {
+            selectedRegions = new Set([regionKey]);
+        } else if (selectedRegions.has(regionKey)) {
             selectedRegions.delete(regionKey);
         } else {
             selectedRegions.add(regionKey);
@@ -12422,6 +12884,15 @@ function filterAirports() {
         }
     }
 
+    // GUARANTEE: The currently inspected / selected airport must ALWAYS remain visible on map
+    // so filtering never causes the selected airport or its pastille to disappear under the user's feet!
+    const activeInspectAirport = currentRadialAirport || selectedAirport || currentClassicAirport;
+    if (activeInspectAirport && activeInspectAirport.icao && activeInspectAirport.lat && activeInspectAirport.lon) {
+        if (!currentlyFilteredAirports.some(a => a.icao === activeInspectAirport.icao)) {
+            currentlyFilteredAirports.unshift(activeInspectAirport);
+        }
+    }
+
     // GSX Audit Temporary Display Guarantee:
     // If an audited airport (e.g. orphan or not yet in allAirportsData) is missing, inject it so its marker is rendered
     if (isGsxAuditOpen && window.gsxAuditData && window.gsxAuditData.by_icao) {
@@ -12452,6 +12923,30 @@ function filterAirports() {
     }
 
     renderAirportsOnMap(currentlyFilteredAirports);
+
+    // Keep active inspected airport radial menu / central pastille anchored and visible after filter re-render
+    const isRouteActive = (typeof isFlightOptimizerModalOpen === 'function' && isFlightOptimizerModalOpen()) ||
+                          (typeof isFlightPlanningMode !== 'undefined' && isFlightPlanningMode && (optimizerOrigin || optimizerDest)) ||
+                          (typeof isFlightCorridorOptimized !== 'undefined' && isFlightCorridorOptimized && (optimizerOrigin || optimizerDest));
+    if (isRouteActive) {
+        if (typeof closeAirportRadialMenu === 'function') closeAirportRadialMenu(false);
+        if (typeof updateRouteAirportBadges === 'function') updateRouteAirportBadges();
+    } else if (activeInspectAirport && typeof updateRadialMenuPosition === 'function') {
+        if (typeof airportMarkerCache !== 'undefined' && airportMarkerCache.has(activeInspectAirport.icao)) {
+            currentRadialMarker = airportMarkerCache.get(activeInspectAirport.icao);
+        }
+        const radialEl = document.getElementById('airport-radial-menu');
+        if (radialEl) {
+            if (isClassicNavMode()) {
+                radialEl.classList.add('radial-only-core');
+                radialEl.classList.remove('hidden', 'radial-quadrants-collapsed');
+                radialEl.style.display = '';
+            } else {
+                radialEl.classList.remove('radial-only-core');
+            }
+            updateRadialMenuPosition(true);
+        }
+    }
 }
 
 function handleSearchKeyDown(e) {
@@ -12598,7 +13093,9 @@ function togglePricingFilter(pricing, isCumulative = false) {
     if (pricing === 'all') {
         selectedPricing = new Set(ALL_PRICING_LIST);
     } else if (isCumulative) {
-        if (selectedPricing.has(pricing)) {
+        if (selectedPricing.size === ALL_PRICING_LIST.length) {
+            selectedPricing = new Set([pricing]);
+        } else if (selectedPricing.has(pricing)) {
             selectedPricing.delete(pricing);
             if (selectedPricing.size === 0) {
                 selectedPricing = new Set(ALL_PRICING_LIST);
@@ -12621,7 +13118,9 @@ function toggleSourceFilter(src, isCumulative = false) {
     if (src === 'all') {
         selectedSources = new Set(ALL_SOURCES_LIST);
     } else if (isCumulative) {
-        if (selectedSources.has(src)) {
+        if (selectedSources.size === ALL_SOURCES_LIST.length) {
+            selectedSources = new Set([src]);
+        } else if (selectedSources.has(src)) {
             selectedSources.delete(src);
             if (selectedSources.size === 0) {
                 selectedSources = new Set(ALL_SOURCES_LIST);
@@ -12644,7 +13143,9 @@ function toggleTypeFilter(type, isCumulative = false) {
     if (type === 'all') {
         selectedTypes = new Set(ALL_TYPES_LIST);
     } else if (isCumulative) {
-        if (selectedTypes.has(type)) {
+        if (selectedTypes.size === ALL_TYPES_LIST.length) {
+            selectedTypes = new Set([type]);
+        } else if (selectedTypes.has(type)) {
             selectedTypes.delete(type);
             if (selectedTypes.size === 0) {
                 selectedTypes = new Set(ALL_TYPES_LIST);
@@ -12666,23 +13167,50 @@ function toggleTypeFilter(type, isCumulative = false) {
 function setPillHighlight(el, isActive, colorType) {
     if (!el) return;
 
-    // Reset base classes for clean flat aplat style
-    el.className = "flex items-center gap-1.5 px-3.5 py-1.5 rounded-full shrink-0 cursor-pointer transition-all";
+    // Reset base classes for clean pill surface
+    el.className = "stat-pill flex items-center gap-1.5 px-3.5 py-1.5 rounded-full shrink-0 cursor-pointer transition-all";
+
+    const countSpan = el.querySelector('span[id^="stat-"]');
+    const labelSpan = el.querySelector('span[data-i18n]');
 
     if (isActive) {
         if (colorType === 'sky') {
-            el.classList.add('bg-sky-600', 'text-white');
+            el.classList.add('bg-sky-600', 'border', 'border-sky-500', 'shadow-sm');
+            if (countSpan) countSpan.className = "font-mono font-bold text-white text-sm lg:text-base leading-none tabular-nums";
+            if (labelSpan) labelSpan.className = "text-[11px] font-sans font-bold uppercase tracking-wider text-white";
         } else if (colorType === 'purple') {
-            el.classList.add('bg-purple-600', 'text-white');
+            el.classList.add('bg-purple-600', 'border', 'border-purple-500', 'shadow-sm');
+            if (countSpan) countSpan.className = "font-mono font-bold text-white text-sm lg:text-base leading-none tabular-nums";
+            if (labelSpan) labelSpan.className = "text-[11px] font-sans font-bold uppercase tracking-wider text-white";
         } else if (colorType === 'cyan') {
-            el.classList.add('bg-cyan-600', 'text-white');
+            el.classList.add('bg-cyan-600', 'border', 'border-cyan-500', 'shadow-sm');
+            if (countSpan) countSpan.className = "font-mono font-bold text-white text-sm lg:text-base leading-none tabular-nums";
+            if (labelSpan) labelSpan.className = "text-[11px] font-sans font-bold uppercase tracking-wider text-white";
         } else if (colorType === 'amber') {
-            el.classList.add('bg-amber-500', 'text-slate-950', 'font-black');
+            el.classList.add('bg-amber-500', 'border', 'border-amber-400', 'shadow-sm');
+            if (countSpan) countSpan.className = "font-mono font-bold text-slate-950 text-sm lg:text-base leading-none tabular-nums";
+            if (labelSpan) labelSpan.className = "text-[11px] font-sans font-bold uppercase tracking-wider text-slate-950";
         } else if (colorType === 'blue') {
-            el.classList.add('bg-blue-600', 'text-white');
+            el.classList.add('bg-blue-600', 'border', 'border-blue-500', 'shadow-sm');
+            if (countSpan) countSpan.className = "font-mono font-bold text-white text-sm lg:text-base leading-none tabular-nums";
+            if (labelSpan) labelSpan.className = "text-[11px] font-sans font-bold uppercase tracking-wider text-white";
         }
     } else {
-        el.classList.add('bg-slate-800', 'text-slate-300');
+        el.classList.add('bg-slate-900/80', 'border', 'border-slate-700/60', 'hover:bg-slate-800');
+        if (colorType === 'sky' && countSpan) {
+            countSpan.className = "font-mono font-bold text-sky-400 text-sm lg:text-base leading-none tabular-nums";
+        } else if (colorType === 'purple' && countSpan) {
+            countSpan.className = "font-mono font-bold text-purple-400 text-sm lg:text-base leading-none tabular-nums";
+        } else if (colorType === 'cyan' && countSpan) {
+            countSpan.className = "font-mono font-bold text-cyan-400 text-sm lg:text-base leading-none tabular-nums";
+        } else if (colorType === 'amber' && countSpan) {
+            countSpan.className = "font-mono font-bold text-amber-400 text-sm lg:text-base leading-none tabular-nums";
+        } else if (colorType === 'blue' && countSpan) {
+            countSpan.className = "font-mono font-bold text-blue-400 text-sm lg:text-base leading-none tabular-nums";
+        }
+        if (labelSpan) {
+            labelSpan.className = "text-[11px] font-sans font-bold uppercase tracking-wider text-slate-200";
+        }
     }
 }
 
@@ -12762,6 +13290,9 @@ function updateFilterUI() {
     }
 
     updateFilterRadialUI();
+    if (typeof updateClassicPanelUI === 'function') {
+        updateClassicPanelUI();
+    }
 }
 
 function toggleGsxFilter(val) {
@@ -12964,13 +13495,7 @@ function initDraggableFilterRadial() {
 }
 
 function openFilterRadialMenu(clientX, clientY) {
-    if (!isAirlinesModalOpen() && !isDetailsModalOpen()) {
-        const radialEl = document.getElementById('airport-radial-menu');
-        if (radialEl) {
-            radialEl.classList.add('hidden');
-            radialEl.classList.remove('animate-radial-open');
-        }
-    }
+    if (isClassicNavMode()) return;
 
     const menuEl = document.getElementById('filter-radial-menu');
     if (!menuEl) return;
@@ -12984,6 +13509,7 @@ function openFilterRadialMenu(clientX, clientY) {
     const posX = Math.max(half + margin, Math.min(window.innerWidth - half - margin, clientX));
     const posY = Math.max(half + margin, Math.min(window.innerHeight - half - margin, clientY));
 
+    menuEl.style.display = '';
     menuEl.style.left = `${posX}px`;
     menuEl.style.top = `${posY}px`;
     menuEl.classList.remove('hidden');
@@ -13038,16 +13564,16 @@ function renderContextualRadialHub() {
                 <!-- TOP SEMI-CIRCLE: FILTERS -->
                 <g class="hub-semicircle group cursor-pointer" data-mode="filters" onclick="selectContextualRadialMode('filters')">
                     <path class="hub-semicircle-path" d="M 4 104 A 104 104 0 0 1 212 104 Z" />
-                    <text x="108" y="68" text-anchor="middle"
-                          class="fill-slate-200 group-hover:fill-white font-mono font-black text-sm uppercase tracking-wider pointer-events-none select-none">
+                    <text x="108" y="68" text-anchor="middle" font-family="'Plus Jakarta Sans', sans-serif"
+                          class="fill-slate-200 group-hover:fill-white font-sans font-extrabold text-sm uppercase tracking-wider pointer-events-none select-none">
                         FILTERS
                     </text>
                 </g>
                 <!-- BOTTOM SEMI-CIRCLE: OPTIMIZER -->
                 <g class="hub-semicircle group cursor-pointer" data-mode="flight_optimizer" onclick="selectContextualRadialMode('flight_optimizer')">
                     <path class="hub-semicircle-path" d="M 212 112 A 104 104 0 0 1 4 112 Z" />
-                    <text x="108" y="158" text-anchor="middle"
-                          class="fill-slate-200 group-hover:fill-white font-mono font-black text-sm uppercase tracking-wider pointer-events-none select-none">
+                    <text x="108" y="158" text-anchor="middle" font-family="'Plus Jakarta Sans', sans-serif"
+                          class="fill-slate-200 group-hover:fill-white font-sans font-extrabold text-sm uppercase tracking-wider pointer-events-none select-none">
                         OPTIMIZER
                     </text>
                 </g>
@@ -13057,15 +13583,15 @@ function renderContextualRadialHub() {
         hubEl.classList.remove('hub-mode-dual');
         hubEl.innerHTML = `
             <div class="flex flex-col items-center justify-center select-none text-center w-full h-full px-4 py-2 pointer-events-none">
-                <span class="text-sm font-black font-mono text-white tracking-widest uppercase">OPTIMIZER</span>
+                <span class="text-sm font-extrabold font-sans text-white tracking-widest uppercase">OPTIMIZER</span>
                 <button type="button"
                         onclick="event.stopPropagation(); selectContextualRadialMode('hub')"
-                        class="mt-2.5 flex items-center justify-center p-1.5 text-white hover:text-slate-300 hover:scale-115 transition-all cursor-pointer pointer-events-auto border-0 bg-transparent shadow-none"
+                        class="mt-2.5 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#181E2B] hover:bg-[#253046] border border-[#2D3A54] hover:border-[#38BDF8] text-[#94A3B8] hover:text-white transition-all cursor-pointer pointer-events-auto shadow-lg group"
                         title="Return to selection">
-                    <svg class="w-5 h-5 shrink-0 pointer-events-none text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="7.6 7 2.5 12 7.6 17"></polyline>
-                        <line x1="21.5" x2="4.8" y1="12" y2="12"></line>
+                    <svg class="w-3.5 h-3.5 text-[#38BDF8] group-hover:text-white group-hover:-translate-x-0.5 transition-all pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M15 18l-6-6 6-6"/>
                     </svg>
+                    <span class="text-[10px] font-sans font-bold tracking-wider uppercase text-[#CBD5E1] group-hover:text-white pointer-events-none">BACK</span>
                 </button>
             </div>
         `;
@@ -13074,17 +13600,17 @@ function renderContextualRadialHub() {
         const count = currentlyFilteredAirports ? currentlyFilteredAirports.length : (allAirportsData ? allAirportsData.length : 0);
         hubEl.innerHTML = `
             <div class="flex flex-col items-center justify-center select-none text-center w-full h-full px-4 py-2 pointer-events-none">
-                <span class="text-[10px] font-bold tracking-widest text-slate-400 uppercase leading-tight">${t('radial.map_view', 'MAP VIEW')}</span>
-                <span class="text-2xl font-black font-mono text-white leading-none mt-1 tracking-tight">${count}</span>
-                <span class="text-[9.5px] font-normal tracking-wider text-slate-400 uppercase leading-tight mt-0.5">${t('radial.airports_caps', 'AIRPORTS')}</span>
+                <span class="text-[10px] font-bold tracking-widest text-slate-400 uppercase leading-tight font-sans">${t('radial.map_view', 'MAP VIEW')}</span>
+                <span class="text-2xl font-black font-sans text-white leading-none mt-1 tracking-tight">${count}</span>
+                <span class="text-[9.5px] font-bold tracking-wider text-slate-400 uppercase leading-tight mt-0.5 font-sans">${t('radial.airports_caps', 'AIRPORTS')}</span>
                 <button type="button"
                         onclick="event.stopPropagation(); selectContextualRadialMode('hub')"
-                        class="mt-2 flex items-center justify-center p-1.5 text-white hover:text-slate-300 hover:scale-115 transition-all cursor-pointer pointer-events-auto border-0 bg-transparent shadow-none"
+                        class="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#181E2B] hover:bg-[#253046] border border-[#2D3A54] hover:border-[#38BDF8] text-[#94A3B8] hover:text-white transition-all cursor-pointer pointer-events-auto shadow-lg group"
                         title="Return to selection">
-                    <svg class="w-5 h-5 shrink-0 pointer-events-none text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="7.6 7 2.5 12 7.6 17"></polyline>
-                        <line x1="21.5" x2="4.8" y1="12" y2="12"></line>
+                    <svg class="w-3.5 h-3.5 text-[#38BDF8] group-hover:text-white group-hover:-translate-x-0.5 transition-all pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M15 18l-6-6 6-6"/>
                     </svg>
+                    <span class="text-[10px] font-sans font-bold tracking-wider uppercase text-[#CBD5E1] group-hover:text-white pointer-events-none">BACK</span>
                 </button>
             </div>
         `;
@@ -13136,7 +13662,7 @@ function updateFlightOptimizerRadialSectors() {
                 labelHtml = `SMART LOD<br><span class="text-amber-400 text-[9px] font-sans font-semibold">(AUTOFPS)</span>`;
             }
             spanEl.innerHTML = labelHtml;
-            spanEl.className = `text-[10.5px] font-mono font-black tracking-wider uppercase ${isDisabled ? 'text-slate-500' : 'text-slate-200 group-hover:text-white'}`;
+            spanEl.className = `text-[10.5px] font-sans font-bold tracking-wider uppercase ${isDisabled ? 'text-slate-500' : 'text-slate-200 group-hover:text-white'}`;
         }
     });
 }
@@ -13191,7 +13717,7 @@ function renderFlightOptimizerRadialWheel() {
                 <path class="radial-flight-sector-path" d="${pathD}" />
                 <foreignObject x="${(tx - 65).toFixed(1)}" y="${(ty - 25).toFixed(1)}" width="130" height="50" class="pointer-events-none">
                     <div class="w-full h-full flex flex-col items-center justify-center text-center leading-tight px-1">
-                        <span class="text-[10.5px] font-mono font-black tracking-wider uppercase ${(isWinOpen || isSmartLodLocked) ? 'text-slate-500' : 'text-slate-200 group-hover:text-white'}">${labelHtml}</span>
+                        <span class="text-[10.5px] font-sans font-bold tracking-wider uppercase ${(isWinOpen || isSmartLodLocked) ? 'text-slate-500' : 'text-slate-200 group-hover:text-white'}">${labelHtml}</span>
                     </div>
                 </foreignObject>
             </g>
@@ -13207,12 +13733,16 @@ function handleFlightOptimizerSectorClick(key) {
         showToastNotification("Smart LOD locked: MSFS AutoFPS is active in background.", "warning");
         return;
     }
-    // Point 11: Keep radial menu open in place, gray out sector, and open floating window
+    if (key === 'route') {
+        if (typeof closeFilterRadialMenu === 'function') closeFilterRadialMenu();
+        if (typeof closeAirportRadialMenu === 'function') closeAirportRadialMenu(false);
+    }
     openFloatingWindow(key);
     updateFlightOptimizerRadialSectors();
 }
 
 function toggleFilterRadialMenuAtCenter() {
+    if (isClassicNavMode()) return;
     if (isFilterRadialOpen) {
         closeFilterRadialMenu();
     } else {
@@ -13486,7 +14016,7 @@ function renderFilterRadialWheel(forceAnimateOuter = false) {
                 <foreignObject x="${(tx - 58).toFixed(1)}" y="${(ty - 26).toFixed(1)}" width="116" height="52" class="pointer-events-none">
                     <div class="w-full h-full flex flex-col items-center justify-center text-center leading-none px-1">
                         <span class="text-[9.5px] font-black tracking-wider uppercase leading-tight text-center ${isCatActive ? 'text-white font-extrabold' : 'text-slate-200 group-hover:text-white'}">${formattedCatLabel}</span>
-                        <span class="text-[10px] font-mono font-bold ${isCatActive ? 'text-white' : 'text-sky-400'} truncate max-w-[108px] mt-1">${summaryHtml}</span>
+                        <span class="text-[10px] font-sans font-bold ${isCatActive ? 'text-white' : 'text-sky-400'} truncate max-w-[108px] mt-1">${summaryHtml}</span>
                     </div>
                 </foreignObject>
             </g>
@@ -13719,6 +14249,8 @@ async function startGsxScanPhase(isStartup = false) {
     const detail = document.getElementById('rescan-gsx-detail-text');
 
     if (modal && phaseGsx) {
+        const backdrop = document.getElementById('rescan-backdrop');
+        if (backdrop) backdrop.classList.remove('hidden');
         if (phaseScanning) phaseScanning.classList.add('hidden');
         if (phaseResult) phaseResult.classList.add('hidden');
         phaseGsx.classList.remove('hidden');
@@ -13726,6 +14258,13 @@ async function startGsxScanPhase(isStartup = false) {
         if (pct) pct.innerText = '20%';
         if (detail) detail.innerText = 'Scanning GSX profile files in %APPDATA%\\Virtuali\\GSX\\MSFS...';
         modal.classList.remove('hidden');
+        if (window.windowManager) {
+            window.windowManager.centerModal(modal);
+        } else {
+            modal.style.left = '50%';
+            modal.style.top = '50%';
+            modal.style.transform = 'translate(-50%, -50%)';
+        }
     }
 
     try {
@@ -13832,10 +14371,19 @@ function displayScanResults(delta, isStartup = false) {
     const listCont = document.getElementById('rescan-new-items-container');
 
     if (modal) {
+        const backdrop = document.getElementById('rescan-backdrop');
+        if (backdrop) backdrop.classList.remove('hidden');
         if (phaseScanning) phaseScanning.classList.add('hidden');
         if (phaseGsx) phaseGsx.classList.add('hidden');
         if (phaseResult) phaseResult.classList.remove('hidden');
         modal.classList.remove('hidden');
+        if (window.windowManager) {
+            window.windowManager.centerModal(modal);
+        } else {
+            modal.style.left = '50%';
+            modal.style.top = '50%';
+            modal.style.transform = 'translate(-50%, -50%)';
+        }
     }
 
     if (totalChanges > 0) {
@@ -13978,6 +14526,9 @@ async function rescanMSFS() {
     const icon = document.getElementById('rescan-icon');
     if (icon) icon.classList.add('fa-spin');
 
+    const backdrop = document.getElementById('rescan-backdrop');
+    if (backdrop) backdrop.classList.remove('hidden');
+
     const modal = document.getElementById('rescan-modal');
     const phaseScanning = document.getElementById('rescan-phase-scanning');
     const phaseResult = document.getElementById('rescan-phase-result');
@@ -13992,6 +14543,14 @@ async function rescanMSFS() {
         if (percentText) percentText.innerText = '10%';
         if (detailText) detailText.innerText = t('rescan.sub_checking', 'Checking Community & OneStore folders...');
         modal.classList.remove('hidden');
+        if (window.windowManager) {
+            window.windowManager.centerModal(modal);
+            window.windowManager.bringToFront(modal);
+        } else {
+            modal.style.left = '50%';
+            modal.style.top = '50%';
+            modal.style.transform = 'translate(-50%, -50%)';
+        }
     }
 
     // Force browser repaint
@@ -14083,6 +14642,9 @@ async function rescanMSFS() {
 }
 
 async function runInitialFirstLaunchScan() {
+    const backdrop = document.getElementById('rescan-backdrop');
+    if (backdrop) backdrop.classList.remove('hidden');
+
     const modal = document.getElementById('rescan-modal');
     const phaseScanning = document.getElementById('rescan-phase-scanning');
     const phaseResult = document.getElementById('rescan-phase-result');
@@ -14090,7 +14652,7 @@ async function runInitialFirstLaunchScan() {
     const percentText = document.getElementById('rescan-percent-text');
     const detailText = document.getElementById('rescan-detail-text');
     const statusSub = document.getElementById('rescan-status-sub');
-    const titleEl = document.querySelector('#rescan-phase-scanning h3');
+    const titleEl = document.querySelector('#rescan-phase-scanning h4') || document.querySelector('#rescan-phase-scanning h3');
 
     if (modal) {
         if (titleEl) titleEl.innerText = t('rescan.first_launch_title', 'First Launch - Indexing Library');
@@ -14101,6 +14663,14 @@ async function runInitialFirstLaunchScan() {
         if (percentText) percentText.innerText = '15%';
         if (detailText) detailText.innerText = t('rescan.sub_checking', 'Checking Community & OneStore folders...');
         modal.classList.remove('hidden');
+        if (window.windowManager) {
+            window.windowManager.centerModal(modal);
+            window.windowManager.bringToFront(modal);
+        } else {
+            modal.style.left = '50%';
+            modal.style.top = '50%';
+            modal.style.transform = 'translate(-50%, -50%)';
+        }
     }
 
     // Force browser repaint
@@ -14174,11 +14744,11 @@ async function runInitialFirstLaunchScan() {
         const listCont = document.getElementById('rescan-new-items-container');
 
         if (resultTitle) {
-            resultTitle.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400 text-lg mr-2"></i><span>${t('rescan.first_launch_complete', 'Library Initialized!')}</span>`;
+            resultTitle.innerHTML = `<span class="font-bold text-slate-100 text-sm">${t('rescan.first_launch_complete', 'Library Initialized!')}</span>`;
         }
         if (resultMsg) {
             const customCount = allAirportsData.filter(a => a.pricing_type !== 'Default').length;
-            resultMsg.innerHTML = `<span class="text-emerald-400 font-bold">${allAirportsData.length}</span> ${t('general.airports', 'airports indexed')} (<span class="text-cyan-400 font-bold">${customCount}</span> ${t('general.custom_addons', 'custom add-ons & GSX profiles')}). ${t('general.welcome', 'Welcome to SceneryX!')}`;
+            resultMsg.innerHTML = `<span class="text-slate-100 font-bold">${allAirportsData.length}</span> ${t('general.airports', 'airports indexed')} (<span class="text-slate-100 font-bold">${customCount}</span> ${t('general.custom_addons', 'custom add-ons & GSX profiles')}). ${t('general.welcome', 'Welcome to SceneryX!')}`;
         }
         if (listCont) {
             listCont.classList.add('hidden');
@@ -14194,6 +14764,10 @@ async function runInitialFirstLaunchScan() {
 }
 
 function closeRescanModal() {
+    const backdrop = document.getElementById('rescan-backdrop');
+    if (backdrop) backdrop.classList.add('hidden');
+    const discBackdrop = document.getElementById('disclaimer-backdrop');
+    if (discBackdrop) discBackdrop.classList.add('hidden');
     const modal = document.getElementById('rescan-modal');
     if (modal) modal.classList.add('hidden');
     const icon = document.getElementById('rescan-icon');
@@ -14207,10 +14781,15 @@ function closeRescanModal() {
     if (phaseResult) phaseResult.classList.add('hidden');
 
     const statusSub = document.getElementById('rescan-status-sub');
-    const titleEl = document.querySelector('#rescan-phase-scanning h3');
+    const titleEl = document.querySelector('#rescan-phase-scanning h4') || document.querySelector('#rescan-phase-scanning h3');
     if (titleEl) titleEl.innerText = t('rescan.title_scanning', 'Scanning Sceneries');
     if (statusSub) statusSub.innerText = t('rescan.sub_checking', 'Checking Community & OneStore folders...');
+
+    if (window.onboardingTour && typeof window.onboardingTour.checkAutoPrompt === 'function') {
+        setTimeout(() => window.onboardingTour.checkAutoPrompt(), 400);
+    }
 }
+window.closeRescanModal = closeRescanModal;
 
 function openPackageFolder() {
     if (selectedAirport && window.pywebview) {
@@ -14434,18 +15013,38 @@ function openGsxFolderInExplorer() {
 
 async function openSettingsModal() {
     try {
-        if (window.pywebview) {
+        if (window.pywebview && window.pywebview.api && typeof window.pywebview.api.get_settings === 'function') {
             const cfgStr = await window.pywebview.api.get_settings();
-            currentSettings = JSON.parse(cfgStr);
-        } else {
-            const resp = await fetch('/api/settings');
-            currentSettings = await resp.json();
+            if (cfgStr) {
+                currentSettings = (typeof cfgStr === 'string') ? JSON.parse(cfgStr) : cfgStr;
+            }
+        } else if (typeof fetch === 'function') {
+            try {
+                const resp = await fetch('/api/settings');
+                if (resp.ok) {
+                    currentSettings = await resp.json();
+                }
+            } catch (err) {}
         }
     } catch (e) {
         console.error("Failed to load settings:", e);
     }
 
-    document.getElementById('cfg-auto-scan').checked = !!currentSettings.auto_scan_on_startup;
+    if (!currentSettings || typeof currentSettings !== 'object') {
+        currentSettings = {
+            auto_scan_on_startup: true,
+            scan_paths: [],
+            camera_airport_zoom: 6.0,
+            camera_pan_duration: 0.8,
+            navigation_style: 'classic',
+            theme: 'dark'
+        };
+    }
+
+    const autoScanEl = document.getElementById('cfg-auto-scan');
+    if (autoScanEl) {
+        autoScanEl.checked = !!currentSettings.auto_scan_on_startup;
+    }
     const gsxInput = document.getElementById('cfg-gsx-path');
     if (gsxInput) {
         gsxInput.value = currentSettings.gsx_profile_path || '';
@@ -14470,6 +15069,11 @@ async function openSettingsModal() {
         durSlider.value = dVal;
         const dDisp = document.getElementById('cfg-duration-display');
         if (dDisp) dDisp.innerText = `${dVal.toFixed(1)}s`;
+    }
+
+    const navStyleSelect = document.getElementById('cfg-nav-style');
+    if (navStyleSelect) {
+        navStyleSelect.value = currentSettings.navigation_style || 'radial';
     }
 
     const langSelect = document.getElementById('cfg-app-language');
@@ -14512,10 +15116,26 @@ async function openSettingsModal() {
     if (typeof refreshIngamePanelStatus === 'function') {
         refreshIngamePanelStatus();
     }
+    const backdrop = document.getElementById('settings-modal-backdrop');
+    if (backdrop) {
+        backdrop.classList.remove('hidden');
+        backdrop.style.zIndex = '4999';
+    }
+
     const modal = document.getElementById('settings-modal');
     if (modal) {
         modal.classList.remove('hidden');
         modal.classList.add('flex');
+        modal._hasBeenDragged = false;
+        modal.style.left = '50%';
+        modal.style.top = '50%';
+        modal.style.transform = 'translate(-50%, -50%)';
+        modal.style.right = 'auto';
+        modal.style.bottom = 'auto';
+        modal.style.zIndex = '5000';
+        if (window.windowManager) {
+            window.windowManager.bringToFront(modal);
+        }
     }
 }
 
@@ -14552,17 +15172,53 @@ function toggleExternalAutoFpsSettingSwitch() {
 }
 
 function closeSettingsModal() {
+    const backdrop = document.getElementById('settings-modal-backdrop');
+    if (backdrop) backdrop.classList.add('hidden');
+
     const modal = document.getElementById('settings-modal');
     if (modal) {
         modal.classList.add('hidden');
         modal.classList.remove('flex');
+        modal._hasBeenDragged = false;
     }
-    if (currentRadialAirport) {
+    // Revert navigation style dropdown and active mode if cancelled without saving
+    const navStyleSelect = document.getElementById('cfg-nav-style');
+    if (navStyleSelect && typeof currentSettings !== 'undefined') {
+        const savedStyle = currentSettings.navigation_style || 'radial';
+        if (navStyleSelect.value !== savedStyle) {
+            navStyleSelect.value = savedStyle;
+            if (typeof applyNavigationStyle === 'function') {
+                applyNavigationStyle(savedStyle);
+            }
+        }
+    }
+    if (isClassicNavMode()) {
         const radialEl = document.getElementById('airport-radial-menu');
         if (radialEl) {
-            radialEl.classList.remove('hidden');
+            radialEl.classList.add('hidden');
+            radialEl.style.display = 'none';
         }
-        updateRadialMenuPosition(true);
+        const filterEl = document.getElementById('filter-radial-menu');
+        if (filterEl) {
+            filterEl.classList.add('hidden');
+            filterEl.style.display = 'none';
+        }
+    } else {
+        const radialEl = document.getElementById('airport-radial-menu');
+        if (radialEl) {
+            radialEl.style.display = '';
+            radialEl.classList.remove('radial-only-core');
+        }
+        const filterEl = document.getElementById('filter-radial-menu');
+        if (filterEl) {
+            filterEl.style.display = '';
+        }
+        const targetAp = currentRadialAirport || currentClassicAirport || selectedAirport;
+        currentClassicAirport = null;
+        if (targetAp) {
+            const targetMarker = (typeof airportMarkerCache !== 'undefined' && airportMarkerCache.get(targetAp.icao)) || currentRadialMarker || null;
+            openAirportRadialMenu(targetAp, targetMarker);
+        }
     }
 }
 
@@ -14706,112 +15362,142 @@ async function addCustomPathRow() {
 
 
 async function saveSettings() {
-    currentSettings.auto_scan_on_startup = document.getElementById('cfg-auto-scan').checked;
-    const gsxInput = document.getElementById('cfg-gsx-path');
-    if (gsxInput) {
-        currentSettings.gsx_profile_path = gsxInput.value.trim();
-    }
-
-    const regSelect = document.getElementById('cfg-camera-region');
-    if (regSelect) {
-        currentSettings.camera_startup_region = regSelect.value;
-    }
-    const zoomSlider = document.getElementById('cfg-camera-zoom');
-    if (zoomSlider) {
-        currentSettings.camera_airport_zoom = parseFloat(zoomSlider.value);
-    }
-    const durSlider = document.getElementById('cfg-camera-duration');
-    if (durSlider) {
-        currentSettings.camera_pan_duration = parseFloat(durSlider.value);
-    }
-
-    const langSelect = document.getElementById('cfg-app-language');
-    if (langSelect) {
-        currentSettings.language = langSelect.value;
-        if (typeof setAppLanguage === 'function') {
-            setAppLanguage(langSelect.value);
-        }
-    }
-
-    const currSelect = document.getElementById('cfg-app-currency');
-    if (currSelect) {
-        currentSettings.currency = currSelect.value;
-        setCurrency(currSelect.value);
-    }
-
-    const chkIcao = document.getElementById('cfg-label-icao');
-    if (chkIcao) currentSettings.show_label_icao = chkIcao.checked;
-    const chkName = document.getElementById('cfg-label-name');
-    if (chkName) currentSettings.show_label_name = chkName.checked;
-    const chkCity = document.getElementById('cfg-label-city');
-    if (chkCity) currentSettings.show_label_city = chkCity.checked;
-
-    const isExt = !!currentSettings.external_autofps;
-    currentSettings.external_autofps = isExt;
-    currentSettings.dynamic_lod_engine = isExt ? 'external_autofps' : 'smart_lod';
-    if (window.pywebview && window.pywebview.api && window.pywebview.api.set_external_autofps) {
-        window.pywebview.api.set_external_autofps(isExt);
-    }
-    const closeActionSelect = document.getElementById('cfg-close-action');
-    if (closeActionSelect) {
-        currentSettings.close_action = closeActionSelect.value;
-    }
-
-    const chkPrivacyCrash = document.getElementById('cfg-privacy-crash-reports');
-    if (chkPrivacyCrash) {
-        currentSettings.auto_send_crash_reports = chkPrivacyCrash.checked;
-    }
-    const chkPrivacyTelem = document.getElementById('cfg-privacy-telemetry-stats');
-    if (chkPrivacyTelem) {
-        currentSettings.send_anonymous_telemetry = chkPrivacyTelem.checked;
-    }
-    if (window.pywebview && window.pywebview.api && window.pywebview.api.save_bug_reporter_privacy) {
-        window.pywebview.api.save_bug_reporter_privacy(JSON.stringify({
-            auto_send_crash_reports: currentSettings.auto_send_crash_reports !== false,
-            send_anonymous_telemetry: currentSettings.send_anonymous_telemetry !== false
-        })).catch(() => {});
-    }
-
-    if (window.pywebview && window.pywebview.api && window.pywebview.api.save_smart_lod_config) {
-        window.pywebview.api.save_smart_lod_config(JSON.stringify({
-            "source": lodSelect ? (lodSelect.value === 'external_autofps' ? 'external_autofps' : (lodSelect.value === 'disabled' ? 'manual' : 'native')) : 'native',
-            "auto_kill_autofps": chkAutoFpsKill ? chkAutoFpsKill.checked : false
-        })).catch(() => {});
-    }
-
-    const sbInput = document.getElementById('cfg-simbrief-id');
-    if (sbInput) {
-        const val = sbInput.value.trim();
-        if (val.match(/^\d+$/)) {
-            currentSettings.simbrief_userid = val;
-        } else {
-            currentSettings.simbrief_username = val;
-        }
-    }
-
-    // Only apply startup camera if no airport is currently focused and not in flight planning mode
-    if (!currentRadialAirport && !selectedAirport && !isFlightPlanningMode) {
-        applyStartupCameraSettings();
-    }
-
-    // Re-render map markers with updated label settings
-    airportMarkerCache.clear();
-    customDivIconCache.clear();
-    if (map && currentlyFilteredAirports && currentlyFilteredAirports.length > 0) {
-        renderAirportsOnMap(currentlyFilteredAirports);
-    }
-
-    if (currentRadialAirport) {
-        currentRadialMarker = airportMarkerCache.get(currentRadialAirport.icao) || null;
-        const radialEl = document.getElementById('airport-radial-menu');
-        if (radialEl) {
-            radialEl.classList.remove('hidden');
-        }
-        updateRadialMenuPosition(true);
-    }
-
     try {
-        if (window.pywebview) {
+        const autoScanEl = document.getElementById('cfg-auto-scan');
+        if (autoScanEl) currentSettings.auto_scan_on_startup = autoScanEl.checked;
+
+        const gsxInput = document.getElementById('cfg-gsx-path');
+        if (gsxInput) {
+            currentSettings.gsx_profile_path = gsxInput.value.trim();
+        }
+
+        const regSelect = document.getElementById('cfg-camera-region');
+        if (regSelect) {
+            currentSettings.camera_startup_region = regSelect.value;
+        }
+        const zoomSlider = document.getElementById('cfg-camera-zoom');
+        if (zoomSlider) {
+            currentSettings.camera_airport_zoom = parseFloat(zoomSlider.value);
+        }
+        const durSlider = document.getElementById('cfg-camera-duration');
+        if (durSlider) {
+            currentSettings.camera_pan_duration = parseFloat(durSlider.value);
+        }
+
+        const navStyleSelect = document.getElementById('cfg-nav-style');
+        if (navStyleSelect) {
+            currentSettings.navigation_style = navStyleSelect.value || 'radial';
+            if (typeof applyNavigationStyle === 'function') {
+                applyNavigationStyle(currentSettings.navigation_style);
+            }
+        }
+
+        const langSelect = document.getElementById('cfg-app-language');
+        if (langSelect) {
+            currentSettings.language = langSelect.value;
+            if (typeof setAppLanguage === 'function') {
+                setAppLanguage(langSelect.value);
+            }
+        }
+
+        const currSelect = document.getElementById('cfg-app-currency');
+        if (currSelect) {
+            currentSettings.currency = currSelect.value;
+            setCurrency(currSelect.value);
+        }
+
+        const chkIcao = document.getElementById('cfg-label-icao');
+        if (chkIcao) currentSettings.show_label_icao = chkIcao.checked;
+        const chkName = document.getElementById('cfg-label-name');
+        if (chkName) currentSettings.show_label_name = chkName.checked;
+        const chkCity = document.getElementById('cfg-label-city');
+        if (chkCity) currentSettings.show_label_city = chkCity.checked;
+
+        const isExt = !!currentSettings.external_autofps;
+        currentSettings.external_autofps = isExt;
+        currentSettings.dynamic_lod_engine = isExt ? 'external_autofps' : 'smart_lod';
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.set_external_autofps) {
+            window.pywebview.api.set_external_autofps(isExt);
+        }
+        const closeActionSelect = document.getElementById('cfg-close-action');
+        if (closeActionSelect) {
+            currentSettings.close_action = closeActionSelect.value;
+        }
+
+        const chkPrivacyCrash = document.getElementById('cfg-privacy-crash-reports');
+        if (chkPrivacyCrash) {
+            currentSettings.auto_send_crash_reports = chkPrivacyCrash.checked;
+        }
+        const chkPrivacyTelem = document.getElementById('cfg-privacy-telemetry-stats');
+        if (chkPrivacyTelem) {
+            currentSettings.send_anonymous_telemetry = chkPrivacyTelem.checked;
+        }
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.save_bug_reporter_privacy) {
+            window.pywebview.api.save_bug_reporter_privacy(JSON.stringify({
+                auto_send_crash_reports: currentSettings.auto_send_crash_reports !== false,
+                send_anonymous_telemetry: currentSettings.send_anonymous_telemetry !== false
+            })).catch(() => {});
+        }
+
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.save_smart_lod_config) {
+            window.pywebview.api.save_smart_lod_config(JSON.stringify({
+                "source": isExt ? 'external_autofps' : 'native',
+                "auto_kill_autofps": false
+            })).catch(() => {});
+        }
+
+        const sbInput = document.getElementById('cfg-simbrief-id');
+        if (sbInput) {
+            const val = sbInput.value.trim();
+            if (val.match(/^\d+$/)) {
+                currentSettings.simbrief_userid = val;
+            } else {
+                currentSettings.simbrief_username = val;
+            }
+        }
+
+        // Only apply startup camera if no airport is currently focused and not in flight planning mode
+        if (!currentRadialAirport && !selectedAirport && !isFlightPlanningMode) {
+            applyStartupCameraSettings();
+        }
+
+        // Re-render map markers with updated label settings
+        airportMarkerCache.clear();
+        customDivIconCache.clear();
+        if (map && currentlyFilteredAirports && currentlyFilteredAirports.length > 0) {
+            renderAirportsOnMap(currentlyFilteredAirports);
+        }
+
+        if (isClassicNavMode()) {
+            const radialEl = document.getElementById('airport-radial-menu');
+            if (radialEl) {
+                radialEl.classList.add('hidden');
+                radialEl.style.display = 'none';
+            }
+            const filterEl = document.getElementById('filter-radial-menu');
+            if (filterEl) {
+                filterEl.classList.add('hidden');
+                filterEl.style.display = 'none';
+            }
+        } else {
+            const radialEl = document.getElementById('airport-radial-menu');
+            if (radialEl) {
+                radialEl.style.display = '';
+                radialEl.classList.remove('radial-only-core');
+            }
+            const filterEl = document.getElementById('filter-radial-menu');
+            if (filterEl) {
+                filterEl.style.display = '';
+            }
+            const targetAp = currentRadialAirport || currentClassicAirport || selectedAirport;
+            currentClassicAirport = null;
+            if (targetAp) {
+                const targetMarker = (typeof airportMarkerCache !== 'undefined' && airportMarkerCache.get(targetAp.icao)) || currentRadialMarker || null;
+                openAirportRadialMenu(targetAp, targetMarker);
+            }
+        }
+
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.save_settings) {
             await window.pywebview.api.save_settings(JSON.stringify(currentSettings));
         }
         if (typeof showToast === 'function') {
@@ -14821,7 +15507,7 @@ async function saveSettings() {
         const saveBtnText = document.getElementById('settings-save-btn-text');
         if (saveBtnText) {
             const origText = saveBtnText.textContent;
-            saveBtnText.textContent = 'Saved ✓';
+            saveBtnText.textContent = (typeof t === 'function') ? t('settings.saved', 'Saved') : 'Saved';
             if (saveBtn) saveBtn.classList.add('text-emerald-400', 'border-emerald-600/60');
             setTimeout(() => {
                 if (saveBtnText) saveBtnText.textContent = origText;
@@ -14912,11 +15598,802 @@ async function saveCameraSettingsOnly() {
     }
 }
 
+/* =========================================================================
+   CLASSIC FLIGHT OPS PANEL CONTROLLER (NAVIGRAPH / FLIGHT SIM SIDEBAR MODE)
+   ========================================================================= */
+
+let currentClassicAirport = null;
+
+function applyNavigationStyle(style) {
+    const navStyle = (style === 'classic') ? 'classic' : 'radial';
+    if (typeof currentSettings !== 'undefined') {
+        currentSettings.navigation_style = navStyle;
+    }
+    const sidePanel = document.getElementById('classic-flight-ops-panel');
+    const radialMenu = document.getElementById('airport-radial-menu');
+    const filterMenu = document.getElementById('filter-radial-menu');
+
+    if (navStyle === 'classic') {
+        // Suppress all radial menus in Classic mode
+        closeAirportRadialMenu(false);
+        if (typeof closeFilterRadialMenu === 'function') {
+            closeFilterRadialMenu();
+        }
+        if (radialMenu) {
+            radialMenu.classList.add('hidden');
+            radialMenu.style.display = 'none';
+        }
+        if (filterMenu) {
+            filterMenu.classList.add('hidden');
+            filterMenu.style.display = 'none';
+        }
+        if (sidePanel) {
+            sidePanel.classList.remove('hidden');
+            sidePanel.style.display = 'flex';
+        }
+        const targetAp = currentClassicAirport || currentRadialAirport || selectedAirport;
+        if (targetAp) {
+            showClassicAirportView(targetAp);
+        } else {
+            closeClassicAirportView();
+        }
+        updateClassicPanelUI();
+    } else {
+        if (sidePanel) {
+            sidePanel.classList.add('hidden');
+            sidePanel.style.display = 'none';
+        }
+        if (radialMenu) {
+            radialMenu.style.display = '';
+            radialMenu.classList.remove('radial-only-core');
+        }
+        if (filterMenu) {
+            filterMenu.style.display = '';
+        }
+        const targetAp = currentClassicAirport || currentRadialAirport || selectedAirport;
+        currentClassicAirport = null;
+        if (targetAp) {
+            currentRadialAirport = targetAp;
+            selectedAirport = targetAp;
+            currentRadialMarker = (typeof airportMarkerCache !== 'undefined' && airportMarkerCache.get(targetAp.icao)) || currentRadialMarker || null;
+            const settingsModal = document.getElementById('settings-modal');
+            const isModalOpen = settingsModal && (settingsModal.classList.contains('flex') || !settingsModal.classList.contains('hidden'));
+            if (!isModalOpen) {
+                openAirportRadialMenu(targetAp, currentRadialMarker);
+            }
+        }
+    }
+
+    if (document.body) {
+        document.body.classList.toggle('classic-nav-active', navStyle === 'classic');
+    }
+    if (window.windowManager && typeof window.windowManager.clampAllActiveModals === 'function') {
+        window.windowManager.clampAllActiveModals();
+    }
+
+    if (map && typeof map.invalidateSize === 'function') {
+        setTimeout(() => map.invalidateSize(), 60);
+        setTimeout(() => map.invalidateSize(), 250);
+    }
+}
+
+function previewNavStyle(style) {
+    applyNavigationStyle(style);
+}
+
+const classicFilterMode = {
+    pricing: 'single',
+    source: 'single',
+    region: 'single',
+    type: 'single',
+    gsx: 'single'
+};
+
+function updateClassicPanelUI() {
+    // 0. Airport Header Card, Actions, & Flight Optimizer visibility check
+    const headerCard = document.getElementById('classic-ap-header-card');
+    const actionsSec = document.getElementById('classic-ap-actions-section');
+    const flightOptSec = document.getElementById('classic-flight-optimizer-section');
+    if (!currentClassicAirport) {
+        if (headerCard) headerCard.classList.add('hidden');
+        if (actionsSec) actionsSec.classList.add('hidden');
+        if (flightOptSec) flightOptSec.classList.remove('hidden');
+    } else {
+        if (headerCard) headerCard.classList.remove('hidden');
+        if (actionsSec) actionsSec.classList.remove('hidden');
+        if (flightOptSec) flightOptSec.classList.add('hidden');
+    }
+
+    // 1. Filter Category Options: Colors, Multi-Select States & Tickboxes
+    const isAllPricing = (selectedPricing.size === ALL_PRICING_LIST.length);
+    const tickPricingAll = document.getElementById('classic-tick-pricing-all');
+    if (tickPricingAll) tickPricingAll.textContent = '';
+    const btnPricingAll = document.getElementById('classic-opt-pricing-all');
+    if (btnPricingAll) {
+        btnPricingAll.className = isAllPricing
+            ? 'w-full h-7 px-2.5 rounded-md bg-[#00A8FF] text-[#0F1115] font-bold text-[10px] font-mono uppercase tracking-wider text-left truncate border-0 shadow-sm cursor-pointer'
+            : 'w-full h-7 px-2.5 rounded-md bg-[#1C212B] text-slate-300 hover:bg-[#222834] hover:text-white text-[10px] font-mono font-bold uppercase tracking-wider text-left truncate border border-[#2A3241] cursor-pointer';
+    }
+
+    const pricingDefs = [
+        { key: 'payware', target: 'Payware', tick: 'classic-tick-pricing-payware', btn: 'classic-opt-pricing-payware', activeCls: 'bg-purple-600 text-white border-purple-400 font-bold shadow-sm', inactiveCls: 'bg-[#1C212B] text-purple-400 hover:bg-[#222834] border border-[#2A3241] font-bold' },
+        { key: 'freeware', target: 'Freeware / Flightsim.to', tick: 'classic-tick-pricing-freeware', btn: 'classic-opt-pricing-freeware', activeCls: 'bg-[#00A8FF] text-[#0F1115] border-[#38BDF8] font-bold shadow-sm', inactiveCls: 'bg-[#1C212B] text-cyan-400 hover:bg-[#222834] border border-[#2A3241] font-bold' },
+        { key: 'asobo', target: 'Asobo', tick: 'classic-tick-pricing-asobo', btn: 'classic-opt-pricing-asobo', activeCls: 'bg-[#F59E0B] text-[#0F1115] border-amber-300 font-black shadow-sm', inactiveCls: 'bg-[#1C212B] text-amber-400 hover:bg-[#222834] border border-[#2A3241] font-bold' },
+        { key: 'default', target: 'Default', tick: 'classic-tick-pricing-default', btn: 'classic-opt-pricing-default', activeCls: 'bg-blue-600 text-white border-blue-400 font-bold shadow-sm', inactiveCls: 'bg-[#1C212B] text-blue-400 hover:bg-[#222834] border border-[#2A3241] font-bold' }
+    ];
+
+    pricingDefs.forEach(p => {
+        const isSelected = !isAllPricing && selectedPricing.has(p.target);
+        const tickEl = document.getElementById(p.tick);
+        if (tickEl) {
+            tickEl.textContent = isSelected ? '✓' : '';
+            tickEl.className = isSelected
+                ? 'w-3.5 h-3.5 rounded border border-white/60 bg-white/20 flex items-center justify-center text-[9px] text-white font-black shrink-0 select-none'
+                : 'w-3.5 h-3.5 rounded border border-[#3E495D] bg-[#161920] flex items-center justify-center text-[9px] text-slate-400 shrink-0 select-none';
+        }
+        const btnEl = document.getElementById(p.btn);
+        if (btnEl) {
+            btnEl.className = `h-7 px-2 rounded-md flex items-center gap-1.5 truncate cursor-pointer transition-colors text-[10px] font-mono uppercase ${isSelected ? p.activeCls : p.inactiveCls}`;
+        }
+    });
+
+    const isAllSources = (selectedSources.size === ALL_SOURCES_LIST.length);
+    const tickSourceAll = document.getElementById('classic-tick-source-all');
+    if (tickSourceAll) tickSourceAll.textContent = '';
+    const btnSourceAll = document.getElementById('classic-opt-source-all');
+    if (btnSourceAll) {
+        btnSourceAll.className = isAllSources
+            ? 'w-full h-7 px-2.5 rounded-md bg-[#00A8FF] text-[#0F1115] font-bold text-[11px] font-mono text-left truncate border-0 shadow-sm cursor-pointer'
+            : 'w-full h-7 px-2.5 rounded-md bg-[#1C212B] text-slate-300 hover:bg-[#222834] hover:text-white text-[11px] font-mono font-semibold text-left truncate border border-[#2A3241] cursor-pointer';
+    }
+
+    ['community', 'official'].forEach(srcKey => {
+        const val = srcKey === 'community' ? 'Community' : 'Official';
+        const isSelected = !isAllSources && selectedSources.has(val);
+        const tickEl = document.getElementById(`classic-tick-source-${srcKey}`);
+        if (tickEl) {
+            tickEl.textContent = isSelected ? '✓' : '';
+            tickEl.className = isSelected
+                ? 'w-3.5 h-3.5 rounded border border-[#0F1115]/30 bg-[#0F1115]/20 flex items-center justify-center text-[9px] text-[#0F1115] font-black shrink-0 select-none'
+                : 'w-3.5 h-3.5 rounded border border-[#3E495D] bg-[#161920] flex items-center justify-center text-[9px] text-slate-400 shrink-0 select-none';
+        }
+        const btnEl = document.getElementById(`classic-opt-source-${srcKey}`);
+        if (btnEl) {
+            btnEl.className = isSelected
+                ? 'w-full h-7 px-2 rounded-md bg-[#00A8FF] text-[#0F1115] font-bold text-[11px] font-mono flex items-center gap-2 truncate border-0 shadow-sm cursor-pointer'
+                : 'w-full h-7 px-2 rounded-md bg-[#1C212B] text-slate-300 hover:bg-[#222834] hover:text-white text-[11px] font-mono font-semibold flex items-center gap-2 truncate border border-[#2A3241] cursor-pointer';
+        }
+    });
+
+    const isAllRegions = (!selectedRegion && selectedRegions.size === 0) || (selectedRegions.size === ALL_REGIONS_LIST.length);
+    const tickRegionNull = document.getElementById('classic-tick-region-null');
+    if (tickRegionNull) tickRegionNull.textContent = '';
+    const btnRegionNull = document.getElementById('classic-opt-region-null');
+    if (btnRegionNull) {
+        btnRegionNull.className = isAllRegions
+            ? 'w-full h-7 px-2.5 rounded-md bg-[#00A8FF] text-[#0F1115] font-bold text-[11px] font-mono text-left truncate border-0 shadow-sm cursor-pointer'
+            : 'w-full h-7 px-2.5 rounded-md bg-[#1C212B] text-slate-300 hover:bg-[#222834] hover:text-white text-[11px] font-mono font-semibold text-left truncate border border-[#2A3241] cursor-pointer';
+    }
+
+    ['weurope', 'eeurope', 'namerica', 'camerica', 'samerica', 'asia', 'middleeast', 'nafrica', 'ssafrica', 'oceania', 'pacific'].forEach(regKey => {
+        const actualKey = regKey === 'camerica' ? 'camerica_caribbean' : regKey;
+        const isSelected = !isAllRegions && selectedRegions.has(actualKey);
+        const tickEl = document.getElementById(`classic-tick-region-${regKey}`);
+        if (tickEl) {
+            tickEl.textContent = isSelected ? '✓' : '';
+            tickEl.className = isSelected
+                ? 'w-3.5 h-3.5 rounded border border-[#0F1115]/30 bg-[#0F1115]/20 flex items-center justify-center text-[9px] text-[#0F1115] font-black shrink-0 select-none'
+                : 'w-3.5 h-3.5 rounded border border-[#3E495D] bg-[#161920] flex items-center justify-center text-[9px] text-slate-400 shrink-0 select-none';
+        }
+        const btnEl = document.getElementById(`classic-opt-region-${regKey}`);
+        if (btnEl) {
+            btnEl.className = isSelected
+                ? 'w-full h-7 px-2 rounded-md bg-[#00A8FF] text-[#0F1115] font-bold text-[11px] font-mono flex items-center gap-2 truncate border-0 shadow-sm cursor-pointer'
+                : 'w-full h-7 px-2 rounded-md bg-[#1C212B] text-slate-300 hover:bg-[#222834] hover:text-white text-[11px] font-mono font-semibold flex items-center gap-2 truncate border border-[#2A3241] cursor-pointer';
+        }
+    });
+
+    const isAllTypes = (selectedTypes.size === ALL_TYPES_LIST.length);
+    const tickTypeAll = document.getElementById('classic-tick-type-all');
+    if (tickTypeAll) tickTypeAll.textContent = '';
+    const btnTypeAll = document.getElementById('classic-opt-type-all');
+    if (btnTypeAll) {
+        btnTypeAll.className = isAllTypes
+            ? 'w-full h-7 px-2.5 rounded-md bg-[#00A8FF] text-[#0F1115] font-bold text-[11px] font-mono text-left truncate border-0 shadow-sm cursor-pointer'
+            : 'w-full h-7 px-2.5 rounded-md bg-[#1C212B] text-slate-300 hover:bg-[#222834] hover:text-white text-[11px] font-mono font-semibold text-left truncate border border-[#2A3241] cursor-pointer';
+    }
+
+    [
+        { key: 'int', val: 'International' },
+        { key: 'reg', val: 'Regional' },
+        { key: 'ga', val: 'General Aviation' },
+        { key: 'heli', val: 'Heli / Water' }
+    ].forEach(t => {
+        const isSelected = !isAllTypes && selectedTypes.has(t.val);
+        const tickEl = document.getElementById(`classic-tick-type-${t.key}`);
+        if (tickEl) {
+            tickEl.textContent = isSelected ? '✓' : '';
+            tickEl.className = isSelected
+                ? 'w-3.5 h-3.5 rounded border border-[#0F1115]/30 bg-[#0F1115]/20 flex items-center justify-center text-[9px] text-[#0F1115] font-black shrink-0 select-none'
+                : 'w-3.5 h-3.5 rounded border border-[#3E495D] bg-[#161920] flex items-center justify-center text-[9px] text-slate-400 shrink-0 select-none';
+        }
+        const btnEl = document.getElementById(`classic-opt-type-${t.key}`);
+        if (btnEl) {
+            btnEl.className = isSelected
+                ? 'w-full h-7 px-2 rounded-md bg-[#00A8FF] text-[#0F1115] font-bold text-[11px] font-mono flex items-center gap-2 truncate border-0 shadow-sm cursor-pointer'
+                : 'w-full h-7 px-2 rounded-md bg-[#1C212B] text-slate-300 hover:bg-[#222834] hover:text-white text-[11px] font-mono font-semibold flex items-center gap-2 truncate border border-[#2A3241] cursor-pointer';
+        }
+    });
+
+    const isAllGsx = (selectedGsxFilter === 'all');
+    const hasWith = (selectedGsxFilter === 'with' || selectedGsxFilter === 'all_both');
+    const hasNone = (selectedGsxFilter === 'none' || selectedGsxFilter === 'all_both');
+    const tickGsxAll = document.getElementById('classic-tick-gsx-all');
+    if (tickGsxAll) tickGsxAll.textContent = '';
+    const btnGsxAll = document.getElementById('classic-opt-gsx-all');
+    if (btnGsxAll) {
+        btnGsxAll.className = isAllGsx
+            ? 'w-full h-7 px-2.5 rounded-md bg-[#00A8FF] text-[#0F1115] font-bold text-[11px] font-mono text-left truncate border-0 shadow-sm cursor-pointer'
+            : 'w-full h-7 px-2.5 rounded-md bg-[#1C212B] text-slate-300 hover:bg-[#222834] hover:text-white text-[11px] font-mono font-semibold text-left truncate border border-[#2A3241] cursor-pointer';
+    }
+
+    ['with', 'none'].forEach(g => {
+        const isSelected = (g === 'with') ? hasWith : hasNone;
+        const tickEl = document.getElementById(`classic-tick-gsx-${g}`);
+        if (tickEl) {
+            tickEl.textContent = '';
+        }
+        const btnEl = document.getElementById(`classic-opt-gsx-${g}`);
+        if (btnEl) {
+            btnEl.className = isSelected
+                ? 'w-full h-7 px-2.5 rounded-md bg-[#00A8FF] text-[#0F1115] font-bold text-[11px] font-mono text-left truncate border-0 shadow-sm cursor-pointer'
+                : 'w-full h-7 px-2.5 rounded-md bg-[#1C212B] text-slate-300 hover:bg-[#222834] hover:text-white text-[11px] font-mono font-semibold text-left truncate border border-[#2A3241] cursor-pointer';
+        }
+    });
+
+    [0, 1, 2, 3, 4, 5].forEach(val => {
+        const btn = document.getElementById(`classic-opt-rating-${val}`);
+        if (!btn) return;
+        const isActive = (val === 0 ? (!selectedMinRating || selectedMinRating === 0) : selectedMinRating === val);
+        if (val === 0) {
+            if (isActive) btn.className = 'w-full h-7 px-2 rounded-md bg-[#00A8FF] text-[#0F1115] font-bold text-[11px] font-mono text-left truncate border-0 cursor-pointer shadow-sm';
+            else btn.className = 'w-full h-7 px-2 rounded-md bg-[#1C212B] text-slate-300 hover:bg-[#222834] hover:text-white text-[11px] font-mono font-semibold text-left truncate border border-[#2A3241] cursor-pointer';
+        } else {
+            if (isActive) btn.className = 'h-7 rounded-md bg-[#F59E0B] text-[#0F1115] font-mono font-black text-xs text-center border-0 cursor-pointer shadow-sm scale-105';
+            else btn.className = 'h-7 rounded-md bg-[#1C212B] text-amber-400 hover:bg-[#222834] font-mono font-bold text-xs text-center border border-[#2A3241] cursor-pointer';
+        }
+    });
+
+    // 2. Flight Optimizer Badges (100% solid, crisp pill colors - Zero Glass Effect)
+    const badgeSmartLod = document.getElementById('classic-badge-smart-lod');
+    if (badgeSmartLod) {
+        const isExt = !!(smartLodAxisState && smartLodAxisState.external_autofps) || !!(typeof currentSettings !== 'undefined' && currentSettings.external_autofps);
+        if (isExt) {
+            badgeSmartLod.textContent = 'AUTOFPS';
+            badgeSmartLod.className = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#F59E0B] text-[#0F1115] shadow-sm';
+        } else if (window.smartLodActive) {
+            badgeSmartLod.textContent = 'ACTIVE';
+            badgeSmartLod.className = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#10B981] text-white shadow-sm';
+        } else {
+            badgeSmartLod.textContent = 'OFF';
+            badgeSmartLod.className = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#161920] text-[#64748B] border border-[#2A3241]';
+        }
+    }
+
+    const badgeGraphics = document.getElementById('classic-badge-graphics');
+    if (badgeGraphics) {
+        const mode = (typeof currentMsfsGraphicsMode !== 'undefined') ? currentMsfsGraphicsMode : '2D';
+        badgeGraphics.textContent = mode.toUpperCase();
+        badgeGraphics.className = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#161920] text-slate-300 border border-[#2A3241]';
+    }
+
+    const badgeMyRig = document.getElementById('classic-badge-my-rig');
+    if (badgeMyRig) {
+        badgeMyRig.textContent = 'OPTIMUM';
+        badgeMyRig.className = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#10B981] text-white shadow-sm';
+    }
+
+    const badgeTelemetry = document.getElementById('classic-badge-telemetry');
+    if (badgeTelemetry) {
+        const timeVal = (window.flightPerfSampleCount && window.flightPerfSampleCount > 0) ? `${Math.floor(window.flightPerfSampleCount / 60)}m` : '00:00';
+        badgeTelemetry.textContent = timeVal;
+        badgeTelemetry.className = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#161920] text-[#64748B] border border-[#2A3241]';
+    }
+
+    if (typeof updateClassicSidebarRouteBadge === 'function') {
+        updateClassicSidebarRouteBadge();
+    }
+}
+
+function showClassicAirportView(ap) {
+    if (!ap) return;
+    currentClassicAirport = ap;
+    currentRadialAirport = ap;
+    selectedAirport = ap;
+    isCameraPanningToRadial = true;
+    if (typeof airportMarkerCache !== 'undefined' && airportMarkerCache.has(ap.icao)) {
+        currentRadialMarker = airportMarkerCache.get(ap.icao);
+    }
+
+    // Reveal Header Card and Actions Section, Hide Flight Optimizer
+    const headerCard = document.getElementById('classic-ap-header-card');
+    if (headerCard) headerCard.classList.remove('hidden');
+
+    const actionsSec = document.getElementById('classic-ap-actions-section');
+    if (actionsSec) actionsSec.classList.remove('hidden');
+
+    const flightOptSec = document.getElementById('classic-flight-optimizer-section');
+    if (flightOptSec) flightOptSec.classList.add('hidden');
+
+    const cat = (typeof getAirportCategory === 'function') ? getAirportCategory(ap) : 'DEFAULT';
+
+    // 1. ICAO / IATA Codes (Colored to match category/family)
+    const codesEl = document.getElementById('classic-ap-codes');
+    if (codesEl) {
+        const iataVal = (ap.iata && ap.iata.trim() && ap.iata.trim() !== '—' && ap.iata.trim() !== '-') ? ap.iata.trim().toUpperCase() : '';
+        codesEl.textContent = iataVal ? `${ap.icao} / ${iataVal}` : (ap.icao || '----');
+
+        let codeColor = 'text-white';
+        if (ap.has_conflict) {
+            codeColor = 'text-rose-400';
+        } else if (ap.is_disabled) {
+            codeColor = 'text-slate-400';
+        } else if (cat === 'ASOBO') {
+            codeColor = 'text-amber-400';
+        } else if (cat === 'PAYWARE') {
+            codeColor = 'text-purple-400';
+        } else if (cat === 'DEFAULT') {
+            codeColor = 'text-blue-400';
+        } else {
+            codeColor = 'text-cyan-400';
+        }
+        codesEl.className = `font-mono text-2xl font-black tracking-tight block w-full truncate text-center ${codeColor}`;
+    }
+
+    // 2. Family Category Badge (Strict Category Color Codes, 100% Solid Flat Colors)
+    const familyBadge = document.getElementById('classic-ap-family-badge');
+    if (familyBadge) {
+        if (ap.has_conflict) {
+            familyBadge.textContent = 'CONFLICT';
+            familyBadge.className = 'px-3.5 py-1 rounded-full text-xs font-sans font-black uppercase tracking-wider bg-[#EF4444] text-white border-0 animate-pulse inline-block shadow-sm';
+        } else if (ap.is_disabled) {
+            familyBadge.textContent = 'DISABLED';
+            familyBadge.className = 'px-3.5 py-1 rounded-full text-xs font-sans font-bold uppercase tracking-wider bg-[#161920] text-slate-300 border border-[#2A3241] inline-block';
+        } else if (cat === 'ASOBO') {
+            familyBadge.textContent = 'ASOBO';
+            familyBadge.className = 'px-5 py-1.5 rounded-full text-xs font-sans font-black uppercase tracking-wider bg-[#F59E0B] text-[#0F1115] border-0 shadow-md inline-block';
+        } else if (cat === 'PAYWARE') {
+            familyBadge.textContent = ap.vendor ? `PAYWARE • ${ap.vendor}` : 'PAYWARE';
+            familyBadge.className = 'px-3.5 py-1 rounded-full text-xs font-sans font-bold uppercase tracking-wider bg-purple-600 text-white border-0 shadow-sm inline-block';
+        } else if (cat === 'DEFAULT') {
+            familyBadge.textContent = 'DEFAULT MSFS';
+            familyBadge.className = 'px-3.5 py-1 rounded-full text-xs font-sans font-bold uppercase tracking-wider bg-blue-600 text-white border-0 shadow-sm inline-block';
+        } else {
+            familyBadge.textContent = ap.vendor ? `FREEWARE • ${ap.vendor}` : 'FREEWARE';
+            familyBadge.className = 'px-3.5 py-1 rounded-full text-xs font-sans font-bold uppercase tracking-wider bg-[#00A8FF] text-[#0F1115] border-0 shadow-sm inline-block';
+        }
+    }
+
+    // 3. Clean Airport Name (Centered)
+    const nameEl = document.getElementById('classic-ap-name');
+    if (nameEl) {
+        const cleanName = (typeof getCleanAirportName === 'function') ? getCleanAirportName(ap.name, ap.city) : (ap.name || ap.icao);
+        nameEl.textContent = (cleanName || ap.icao || '').toUpperCase();
+    }
+
+    // 4. Location: City, Country (Centered)
+    const locEl = document.getElementById('classic-ap-location');
+    if (locEl) {
+        let apIsoCode = ((ap.country || ap.iso_country || '').toString()).toUpperCase().trim();
+        if (!apIsoCode || apIsoCode.length !== 2) {
+            for (const [code, name] of Object.entries(ISO_TO_COUNTRY_NAME)) {
+                if (name.toLowerCase() === (ap.country || '').toLowerCase()) {
+                    apIsoCode = code;
+                    break;
+                }
+            }
+        }
+        const resolvedCountryName = (typeof getLocalizedCountryName === 'function') ? getLocalizedCountryName(apIsoCode, ap.country) : (ISO_TO_COUNTRY_NAME[apIsoCode] || ap.country || 'Unknown Country');
+        const cleanCity = (typeof getCleanCityName === 'function') ? getCleanCityName(ap.city) : ap.city;
+        const loc = [cleanCity, resolvedCountryName].filter(Boolean).join(', ');
+        locEl.textContent = loc || 'Location Unknown';
+    }
+
+    // 5. 2x2 Pills: ELEV, RUNWAYS, COORD N/S, COORD E/W
+    const elevEl = document.getElementById('classic-ap-elev');
+    if (elevEl) {
+        const altVal = ap.elevation !== undefined ? ap.elevation : (ap.alt !== undefined ? ap.alt : '--');
+        elevEl.textContent = `${altVal} FT`;
+    }
+
+    const rwysEl = document.getElementById('classic-ap-rwys');
+    if (rwysEl) {
+        const cat = typeof formatAirportCategoryDisplay === 'function' ? formatAirportCategoryDisplay(ap) : (ap.category || 'REGIONAL');
+        rwysEl.textContent = cat;
+        rwysEl.title = cat;
+    }
+
+    const latEl = document.getElementById('classic-ap-lat');
+    if (latEl) {
+        if (ap.lat !== undefined && ap.lat !== null && !isNaN(ap.lat)) {
+            const latVal = parseFloat(ap.lat);
+            latEl.textContent = `${Math.abs(latVal).toFixed(4)}° ${latVal >= 0 ? 'N' : 'S'}`;
+        } else {
+            latEl.textContent = '--';
+        }
+    }
+
+    const lonEl = document.getElementById('classic-ap-lon');
+    if (lonEl) {
+        if (ap.lon !== undefined && ap.lon !== null && !isNaN(ap.lon)) {
+            const lonVal = parseFloat(ap.lon);
+            lonEl.textContent = `${Math.abs(lonVal).toFixed(4)}° ${lonVal >= 0 ? 'E' : 'W'}`;
+        } else {
+            lonEl.textContent = '--';
+        }
+    }
+
+    // 6. Contextual Actions Section (Reveal)
+    const scCountEl = document.getElementById('classic-ap-scenery-count');
+    if (scCountEl) {
+        const scCount = (ap.sceneries && ap.sceneries.length) || 1;
+        scCountEl.textContent = `${scCount} ADDON${scCount > 1 ? 'S' : ''}`;
+    }
+
+    const airCountEl = document.getElementById('classic-ap-airlines-count');
+    if (airCountEl) {
+        airCountEl.innerHTML = '&rarr;';
+    }
+
+    const gsxEl = document.getElementById('classic-ap-gsx-status');
+    if (gsxEl) {
+        gsxEl.innerHTML = '&rarr;';
+    }
+
+    // 7. Screen 4: Reveal and Anchor Radial Central Pastille on Map Marker in Classic Mode
+    const radialEl = document.getElementById('airport-radial-menu');
+    if (radialEl) {
+        radialEl.classList.add('radial-only-core');
+        radialEl.classList.remove('hidden', 'radial-quadrants-collapsed');
+        radialEl.style.display = '';
+
+        const icaoEl = document.getElementById('radial-icao');
+        const badgeEl = document.getElementById('radial-badge');
+        const nameEl = document.getElementById('radial-name');
+        const cityEl = document.getElementById('radial-city');
+        const iataVal = (ap.iata && ap.iata.trim() && ap.iata.trim() !== '—' && ap.iata.trim() !== '-') ? ap.iata.trim().toUpperCase() : '';
+        const codesStr = iataVal ? `${ap.icao}/${iataVal}` : (ap.icao || '');
+        if (icaoEl) icaoEl.innerText = codesStr;
+        if (nameEl) nameEl.innerText = (typeof getCleanAirportName === 'function' ? getCleanAirportName(ap.name, ap.city) : ap.name) || ap.icao;
+
+        let apIsoCode = ((ap.country || ap.iso_country || '').toString()).toUpperCase().trim();
+        if (!apIsoCode || apIsoCode.length !== 2) {
+            for (const [code, name] of Object.entries(ISO_TO_COUNTRY_NAME)) {
+                if (name.toLowerCase() === (ap.country || '').toLowerCase()) {
+                    apIsoCode = code;
+                    break;
+                }
+            }
+        }
+        const resolvedCountryName = (typeof getLocalizedCountryName === 'function') ? getLocalizedCountryName(apIsoCode, ap.country) : (ISO_TO_COUNTRY_NAME[apIsoCode] || ap.country || 'Unknown Country');
+        const cleanCity = (typeof getCleanCityName === 'function') ? getCleanCityName(ap.city) : ap.city;
+        if (cityEl) cityEl.innerText = `${cleanCity || 'Unknown City'}, ${resolvedCountryName}`;
+
+        let rBadgeLabel = 'FREEWARE';
+        let rBadgeClass = 'bg-cyan-600 text-white font-bold';
+        let rIcaoColor = 'text-cyan-400';
+
+        if (ap.has_conflict) {
+            rBadgeLabel = `⚠️ CONFLICT (${ap.conflict_count || 2})`;
+            rBadgeClass = 'bg-rose-600 text-white font-black animate-pulse';
+            rIcaoColor = 'text-rose-400';
+        } else if (ap.is_disabled) {
+            rBadgeLabel = 'DISABLED';
+            rBadgeClass = 'bg-slate-700 text-slate-300 font-bold';
+            rIcaoColor = 'text-slate-400';
+        } else if (cat === 'ASOBO') {
+            rBadgeLabel = 'ASOBO / MICROSOFT';
+            rBadgeClass = 'bg-amber-500 text-slate-950 font-black';
+            rIcaoColor = 'text-amber-400';
+        } else if (cat === 'PAYWARE') {
+            rBadgeLabel = ap.vendor ? `PAYWARE • ${ap.vendor}` : 'PAYWARE';
+            rBadgeClass = 'bg-purple-600 text-white font-bold';
+            rIcaoColor = 'text-purple-400';
+        } else if (cat === 'DEFAULT') {
+            rBadgeLabel = 'DEFAULT MSFS';
+            rBadgeClass = 'bg-blue-600 text-white font-bold';
+            rIcaoColor = 'text-blue-400';
+        } else {
+            rBadgeLabel = ap.vendor ? `FREEWARE • ${ap.vendor}` : 'FREEWARE';
+            rBadgeClass = 'bg-cyan-600 text-white font-bold';
+            rIcaoColor = 'text-cyan-400';
+        }
+
+        if (badgeEl) {
+            badgeEl.innerText = rBadgeLabel;
+            badgeEl.className = `text-[11px] font-mono font-black px-3 py-1 rounded-full border-0 tracking-wide uppercase truncate max-w-[210px] shadow-sm ${rBadgeClass}`;
+        }
+        if (icaoEl) {
+            icaoEl.innerText = codesStr;
+            icaoEl.className = `font-mono font-black text-3xl tracking-tight leading-none ${rIcaoColor}`;
+        }
+
+        if (typeof updateRadialMenuPosition === 'function') {
+            updateRadialMenuPosition(true);
+        }
+    }
+
+    if (typeof prefetchRadialStores === 'function') {
+        prefetchRadialStores(ap);
+    }
+    if (typeof refreshAirportGsxStatus === 'function') {
+        refreshAirportGsxStatus(ap.icao);
+    }
+}
+
+function closeClassicAirportView() {
+    currentClassicAirport = null;
+
+    // Hide Header Card and Contextual Actions Section, Restore Flight Optimizer
+    const headerCard = document.getElementById('classic-ap-header-card');
+    if (headerCard) {
+        headerCard.classList.add('hidden');
+    }
+
+    const actionsSec = document.getElementById('classic-ap-actions-section');
+    if (actionsSec) {
+        actionsSec.classList.add('hidden');
+    }
+
+    const flightOptSec = document.getElementById('classic-flight-optimizer-section');
+    if (flightOptSec) {
+        flightOptSec.classList.remove('hidden');
+    }
+
+    const radialEl = document.getElementById('airport-radial-menu');
+    if (radialEl) {
+        if (isClassicNavMode()) {
+            radialEl.classList.add('hidden');
+        }
+        radialEl.classList.remove('radial-only-core');
+    }
+
+    // Close any airport-specific modals that belong to the deselected airport
+    const sceneriesExt = document.getElementById('radial-sceneries-extension');
+    if (sceneriesExt && !sceneriesExt.classList.contains('hidden')) {
+        sceneriesExt.classList.add('hidden');
+        sceneriesExt._hasBeenDragged = false;
+        const bodyEl = document.getElementById('radial-sceneries-extension-body');
+        if (bodyEl) bodyEl.innerHTML = '';
+    }
+    const airlinesModal = document.getElementById('radial-airlines-modal');
+    if (airlinesModal && !airlinesModal.classList.contains('hidden')) {
+        airlinesModal.classList.add('hidden');
+        airlinesModal._hasBeenDragged = false;
+    }
+    const detailsModal = document.getElementById('radial-details-modal');
+    if (detailsModal && !detailsModal.classList.contains('hidden')) {
+        detailsModal.classList.add('hidden');
+        detailsModal._hasBeenDragged = false;
+    }
+
+    if (!isFlightPlanningMode && !isDetailsModalOpen() && !isAirlinesModalOpen()) {
+        currentRadialAirport = null;
+        selectedAirport = null;
+    }
+    updateClassicPanelUI();
+    if (window.windowManager) {
+        window.windowManager.autoTileWindows(true);
+    }
+}
+
+function toggleClassicFilterSubmenu(key, event) {
+    if (event && typeof event.stopPropagation === 'function') event.stopPropagation();
+    const subEl = document.getElementById(`classic-sub-${key}`);
+    const chevEl = document.getElementById(`classic-chevron-${key}`);
+    if (!subEl) return;
+    const isHidden = subEl.classList.contains('hidden');
+    document.querySelectorAll('[id^="classic-sub-"]').forEach(el => {
+        if (el !== subEl) el.classList.add('hidden');
+    });
+    document.querySelectorAll('[id^="classic-chevron-"]').forEach(el => {
+        if (el !== chevEl) el.style.transform = 'rotate(0deg)';
+    });
+    if (isHidden) {
+        subEl.classList.remove('hidden');
+        if (chevEl) chevEl.style.transform = 'rotate(180deg)';
+    } else {
+        subEl.classList.add('hidden');
+        if (chevEl) chevEl.style.transform = 'rotate(0deg)';
+    }
+}
+
+function classicSetPricing(type, event) {
+    if (event && typeof event.stopPropagation === 'function') event.stopPropagation();
+    const isTickClick = !!(event && event.target && event.target.closest('[id^="classic-tick-"]'));
+    const isCumulative = !!(event && (event.shiftKey || event.ctrlKey || event.metaKey || isTickClick));
+    const pricingKeyMap = {
+        'payware': 'Payware',
+        'freeware': 'Freeware / Flightsim.to',
+        'asobo': 'Asobo',
+        'default': 'Default'
+    };
+    const key = (type === 'all') ? 'all' : (pricingKeyMap[type] || type);
+    togglePricingFilter(key, isCumulative);
+    updateClassicPanelUI();
+}
+
+function classicSetSource(src, event) {
+    if (event && typeof event.stopPropagation === 'function') event.stopPropagation();
+    const isTickClick = !!(event && event.target && event.target.closest('[id^="classic-tick-"]'));
+    const isCumulative = !!(event && (event.shiftKey || event.ctrlKey || event.metaKey || isTickClick));
+    const sourceKeyMap = {
+        'community': 'Community',
+        'official': 'Official'
+    };
+    const key = (src === 'all') ? 'all' : (sourceKeyMap[src] || src);
+    toggleSourceFilter(key, isCumulative);
+    updateClassicPanelUI();
+}
+
+function classicSetRegion(reg, event) {
+    if (event && typeof event.stopPropagation === 'function') event.stopPropagation();
+    const isTickClick = !!(event && event.target && event.target.closest('[id^="classic-tick-"]'));
+    const isCumulative = !!(event && (event.shiftKey || event.ctrlKey || event.metaKey || isTickClick));
+    const actualKey = (!reg || reg === 'null' || reg === 'all') ? 'all' : (reg === 'camerica' ? 'camerica_caribbean' : reg);
+    toggleRegionFilter(actualKey, isCumulative);
+    updateClassicPanelUI();
+}
+
+function classicSetType(type, event) {
+    if (event && typeof event.stopPropagation === 'function') event.stopPropagation();
+    const isTickClick = !!(event && event.target && event.target.closest('[id^="classic-tick-"]'));
+    const isCumulative = !!(event && (event.shiftKey || event.ctrlKey || event.metaKey || isTickClick));
+    const typeKeyMap = {
+        'int': 'International',
+        'reg': 'Regional',
+        'ga': 'General Aviation',
+        'heli': 'Heli / Water'
+    };
+    const key = (type === 'all') ? 'all' : (typeKeyMap[type] || type);
+    toggleTypeFilter(key, isCumulative);
+    updateClassicPanelUI();
+}
+
+function classicSetGsx(val, event) {
+    if (event && typeof event.stopPropagation === 'function') event.stopPropagation();
+    if (val === 'all') {
+        selectedGsxFilter = 'all';
+    } else {
+        selectedGsxFilter = (selectedGsxFilter === val) ? 'all' : val;
+    }
+    updateFilterUI();
+    filterAirports();
+    updateClassicPanelUI();
+}
+
+function classicSetRating(val) {
+    selectedMinRating = val;
+    updateFilterUI();
+    filterAirports();
+    updateClassicPanelUI();
+}
+
+function openClassicAirportModal(key, event) {
+    if (event && typeof event.stopPropagation === 'function') event.stopPropagation();
+    if (!currentClassicAirport) return;
+    currentRadialAirport = currentClassicAirport;
+
+    if (key === 'details') {
+        const modal = document.getElementById('radial-details-modal');
+        if (modal && !modal.classList.contains('hidden') && modal.dataset.icao === currentClassicAirport.icao) {
+            closeRadialDetailsModal(null, true);
+            if (window.windowManager) window.windowManager.autoTileWindows(true);
+            return;
+        }
+        if (typeof triggerRadialFullDetails === 'function') triggerRadialFullDetails();
+    } else if (key === 'sceneries') {
+        const extEl = document.getElementById('radial-sceneries-extension');
+        if (extEl && !extEl.classList.contains('hidden')) {
+            triggerRadialScenerySelector();
+            return;
+        }
+        if (typeof triggerRadialScenerySelector === 'function') triggerRadialScenerySelector();
+    } else if (key === 'airlines') {
+        const modal = document.getElementById('radial-airlines-modal');
+        if (modal && !modal.classList.contains('hidden')) {
+            closeRadialAirlinesModal();
+            if (window.windowManager) window.windowManager.autoTileWindows(true);
+            return;
+        }
+        if (typeof triggerRadialOperatingAirlines === 'function') triggerRadialOperatingAirlines();
+    } else if (key === 'gsx') {
+        const gsxModal = document.getElementById('gsx-audit-modal');
+        if (gsxModal && !gsxModal.classList.contains('hidden')) {
+            if (typeof closeGsxAuditModal === 'function') closeGsxAuditModal();
+            return;
+        }
+        if (typeof openGsxAuditModal === 'function') openGsxAuditModal('ALL');
+    }
+    if (window.windowManager) {
+        window.windowManager.autoTileWindows();
+    }
+}
+
+function setClassicAirportFlightPlan(type) {
+    if (!currentClassicAirport) return;
+    const ap = currentClassicAirport;
+
+    if (type === 'origin') {
+        isFlightPlanningMode = true;
+        flightPlanningDeparture = ap;
+        selectedAirport = ap;
+        if (!flightPlanningDestination) {
+            flightCorridorArrivalAirport = null;
+        }
+        if (flightCorridorLayerGroup && map && (!flightPlanningDestination || flightPlanningDestination.icao === ap.icao)) {
+            flightCorridorLayerGroup.clearLayers();
+        }
+        if (typeof updateFlightPlanningBannerUI === 'function') updateFlightPlanningBannerUI();
+        if (typeof positionFlightPlanningBanner === 'function') positionFlightPlanningBanner(ap);
+        if (typeof initDraggableFlightPlanningBanner === 'function') initDraggableFlightPlanningBanner();
+        if (flightPlanningDestination && flightPlanningDestination.icao !== ap.icao && typeof renderFlightCorridor === 'function') {
+            renderFlightCorridor();
+        }
+        if (typeof showToast === 'function') {
+            showToast(`✈ ${ap.icao} set as Departure.`, 'info');
+        }
+    } else if (type === 'dest') {
+        if (!flightPlanningDeparture) {
+            if (typeof showToast === 'function') {
+                showToast('Please set a Departure airport first.', 'warning');
+            }
+            return;
+        }
+        if (flightPlanningDeparture.icao === ap.icao) {
+            if (typeof showToast === 'function') {
+                showToast('Departure and Destination cannot be the same airport.', 'warning');
+            }
+            return;
+        }
+        isFlightPlanningMode = true;
+        flightPlanningDestination = ap;
+        flightCorridorArrivalAirport = ap;
+        if (typeof updateFlightPlanningBannerUI === 'function') updateFlightPlanningBannerUI();
+        if (typeof renderFlightCorridor === 'function') renderFlightCorridor();
+        if (typeof showToast === 'function') {
+            showToast(`✈ ${ap.icao} set as Destination. Corridor generated!`, 'info');
+        }
+    }
+    updateClassicPanelUI();
+}
+
+window.applyNavigationStyle = applyNavigationStyle;
+window.previewNavStyle = previewNavStyle;
+window.updateClassicPanelUI = updateClassicPanelUI;
+window.showClassicAirportView = showClassicAirportView;
+window.closeClassicAirportView = closeClassicAirportView;
+window.toggleClassicFilterSubmenu = toggleClassicFilterSubmenu;
+window.classicSetPricing = classicSetPricing;
+window.classicSetSource = classicSetSource;
+window.classicSetRegion = classicSetRegion;
+window.classicSetType = classicSetType;
+window.classicSetGsx = classicSetGsx;
+window.classicSetRating = classicSetRating;
+window.openClassicAirportModal = openClassicAirportModal;
+window.setClassicAirportFlightPlan = setClassicAirportFlightPlan;
+
 /* ================= EXPORT COLLECTION FUNCTIONS ================= */
 
 function openExportModal() {
     const modal = document.getElementById('export-modal');
-    if (modal) modal.classList.remove('hidden');
+    if (modal) {
+        modal.classList.remove('hidden');
+        if (window.windowManager) {
+            window.windowManager.centerModal(modal);
+            window.windowManager.bringToFront(modal);
+        }
+    }
 
     const txtEl = document.getElementById('export-scope-text');
     const scopeEl = document.querySelector('input[name="export-scope"]:checked');
@@ -15075,11 +16552,14 @@ function showCustomModal(titleOrObj, messageStr, typeStr = 'info') {
         }
     }
 
+    const loadingContainer = document.getElementById('custom-modal-loading-bar-container');
     if (type === 'loading') {
         if (confirmBtn) confirmBtn.classList.add('hidden');
         if (secondaryBtn) secondaryBtn.classList.add('hidden');
         if (cancelBtn) cancelBtn.classList.add('hidden');
+        if (loadingContainer) loadingContainer.classList.remove('hidden');
     } else {
+        if (loadingContainer) loadingContainer.classList.add('hidden');
         if (confirmBtn) {
             confirmBtn.innerText = confirmText;
             confirmBtn.classList.remove('hidden');
@@ -15418,6 +16898,23 @@ async function syncSimBriefFlightPlan() {
         // 5. Render corridor, alternates, and fit map bounds
         renderFlightCorridor();
         filterAirports();
+        if (typeof updateClassicSidebarRouteBadge === 'function') {
+            updateClassicSidebarRouteBadge();
+        }
+
+        const postSimBriefSync = () => {
+            if (typeof updateRouteAirportBadgesZoomScale === 'function') {
+                updateRouteAirportBadgesZoomScale();
+            }
+            if (typeof syncRouteBadgesAirportMarkerLabels === 'function') {
+                syncRouteBadgesAirportMarkerLabels();
+            }
+            if (typeof updateClassicSidebarRouteBadge === 'function') {
+                updateClassicSidebarRouteBadge();
+            }
+        };
+        setTimeout(postSimBriefSync, 150);
+        setTimeout(postSimBriefSync, 450);
 
         const altCount = currentSimBriefAlternates.length;
         const flightNum = flight.flight_number ? `${flight.flight_number} • ` : '';
@@ -15452,7 +16949,7 @@ function updateFlightModeBannerUI(flightMode) {
 
     if (currentFlightMode && currentFlightMode.active) {
         if (badge) {
-            badge.className = "text-[9px] font-bold font-mono px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40 animate-pulse";
+            badge.className = "text-[9px] font-bold font-mono px-2 py-0.5 rounded-full bg-amber-500 text-slate-950 font-black border-0 shadow-sm animate-pulse";
             badge.innerText = "ACTIVE";
         }
         if (routeInfo) routeInfo.classList.remove('hidden');
@@ -15463,9 +16960,9 @@ function updateFlightModeBannerUI(flightMode) {
             disabledText.innerText = `${currentFlightMode.disabled_count || 0} sceneries isolated`;
         }
         if (importBtn) {
-            importBtn.className = "w-full py-2.5 px-3 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-200 font-extrabold text-xs transition-all flex items-center justify-center gap-2 active:scale-98 cursor-pointer";
+            importBtn.className = "w-full py-2.5 px-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-extrabold text-xs transition-all flex items-center justify-center gap-2 active:scale-98 cursor-pointer shadow-sm border-0";
             importBtn.onclick = function() { restoreAllFlightSceneriesUI(); };
-            importBtn.innerHTML = `<i class="fa-solid fa-power-off text-rose-400"></i> <span>Exit Flight Mode & Restore Sceneries</span>`;
+            importBtn.innerHTML = `<i class="fa-solid fa-power-off text-white"></i> <span>Exit Flight Mode & Restore Sceneries</span>`;
         }
     } else {
         if (badge) {
@@ -15958,6 +17455,270 @@ function getAirportPricingTextColor(ap) {
     return 'text-blue-400';
 }
 
+// Dedicated Leaflet-anchored Route Airport Badges Layer & Markers (Departure & Arrival)
+let routeAirportBadgesLayerGroup = L.layerGroup();
+let routeDepartureMarker = null;
+let routeArrivalMarker = null;
+
+function getRouteBadgeScale(zoom) {
+    if (zoom >= 8.0) return 1.0;
+    if (zoom >= 5.0) {
+        return 0.32 + ((zoom - 5.0) / 3.0) * 0.68;
+    }
+    if (zoom <= 2.0) return 0.18;
+    return 0.18 + ((zoom - 2.0) / 3.0) * (0.32 - 0.18);
+}
+
+function createRouteAirportBadgeIcon(ap, role = 'DEP') {
+    if (!ap) return null;
+    const cat = (typeof getAirportCategory === 'function') ? getAirportCategory(ap) : 'DEFAULT';
+    const isDep = (role === 'DEP');
+
+    // 1. Codes (ICAO / IATA)
+    const iataVal = (ap.iata && ap.iata.trim() && ap.iata.trim() !== '—' && ap.iata.trim() !== '-') ? ap.iata.trim().toUpperCase() : '';
+    const codesStr = iataVal ? `${ap.icao}/${iataVal}` : (ap.icao || '----');
+
+    // 2. Pricing / Category Colors & Labels (Liseré matches category strictly with zero glow)
+    let rBadgeLabel = 'FREEWARE';
+    let rBadgeClass = 'bg-cyan-600 text-white font-bold';
+    let rIcaoColor = 'text-cyan-400';
+    let circleBorderClass = 'border-2 border-cyan-400';
+
+    if (ap.has_conflict) {
+        rBadgeLabel = `⚠️ CONFLICT (${ap.conflict_count || 2})`;
+        rBadgeClass = 'bg-rose-600 text-white font-black animate-pulse';
+        rIcaoColor = 'text-rose-400';
+        circleBorderClass = 'border-2 border-rose-500';
+    } else if (ap.is_disabled) {
+        rBadgeLabel = 'DISABLED';
+        rBadgeClass = 'bg-slate-700 text-slate-300 font-bold';
+        rIcaoColor = 'text-slate-400';
+        circleBorderClass = 'border-2 border-slate-500';
+    } else if (cat === 'ASOBO') {
+        rBadgeLabel = 'ASOBO / MICROSOFT';
+        rBadgeClass = 'bg-amber-500 text-slate-950 font-black';
+        rIcaoColor = 'text-amber-400';
+        circleBorderClass = 'border-2 border-amber-400';
+    } else if (cat === 'PAYWARE') {
+        rBadgeLabel = ap.vendor ? `PAYWARE • ${ap.vendor}` : 'PAYWARE';
+        rBadgeClass = 'bg-purple-600 text-white font-bold';
+        rIcaoColor = 'text-purple-400';
+        circleBorderClass = 'border-2 border-purple-400';
+    } else if (cat === 'DEFAULT') {
+        rBadgeLabel = 'DEFAULT MSFS';
+        rBadgeClass = 'bg-blue-600 text-white font-bold';
+        rIcaoColor = 'text-blue-400';
+        circleBorderClass = 'border-2 border-blue-400';
+    } else {
+        rBadgeLabel = ap.vendor ? `FREEWARE • ${ap.vendor}` : 'FREEWARE';
+        rBadgeClass = 'bg-cyan-600 text-white font-bold';
+        rIcaoColor = 'text-cyan-400';
+        circleBorderClass = 'border-2 border-cyan-400';
+    }
+
+    // 3. Clean Name & Location
+    const cleanName = (typeof getCleanAirportName === 'function') ? getCleanAirportName(ap.name, ap.city) : (ap.name || ap.icao);
+    let apIsoCode = ((ap.country || ap.iso_country || '').toString()).toUpperCase().trim();
+    if (!apIsoCode || apIsoCode.length !== 2) {
+        if (typeof ISO_TO_COUNTRY_NAME !== 'undefined') {
+            for (const [code, name] of Object.entries(ISO_TO_COUNTRY_NAME)) {
+                if (name.toLowerCase() === (ap.country || '').toLowerCase()) {
+                    apIsoCode = code;
+                    break;
+                }
+            }
+        }
+    }
+    const resolvedCountryName = (typeof getLocalizedCountryName === 'function')
+        ? getLocalizedCountryName(apIsoCode, ap.country)
+        : ((typeof ISO_TO_COUNTRY_NAME !== 'undefined' && ISO_TO_COUNTRY_NAME[apIsoCode]) || ap.country || '');
+    const cleanCity = (typeof getCleanCityName === 'function') ? getCleanCityName(ap.city) : (ap.city || '');
+    const locStr = [cleanCity, resolvedCountryName].filter(Boolean).join(', ') || 'Unknown Location';
+
+    const roleTagClass = isDep
+        ? 'bg-cyan-600 text-white font-mono font-black border-0 shadow-sm'
+        : 'bg-purple-600 text-white font-mono font-black border-0 shadow-sm';
+    const roleLabel = isDep ? 'DEPARTURE' : 'ARRIVAL';
+
+    const currentZoom = (map && typeof map.getZoom === 'function') ? map.getZoom() : 7;
+    const initialScale = getRouteBadgeScale(currentZoom);
+
+    const html = `
+        <div class="route-airport-circle absolute left-0 top-0 w-[248px] h-[248px] rounded-full bg-slate-950/90 ${circleBorderClass} p-4 flex flex-col items-center justify-center text-center gap-1 backdrop-blur-xl pointer-events-auto select-none cursor-pointer"
+             style="transform: translate(-50%, -50%) scale(${initialScale.toFixed(3)}); transform-origin: center center;"
+             title="${roleLabel}: ${ap.icao} - ${cleanName} (Click to focus, double-click to cancel route)"
+             data-route-role="${role}" data-icao="${ap.icao}">
+            <div class="flex items-center justify-center mb-0.5 pointer-events-none">
+                <span class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-black tracking-widest uppercase ${roleTagClass}">
+                    ${roleLabel}
+                </span>
+            </div>
+            <span class="font-mono font-black text-2xl tracking-tight leading-none ${rIcaoColor} pointer-events-none">
+                ${codesStr}
+            </span>
+            <h4 class="text-sm font-bold text-white truncate max-w-[200px] leading-tight mt-0.5 pointer-events-none">
+                ${cleanName}
+            </h4>
+            <p class="text-[11px] font-medium text-slate-400 truncate max-w-[200px] leading-tight pointer-events-none">
+                ${locStr}
+            </p>
+            <div class="pt-0.5 flex items-center justify-center w-full pointer-events-none">
+                <span class="text-[10px] font-mono font-black px-2.5 py-0.5 rounded-full border-0 tracking-wide uppercase truncate max-w-[200px] shadow-sm ${rBadgeClass}">
+                    ${rBadgeLabel}
+                </span>
+            </div>
+        </div>
+    `;
+
+    return L.divIcon({
+        className: 'route-badge-div-icon',
+        html: html,
+        iconSize: [0, 0],
+        iconAnchor: [0, 0]
+    });
+}
+
+function updateRouteAirportBadgesZoomScale(targetZoom) {
+    if (!map) return;
+    const currentZoom = (typeof targetZoom === 'number')
+        ? targetZoom
+        : ((typeof map.getZoom === 'function') ? map.getZoom() : 7);
+    const scale = getRouteBadgeScale(currentZoom);
+    const badges = document.querySelectorAll('.route-airport-circle');
+    badges.forEach(el => {
+        el.style.transform = `translate(-50%, -50%) scale(${scale.toFixed(3)})`;
+    });
+}
+
+function syncRouteBadgesWrapping() {
+    if (!map) return;
+    if (routeDepartureMarker && optimizerOrigin) {
+        const ll = (typeof getWrappedAirportLatLng === 'function')
+            ? getWrappedAirportLatLng(optimizerOrigin)
+            : [parseFloat(optimizerOrigin.lat), parseFloat(optimizerOrigin.lon)];
+        if (ll) routeDepartureMarker.setLatLng(ll);
+    }
+    if (routeArrivalMarker && optimizerDest) {
+        const ll = (typeof getWrappedAirportLatLng === 'function')
+            ? getWrappedAirportLatLng(optimizerDest)
+            : [parseFloat(optimizerDest.lat), parseFloat(optimizerDest.lon)];
+        if (ll) routeArrivalMarker.setLatLng(ll);
+    }
+}
+
+function updateRouteAirportBadges() {
+    if (!map) return;
+
+    if (!routeAirportBadgesLayerGroup) {
+        routeAirportBadgesLayerGroup = L.layerGroup().addTo(map);
+    } else if (!map.hasLayer(routeAirportBadgesLayerGroup)) {
+        map.addLayer(routeAirportBadgesLayerGroup);
+    }
+
+    // 1. Departure Badge
+    if (optimizerOrigin) {
+        const depLatLng = (typeof getWrappedAirportLatLng === 'function')
+            ? getWrappedAirportLatLng(optimizerOrigin)
+            : [parseFloat(optimizerOrigin.lat), parseFloat(optimizerOrigin.lon)];
+
+        if (depLatLng) {
+            const depIcon = createRouteAirportBadgeIcon(optimizerOrigin, 'DEP');
+            if (!routeDepartureMarker) {
+                routeDepartureMarker = L.marker(depLatLng, {
+                    icon: depIcon,
+                    interactive: true,
+                    zIndexOffset: 1200
+                });
+                routeDepartureMarker.on('click', function (e) {
+                    if (e && e.originalEvent) L.DomEvent.stopPropagation(e.originalEvent);
+                    if (typeof focusOptimizerAirport === 'function') focusOptimizerAirport('origin');
+                });
+                routeDepartureMarker.on('dblclick', function (e) {
+                    if (e && e.originalEvent) L.DomEvent.stopPropagation(e.originalEvent);
+                    clearOptimizerRoutePlanning();
+                });
+                routeAirportBadgesLayerGroup.addLayer(routeDepartureMarker);
+            } else {
+                routeDepartureMarker.setLatLng(depLatLng);
+                routeDepartureMarker.setIcon(depIcon);
+                if (!routeAirportBadgesLayerGroup.hasLayer(routeDepartureMarker)) {
+                    routeAirportBadgesLayerGroup.addLayer(routeDepartureMarker);
+                }
+            }
+        }
+    } else {
+        if (routeDepartureMarker) {
+            routeAirportBadgesLayerGroup.removeLayer(routeDepartureMarker);
+            routeDepartureMarker = null;
+        }
+    }
+
+    // 2. Arrival Badge
+    if (optimizerDest) {
+        const arrLatLng = (typeof getWrappedAirportLatLng === 'function')
+            ? getWrappedAirportLatLng(optimizerDest)
+            : [parseFloat(optimizerDest.lat), parseFloat(optimizerDest.lon)];
+
+        if (arrLatLng) {
+            const arrIcon = createRouteAirportBadgeIcon(optimizerDest, 'ARR');
+            if (!routeArrivalMarker) {
+                routeArrivalMarker = L.marker(arrLatLng, {
+                    icon: arrIcon,
+                    interactive: true,
+                    zIndexOffset: 1200
+                });
+                routeArrivalMarker.on('click', function (e) {
+                    if (e && e.originalEvent) L.DomEvent.stopPropagation(e.originalEvent);
+                    if (typeof focusOptimizerAirport === 'function') focusOptimizerAirport('dest');
+                });
+                routeArrivalMarker.on('dblclick', function (e) {
+                    if (e && e.originalEvent) L.DomEvent.stopPropagation(e.originalEvent);
+                    clearOptimizerRoutePlanning();
+                });
+                routeAirportBadgesLayerGroup.addLayer(routeArrivalMarker);
+            } else {
+                routeArrivalMarker.setLatLng(arrLatLng);
+                routeArrivalMarker.setIcon(arrIcon);
+                if (!routeAirportBadgesLayerGroup.hasLayer(routeArrivalMarker)) {
+                    routeAirportBadgesLayerGroup.addLayer(routeArrivalMarker);
+                }
+            }
+        }
+    } else {
+        if (routeArrivalMarker) {
+            routeAirportBadgesLayerGroup.removeLayer(routeArrivalMarker);
+            routeArrivalMarker = null;
+        }
+    }
+
+    // 3. Keep label hiding & scale synchronized
+    syncRouteBadgesAirportMarkerLabels();
+    updateRouteAirportBadgesZoomScale();
+}
+
+function syncRouteBadgesAirportMarkerLabels() {
+    document.querySelectorAll('.route-badge-active').forEach(el => el.classList.remove('route-badge-active'));
+    if (routeDepartureMarker && optimizerOrigin && optimizerOrigin.icao) {
+        const m = (airportMarkerCache && airportMarkerCache.get(optimizerOrigin.icao));
+        const el = m && (typeof m.getElement === 'function' ? m.getElement() : m._icon);
+        if (el) el.classList.add('route-badge-active');
+    }
+    if (routeArrivalMarker && optimizerDest && optimizerDest.icao) {
+        const m = (airportMarkerCache && airportMarkerCache.get(optimizerDest.icao));
+        const el = m && (typeof m.getElement === 'function' ? m.getElement() : m._icon);
+        if (el) el.classList.add('route-badge-active');
+    }
+}
+
+function clearRouteAirportBadges() {
+    if (routeAirportBadgesLayerGroup) {
+        routeAirportBadgesLayerGroup.clearLayers();
+    }
+    routeDepartureMarker = null;
+    routeArrivalMarker = null;
+    document.querySelectorAll('.route-badge-active').forEach(el => el.classList.remove('route-badge-active'));
+}
+
 function isFlightOptimizerModalOpen() {
     const modal = document.getElementById('flight-optimizer-modal');
     const isOldOpen = !!(modal && !modal.classList.contains('hidden'));
@@ -15970,6 +17731,11 @@ function handleAirportRouteSelection(ap) {
     if (!ap) return;
     const wasOpen = isFlightOptimizerModalOpen();
     hasUserDraggedOptimizerModal = false;
+
+    // Suppress single-airport radial menu while selecting route
+    if (typeof closeAirportRadialMenu === 'function') {
+        closeAirportRadialMenu(false);
+    }
 
     if (!optimizerOrigin) {
         // Step 1: Set departure (Point A)
@@ -16024,6 +17790,12 @@ function handleAirportRouteSelection(ap) {
         if (typeof showToast === 'function') {
             showToast(`✈ Flight Route set: ${optimizerOrigin.icao} ➔ ${ap.icao}. Sceneries ready for flight isolation.`, 'success');
         }
+    }
+
+    // Always keep route badges synchronized with selected airports
+    updateRouteAirportBadges();
+    if (typeof updateClassicSidebarRouteBadge === 'function') {
+        updateClassicSidebarRouteBadge();
     }
 
     if (!wasOpen) {
@@ -16130,9 +17902,12 @@ function positionFlightOptimizerModal(targetAp = null) {
 
     let top = Math.round(markerBottomY) + 12;
     const modalHeight = modal.offsetHeight || 280;
-    if (top + modalHeight > window.innerHeight - pad) {
-        top = Math.max(124, window.innerHeight - modalHeight - pad);
+    const topLimit = 126;
+    const bottomLimit = 84;
+    if (top + modalHeight > window.innerHeight - bottomLimit) {
+        top = Math.max(topLimit, window.innerHeight - modalHeight - bottomLimit);
     }
+    top = Math.max(topLimit, top);
 
     modal.style.left = `${left}px`;
     modal.style.top = `${top}px`;
@@ -16173,10 +17948,14 @@ function initDraggableFlightOptimizerModal() {
             let newLeft = moveEvent.clientX - optimizerModalDragStart.offsetX;
             let newTop = moveEvent.clientY - optimizerModalDragStart.offsetY;
 
-            const maxLeft = window.innerWidth - modal.offsetWidth - 10;
-            const maxTop = window.innerHeight - modal.offsetHeight - 10;
-            newLeft = Math.max(10, Math.min(newLeft, maxLeft));
-            newTop = Math.max(10, Math.min(newTop, maxTop));
+            const curW = modal.offsetWidth || 400;
+            const curH = modal.offsetHeight || 280;
+            const topLimit = 126;
+            const bottomLimit = 84;
+            const maxLeft = Math.max(12, window.innerWidth - curW - 12);
+            const maxTop = Math.max(topLimit, window.innerHeight - bottomLimit - curH);
+            newLeft = Math.max(12, Math.min(newLeft, maxLeft));
+            newTop = Math.max(topLimit, Math.min(newTop, maxTop));
 
             modal.style.left = `${newLeft}px`;
             modal.style.top = `${newTop}px`;
@@ -16261,6 +18040,7 @@ class WindowManager {
         // Global mousemove and mouseup listeners to guarantee smooth drag/resize even if cursor leaves window
         window.addEventListener('mousemove', (e) => this._onGlobalMouseMove(e), { passive: false, capture: true });
         window.addEventListener('mouseup', (e) => this._onGlobalMouseUp(e), { passive: false, capture: true });
+        window.addEventListener('resize', () => this.clampAllActiveModals());
 
         // MutationObserver to auto-register any modal added dynamically
         const observer = new MutationObserver((mutations) => {
@@ -16306,9 +18086,36 @@ class WindowManager {
         });
     }
 
+    isContentFitWindow(modalEl) {
+        if (!modalEl) return false;
+        const id = modalEl.id || modalEl.dataset?.modalId || '';
+        return id === 'float-win-my-rig' ||
+               id === 'float-win-smart-lod' ||
+               id === 'float-win-route-opt' ||
+               id === 'float-win-telemetry' ||
+               id === 'float-win-remote-panel' ||
+               id === 'float-win-bug-report' ||
+               id === 'radial-sceneries-extension' ||
+               id === 'radial-details-modal' ||
+               id === 'radial-airlines-modal' ||
+               modalEl.classList.contains('is-content-fit');
+    }
+
+    isViewportFillWindow(modalEl) {
+        if (!modalEl) return false;
+        const id = modalEl.id || modalEl.dataset?.modalId || '';
+        return id === 'float-win-graphics' ||
+               id === 'gsx-audit-modal' ||
+               id === 'float-win-report-viewer';
+    }
+
     register(modalEl) {
         if (!modalEl || modalEl._wmRegistered) return;
         modalEl._wmRegistered = true;
+
+        if (this.isContentFitWindow(modalEl)) {
+            modalEl.classList.add('is-content-fit');
+        }
 
         // Bring to front on click anywhere inside modal
         modalEl.addEventListener('mousedown', () => {
@@ -16345,43 +18152,514 @@ class WindowManager {
             return;
         }
 
+        const topBound = 126;
+        const botBound = 84;
+        const maxAllowedH = Math.max(200, window.innerHeight - topBound - botBound);
+        modalEl.style.maxHeight = `${maxAllowedH}px`;
+
+        const isClassicOpen = isClassicNavMode() || document.body.classList.contains('classic-nav-active') || (document.getElementById('classic-flight-ops-panel') && !document.getElementById('classic-flight-ops-panel').classList.contains('hidden'));
+        const minLeft = isClassicOpen ? 304 : 16;
+        const isRadial = (modalEl.id === 'radial-details-modal' || modalEl.id === 'radial-airlines-modal' || modalEl.id === 'radial-sceneries-extension') && !isClassicOpen;
+
         const modalId = modalEl.dataset.modalId || modalEl.id;
-        const saved = modalId ? this.sessionState[modalId] : null;
+        const saved = (modalId && (!isRadial || modalEl._hasBeenDragged)) ? this.sessionState[modalId] : null;
 
         if (saved) {
-            if (saved.left !== undefined) modalEl.style.left = `${saved.left}px`;
-            if (saved.top !== undefined) modalEl.style.top = `${saved.top}px`;
-            if (saved.width !== undefined) {
+            let left = saved.left !== undefined ? saved.left : minLeft;
+            let top = saved.top !== undefined ? saved.top : topBound;
+            let width = saved.width;
+            let height = saved.height;
+
+            top = Math.max(topBound, Math.min(window.innerHeight - botBound - 150, top));
+            if (this.isContentFitWindow(modalEl)) {
+                modalEl.style.height = 'auto';
+                modalEl.style.maxHeight = `${maxAllowedH}px`;
+            } else if (height !== undefined) {
+                height = Math.min(maxAllowedH, height);
+                if (top + height > window.innerHeight - botBound) {
+                    top = Math.max(topBound, window.innerHeight - botBound - height);
+                }
+                modalEl.style.height = `${height}px`;
+            }
+            if (width !== undefined) {
                 if (modalId === 'float-win-route-opt') {
                     modalEl.style.width = 'fit-content';
                 } else {
-                    modalEl.style.width = `${saved.width}px`;
+                    modalEl.style.width = `${Math.min(window.innerWidth - minLeft - 24, width)}px`;
                 }
             }
-            if (saved.height !== undefined) modalEl.style.height = `${saved.height}px`;
+            left = Math.max(minLeft, Math.min(window.innerWidth - 100, left));
+            modalEl.style.left = `${left}px`;
+            modalEl.style.top = `${top}px`;
             modalEl.style.transform = 'none';
         } else {
-            // Check if element has an inline position or is a radial-anchored modal
-            const isRadial = modalEl.id === 'radial-details-modal' || modalEl.id === 'radial-airlines-modal' || modalEl.id === 'radial-sceneries-extension';
+            // Dialog modals (e.g. Export, Stores, Conflicts, Settings, Disclaimer, Legal, Rescan) must always be centered, not tiled as column utilities
+            const isDialog = modalEl.id === 'export-modal' || modalEl.id === 'payware-stores-modal' || modalEl.id === 'smart-lod-conflict-modal' || modalEl.id === 'settings-modal' || modalEl.id === 'disclaimer-modal' || modalEl.id === 'legal-modal' || modalEl.id === 'rescan-modal';
             const hasExplicitPos = modalEl._hasBeenDragged || (modalEl.style.left && modalEl.style.left !== 'auto' && modalEl.style.left !== '50%');
-            if (!isRadial && !hasExplicitPos) {
+            if (isDialog) {
+                if (!modalEl._hasBeenDragged) this.centerModal(modalEl);
+            } else if (isRadial) {
+                if (modalEl.id === 'radial-sceneries-extension' && typeof updateRadialMenuPosition === 'function') {
+                    updateRadialMenuPosition(true);
+                } else if (modalEl.id === 'radial-airlines-modal' && typeof updateRadialAirlinesModalPosition === 'function') {
+                    updateRadialAirlinesModalPosition(true);
+                } else if (modalEl.id === 'radial-details-modal' && typeof updateRadialDetailsModalPosition === 'function') {
+                    updateRadialDetailsModalPosition(true);
+                }
+            } else if (!isRadial && !modalEl._hasBeenDragged) {
+                this.autoTileWindows();
+            } else if (!isRadial && !hasExplicitPos) {
                 this.centerModal(modalEl);
             }
         }
     }
 
+    autoTileWindows(force = false) {
+        const isClassic = document.body.classList.contains('classic-nav-active') || (document.getElementById('classic-flight-ops-panel') && !document.getElementById('classic-flight-ops-panel').classList.contains('hidden'));
+        const minLeft = isClassic ? 304 : 20;
+        const rightMargin = 20;
+        const gap = 12;
+
+        const pinnedRig = document.getElementById('float-win-my-rig');
+        const isRigPinned = pinnedRig && pinnedRig.classList.contains('is-pinned') && !pinnedRig.classList.contains('hidden');
+        const baseTopBound = isRigPinned 
+            ? Math.min(window.innerHeight - 300, (pinnedRig.offsetTop || 126) + (pinnedRig.offsetHeight || 135) + 10) 
+            : 126;
+        const botBound = 84;
+        const availableW = window.innerWidth - minLeft - rightMargin;
+
+        const isWinOpen = (el) => el && !el.classList.contains('hidden') && el.style.display !== 'none';
+
+        const gsxModal = document.getElementById('gsx-audit-modal');
+        const sceneriesExt = document.getElementById('radial-sceneries-extension');
+        const smartLod = document.getElementById('float-win-smart-lod');
+        const telemetry = document.getElementById('float-win-telemetry');
+        const graphics = document.getElementById('float-win-graphics');
+        const detailsModal = document.getElementById('radial-details-modal');
+        const airlinesModal = document.getElementById('radial-airlines-modal');
+        const routeOpt = document.getElementById('float-win-route-opt');
+        const remotePanel = document.getElementById('float-win-remote-panel');
+        const bugReport = document.getElementById('float-win-bug-report');
+        const reportViewer = document.getElementById('float-win-report-viewer');
+
+        const isRouteOpen = isWinOpen(routeOpt);
+
+        // FLIGHT ROUTE OPTIMIZATION: ALWAYS A HORIZONTAL BANNER (BANDEAU), NEVER A VERTICAL COLUMN!
+        if (isRouteOpen) {
+            routeOpt.style.width = 'fit-content';
+            routeOpt.style.maxWidth = `calc(100vw - ${minLeft + rightMargin}px)`;
+            routeOpt.style.height = 'auto';
+            routeOpt.style.maxHeight = 'none';
+            routeOpt.style.right = 'auto';
+            routeOpt.style.bottom = 'auto';
+            routeOpt.style.transform = 'none';
+            routeOpt.style.top = `${baseTopBound}px`;
+            const routeW = routeOpt.offsetWidth || 960;
+            const routeLeft = Math.max(minLeft, Math.floor(minLeft + Math.max(0, (availableW - routeW) / 2)));
+            routeOpt.style.left = `${routeLeft}px`;
+        }
+
+        // FLIGHT REPORT VIEWER: ALWAYS A STANDALONE WIDE INSPECTION MODAL, NEVER SQUEEZED INTO TILED COLUMNS!
+        if (reportViewer && isWinOpen(reportViewer)) {
+            const reportTop = baseTopBound;
+            const reportH = Math.max(240, window.innerHeight - baseTopBound - botBound);
+            reportViewer.style.maxHeight = `${reportH}px`;
+            if (!reportViewer._hasBeenDragged) {
+                const targetW = Math.min(1080, window.innerWidth - 32);
+                reportViewer.style.width = `${targetW}px`;
+                reportViewer.style.height = `${reportH}px`;
+                reportViewer.style.top = `${reportTop}px`;
+                const left = Math.max(16, Math.floor((window.innerWidth - targetW) / 2));
+                reportViewer.style.left = `${left}px`;
+            } else {
+                const curW = reportViewer.offsetWidth || parseInt(reportViewer.style.width) || 1040;
+                const curH = reportViewer.offsetHeight || parseInt(reportViewer.style.height) || reportH;
+                let curLeft = parseInt(reportViewer.style.left) || 16;
+                let curTop = parseInt(reportViewer.style.top) || reportTop;
+                curLeft = Math.max(16, Math.min(window.innerWidth - curW - 16, curLeft));
+                curTop = Math.max(baseTopBound, Math.min(window.innerHeight - botBound - curH, curTop));
+                reportViewer.style.left = `${curLeft}px`;
+                reportViewer.style.top = `${curTop}px`;
+            }
+            reportViewer.style.zIndex = '2800';
+        }
+
+        // Columns must sit strictly below the Route Optimization horizontal banner when it is open
+        const routeH = isRouteOpen ? ((routeOpt.offsetHeight || 88) + gap) : 0;
+        const topBound = baseTopBound + routeH;
+        const availableH = Math.max(240, window.innerHeight - topBound - botBound);
+
+        // Column candidates (routeOpt and reportViewer are strictly excluded from columns)
+        const unpinnedRig = (!isRigPinned && isWinOpen(pinnedRig)) ? pinnedRig : null;
+        const isGsxOpen = isWinOpen(gsxModal);
+        const isSceneriesOpen = isClassic && isWinOpen(sceneriesExt);
+        const columnWindows = [
+            gsxModal,
+            isClassic ? sceneriesExt : null,
+            smartLod,
+            telemetry,
+            graphics,
+            unpinnedRig,
+            isClassic ? detailsModal : null,
+            isClassic ? airlinesModal : null,
+            remotePanel,
+            bugReport
+        ].filter(Boolean).filter(isWinOpen);
+
+        if (!isClassic) {
+            if (isWinOpen(sceneriesExt) && typeof updateRadialMenuPosition === 'function') {
+                updateRadialMenuPosition(force);
+            }
+            if (isWinOpen(airlinesModal) && typeof updateRadialAirlinesModalPosition === 'function') {
+                updateRadialAirlinesModalPosition(force);
+            }
+            if (isWinOpen(detailsModal) && typeof updateRadialDetailsModalPosition === 'function') {
+                updateRadialDetailsModalPosition(force);
+            }
+        }
+
+        if (columnWindows.length === 0) return;
+
+        const applyWinBounds = (winEl, left, top, width, height) => {
+            if (!winEl) return;
+            if (!force && winEl._hasBeenDragged) return;
+            winEl.style.left = `${Math.round(left)}px`;
+            winEl.style.top = `${Math.round(top)}px`;
+            if (width !== null) winEl.style.width = `${Math.round(width)}px`;
+            if (this.isContentFitWindow(winEl)) {
+                winEl.style.height = 'auto';
+                winEl.style.maxHeight = `${Math.round(availableH)}px`;
+            } else if (height !== null) {
+                winEl.style.height = `${Math.round(height)}px`;
+                winEl.style.maxHeight = `${Math.round(height)}px`;
+            } else {
+                winEl.style.height = 'auto';
+                winEl.style.maxHeight = `${Math.round(availableH)}px`;
+            }
+            winEl.style.right = 'auto';
+            winEl.style.bottom = 'auto';
+            winEl.style.transform = 'none';
+        };
+
+        const getWinNaturalH = (winEl, fallback = 220) => {
+            if (!winEl) return fallback;
+            if (winEl.id === 'float-win-my-rig') return 210;
+            if (winEl.id === 'float-win-smart-lod') return 520;
+            if (winEl.id === 'radial-details-modal') return Math.min(availableH, winEl.scrollHeight || winEl.offsetHeight || 300);
+            if (winEl.id === 'radial-sceneries-extension') return Math.min(availableH, winEl.scrollHeight || winEl.offsetHeight || 320);
+            if (winEl.id === 'radial-airlines-modal') return Math.min(availableH, winEl.scrollHeight || winEl.offsetHeight || 340);
+            if (winEl.offsetHeight && winEl.offsetHeight > 80) return winEl.offsetHeight;
+            return fallback;
+        };
+
+        // 1. Single Column Window
+        if (columnWindows.length === 1) {
+            const single = columnWindows[0];
+            const isFill = this.isViewportFillWindow(single);
+            const defaultW = isFill 
+                ? (single.id === 'float-win-graphics' ? 960 : 580)
+                : (single.id === 'float-win-my-rig' ? availableW : (single.id === 'float-win-smart-lod' ? 620 : (single.id === 'radial-sceneries-extension' ? 460 : (single.id === 'radial-details-modal' ? 880 : 560))));
+            applyWinBounds(single, minLeft, topBound, Math.min(defaultW, availableW), isFill ? availableH : null);
+            return;
+        }
+
+        // 2. Scenario Screen 4: GSX Profiles Details + Available Addons + Utilities
+        if (isGsxOpen && isSceneriesOpen) {
+            const col1W = Math.min(460, Math.max(370, Math.floor(availableW * 0.28)));
+            applyWinBounds(gsxModal, minLeft, topBound, col1W, availableH);
+
+            const col2Left = minLeft + col1W + gap;
+            const col2W = Math.min(410, Math.max(330, Math.floor(availableW * 0.25)));
+            applyWinBounds(sceneriesExt, col2Left, topBound, col2W, this.isContentFitWindow(sceneriesExt) ? null : availableH);
+
+            const remainingLeft = col2Left + col2W + gap;
+            const remainingW = window.innerWidth - remainingLeft - rightMargin;
+
+            const activeUtilities = [smartLod, telemetry, graphics, unpinnedRig, remotePanel, bugReport].filter(Boolean).filter(isWinOpen);
+            if (activeUtilities.length === 1) {
+                const uW = activeUtilities[0].id === 'float-win-graphics' ? Math.min(940, remainingW) : (activeUtilities[0].id === 'float-win-smart-lod' ? Math.min(620, remainingW) : (activeUtilities[0].id === 'float-win-telemetry' ? Math.min(640, remainingW) : Math.min(560, remainingW)));
+                applyWinBounds(activeUtilities[0], remainingLeft, topBound, uW, this.isViewportFillWindow(activeUtilities[0]) ? availableH : null);
+            } else if (activeUtilities.length === 2) {
+                const u0 = activeUtilities[0];
+                const u1 = activeUtilities[1];
+                const isU0Fit = this.isContentFitWindow(u0);
+                applyWinBounds(u0, remainingLeft, topBound, Math.min(560, remainingW), isU0Fit ? null : Math.floor((availableH - gap) * 0.49));
+                const u0H = isU0Fit ? getWinNaturalH(u0) : Math.floor((availableH - gap) * 0.49);
+                const u1Top = topBound + u0H + gap;
+                const u1RemH = Math.max(200, availableH - (u1Top - topBound));
+                applyWinBounds(u1, remainingLeft, u1Top, Math.min(560, remainingW), this.isContentFitWindow(u1) ? null : u1RemH);
+            } else if (activeUtilities.length >= 3) {
+                if (remainingW >= 800) {
+                    const uColW = Math.floor((remainingW - gap) * 0.5);
+                    const isU0Fit = this.isContentFitWindow(activeUtilities[0]);
+                    applyWinBounds(activeUtilities[0], remainingLeft, topBound, uColW, isU0Fit ? null : Math.floor((availableH - gap) * 0.49));
+                    const u0H = isU0Fit ? getWinNaturalH(activeUtilities[0]) : Math.floor((availableH - gap) * 0.49);
+                    const u1Top = topBound + u0H + gap;
+                    applyWinBounds(activeUtilities[1], remainingLeft, u1Top, uColW, this.isContentFitWindow(activeUtilities[1]) ? null : (availableH - (u1Top - topBound)));
+                    
+                    const col4Left = remainingLeft + uColW + gap;
+                    const col4W = window.innerWidth - col4Left - rightMargin;
+                    if (activeUtilities.length === 3) {
+                        applyWinBounds(activeUtilities[2], col4Left, topBound, col4W, this.isContentFitWindow(activeUtilities[2]) ? null : availableH);
+                    } else {
+                        const isU2Fit = this.isContentFitWindow(activeUtilities[2]);
+                        applyWinBounds(activeUtilities[2], col4Left, topBound, col4W, isU2Fit ? null : Math.floor((availableH - gap) * 0.49));
+                        const u2H = isU2Fit ? getWinNaturalH(activeUtilities[2]) : Math.floor((availableH - gap) * 0.49);
+                        const u3Top = topBound + u2H + gap;
+                        applyWinBounds(activeUtilities[3], col4Left, u3Top, col4W, this.isContentFitWindow(activeUtilities[3]) ? null : (availableH - (u3Top - topBound)));
+                    }
+                } else {
+                    const isU0Fit = this.isContentFitWindow(activeUtilities[0]);
+                    applyWinBounds(activeUtilities[0], remainingLeft, topBound, remainingW, isU0Fit ? null : Math.floor((availableH - gap) * 0.49));
+                    const u0H = isU0Fit ? getWinNaturalH(activeUtilities[0]) : Math.floor((availableH - gap) * 0.49);
+                    const u1Top = topBound + u0H + gap;
+                    applyWinBounds(activeUtilities[1], remainingLeft, u1Top, remainingW, this.isContentFitWindow(activeUtilities[1]) ? null : (availableH - (u1Top - topBound)));
+                }
+            }
+            return;
+        }
+
+        // 3. One Tall Window (GSX or Sceneries) + Utilities (e.g. GSX + Smart LOD + Telemetry + Graphics + unpinned My Rig)
+        if ((isGsxOpen || isSceneriesOpen) && !(isGsxOpen && isSceneriesOpen)) {
+            const primaryWin = isGsxOpen ? gsxModal : sceneriesExt;
+            const primaryW = isGsxOpen 
+                ? Math.min(520, Math.max(380, Math.floor(availableW * 0.31)))
+                : 460;
+            const primaryH = this.isContentFitWindow(primaryWin) ? null : availableH;
+            applyWinBounds(primaryWin, minLeft, topBound, primaryW, primaryH);
+
+            const remainingLeft = minLeft + primaryW + gap;
+            const remainingW = window.innerWidth - remainingLeft - rightMargin;
+
+            const activeUtilities = [smartLod, telemetry, graphics, unpinnedRig, remotePanel, detailsModal, airlinesModal, bugReport].filter(Boolean).filter(isWinOpen);
+            if (activeUtilities.length === 1) {
+                const uW = activeUtilities[0].id === 'float-win-graphics' ? Math.min(940, remainingW) : (activeUtilities[0].id === 'float-win-smart-lod' ? Math.min(620, remainingW) : (activeUtilities[0].id === 'float-win-telemetry' ? Math.min(640, remainingW) : (activeUtilities[0].id === 'radial-details-modal' ? Math.min(880, remainingW) : (activeUtilities[0].id === 'radial-airlines-modal' ? Math.min(560, remainingW) : Math.min(560, remainingW)))));
+                applyWinBounds(activeUtilities[0], remainingLeft, topBound, uW, this.isViewportFillWindow(activeUtilities[0]) ? availableH : null);
+            } else if (activeUtilities.length === 2) {
+                const hasGfx = activeUtilities.some(w => w.id === 'float-win-graphics');
+                if (hasGfx && remainingW >= 1200) {
+                    const gfxWin = activeUtilities.find(w => w.id === 'float-win-graphics');
+                    const otherWin = activeUtilities.find(w => w !== 'float-win-graphics');
+                    const gfxW = Math.min(940, Math.floor(remainingW * 0.58));
+                    const defaultOtherW = otherWin.id === 'float-win-smart-lod' ? 620 : (otherWin.id === 'float-win-telemetry' ? 640 : 680);
+                    const otherW = Math.min(defaultOtherW, remainingW - gfxW - gap);
+                    applyWinBounds(gfxWin, remainingLeft, topBound, gfxW, availableH);
+                    applyWinBounds(otherWin, remainingLeft + gfxW + gap, topBound, otherW, this.isContentFitWindow(otherWin) ? null : availableH);
+                } else if (remainingW >= 1000) {
+                    const uColW = Math.min(540, Math.floor((remainingW - gap) * 0.5));
+                    applyWinBounds(activeUtilities[0], remainingLeft, topBound, uColW, this.isContentFitWindow(activeUtilities[0]) ? null : availableH);
+                    applyWinBounds(activeUtilities[1], remainingLeft + uColW + gap, topBound, uColW, this.isContentFitWindow(activeUtilities[1]) ? null : availableH);
+                } else {
+                    const isU0Fit = this.isContentFitWindow(activeUtilities[0]);
+                    applyWinBounds(activeUtilities[0], remainingLeft, topBound, Math.min(560, remainingW), isU0Fit ? null : Math.floor((availableH - gap) * 0.49));
+                    const u0H = isU0Fit ? getWinNaturalH(activeUtilities[0]) : Math.floor((availableH - gap) * 0.49);
+                    const u1Top = topBound + u0H + gap;
+                    applyWinBounds(activeUtilities[1], remainingLeft, u1Top, Math.min(560, remainingW), this.isContentFitWindow(activeUtilities[1]) ? null : (availableH - (u1Top - topBound)));
+                }
+            } else if (activeUtilities.length >= 3) {
+                const uColW = Math.min(540, Math.floor((remainingW - gap) * 0.5));
+                const isU0Fit = this.isContentFitWindow(activeUtilities[0]);
+                applyWinBounds(activeUtilities[0], remainingLeft, topBound, uColW, isU0Fit ? null : Math.floor((availableH - gap) * 0.49));
+                const u0H = isU0Fit ? getWinNaturalH(activeUtilities[0]) : Math.floor((availableH - gap) * 0.49);
+                const u1Top = topBound + u0H + gap;
+                applyWinBounds(activeUtilities[1], remainingLeft, u1Top, uColW, this.isContentFitWindow(activeUtilities[1]) ? null : (availableH - (u1Top - topBound)));
+
+                const col3Left = remainingLeft + uColW + gap;
+                const col3W = Math.min(540, window.innerWidth - col3Left - rightMargin);
+                if (activeUtilities.length === 3) {
+                    applyWinBounds(activeUtilities[2], col3Left, topBound, col3W, this.isContentFitWindow(activeUtilities[2]) ? null : availableH);
+                } else {
+                    const isU2Fit = this.isContentFitWindow(activeUtilities[2]);
+                    applyWinBounds(activeUtilities[2], col3Left, topBound, col3W, isU2Fit ? null : Math.floor((availableH - gap) * 0.49));
+                    const u2H = isU2Fit ? getWinNaturalH(activeUtilities[2]) : Math.floor((availableH - gap) * 0.49);
+                    const u3Top = topBound + u2H + gap;
+                    applyWinBounds(activeUtilities[3], col3Left, u3Top, col3W, this.isContentFitWindow(activeUtilities[3]) ? null : (availableH - (u3Top - topBound)));
+                }
+                for (let i = 4; i < activeUtilities.length; i++) {
+                    const offset = (i - 3) * 20;
+                    applyWinBounds(activeUtilities[i], col3Left + offset, topBound + offset, col3W, null);
+                }
+            }
+            return;
+        }
+
+        // 4. No Tall Windows Open (Utilities only: Smart LOD, Telemetry, Graphics, My Rig, Remote, etc.)
+        if (!isGsxOpen && !isSceneriesOpen && columnWindows.length >= 2) {
+            if (columnWindows.length === 2) {
+                const hasGraphics = columnWindows.some(w => w.id === 'float-win-graphics');
+                if (hasGraphics && availableW >= 1200) {
+                    const gfxWin = columnWindows.find(w => w.id === 'float-win-graphics');
+                    const otherWin = columnWindows.find(w => w !== gfxWin);
+                    const gfxW = Math.min(960, Math.max(780, Math.floor(availableW * 0.54)));
+                    const defaultOtherW = otherWin.id === 'float-win-smart-lod' ? 620 : (otherWin.id === 'float-win-telemetry' ? 640 : (otherWin.id === 'float-win-my-rig' ? 780 : 640));
+                    const otherW = Math.min(defaultOtherW, availableW - gfxW - gap);
+                    applyWinBounds(gfxWin, minLeft, topBound, gfxW, availableH);
+                    applyWinBounds(otherWin, minLeft + gfxW + gap, topBound, otherW, this.isContentFitWindow(otherWin) ? null : availableH);
+                } else if (availableW >= 1140) {
+                    const utilW = Math.min(620, Math.max(600, Math.floor((availableW - gap) / 2)));
+                    applyWinBounds(columnWindows[0], minLeft, topBound, utilW, this.isContentFitWindow(columnWindows[0]) ? null : availableH);
+                    applyWinBounds(columnWindows[1], minLeft + utilW + gap, topBound, utilW, this.isContentFitWindow(columnWindows[1]) ? null : availableH);
+                } else {
+                    const utilW = Math.min(640, Math.max(600, availableW));
+                    const isWin0Fit = this.isContentFitWindow(columnWindows[0]);
+                    applyWinBounds(columnWindows[0], minLeft, topBound, utilW, isWin0Fit ? null : Math.floor((availableH - gap) * 0.49));
+                    const win0H = isWin0Fit ? getWinNaturalH(columnWindows[0]) : Math.floor((availableH - gap) * 0.49);
+                    const win1Top = topBound + win0H + gap;
+                    applyWinBounds(columnWindows[1], minLeft, win1Top, utilW, this.isContentFitWindow(columnWindows[1]) ? null : (availableH - (win1Top - topBound)));
+                }
+                return;
+            }
+            if (columnWindows.length >= 3) {
+                const hasGraphics = columnWindows.some(w => w.id === 'float-win-graphics');
+                if (hasGraphics && availableW >= 1350) {
+                    const gfxWin = columnWindows.find(w => w.id === 'float-win-graphics');
+                    const otherWins = columnWindows.filter(w => w !== gfxWin);
+                    const gfxW = Math.min(960, Math.max(780, Math.floor(availableW * 0.54)));
+                    applyWinBounds(gfxWin, minLeft, topBound, gfxW, availableH);
+
+                    const rightLeft = minLeft + gfxW + gap;
+                    const rightW = window.innerWidth - rightLeft - rightMargin;
+
+                    if (otherWins.length === 2) {
+                        const rigWin = otherWins.find(w => w.id === 'float-win-my-rig') || otherWins[0];
+                        const secondWin = otherWins.find(w => w !== rigWin) || otherWins[1];
+                        const rigW = Math.min(rigWin.id === 'float-win-my-rig' ? 780 : 640, rightW);
+                        applyWinBounds(rigWin, rightLeft, topBound, rigW, this.isContentFitWindow(rigWin) ? null : Math.floor((availableH - gap) * 0.45));
+
+                        const rigH = getWinNaturalH(rigWin, 210);
+                        const secondTop = topBound + rigH + gap;
+                        const secondDefaultW = secondWin.id === 'float-win-smart-lod' ? 620 : 640;
+                        const secondW = Math.min(secondDefaultW, rightW);
+                        const secondRemH = Math.max(200, availableH - rigH - gap);
+                        applyWinBounds(secondWin, rightLeft, secondTop, secondW, this.isContentFitWindow(secondWin) ? null : secondRemH);
+                        return;
+                    }
+                }
+
+                // General 2-column multi-stacking
+                const uColW = Math.min(560, Math.floor((availableW - gap) * 0.5));
+                const isWin0Fit = this.isContentFitWindow(columnWindows[0]);
+                applyWinBounds(columnWindows[0], minLeft, topBound, uColW, isWin0Fit ? null : Math.floor((availableH - gap) * 0.49));
+                const win0H = isWin0Fit ? getWinNaturalH(columnWindows[0]) : Math.floor((availableH - gap) * 0.49);
+                const win1Top = topBound + win0H + gap;
+                applyWinBounds(columnWindows[1], minLeft, win1Top, uColW, this.isContentFitWindow(columnWindows[1]) ? null : (availableH - (win1Top - topBound)));
+
+                const col2Left = minLeft + uColW + gap;
+                const col2W = Math.min(560, window.innerWidth - col2Left - rightMargin);
+                if (columnWindows.length === 3) {
+                    applyWinBounds(columnWindows[2], col2Left, topBound, col2W, this.isContentFitWindow(columnWindows[2]) ? null : availableH);
+                } else {
+                    const isWin2Fit = this.isContentFitWindow(columnWindows[2]);
+                    applyWinBounds(columnWindows[2], col2Left, topBound, col2W, isWin2Fit ? null : Math.floor((availableH - gap) * 0.49));
+                    const win2H = isWin2Fit ? getWinNaturalH(columnWindows[2]) : Math.floor((availableH - gap) * 0.49);
+                    const win3Top = topBound + win2H + gap;
+                    applyWinBounds(columnWindows[3], col2Left, win3Top, col2W, this.isContentFitWindow(columnWindows[3]) ? null : (availableH - (win3Top - topBound)));
+                }
+                for (let i = 4; i < columnWindows.length; i++) {
+                    const offset = (i - 3) * 20;
+                    applyWinBounds(columnWindows[i], col2Left + offset, topBound + offset, col2W, null);
+                }
+                return;
+            }
+        }
+
+        // 5. Fallback Tiling
+        let curX = minLeft;
+        columnWindows.forEach((win) => {
+            const colW = Math.min(520, Math.floor((availableW - (columnWindows.length - 1) * gap) / columnWindows.length));
+            applyWinBounds(win, curX, topBound, colW, this.isContentFitWindow(win) ? null : availableH);
+            curX += colW + gap;
+        });
+    }
+
     centerModal(modalEl) {
         if (!modalEl) return;
+        if (modalEl.id === 'settings-modal') {
+            modalEl.style.width = '680px';
+            modalEl.style.left = '50%';
+            modalEl.style.top = '50%';
+            modalEl.style.transform = 'translate(-50%, -50%)';
+            modalEl.style.right = 'auto';
+            modalEl.style.bottom = 'auto';
+            modalEl.style.zIndex = '5000';
+            const backdrop = document.getElementById('settings-modal-backdrop') || document.getElementById('settings-backdrop');
+            if (backdrop) backdrop.style.zIndex = '4999';
+            return;
+        }
+        if (modalEl.id === 'disclaimer-modal') {
+            modalEl.style.width = '680px';
+            modalEl.style.left = '50%';
+            modalEl.style.top = '50%';
+            modalEl.style.transform = 'translate(-50%, -50%)';
+            modalEl.style.right = 'auto';
+            modalEl.style.bottom = 'auto';
+            modalEl.style.zIndex = '6000';
+            const backdrop = document.getElementById('disclaimer-backdrop');
+            if (backdrop) backdrop.style.zIndex = '5999';
+            return;
+        }
+        if (modalEl.id === 'legal-modal') {
+            modalEl.style.width = '840px';
+            modalEl.style.left = '50%';
+            modalEl.style.top = '50%';
+            modalEl.style.transform = 'translate(-50%, -50%)';
+            modalEl.style.right = 'auto';
+            modalEl.style.bottom = 'auto';
+            modalEl.style.zIndex = '7000';
+            const backdrop = document.getElementById('legal-backdrop');
+            if (backdrop) backdrop.style.zIndex = '6999';
+            return;
+        }
+        if (modalEl.id === 'rescan-modal') {
+            modalEl.style.width = '540px';
+            modalEl.style.left = '50%';
+            modalEl.style.top = '50%';
+            modalEl.style.transform = 'translate(-50%, -50%)';
+            modalEl.style.right = 'auto';
+            modalEl.style.bottom = 'auto';
+            modalEl.style.zIndex = '5000';
+            const backdrop = document.getElementById('rescan-backdrop');
+            if (backdrop) backdrop.style.zIndex = '4999';
+            return;
+        }
+        if (modalEl.id === 'radial-details-modal') {
+            modalEl.style.width = '880px';
+        }
+        const topBound = 126;
+        const botBound = 84;
+        const maxAllowedH = Math.max(200, window.innerHeight - topBound - botBound);
+        modalEl.style.maxHeight = `${maxAllowedH}px`;
+
         if (modalEl.id === 'float-win-route-opt' || modalEl.dataset?.modalId === 'float-win-route-opt') {
             modalEl.style.width = 'fit-content';
         }
+        if (modalEl.id === 'float-win-my-rig') {
+            modalEl.style.height = 'auto';
+            modalEl.style.width = '780px';
+        }
+        if (modalEl.id === 'float-win-graphics') {
+            modalEl.style.width = '960px';
+        }
+        if (modalEl.id === 'float-win-smart-lod') {
+            modalEl.style.height = 'auto';
+            modalEl.style.width = '620px';
+        }
+        if (this.isContentFitWindow(modalEl)) {
+            modalEl.style.height = 'auto';
+        }
         const rect = modalEl.getBoundingClientRect();
-        const w = rect.width || modalEl.offsetWidth || 960;
-        const h = rect.height || parseInt(modalEl.style.height) || 400;
-        const left = Math.max(16, Math.floor((window.innerWidth - w) / 2));
-        const top = (modalEl.id === 'float-win-route-opt' || modalEl.dataset?.modalId === 'float-win-route-opt')
-            ? 76
-            : Math.max(16, Math.floor((window.innerHeight - h) / 2));
+        const w = rect.width || modalEl.offsetWidth || parseInt(modalEl.style.width) || 540;
+        const h = Math.min(maxAllowedH, rect.height || parseInt(modalEl.style.height) || modalEl.offsetHeight || 400);
+
+        const isClassicOpen = document.body.classList.contains('classic-nav-active') || (document.getElementById('classic-flight-ops-panel') && !document.getElementById('classic-flight-ops-panel').classList.contains('hidden'));
+        const minLeft = isClassicOpen ? 304 : 16;
+        const availableW = window.innerWidth - minLeft - 16;
+        const left = Math.max(minLeft, Math.min(window.innerWidth - w - 16, Math.floor(minLeft + Math.max(0, (availableW - w) / 2))));
+
+        const availableH = window.innerHeight - topBound - botBound;
+        const centeredTop = Math.floor(topBound + Math.max(0, (availableH - h) / 2));
+        const top = Math.max(topBound, Math.min(window.innerHeight - botBound - h, centeredTop));
+
         modalEl.style.left = `${left}px`;
         modalEl.style.top = `${top}px`;
         modalEl.style.right = 'auto';
@@ -16391,8 +18669,45 @@ class WindowManager {
 
     bringToFront(modalEl) {
         if (!modalEl) return;
+        if (modalEl.id === 'settings-modal') {
+            modalEl.style.zIndex = '5000';
+            const backdrop = document.getElementById('settings-modal-backdrop') || document.getElementById('settings-backdrop');
+            if (backdrop) backdrop.style.zIndex = '4999';
+            return;
+        }
+        if (modalEl.id === 'rescan-modal') {
+            modalEl.style.zIndex = '5000';
+            const backdrop = document.getElementById('rescan-backdrop');
+            if (backdrop) backdrop.style.zIndex = '4999';
+            return;
+        }
+        if (modalEl.id === 'disclaimer-modal') {
+            modalEl.style.zIndex = '6000';
+            const backdrop = document.getElementById('disclaimer-backdrop');
+            if (backdrop) backdrop.style.zIndex = '5999';
+            return;
+        }
+        if (modalEl.id === 'legal-modal') {
+            modalEl.style.zIndex = '7000';
+            const backdrop = document.getElementById('legal-backdrop');
+            if (backdrop) backdrop.style.zIndex = '6999';
+            return;
+        }
+        if (modalEl.id === 'float-win-report-viewer') {
+            modalEl.style.zIndex = '2800';
+            return;
+        }
         this.topZIndex += 2;
+        if (this.topZIndex >= 2700) {
+            this.topZIndex = 2500;
+        }
         modalEl.style.zIndex = this.topZIndex;
+
+        // Ensure report viewer stays strictly on top of other floating windows if open
+        const reportWin = document.getElementById('float-win-report-viewer');
+        if (reportWin && !reportWin.classList.contains('hidden') && reportWin.style.display !== 'none') {
+            reportWin.style.zIndex = '2800';
+        }
     }
 
     bindDrag(modalEl, headerEl) {
@@ -16417,7 +18732,6 @@ class WindowManager {
             modalEl.style.right = 'auto';
             modalEl.style.bottom = 'auto';
             modalEl.style.transform = 'none';
-            modalEl._hasBeenDragged = true;
             if (typeof closeAllProfileDropdowns === 'function') closeAllProfileDropdowns();
         });
     }
@@ -16456,8 +18770,23 @@ class WindowManager {
             const { modalEl, startX, startY, origLeft, origTop } = this._dragState;
             const dx = e.clientX - startX;
             const dy = e.clientY - startY;
-            const newLeft = Math.max(10, Math.min(window.innerWidth - 80, origLeft + dx));
-            const newTop = Math.max(10, Math.min(window.innerHeight - 80, origTop + dy));
+            if (Math.hypot(dx, dy) > 5) {
+                modalEl._hasBeenDragged = true;
+            }
+
+            const topBound = 126;
+            const botBound = 84;
+            const curW = modalEl.offsetWidth || 400;
+            const curH = modalEl.offsetHeight || 300;
+
+            const isClassicOpen = document.body.classList.contains('classic-nav-active') || (document.getElementById('classic-flight-ops-panel') && !document.getElementById('classic-flight-ops-panel').classList.contains('hidden'));
+            const minLeft = isClassicOpen ? 304 : 12;
+
+            const maxTop = Math.max(topBound, window.innerHeight - botBound - curH);
+            const newTop = Math.max(topBound, Math.min(maxTop, origTop + dy));
+            const maxLeft = Math.max(minLeft, window.innerWidth - curW - 12);
+            const newLeft = Math.max(minLeft, Math.min(maxLeft, origLeft + dx));
+
             modalEl.style.left = `${newLeft}px`;
             modalEl.style.top = `${newTop}px`;
 
@@ -16475,27 +18804,120 @@ class WindowManager {
             const { modalEl, startX, startY, origWidth, origHeight, origLeft, origTop, minW, minH } = this._resizeState;
             const dw = e.clientX - startX;
             const dh = e.clientY - startY;
-            const maxW = window.innerWidth - origLeft - 10;
-            const maxH = window.innerHeight - origTop - 10;
+
+            const topBound = 126;
+            const botBound = 84;
+            const maxW = Math.max(minW, window.innerWidth - origLeft - 12);
+            const maxH = Math.max(minH, window.innerHeight - botBound - origTop);
+
             const newW = Math.max(minW, Math.min(maxW, origWidth + dw));
-            const newH = Math.max(minH, Math.min(maxH, origHeight + dh));
             modalEl.style.width = `${newW}px`;
-            modalEl.style.height = `${newH}px`;
+
+            if (this.isContentFitWindow(modalEl)) {
+                // Content-Fit: strictly content-driven height, never stretch into empty void
+                modalEl.style.height = 'auto';
+                modalEl.style.maxHeight = `${maxH}px`;
+            } else {
+                // Viewport-Fill: allow vertical expansion to display more items
+                const newH = Math.max(minH, Math.min(maxH, origHeight + dh));
+                modalEl.style.height = `${newH}px`;
+                modalEl.style.maxHeight = `${newH}px`;
+            }
 
             const modalId = modalEl.dataset.modalId || modalEl.id;
             if (modalId) {
                 this.sessionState[modalId] = {
                     ...(this.sessionState[modalId] || {}),
                     width: newW,
-                    height: newH
+                    ...(this.isContentFitWindow(modalEl) ? {} : { height: parseInt(modalEl.style.height) || undefined })
                 };
             }
         }
     }
 
     _onGlobalMouseUp() {
+        if (this._resizeState) {
+            const { modalEl } = this._resizeState;
+            if (modalEl && this.isContentFitWindow(modalEl)) {
+                modalEl.style.height = 'auto';
+            }
+        }
         this._dragState = null;
         this._resizeState = null;
+    }
+
+    clampAllActiveModals() {
+        const isClassicOpen = document.body.classList.contains('classic-nav-active') || (document.getElementById('classic-flight-ops-panel') && !document.getElementById('classic-flight-ops-panel').classList.contains('hidden'));
+        const minLeft = isClassicOpen ? 304 : 16;
+        const topBound = 126;
+        const botBound = 84;
+        const maxAllowedH = Math.max(200, window.innerHeight - topBound - botBound);
+
+        document.querySelectorAll('.sceneryx-modal:not(.hidden)').forEach(modalEl => {
+            if (modalEl.classList.contains('is-pinned')) return;
+            if (modalEl.style.display === 'none') return;
+
+            // Handle radial-anchored modals specifically
+            if (modalEl.id === 'radial-details-modal') {
+                if (typeof updateRadialDetailsModalPosition === 'function') updateRadialDetailsModalPosition();
+                return;
+            }
+            if (modalEl.id === 'radial-airlines-modal') {
+                if (typeof updateRadialAirlinesModalPosition === 'function') updateRadialAirlinesModalPosition();
+                return;
+            }
+            if (modalEl.id === 'radial-sceneries-extension') {
+                if (typeof updateRadialMenuPosition === 'function') updateRadialMenuPosition();
+                return;
+            }
+
+            // Exclude modal dialogs with backdrop (Settings, Disclaimer, Legal, Rescan, etc.) to keep them centered
+            if (modalEl.id === 'settings-modal' || modalEl.id === 'disclaimer-modal' || modalEl.id === 'legal-modal' || modalEl.id === 'rescan-modal') {
+                if (!modalEl._hasBeenDragged) {
+                    this.centerModal(modalEl);
+                } else {
+                    const rect = modalEl.getBoundingClientRect();
+                    let curLeft = parseInt(modalEl.style.left) || rect.left;
+                    let curTop = parseInt(modalEl.style.top) || rect.top;
+                    const curW = rect.width || modalEl.offsetWidth || 680;
+                    const curH = rect.height || modalEl.offsetHeight || 500;
+                    curLeft = Math.max(16, Math.min(window.innerWidth - curW - 16, curLeft));
+                    curTop = Math.max(16, Math.min(window.innerHeight - curH - 16, curTop));
+                    modalEl.style.left = `${curLeft}px`;
+                    modalEl.style.top = `${curTop}px`;
+                }
+                return;
+            }
+            if (modalEl.id === 'export-modal' || modalEl.id === 'payware-stores-modal' || modalEl.id === 'smart-lod-conflict-modal') {
+                if (!modalEl._hasBeenDragged) {
+                    this.centerModal(modalEl);
+                    return;
+                }
+            }
+            if (!modalEl._hasBeenDragged && ((modalEl.style.left && modalEl.style.left.includes('%')) || (modalEl.style.transform && modalEl.style.transform.includes('translate(-50%')))) {
+                return;
+            }
+
+            modalEl.style.maxHeight = `${maxAllowedH}px`;
+            const rect = modalEl.getBoundingClientRect();
+            let curLeft = parseInt(modalEl.style.left) || rect.left;
+            let curTop = parseInt(modalEl.style.top) || rect.top;
+            const curW = rect.width || modalEl.offsetWidth || parseInt(modalEl.style.width) || 400;
+            const curH = Math.min(maxAllowedH, rect.height || modalEl.offsetHeight || parseInt(modalEl.style.height) || 300);
+
+            // Clamp horizontal
+            const maxLeft = Math.max(minLeft, window.innerWidth - curW - 16);
+            if (curLeft < minLeft) curLeft = minLeft;
+            if (curLeft > maxLeft) curLeft = maxLeft;
+
+            // Clamp vertical
+            const maxTop = Math.max(topBound, window.innerHeight - botBound - curH);
+            if (curTop < topBound) curTop = topBound;
+            if (curTop > maxTop) curTop = maxTop;
+
+            modalEl.style.left = `${curLeft}px`;
+            modalEl.style.top = `${curTop}px`;
+        });
     }
 
     openModal(modalEl) {
@@ -16512,7 +18934,14 @@ class WindowManager {
         if (!modalEl) return;
         modalEl.classList.add('hidden');
         modalEl.style.display = 'none';
+        modalEl._hasBeenDragged = false;
+        modalEl.style.height = 'auto';
         this.activeModals.delete(modalEl);
+        // Clear dragged flag on remaining active windows so layout snaps back cleanly
+        document.querySelectorAll('.sceneryx-modal.floating-window').forEach(el => {
+            el._hasBeenDragged = false;
+        });
+        this.autoTileWindows(true);
     }
 }
 
@@ -16555,27 +18984,30 @@ const FLOATING_WINDOW_MAP = {
 };
 
 const FLOATING_DEFAULT_OFFSETS = {
-    'my_rig': { x: 80, y: 70 },
-    'graphics': { x: 180, y: 80 },
-    'smart_lod': { x: 280, y: 110 },
-    'telemetry': { x: 180, y: 120 },
-    'route': { x: 120, y: 90 },
-    'bug_report': { x: 260, y: 110 },
-    'remote_panel': { x: 300, y: 100 },
-    'report_viewer': { x: 550, y: 65 },
-    'report-viewer': { x: 550, y: 65 }
+    'my_rig': { x: 310, y: 126 },
+    'graphics': { x: 320, y: 126 },
+    'smart_lod': { x: 340, y: 126 },
+    'telemetry': { x: 320, y: 126 },
+    'route': { x: 310, y: 126 },
+    'bug_report': { x: 340, y: 126 },
+    'remote_panel': { x: 330, y: 126 },
+    'report_viewer': { x: 310, y: 126 },
+    'report-viewer': { x: 310, y: 126 }
 };
 
-function toggleFloatingWindow(winKey) {
+function toggleFloatingWindow(winKey, event) {
+    if (event && typeof event.stopPropagation === 'function') event.stopPropagation();
     const elId = (typeof FLOATING_WINDOW_MAP !== 'undefined' && FLOATING_WINDOW_MAP[winKey]) ? FLOATING_WINDOW_MAP[winKey] : winKey;
     const winEl = document.getElementById(elId);
     if (!winEl) return;
-    if (winEl.classList.contains('hidden')) {
-        openFloatingWindow(winKey);
-    } else {
+    const isOpen = !winEl.classList.contains('hidden') && winEl.style.display !== 'none';
+    if (isOpen) {
         closeFloatingWindow(winKey);
+    } else {
+        openFloatingWindow(winKey);
     }
 }
+window.toggleFloatingWindow = toggleFloatingWindow;
 
 window.addEventListener('message', function (event) {
     if (event.data && event.data.type === 'SCENERYX_PANEL_RESIZE') {
@@ -16612,37 +19044,62 @@ function openFloatingWindow(winKey, targetAp = null) {
     }
 
     if (!winEl.classList.contains('is-pinned')) {
+        const topBound = 126;
+        const botBound = 84;
+        const maxAllowedH = Math.max(200, window.innerHeight - topBound - botBound);
+        winEl.style.maxHeight = `${maxAllowedH}px`;
+
         if (!winEl._hasBeenDragged && !winEl.style.left) {
+            const isClassic = document.body.classList.contains('classic-nav-active') || (document.getElementById('classic-flight-ops-panel') && !document.getElementById('classic-flight-ops-panel').classList.contains('hidden'));
+            const minLeft = isClassic ? 304 : 20;
+            const availableW = window.innerWidth - minLeft - 20;
+
+            const pinnedRig = document.getElementById('float-win-my-rig');
+            const isRigPinnedOpen = pinnedRig && pinnedRig.classList.contains('is-pinned') && !pinnedRig.classList.contains('hidden');
+            const effectiveTopBound = isRigPinnedOpen ? Math.min(window.innerHeight - botBound - 300, (pinnedRig.offsetHeight || 135) + 126 + 10) : topBound;
+
             if (winKey === 'route' || elId === 'float-win-route-opt') {
                 winEl.style.width = 'fit-content';
-                const targetW = winEl.offsetWidth || 960;
-                const left = Math.max(20, Math.floor((window.innerWidth - targetW) / 2));
+                const targetW = winEl.offsetWidth || parseInt(winEl.style.width) || 960;
+                const left = Math.max(minLeft, Math.floor(minLeft + Math.max(0, (availableW - targetW) / 2)));
                 winEl.style.left = `${left}px`;
-                winEl.style.top = '76px';
+                winEl.style.top = `${effectiveTopBound}px`;
             } else if (winKey === 'report_viewer' || winKey === 'report-viewer' || elId === 'float-win-report-viewer') {
-                const targetW = Math.min(1360, window.innerWidth - 40);
-                const left = Math.max(20, Math.floor((window.innerWidth - targetW) / 2));
+                const targetW = Math.min(1080, window.innerWidth - 32);
+                const left = Math.max(16, Math.floor((window.innerWidth - targetW) / 2));
                 winEl.style.width = `${targetW}px`;
                 winEl.style.left = `${left}px`;
-                winEl.style.top = '50px';
-                winEl.style.height = '860px';
+                winEl.style.top = `${topBound}px`;
+                winEl.style.height = `${maxAllowedH}px`;
+                winEl.style.maxHeight = `${maxAllowedH}px`;
+                winEl.style.zIndex = '2800';
             } else {
-                const offset = FLOATING_DEFAULT_OFFSETS[winKey] || { x: 140, y: 100 };
-                const left = Math.max(20, Math.min(window.innerWidth - 650, offset.x));
-                const top = Math.max(20, Math.min(window.innerHeight - 500, offset.y));
+                const winW = winEl.offsetWidth || parseInt(winEl.style.width) || 720;
+                const defaultX = isClassic ? 320 : 140;
+                const offset = FLOATING_DEFAULT_OFFSETS[winKey] || { x: defaultX, y: effectiveTopBound };
+                const maxLeft = Math.max(minLeft, window.innerWidth - winW - 20);
+                const left = Math.max(minLeft, Math.min(maxLeft, isClassic ? Math.max(minLeft, offset.x) : offset.x));
+                const winH = winEl.offsetHeight || parseInt(winEl.style.height) || 400;
+                const targetY = isRigPinnedOpen ? effectiveTopBound : offset.y;
+                const maxTop = Math.max(topBound, window.innerHeight - botBound - winH);
+                const top = Math.max(topBound, Math.min(maxTop, targetY));
                 winEl.style.left = `${left}px`;
                 winEl.style.top = `${top}px`;
             }
         }
 
-        // Auto-dimension window to content at opening (removes empty bottom void, except scrollable reports)
-        if (winKey !== 'report_viewer' && winKey !== 'report-viewer' && elId !== 'float-win-report-viewer') {
+        // Auto-dimension window to content at opening (removes empty bottom void, except scrollable reports and viewport-fill windows)
+        if (winKey !== 'report_viewer' && winKey !== 'report-viewer' && elId !== 'float-win-report-viewer' && winKey !== 'graphics' && elId !== 'float-win-graphics') {
             winEl.style.height = 'auto';
         }
     }
 
     winEl.classList.remove('hidden');
+    winEl._hasBeenDragged = false;
     bringFloatingWindowToFront(winEl);
+    if (window.windowManager) {
+        window.windowManager.autoTileWindows(true);
+    }
     if (typeof updateFlightOptimizerRadialSectors === 'function') {
         updateFlightOptimizerRadialSectors();
     }
@@ -16666,10 +19123,20 @@ function openFloatingWindow(winKey, targetAp = null) {
         startBlackboxTelemetryPolling();
         refreshBenchmarksList();
     } else if (winKey === 'route') {
+        if (typeof closeAirportRadialMenu === 'function') {
+            closeAirportRadialMenu(false);
+        }
+        if (typeof closeFilterRadialMenu === 'function') {
+            closeFilterRadialMenu();
+        }
         if (targetAp) {
             optimizerOrigin = targetAp;
             flightPlanningDeparture = targetAp;
             selectedAirport = targetAp;
+        } else if (currentClassicAirport && !optimizerOrigin) {
+            optimizerOrigin = currentClassicAirport;
+            flightPlanningDeparture = currentClassicAirport;
+            selectedAirport = currentClassicAirport;
         }
         updateOptimizerRouteUI();
     } else if (winKey === 'remote_panel') {
@@ -16689,9 +19156,19 @@ function closeFloatingWindow(winKey) {
     if (typeof closeAllSmartLodProfileDropdowns === 'function') closeAllSmartLodProfileDropdowns();
     const elId = FLOATING_WINDOW_MAP[winKey] || winKey;
     const winEl = document.getElementById(elId);
+    const wasOpen = winEl && !winEl.classList.contains('hidden') && winEl.style.display !== 'none';
     if (winEl) {
         winEl.classList.add('hidden');
         winEl.style.height = 'auto';
+        winEl._hasBeenDragged = false;
+    }
+    if (!wasOpen) return;
+    // Cleanly untag dragged flag on remaining active windows so layout snaps back
+    document.querySelectorAll('.sceneryx-modal.floating-window').forEach(el => {
+        el._hasBeenDragged = false;
+    });
+    if (window.windowManager) {
+        window.windowManager.autoTileWindows(true);
     }
     if (typeof updateFlightOptimizerRadialSectors === 'function') {
         updateFlightOptimizerRadialSectors();
@@ -16702,6 +19179,25 @@ function closeFloatingWindow(winKey) {
     if (winKey === 'remote_panel') {
         const inGameBtn = document.getElementById('in-game-panel-btn');
         if (inGameBtn) inGameBtn.classList.remove('bg-slate-700');
+    }
+    if (winKey === 'route' || elId === 'float-win-route-opt') {
+        if (!isFlightCorridorOptimized) {
+            if (typeof clearOptimizerRoutePlanning === 'function') {
+                clearOptimizerRoutePlanning(true);
+            }
+            if (typeof clearRouteAirportBadges === 'function') {
+                clearRouteAirportBadges();
+            }
+            isFlightPlanningMode = false;
+        } else {
+            // Keep central route badges & corridor line visible when optimized
+            if (typeof updateRouteAirportBadges === 'function') {
+                updateRouteAirportBadges();
+            }
+        }
+        if (typeof updateClassicSidebarRouteBadge === 'function') {
+            updateClassicSidebarRouteBadge();
+        }
     }
     if (winKey === 'report_viewer' || winKey === 'report-viewer' || elId === 'float-win-report-viewer') {
         if (typeof destroyReportViewerCharts === 'function') {
@@ -16992,6 +19488,13 @@ function setRigWindowPinned(pinned) {
         localStorage.removeItem('sceneryx_my_rig_pinned');
     } catch (e) {}
 
+    const isClassic = (typeof activeNavMode !== 'undefined' && activeNavMode === 'classic') ||
+                      document.body.classList.contains('classic-nav-active') ||
+                      (document.getElementById('classic-flight-ops-panel') && !document.getElementById('classic-flight-ops-panel').classList.contains('hidden'));
+    if (document.body) {
+        document.body.classList.toggle('classic-nav-active', isClassic);
+    }
+
     if (pinned) {
         win.classList.add('is-pinned');
         win.style.left = '';
@@ -17017,6 +19520,9 @@ function setRigWindowPinned(pinned) {
         if (window.windowManager) {
             window.windowManager.centerModal(win);
         }
+    }
+    if (window.windowManager) {
+        window.windowManager.autoTileWindows();
     }
 }
 
@@ -17120,6 +19626,11 @@ function forceExitOptimizerClean() {
         localStorage.removeItem('sceneryx_saved_flight_plan');
     } catch (e) {}
 
+    // Clear route airport badges from Leaflet map
+    if (typeof clearRouteAirportBadges === 'function') {
+        clearRouteAirportBadges();
+    }
+
     // Clear flight route vector lines and corridor graphics on Leaflet map
     if (flightCorridorLayerGroup && map) {
         flightCorridorLayerGroup.clearLayers();
@@ -17171,7 +19682,8 @@ function focusOptimizerAirport(which) {
     }
 }
 
-function clearOptimizerRoutePlanning() {
+function clearOptimizerRoutePlanning(silent = false) {
+    const hadActiveRoute = !!(optimizerOrigin || optimizerDest || flightPlanningDeparture || flightPlanningDestination || isFlightCorridorOptimized);
     if (isFlightCorridorOptimized) {
         if (typeof restoreFlightCorridorSceneries === 'function') {
             restoreFlightCorridorSceneries();
@@ -17204,6 +19716,11 @@ function clearOptimizerRoutePlanning() {
     try {
         localStorage.removeItem('sceneryx_saved_flight_plan');
     } catch (e) {}
+
+    // Clear route airport badges from Leaflet map
+    if (typeof clearRouteAirportBadges === 'function') {
+        clearRouteAirportBadges();
+    }
 
     // Clear flight route vector lines and corridor graphics on Leaflet map
     if (flightCorridorLayerGroup && map) {
@@ -17240,7 +19757,7 @@ function clearOptimizerRoutePlanning() {
         map.invalidateSize();
     }
 
-    if (typeof showToast === 'function') {
+    if (!silent && hadActiveRoute && (!document.body || !document.body.classList.contains('tour-active')) && typeof showToast === 'function') {
         showToast("Flight route reset. Click any airport on the map to set Departure.", "info");
     }
 }
@@ -17267,6 +19784,9 @@ function switchOptimizerTab(tabName) {
 }
 
 function updateOptimizerRouteUI() {
+    if (typeof updateRouteAirportBadges === 'function') {
+        updateRouteAirportBadges();
+    }
     const origIcao = document.getElementById('opt-route-origin-icao');
     const origName = document.getElementById('opt-route-origin-name');
     const destIcao = document.getElementById('opt-route-dest-icao');
@@ -17302,11 +19822,11 @@ function updateOptimizerRouteUI() {
         if (card) {
             const titleSpan = card.querySelector('span');
             if (m.toUpperCase() === optimizerMode) {
-                card.className = 'h-9 px-3 rounded bg-blue-600 text-white font-semibold text-xs transition-colors cursor-pointer border-0 outline-none flex items-center justify-center';
-                if (titleSpan) titleSpan.className = 'font-semibold text-white';
+                card.className = 'h-8 px-3 rounded-md bg-[#00A8FF] text-[#0F1115] font-bold text-xs uppercase tracking-wider transition-all cursor-pointer border-0 outline-none flex items-center justify-center shadow-sm';
+                if (titleSpan) titleSpan.className = 'font-bold text-[#0F1115]';
             } else {
-                card.className = 'h-9 px-3 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-semibold text-xs transition-colors cursor-pointer border-0 outline-none flex items-center justify-center';
-                if (titleSpan) titleSpan.className = 'font-semibold text-slate-300';
+                card.className = 'h-8 px-3.5 rounded-md bg-transparent hover:bg-[#1C212B] text-slate-400 hover:text-white font-semibold text-xs uppercase tracking-wider transition-all cursor-pointer border-0 outline-none flex items-center justify-center';
+                if (titleSpan) titleSpan.className = 'font-semibold text-slate-400';
             }
         }
     });
@@ -17315,13 +19835,13 @@ function updateOptimizerRouteUI() {
     if (clearRouteBtn) {
         const hasRoute = !!(optimizerOrigin || optimizerDest);
         clearRouteBtn.disabled = false;
-        clearRouteBtn.className = 'h-9 px-4 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-semibold text-xs transition-colors cursor-pointer border-0 outline-none flex items-center justify-center shadow-sm';
+        clearRouteBtn.className = 'h-9 px-3.5 rounded-md bg-[#1C212B] hover:bg-[#242B38] border border-[#2A3241] text-slate-200 hover:text-white font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center shadow-sm';
         clearRouteBtn.title = hasRoute ? 'Clear current flight route' : 'Start a new flight route';
     }
 
     const restoreBtn = document.getElementById('opt-btn-restore-sceneries');
     if (restoreBtn) {
-        restoreBtn.className = 'h-9 px-3.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-semibold text-xs transition-colors cursor-pointer border-0 outline-none flex items-center justify-center shadow-sm';
+        restoreBtn.className = 'h-9 px-3.5 rounded-md bg-[#1C212B] hover:bg-[#242B38] border border-[#2A3241] text-slate-200 hover:text-white font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center shadow-sm';
         if (isFlightCorridorOptimized) {
             restoreBtn.classList.remove('hidden');
         } else {
@@ -17342,6 +19862,9 @@ function updateOptimizerRouteUI() {
     }
 
     updateOptimizerSavings();
+    if (typeof updateClassicSidebarRouteBadge === 'function') {
+        updateClassicSidebarRouteBadge();
+    }
 }
 
 function updateOptimizerSavings() {
@@ -17392,6 +19915,38 @@ function updateOptimizerSavings() {
     const vramSavedMb = Math.round(disabledCount * 1.25);
     if (savingRamEl) savingRamEl.textContent = `${ramSavedGb} GB`;
     if (savingVramEl) savingVramEl.textContent = `${vramSavedMb} MB`;
+}
+
+function updateClassicSidebarRouteBadge() {
+    const badgeRoute = document.getElementById('classic-badge-route');
+    if (!badgeRoute) return;
+
+    const dep = (typeof optimizerOrigin !== 'undefined' && optimizerOrigin) ||
+                (typeof flightPlanningDeparture !== 'undefined' && flightPlanningDeparture) ||
+                (typeof currentFlightMode !== 'undefined' && currentFlightMode && currentFlightMode.dep_icao ? { icao: currentFlightMode.dep_icao } : null) ||
+                (typeof flightOriginAirport !== 'undefined' ? flightOriginAirport : null);
+    const arr = (typeof optimizerDest !== 'undefined' && optimizerDest) ||
+                (typeof flightPlanningDestination !== 'undefined' && flightPlanningDestination) ||
+                (typeof currentFlightMode !== 'undefined' && currentFlightMode && currentFlightMode.arr_icao ? { icao: currentFlightMode.arr_icao } : null) ||
+                (typeof flightDestinationAirport !== 'undefined' ? flightDestinationAirport : (typeof flightDestAirport !== 'undefined' ? flightDestAirport : null));
+
+    const depIcao = dep ? (dep.icao || '').toUpperCase() : '';
+    const arrIcao = arr ? (arr.icao || '').toUpperCase() : '';
+
+    if (depIcao && arrIcao) {
+        badgeRoute.textContent = `${depIcao} ➔ ${arrIcao}`;
+        if (typeof isFlightCorridorOptimized !== 'undefined' && isFlightCorridorOptimized) {
+            badgeRoute.className = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#10B981] text-white shadow-sm';
+        } else {
+            badgeRoute.className = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#00A8FF] text-[#0F1115] shadow-sm';
+        }
+    } else if (depIcao) {
+        badgeRoute.textContent = `${depIcao} ➔ ...`;
+        badgeRoute.className = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#38BDF8] text-[#0F1115] shadow-sm';
+    } else {
+        badgeRoute.textContent = 'OFF';
+        badgeRoute.className = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#161920] text-[#64748B] border border-[#2A3241]';
+    }
 }
 
 function swapOptimizerRouteAirports() {
@@ -17509,30 +20064,30 @@ function toSettingTitleCase(str) {
 
 const MSFS_GRAPHICS_CATEGORIES = {
     'COMMON': [
-        { name: 'Traffic', index: 0 },
-        { name: 'Airport Services', index: 1 },
-        { name: 'Characters & Fauna', index: 2 }
+        { name: 'TRAFFIC', index: 0 },
+        { name: 'AIRPORT SERVICES', index: 1 },
+        { name: 'CHARACTERS & FAUNA', index: 2 }
     ],
     'SHARED': [
-        { name: 'Traffic', index: 0 },
-        { name: 'Airport Services', index: 1 },
-        { name: 'Characters & Fauna', index: 2 }
+        { name: 'TRAFFIC', index: 0 },
+        { name: 'AIRPORT SERVICES', index: 1 },
+        { name: 'CHARACTERS & FAUNA', index: 2 }
     ],
     '2D': [
-        { name: 'Frame Rate & Sync', index: 0 },
-        { name: 'Terrain & Textures', index: 1 },
-        { name: 'Environment', index: 2 },
-        { name: 'Lighting', index: 3 },
-        { name: 'Cockpit', index: 4 },
-        { name: 'Post-Processing', index: 5 }
+        { name: 'FRAME RATE & SYNC', index: 0 },
+        { name: 'TERRAIN & TEXTURES', index: 1 },
+        { name: 'ENVIRONMENT', index: 2 },
+        { name: 'LIGHTING', index: 3 },
+        { name: 'COCKPIT', index: 4 },
+        { name: 'POST-PROCESSING', index: 5 }
     ],
     'VR': [
-        { name: 'Headset & Sync', index: 0 },
-        { name: 'Optimizations & DLSS', index: 1 },
-        { name: 'Terrain & Textures', index: 2 },
-        { name: 'Environment', index: 3 },
-        { name: 'Lighting', index: 4 },
-        { name: 'Cockpit & Post', index: 5 }
+        { name: 'HEADSET & SYNC', index: 0 },
+        { name: 'OPTIMIZATIONS & DLSS', index: 1 },
+        { name: 'TERRAIN & TEXTURES', index: 2 },
+        { name: 'ENVIRONMENT', index: 3 },
+        { name: 'LIGHTING', index: 4 },
+        { name: 'COCKPIT & POST', index: 5 }
     ]
 };
 
@@ -17785,9 +20340,9 @@ function renderMsfsCategoryTabs() {
     container.innerHTML = cats.map(cat => {
         const isSel = (cat.index === currentGraphicsSettingsPage);
         const cls = isSel
-            ? 'px-4 py-2 rounded-xl bg-sky-500 text-white transition-all cursor-pointer font-semibold shadow-md whitespace-nowrap text-xs tracking-normal'
-            : 'px-4 py-2 rounded-xl text-slate-400 hover:text-white transition-all cursor-pointer font-semibold whitespace-nowrap text-xs tracking-normal';
-        return `<button id="opt-page-pill-${cat.index}" onclick="switchGraphicsSettingsPage(${cat.index})" class="${cls}">${cat.name}</button>`;
+            ? 'px-3 py-1.5 rounded-md bg-[#00A8FF] text-[#0B0D11] transition-all cursor-pointer font-bold shadow-sm whitespace-nowrap text-xs tracking-wider uppercase shrink-0'
+            : 'px-3 py-1.5 rounded-md text-[#94A3B8] hover:text-[#F1F5F9] transition-all cursor-pointer font-bold whitespace-nowrap text-xs tracking-wider uppercase shrink-0';
+        return `<button id="opt-page-pill-${cat.index}" onclick="switchGraphicsSettingsPage(${cat.index})" class="${cls}">${cat.name.toUpperCase()}</button>`;
     }).join('');
 }
 
@@ -17796,6 +20351,10 @@ function switchGraphicsSettingsPage(pageIndex) {
     if (pageIndex < 0 || pageIndex >= cats.length) return;
     currentGraphicsSettingsPage = pageIndex;
     updateCarouselUI();
+    const pill = document.getElementById(`opt-page-pill-${pageIndex}`);
+    if (pill) {
+        try { pill.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' }); } catch (e) {}
+    }
 }
 
 function prevGraphicsSettingsPage() {
@@ -17846,9 +20405,9 @@ function updateCarouselUI() {
         const pill = document.getElementById(`opt-page-pill-${cat.index}`);
         if (pill) {
             if (cat.index === currentGraphicsSettingsPage) {
-                pill.className = 'px-4 py-2 rounded-xl bg-sky-500 text-white transition-all cursor-pointer font-semibold shadow-md whitespace-nowrap text-xs tracking-normal';
+                pill.className = 'px-3 py-1.5 rounded-md bg-[#00A8FF] text-[#0B0D11] transition-all cursor-pointer font-bold shadow-sm whitespace-nowrap text-xs tracking-wider uppercase shrink-0';
             } else {
-                pill.className = 'px-4 py-2 rounded-xl text-slate-400 hover:text-white transition-all cursor-pointer font-semibold whitespace-nowrap text-xs tracking-normal';
+                pill.className = 'px-3 py-1.5 rounded-md text-[#94A3B8] hover:text-[#F1F5F9] transition-all cursor-pointer font-bold whitespace-nowrap text-xs tracking-wider uppercase shrink-0';
             }
         }
     });
@@ -17933,8 +20492,8 @@ async function loadRigDiagnostics(profileId = null) {
                 else if (cores < 8) coreColor = 'text-amber-400';
                 else if (cores < 16) coreColor = 'text-sky-400';
                 cpuCoresEl.innerHTML = `
-                    <span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-semibold tabular-nums bg-slate-800 border border-slate-700/60 ${coreColor} uppercase">${cores} CORES</span>
-                    <span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-semibold tabular-nums bg-slate-800 border border-slate-700/60 text-slate-300 uppercase">${threads} THREADS</span>
+                    <span class="px-2 py-0.5 rounded-lg text-[10.5px] font-mono font-bold tabular-nums bg-slate-800 border border-slate-700/60 ${coreColor} uppercase whitespace-nowrap leading-none">${cores} CORES</span>
+                    <span class="px-2 py-0.5 rounded-lg text-[10.5px] font-mono font-bold tabular-nums bg-slate-800 border border-slate-700/60 text-slate-300 uppercase whitespace-nowrap leading-none">${threads} THREADS</span>
                 `;
             }
         }
@@ -17958,8 +20517,8 @@ async function loadRigDiagnostics(profileId = null) {
                     : `Driver ${det.gpu.driver_version} (Outdated - Latest: ${det.gpu.latest_driver_version || 'newer'})`;
 
                 gpuVramEl.innerHTML = `
-                    <span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-semibold tabular-nums bg-slate-800 border border-slate-700/60 ${vramColor} uppercase">${vramGb} GB VRAM</span>
-                    <span class="px-2.5 py-1 rounded-lg typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] bg-slate-800 border border-slate-700/60 ${driverColor}" title="${driverTitle}">DRIVER ${det.gpu.driver_version || 'LATEST'}</span>
+                    <span class="px-2 py-0.5 rounded-lg text-[10.5px] font-mono font-bold tabular-nums bg-slate-800 border border-slate-700/60 ${vramColor} uppercase whitespace-nowrap leading-none">${vramGb} GB VRAM</span>
+                    <span class="px-2 py-0.5 rounded-lg text-[10.5px] font-mono font-bold uppercase tracking-wider bg-slate-800 border border-slate-700/60 ${driverColor} whitespace-nowrap leading-none" title="${driverTitle}">DRIVER ${det.gpu.driver_version || 'LATEST'}</span>
                 `;
             }
         }
@@ -17977,12 +20536,12 @@ async function loadRigDiagnostics(profileId = null) {
                         const isSel = (d.id === activeId || String(d.index) === String(activeId));
                         const hz = d.refresh_rate_int || 60;
                         const bgClass = isSel ? 'pill-soft-sky text-white shadow-sm' : 'pill-soft-slate text-slate-200 hover:bg-slate-600';
-                        return `<button type="button" onclick="selectCadenceDisplay('${d.id}')" class="px-2.5 py-0.5 rounded-full typo-action-btn text-xs font-bold tabular-nums uppercase tracking-[0.02em] ${bgClass} transition-colors cursor-pointer border-0" title="${d.formatted || d.id}">${d.id} (${hz} HZ)</button>`;
+                        return `<button type="button" onclick="selectCadenceDisplay('${d.id}')" class="px-2 py-0.5 rounded-full text-[10.5px] font-bold tabular-nums uppercase tracking-wider ${bgClass} transition-colors cursor-pointer border-0 leading-none" title="${d.formatted || d.id}">${d.id} (${hz} HZ)</button>`;
                     }).join('');
                 } else {
                     displayResEl.innerHTML = `
-                        <span class="px-2.5 py-0.5 rounded-full typo-metric text-xs font-bold tabular-nums pill-soft-cyan uppercase">${det.display.refresh_rate_int || 60} HZ</span>
-                        <span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-semibold tabular-nums bg-slate-800 text-slate-300 uppercase">${det.display.width}x${det.display.height}</span>
+                        <span class="px-2 py-0.5 rounded-full text-[10.5px] font-bold tabular-nums pill-soft-cyan uppercase leading-none">${det.display.refresh_rate_int || 60} HZ</span>
+                        <span class="px-2 py-0.5 rounded-lg text-[10.5px] font-semibold tabular-nums bg-slate-800 text-slate-300 uppercase leading-none">${det.display.width}x${det.display.height}</span>
                     `;
                 }
             }
@@ -17998,7 +20557,7 @@ async function loadRigDiagnostics(profileId = null) {
                 if (vrHzEl) {
                     const hz = vrHeadset.refresh_rate_hz || 72;
                     const vrColor = hz >= 72 ? 'text-emerald-400' : 'text-amber-400';
-                    vrHzEl.innerHTML = `<span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-bold tabular-nums bg-slate-800 border border-slate-700/60 ${vrColor} uppercase">${hz} HZ ACTIVE</span>`;
+                    vrHzEl.innerHTML = `<span class="px-2 py-0.5 rounded-lg text-[10.5px] font-mono font-bold tabular-nums bg-slate-800 border border-slate-700/60 ${vrColor} uppercase whitespace-nowrap leading-none">${hz} HZ ACTIVE</span>`;
                 }
                 if (vrHeadset.refresh_rate_hz) {
                     currentVrRefreshRate = vrHeadset.refresh_rate_hz;
@@ -18006,7 +20565,7 @@ async function loadRigDiagnostics(profileId = null) {
             } else {
                 vrNameEl.textContent = 'NONE DETECTED';
                 if (vrHzEl) {
-                    vrHzEl.innerHTML = `<span class="px-2.5 py-1 rounded-lg typo-action-btn text-xs font-bold uppercase tracking-[0.02em] bg-slate-800 border border-slate-700/60 text-slate-400">DESKTOP MODE</span>`;
+                    vrHzEl.innerHTML = `<span class="px-2 py-0.5 rounded-lg text-[10.5px] font-sans font-bold uppercase tracking-wider bg-slate-800 border border-slate-700/60 text-slate-400 whitespace-nowrap leading-none">DESKTOP MODE</span>`;
                 }
             }
         }
@@ -18024,8 +20583,8 @@ async function loadRigDiagnostics(profileId = null) {
                 const isXmp = !!det.ram.is_xmp_active;
                 const xmpColor = isXmp ? 'text-emerald-400' : 'text-amber-400';
                 ramBadgesEl.innerHTML = `
-                    <span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-semibold tabular-nums bg-slate-800 border border-slate-700/60 ${speedColor} uppercase">${speedMhz} MHZ</span>
-                    <span class="px-2.5 py-1 rounded-lg typo-action-btn text-xs font-bold uppercase tracking-[0.02em] bg-slate-800 border border-slate-700/60 ${xmpColor}">${isXmp ? 'XMP ON' : 'XMP OFF'}</span>
+                    <span class="px-2 py-0.5 rounded-lg text-[10.5px] font-mono font-bold tabular-nums bg-slate-800 border border-slate-700/60 ${speedColor} uppercase whitespace-nowrap leading-none">${speedMhz} MHZ</span>
+                    <span class="px-2 py-0.5 rounded-lg text-[10.5px] font-mono font-bold uppercase tracking-wider bg-slate-800 border border-slate-700/60 ${xmpColor} whitespace-nowrap leading-none">${isXmp ? 'XMP ON' : 'XMP OFF'}</span>
                 `;
             }
         }
@@ -18047,12 +20606,12 @@ async function loadRigDiagnostics(profileId = null) {
                 : `DLSS ${dlssVer} (Outdated - Latest: ${dlssObj.latest_version || 'newer'})`;
 
             let html = `
-                <span class="px-2.5 py-1 rounded-lg typo-action-btn text-xs font-bold uppercase tracking-[0.02em] bg-slate-800 border border-slate-700/60 ${rbarColor}">R-BAR ${isRbar ? 'ON' : 'OFF'}</span>
-                <span class="px-2.5 py-1 rounded-lg typo-action-btn text-xs font-bold uppercase tracking-[0.02em] bg-slate-800 border border-slate-700/60 ${hagsColor}">HAGS ${isHags ? 'ON' : 'OFF'}</span>
-                <span class="px-2.5 py-1 rounded-lg typo-action-btn text-xs font-bold uppercase tracking-[0.02em] bg-slate-800 border border-slate-700/60 ${dlssColor}" title="${dlssTitle}">DLSS ${dlssVer}</span>
+                <span class="px-2 py-0.5 rounded-lg text-[10.5px] font-mono font-bold uppercase tracking-wider bg-slate-800 border border-slate-700/60 ${rbarColor} whitespace-nowrap leading-none">R-BAR ${isRbar ? 'ON' : 'OFF'}</span>
+                <span class="px-2 py-0.5 rounded-lg text-[10.5px] font-mono font-bold uppercase tracking-wider bg-slate-800 border border-slate-700/60 ${hagsColor} whitespace-nowrap leading-none">HAGS ${isHags ? 'ON' : 'OFF'}</span>
+                <span class="px-2 py-0.5 rounded-lg text-[10.5px] font-mono font-bold uppercase tracking-wider bg-slate-800 border border-slate-700/60 ${dlssColor} whitespace-nowrap leading-none" title="${dlssTitle}">DLSS ${dlssVer}</span>
             `;
             if (dlssObj.frame_gen_version) {
-                html += `<span class="px-2.5 py-1 rounded-lg typo-action-btn text-xs font-bold uppercase tracking-[0.02em] bg-slate-800 border border-slate-700/60 text-emerald-400" title="Frame Generation DLL active">FRAME GEN</span>`;
+                html += `<span class="px-2 py-0.5 rounded-lg text-[10.5px] font-mono font-bold uppercase tracking-wider bg-slate-800 border border-slate-700/60 text-emerald-400 whitespace-nowrap leading-none" title="Frame Generation DLL active">FRAME GEN</span>`;
             }
             miscBadgesEl.innerHTML = html;
         }
@@ -18068,11 +20627,11 @@ async function loadRigDiagnostics(profileId = null) {
             if (storageBadgeEl) {
                 storageBadgeEl.textContent = (s.tier || 'NVMe SSD').toUpperCase();
                 if (s.is_hdd) {
-                    storageBadgeEl.className = 'px-3 py-1 rounded-full typo-action-btn text-[10.5px] font-bold uppercase tracking-[0.02em] bg-slate-800 border border-slate-700/60 text-rose-400 animate-pulse';
+                    storageBadgeEl.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-[#EF4444] text-[#0F1115] shadow-sm animate-pulse whitespace-nowrap leading-none select-none';
                 } else if (s.is_nvme) {
-                    storageBadgeEl.className = 'px-3 py-1 rounded-full typo-action-btn text-[10.5px] font-bold uppercase tracking-[0.02em] bg-slate-800 border border-slate-700/60 text-emerald-400';
+                    storageBadgeEl.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-[#10B981] text-[#0F1115] shadow-sm whitespace-nowrap leading-none select-none';
                 } else {
-                    storageBadgeEl.className = 'px-3 py-1 rounded-full typo-action-btn text-[10.5px] font-bold uppercase tracking-[0.02em] bg-slate-800 border border-slate-700/60 text-sky-400';
+                    storageBadgeEl.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-[#00A8FF] text-[#0F1115] shadow-sm whitespace-nowrap leading-none select-none';
                 }
             }
             if (storageNameEl) {
@@ -18085,8 +20644,8 @@ async function loadRigDiagnostics(profileId = null) {
                 if (freeGb < 40) freeColor = 'text-rose-400';
                 else if (freeGb < 100) freeColor = 'text-amber-400';
                 storageDetailsEl.innerHTML = `
-                    <span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-semibold tabular-nums bg-slate-800 border border-slate-700/60 ${freeColor} uppercase">${freeGb} GB FREE</span>
-                    <span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-semibold tabular-nums bg-slate-800 border border-slate-700/60 text-slate-400 uppercase">${s.total_gb || 0} GB TOTAL</span>
+                    <span class="px-2 py-0.5 rounded-md text-[10.5px] font-mono font-bold tabular-nums bg-[#161920] border border-[#242B38] ${freeColor} uppercase whitespace-nowrap leading-none">${freeGb} GB FREE</span>
+                    <span class="px-2 py-0.5 rounded-md text-[10.5px] font-mono font-bold tabular-nums bg-[#161920] border border-[#242B38] text-slate-400 uppercase whitespace-nowrap leading-none">${s.total_gb || 0} GB TOTAL</span>
                 `;
             }
             if (storageWarningEl) {
@@ -18109,13 +20668,13 @@ async function loadRigDiagnostics(profileId = null) {
                 if (net.is_wifi) {
                     const sigTxt = (net.wifi_signal_pct !== null && net.wifi_signal_pct !== undefined) ? ` (${net.wifi_signal_pct}%)` : '';
                     netBadgeEl.textContent = `WI-FI${sigTxt}`;
-                    netBadgeEl.className = 'px-3 py-1 rounded-full typo-action-btn text-[10.5px] font-bold uppercase tracking-[0.02em] bg-slate-800 border border-slate-700/60 text-amber-400';
+                    netBadgeEl.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-[#F59E0B] text-[#0F1115] shadow-sm whitespace-nowrap leading-none select-none';
                 } else if (net.is_connected) {
                     netBadgeEl.textContent = 'ETHERNET';
-                    netBadgeEl.className = 'px-3 py-1 rounded-full typo-action-btn text-[10.5px] font-bold uppercase tracking-[0.02em] bg-slate-800 border border-slate-700/60 text-emerald-400';
+                    netBadgeEl.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-[#10B981] text-[#0F1115] shadow-sm whitespace-nowrap leading-none select-none';
                 } else {
                     netBadgeEl.textContent = 'OFFLINE';
-                    netBadgeEl.className = 'px-3 py-1 rounded-full typo-action-btn text-[10.5px] font-bold uppercase tracking-[0.02em] bg-slate-800 border border-slate-700/60 text-rose-400';
+                    netBadgeEl.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-[#EF4444] text-[#0F1115] shadow-sm whitespace-nowrap leading-none select-none';
                 }
             }
             if (netSpeedEl) {
@@ -18134,8 +20693,8 @@ async function loadRigDiagnostics(profileId = null) {
                     else pingColor = 'text-emerald-400';
                 }
                 netDetailsEl.innerHTML = `
-                    <span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-semibold tabular-nums bg-slate-800 border border-slate-700/60 ${pingColor} uppercase">${pingTxt} PING</span>
-                    <span class="px-2.5 py-1 rounded-lg typo-metric text-xs font-semibold tabular-nums bg-slate-800 border border-slate-700/60 text-slate-300 uppercase truncate max-w-[190px]" title="${net.adapter_name || ''}">${net.adapter_name || 'Adapter Active'}</span>
+                    <span class="px-2 py-0.5 rounded-md text-[10.5px] font-mono font-bold tabular-nums bg-[#161920] border border-[#242B38] ${pingColor} uppercase whitespace-nowrap leading-none">${pingTxt} PING</span>
+                    <span class="px-2 py-0.5 rounded-md text-[10.5px] font-mono font-bold tabular-nums bg-[#161920] border border-[#242B38] text-slate-300 uppercase whitespace-nowrap truncate max-w-[150px] leading-none" title="${net.adapter_name || ''}">${net.adapter_name || 'Adapter Active'}</span>
                 `;
             }
         }
@@ -18157,11 +20716,11 @@ async function loadRigDiagnostics(profileId = null) {
 
             if (balanceBadge) {
                 balanceBadge.textContent = b.tier;
-                balanceBadge.className = 'px-3 py-1 rounded-full typo-action-btn text-xs font-bold uppercase tracking-[0.02em] bg-slate-800 border border-slate-700/60 ' + tierColorClass;
+                balanceBadge.className = 'px-3 py-1 rounded-full text-xs font-mono font-bold uppercase tracking-wider bg-[#161920] border border-[#242B38] ' + tierColorClass;
             }
             if (pinnedTag) {
                 pinnedTag.textContent = (b.tier || 'OPTIMUM').toUpperCase();
-                pinnedTag.className = 'hidden px-3 py-1 rounded-full text-[10.5px] font-bold tracking-wider uppercase bg-slate-800 border border-slate-700/60 ' + tierColorClass;
+                pinnedTag.className = 'hidden px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold tracking-wider uppercase bg-[#10B981] text-[#0F1115] shadow-sm';
             }
             if (balanceDesc) {
                 balanceDesc.textContent = b.summary;
@@ -18223,8 +20782,8 @@ function switchMsfsGraphicsMode(mode, resetPage = false) {
     const btn2d = document.getElementById('opt-msfs-mode-btn-2d');
     const btnVr = document.getElementById('opt-msfs-mode-btn-vr');
 
-    const activeClass = 'px-4 py-1.5 rounded-xl bg-sky-500 text-white transition-all cursor-pointer shadow-md font-semibold text-xs tracking-normal';
-    const inactiveClass = 'px-4 py-1.5 rounded-xl text-slate-400 hover:text-white transition-all cursor-pointer font-semibold text-xs tracking-normal';
+    const activeClass = 'px-3.5 py-1.5 rounded-md bg-[#00A8FF] text-[#0B0D11] transition-all cursor-pointer shadow-sm font-bold text-xs tracking-wider uppercase';
+    const inactiveClass = 'px-3.5 py-1.5 rounded-md text-[#94A3B8] hover:text-[#F1F5F9] transition-all cursor-pointer font-bold text-xs tracking-wider uppercase';
 
     if (btnCommon) btnCommon.className = (mode === 'COMMON') ? activeClass : inactiveClass;
     if (btn2d) btn2d.className = (mode === '2D') ? activeClass : inactiveClass;
@@ -18477,28 +21036,27 @@ function getSettingRatingBadgeHtml(tag, rating, isCompact = false, isHeader = fa
     const cursorClass = title ? 'cursor-help' : '';
 
     if (cleanTag === 'SWEET SPOT') {
+        const star = `<span class="text-[#0B0D11] text-[10px] leading-none select-none">★</span>`;
         if (isHeader) {
-            return `<span ${idAttr} ${titleAttr} class="px-2.5 py-0.5 rounded typo-action-btn text-xs font-bold uppercase tracking-[0.02em] shrink-0 shadow-sm inline-flex items-center gap-1 bg-slate-950/90 border border-[#2ce586]/80 text-[#2ce586] ${cursorClass}"><span class="text-[#fbbf24] drop-shadow-[0_0_5px_rgba(251,191,36,0.85)] leading-none select-none">★</span><span class="tracking-wider">SWEET SPOT</span></span>`;
+            return `<span ${idAttr} ${titleAttr} class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shrink-0 shadow-sm inline-flex items-center gap-1 bg-[#F59E0B] text-[#0B0D11] ${cursorClass} whitespace-nowrap leading-none">${star}<span>SWEET SPOT</span></span>`;
         } else {
-            return `<span ${idAttr} ${titleAttr} class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide inline-flex items-center gap-1 shrink-0 shadow-sm bg-slate-950/95 border border-[#2ce586]/70 text-[#2ce586] ${cursorClass}"><span class="text-[#fbbf24] drop-shadow-[0_0_4px_rgba(251,191,36,0.85)] text-[9px] leading-none select-none">★</span><span class="tracking-wider">SWEET SPOT</span></span>`;
+            return `<span ${idAttr} ${titleAttr} class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide inline-flex items-center gap-1 shrink-0 shadow-sm bg-[#F59E0B] text-[#0B0D11] ${cursorClass} whitespace-nowrap leading-none">${star}<span>SWEET SPOT</span></span>`;
         }
     }
 
-    let bgClass = 'bg-emerald-600 text-white font-bold';
+    let bgClass = 'bg-[#10B981] text-white font-bold';
     if (cleanTag === 'OFF') {
-        bgClass = 'bg-slate-700 text-slate-300 font-bold';
-    } else if (cleanTag === 'ACCEPTABLE') {
-        bgClass = 'bg-amber-600 text-white font-bold';
-    } else if (cleanTag === 'SUBOPTIMAL') {
-        bgClass = 'bg-orange-600 text-white font-bold';
+        bgClass = 'bg-[#EF4444] text-white font-bold';
+    } else if (cleanTag === 'ACCEPTABLE' || cleanTag === 'SUBOPTIMAL') {
+        bgClass = 'bg-[#F59E0B] text-[#0B0D11] font-bold';
     } else if (cleanTag === 'HAZARD') {
-        bgClass = 'bg-rose-600 text-white font-bold';
+        bgClass = 'bg-[#EF4444] text-white font-bold';
     }
 
     if (isHeader) {
-        return `<span ${idAttr} ${titleAttr} class="px-2.5 py-0.5 rounded typo-action-btn text-xs font-semibold uppercase tracking-[0.02em] shrink-0 shadow-sm ${bgClass} ${cursorClass}">${cleanTag}</span>`;
+        return `<span ${idAttr} ${titleAttr} class="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shrink-0 shadow-sm ${bgClass} ${cursorClass} inline-flex items-center justify-center whitespace-nowrap leading-none">${cleanTag}</span>`;
     } else {
-        return `<span ${idAttr} ${titleAttr} class="text-[9px] font-bold px-1.5 py-0.5 rounded tracking-wide uppercase shrink-0 shadow-sm ${bgClass} ${cursorClass}">${cleanTag}</span>`;
+        return `<span ${idAttr} ${titleAttr} class="text-[9px] font-bold px-1.5 py-0.5 rounded tracking-wide uppercase shrink-0 shadow-sm ${bgClass} ${cursorClass} inline-flex items-center justify-center whitespace-nowrap leading-none">${cleanTag}</span>`;
     }
 }
 
@@ -18719,17 +21277,17 @@ function setPerformanceMetricMode(mode) {
     
     if (mode === 'mainthread') {
         if (cpuBtn) {
-            cpuBtn.className = "px-3 py-1 rounded-lg transition-all cursor-pointer font-bold uppercase tracking-wider text-[11px] bg-sky-500 text-white shadow-sm";
+            cpuBtn.className = "px-3 py-1 rounded-md transition-all cursor-pointer font-bold uppercase tracking-wider text-[11px] bg-[#00A8FF] text-[#0F1115] shadow-sm";
         }
         if (vramBtn) {
-            vramBtn.className = "px-3 py-1 rounded-lg transition-all cursor-pointer font-bold uppercase tracking-wider text-[11px] bg-transparent text-slate-400 hover:text-white";
+            vramBtn.className = "px-3 py-1 rounded-md transition-all cursor-pointer font-bold uppercase tracking-wider text-[11px] bg-transparent text-slate-400 hover:text-white";
         }
     } else {
         if (cpuBtn) {
-            cpuBtn.className = "px-3 py-1 rounded-lg transition-all cursor-pointer font-bold uppercase tracking-wider text-[11px] bg-transparent text-slate-400 hover:text-white";
+            cpuBtn.className = "px-3 py-1 rounded-md transition-all cursor-pointer font-bold uppercase tracking-wider text-[11px] bg-transparent text-slate-400 hover:text-white";
         }
         if (vramBtn) {
-            vramBtn.className = "px-3 py-1 rounded-lg transition-all cursor-pointer font-bold uppercase tracking-wider text-[11px] bg-sky-500 text-white shadow-sm";
+            vramBtn.className = "px-3 py-1 rounded-md transition-all cursor-pointer font-bold uppercase tracking-wider text-[11px] bg-[#00A8FF] text-[#0F1115] shadow-sm";
         }
     }
     
@@ -19436,33 +21994,36 @@ function updatePerfCard(section, labelText, valueText, barPct, color, badgeText,
     const targetContainerEl = document.getElementById(`opt-perf-target-container-${section}`);
 
     const colorHexMap = {
-        'emerald': '#10b981',
-        'amber': '#f59e0b',
-        'orange': '#f97316',
-        'rose': '#f43f5e',
-        'sky': '#0ea5e9'
+        'emerald': '#10B981',
+        'amber': '#F59E0B',
+        'orange': '#F59E0B',
+        'rose': '#EF4444',
+        'sky': '#00A8FF'
     };
-    const hex = colorHexMap[color] || '#10b981';
+    const hex = colorHexMap[color] || '#10B981';
 
     if (labelEl) labelEl.textContent = labelText;
     if (valEl) {
         valEl.textContent = valueText;
-        valEl.style.color = (badgeText === 'SWEET SPOT') ? '#2ce586' : hex;
-        valEl.className = 'typo-metric font-semibold text-xs tabular-nums';
+        valEl.style.color = '#F1F5F9';
+        valEl.className = 'typo-metric font-bold text-xs tabular-nums text-[#F1F5F9]';
     }
     if (barEl) {
         barEl.style.width = `${Math.min(100, Math.max(0, barPct))}%`;
-        barEl.style.backgroundColor = (badgeText === 'SWEET SPOT') ? '#2ce586' : hex;
+        barEl.style.backgroundColor = (badgeText === 'SWEET SPOT' || badgeText === 'BALANCED') ? '#F59E0B' : hex;
     }
     if (badgeEl) {
         if (badgeText === 'SWEET SPOT') {
-            badgeEl.innerHTML = `<span class="text-[#fbbf24] drop-shadow-[0_0_4px_rgba(251,191,36,0.85)] mr-1 select-none">★</span><span class="tracking-wider">SWEET SPOT</span>`;
-            badgeEl.className = 'px-2 py-0.5 rounded typo-action-btn text-[10px] font-bold uppercase tracking-[0.02em] inline-flex items-center bg-slate-950/90 border border-[#2ce586]/80 text-[#2ce586] shadow-sm';
+            badgeEl.innerHTML = `<span class="text-[#0B0D11] text-[10px] leading-none select-none">★</span><span>SWEET SPOT</span>`;
+            badgeEl.className = 'px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shrink-0 shadow-sm inline-flex items-center gap-1 bg-[#F59E0B] text-[#0B0D11] whitespace-nowrap leading-none select-none';
             badgeEl.style.backgroundColor = '';
         } else {
             badgeEl.textContent = badgeText;
-            badgeEl.style.backgroundColor = hex;
-            badgeEl.className = 'px-2 py-0.5 rounded typo-action-btn text-[10px] font-semibold uppercase tracking-[0.02em] text-white shadow-sm';
+            const isAmber = (badgeText === 'BALANCED' || badgeText === 'ACCEPTABLE' || badgeText === 'SUBOPTIMAL');
+            const bgHex = isAmber ? '#F59E0B' : (badgeText === 'HAZARD' ? '#EF4444' : hex);
+            badgeEl.style.backgroundColor = bgHex;
+            const textCls = (badgeText === 'OPTIMUM' || badgeText === 'HAZARD') ? 'text-white' : 'text-[#0B0D11]';
+            badgeEl.className = `px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider shrink-0 shadow-sm ${textCls} whitespace-nowrap leading-none select-none inline-flex items-center justify-center`;
         }
     }
     if (subEl) {
@@ -19544,7 +22105,7 @@ function renderMsfsSettingsMatrix() {
 
         // Headset Software Scale badge (e.g. [PIMAX PLAY: 0.80]) - Solid color, no glass effect, white typography
         const headsetSwBadge = (item.key === 'primary_scaling_vr' && item.software_name && item.software_render_scale)
-            ? `<span class="px-2.5 py-0.5 rounded typo-action-btn text-xs font-semibold bg-indigo-600 text-white uppercase tracking-[0.02em] shrink-0 shadow-sm" title="Detected resolution in ${item.software_name}: ${item.software_render_scale} (${item.software_render_scale_pct}%)">${item.software_name}: ${item.software_render_scale.toFixed(2)}</span>`
+            ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-600 text-white uppercase tracking-wider shrink-0 shadow-sm inline-flex items-center justify-center whitespace-nowrap leading-none" title="Detected resolution in ${item.software_name}: ${item.software_render_scale} (${item.software_render_scale_pct}%)">${item.software_name}: ${item.software_render_scale.toFixed(2)}</span>`
             : '';
 
         // AutoFPS & Smart LOD independent axis regulation check
@@ -19563,7 +22124,7 @@ function renderMsfsSettingsMatrix() {
         let autoFpsBadge = '';
         if (isLodAxis) {
             if (isExternalAutoFps) {
-                autoFpsBadge = '<span class="px-2 py-0.5 rounded typo-action-btn text-xs font-semibold bg-cyan-900 text-cyan-300 uppercase tracking-[0.02em] shrink-0" title="Dynamically regulated by external MSFS_AutoFPS">AUTOFPS</span>';
+                autoFpsBadge = '<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-900 text-cyan-300 uppercase tracking-wider shrink-0 whitespace-nowrap leading-none" title="Dynamically regulated by external MSFS_AutoFPS">AUTOFPS</span>';
             }
         }
 
@@ -19604,25 +22165,25 @@ function renderMsfsSettingsMatrix() {
             const targetPresets = Array.from(new Set([fps3x, 30, fps2x, 45])).filter(f => f >= 20 && f <= 60).sort((a, b) => a - b);
 
             const statusBadge = isOfxrRunning
-                ? `<span class="px-2 py-0.5 rounded typo-action-btn text-[10px] font-semibold bg-emerald-500/20 text-emerald-400 border-0 uppercase tracking-[0.02em] shrink-0" title="OFXRBridgeTray.exe detected (PID: ${ofxrPid})">RUNNING</span>`
-                : `<span class="px-2 py-0.5 rounded typo-action-btn text-[10px] font-semibold bg-slate-800 text-slate-400 border-0 uppercase tracking-[0.02em] shrink-0" title="OFXRBridgeTray.exe not detected">NOT DETECTED</span>`;
+                ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-[#10B981] text-white shadow-sm border-0 uppercase tracking-wider shrink-0 whitespace-nowrap leading-none" title="OFXRBridgeTray.exe detected (PID: ${ofxrPid})">RUNNING</span>`
+                : `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-[#0E121A] text-[#94A3B8] border border-[#2D3A54] uppercase tracking-wider shrink-0 whitespace-nowrap leading-none" title="OFXRBridgeTray.exe not detected">NOT DETECTED</span>`;
 
             inputHtml = `
                 <div class="space-y-2.5 pt-0.5 ${!isOfxrRunning ? 'opacity-40 pointer-events-none' : ''}">
-                    <!-- Mode Selector Pills: Flat solid, zero liseres -->
-                    <div class="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-slate-950">
-                        <button type="button" onclick="setOfxrModeCard('OFF')" class="py-1 px-2 rounded-lg text-xs font-semibold uppercase transition-colors cursor-pointer border-0 ${ofxrMode === 'OFF' ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-slate-200'}">OFF</button>
-                        <button type="button" onclick="setOfxrModeCard('2X')" class="py-1 px-2 rounded-lg text-xs font-semibold uppercase transition-colors cursor-pointer border-0 ${ofxrMode === '2X' ? 'bg-cyan-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-slate-200'}">2X (${fps2x})</button>
+                    <!-- Mode Selector Pills -->
+                    <div class="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-[#0E121A] border border-[#2D3A54]">
+                        <button type="button" onclick="setOfxrModeCard('OFF')" class="py-1 px-2 rounded-lg text-xs font-semibold uppercase transition-colors cursor-pointer border-0 ${ofxrMode === 'OFF' ? 'bg-[#181E2B] text-[#F1F5F9] font-bold' : 'text-[#94A3B8] hover:text-[#F1F5F9]'}">OFF</button>
+                        <button type="button" onclick="setOfxrModeCard('2X')" class="py-1 px-2 rounded-lg text-xs font-semibold uppercase transition-colors cursor-pointer border-0 ${ofxrMode === '2X' ? 'bg-[#00A8FF] text-[#0B0D11] font-bold' : 'text-[#94A3B8] hover:text-[#F1F5F9]'}">2X (${fps2x})</button>
                         ${is3xDisabled ? `
-                            <button type="button" disabled class="py-1 px-2 rounded-lg text-xs font-semibold uppercase border-0 opacity-30 cursor-not-allowed select-none bg-slate-900 text-slate-600" title="Mode 3X indisponible à ${vrHz} Hz (cadence de base ${fps3x} FPS < 30 FPS incompatible VR)">3X (${fps3x})</button>
+                            <button type="button" disabled class="py-1 px-2 rounded-lg text-xs font-semibold uppercase border-0 opacity-30 cursor-not-allowed select-none bg-[#0E121A] text-[#64748B]" title="Mode 3X indisponible à ${vrHz} Hz (cadence de base ${fps3x} FPS < 30 FPS incompatible VR)">3X (${fps3x})</button>
                         ` : `
-                            <button type="button" onclick="setOfxrModeCard('3X')" class="py-1 px-2 rounded-lg text-xs font-semibold uppercase transition-colors cursor-pointer border-0 ${ofxrMode === '3X' ? 'bg-cyan-500 text-slate-950 font-bold' : 'text-slate-400 hover:text-slate-200'}">3X (${fps3x})</button>
+                            <button type="button" onclick="setOfxrModeCard('3X')" class="py-1 px-2 rounded-lg text-xs font-semibold uppercase transition-colors cursor-pointer border-0 ${ofxrMode === '3X' ? 'bg-[#00A8FF] text-[#0B0D11] font-bold' : 'text-[#94A3B8] hover:text-[#F1F5F9]'}">3X (${fps3x})</button>
                         `}
                     </div>
 
-                    <!-- Target FPS & Presets Row: Flat solid, zero liseres -->
+                    <!-- Target FPS & Presets Row -->
                     <div class="flex items-center justify-between gap-2 px-1">
-                        <span class="text-[11px] text-slate-400 uppercase tracking-wider font-semibold">Base Target:</span>
+                        <span class="text-[11px] text-[#94A3B8] uppercase tracking-wider font-semibold">Base Target:</span>
                         <div class="flex items-center gap-1.5">
                             ${targetPresets.map(fps => {
                                 const isBelow30 = (fps < 30);
@@ -19632,51 +22193,51 @@ function renderMsfsSettingsMatrix() {
 
                                 if (isDisabled) {
                                     const disabledTitle = isBelow30 
-                                        ? `Désactivé : ${fps} FPS < 30 FPS (incompatible VR)` 
+                                        ? `Disabled: ${fps} FPS < 30 FPS (incompatible with VR)` 
                                         : (ofxrMode === 'OFF' 
-                                            ? 'OFXR désactivé' 
-                                            : `Désactivé : non synchronisé avec le mode ${ofxrMode} (${ofxrMode === '2X' ? fps2x : fps3x} FPS requis à ${vrHz} Hz)`);
-                                    return `<button type="button" disabled class="px-2 py-0.5 rounded text-[11px] font-semibold opacity-25 cursor-not-allowed select-none bg-slate-900 text-slate-600 border-0" title="${disabledTitle}">${fps}</button>`;
+                                            ? 'OFXR disabled' 
+                                            : `Disabled: not synchronized with ${ofxrMode} mode (${ofxrMode === '2X' ? fps2x : fps3x} FPS required at ${vrHz} Hz)`);
+                                    return `<button type="button" disabled class="px-2 py-0.5 rounded text-[11px] font-semibold opacity-25 cursor-not-allowed select-none bg-[#0E121A] text-[#64748B] border-0" title="${disabledTitle}">${fps}</button>`;
                                 } else {
-                                    return `<button type="button" onclick="setOfxrTargetFpsCard(${fps})" class="px-2 py-0.5 rounded text-[11px] font-semibold cursor-pointer transition-colors border-0 ${isSelected ? 'bg-cyan-500 text-slate-950 font-bold' : 'bg-slate-800 text-slate-300 hover:text-white'}" title="Cadence synchronisée ${fps} FPS">${fps}</button>`;
+                                    return `<button type="button" onclick="setOfxrTargetFpsCard(${fps})" class="px-2 py-0.5 rounded text-[11px] font-semibold cursor-pointer transition-colors border border-[#253046] ${isSelected ? 'bg-[#00A8FF] border-[#00A8FF] text-[#0B0D11] font-bold' : 'bg-[#181E2B] text-[#94A3B8] hover:text-[#F1F5F9]'}" title="Synchronized cadence ${fps} FPS">${fps}</button>`;
                                 }
                             }).join('')}
-                            <span class="text-[11px] text-slate-400 font-mono">FPS</span>
+                            <span class="text-[11px] text-[#94A3B8] font-sans">FPS</span>
                         </div>
                     </div>
 
-                    <!-- Contextual Notice: Flat solid, zero liseres, no icons, concise, yellow typo for warning -->
+                    <!-- Contextual Notice -->
                     ${is3xDisabled ? `
-                        <div class="p-2.5 rounded-lg bg-slate-950 text-xs text-amber-400 select-none">
-                            Mode 2X (${fps2x} FPS) optimal pour ${vrHz} Hz. Mode 3X grisé (cadence de base ${fps3x} FPS < 30 FPS incompatible VR).
+                        <div class="p-2.5 rounded-lg bg-[#0E121A] border border-[#F59E0B]/40 text-xs text-[#F59E0B] select-none font-sans">
+                            2X Mode (${fps2x} FPS) optimal for ${vrHz} Hz. 3X Mode disabled (base cadence ${fps3x} FPS < 30 FPS incompatible with VR).
                         </div>
                     ` : (ofxrMode === '2X' ? `
-                        <div class="p-2.5 rounded-lg bg-slate-950 text-xs text-emerald-400 select-none">
-                            Mode 2X actif (${fps2x} FPS base -> ${vrHz} FPS fluide).
+                        <div class="p-2.5 rounded-lg bg-[#0E121A] border border-[#10B981]/40 text-xs text-[#10B981] select-none font-sans">
+                            Active 2X Mode (${fps2x} FPS base -> ${vrHz} FPS smooth).
                         </div>
                     ` : (ofxrMode === '3X' ? `
-                        <div class="p-2.5 rounded-lg bg-slate-950 text-xs text-emerald-400 select-none">
-                            Mode 3X actif (${fps3x} FPS base -> ${vrHz} FPS fluide).
+                        <div class="p-2.5 rounded-lg bg-[#0E121A] border border-[#10B981]/40 text-xs text-[#10B981] select-none font-sans">
+                            Active 3X Mode (${fps3x} FPS base -> ${vrHz} FPS smooth).
                         </div>
                     ` : ''))}
 
                     <!-- Smart LOD Sync Toggle -->
-                    <div class="flex items-center justify-between px-1 pt-1.5 border-t border-slate-800/60">
+                    <div class="flex items-center justify-between px-1 pt-1.5 border-t border-[#1E2638]">
                         ${isExternalAutoFps ? `
-                            <label class="flex items-center gap-2 select-none text-[11px] text-slate-500 opacity-50 cursor-not-allowed">
-                                <input type="checkbox" id="ofxr-sync-smart-lod-chk" disabled class="rounded bg-slate-950 border-slate-800 text-slate-700 opacity-40 cursor-not-allowed">
-                                <span>Sync Smart LOD Target <span class="text-amber-400 text-[10px]">(Verrouillé : AutoFPS actif)</span></span>
+                            <label class="flex items-center gap-2 select-none text-[11px] text-[#64748B] opacity-50 cursor-not-allowed font-sans">
+                                <input type="checkbox" id="ofxr-sync-smart-lod-chk" disabled class="rounded bg-[#0E121A] border-[#2D3A54] text-[#64748B] opacity-40 cursor-not-allowed">
+                                <span>Sync Smart LOD Target <span class="text-[#F59E0B] text-[10px] font-sans">(Locked: AutoFPS active)</span></span>
                             </label>
                         ` : `
-                            <label class="flex items-center gap-2 cursor-pointer select-none text-[11px] text-slate-300">
-                                <input type="checkbox" id="ofxr-sync-smart-lod-chk" ${ofxrSync ? 'checked' : ''} onchange="toggleOfxrSyncCard(this.checked)" class="rounded bg-slate-950 border-slate-700 text-cyan-500 focus:ring-0">
+                            <label class="flex items-center gap-2 cursor-pointer select-none text-[11px] text-[#94A3B8]">
+                                <input type="checkbox" id="ofxr-sync-smart-lod-chk" ${ofxrSync ? 'checked' : ''} onchange="toggleOfxrSyncCard(this.checked)" class="rounded bg-[#0E121A] border-[#2D3A54] text-[#00A8FF] focus:ring-0">
                                 <span>Sync Smart LOD Target</span>
                             </label>
                         `}
                         ${statusBadge}
                     </div>
                 </div>
-                ${!isOfxrRunning ? '<div class="text-[10px] text-slate-500 font-mono pt-0.5 text-center select-none">OFXRBridgeTray.exe not detected</div>' : ''}
+                ${!isOfxrRunning ? '<div class="text-[10px] text-[#64748B] font-mono pt-0.5 text-center select-none">OFXRBridgeTray.exe not detected</div>' : ''}
             `;
         } else if (isLodAxis && isExternalAutoFps) {
             inputHtml = `
@@ -19684,7 +22245,7 @@ function renderMsfsSettingsMatrix() {
                     <input type="text"
                            value="HANDLED BY AUTOFPS"
                            disabled
-                           class="w-full bg-slate-950/80 border border-slate-800 rounded-xl px-3 py-2 typo-input-val text-xs text-cyan-400 font-medium cursor-not-allowed opacity-80"
+                           class="w-full bg-[#0E121A] border border-[#2D3A54] rounded-xl px-3 py-2 typo-input-val text-xs text-[#00A8FF] font-medium cursor-not-allowed opacity-80"
                            title="This setting is dynamically regulated in real-time by AutoFPS according to your target frame rate.">
                 </div>
             `;
@@ -19735,14 +22296,14 @@ function renderMsfsSettingsMatrix() {
                     const badgeHtml = getSettingRatingBadgeHtml(optTag, optRating, true, false);
 
                     return `
-                        <div class="px-3 py-1.5 hover:bg-slate-800 ${isCur ? 'bg-slate-800/90 text-white font-semibold' : 'text-slate-200 font-medium'} cursor-pointer transition-colors flex items-center justify-between typo-input-val text-xs tabular-nums select-none"
+                        <div class="px-3 py-1.5 hover:bg-[#1E2638] ${isCur ? 'bg-[#1E2638] text-[#F1F5F9] font-semibold' : 'text-[#94A3B8] font-medium'} cursor-pointer transition-colors flex items-center justify-between typo-input-val text-xs tabular-nums select-none"
                              onmouseenter="onComboboxOptionHover('${item.key}', '${optEscaped}')"
                              onmouseleave="onComboboxOptionLeave('${item.key}')"
                              onmousedown="selectComboboxPreset('${item.key}', '${optEscaped}', ${item.min_val ?? 0}, ${item.max_val ?? 400})">
-                            <span class="tabular-nums ${isCur ? 'font-semibold text-white' : 'text-slate-200'}">${opt}</span>
+                            <span class="tabular-nums ${isCur ? 'font-semibold text-[#F1F5F9]' : 'text-[#94A3B8]'}">${opt}</span>
                             <div class="flex items-center gap-1.5 shrink-0">
                                 ${badgeHtml}
-                                ${isCur ? '<span class="text-[9px] font-semibold bg-slate-700 text-white px-1.5 py-0.5 rounded typo-action-btn uppercase shadow-sm">CURRENT</span>' : ''}
+                                ${isCur ? '<span class="text-[9px] font-bold bg-[#0E121A] text-[#F1F5F9] border border-[#2D3A54] px-1.5 py-0.5 rounded uppercase shadow-sm whitespace-nowrap leading-none tracking-wider">CURRENT</span>' : ''}
                             </div>
                         </div>
                     `;
@@ -19751,12 +22312,12 @@ function renderMsfsSettingsMatrix() {
 
             const defaultComboPreviewHtml = `
                 ${getSettingRatingBadgeHtml(currentComboTag, currentComboRating, true, false)}
-                <span class="text-slate-300 text-[10.5px] leading-tight" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${currentComboReason || 'Hover over a preset to preview its impact...'}</span>
+                <span class="text-[#94A3B8] text-[10.5px] leading-tight" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${currentComboReason || 'Hover over a preset to preview its impact...'}</span>
             `;
 
             if (item.key === 'max_frame_rate') {
                 const isFpsActive = !(item.is_active === false || item.raw_value === '0' || item.value === '0' || String(item.value).toUpperCase() === 'OFF' || String(item.value).toLowerCase().includes('unlocked'));
-                const fpsInputColor = isFpsActive ? 'text-emerald-400' : 'text-slate-500 opacity-60';
+                const fpsInputColor = isFpsActive ? 'text-[#10B981]' : 'text-[#64748B] opacity-60';
                 inputHtml = `
                     <div class="flex items-center gap-2 w-full pt-0.5">
                         <div class="relative flex-1" id="opt-combo-wrapper-${item.key}">
@@ -19767,10 +22328,10 @@ function renderMsfsSettingsMatrix() {
                                    onfocus="this.select();"
                                    onkeydown="if(event.key==='Enter'){this.blur();}"
                                    onchange="onMsfsManualSettingSubmitted('${item.key}', this.value, ${item.min_val ?? 0}, ${item.max_val ?? 400})"
-                                   class="w-full bg-slate-950 border border-slate-700/80 focus:border-slate-400 focus:ring-1 focus:ring-slate-400/25 focus:bg-slate-900 rounded-xl pl-3 pr-10 py-2 typo-input-val text-xs ${fpsInputColor} font-semibold tabular-nums focus:outline-none transition-colors"
+                                   class="w-full bg-[#0E121A] border border-[#2D3A54] hover:border-[#3E495D] focus:border-[#00A8FF] rounded-xl pl-3 pr-10 py-2 typo-input-val text-xs ${fpsInputColor} font-semibold tabular-nums focus:outline-none transition-colors"
                                    placeholder="Enter FPS (e.g. 72, 60 or OFF)"
                                    title="${isFpsActive ? 'Target frame rate active - Enter numeric value or select from dropdown' : 'Frame limiter is disabled (OFF) - Click switch to enable'}">
-                            <div class="cursor-pointer absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-white"
+                            <div class="cursor-pointer absolute inset-y-0 right-0 flex items-center pr-3 text-[#94A3B8] hover:text-[#F1F5F9]"
                                  onclick="toggleComboboxDropdown('${item.key}', event)">
                                 <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
                                     <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
@@ -19779,21 +22340,21 @@ function renderMsfsSettingsMatrix() {
                             <div id="opt-combo-menu-${item.key}"
                                  onwheel="event.stopPropagation();"
                                  style="overscroll-behavior: contain;"
-                                 class="hidden fixed z-[99999] max-h-80 overflow-hidden bg-slate-900 border border-slate-700 rounded-xl shadow-2xl flex flex-col">
-                                <div class="py-1 divide-y divide-slate-800 overflow-y-auto max-h-56 custom-scrollbar flex-1">
+                                 class="hidden fixed z-[99999] max-h-80 overflow-hidden bg-[#181E2B] border border-[#253046] rounded-xl shadow-2xl flex flex-col">
+                                <div class="py-1 divide-y divide-[#1E2638] overflow-y-auto max-h-56 custom-scrollbar flex-1">
                                     ${presetListItems}
                                 </div>
                                 <div id="opt-combo-preview-${item.key}"
-                                 class="px-3 py-2 text-[10.5px] leading-tight bg-slate-950/95 border-t border-slate-800 text-slate-300 min-h-[38px] flex items-center gap-1.5 shrink-0 rounded-b-xl">
+                                 class="px-3 py-2 text-[10.5px] leading-tight bg-[#0E121A] border-t border-[#1E2638] text-[#94A3B8] min-h-[38px] flex items-center gap-1.5 shrink-0 rounded-b-xl">
                                     ${defaultComboPreviewHtml}
                                 </div>
                             </div>
                         </div>
                         <div id="opt-switch-container-${item.key}"
                              onclick="toggleMaxFrameRateSwitch('${item.key}')" 
-                             class="relative inline-flex items-center shrink-0 cursor-pointer p-1 rounded-xl hover:bg-slate-800 transition-colors"
+                             class="relative inline-flex items-center shrink-0 cursor-pointer p-1 rounded-xl hover:bg-[#1E2638] transition-colors"
                              title="${isFpsActive ? 'Click to disable frame limiter (OFF)' : 'Click to enable frame limiter'}">
-                            <div id="opt-switch-track-${item.key}" class="w-10 h-5 rounded-full transition-colors duration-200 ease-in-out p-0.5 ${isFpsActive ? 'bg-emerald-600 shadow-sm' : 'bg-slate-700'}">
+                            <div id="opt-switch-track-${item.key}" class="w-10 h-5 rounded-full transition-colors duration-200 ease-in-out p-0.5 ${isFpsActive ? 'bg-[#10B981] shadow-sm' : 'bg-[#1E2638]'}">
                                 <div id="opt-switch-thumb-${item.key}" class="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out ${isFpsActive ? 'translate-x-5' : 'translate-x-0'}"></div>
                             </div>
                         </div>
@@ -19809,10 +22370,10 @@ function renderMsfsSettingsMatrix() {
                                onfocus="this.select();"
                                onkeydown="if(event.key==='Enter'){this.blur();}"
                                onchange="onMsfsManualSettingSubmitted('${item.key}', this.value, ${item.min_val ?? 0}, ${item.max_val ?? 400})"
-                               class="w-full bg-slate-950 border border-slate-700/80 focus:border-slate-400 focus:ring-1 focus:ring-slate-400/25 focus:bg-slate-900 rounded-xl pl-3 pr-10 py-2 typo-input-val text-xs ${valColorClass} font-semibold tabular-nums focus:outline-none transition-colors"
+                               class="w-full bg-[#0E121A] border border-[#2D3A54] hover:border-[#3E495D] focus:border-[#00A8FF] rounded-xl pl-3 pr-10 py-2 typo-input-val text-xs ${valColorClass} font-semibold tabular-nums focus:outline-none transition-colors"
                                placeholder="Select or enter value..."
                                title="Select a preset from dropdown or enter custom value">
-                        <div class="cursor-pointer absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-white"
+                        <div class="cursor-pointer absolute inset-y-0 right-0 flex items-center pr-3 text-[#94A3B8] hover:text-[#F1F5F9]"
                              onclick="toggleComboboxDropdown('${item.key}', event)">
                             <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
                                 <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
@@ -19821,12 +22382,12 @@ function renderMsfsSettingsMatrix() {
                         <div id="opt-combo-menu-${item.key}"
                              onwheel="event.stopPropagation();"
                              style="overscroll-behavior: contain;"
-                             class="hidden fixed z-[99999] max-h-80 overflow-hidden bg-slate-900 border border-slate-700 rounded-xl shadow-2xl flex flex-col">
-                            <div class="py-1 divide-y divide-slate-800 overflow-y-auto max-h-56 custom-scrollbar flex-1">
+                             class="hidden fixed z-[99999] max-h-80 overflow-hidden bg-[#181E2B] border border-[#253046] rounded-xl shadow-2xl flex flex-col">
+                            <div class="py-1 divide-y divide-[#1E2638] overflow-y-auto max-h-56 custom-scrollbar flex-1">
                                 ${presetListItems}
                             </div>
                             <div id="opt-combo-preview-${item.key}"
-                                 class="px-3 py-2 text-[10.5px] leading-tight bg-slate-950/95 border-t border-slate-800 text-slate-300 min-h-[38px] flex items-center gap-1.5 shrink-0 rounded-b-xl">
+                                 class="px-3 py-2 text-[10.5px] leading-tight bg-[#0E121A] border-t border-[#1E2638] text-[#94A3B8] min-h-[38px] flex items-center gap-1.5 shrink-0 rounded-b-xl">
                                 ${defaultComboPreviewHtml}
                             </div>
                         </div>
@@ -19851,11 +22412,11 @@ function renderMsfsSettingsMatrix() {
                     <div class="relative w-full pt-0.5">
                         <div id="opt-switch-container-${item.key}"
                              onclick="toggleBinaryMsfsSetting('${item.key}')"
-                             class="w-full bg-slate-950 border border-slate-700/80 hover:border-slate-600 rounded-xl px-3 py-2 cursor-pointer flex items-center justify-between select-none transition-colors group"
+                             class="w-full bg-[#0E121A] border border-[#2D3A54] hover:border-[#3E495D] rounded-xl px-3 py-2 cursor-pointer flex items-center justify-between select-none transition-colors group"
                              title="${isCurOn ? 'Click to turn OFF' : 'Click to turn ON'}">
-                            <span id="opt-switch-label-${item.key}" class="typo-input-val text-xs font-semibold ${isCurOn ? 'text-emerald-400' : 'text-slate-400'}">${isCurOn ? 'ON' : 'OFF'}</span>
+                            <span id="opt-switch-label-${item.key}" class="typo-input-val text-xs font-semibold ${isCurOn ? 'text-[#10B981]' : 'text-[#94A3B8]'}">${isCurOn ? 'ON' : 'OFF'}</span>
                             <div class="relative inline-flex items-center shrink-0">
-                                <div id="opt-switch-track-${item.key}" class="w-10 h-5 rounded-full transition-colors duration-200 ease-in-out p-0.5 ${isCurOn ? 'bg-emerald-600 shadow-sm' : 'bg-slate-700'}">
+                                <div id="opt-switch-track-${item.key}" class="w-10 h-5 rounded-full transition-colors duration-200 ease-in-out p-0.5 ${isCurOn ? 'bg-[#10B981] shadow-sm' : 'bg-[#1E2638]'}">
                                     <div id="opt-switch-thumb-${item.key}" class="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out ${isCurOn ? 'translate-x-5' : 'translate-x-0'}"></div>
                                 </div>
                             </div>
@@ -19922,14 +22483,14 @@ function renderMsfsSettingsMatrix() {
                     const badgeHtml = getSettingRatingBadgeHtml(optTag, optRating, true, false);
 
                     return `
-                        <div class="px-3 py-2 hover:bg-slate-800 ${isSelected ? 'bg-slate-800/80' : ''} cursor-pointer transition-colors flex items-center justify-between typo-input-val text-xs gap-2 select-none"
+                        <div class="px-3 py-2 hover:bg-[#1E2638] ${isSelected ? 'bg-[#1E2638]' : ''} cursor-pointer transition-colors flex items-center justify-between typo-input-val text-xs gap-2 select-none"
                              onmouseenter="onCustomOptionHover('${item.key}', '${optEscaped}')"
                              onmouseleave="onCustomOptionLeave('${item.key}')"
                              onmousedown="selectCustomOption('${item.key}', '${optEscaped}')">
-                            <span class="${isSelected ? 'text-white font-semibold' : 'text-slate-200 group-hover:text-white font-medium'} truncate">${opt}</span>
+                            <span class="${isSelected ? 'text-[#F1F5F9] font-semibold' : 'text-[#94A3B8] group-hover:text-[#F1F5F9] font-medium'} truncate">${opt}</span>
                             <div class="flex items-center gap-1.5 shrink-0">
                                 ${badgeHtml}
-                                ${isSelected ? '<span class="text-[9px] font-semibold bg-slate-700 text-white px-1.5 py-0.5 rounded typo-action-btn uppercase shadow-sm">CURRENT</span>' : ''}
+                                ${isSelected ? '<span class="text-[9px] font-bold bg-[#0E121A] text-[#F1F5F9] border border-[#2D3A54] px-1.5 py-0.5 rounded uppercase shadow-sm whitespace-nowrap leading-none tracking-wider">CURRENT</span>' : ''}
                             </div>
                         </div>
                     `;
@@ -19938,18 +22499,18 @@ function renderMsfsSettingsMatrix() {
 
             const defaultCustomPreviewHtml = `
                 ${getSettingRatingBadgeHtml(currentTag, currentRating, true, false)}
-                <span class="text-slate-300 text-[10.5px] leading-tight" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${currentReason || 'Hover over an option to preview its technical impact...'}</span>
+                <span class="text-[#94A3B8] text-[10.5px] leading-tight" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${currentReason || 'Hover over an option to preview its technical impact...'}</span>
             `;
 
             inputHtml = `
                 <div class="relative w-full pt-0.5" id="opt-custom-wrapper-${item.key}">
                     <div id="opt-custom-btn-${item.key}"
                          onclick="toggleCustomSelectDropdown('${item.key}', event)"
-                         class="w-full bg-slate-950 border border-slate-700/80 hover:border-slate-600 focus:border-cyan-400 rounded-xl pl-3 pr-10 py-2 typo-input-val text-xs ${valColorClass} font-semibold cursor-pointer flex items-center justify-between select-none transition-colors"
+                         class="w-full bg-[#0E121A] border border-[#2D3A54] hover:border-[#3E495D] focus:border-[#00A8FF] rounded-xl pl-3 pr-10 py-2 typo-input-val text-xs ${valColorClass} font-semibold cursor-pointer flex items-center justify-between select-none transition-colors"
                          title="${(currentReason || '').replace(/"/g, '&quot;')}">
                         <span id="opt-custom-label-${item.key}" class="truncate">${displayVal}</span>
                     </div>
-                    <div class="cursor-pointer pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400">
+                    <div class="cursor-pointer pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-[#94A3B8]">
                         <svg class="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
                             <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
                         </svg>
@@ -19957,12 +22518,12 @@ function renderMsfsSettingsMatrix() {
                     <div id="opt-custom-menu-${item.key}"
                          onwheel="event.stopPropagation();"
                          style="overscroll-behavior: contain;"
-                         class="hidden fixed z-[99999] max-h-80 overflow-hidden bg-slate-900 border border-slate-700 rounded-xl shadow-2xl flex flex-col">
-                        <div class="py-1 divide-y divide-slate-800/60 overflow-y-auto max-h-56 custom-scrollbar flex-1">
+                         class="hidden fixed z-[99999] max-h-80 overflow-hidden bg-[#181E2B] border border-[#253046] rounded-xl shadow-2xl flex flex-col">
+                        <div class="py-1 divide-y divide-[#1E2638] overflow-y-auto max-h-56 custom-scrollbar flex-1">
                             ${optionsHtml}
                         </div>
                         <div id="opt-custom-preview-${item.key}"
-                             class="px-3 py-2 text-[10.5px] leading-tight bg-slate-950/95 border-t border-slate-800 text-slate-300 min-h-[38px] flex items-center gap-1.5 shrink-0 rounded-b-xl">
+                             class="px-3 py-2 text-[10.5px] leading-tight bg-[#0E121A] border-t border-[#1E2638] text-[#94A3B8] min-h-[38px] flex items-center gap-1.5 shrink-0 rounded-b-xl">
                             ${defaultCustomPreviewHtml}
                         </div>
                     </div>
@@ -19982,10 +22543,10 @@ function renderMsfsSettingsMatrix() {
         const isOfxrInactiveCard = (item.key === 'ofxr_frame_gen' && !item.ofxr_running);
 
         return `
-            <div class="setting-card relative p-3.5 rounded-2xl ${isOfxrInactiveCard ? 'bg-slate-900 border border-slate-800/40 opacity-50 grayscale pointer-events-none' : 'bg-slate-900 border border-slate-800 hover:border-slate-700'} transition-all flex flex-col justify-between space-y-2.5" title="${(item.tooltip || '').replace(/"/g, '&quot;')}">
-                <div class="flex items-center justify-between gap-2">
-                    <span class="typo-setting-label text-slate-200 leading-tight break-words" title="${item.name}">${toSettingTitleCase(item.name || '')}</span>
-                    <div class="flex items-center gap-1.5 shrink-0">
+            <div class="setting-card relative p-3.5 rounded-2xl ${isOfxrInactiveCard ? 'bg-[#181E2B] border border-[#253046]/40 opacity-50 grayscale pointer-events-none' : 'bg-[#181E2B] border border-[#253046] hover:border-[#2D3A54]'} transition-all flex flex-col justify-between space-y-2.5" title="${(item.tooltip || '').replace(/"/g, '&quot;')}">
+                <div class="flex items-start justify-between gap-2 min-w-0">
+                    <span class="typo-setting-label text-[#F1F5F9] leading-snug break-words min-w-0 flex-1" title="${item.name}">${toSettingTitleCase(item.name || '')}</span>
+                    <div class="flex items-center gap-1 shrink-0 flex-wrap justify-end max-w-[55%] pt-0.5">
                         ${autoFpsBadge}
                         ${headsetSwBadge}
                         ${sharedBadge}
@@ -19995,10 +22556,10 @@ function renderMsfsSettingsMatrix() {
                 </div>
                 ${inputHtml}
                 ${(item.rec_guidance || isLodAxis) ? `
-                    <div class="flex items-center justify-between gap-1.5 pt-0.5 px-0.5 text-[11px] leading-tight text-slate-400 font-normal">
+                    <div class="flex items-center justify-between gap-1.5 pt-0.5 px-0.5 text-[11px] leading-tight text-[#94A3B8] font-normal">
                         <div class="flex items-center gap-1.5 min-w-0 flex-1 truncate" title="${(fullTip || '').replace(/"/g, '&quot;')}">
-                            <span class="font-bold text-slate-200 tracking-wide uppercase shrink-0">TIP:</span>
-                            <span class="truncate text-slate-400 cursor-help">${shortTip}</span>
+                            <span class="font-bold text-[#F1F5F9] tracking-wide uppercase shrink-0">TIP:</span>
+                            <span class="truncate text-[#94A3B8] cursor-help">${shortTip}</span>
                         </div>
                     </div>
                 ` : ''}
@@ -20140,44 +22701,45 @@ async function onMsfsSettingChanged(settingKey, newValue) {
                 badgeEl.outerHTML = getSettingRatingBadgeHtml(cleanTag, found.rating_color || found.rating, false, true, `opt-badge-${settingKey}`, found.tag_reason || found.rating_reason || '');
             }
 
-            let textClass = 'text-emerald-400';
+            let textClass = 'text-[#10B981]';
             if (cleanTag === 'OFF') {
-                textClass = 'text-slate-500 opacity-60';
-            } else if (cleanTag === 'SWEET SPOT') {
-                textClass = 'text-[#2ce586]';
-            } else if (cleanTag === 'ACCEPTABLE') {
-                textClass = 'text-amber-400';
-            } else if (cleanTag === 'SUBOPTIMAL') {
-                textClass = 'text-orange-400';
+                textClass = 'text-[#64748B] opacity-60';
+            } else if (cleanTag === 'SWEET SPOT' || cleanTag === 'ACCEPTABLE' || cleanTag === 'SUBOPTIMAL') {
+                textClass = 'text-[#F59E0B]';
             } else if (cleanTag === 'HAZARD') {
-                textClass = 'text-rose-400';
+                textClass = 'text-[#EF4444]';
             }
 
+            const allSettingTextClasses = [
+                'text-emerald-400', 'text-[#2ce586]', 'text-amber-400', 'text-orange-400', 'text-rose-400',
+                'text-slate-500', 'text-[#10B981]', 'text-[#F59E0B]', 'text-[#EF4444]', 'text-[#64748B]', 'opacity-60'
+            ];
+
             if (selectEl) {
-                selectEl.classList.remove('text-emerald-400', 'text-[#2ce586]', 'text-amber-400', 'text-orange-400', 'text-rose-400', 'text-slate-500', 'opacity-60');
+                selectEl.classList.remove(...allSettingTextClasses);
                 selectEl.classList.add(textClass);
             }
             if (inputEl) {
                 if (settingKey === 'max_frame_rate') {
                     if (isNewActive) {
                         inputEl.value = String(newValue).replace(/[^0-9]/g, '') || inputEl.value;
-                        inputEl.classList.remove('text-slate-500', 'opacity-60', 'text-[#2ce586]', 'text-amber-400', 'text-orange-400', 'text-rose-400');
-                        inputEl.classList.add(cleanTag === 'SWEET SPOT' ? 'text-[#2ce586]' : 'text-emerald-400');
+                        inputEl.classList.remove(...allSettingTextClasses);
+                        inputEl.classList.add(cleanTag === 'SWEET SPOT' ? 'text-[#F59E0B]' : 'text-[#10B981]');
                         inputEl.title = 'Target frame rate active';
                     } else {
                         inputEl.value = 'OFF';
-                        inputEl.classList.remove('text-emerald-400', 'text-[#2ce586]', 'text-amber-400', 'text-orange-400', 'text-rose-400');
-                        inputEl.classList.add('text-slate-500', 'opacity-60');
+                        inputEl.classList.remove(...allSettingTextClasses);
+                        inputEl.classList.add('text-[#64748B]', 'opacity-60');
                         inputEl.title = 'Frame limiter is disabled (OFF) - Click switch to enable';
                     }
                 } else {
                     inputEl.value = newValue;
-                    inputEl.classList.remove('text-emerald-400', 'text-[#2ce586]', 'text-amber-400', 'text-orange-400', 'text-rose-400', 'text-slate-500', 'opacity-60');
+                    inputEl.classList.remove(...allSettingTextClasses);
                     inputEl.classList.add(textClass);
                 }
             }
             if (customBtn) {
-                customBtn.classList.remove('text-emerald-400', 'text-[#2ce586]', 'text-amber-400', 'text-orange-400', 'text-rose-400', 'text-slate-500', 'opacity-60');
+                customBtn.classList.remove(...allSettingTextClasses);
                 customBtn.classList.add(textClass);
                 if (found.tag_reason || found.rating_reason) {
                     customBtn.title = found.tag_reason || found.rating_reason;
@@ -20189,13 +22751,13 @@ async function onMsfsSettingChanged(settingKey, newValue) {
             if (customPreview) {
                 customPreview.innerHTML = `
                     ${getSettingRatingBadgeHtml(cleanTag, found.rating_color || found.rating, true, false)}
-                    <span class="text-slate-300 text-[10.5px] leading-tight" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${found.tag_reason || found.rating_reason || ''}</span>
+                    <span class="text-[#94A3B8] text-[10.5px] leading-tight" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${found.tag_reason || found.rating_reason || ''}</span>
                 `;
             }
             if (comboPreview) {
                 comboPreview.innerHTML = `
                     ${getSettingRatingBadgeHtml(cleanTag, found.rating_color || found.rating, true, false)}
-                    <span class="text-slate-300 text-[10.5px] leading-tight" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${found.tag_reason || found.rating_reason || ''}</span>
+                    <span class="text-[#94A3B8] text-[10.5px] leading-tight" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${found.tag_reason || found.rating_reason || ''}</span>
                 `;
             }
 
@@ -20207,25 +22769,28 @@ async function onMsfsSettingChanged(settingKey, newValue) {
                     const textSpan = row.querySelector('span.truncate');
                     const isCur = textSpan && (textSpan.textContent.trim().toUpperCase() === String(newValue).trim().toUpperCase());
                     if (isCur) {
-                        row.classList.add('bg-slate-800/80');
+                        row.classList.add('bg-[#1E2638]');
                         if (textSpan) {
-                            textSpan.className = 'text-white font-semibold truncate';
+                            textSpan.className = 'text-[#F1F5F9] font-semibold truncate';
                         }
                         const badgeContainer = row.querySelector('.flex.items-center.gap-1\\.5.shrink-0');
-                        if (badgeContainer && !badgeContainer.querySelector('span.bg-slate-700')) {
+                        const hasCurBadge = badgeContainer && Array.from(badgeContainer.children).some(el => el.textContent.includes('CURRENT'));
+                        if (badgeContainer && !hasCurBadge) {
                             const curSpan = document.createElement('span');
-                            curSpan.className = 'text-[9px] font-semibold bg-slate-700 text-white px-1.5 py-0.5 rounded typo-action-btn uppercase shadow-sm';
+                            curSpan.className = 'text-[9px] font-bold bg-[#0E121A] text-[#F1F5F9] border border-[#2D3A54] px-1.5 py-0.5 rounded uppercase shadow-sm whitespace-nowrap leading-none tracking-wider';
                             curSpan.textContent = 'CURRENT';
                             badgeContainer.appendChild(curSpan);
                         }
                     } else {
-                        row.classList.remove('bg-slate-800/80');
+                        row.classList.remove('bg-[#1E2638]', 'bg-slate-800/80');
                         if (textSpan) {
-                            textSpan.className = 'text-slate-200 group-hover:text-white font-medium truncate';
+                            textSpan.className = 'text-[#94A3B8] group-hover:text-[#F1F5F9] font-medium truncate';
                         }
-                        const curBadge = row.querySelector('span.bg-slate-700');
-                        if (curBadge && curBadge.textContent.includes('CURRENT')) {
-                            curBadge.remove();
+                        const badgeContainer = row.querySelector('.flex.items-center.gap-1\\.5.shrink-0');
+                        if (badgeContainer) {
+                            Array.from(badgeContainer.children).forEach(el => {
+                                if (el.textContent.includes('CURRENT')) el.remove();
+                            });
                         }
                     }
                 });
@@ -20238,43 +22803,46 @@ async function onMsfsSettingChanged(settingKey, newValue) {
                     const textSpan = row.querySelector('span.tabular-nums');
                     const isCur = textSpan && (textSpan.textContent.trim().toUpperCase() === String(newValue).trim().toUpperCase());
                     if (isCur) {
-                        row.className = 'px-3 py-1.5 hover:bg-slate-800 bg-slate-800/90 text-white font-semibold cursor-pointer transition-colors flex items-center justify-between typo-input-val text-xs tabular-nums select-none';
+                        row.className = 'px-3 py-1.5 hover:bg-[#1E2638] bg-[#1E2638] text-[#F1F5F9] font-semibold cursor-pointer transition-colors flex items-center justify-between typo-input-val text-xs tabular-nums select-none';
                         const badgeContainer = row.querySelector('.flex.items-center.gap-1\\.5.shrink-0');
-                        if (badgeContainer && !badgeContainer.querySelector('span.bg-slate-700')) {
+                        const hasCurBadge = badgeContainer && Array.from(badgeContainer.children).some(el => el.textContent.includes('CURRENT'));
+                        if (badgeContainer && !hasCurBadge) {
                             const curSpan = document.createElement('span');
-                            curSpan.className = 'text-[9px] font-semibold bg-slate-700 text-white px-1.5 py-0.5 rounded typo-action-btn uppercase shadow-sm';
+                            curSpan.className = 'text-[9px] font-bold bg-[#0E121A] text-[#F1F5F9] border border-[#2D3A54] px-1.5 py-0.5 rounded uppercase shadow-sm whitespace-nowrap leading-none tracking-wider';
                             curSpan.textContent = 'CURRENT';
                             badgeContainer.appendChild(curSpan);
                         }
                     } else {
-                        row.className = 'px-3 py-1.5 hover:bg-slate-800 text-slate-200 font-medium cursor-pointer transition-colors flex items-center justify-between typo-input-val text-xs tabular-nums select-none';
-                        const curBadge = row.querySelector('span.bg-slate-700');
-                        if (curBadge && curBadge.textContent.includes('CURRENT')) {
-                            curBadge.remove();
+                        row.className = 'px-3 py-1.5 hover:bg-[#1E2638] text-[#94A3B8] font-medium cursor-pointer transition-colors flex items-center justify-between typo-input-val text-xs tabular-nums select-none';
+                        const badgeContainer = row.querySelector('.flex.items-center.gap-1\\.5.shrink-0');
+                        if (badgeContainer) {
+                            Array.from(badgeContainer.children).forEach(el => {
+                                if (el.textContent.includes('CURRENT')) el.remove();
+                            });
                         }
                     }
                 });
             }
 
-                // Immediately synchronize Toggle Switch state in the DOM if this setting has a switch
-                const switchLabel = document.getElementById(`opt-switch-label-${settingKey}`);
-                const switchTrack = document.getElementById(`opt-switch-track-${settingKey}`);
-                const switchThumb = document.getElementById(`opt-switch-thumb-${settingKey}`);
-                const switchCont = document.getElementById(`opt-switch-container-${settingKey}`);
+            // Immediately synchronize Toggle Switch state in the DOM if this setting has a switch
+            const switchLabel = document.getElementById(`opt-switch-label-${settingKey}`);
+            const switchTrack = document.getElementById(`opt-switch-track-${settingKey}`);
+            const switchThumb = document.getElementById(`opt-switch-thumb-${settingKey}`);
+            const switchCont = document.getElementById(`opt-switch-container-${settingKey}`);
 
-                if (switchLabel) {
-                    switchLabel.textContent = (settingKey === 'max_frame_rate') ? (isNewActive ? `${newValue} FPS` : 'OFF') : (isNewActive ? 'ON' : 'OFF');
-                    switchLabel.className = `typo-input-val text-xs font-semibold ${isNewActive ? 'text-emerald-400' : 'text-slate-400'}`;
-                }
-                if (switchTrack) {
-                    switchTrack.className = `w-10 h-5 rounded-full transition-colors duration-200 ease-in-out p-0.5 ${isNewActive ? 'bg-emerald-600 shadow-sm' : 'bg-slate-700'}`;
-                }
-                if (switchThumb) {
-                    switchThumb.className = `w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out ${isNewActive ? 'translate-x-5' : 'translate-x-0'}`;
-                }
-                if (switchCont) {
-                    switchCont.title = isNewActive ? 'Click to disable frame limiter (OFF)' : 'Click to enable frame limiter';
-                }
+            if (switchLabel) {
+                switchLabel.textContent = (settingKey === 'max_frame_rate') ? (isNewActive ? `${newValue} FPS` : 'OFF') : (isNewActive ? 'ON' : 'OFF');
+                switchLabel.className = `typo-input-val text-xs font-semibold ${isNewActive ? 'text-[#10B981]' : 'text-[#64748B]'}`;
+            }
+            if (switchTrack) {
+                switchTrack.className = `w-10 h-5 rounded-full transition-colors duration-200 ease-in-out p-0.5 ${isNewActive ? 'bg-[#10B981] shadow-sm' : 'bg-[#1E2638]'}`;
+            }
+            if (switchThumb) {
+                switchThumb.className = `w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out ${isNewActive ? 'translate-x-5' : 'translate-x-0'}`;
+            }
+            if (switchCont) {
+                switchCont.title = isNewActive ? 'Click to disable frame limiter (OFF)' : 'Click to enable frame limiter';
+            }
 
             // Immediately synchronize Framerate Multiplier card when Frame Generation is toggled
             if (settingKey === 'frame_generation') {
@@ -20303,26 +22871,26 @@ async function onMsfsSettingChanged(settingKey, newValue) {
                     if (multSelect) {
                         multSelect.innerHTML = `<option value="${multItem.value}">${multItem.value}</option>`;
                         multSelect.value = multItem.value;
-                        multSelect.classList.remove('text-emerald-400', 'text-amber-400', 'text-orange-400', 'text-rose-400');
-                        multSelect.classList.add(isOff ? 'text-amber-400' : 'text-emerald-400');
+                        multSelect.classList.remove(...allSettingTextClasses);
+                        multSelect.classList.add(isOff ? 'text-[#F59E0B]' : 'text-[#10B981]');
                     }
                     if (multInput) {
                         multInput.value = multItem.value;
-                        multInput.classList.remove('text-emerald-400', 'text-amber-400', 'text-orange-400', 'text-rose-400');
-                        multInput.classList.add(isOff ? 'text-amber-400' : 'text-emerald-400');
+                        multInput.classList.remove(...allSettingTextClasses);
+                        multInput.classList.add(isOff ? 'text-[#F59E0B]' : 'text-[#10B981]');
                     }
                     if (multCustomLabel) {
                         multCustomLabel.textContent = multItem.value;
                     }
                     if (multCustomBtn) {
-                        multCustomBtn.classList.remove('text-emerald-400', 'text-amber-400', 'text-orange-400', 'text-rose-400');
-                        multCustomBtn.classList.add(isOff ? 'text-amber-400' : 'text-emerald-400');
+                        multCustomBtn.classList.remove(...allSettingTextClasses);
+                        multCustomBtn.classList.add(isOff ? 'text-[#F59E0B]' : 'text-[#10B981]');
                         multCustomBtn.title = multItem.tag_reason;
                     }
                     if (multCustomPreview) {
                         multCustomPreview.innerHTML = `
-                            <span class="px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${isOff ? 'bg-amber-600 text-white' : 'bg-emerald-600 text-white'} shrink-0">${multItem.tag_badge}</span>
-                            <span class="text-slate-300 text-[10.5px] leading-tight" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${multItem.tag_reason}</span>
+                            ${getSettingRatingBadgeHtml(multItem.tag_badge, multItem.rating_color, true, false)}
+                            <span class="text-[#94A3B8] text-[10.5px] leading-tight" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${multItem.tag_reason}</span>
                         `;
                     }
                 }
@@ -20685,20 +23253,20 @@ function openOptFeedbackModal(res) {
         let detailsHtml = '';
         if (currentMsfsGraphicsMode === '2D') {
             detailsHtml += `
-                <div class="flex items-center gap-2 text-emerald-400 font-mono text-xs"><span class="px-1.5 py-0.5 typo-action-btn text-[9px] font-semibold bg-emerald-600 text-white rounded">OK</span><span>Texture Resolution: ${currentFlightMissionProfile === 'LINER' ? 'LOW (Axel LFBO - Frees 6-8 GB VRAM)' : 'HIGH (Full Detail)'}</span></div>
-                <div class="flex items-center gap-2 text-emerald-400 font-mono text-xs"><span class="px-1.5 py-0.5 typo-action-btn text-[9px] font-semibold bg-emerald-600 text-white rounded">OK</span><span>Glass Cockpit Refresh: ${currentFlightMissionProfile === 'LINER' ? 'MEDIUM (Saves 5-8 ms MainThread frame time)' : 'HIGH (Full Synthetic Vision)'}</span></div>
-                <div class="flex items-center gap-2 text-emerald-400 font-mono text-xs"><span class="px-1.5 py-0.5 typo-action-btn text-[9px] font-semibold bg-emerald-600 text-white rounded">OK</span><span>Terrain LOD (TLOD): ${currentFlightMissionProfile === 'LINER' ? '100 (Protects MainThread from WASM avionics)' : '150 (Smooth for VFR)'}</span></div>
-                <div class="flex items-center gap-2 text-emerald-400 font-mono text-xs"><span class="px-1.5 py-0.5 typo-action-btn text-[9px] font-semibold bg-emerald-600 text-white rounded">OK</span><span>Anti-Aliasing & Pacing: DLSS (Quality) + Frame Generation DLSSG (2X)</span></div>
-                <div class="flex items-center gap-2 text-emerald-400 font-mono text-xs"><span class="px-1.5 py-0.5 typo-action-btn text-[9px] font-semibold bg-emerald-600 text-white rounded">OK</span><span>Environment & Shadows: 27 Settings Calibrated across 7 Rubriques</span></div>
+                <div class="flex items-center gap-2 text-emerald-400 font-mono text-xs"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded whitespace-nowrap leading-none">OK</span><span>Texture Resolution: ${currentFlightMissionProfile === 'LINER' ? 'LOW (Axel LFBO - Frees 6-8 GB VRAM)' : 'HIGH (Full Detail)'}</span></div>
+                <div class="flex items-center gap-2 text-emerald-400 font-mono text-xs"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded whitespace-nowrap leading-none">OK</span><span>Glass Cockpit Refresh: ${currentFlightMissionProfile === 'LINER' ? 'MEDIUM (Saves 5-8 ms MainThread frame time)' : 'HIGH (Full Synthetic Vision)'}</span></div>
+                <div class="flex items-center gap-2 text-emerald-400 font-mono text-xs"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded whitespace-nowrap leading-none">OK</span><span>Terrain LOD (TLOD): ${currentFlightMissionProfile === 'LINER' ? '100 (Protects MainThread from WASM avionics)' : '150 (Smooth for VFR)'}</span></div>
+                <div class="flex items-center gap-2 text-emerald-400 font-mono text-xs"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded whitespace-nowrap leading-none">OK</span><span>Anti-Aliasing & Pacing: DLSS (Quality) + Frame Generation DLSSG (2X)</span></div>
+                <div class="flex items-center gap-2 text-emerald-400 font-mono text-xs"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded whitespace-nowrap leading-none">OK</span><span>Environment & Shadows: 27 Settings Calibrated across 7 Rubriques</span></div>
             `;
         } else {
             const targetVrFps = Math.max(30, Math.floor(currentVrRefreshRate / 2));
             detailsHtml += `
-                <div class="flex items-center gap-2 text-emerald-400 font-mono text-xs"><span class="px-1.5 py-0.5 typo-action-btn text-[9px] font-semibold bg-emerald-600 text-white rounded">OK</span><span>Max Frame Rate: ${targetVrFps} FPS (Exact 1/2 sync divisor for ${currentVrRefreshRate} Hz headset)</span></div>
-                <div class="flex items-center gap-2 text-emerald-400 font-mono text-xs"><span class="px-1.5 py-0.5 typo-action-btn text-[9px] font-semibold bg-emerald-600 text-white rounded">OK</span><span>Frame Generation: OFF (Mandatory to prevent VR latency and artifacting)</span></div>
-                <div class="flex items-center gap-2 text-emerald-400 font-mono text-xs"><span class="px-1.5 py-0.5 typo-action-btn text-[9px] font-semibold bg-emerald-600 text-white rounded">OK</span><span>Texture Resolution: ${currentFlightMissionProfile === 'LINER' ? 'LOW (Frees 6-8 GB VRAM, avoids compositor crashes)' : 'MEDIUM (Balanced for VFR)'}</span></div>
-                <div class="flex items-center gap-2 text-emerald-400 font-mono text-xs"><span class="px-1.5 py-0.5 typo-action-btn text-[9px] font-semibold bg-emerald-600 text-white rounded">OK</span><span>Glass Cockpit Refresh: LOW (Quarter rate frees stereo MainThread budget)</span></div>
-                <div class="flex items-center gap-2 text-emerald-400 font-mono text-xs"><span class="px-1.5 py-0.5 typo-action-btn text-[9px] font-semibold bg-emerald-600 text-white rounded">OK</span><span>VR Environment & Terrain: 27 Settings Calibrated for Zero Judder</span></div>
+                <div class="flex items-center gap-2 text-emerald-400 font-mono text-xs"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded whitespace-nowrap leading-none">OK</span><span>Max Frame Rate: ${targetVrFps} FPS (Exact 1/2 sync divisor for ${currentVrRefreshRate} Hz headset)</span></div>
+                <div class="flex items-center gap-2 text-emerald-400 font-mono text-xs"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded whitespace-nowrap leading-none">OK</span><span>Frame Generation: OFF (Mandatory to prevent VR latency and artifacting)</span></div>
+                <div class="flex items-center gap-2 text-emerald-400 font-mono text-xs"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded whitespace-nowrap leading-none">OK</span><span>Texture Resolution: ${currentFlightMissionProfile === 'LINER' ? 'LOW (Frees 6-8 GB VRAM, avoids compositor crashes)' : 'MEDIUM (Balanced for VFR)'}</span></div>
+                <div class="flex items-center gap-2 text-emerald-400 font-mono text-xs"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded whitespace-nowrap leading-none">OK</span><span>Glass Cockpit Refresh: LOW (Quarter rate frees stereo MainThread budget)</span></div>
+                <div class="flex items-center gap-2 text-emerald-400 font-mono text-xs"><span class="px-1.5 py-0.5 text-[9px] font-bold bg-emerald-600 text-white rounded whitespace-nowrap leading-none">OK</span><span>VR Environment & Terrain: 27 Settings Calibrated for Zero Judder</span></div>
             `;
         }
         detailsEl.innerHTML = detailsHtml;
@@ -20752,19 +23320,19 @@ async function fetchAndRenderUserCfgBackups() {
             html += `
                 <div class="p-3 rounded-2xl bg-slate-950 border ${isLatest ? 'border-amber-500/60' : 'border-slate-800'} flex items-center justify-between gap-3">
                     <div class="flex items-center gap-2.5">
-                        <div class="w-8 h-8 rounded-xl ${isLatest ? 'bg-amber-500/20 text-amber-400' : 'bg-slate-800 text-slate-400'} flex items-center justify-center shrink-0">
+                        <div class="w-8 h-8 rounded-xl ${isLatest ? 'bg-amber-500 text-slate-950 font-black' : 'bg-slate-800 text-slate-400'} flex items-center justify-center shrink-0">
                             <span class="font-mono text-[9px] font-black">BAK</span>
                         </div>
                         <div class="flex items-center gap-2">
                             <span class="typo-input-val font-medium text-xs text-white tracking-wide tabular-nums">${b.timestamp}</span>
-                            ${isLatest ? '<span class="px-2 py-0.5 rounded text-[9px] typo-action-btn font-semibold bg-amber-500 text-slate-950 uppercase shadow-sm">MOST RECENT</span>' : ''}
+                            ${isLatest ? '<span class="px-2 py-0.5 rounded text-[9px] font-bold bg-amber-500 text-slate-950 uppercase shadow-sm whitespace-nowrap leading-none tracking-wider">MOST RECENT</span>' : ''}
                         </div>
                     </div>
                     <div class="flex items-center gap-2 shrink-0">
                         <button onclick="restoreUserCfgBackupTarget('${b.filename}')" class="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 typo-action-btn font-semibold text-xs transition-all cursor-pointer active:scale-95 uppercase tracking-[0.02em]">
                             Restore
                         </button>
-                        <button onclick="deleteUserCfgBackupTarget('${b.filename}')" class="px-2.5 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/40 hover:border-transparent typo-action-btn font-semibold text-xs transition-all cursor-pointer active:scale-95" title="Delete backup">
+                        <button onclick="deleteUserCfgBackupTarget('${b.filename}')" class="px-2.5 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white border-0 typo-action-btn font-semibold text-xs transition-all cursor-pointer active:scale-95 shadow-sm" title="Delete backup">
                             <i class="fa-solid fa-trash-can"></i>
                         </button>
                     </div>
@@ -21051,7 +23619,7 @@ function renderCustomProfilesDropdownList() {
         const isCurrentActive = Boolean(p.is_active || (activeProfile && p.id === activeProfile.id));
         const dateFormatted = formatProfileDate(p.created_at);
         const activeBadge = isCurrentActive 
-            ? `<span class="px-2 py-0.5 rounded typo-action-btn text-[10px] font-semibold bg-emerald-600 text-white shadow-sm uppercase tracking-[0.02em]">ACTIVE</span>`
+            ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-600 text-white shadow-sm uppercase tracking-wider whitespace-nowrap leading-none">ACTIVE</span>`
             : '';
 
         let rowBgClass = 'hover:bg-slate-800';
@@ -21373,8 +23941,29 @@ let modalAutoFpsChoice = 'kill';
 let modalOfxrMode = '3X';
 let modalOfxrTargetFps = 36;
 
+let pendingBackgroundToolsCheck = false;
+
 async function checkBackgroundToolsOnStartup() {
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.check_background_tools) return;
+
+    // If onboarding tour has not been seen yet, postpone background tools modal!
+    let hasSeenOnboarding = false;
+    if (window.onboardingTour && typeof window.onboardingTour.isOnboardingCompleted === 'function') {
+        hasSeenOnboarding = await window.onboardingTour.isOnboardingCompleted();
+    } else if (window.pywebview && window.pywebview.api && window.pywebview.api.is_onboarding_completed) {
+        try {
+            const res = JSON.parse(await window.pywebview.api.is_onboarding_completed());
+            hasSeenOnboarding = Boolean(res && res.completed);
+        } catch (e) {}
+    } else {
+        hasSeenOnboarding = (localStorage.getItem('sceneryx_has_seen_onboarding') === 'true');
+    }
+
+    if (!hasSeenOnboarding) {
+        pendingBackgroundToolsCheck = true;
+        return;
+    }
+
     try {
         const resStr = await window.pywebview.api.check_background_tools();
         if (!resStr) return;
@@ -21392,6 +23981,16 @@ async function checkBackgroundToolsOnStartup() {
         console.warn("Background tools startup check error:", e);
     }
 }
+
+function triggerPendingBackgroundToolsCheck() {
+    if (pendingBackgroundToolsCheck) {
+        pendingBackgroundToolsCheck = false;
+        setTimeout(() => {
+            checkBackgroundToolsOnStartup();
+        }, 600);
+    }
+}
+window.triggerPendingBackgroundToolsCheck = triggerPendingBackgroundToolsCheck;
 
 function openBackgroundToolsModal(data) {
     currentBgToolsData = data;
@@ -21668,7 +24267,7 @@ async function setOfxrModeCard(mode) {
     const is3xDisabled = (fps3x < 30 || vrHz <= 75);
 
     if (mode === '3X' && is3xDisabled) {
-        showToastNotification(`Mode 3X désactivé à ${vrHz} Hz (cadence de base < 30 FPS incompatible VR).`, 'warning');
+        showToastNotification(`3X Mode disabled at ${vrHz} Hz (base cadence < 30 FPS incompatible with VR).`, 'warning');
         return;
     }
 
@@ -21730,11 +24329,11 @@ async function setOfxrModeCard(mode) {
         }
     }
     if (mode === '2X') {
-        showToastNotification(`OFXR configuré en mode 2X (${fps2x} FPS base -> ${vrHz} FPS fluide).`, 'info');
+        showToastNotification(`OFXR configured in 2X mode (${fps2x} FPS base -> ${vrHz} FPS smooth).`, 'info');
     } else if (mode === '3X') {
-        showToastNotification(`OFXR configuré en mode 3X (${fps3x} FPS base -> ${vrHz} FPS fluide).`, 'info');
+        showToastNotification(`OFXR configured in 3X mode (${fps3x} FPS base -> ${vrHz} FPS smooth).`, 'info');
     } else {
-        showToastNotification(`OFXR Frame Gen désactivé (OFF).`, 'info');
+        showToastNotification(`OFXR Frame Gen disabled (OFF).`, 'info');
     }
 }
 
@@ -21747,15 +24346,15 @@ async function setOfxrTargetFpsCard(fps) {
     const ofxrMode = (it && it.ofxr_mode) || 'OFF';
 
     if (fps < 30) {
-        showToastNotification("Les cadences inférieures à 30 FPS sont désactivées en VR.", 'warning');
+        showToastNotification("Cadences below 30 FPS are disabled in VR.", 'warning');
         return;
     }
     if (ofxrMode === '2X' && fps !== fps2x) {
-        showToastNotification(`À ${vrHz} Hz en mode 2X, la cadence requise est ${fps2x} FPS.`, 'warning');
+        showToastNotification(`At ${vrHz} Hz in 2X mode, required cadence is ${fps2x} FPS.`, 'warning');
         return;
     }
     if (ofxrMode === '3X' && fps !== fps3x) {
-        showToastNotification(`À ${vrHz} Hz en mode 3X, la cadence requise est ${fps3x} FPS.`, 'warning');
+        showToastNotification(`At ${vrHz} Hz in 3X mode, required cadence is ${fps3x} FPS.`, 'warning');
         return;
     }
 
@@ -21784,7 +24383,7 @@ async function setOfxrTargetFpsCard(fps) {
         const sync = (it && it.ofxr_sync_smart_lod !== false);
         await window.pywebview.api.save_ofxr_settings(mode, fps, sync);
     }
-    showToastNotification(`OFXR Base Target réglé à ${fps} FPS (Max Frame Rate synchronisé)`, 'info');
+    showToastNotification(`OFXR Base Target set to ${fps} FPS (Max Frame Rate synchronized)`, 'info');
 }
 
 async function toggleOfxrSyncCard(enabled) {
@@ -22295,7 +24894,7 @@ async function toggleBlackboxRecording() {
             const resStr = await window.pywebview.api.start_flight_blackbox(flightName, dep, arr, studio);
             isBlackboxRunning = true;
             if (btnText) btnText.textContent = "STOP MONITORING";
-            if (btn) btn.className = "h-9 px-4 rounded-md bg-amber-600 hover:bg-amber-500 text-white font-bold tracking-wider text-xs transition-all cursor-pointer active:scale-95 inline-flex items-center justify-center shadow-md shadow-amber-950/30 btn-elevate uppercase leading-none select-none";
+            if (btn) btn.className = "h-8 sm:h-9 px-3 sm:px-3.5 rounded-md bg-[#EF4444] hover:bg-rose-500 text-white font-sans font-bold tracking-wider text-xs transition-all cursor-pointer active:scale-95 inline-flex items-center justify-center shadow-md uppercase leading-none select-none whitespace-nowrap shrink-0";
             if (typeof showToast === 'function') showToast("Flight telemetry monitoring started!", "success");
         } catch (e) {
             if (typeof showToast === 'function') showToast("Error starting recording: " + e, "error");
@@ -22306,10 +24905,21 @@ async function toggleBlackboxRecording() {
             const res = typeof resStr === 'string' ? JSON.parse(resStr) : resStr;
             isBlackboxRunning = false;
             if (btnText) btnText.textContent = "START MONITORING";
-            if (btn) btn.className = "h-9 px-4 rounded-md bg-cyan-600 hover:bg-cyan-500 text-white font-bold tracking-wider text-xs transition-all cursor-pointer active:scale-95 inline-flex items-center justify-center shadow-md shadow-cyan-950/30 btn-elevate uppercase leading-none select-none";
+            if (btn) btn.className = "h-8 sm:h-9 px-3 sm:px-3.5 rounded-md bg-[#00A8FF] hover:bg-[#38BDF8] text-[#0F1115] font-sans font-bold tracking-wider text-xs transition-all cursor-pointer active:scale-95 inline-flex items-center justify-center shadow-md uppercase leading-none select-none whitespace-nowrap shrink-0";
             
             const timerEl = document.getElementById('opt-blackbox-timer');
             if (timerEl) timerEl.textContent = "00:00";
+
+            const acEl = document.getElementById('opt-live-aircraft');
+            if (acEl) { acEl.textContent = "Not detected"; acEl.title = "Not detected"; }
+            const rLbl = document.getElementById('opt-live-route-lbl');
+            if (rLbl) rLbl.textContent = "ORIGIN :";
+            const rEl = document.getElementById('opt-live-route');
+            if (rEl) { rEl.textContent = "Waiting for flight"; rEl.title = "Waiting for flight"; }
+            const flTag = document.getElementById('opt-mode-flight-tag');
+            if (flTag) flTag.textContent = "FREE FLIGHT";
+            const opTag = document.getElementById('opt-mode-opt-tag');
+            if (opTag) opTag.textContent = "NO SCENERY OPTIMIZATION";
 
             let reportName = null;
             if (res && res.report_path) {
@@ -22423,13 +25033,13 @@ function startBlackboxTelemetryPolling() {
             }
 
             // 3. Status Badges (SIMCONNECT LIVE & SMART LOD LIVE)
-            // Rule: Grey background when inactive, green background (#059669) when active, no dots.
+            // Rule: Grey background when inactive, green background (#10B981) when active, compact pill.
             const scBadge = document.getElementById('opt-simconnect-badge');
             if (scBadge) {
                 if (telem.simconnect_connected) {
-                    scBadge.className = 'px-2.5 py-1 rounded-md text-[10px] font-mono font-bold tracking-wider uppercase border border-emerald-600/80 bg-[#059669] text-white select-none transition-colors';
+                    scBadge.className = 'px-2 py-0.5 rounded-full text-[9.5px] font-sans font-bold tracking-wider uppercase bg-[#10B981] text-[#0B0D11] shadow-sm select-none transition-colors whitespace-nowrap shrink-0 inline-flex items-center justify-center';
                 } else {
-                    scBadge.className = 'px-2.5 py-1 rounded-md text-[10px] font-mono font-bold tracking-wider uppercase border border-slate-700/60 bg-slate-800 text-slate-400 select-none transition-colors';
+                    scBadge.className = 'px-2 py-0.5 rounded-full text-[9.5px] font-sans font-bold tracking-wider uppercase border border-[#2D3A54] bg-[#12161F] text-[#94A3B8] select-none transition-colors whitespace-nowrap shrink-0 inline-flex items-center justify-center';
                 }
             }
 
@@ -22437,38 +25047,43 @@ function startBlackboxTelemetryPolling() {
             if (smartLodBadge) {
                 const isSmartActive = window.smartLodActive || telem.smart_lod_active || (telem.smart_lod && telem.smart_lod.active);
                 if (isSmartActive) {
-                    smartLodBadge.className = 'px-2.5 py-1 rounded-md text-[10px] font-mono font-bold tracking-wider uppercase border border-emerald-600/80 bg-[#059669] text-white select-none transition-colors';
+                    smartLodBadge.className = 'px-2 py-0.5 rounded-full text-[9.5px] font-sans font-bold tracking-wider uppercase bg-[#10B981] text-[#0B0D11] shadow-sm select-none transition-colors whitespace-nowrap shrink-0 inline-flex items-center justify-center';
                 } else {
-                    smartLodBadge.className = 'px-2.5 py-1 rounded-md text-[10px] font-mono font-bold tracking-wider uppercase border border-slate-700/60 bg-slate-800 text-slate-400 select-none transition-colors';
+                    smartLodBadge.className = 'px-2 py-0.5 rounded-full text-[9.5px] font-sans font-bold tracking-wider uppercase border border-[#2D3A54] bg-[#12161F] text-[#94A3B8] select-none transition-colors whitespace-nowrap shrink-0 inline-flex items-center justify-center';
                 }
             }
 
             // 4. Context Bar: Aircraft, Route / Origin, Discrete Grey Mode Tags
+            const isDisconnected = !telem.is_tracking && !telem.simconnect_connected;
             const aircraftEl = document.getElementById('opt-live-aircraft');
             if (aircraftEl) {
-                aircraftEl.textContent = telem.aircraft || 'Not detected';
+                const acVal = isDisconnected ? 'Not detected' : (telem.aircraft || 'Not detected');
+                aircraftEl.textContent = acVal;
+                aircraftEl.title = acVal;
             }
 
             const routeLbl = document.getElementById('opt-live-route-lbl');
             const routeEl = document.getElementById('opt-live-route');
             if (routeLbl) {
-                routeLbl.textContent = telem.route_label || (telem.flight_type_tag === 'SIMBRIEF OFP' ? 'ROUTE:' : 'ORIGIN:');
+                routeLbl.textContent = isDisconnected ? 'ORIGIN :' : (telem.route_label || (telem.flight_type_tag === 'SIMBRIEF OFP' ? 'ROUTE :' : 'ORIGIN :'));
             }
             if (routeEl) {
-                if (telem.flight_type_tag === 'SIMBRIEF OFP' && telem.route_display) {
-                    routeEl.textContent = telem.route_display;
-                } else {
-                    routeEl.textContent = telem.nearest_icao || telem.dep || 'Waiting for flight';
-                }
+                const rVal = isDisconnected 
+                    ? 'Waiting for flight' 
+                    : ((telem.flight_type_tag === 'SIMBRIEF OFP' && telem.route_display)
+                        ? telem.route_display
+                        : (telem.route_display || telem.nearest_icao || telem.dep || 'Waiting for flight'));
+                routeEl.textContent = rVal;
+                routeEl.title = rVal;
             }
 
             const flightTag = document.getElementById('opt-mode-flight-tag');
             if (flightTag) {
-                flightTag.textContent = telem.flight_type_tag || 'FREE FLIGHT';
+                flightTag.textContent = isDisconnected ? 'FREE FLIGHT' : (telem.flight_type_tag || 'FREE FLIGHT');
             }
             const optTag = document.getElementById('opt-mode-opt-tag');
             if (optTag) {
-                optTag.textContent = telem.scenery_opt_tag || 'NO SCENERY OPTIMIZATION';
+                optTag.textContent = isDisconnected ? 'NO SCENERY OPTIMIZATION' : (telem.scenery_opt_tag || 'NO SCENERY OPTIMIZATION');
             }
 
             // 5. Performance Monitoring HUD Metrics
@@ -23118,11 +25733,11 @@ function colorizeDiagnosticText(html) {
     // Key metrics in text nodes
     res = res.replace(/(?<!class="[^"]*)(?<!style="[^"]*)\b(CPU MainThread|MainThread)\b(?![^<]*>)/gi, '<span class="text-amber-400 font-bold">$1</span>');
     res = res.replace(/(?<!class="[^"]*)(?<!style="[^"]*)\b(VRAM)\b(?![^<]*>)/gi, '<span class="text-sky-400 font-bold">$1</span>');
-    res = res.replace(/(?<!class="[^"]*)(?<!style="[^"]*)\b(\d+(?:\.\d+)?\s*ms)\b(?![^<]*>)/gi, '<span class="text-amber-400 font-bold font-mono">$1</span>');
-    res = res.replace(/(?<!class="[^"]*)(?<!style="[^"]*)\b(\d+(?:\.\d+)?\s*FPS)\b(?![^<]*>)/gi, '<span class="text-emerald-400 font-bold font-mono">$1</span>');
-    res = res.replace(/(?<!class="[^"]*)(?<!style="[^"]*)\b(TLOD)\b(?![^<]*>)/gi, '<span class="text-pink-400 font-bold font-mono">$1</span>');
-    res = res.replace(/(?<!class="[^"]*)(?<!style="[^"]*)\b(OLOD)\b(?![^<]*>)/gi, '<span class="text-purple-400 font-bold font-mono">$1</span>');
-    res = res.replace(/(?<!class="[^"]*)(?<!style="[^"]*)\b(\d+(?:\.\d+)?\s*Mbps)\b(?![^<]*>)/gi, '<span class="text-cyan-400 font-bold font-mono">$1</span>');
+    res = res.replace(/(?<!class="[^"]*)(?<!style="[^"]*)\b(\d+(?:\.\d+)?\s*ms)\b(?![^<]*>)/gi, '<span class="text-amber-400 font-bold font-sans">$1</span>');
+    res = res.replace(/(?<!class="[^"]*)(?<!style="[^"]*)\b(\d+(?:\.\d+)?\s*FPS)\b(?![^<]*>)/gi, '<span class="text-emerald-400 font-bold font-sans">$1</span>');
+    res = res.replace(/(?<!class="[^"]*)(?<!style="[^"]*)\b(TLOD)\b(?![^<]*>)/gi, '<span class="text-pink-400 font-bold font-sans">$1</span>');
+    res = res.replace(/(?<!class="[^"]*)(?<!style="[^"]*)\b(OLOD)\b(?![^<]*>)/gi, '<span class="text-purple-400 font-bold font-sans">$1</span>');
+    res = res.replace(/(?<!class="[^"]*)(?<!style="[^"]*)\b(\d+(?:\.\d+)?\s*Mbps)\b(?![^<]*>)/gi, '<span class="text-cyan-400 font-bold font-sans">$1</span>');
 
     return res;
 }
@@ -23158,8 +25773,9 @@ function sanitizeSmartLodSection(rawHtml) {
     res = res.replace(/FPS Mesuré/gi, 'Measured FPS');
     res = res.replace(/Raison Déclencheur/gi, 'Trigger Reason');
 
-    // Enforce nowrap on th
-    res = res.replace(/<th\b([^>]*)>/gi, '<th$1 style="white-space:nowrap; padding:8px 12px; font-family:monospace; font-size:11px;">');
+    // Enforce nowrap on th and strip monospace font
+    res = res.replace(/<th\b([^>]*)>/gi, '<th$1 style="white-space:nowrap; padding:8px 12px; font-size:11px;">');
+    res = res.replace(/font-family:\s*monospace;?/gi, '');
     return res;
 }
 
@@ -23183,6 +25799,7 @@ function sanitizeMilestonesSection(rawHtml) {
     res = res.replace(/Phase de vol/gi, 'Flight Phase');
     res = res.replace(/Comportement & Impact/gi, 'Behavior & Impact');
     res = res.replace(/Altitude \(Sol\)/gi, 'Altitude (AGL)');
+    res = res.replace(/font-family:\s*monospace;?/gi, '');
     return res;
 }
 
@@ -23235,10 +25852,10 @@ function renderReportInViewerModal(report) {
         let cleanSub = (c.sub || '').replace(/\s*•\s*/g, ' / ');
 
         return `
-            <div class="p-3.5 rounded-lg bg-slate-900/85 border border-slate-800 flex flex-col justify-between shadow-sm min-h-[96px]">
-                <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider font-mono">${escapeHtml(c.title)}</span>
-                <div class="text-xl font-extrabold ${valColor} font-mono my-1 leading-tight">${c.val_html || escapeHtml(c.val_text || c.val)}</div>
-                <span class="text-[11px] font-sans text-slate-400 leading-snug">${escapeHtml(cleanSub)}</span>
+            <div class="p-3 rounded-lg bg-[#181E2B] border border-[#253046] flex flex-col justify-between shadow-sm min-h-[86px]">
+                <span class="text-[10px] font-bold text-[#64748B] uppercase tracking-wider font-sans leading-none">${escapeHtml(c.title)}</span>
+                <div class="text-lg sm:text-xl font-extrabold ${valColor} font-sans my-1 leading-tight">${c.val_html || escapeHtml(c.val_text || c.val)}</div>
+                <span class="text-[10.5px] font-sans text-[#94A3B8] leading-snug">${escapeHtml(cleanSub)}</span>
             </div>
         `;
     }).join('');
@@ -23254,7 +25871,7 @@ function renderReportInViewerModal(report) {
             return `<ul ${clean} style="list-style:none; padding-left:0; margin:0 0 14px 0;">`;
         });
         // Standardize recommendation block: skip a line (margin-top: 14px) and flush padding-left: 0
-        narrativeContent = narrativeContent.replace(/<div\s+style="[^"]*(?:background:#0b0f19|padding-top|border-top|margin-top)[^"]*"([^>]*)>/gi, '<div class="mt-3.5 pl-0 text-sm text-slate-200 font-sans leading-relaxed text-justify" style="margin-top:14px; padding-left:0;">');
+        narrativeContent = narrativeContent.replace(/<div\s+style="[^"]*(?:background:#0b0f19|padding-top|border-top|margin-top)[^"]*"([^>]*)>/gi, '<div class="mt-3 pl-0 text-xs sm:text-sm text-[#E2E8F0] font-sans leading-relaxed text-justify" style="margin-top:12px; padding-left:0;">');
         narrativeContent = narrativeContent.replace(/(<div[^>]*)(>[\s\S]*?Recommendation:)/gi, function(match, openTag, rest) {
             let cleanTag = openTag.replace(/padding-left:\s*[^;]+;?/gi, '').replace(/pl-\[[^\]]+\]/gi, '').replace(/\bpl-\d+\b/gi, '');
             if (cleanTag.includes('style="')) {
@@ -23268,7 +25885,7 @@ function renderReportInViewerModal(report) {
         narrativeContent = colorizeDiagnosticText(narrativeContent);
     }
     const narrativeHtml = narrativeContent.trim() ? `
-        <div class="p-4 rounded-lg bg-slate-900/85 border border-slate-800 text-sm text-slate-100 font-sans shadow-sm leading-relaxed space-y-2">
+        <div class="p-3.5 sm:p-4 rounded-lg bg-[#181E2B] border border-[#253046] text-xs sm:text-sm text-[#F1F5F9] font-sans shadow-sm leading-relaxed space-y-2">
             ${narrativeContent}
         </div>
     ` : '';
@@ -23287,58 +25904,68 @@ function renderReportInViewerModal(report) {
                 const parenText = parenM ? parenM[1] : 'PC HIGH / VR HIGH';
                 cloudTags = `
                     <div class="flex flex-wrap items-center gap-2 mb-3">
-                        <span class="px-2.5 py-1 rounded bg-slate-800 border border-slate-700/70 text-slate-200 text-xs font-mono font-bold uppercase">AUTOFPS CLOUD: NOMINAL QUALITY</span>
-                        <span class="px-2.5 py-1 rounded bg-slate-800 border border-slate-700/70 text-cyan-400 text-xs font-mono font-bold uppercase">${escapeHtml(parenText)}</span>
-                        <span class="px-2.5 py-1 rounded bg-slate-800 border border-slate-700/70 text-emerald-400 text-xs font-mono font-bold uppercase">NO CLOUD DROPS</span>
+                        <span class="px-2.5 py-1 rounded bg-[#0E121A] border border-[#2D3A54] text-[#CBD5E1] text-[11px] font-sans font-bold uppercase">AUTOFPS CLOUD: NOMINAL QUALITY</span>
+                        <span class="px-2.5 py-1 rounded bg-[#0E121A] border border-[#2D3A54] text-[#38BDF8] text-[11px] font-sans font-bold uppercase">${escapeHtml(parenText)}</span>
+                        <span class="px-2.5 py-1 rounded bg-[#0E121A] border border-[#2D3A54] text-[#10B981] text-[11px] font-sans font-bold uppercase">NO CLOUD DROPS</span>
                     </div>
                 `;
             } else {
                 cloudTags = `
                     <div class="flex flex-wrap items-center gap-2 mb-3">
-                        <span class="px-2.5 py-1 rounded bg-slate-800 border border-slate-700/70 text-amber-400 text-xs font-mono font-bold uppercase">AUTOFPS CLOUD: REDUCTION ACTIVE</span>
-                        <span class="px-2.5 py-1 rounded bg-slate-800 border border-slate-700/70 text-rose-400 text-xs font-mono font-bold uppercase">QUALITY DROPPED</span>
+                        <span class="px-2.5 py-1 rounded bg-[#0E121A] border border-[#2D3A54] text-[#F59E0B] text-[11px] font-sans font-bold uppercase">AUTOFPS CLOUD: REDUCTION ACTIVE</span>
+                        <span class="px-2.5 py-1 rounded bg-[#0E121A] border border-[#2D3A54] text-[#EF4444] text-[11px] font-sans font-bold uppercase">QUALITY DROPPED</span>
                     </div>
                 `;
             }
             milestonesContent = milestonesContent.replace(/<div style="font-size:12px; color:#94a3b8;">AutoFPS Cloud Quality:[\s\S]*?<\/div>/i, cloudTags);
         }
         // Enforce white-space: nowrap on table headers so they never break onto multiple lines
-        milestonesContent = milestonesContent.replace(/<th\b([^>]*)>/gi, '<th$1 style="white-space:nowrap; padding:8px 14px; font-family:monospace; font-size:11px;">');
+        milestonesContent = milestonesContent.replace(/<th\b([^>]*)>/gi, '<th$1 style="white-space:nowrap; padding:8px 12px; font-size:11px; color:#64748B; border-bottom:1px solid #253046;">');
         milestonesContent = sanitizeMilestonesSection(milestonesContent);
     }
 
     const milestonesHtml = milestonesContent.trim() ? `
-        <div class="p-4 rounded-lg bg-slate-900/85 border border-slate-800 text-xs text-slate-300 font-sans shadow-sm overflow-x-auto">
+        <div class="p-3.5 sm:p-4 rounded-lg bg-[#181E2B] border border-[#253046] text-xs text-[#CBD5E1] font-sans shadow-sm overflow-x-auto">
             ${milestonesContent}
         </div>
     ` : '';
 
     const sanitizedSmartLod = sanitizeSmartLodSection(report.smart_lod_section || '');
     const smartLodHtml = sanitizedSmartLod ? `
-        <div class="p-4 rounded-lg bg-slate-900/85 border border-slate-800 text-xs text-slate-300 font-sans shadow-sm">
+        <div class="p-3.5 sm:p-4 rounded-lg bg-[#181E2B] border border-[#253046] text-xs text-[#CBD5E1] font-sans shadow-sm">
             ${sanitizedSmartLod}
         </div>
     ` : '';
 
+    const cleanMode = (report.mode_display || 'Active').replace(/\s*•\s*/g, ' - ');
+
     bodyEl.innerHTML = `
-        <!-- Header Info Bar (Balanced 4-Column Layout, Perfectly Aligned Labels) -->
-        <div class="p-4 rounded-lg bg-slate-800/80 border border-slate-700/80 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-5 items-start text-xs shadow-sm">
-            <div class="lg:col-span-3">
-                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block font-mono h-4 leading-4">AIRCRAFT</span>
-                <span class="text-base sm:text-xl font-black text-white font-mono block leading-tight mt-1">${escapeHtml(acInfo.model)}</span>
-                <span class="text-xs text-slate-400 font-medium block mt-0.5">${escapeHtml(acInfo.developer)}</span>
+        <!-- Header Info Bar (Balanced 4-Column Layout, Space-Saving Precision Metrics) -->
+        <div class="p-3 sm:p-3.5 rounded-lg bg-[#181E2B] border border-[#253046] grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 sm:gap-4 items-start text-xs shadow-sm">
+            <div class="lg:col-span-3 min-w-0">
+                <span class="text-[9.5px] font-bold text-[#64748B] uppercase tracking-wider block font-sans h-3.5 leading-[14px] truncate mb-1">AIRCRAFT</span>
+                <div class="h-5 flex items-center min-w-0">
+                    <span class="text-xs sm:text-sm font-bold text-[#F1F5F9] font-sans truncate leading-none" title="${escapeHtml(acInfo.model)}">${escapeHtml(acInfo.model)}</span>
+                </div>
+                <span class="text-[10.5px] text-[#94A3B8] font-medium block truncate mt-0.5" title="${escapeHtml(acInfo.developer)}">${escapeHtml(acInfo.developer)}</span>
             </div>
-            <div class="lg:col-span-4">
-                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block font-mono h-4 leading-4">ROUTE / ORIGIN</span>
-                <span class="text-base sm:text-xl font-black text-cyan-400 font-mono block leading-tight whitespace-nowrap mt-1">${escapeHtml(cleanRoute)}</span>
+            <div class="lg:col-span-4 min-w-0">
+                <span class="text-[9.5px] font-bold text-[#64748B] uppercase tracking-wider block font-sans h-3.5 leading-[14px] truncate mb-1">ROUTE / ORIGIN</span>
+                <div class="h-5 flex items-center min-w-0">
+                    <span class="text-xs sm:text-sm font-bold text-[#38BDF8] font-sans truncate leading-none" title="${escapeHtml(cleanRoute)}">${escapeHtml(cleanRoute)}</span>
+                </div>
             </div>
-            <div class="lg:col-span-3">
-                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block font-mono h-4 leading-4">FLIGHT MODE</span>
-                <span class="text-xs sm:text-sm font-bold text-emerald-400 font-mono block mt-1 leading-snug">${escapeHtml(report.mode_display || 'Active')}</span>
+            <div class="lg:col-span-3 min-w-0">
+                <span class="text-[9.5px] font-bold text-[#64748B] uppercase tracking-wider block font-sans h-3.5 leading-[14px] truncate mb-1">FLIGHT MODE</span>
+                <div class="h-5 flex items-center min-w-0">
+                    <span class="text-xs sm:text-sm font-bold text-[#10B981] font-sans truncate leading-none" title="${escapeHtml(cleanMode)}">${escapeHtml(cleanMode)}</span>
+                </div>
             </div>
-            <div class="lg:col-span-2 text-left sm:text-right">
-                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block font-mono h-4 leading-4">MONITORING TIME</span>
-                <span class="text-base sm:text-xl font-black text-white font-mono block leading-tight whitespace-nowrap mt-1">${escapeHtml(report.time_display_full || report.duration || '--')}</span>
+            <div class="lg:col-span-2 text-left sm:text-right min-w-0">
+                <span class="text-[9.5px] font-bold text-[#64748B] uppercase tracking-wider block font-sans h-3.5 leading-[14px] truncate mb-1">MONITORING TIME</span>
+                <div class="h-5 flex items-center justify-start sm:justify-end min-w-0">
+                    <span class="text-xs sm:text-sm font-bold text-[#F1F5F9] font-sans whitespace-nowrap leading-none">${escapeHtml(report.time_display_full || report.duration || '--')}</span>
+                </div>
             </div>
         </div>
 
@@ -23354,10 +25981,10 @@ function renderReportInViewerModal(report) {
         <!-- 4 Interactive Charts with Left-Column Checkbox Legends -->
         <div class="space-y-4 pt-2">
             <!-- Chart 1: Smoothness & Latency -->
-            <div class="p-4 rounded-lg bg-slate-900/90 border border-slate-800 space-y-3 shadow-sm">
-                <div class="flex items-center justify-between pb-2 border-b border-slate-800/80">
-                    <span class="text-xs font-bold text-slate-200 font-mono uppercase tracking-wider">1. SMOOTHNESS & LATENCY</span>
-                    <button onclick="resetViewerChartZoom(0)" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-[10px] font-mono font-bold uppercase transition-all cursor-pointer">
+            <div class="p-3.5 sm:p-4 rounded-lg bg-[#181E2B] border border-[#253046] space-y-3 shadow-sm">
+                <div class="flex items-center justify-between pb-2 border-b border-[#253046]">
+                    <span class="text-xs font-bold text-[#F1F5F9] font-sans uppercase tracking-wider">1. SMOOTHNESS & LATENCY</span>
+                    <button onclick="resetViewerChartZoom(0)" class="px-2.5 py-1 rounded bg-[#0E121A] hover:bg-[#141B28] text-[#94A3B8] hover:text-[#F1F5F9] border border-[#2D3A54] text-[10px] font-sans font-bold uppercase transition-all cursor-pointer">
                         RESET ZOOM
                     </button>
                 </div>
@@ -23370,10 +25997,10 @@ function renderReportInViewerModal(report) {
             </div>
 
             <!-- Chart 2: Memory Footprint -->
-            <div class="p-4 rounded-lg bg-slate-900/90 border border-slate-800 space-y-3 shadow-sm">
-                <div class="flex items-center justify-between pb-2 border-b border-slate-800/80">
-                    <span class="text-xs font-bold text-slate-200 font-mono uppercase tracking-wider">2. MEMORY & THERMALS</span>
-                    <button onclick="resetViewerChartZoom(1)" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-[10px] font-mono font-bold uppercase transition-all cursor-pointer">
+            <div class="p-3.5 sm:p-4 rounded-lg bg-[#181E2B] border border-[#253046] space-y-3 shadow-sm">
+                <div class="flex items-center justify-between pb-2 border-b border-[#253046]">
+                    <span class="text-xs font-bold text-[#F1F5F9] font-sans uppercase tracking-wider">2. MEMORY & THERMALS</span>
+                    <button onclick="resetViewerChartZoom(1)" class="px-2.5 py-1 rounded bg-[#0E121A] hover:bg-[#141B28] text-[#94A3B8] hover:text-[#F1F5F9] border border-[#2D3A54] text-[10px] font-sans font-bold uppercase transition-all cursor-pointer">
                         RESET ZOOM
                     </button>
                 </div>
@@ -23386,10 +26013,10 @@ function renderReportInViewerModal(report) {
             </div>
 
             <!-- Chart 3: Flight Profile & Dynamics -->
-            <div class="p-4 rounded-lg bg-slate-900/90 border border-slate-800 space-y-3 shadow-sm">
-                <div class="flex items-center justify-between pb-2 border-b border-slate-800/80">
-                    <span class="text-xs font-bold text-slate-200 font-mono uppercase tracking-wider">3. FLIGHT PROFILE & DYNAMICS</span>
-                    <button onclick="resetViewerChartZoom(2)" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-[10px] font-mono font-bold uppercase transition-all cursor-pointer">
+            <div class="p-3.5 sm:p-4 rounded-lg bg-[#181E2B] border border-[#253046] space-y-3 shadow-sm">
+                <div class="flex items-center justify-between pb-2 border-b border-[#253046]">
+                    <span class="text-xs font-bold text-[#F1F5F9] font-sans uppercase tracking-wider">3. FLIGHT PROFILE & DYNAMICS</span>
+                    <button onclick="resetViewerChartZoom(2)" class="px-2.5 py-1 rounded bg-[#0E121A] hover:bg-[#141B28] text-[#94A3B8] hover:text-[#F1F5F9] border border-[#2D3A54] text-[10px] font-sans font-bold uppercase transition-all cursor-pointer">
                         RESET ZOOM
                     </button>
                 </div>
@@ -23402,10 +26029,10 @@ function renderReportInViewerModal(report) {
             </div>
 
             <!-- Chart 4: Streaming & Rolling Cache -->
-            <div class="p-4 rounded-lg bg-slate-900/90 border border-slate-800 space-y-3 shadow-sm">
-                <div class="flex items-center justify-between pb-2 border-b border-slate-800/80">
-                    <span class="text-xs font-bold text-slate-200 font-mono uppercase tracking-wider">4. STREAMING & ROLLING CACHE</span>
-                    <button onclick="resetViewerChartZoom(3)" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 text-[10px] font-mono font-bold uppercase transition-all cursor-pointer">
+            <div class="p-3.5 sm:p-4 rounded-lg bg-[#181E2B] border border-[#253046] space-y-3 shadow-sm">
+                <div class="flex items-center justify-between pb-2 border-b border-[#253046]">
+                    <span class="text-xs font-bold text-[#F1F5F9] font-sans uppercase tracking-wider">4. STREAMING & ROLLING CACHE</span>
+                    <button onclick="resetViewerChartZoom(3)" class="px-2.5 py-1 rounded bg-[#0E121A] hover:bg-[#141B28] text-[#94A3B8] hover:text-[#F1F5F9] border border-[#2D3A54] text-[10px] font-sans font-bold uppercase transition-all cursor-pointer">
                         RESET ZOOM
                     </button>
                 </div>
@@ -23486,14 +26113,14 @@ function initModalChartInstances(report) {
                     ctx.stroke();
 
                     ctx.setLineDash([]);
-                    ctx.font = 'bold 9px monospace';
+                    ctx.font = 'bold 9px system-ui, -apple-system, sans-serif';
                     const textW = ctx.measureText(ev.label).width;
                     const bw = textW + 8;
                     const bh = 15;
                     const bx = Math.min(right - bw, Math.max(left, posX - bw / 2));
                     const by = top + 4;
 
-                    ctx.fillStyle = '#0f172a';
+                    ctx.fillStyle = '#0E121A';
                     ctx.fillRect(bx, by, bw, bh);
                     ctx.strokeStyle = ev.color || 'rgba(56, 189, 248, 0.8)';
                     ctx.lineWidth = 1;
@@ -23522,11 +26149,11 @@ function initModalChartInstances(report) {
             const color = ds.borderColor || ds.backgroundColor || '#38bdf8';
             const isHidden = !chart.isDatasetVisible(dsIdx);
             const labelEl = document.createElement('label');
-            labelEl.className = 'flex items-center gap-2.5 px-2.5 py-1.5 rounded-md bg-slate-800/60 hover:bg-slate-800 border border-slate-700/60 cursor-pointer transition-all text-xs text-slate-200 select-none';
+            labelEl.className = 'flex items-center gap-2.5 px-2.5 py-1.5 rounded-md bg-[#0E121A] hover:bg-[#141B28] border border-[#253046] cursor-pointer transition-all text-xs text-[#CBD5E1] select-none';
             labelEl.innerHTML = `
                 <input type="checkbox" ${!isHidden ? 'checked' : ''} onchange="toggleViewerDataset(${chartIdx}, ${dsIdx}, this.checked)" class="accent-cyan-500 rounded cursor-pointer w-3.5 h-3.5" />
                 <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: ${color}; box-shadow: 0 0 6px ${color}66;"></span>
-                <span class="truncate font-sans font-medium text-[11px] leading-tight text-slate-300" title="${escapeHtml(ds.label)}">${escapeHtml(ds.label)}</span>
+                <span class="truncate font-sans font-medium text-[11px] leading-tight text-[#94A3B8]" title="${escapeHtml(ds.label)}">${escapeHtml(ds.label)}</span>
             `;
             container.appendChild(labelEl);
         });
@@ -23564,11 +26191,11 @@ function initModalChartInstances(report) {
             enabled: true,
             mode: 'index',
             intersect: false,
-            backgroundColor: 'rgba(15, 23, 42, 0.95)',
-            borderColor: 'rgba(51, 65, 85, 0.8)',
+            backgroundColor: 'rgba(18, 22, 31, 0.96)',
+            borderColor: '#253046',
             borderWidth: 1,
-            titleFont: { family: 'monospace', size: 11 },
-            bodyFont: { family: 'monospace', size: 10 }
+            titleFont: { family: 'system-ui, -apple-system, sans-serif', size: 11, weight: 'bold' },
+            bodyFont: { family: 'system-ui, -apple-system, sans-serif', size: 10 }
         }
     };
 
@@ -24008,17 +26635,17 @@ function switchSmartLodTargetMode(mode) {
 
     if (currentSmartLodMode === '2D') {
         if (btn2D) {
-            btn2D.className = 'px-3 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer bg-cyan-600 text-white shadow-sm';
+            btn2D.className = 'px-3.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer bg-[#00A8FF] text-[#0F1115] shadow-sm';
         }
         if (btnVR) {
-            btnVR.className = 'px-3 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer text-slate-400 hover:text-white bg-transparent';
+            btnVR.className = 'px-3.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer text-slate-400 hover:text-white bg-transparent';
         }
     } else {
         if (btnVR) {
-            btnVR.className = 'px-3 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer bg-cyan-600 text-white shadow-sm';
+            btnVR.className = 'px-3.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer bg-[#00A8FF] text-[#0F1115] shadow-sm';
         }
         if (btn2D) {
-            btn2D.className = 'px-3 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer text-slate-400 hover:text-white bg-transparent';
+            btn2D.className = 'px-3.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider transition-all cursor-pointer text-slate-400 hover:text-white bg-transparent';
         }
     }
     syncSmartLodCardSliders();
@@ -24116,6 +26743,21 @@ function updateSmartLodUIFromStatus(status) {
 
     const wasActive = window.smartLodActive;
     window.smartLodActive = isExtAutoFps ? false : !!(status.enabled && status.is_running);
+
+    // Direct synchronous update of the Classic Sidebar Smart LOD Badge
+    const badgeSmartLod = document.getElementById('classic-badge-smart-lod');
+    if (badgeSmartLod) {
+        if (isExtAutoFps) {
+            badgeSmartLod.textContent = 'AUTOFPS';
+            badgeSmartLod.className = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#F59E0B] text-[#0F1115] shadow-sm';
+        } else if (window.smartLodActive) {
+            badgeSmartLod.textContent = 'ACTIVE';
+            badgeSmartLod.className = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#10B981] text-white shadow-sm';
+        } else {
+            badgeSmartLod.textContent = 'OFF';
+            badgeSmartLod.className = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#161920] text-[#64748B] border border-[#2A3241]';
+        }
+    }
 
     syncSmartLodCardSliders();
 
@@ -24229,6 +26871,9 @@ function updateSmartLodUIFromStatus(status) {
         if (typeof updatePerformanceCockpitGauges === 'function') {
             updatePerformanceCockpitGauges();
         }
+        if (typeof updateClassicPanelUI === 'function') {
+            updateClassicPanelUI();
+        }
     }
 }
 
@@ -24291,7 +26936,7 @@ setInterval(() => {
 async function toggleSmartLodActive() {
     const isExtAutoFps = !!(smartLodAxisState && smartLodAxisState.external_autofps) || !!(typeof currentSettings !== 'undefined' && (currentSettings.external_autofps || currentSettings.dynamic_lod_engine === 'external_autofps'));
     if (isExtAutoFps) {
-        showToastNotification("Smart LOD verrouillé : MSFS AutoFPS est actif en arrière-plan.", "warning");
+        showToastNotification("Smart LOD locked: MSFS AutoFPS is active in background.", "warning");
         return;
     }
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.set_smart_lod_enabled) return;
@@ -24302,6 +26947,7 @@ async function toggleSmartLodActive() {
             const res = JSON.parse(resStr);
             if (res.success) {
                 window.smartLodActive = false;
+                if (typeof updateClassicPanelUI === 'function') updateClassicPanelUI();
                 await refreshSmartLodStatus();
                 if (typeof showToast === 'function') showToast("Smart LOD disabled.", "info");
                 if (typeof renderMsfsSettingsMatrix === 'function') renderMsfsSettingsMatrix();
@@ -24315,6 +26961,7 @@ async function toggleSmartLodActive() {
                 openSmartLodConflictModal();
             } else if (res.success) {
                 window.smartLodActive = true;
+                if (typeof updateClassicPanelUI === 'function') updateClassicPanelUI();
                 await refreshSmartLodStatus();
                 if (typeof showToast === 'function') showToast("Smart LOD activated (Dynamic governor engaged).", "success");
                 if (typeof renderMsfsSettingsMatrix === 'function') renderMsfsSettingsMatrix();
@@ -24744,12 +27391,12 @@ async function saveCurrentSmartLodProfile() {
     if (currSelected && currSelected.name.trim().toLowerCase() !== name.toLowerCase()) {
         showCustomModal({
             title: 'PROFILE SAVE / RENAME',
-            message: `Le nom du profil a été modifié de "<b>${escapeHtml(currSelected.name)}</b>" en "<b>${escapeHtml(name)}</b>".<br><br>Voulez-vous renommer le profil existant ou sauvegarder comme nouveau profil ?`,
+            message: `The profile name was changed from "<b>${escapeHtml(currSelected.name)}</b>" to "<b>${escapeHtml(name)}</b>".<br><br>Do you want to rename the existing profile or save it as a new profile?`,
             type: 'info',
             showCancel: true,
-            confirmText: 'RENOMMER',
-            secondaryText: 'NOUVEAU PROFIL',
-            cancelText: 'ANNULER',
+            confirmText: 'RENAME',
+            secondaryText: 'NEW PROFILE',
+            cancelText: 'CANCEL',
             confirmClass: 'px-4 py-1.5 text-center rounded-xl bg-blue-600 hover:bg-blue-500 text-white typo-action-btn font-semibold text-xs uppercase transition-all border-0 cursor-pointer shadow-md',
             secondaryClass: 'px-4 py-1.5 text-center rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white typo-action-btn font-semibold uppercase transition-all cursor-pointer text-xs shadow-md',
             cancelClass: 'px-4 py-1.5 text-center rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 hover:text-white typo-action-btn text-xs font-semibold uppercase transition-all cursor-pointer',
@@ -24978,7 +27625,7 @@ async function toggleIngamePanelInstall() {
             if (res.success) {
                 if (typeof showToast === 'function') showToast(res.message, "info");
             } else {
-                if (typeof showToast === 'function') showToast(res.message || "Erreur de désinstallation.", "error");
+                if (typeof showToast === 'function') showToast(res.message || "Uninstallation error.", "error");
             }
         } else {
             if (!window.pywebview.api.install_ingame_panel) return;
@@ -24987,7 +27634,7 @@ async function toggleIngamePanelInstall() {
             if (res.success) {
                 if (typeof showToast === 'function') showToast(res.message, "success");
             } else {
-                if (typeof showToast === 'function') showToast(res.message || "Erreur d'installation.", "error");
+                if (typeof showToast === 'function') showToast(res.message || "Installation error.", "error");
             }
         }
         await refreshIngamePanelStatus();
@@ -25030,5 +27677,1385 @@ window.addEventListener('keydown', function(e) {
     if (e.key === 'F11' || (e.ctrlKey && e.shiftKey && (e.key === 'B' || e.key === 'b'))) {
         e.preventDefault();
         openBugReportModal();
+    }
+});
+
+// ==============================================================================
+// SCENERYX ONBOARDING & INTERACTIVE SPOTLIGHT TOUR SYSTEM
+// ==============================================================================
+
+class OnboardingTourController {
+    constructor() {
+        this.isOpen = false;
+        this.currentStepIndex = 0;
+        this._activeTargetEl = null;
+        this._activeCutoutRect = null;
+        this._trackingRafId = null;
+        this._boundHandleResize = this._handleResize.bind(this);
+        this._boundHandleScroll = this._handleScroll.bind(this);
+        this._boundHandleMapMove = this._handleMapMove.bind(this);
+
+        this.steps = [
+            // STEP 1: Navigation Mode (Settings Modal)
+            {
+                id: 'nav_style',
+                targetSelector: '#settings-nav-style-control',
+                titleKey: 'onboarding.step1_title',
+                bodyKey: 'onboarding.step1_body',
+                defaultTitle: 'Navigation Mode',
+                defaultBody: 'SceneryX offers two navigation styles: a streamlined Classic Sidebar or an immersive Radial Quick-Menu. We have set "Classic" by default for this tour, but you can switch anytime here.',
+                preferredPlacement: 'right',
+                async beforeEnter() {
+                    const modal = document.getElementById('settings-modal');
+                    if (!modal || modal.classList.contains('hidden')) {
+                        if (typeof openSettingsModal === 'function') {
+                            await openSettingsModal();
+                        }
+                    }
+                    const navSelect = document.getElementById('cfg-nav-style');
+                    if (navSelect) {
+                        navSelect.value = 'classic';
+                        if (typeof previewNavStyle === 'function') {
+                            previewNavStyle('classic');
+                        }
+                    }
+                    const target = document.querySelector('#settings-nav-style-control') || document.querySelector('#settings-nav-style-section');
+                    if (target) {
+                        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                    const radialEl = document.getElementById('airport-radial-menu');
+                    if (radialEl) {
+                        radialEl.classList.add('hidden');
+                        radialEl.style.display = 'none';
+                    }
+                    const headerCard = document.getElementById('classic-ap-header-card');
+                    if (headerCard) headerCard.classList.add('hidden');
+                    await new Promise(r => setTimeout(r, 220));
+                },
+                async beforeExit(direction) {
+                    if (direction === 'next') {
+                        const navSelect = document.getElementById('cfg-nav-style');
+                        const chosenStyle = navSelect ? navSelect.value : 'classic';
+                        if (typeof currentSettings !== 'undefined' && currentSettings) {
+                            currentSettings.navigation_style = chosenStyle;
+                        }
+                        if (window.pywebview && window.pywebview.api && window.pywebview.api.save_settings) {
+                            try {
+                                await window.pywebview.api.save_settings(JSON.stringify(currentSettings));
+                            } catch (e) {}
+                        }
+                        if (typeof applyNavigationStyle === 'function') {
+                            applyNavigationStyle(chosenStyle);
+                        }
+                        if (typeof closeSettingsModal === 'function') {
+                            closeSettingsModal();
+                        }
+                        await new Promise(r => setTimeout(r, 260));
+                    }
+                }
+            },
+            // STEP 2: Scenery Collection (Header Stats)
+            {
+                id: 'header_stats',
+                targetSelector: '#header-hero-stats',
+                titleKey: 'onboarding.step2_title',
+                bodyKey: 'onboarding.step2_body',
+                defaultTitle: 'Scenery Collection',
+                defaultBody: 'Monitor your global scenery metrics in real time across Payware, Freeware, and Asobo libraries, along with your community investment stats.',
+                preferredPlacement: 'bottom',
+                async beforeEnter() {
+                    const modal = document.getElementById('settings-modal');
+                    if (modal && !modal.classList.contains('hidden')) {
+                        if (typeof closeSettingsModal === 'function') closeSettingsModal();
+                        await new Promise(r => setTimeout(r, 200));
+                    }
+                    const radialEl = document.getElementById('airport-radial-menu');
+                    if (radialEl) {
+                        radialEl.classList.add('hidden');
+                        radialEl.style.display = 'none';
+                    }
+                    const headerCard = document.getElementById('classic-ap-header-card');
+                    if (headerCard) headerCard.classList.add('hidden');
+                },
+                async beforeExit() {}
+            },
+            // STEP 3: Universal Airport Search
+            {
+                id: 'search_bar',
+                targetSelector: '#search-input',
+                titleKey: 'onboarding.step_search_title',
+                bodyKey: 'onboarding.step_search_body',
+                defaultTitle: 'Universal Airport Search',
+                defaultBody: 'Instantly look up any airfield worldwide by ICAO code (e.g. LPMA, KJFK, LFPG), airport name, city, or country. Search results instantly update and center the world map in real time.',
+                preferredPlacement: 'top',
+                async beforeEnter() {
+                    if (window.onboardingTour) window.onboardingTour._cleanupOpenedModals();
+                    const modal = document.getElementById('settings-modal');
+                    if (modal && !modal.classList.contains('hidden')) {
+                        if (typeof closeSettingsModal === 'function') closeSettingsModal();
+                    }
+                    const sInput = document.getElementById('search-input');
+                    if (sInput) {
+                        sInput.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                    await new Promise(r => setTimeout(r, 220));
+                },
+                async beforeExit() {}
+            },
+            // STEP 4: Export Scenery Collection
+            {
+                id: 'export_sceneries',
+                targetSelector: '#export-modal',
+                titleKey: 'onboarding.step_export_title',
+                bodyKey: 'onboarding.step_export_body',
+                defaultTitle: 'Export Scenery Collection',
+                defaultBody: 'Export your scenery library into CSV or JSON format with all metadata, pricing tiers, and active states. You can export either your complete collection or only the sceneries matching your current sidebar filters.',
+                preferredPlacement: 'right',
+                async beforeEnter() {
+                    if (window.onboardingTour) window.onboardingTour._cleanupOpenedModals();
+                    if (typeof openExportModal === 'function') {
+                        openExportModal();
+                    }
+                    const expModal = document.getElementById('export-modal');
+                    if (expModal) {
+                        expModal.classList.remove('hidden');
+                        expModal.classList.add('flex');
+                        if (window.windowManager) {
+                            window.windowManager.centerModal(expModal);
+                            window.windowManager.bringToFront(expModal);
+                        }
+                    }
+                    await new Promise(r => setTimeout(r, 260));
+                },
+                async beforeExit(direction) {
+                    if (typeof closeExportModal === 'function') {
+                        closeExportModal();
+                    }
+                    await new Promise(r => setTimeout(r, 180));
+                }
+            },
+            // STEP 5: Quick Toolbar Actions (Rescan, Settings, Window Reorder)
+            {
+                id: 'toolbar_actions',
+                targetSelector: '#bottom-toolbar-actions',
+                titleKey: 'onboarding.step_toolbar_actions_title',
+                bodyKey: 'onboarding.step_toolbar_actions_body',
+                defaultTitle: 'Quick Toolbar Actions',
+                defaultBody: 'Quick utility tools at your fingertips: Rescan Packages detects newly added or removed Community/Official add-ons without restarting; Settings gives instant access to simulator folders and preferences; and Auto-Tile automatically organizes all open floating windows.',
+                preferredPlacement: 'top',
+                async beforeEnter() {
+                    if (window.onboardingTour) window.onboardingTour._cleanupOpenedModals();
+                    if (typeof closeExportModal === 'function') closeExportModal();
+                    const tbActions = document.getElementById('bottom-toolbar-actions');
+                    if (tbActions) {
+                        tbActions.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                    await new Promise(r => setTimeout(r, 220));
+                },
+                async beforeExit() {}
+            },
+            // STEP 6: Interactive Airport Hub (e.g. LPMA on Map)
+            {
+                id: 'lpma_map_hub',
+                targetSelector: '#radial-core',
+                titleKey: 'onboarding.step6_title',
+                bodyKey: 'onboarding.step6_body',
+                defaultTitle: 'Interactive Airport Hub',
+                defaultBody: 'Every airport is represented on the world map by an interactive hub. Click any airport to center the camera, inspect its orientation, and view its connected route network.',
+                preferredPlacement: 'bottom',
+                async beforeEnter() {
+                    if (window.onboardingTour) window.onboardingTour._cleanupOpenedModals();
+                    const headerCard = document.getElementById('classic-ap-header-card');
+                    if (headerCard) headerCard.classList.add('hidden');
+
+                    const ap = window.onboardingTour ? window.onboardingTour._getLpmaAirport() : null;
+                    if (ap) {
+                        currentRadialAirport = ap;
+                        selectedAirport = ap;
+                        if (typeof panMapToAirport === 'function') {
+                            panMapToAirport(ap, 7.5);
+                        } else {
+                            const lMap = (window.onboardingTour && typeof window.onboardingTour._getLeafletMap === 'function')
+                                ? window.onboardingTour._getLeafletMap()
+                                : null;
+                            if (lMap && ap.lat && ap.lon) {
+                                lMap.flyTo([ap.lat, ap.lon], 7.5, { duration: 0.8 });
+                            }
+                        }
+                        if (typeof setAirportMarkerLabelFocus === 'function') {
+                            setAirportMarkerLabelFocus(ap.icao);
+                        }
+                        if (typeof updateRadialCoreBadge === 'function') {
+                            updateRadialCoreBadge(ap);
+                        }
+                        const radialEl = document.getElementById('airport-radial-menu');
+                        if (radialEl) {
+                            radialEl.classList.add('radial-only-core');
+                            radialEl.classList.remove('hidden', 'radial-quadrants-collapsed');
+                            radialEl.style.display = '';
+                            if (typeof updateRadialMenuPosition === 'function') {
+                                updateRadialMenuPosition(true);
+                            }
+                        }
+                    }
+                    await new Promise(r => setTimeout(r, 250));
+                },
+                async beforeExit() {}
+            },
+            // STEP 7: Airport Identity & Specifications (Sidebar Card)
+            {
+                id: 'lpma_sidebar_card',
+                targetSelector: '#classic-ap-header-card',
+                titleKey: 'onboarding.step7_title',
+                bodyKey: 'onboarding.step7_body',
+                defaultTitle: 'Airport Identity & Specifications',
+                defaultBody: 'Inspect all essential airport data in the sidebar: ICAO & IATA codes, active status, scenery vendor, field elevation, and GPS coordinates.',
+                preferredPlacement: 'right',
+                async beforeEnter() {
+                    if (window.onboardingTour) window.onboardingTour._cleanupOpenedModals();
+                    const ap = window.onboardingTour ? window.onboardingTour._getLpmaAirport() : null;
+                    if (ap && (!currentClassicAirport || currentClassicAirport.icao !== ap.icao)) {
+                        if (typeof showClassicAirportView === 'function') {
+                            showClassicAirportView(ap);
+                        }
+                    }
+                    const card = document.getElementById('classic-ap-header-card');
+                    if (card) {
+                        card.classList.remove('hidden');
+                        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                    await new Promise(r => setTimeout(r, 200));
+                },
+                async beforeExit() {}
+            },
+            // STEP 8: Airport Details (Docked Modal)
+            {
+                id: 'lpma_details_modal',
+                targetSelector: '#radial-details-modal',
+                titleKey: 'onboarding.step8_title',
+                bodyKey: 'onboarding.step8_body',
+                defaultTitle: 'Airport Details',
+                defaultBody: 'Inspect complete runway specifications (dimensions, asphalt surface, threshold coordinates, lighting), field elevation, and linked GSX profile status.',
+                preferredPlacement: 'right',
+                async beforeEnter() {
+                    if (window.onboardingTour) window.onboardingTour._cleanupOpenedModals();
+                    const ap = window.onboardingTour ? window.onboardingTour._getLpmaAirport() : null;
+                    if (ap && (!currentClassicAirport || currentClassicAirport.icao !== ap.icao)) {
+                        if (typeof showClassicAirportView === 'function') {
+                            showClassicAirportView(ap);
+                        }
+                    }
+                    const radialEl = document.getElementById('airport-radial-menu');
+                    if (radialEl) {
+                        radialEl.classList.remove('hidden');
+                        radialEl.style.display = '';
+                    }
+                    if (typeof openClassicAirportModal === 'function') {
+                        openClassicAirportModal('details');
+                    }
+                    if (window.windowManager) {
+                        window.windowManager.autoTileWindows(true);
+                    }
+                    await new Promise(r => setTimeout(r, 260));
+                },
+                async beforeExit() {}
+            },
+            // STEP 9: Available Add-ons (Docked Modal)
+            {
+                id: 'lpma_addons_modal',
+                targetSelector: '#radial-sceneries-extension',
+                titleKey: 'onboarding.step9_title',
+                bodyKey: 'onboarding.step9_body',
+                defaultTitle: 'Available Add-ons',
+                defaultBody: 'Browse all detected scenery packages for this airport (Payware, Freeware, and Streamed). Enable, disable, or isolate specific scenery versions with a single click.',
+                preferredPlacement: 'right',
+                async beforeEnter() {
+                    if (window.onboardingTour) window.onboardingTour._cleanupOpenedModals();
+                    const ap = window.onboardingTour ? window.onboardingTour._getLpmaAirport() : null;
+                    if (ap && (!currentClassicAirport || currentClassicAirport.icao !== ap.icao)) {
+                        if (typeof showClassicAirportView === 'function') {
+                            showClassicAirportView(ap);
+                        }
+                    }
+                    const radialEl = document.getElementById('airport-radial-menu');
+                    if (radialEl) {
+                        radialEl.classList.remove('hidden');
+                        radialEl.style.display = '';
+                    }
+                    if (typeof openClassicAirportModal === 'function') {
+                        openClassicAirportModal('sceneries');
+                    }
+                    if (window.windowManager) {
+                        window.windowManager.autoTileWindows(true);
+                    }
+                    await new Promise(r => setTimeout(r, 260));
+                },
+                async beforeExit() {}
+            },
+            // STEP 10: Operating Airlines (Docked Modal)
+            {
+                id: 'lpma_airlines_modal',
+                targetSelector: '#radial-airlines-modal',
+                titleKey: 'onboarding.step10_title',
+                bodyKey: 'onboarding.step10_body',
+                defaultTitle: 'Operating Airlines',
+                defaultBody: 'Discover real-world commercial carriers operating scheduled flights at this airport. Click any airline or destination to plot the route network directly across the world map.',
+                preferredPlacement: 'right',
+                async beforeEnter() {
+                    if (window.onboardingTour) window.onboardingTour._cleanupOpenedModals();
+                    const ap = window.onboardingTour ? window.onboardingTour._getLpmaAirport() : null;
+                    if (ap && (!currentClassicAirport || currentClassicAirport.icao !== ap.icao)) {
+                        if (typeof showClassicAirportView === 'function') {
+                            showClassicAirportView(ap);
+                        }
+                    }
+                    const radialEl = document.getElementById('airport-radial-menu');
+                    if (radialEl) {
+                        radialEl.classList.remove('hidden');
+                        radialEl.style.display = '';
+                    }
+                    if (typeof openClassicAirportModal === 'function') {
+                        openClassicAirportModal('airlines');
+                    }
+                    if (window.windowManager) {
+                        window.windowManager.autoTileWindows(true);
+                    }
+                    await new Promise(r => setTimeout(r, 260));
+                },
+                async beforeExit() {}
+            },
+            // STEP 11: Pricing Model
+            {
+                id: 'filter_pricing',
+                targetSelector: '#classic-filter-pricing-item',
+                titleKey: 'onboarding.filter_pricing_title',
+                bodyKey: 'onboarding.filter_pricing_body',
+                defaultTitle: 'Pricing Model',
+                defaultBody: 'Isolate airports by commercial type: Payware add-ons, community Freeware, handcrafted Asobo / World Update sceneries, or Default procedural airports. Multi-selection is supported.',
+                preferredPlacement: 'right',
+                async beforeEnter() {
+                    if (window.onboardingTour) await window.onboardingTour._prepareFilterStep('pricing');
+                },
+                async beforeExit() {}
+            },
+            // STEP 12: Scenery Source
+            {
+                id: 'filter_source',
+                targetSelector: '#classic-filter-source-item',
+                titleKey: 'onboarding.filter_source_title',
+                bodyKey: 'onboarding.filter_source_body',
+                defaultTitle: 'Scenery Source',
+                defaultBody: 'Distinguish between packages installed in your Community folder (local add-ons) and Official MSFS packages (including streamed content in MSFS 2024).',
+                preferredPlacement: 'right',
+                async beforeEnter() {
+                    if (window.onboardingTour) await window.onboardingTour._prepareFilterStep('source');
+                },
+                async beforeExit() {}
+            },
+            // STEP 13: World Region
+            {
+                id: 'filter_region',
+                targetSelector: '#classic-filter-region-item',
+                titleKey: 'onboarding.filter_region_title',
+                bodyKey: 'onboarding.filter_region_body',
+                defaultTitle: 'World Region',
+                defaultBody: 'Narrow your search to 11 geographic regions (Western Europe, North America, Asia, Oceania, etc.) or display all airfields globally with one click.',
+                preferredPlacement: 'right',
+                async beforeEnter() {
+                    if (window.onboardingTour) await window.onboardingTour._prepareFilterStep('region');
+                },
+                async beforeExit() {}
+            },
+            // STEP 14: Airport Category
+            {
+                id: 'filter_type',
+                targetSelector: '#classic-filter-type-item',
+                titleKey: 'onboarding.filter_type_title',
+                bodyKey: 'onboarding.filter_type_body',
+                defaultTitle: 'Airport Category',
+                defaultBody: 'Filter by operational profile: major International hubs, Regional airfields, General Aviation (GA) aeroclubs and bush strips, or Helipads and Seaplane water bases.',
+                preferredPlacement: 'right',
+                async beforeEnter() {
+                    if (window.onboardingTour) await window.onboardingTour._prepareFilterStep('type');
+                },
+                async beforeExit() {}
+            },
+            // STEP 15: GSX Profile
+            {
+                id: 'filter_gsx',
+                targetSelector: '#classic-filter-gsx-item',
+                titleKey: 'onboarding.filter_gsx_title',
+                bodyKey: 'onboarding.filter_gsx_body',
+                defaultTitle: 'GSX Profile',
+                defaultBody: 'Quickly isolate airports equipped with an active custom GSX profile (custom pushback procedures, vehicle spots, and passenger boarding paths) or identify airfields lacking one.',
+                preferredPlacement: 'right',
+                async beforeEnter() {
+                    if (window.onboardingTour) await window.onboardingTour._prepareFilterStep('gsx');
+                },
+                async beforeExit() {}
+            },
+            // STEP 16: Minimum Rating
+            {
+                id: 'filter_rating',
+                targetSelector: '#classic-filter-rating-item',
+                titleKey: 'onboarding.filter_rating_title',
+                bodyKey: 'onboarding.filter_rating_body',
+                defaultTitle: 'Minimum Rating',
+                defaultBody: 'Filter scenery quality by community rating from 1★ to 5★. Perfect for instantly discovering the most acclaimed destinations in your global library.',
+                preferredPlacement: 'right',
+                async beforeEnter() {
+                    if (window.onboardingTour) await window.onboardingTour._prepareFilterStep('rating');
+                },
+                async beforeExit() {}
+            },
+            // STEP 17: Route Optimization
+            {
+                id: 'route_optimization',
+                targetSelector: '#float-win-route-opt',
+                titleKey: 'onboarding.step_route_opt_title',
+                bodyKey: 'onboarding.step_route_opt_body',
+                defaultTitle: 'Flight Route Optimization',
+                defaultBody: 'Import your SimBrief flight plan or select a Direct or Corridor profile: SceneryX isolates your path, disabling unneeded sceneries to free valuable GBs of RAM and VRAM.',
+                preferredPlacement: 'right',
+                async beforeEnter() {
+                    if (window.onboardingTour) window.onboardingTour._cleanupOpenedModals();
+                    const radialEl = document.getElementById('airport-radial-menu');
+                    if (radialEl) {
+                        radialEl.classList.add('hidden');
+                        radialEl.style.display = 'none';
+                    }
+                    const headerCard = document.getElementById('classic-ap-header-card');
+                    if (headerCard) headerCard.classList.add('hidden');
+                    document.querySelectorAll('[id^="classic-sub-"]').forEach(el => el.classList.add('hidden'));
+                    document.querySelectorAll('[id^="classic-chevron-"]').forEach(el => el.style.transform = 'rotate(0deg)');
+
+                    if (typeof openFloatingWindow === 'function') {
+                        openFloatingWindow('route');
+                    }
+                    const win = document.getElementById('float-win-route-opt');
+                    if (win) {
+                        win.classList.remove('hidden');
+                        win.style.display = 'flex';
+                    }
+                    await new Promise(r => setTimeout(r, 260));
+                },
+                async beforeExit(direction) {
+                    if (typeof closeFloatingWindow === 'function') {
+                        closeFloatingWindow('route');
+                    }
+                }
+            },
+            // STEP 18: Smart LOD & Auto FPS
+            {
+                id: 'smart_lod',
+                targetSelector: '#float-win-smart-lod',
+                titleKey: 'onboarding.step_smart_lod_title',
+                bodyKey: 'onboarding.step_smart_lod_body',
+                defaultTitle: 'Smart LOD & Auto FPS',
+                defaultBody: 'Dynamic Level of Detail governor (TLOD & OLOD) based on your flight altitude with Auto Cloud Recovery. SceneryX embeds its own governor and prevents conflicts with external AutoFPS.',
+                preferredPlacement: 'right',
+                async beforeEnter() {
+                    if (window.onboardingTour) window.onboardingTour._cleanupOpenedModals();
+                    if (typeof openFloatingWindow === 'function') {
+                        openFloatingWindow('smart_lod');
+                    }
+                    const win = document.getElementById('float-win-smart-lod');
+                    if (win) {
+                        win.classList.remove('hidden');
+                        win.style.display = 'flex';
+                    }
+                    await new Promise(r => setTimeout(r, 260));
+                },
+                async beforeExit(direction) {
+                    if (typeof closeFloatingWindow === 'function') {
+                        closeFloatingWindow('smart_lod');
+                    }
+                }
+            },
+            // STEP 19: MSFS Graphic Settings
+            {
+                id: 'graphics_settings',
+                targetSelector: '#float-win-graphics',
+                titleKey: 'onboarding.step_graphics_title',
+                bodyKey: 'onboarding.step_graphics_body',
+                defaultTitle: 'MSFS Graphic Settings',
+                defaultBody: 'All MSFS graphics settings organized into three distinct profiles: Shared, 2D Display, and VR Headset (with OFXR Frame Gen bridge). Manage profiles and monitor CPU/VRAM balance in real time.',
+                preferredPlacement: 'right',
+                async beforeEnter() {
+                    if (window.onboardingTour) window.onboardingTour._cleanupOpenedModals();
+                    if (typeof closeBackgroundToolsModal === 'function') closeBackgroundToolsModal();
+                    if (typeof openFloatingWindow === 'function') {
+                        openFloatingWindow('graphics');
+                    }
+                    const win = document.getElementById('float-win-graphics');
+                    if (win) {
+                        win.classList.remove('hidden');
+                        win.style.display = 'flex';
+                    }
+                    await new Promise(r => setTimeout(r, 260));
+                },
+                async beforeExit(direction) {
+                    if (direction === 'prev') {
+                        if (typeof closeFloatingWindow === 'function') {
+                            closeFloatingWindow('graphics');
+                        }
+                    }
+                }
+            },
+            // STEP 20: OFXR & Auto FPS Conflict Detection (Modal pops in front of Graphic Settings)
+            {
+                id: 'bg_tools_ofxr_autofps',
+                targetSelector: '#background-tools-modal',
+                titleKey: 'onboarding.step_bg_tools_title',
+                bodyKey: 'onboarding.step_bg_tools_body',
+                defaultTitle: 'OFXR Detection & Auto FPS Conflicts',
+                defaultBody: 'SceneryX detects if the OFXR Frame Gen bridge is running. Meanwhile, Smart LOD and external AutoFPS write to identical memory offsets and cannot cohabit: this alert modal warns you whenever Auto FPS runs in the background.',
+                preferredPlacement: 'right',
+                async beforeEnter() {
+                    // Keep MSFS Graphic Settings open in background
+                    const gWin = document.getElementById('float-win-graphics');
+                    if (!gWin || gWin.classList.contains('hidden') || gWin.style.display === 'none') {
+                        if (typeof openFloatingWindow === 'function') openFloatingWindow('graphics');
+                        if (gWin) {
+                            gWin.classList.remove('hidden');
+                            gWin.style.display = 'flex';
+                        }
+                    }
+                    // Trigger Background Tools conflict modal with both AutoFPS and OFXR sections active
+                    const demoBgData = {
+                        autofps_running: true,
+                        autofps_pid: 14820,
+                        ofxr_running: true,
+                        ofxr_pid: 9240,
+                        ofxr_mode: '3X',
+                        vr_hz: 90,
+                        fps_2x: 45,
+                        fps_3x: 30,
+                        ofxr_sync_smart_lod: true
+                    };
+                    if (typeof openBackgroundToolsModal === 'function') {
+                        openBackgroundToolsModal(demoBgData);
+                    }
+                    const bModal = document.getElementById('background-tools-modal');
+                    if (bModal) {
+                        bModal.classList.remove('hidden');
+                        bModal.classList.add('flex');
+                        if (window.windowManager) {
+                            window.windowManager.centerModal(bModal);
+                        }
+                    }
+                    await new Promise(r => setTimeout(r, 260));
+                },
+                async beforeExit(direction) {
+                    if (typeof closeBackgroundToolsModal === 'function') {
+                        closeBackgroundToolsModal();
+                    }
+                    if (direction === 'next') {
+                        if (typeof closeFloatingWindow === 'function') {
+                            closeFloatingWindow('graphics');
+                        }
+                    }
+                }
+            },
+            // STEP 21: My Rig (Hardware Specs Audit)
+            {
+                id: 'my_rig',
+                targetSelector: '#float-win-my-rig',
+                titleKey: 'onboarding.step_my_rig_title',
+                bodyKey: 'onboarding.step_my_rig_body',
+                defaultTitle: 'Hardware Specs Audit',
+                defaultBody: 'Real-time audit of your hardware components: Processor (CPU), Graphics Card (GPU), RAM, high-speed NVMe storage, network bandwidth, and detected VR headsets to evaluate your system baseline.',
+                preferredPlacement: 'right',
+                async beforeEnter() {
+                    if (window.onboardingTour) window.onboardingTour._cleanupOpenedModals();
+                    if (typeof closeBackgroundToolsModal === 'function') closeBackgroundToolsModal();
+                    if (typeof openFloatingWindow === 'function') {
+                        openFloatingWindow('my_rig');
+                    }
+                    const win = document.getElementById('float-win-my-rig');
+                    if (win) {
+                        win.classList.remove('hidden');
+                        win.style.display = 'flex';
+                    }
+                    await new Promise(r => setTimeout(r, 260));
+                },
+                async beforeExit(direction) {
+                    if (direction === 'prev') {
+                        if (typeof closeFloatingWindow === 'function') {
+                            closeFloatingWindow('my_rig');
+                        }
+                    }
+                }
+            },
+            // STEP 22: Active Display Selection in My Rig
+            {
+                id: 'my_rig_display',
+                targetSelector: '#opt-rig-card-display',
+                titleKey: 'onboarding.step_display_select_title',
+                bodyKey: 'onboarding.step_display_select_body',
+                defaultTitle: 'Active Display Selection',
+                defaultBody: 'Essential step: make sure to click on the monitor that will be actively displaying MSFS (e.g. Screen 1 at 180 Hz vs Screen 2 at 165 Hz). SceneryX calibrates refresh cadence, frame pacing, and 1/2 sync targets on this specific display.',
+                preferredPlacement: 'right',
+                async beforeEnter() {
+                    const rigWin = document.getElementById('float-win-my-rig');
+                    if (!rigWin || rigWin.classList.contains('hidden') || rigWin.style.display === 'none') {
+                        if (typeof openFloatingWindow === 'function') openFloatingWindow('my_rig');
+                        if (rigWin) {
+                            rigWin.classList.remove('hidden');
+                            rigWin.style.display = 'flex';
+                        }
+                    }
+                    const card = document.getElementById('opt-rig-card-display') || document.querySelector('.rig-card-display');
+                    if (card) {
+                        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                    await new Promise(r => setTimeout(r, 260));
+                },
+                async beforeExit(direction) {
+                    if (direction === 'next') {
+                        if (typeof closeFloatingWindow === 'function') {
+                            closeFloatingWindow('my_rig');
+                        }
+                    }
+                }
+            },
+            // STEP 23: In-Game Panel Install in Settings
+            {
+                id: 'ingame_panel_install',
+                targetSelector: '#cfg-ingame-panel-section',
+                titleKey: 'onboarding.step_ingame_install_title',
+                bodyKey: 'onboarding.step_ingame_install_body',
+                defaultTitle: 'In-Game Toolbar Panel Installation',
+                defaultBody: 'In Settings, a single click on "INSTALL" deploys the SceneryX HUD panel into your MSFS Community folder for quick in-flight Smart LOD and telemetry access.',
+                preferredPlacement: 'bottom',
+                async beforeEnter() {
+                    if (window.onboardingTour) window.onboardingTour._cleanupOpenedModals();
+                    const modal = document.getElementById('settings-modal');
+                    if (!modal || modal.classList.contains('hidden')) {
+                        if (typeof openSettingsModal === 'function') {
+                            await openSettingsModal();
+                        }
+                    }
+                    const section = document.getElementById('cfg-ingame-panel-section');
+                    if (section) {
+                        section.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                    await new Promise(r => setTimeout(r, 240));
+                },
+                async beforeExit(direction) {
+                    if (typeof closeSettingsModal === 'function') {
+                        closeSettingsModal();
+                    }
+                    await new Promise(r => setTimeout(r, 200));
+                }
+            },
+            // STEP 24: In-Game Panel in Cockpit
+            {
+                id: 'ingame_panel_cockpit',
+                targetSelector: '#float-win-remote-panel',
+                titleKey: 'onboarding.step_ingame_cockpit_title',
+                bodyKey: 'onboarding.step_ingame_cockpit_body',
+                defaultTitle: 'In-Game Panel in Cockpit',
+                defaultBody: 'Here is the SceneryX panel inside the MSFS cockpit: adjust TLOD / OLOD in real time, toggle Auto Cloud Recovery, and monitor displayed/base FPS, CPU MainThread latency, and GPU/VRAM load.',
+                preferredPlacement: 'right',
+                async beforeEnter() {
+                    if (window.onboardingTour) window.onboardingTour._cleanupOpenedModals();
+                    const img = document.getElementById('remote-panel-cockpit-img');
+                    if (img) {
+                        img.classList.remove('hidden');
+                        img.style.display = 'block';
+                    }
+                    const frame = document.getElementById('remote-panel-preview-frame');
+                    if (frame) {
+                        frame.classList.add('hidden');
+                        frame.style.display = 'none';
+                    }
+                    if (typeof openFloatingWindow === 'function') {
+                        openFloatingWindow('remote_panel');
+                    }
+                    const win = document.getElementById('float-win-remote-panel');
+                    if (win) {
+                        win.classList.remove('hidden');
+                        win.style.display = 'flex';
+                    }
+                    await new Promise(r => setTimeout(r, 260));
+                },
+                async beforeExit(direction) {
+                    if (typeof closeFloatingWindow === 'function') {
+                        closeFloatingWindow('remote_panel');
+                    }
+                }
+            },
+            // STEP 25: Flight Performance Report
+            {
+                id: 'flight_report',
+                targetSelector: '#float-win-report-viewer',
+                titleKey: 'onboarding.step_flight_report_title',
+                bodyKey: 'onboarding.step_flight_report_body',
+                defaultTitle: 'Flight Performance Reports',
+                defaultBody: 'Record flights with "Start Monitoring" to generate complete telemetry reports: interactive smoothness charts (FPS, 1% Low, MainThread ms), VRAM/RAM load, and stutter detection.',
+                preferredPlacement: 'bottom',
+                async beforeEnter() {
+                    if (window.onboardingTour) window.onboardingTour._cleanupOpenedModals();
+                    let hasOpened = false;
+                    if (typeof currentBenchmarksList !== 'undefined' && Array.isArray(currentBenchmarksList) && currentBenchmarksList.length > 0) {
+                        if (typeof openReportViewerModal === 'function') {
+                            try {
+                                await openReportViewerModal(currentBenchmarksList[0].filename);
+                                hasOpened = true;
+                            } catch (e) {
+                                hasOpened = false;
+                            }
+                        }
+                    }
+                    if (!hasOpened) {
+                        if (typeof openFloatingWindow === 'function') {
+                            openFloatingWindow('report_viewer');
+                        }
+                        const win = document.getElementById('float-win-report-viewer');
+                        if (win) {
+                            win.classList.remove('hidden');
+                            win.style.display = 'flex';
+                        }
+                        const demoReport = {
+                            filename: 'demo_flight_report_LPMA.json',
+                            departure: 'LPMA',
+                            arrival: 'LPFR',
+                            aircraft: 'Airbus A320neo',
+                            aircraft_model: 'Airbus A320neo',
+                            aircraft_developer: 'FlyByWire / Asobo',
+                            flight_time_min: 65,
+                            duration: '1h 05m',
+                            time_display_full: '1h 05m (Cruise FL280)',
+                            mode_display: 'Route Corridor • Active',
+                            summary: {
+                                avg_fps: 58.4,
+                                min_fps: 42.1,
+                                p1_low_fps: 46.8,
+                                stutter_count: 2,
+                                avg_cpu_mainthread_ms: 12.8,
+                                avg_vram_gb: 9.4,
+                                max_vram_gb: 11.2,
+                                avg_ram_gb: 18.2
+                            },
+                            cards_list: [
+                                { title: "Average FPS", val_html: "58.4 <span class='text-xs font-normal text-slate-400'>FPS (1% Low: 46.8)</span>", sub: "Target 60 • Ultra 4K" },
+                                { title: "Average CPU MainThread", val_html: "12.8 <span class='text-xs font-normal text-slate-400'>ms</span>", sub: "Optimal < 16.6ms • 0 Bound" },
+                                { title: "Average GPU VRAM", val_html: "9.4 <span class='text-xs font-normal text-slate-400'>/ 16.0 GB</span>", sub: "Peak: 11.2 GB • 58% Alloc" },
+                                { title: "Average Physical RAM", val_html: "18.2 <span class='text-xs font-normal text-slate-400'>/ 32.0 GB</span>", sub: "Stable Footprint" },
+                                { title: "Flight Duration", val_html: "1h 05m", sub: "LPMA ➔ LPFR • Cruise FL280" },
+                                { title: "Stutter Index", val_html: "<span class='text-emerald-400'>Smooth (2 spikes)</span>", sub: "99.8% Stutter-Free" }
+                            ],
+                            times: ["00:00", "05:00", "10:00", "15:00", "20:00", "25:00", "30:00", "35:00", "40:00", "45:00", "50:00", "55:00", "60:00"],
+                            fps_chart: {
+                                disp_fps: [54, 57, 59, 61, 60, 58, 59, 58, 57, 60, 56, 58, 59],
+                                main_thread_ms: [14.2, 13.5, 12.8, 12.4, 12.6, 13.0, 12.7, 12.9, 13.1, 12.5, 13.4, 12.8, 12.7],
+                                base_fps: [42, 45, 48, 50, 49, 47, 48, 47, 46, 49, 45, 47, 48]
+                            },
+                            perf_chart: {
+                                vram_vals: [8800, 9100, 9300, 9400, 9500, 9450, 9400, 9520, 9600, 9500, 9400, 9400, 9300],
+                                msfs_ram_vals: [14200, 15100, 15800, 16200, 16500, 16400, 16300, 16500, 16600, 16500, 16400, 16300, 16200]
+                            },
+                            lod_chart: {
+                                tlod_vals: [150, 160, 180, 200, 200, 200, 200, 200, 200, 200, 180, 160, 150],
+                                olod_vals: [120, 130, 150, 150, 150, 150, 150, 150, 150, 150, 140, 130, 120],
+                                alt_vals: [200, 3500, 12000, 28000, 28000, 28000, 28000, 28000, 28000, 24000, 11000, 2500, 190]
+                            },
+                            io_chart: {
+                                rolling_cache_read_mb: [12, 18, 45, 8, 4, 3, 4, 5, 4, 15, 38, 22, 10],
+                                disk_read_speed_mb: [25, 42, 85, 12, 6, 5, 6, 8, 6, 28, 65, 34, 18]
+                            },
+                            narrative_section: "Flight telemetry analysis: Frame pacing remained exceptionally stable with minimal latency jitter. GPU VRAM stayed safely below allocation thresholds.",
+                            milestones_section: "",
+                            smart_lod_section: ""
+                        };
+                        if (typeof renderReportInViewerModal === 'function') {
+                            renderReportInViewerModal(demoReport);
+                        }
+                    }
+                    await new Promise(r => setTimeout(r, 280));
+                },
+                async beforeExit(direction) {
+                    if (typeof closeFloatingWindow === 'function') {
+                        closeFloatingWindow('report_viewer');
+                    }
+                }
+            }
+        ];
+    }
+
+    _getLeafletMap() {
+        if (typeof map !== 'undefined' && map && typeof map.on === 'function') {
+            return map;
+        }
+        if (typeof window !== 'undefined' && window.leafletMap && typeof window.leafletMap.on === 'function') {
+            return window.leafletMap;
+        }
+        return null;
+    }
+
+    _getLpmaAirport() {
+        let ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao('LPMA') : null;
+        if (!ap && typeof allAirportsData !== 'undefined' && Array.isArray(allAirportsData)) {
+            ap = allAirportsData.find(a => (a.icao || '').toUpperCase() === 'LPMA');
+        }
+        if (!ap && typeof allAirportsData !== 'undefined' && Array.isArray(allAirportsData) && allAirportsData.length > 0) {
+            ap = allAirportsData.find(a => a.pricing_type === 'Payware' || a.pricing_type === 'Freeware') || allAirportsData[0];
+        }
+        return ap;
+    }
+
+    _cleanupFloatingWindows() {
+        if (typeof closeBackgroundToolsModal === 'function') {
+            closeBackgroundToolsModal();
+        }
+        if (typeof closeExportModal === 'function') {
+            closeExportModal();
+        }
+        ['route', 'smart_lod', 'graphics', 'my_rig', 'remote_panel', 'report_viewer', 'telemetry'].forEach(k => {
+            const elId = (typeof FLOATING_WINDOW_MAP !== 'undefined' && FLOATING_WINDOW_MAP[k]) || k;
+            const winEl = document.getElementById(elId);
+            if (winEl && (!winEl.classList.contains('hidden') || winEl.style.display !== 'none')) {
+                if (typeof closeFloatingWindow === 'function') {
+                    closeFloatingWindow(k);
+                }
+            }
+        });
+        const settingsModal = document.getElementById('settings-modal');
+        if (settingsModal && !settingsModal.classList.contains('hidden')) {
+            if (typeof closeSettingsModal === 'function') closeSettingsModal();
+        }
+    }
+
+    _cleanupOpenedModals() {
+        if (typeof closeExportModal === 'function') {
+            closeExportModal();
+        }
+        if (typeof closeRadialDetailsModal === 'function') {
+            closeRadialDetailsModal(null, true);
+        }
+        if (typeof closeRadialAirlinesModal === 'function') {
+            closeRadialAirlinesModal();
+        }
+        const sceneriesExt = document.getElementById('radial-sceneries-extension');
+        if (sceneriesExt) {
+            sceneriesExt.classList.add('hidden');
+            sceneriesExt.style.opacity = '';
+            const bodyEl = document.getElementById('radial-sceneries-extension-body');
+            if (bodyEl) bodyEl.innerHTML = '';
+            if (typeof stagedRadialScenerySelection !== 'undefined') stagedRadialScenerySelection = null;
+        }
+        this._cleanupFloatingWindows();
+        if (window.windowManager) {
+            window.windowManager.autoTileWindows();
+        }
+    }
+
+    async _prepareFilterStep(key) {
+        this._cleanupOpenedModals();
+        const radialEl = document.getElementById('airport-radial-menu');
+        if (radialEl) {
+            radialEl.classList.add('hidden');
+            radialEl.style.display = 'none';
+        }
+        const headerCard = document.getElementById('classic-ap-header-card');
+        if (headerCard) headerCard.classList.add('hidden');
+        const actionsSec = document.getElementById('classic-ap-actions-section');
+        if (actionsSec) actionsSec.classList.add('hidden');
+        const filtersSec = document.getElementById('classic-filters-section');
+        if (filtersSec) filtersSec.classList.remove('hidden');
+
+        // Unfold target accordion and collapse all others
+        const subEl = document.getElementById(`classic-sub-${key}`);
+        const chevEl = document.getElementById(`classic-chevron-${key}`);
+        document.querySelectorAll('[id^="classic-sub-"]').forEach(el => {
+            if (el !== subEl) el.classList.add('hidden');
+        });
+        document.querySelectorAll('[id^="classic-chevron-"]').forEach(el => {
+            if (el !== chevEl) el.style.transform = 'rotate(0deg)';
+        });
+        if (subEl) subEl.classList.remove('hidden');
+        if (chevEl) chevEl.style.transform = 'rotate(180deg)';
+
+        const itemEl = document.getElementById(`classic-filter-${key}-item`);
+        if (itemEl) {
+            itemEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+        await new Promise(r => setTimeout(r, 220));
+    }
+
+    async isOnboardingCompleted() {
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.is_onboarding_completed) {
+            try {
+                const resStr = await window.pywebview.api.is_onboarding_completed();
+                const res = (typeof resStr === 'string') ? JSON.parse(resStr) : resStr;
+                if (res && typeof res.completed === 'boolean') {
+                    if (res.completed) {
+                        try { localStorage.setItem('sceneryx_has_seen_onboarding', 'true'); } catch(e) {}
+                        return true;
+                    } else {
+                        try { localStorage.removeItem('sceneryx_has_seen_onboarding'); } catch(e) {}
+                        return false;
+                    }
+                }
+            } catch (e) {
+                console.warn("[OnboardingTour] Backend onboarding status check warning:", e);
+            }
+        }
+        if (typeof currentSettings !== 'undefined' && currentSettings && currentSettings.has_seen_onboarding) {
+            return true;
+        }
+        return false;
+    }
+
+    async checkAutoPrompt() {
+        try {
+            const completed = await this.isOnboardingCompleted();
+            if (completed) {
+                return;
+            }
+            const discModal = document.getElementById('disclaimer-modal');
+            if (discModal && !discModal.classList.contains('hidden')) {
+                return;
+            }
+            const rescanModal = document.getElementById('rescan-modal');
+            if (rescanModal && !rescanModal.classList.contains('hidden')) {
+                return;
+            }
+            const splash = document.getElementById('splash-screen');
+            if (splash && !splash.classList.contains('hidden') && splash.style.display !== 'none') {
+                return;
+            }
+            this.showPrompt();
+        } catch (err) {
+            console.warn("[OnboardingTour] Auto-prompt check error:", err);
+        }
+    }
+
+    showPrompt() {
+        const backdrop = document.getElementById('onboarding-prompt-backdrop');
+        const modal = document.getElementById('onboarding-prompt-modal');
+        if (backdrop) backdrop.classList.remove('hidden');
+        if (modal) {
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            const titleEl = document.getElementById('onboarding-prompt-title');
+            const subEl = document.getElementById('onboarding-prompt-subtitle');
+            const startBtn = modal.querySelector('span[data-i18n="onboarding.btn_start"]');
+            const skipBtn = modal.querySelector('span[data-i18n="onboarding.btn_skip"]');
+            if (titleEl && typeof t === 'function') titleEl.innerText = t('onboarding.prompt_title', 'Welcome to SceneryX!');
+            if (subEl && typeof t === 'function') subEl.innerText = t('onboarding.prompt_subtitle', 'Take a quick guided tour to discover how to navigate, inspect airports, explore add-ons, and optimize your scenery library.');
+            if (startBtn && typeof t === 'function') startBtn.innerText = t('onboarding.btn_start', 'Start Interactive Tour');
+            if (skipBtn && typeof t === 'function') skipBtn.innerText = t('onboarding.btn_skip', 'Skip Tour');
+        }
+    }
+
+    dismissPrompt(markSeen = true) {
+        const backdrop = document.getElementById('onboarding-prompt-backdrop');
+        const modal = document.getElementById('onboarding-prompt-modal');
+        if (backdrop) backdrop.classList.add('hidden');
+        if (modal) {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+        if (markSeen) {
+            this.markCompleted();
+            if (typeof triggerPendingBackgroundToolsCheck === 'function') {
+                triggerPendingBackgroundToolsCheck();
+            }
+        }
+    }
+
+    async start(stepIndex = 0) {
+        try {
+            this.dismissPrompt(false);
+            this.isOpen = true;
+            this.currentStepIndex = stepIndex;
+
+            document.body.classList.add('tour-active');
+
+            const overlay = document.getElementById('onboarding-tour-overlay');
+            if (overlay) overlay.classList.remove('hidden');
+
+            window.removeEventListener('resize', this._boundHandleResize);
+            window.addEventListener('resize', this._boundHandleResize);
+            window.removeEventListener('scroll', this._boundHandleScroll, true);
+            window.addEventListener('scroll', this._boundHandleScroll, true);
+
+            const lMap = this._getLeafletMap();
+            if (lMap) {
+                lMap.off('move', this._boundHandleMapMove);
+                lMap.on('move', this._boundHandleMapMove);
+                lMap.off('moveend', this._boundHandleMapMove);
+                lMap.on('moveend', this._boundHandleMapMove);
+                lMap.off('zoomend', this._boundHandleMapMove);
+                lMap.on('zoomend', this._boundHandleMapMove);
+            }
+
+            this._setupSpotlightClickListener();
+            await this.goToStep(this.currentStepIndex);
+        } catch (err) {
+            console.error("[OnboardingTour] Failed to start tour:", err);
+        }
+    }
+
+    _handleResize() {
+        if (!this.isOpen) return;
+        this.updateSpotlight();
+    }
+
+    _handleScroll() {
+        if (!this.isOpen || !this._activeTargetEl) return;
+        this.updateSpotlight();
+    }
+
+    _handleMapMove() {
+        if (!this.isOpen || !this._activeTargetEl) return;
+        this.updateSpotlight();
+    }
+
+    _setupSpotlightClickListener() {
+        // Clicks on underlying elements are strictly prevented during tour
+    }
+
+    async goToStep(index, direction = 'next') {
+        try {
+            if (index < 0 || index >= this.steps.length) return;
+
+            // Run exit hook of previous step if changing
+            if (this._activeTargetEl && this.steps[this.currentStepIndex] && typeof this.steps[this.currentStepIndex].beforeExit === 'function') {
+                await this.steps[this.currentStepIndex].beforeExit(direction);
+            }
+
+            this.currentStepIndex = index;
+            const step = this.steps[index];
+
+            // Run enter hook of current step
+            if (typeof step.beforeEnter === 'function') {
+                await step.beforeEnter(direction);
+            }
+
+            // Render Tooltip Card text and controls
+            this._renderTooltip(step, index);
+
+            // Update Spotlight Target & Cutout
+            await this._focusTarget(step.targetSelector, step.preferredPlacement);
+        } catch (err) {
+            console.error("[OnboardingTour] Error during goToStep:", index, err);
+        }
+    }
+
+    _renderTooltip(step, index) {
+        const badge = document.getElementById('tour-step-badge');
+        const titleEl = document.getElementById('tour-step-title');
+        const bodyEl = document.getElementById('tour-step-body');
+        const prevBtn = document.getElementById('tour-btn-prev');
+        const nextBtn = document.getElementById('tour-btn-next');
+        const nextLabel = document.getElementById('tour-btn-next-label');
+        const skipBtn = document.getElementById('tour-btn-skip');
+
+        const totalSteps = this.steps.length;
+        const stepCounterText = `${index + 1}/${totalSteps}`;
+
+        if (badge) badge.innerText = stepCounterText;
+        if (titleEl) titleEl.innerText = (typeof t === 'function') ? t(step.titleKey, step.defaultTitle) : step.defaultTitle;
+        if (bodyEl) bodyEl.innerText = (typeof t === 'function') ? t(step.bodyKey, step.defaultBody) : step.defaultBody;
+
+        if (prevBtn) {
+            if (index === 0) {
+                prevBtn.classList.add('hidden');
+            } else {
+                prevBtn.classList.remove('hidden');
+                prevBtn.innerText = (typeof t === 'function') ? t('onboarding.btn_prev', 'Previous') : 'Previous';
+            }
+        }
+
+        if (skipBtn) {
+            skipBtn.innerText = (typeof t === 'function') ? t('onboarding.btn_skip_tour', 'Skip Tour') : 'Skip Tour';
+        }
+
+        if (nextLabel) {
+            if (index === totalSteps - 1) {
+                nextLabel.innerHTML = `<i class="fa-solid fa-check text-[11px] mr-1.5"></i>${(typeof t === 'function') ? t('onboarding.btn_finish', 'Finish') : 'Finish'}`;
+            } else {
+                nextLabel.innerText = (typeof t === 'function') ? t('onboarding.btn_next', 'Next') : 'Next';
+            }
+        }
+    }
+
+    async _focusTarget(selector, preferredPlacement = 'right') {
+        let targetEl = document.querySelector(selector);
+
+        // Small polling retry in case element was transitioning or just rendered
+        if (!targetEl) {
+            for (let i = 0; i < 10; i++) {
+                await new Promise(r => setTimeout(r, 60));
+                targetEl = document.querySelector(selector);
+                if (targetEl) break;
+            }
+        }
+
+        if (this._activeTargetEl) {
+            this._activeTargetEl.classList.remove('tour-spotlight-target');
+            if (this._activeTargetEl._tourSetRelativePosition) {
+                this._activeTargetEl.style.position = '';
+                delete this._activeTargetEl._tourSetRelativePosition;
+            }
+        }
+
+        if (!targetEl) {
+            console.warn("[OnboardingTour] Target not found:", selector);
+            this._centerTooltipFallback();
+            return;
+        }
+
+        this._activeTargetEl = targetEl;
+        const computedPos = window.getComputedStyle(targetEl).position;
+        if (computedPos === 'static') {
+            targetEl.style.position = 'relative';
+            targetEl._tourSetRelativePosition = true;
+        }
+        targetEl.classList.add('tour-spotlight-target');
+
+        // Dynamically track target element during entrance animations, window tiling and map pan
+        this._startTargetTracking(preferredPlacement, 1200);
+    }
+
+    _centerTooltipFallback() {
+        const card = document.getElementById('tour-tooltip-card');
+        if (card) {
+            const vpW = window.innerWidth;
+            const vpH = window.innerHeight;
+            card.style.left = `${Math.round(Math.max(16, (vpW - 360) / 2))}px`;
+            card.style.top = `${Math.round(Math.max(16, (vpH - 200) / 2))}px`;
+        }
+    }
+
+    _startTargetTracking(preferredPlacement, durationMs = 750) {
+        if (this._trackingRafId) {
+            cancelAnimationFrame(this._trackingRafId);
+            this._trackingRafId = null;
+        }
+        const startTime = performance.now();
+        const track = () => {
+            if (!this.isOpen || !this._activeTargetEl) return;
+            this.updateSpotlight(preferredPlacement);
+            if (performance.now() - startTime < durationMs) {
+                this._trackingRafId = requestAnimationFrame(track);
+            } else {
+                this._trackingRafId = null;
+                this.updateSpotlight(preferredPlacement);
+            }
+        };
+        this._trackingRafId = requestAnimationFrame(track);
+    }
+
+    updateSpotlight(overridePlacement = null) {
+        if (!this._activeTargetEl) return;
+        const rect = this._activeTargetEl.getBoundingClientRect();
+        const pad = 6;
+        const x = Math.max(0, rect.left - pad);
+        const y = Math.max(0, rect.top - pad);
+        const w = rect.width + pad * 2;
+        const h = rect.height + pad * 2;
+
+        let rx = 10;
+        try {
+            const computedStyle = window.getComputedStyle(this._activeTargetEl);
+            const br = computedStyle.borderRadius || '';
+            if (br.includes('%') || parseFloat(br) >= Math.min(rect.width, rect.height) / 2 - 10) {
+                rx = Math.min(w, h) / 2;
+            }
+        } catch(e) {}
+
+        this._activeCutoutRect = { left: x, top: y, width: w, height: h };
+
+        const cutout = document.getElementById('tour-mask-cutout');
+        const glow = document.getElementById('tour-spotlight-glow');
+        if (cutout) {
+            cutout.setAttribute('x', x);
+            cutout.setAttribute('y', y);
+            cutout.setAttribute('width', w);
+            cutout.setAttribute('height', h);
+            cutout.setAttribute('rx', rx);
+            cutout.setAttribute('ry', rx);
+        }
+        if (glow) {
+            glow.setAttribute('x', x);
+            glow.setAttribute('y', y);
+            glow.setAttribute('width', w);
+            glow.setAttribute('height', h);
+            glow.setAttribute('rx', rx);
+            glow.setAttribute('ry', rx);
+            glow.setAttribute('opacity', '1');
+        }
+
+        const placement = overridePlacement || (this.steps[this.currentStepIndex] ? this.steps[this.currentStepIndex].preferredPlacement : 'right');
+        this._positionTooltip(rect, placement);
+    }
+
+    _positionTooltip(targetRect, preferredPlacement = 'right') {
+        const card = document.getElementById('tour-tooltip-card');
+        if (!card) return;
+        const cardRect = card.getBoundingClientRect();
+        const tooltipW = cardRect.width || 360;
+        const tooltipH = cardRect.height || 180;
+        const pad = 14;
+        const margin = 16;
+        const vpW = window.innerWidth;
+        const vpH = window.innerHeight;
+
+        let left = 0;
+        let top = 0;
+
+        let placement = preferredPlacement;
+        if (placement === 'right' && (targetRect.right + pad + tooltipW > vpW - margin)) {
+            if (targetRect.bottom + pad + tooltipH <= vpH - margin) {
+                placement = 'bottom';
+            } else if (targetRect.top - pad - tooltipH >= margin) {
+                placement = 'top';
+            } else {
+                placement = 'left';
+            }
+        }
+        if (placement === 'bottom' && (targetRect.bottom + pad + tooltipH > vpH - margin)) {
+            placement = 'top';
+        }
+
+        if (placement === 'right') {
+            left = targetRect.right + pad;
+            top = targetRect.top;
+        } else if (placement === 'left') {
+            left = targetRect.left - pad - tooltipW;
+            top = targetRect.top;
+        } else if (placement === 'bottom') {
+            left = targetRect.left + (targetRect.width - tooltipW) / 2;
+            top = targetRect.bottom + pad;
+        } else if (placement === 'top') {
+            left = targetRect.left + (targetRect.width - tooltipW) / 2;
+            top = targetRect.top - pad - tooltipH;
+        }
+
+        left = Math.max(margin, Math.min(vpW - tooltipW - margin, left));
+        top = Math.max(margin, Math.min(vpH - tooltipH - margin, top));
+
+        card.style.left = `${Math.round(left)}px`;
+        card.style.top = `${Math.round(top)}px`;
+    }
+
+    async next() {
+        if (this.currentStepIndex < this.steps.length - 1) {
+            await this.goToStep(this.currentStepIndex + 1, 'next');
+        } else {
+            await this.finish();
+        }
+    }
+
+    async prev() {
+        if (this.currentStepIndex > 0) {
+            await this.goToStep(this.currentStepIndex - 1, 'prev');
+        }
+    }
+
+    async finish() {
+        this._cleanupOpenedModals();
+        await this.markCompleted();
+        this.hide();
+        if (typeof triggerPendingBackgroundToolsCheck === 'function') {
+            triggerPendingBackgroundToolsCheck();
+        }
+        if (typeof showToast === 'function') {
+            const toastMsg = (typeof t === 'function')
+                ? t('onboarding.toast_completed', 'Onboarding tour completed! You can replay it anytime from Settings.')
+                : 'Onboarding tour completed! You can replay it anytime from Settings.';
+            showToast(toastMsg, 'success', 3800);
+        }
+    }
+
+    async skip() {
+        this._cleanupOpenedModals();
+        await this.markCompleted();
+        this.hide();
+        if (typeof triggerPendingBackgroundToolsCheck === 'function') {
+            triggerPendingBackgroundToolsCheck();
+        }
+    }
+
+    async markCompleted() {
+        try {
+            localStorage.setItem('sceneryx_has_seen_onboarding', 'true');
+            if (typeof currentSettings !== 'undefined') {
+                currentSettings.has_seen_onboarding = true;
+            }
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.set_onboarding_completed) {
+                await window.pywebview.api.set_onboarding_completed(true);
+            }
+        } catch (e) {
+            console.warn("[OnboardingTour] Error marking completed:", e);
+        }
+    }
+
+    hide() {
+        this.isOpen = false;
+        document.body.classList.remove('tour-active');
+        window.removeEventListener('resize', this._boundHandleResize);
+        window.removeEventListener('scroll', this._boundHandleScroll, true);
+
+        if (this._trackingRafId) {
+            cancelAnimationFrame(this._trackingRafId);
+            this._trackingRafId = null;
+        }
+
+        const lMap = this._getLeafletMap();
+        if (lMap) {
+            lMap.off('move', this._boundHandleMapMove);
+            lMap.off('moveend', this._boundHandleMapMove);
+            lMap.off('zoomend', this._boundHandleMapMove);
+        }
+
+        this._cleanupOpenedModals();
+
+        const radialEl = document.getElementById('airport-radial-menu');
+        if (radialEl) {
+            radialEl.classList.add('hidden');
+            radialEl.style.display = 'none';
+        }
+
+        document.querySelectorAll('[id^="classic-sub-"]').forEach(el => el.classList.add('hidden'));
+        document.querySelectorAll('[id^="classic-chevron-"]').forEach(el => el.style.transform = 'rotate(0deg)');
+
+        if (this._activeTargetEl) {
+            this._activeTargetEl.classList.remove('tour-spotlight-target');
+            if (this._activeTargetEl._tourSetRelativePosition) {
+                this._activeTargetEl.style.position = '';
+                delete this._activeTargetEl._tourSetRelativePosition;
+            }
+            this._activeTargetEl = null;
+        }
+        this._activeCutoutRect = null;
+
+        const cutout = document.getElementById('tour-mask-cutout');
+        const glow = document.getElementById('tour-spotlight-glow');
+        if (cutout) {
+            cutout.setAttribute('width', 0);
+            cutout.setAttribute('height', 0);
+        }
+        if (glow) {
+            glow.setAttribute('width', 0);
+            glow.setAttribute('height', 0);
+            glow.setAttribute('opacity', '0');
+        }
+
+        const overlay = document.getElementById('onboarding-tour-overlay');
+        if (overlay) overlay.classList.add('hidden');
+    }
+}
+
+window.onboardingTour = new OnboardingTourController();
+window.startOnboardingTour = () => window.onboardingTour && window.onboardingTour.start();
+
+window.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && window.onboardingTour && window.onboardingTour.isOpen) {
+        window.onboardingTour.skip();
     }
 });

@@ -1,0 +1,97 @@
+# SCENERYX END USER LICENSE AGREEMENT (EULA)
+
+**Last Updated: October 2026**  
+**Author & Licensor:** Sidestick Priority  
+**Software:** SceneryX (Desktop Application for Microsoft Windows)
+
+PLEASE READ THIS END USER LICENSE AGREEMENT ("AGREEMENT") CAREFULLY BEFORE DOWNLOADING, INSTALLING, OR USING SCENERYX ("SOFTWARE"). BY DOWNLOADING, INSTALLING, COPYING, OR USING THE SOFTWARE, YOU AGREE TO BE BOUND BY THE TERMS AND CONDITIONS OF THIS AGREEMENT. IF YOU DO NOT AGREE TO THESE TERMS, DO NOT INSTALL OR USE THE SOFTWARE.
+
+---
+
+### 1. GRANT OF LICENSE
+
+1.1. **Personal License:** Subject to the terms and conditions of this Agreement, **Sidestick Priority** grants you a personal, single, non-exclusive, non-transferable, revocable license to install and execute one copy of `SceneryX.exe` on personal computers owned or controlled by you.
+
+1.2. **Non-Commercial Use:** This license is granted strictly for personal, non-commercial flight simulation entertainment and enthusiast use. Any commercial deployment, public exhibition, broadcast for revenue, or commercial redistribution without prior written consent from Sidestick Priority is strictly prohibited.
+
+---
+
+### 2. RESTRICTIONS ON USE
+
+You agree not to, and you shall not permit, assist, or authorize any third party to:
+
+2.1. **Reverse Engineering:** Decompile, disassemble, reverse engineer, decrypt, unpack, extract source code from, or attempt to derive the internal architecture, algorithms, or protocols of `SceneryX.exe` or any associated compiled packages.
+
+2.2. **License Circumvention:** Tamper with, bypass, alter, disable, emulate, or circumvent any software protection, activation keys, cryptographic signatures, or digital licensing mechanisms implemented by Sidestick Priority or its distribution partners.
+
+2.3. **Redistribution & Sublicensing:** Sell, rent, lease, sublicense, distribute, publish, assign, mirror, share, host on peer-to-peer networks, or otherwise transfer `SceneryX.exe` or any portion of the software to any third party.
+
+2.4. **Derivative Works:** Modify, adapt, translate, or create derivative works based upon the Software, its branding, or its proprietary components.
+
+2.5. **Malicious Use:** Use the Software to introduce viruses, trojans, worms, or other malicious software, or attempt to intercept, disrupt, or damage third-party APIs or simulator services.
+
+---
+
+### 3. INTELLECTUAL PROPERTY & OWNERSHIP
+
+3.1. **Exclusive Ownership:** The Software, including all source code, compiled binaries, graphic user interfaces, visual designs, databases, documentation, and proprietary algorithmic routines—specifically including, but not limited to:
+- The **Smart LOD Dynamic Governor** system,
+- The **Flight Route Corridor Isolation & Automated En-Route Scenery Staging** algorithms,
+- The **Performance & Matrix Diagnostic Engines**, and
+- The **Scenery Collision & Conflict Resolution Architectures**—  
+are and shall remain the sole and exclusive intellectual property of **Sidestick Priority**.
+
+3.2. **Reservation of Rights:** The Software is licensed, not sold. This Agreement does not convey to you any ownership rights in or to the Software. All rights, title, and interest not expressly granted herein are reserved exclusively by Sidestick Priority.
+
+---
+
+### 4. THIRD-PARTY TRADEMARKS & NON-AFFILIATION
+
+4.1. **Independent Utility:** SceneryX is an independent third-party management and optimization tool created by Sidestick Priority.
+
+4.2. **Non-Affiliation Notice:** SceneryX is **not** affiliated with, authorized by, endorsed by, or in any way officially connected with:
+- **Microsoft Corporation**,
+- **Asobo Studio**,
+- **FSDreamTeam (Virtuali s.a.s.)**,
+- **Navigraph**, or
+- **SimBrief**.
+
+4.3. **Trademarks:** "Microsoft", "Microsoft Flight Simulator", "MSFS 2020", "MSFS 2024", "Windows", "GSX", "GSX Pro", "Navigraph", "SimBrief", and all other associated product names, logos, and brands are registered trademarks of their respective owners. Their mention in SceneryX is solely for descriptive compatibility, interoperability, and identification purposes under nominative fair use.
+
+4.4. **Third-Party Content Responsibility:** You are solely responsible for ensuring that you hold valid, legitimate licenses for all third-party sceneries, aircraft, and GSX profiles organized, isolated, or monitored through SceneryX.
+
+---
+
+### 5. DISCLAIMER OF WARRANTIES
+
+5.1. **"AS IS" Provision:** TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, SCENERYX IS PROVIDED **"AS IS"** AND **"AS AVAILABLE"**, WITH ALL FAULTS AND WITHOUT WARRANTY OF ANY KIND. 
+
+5.2. **No Warranties:** SIDESTICK PRIORITY EXPRESSLY DISCLAIMS ALL WARRANTIES, WHETHER EXPRESS, IMPLIED, STATUTORY, OR OTHERWISE, INCLUDING WITHOUT LIMITATION ANY IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, QUIET ENJOYMENT, SYSTEM INTEGRATION, OR NON-INFRINGEMENT.
+
+5.3. **Simulation Entertainment Only:** All runway identifiers, geographic coordinates, airway corridors, navigation aids, and telemetry readings are provided solely for recreational flight simulation purposes. THEY MUST NEVER BE USED FOR REAL-WORLD FLIGHT PLANNING, REAL PILOT TRAINING, OR REAL-WORLD AIR NAVIGATION.
+
+---
+
+### 6. LIMITATION OF LIABILITY
+
+6.1. **Non-Destructive Operations:** SceneryX operates using non-destructive staging protocols and temporary package configuration files (such as `Content.xml`). However, the interaction of multiple simulator addons can introduce unexpected software states.
+
+6.2. **Damage Limitation:** UNDER NO CIRCUMSTANCES SHALL SIDESTICK PRIORITY, ITS DEVELOPERS, OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, PUNITIVE, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, LOSS OF USE, DATA LOSS, CORRUPTION OF SIMULATOR INSTALLATIONS, SIMULATOR INSTABILITY, CRASH-TO-DESKTOP (CTD) EVENTS, HARDWARE MALFUNCTION, OR BUSINESS INTERRUPTION) ARISING OUT OF THE USE OF OR INABILITY TO USE SCENERYX, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+---
+
+### 7. TERMINATION
+
+7.1. **Breach:** This Agreement is effective until terminated. Your rights under this license will terminate automatically without notice from Sidestick Priority if you fail to comply with any of its terms or conditions.
+
+7.2. **Effect of Termination:** Upon termination, you must immediately discontinue all use of SceneryX and permanently delete and destroy all copies of `SceneryX.exe`, related documentation, and local configuration files.
+
+---
+
+### 8. SEVERABILITY & GOVERNING LAW
+
+8.1. **Severability:** If any provision of this Agreement is held to be invalid, illegal, or unenforceable under applicable law, such provision shall be construed and enforced to the maximum extent permitted, and the remaining provisions of this Agreement shall remain in full force and effect.
+
+8.2. **Entire Agreement:** This Agreement constitutes the entire agreement between you and Sidestick Priority regarding the Software and supersedes all prior representations, discussions, or understandings.
+
+8.3. **Contact:** For licensing inquiries, compliance questions, or support, please contact Sidestick Priority through official application channels or the project repository.

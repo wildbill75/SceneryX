@@ -1,0 +1,341 @@
+/**
+ * SceneryX — Production Design System & UI Component Tokens
+ * Brand Identity: Sidestick Priority
+ * Architecture: High-End Aviation Instrumentation meets Modern Desktop Ergonomics
+ */
+
+:root {
+  /* ==========================================================================
+     1. STRICT 3-TIER SURFACE HIERARCHY & NORMALIZED TOKENS
+     ========================================================================== */
+  
+  /* Level 0: Base / Canvas / Map overlay backdrop */
+  --sx-bg-canvas: #0B0D11;
+  --sx-bg-app: #0B0D11;
+
+  /* Level 1: Floating Window Containers, Main Header & Sidebar Rail */
+  --sx-surface-window: #12161F;
+  --sx-surface-sidebar: #12161F;
+  --sx-surface-header: #12161F;
+  --sx-surface-pill: #161D2B;
+  --sx-border-window: #1E2638;
+
+  /* Level 2: Inner Cards, Group Boxes, Telemetry Panels */
+  --sx-surface-card: #181E2B;
+  --sx-surface-card-hover: #1E2638;
+  --sx-surface-card-active: #253046;
+  --sx-border-card: #253046;
+
+  /* Level 3: Inputs, Select Dropdowns, Inactive Sliders */
+  --sx-surface-input: #0E121A;
+  --sx-border-input: #2D3A54;
+  --sx-border-focus: #00A8FF;
+
+  /* Primary Interactive Accent (Electric Aviation Cyan ONLY) */
+  --sx-accent-primary: #00A8FF;
+  --sx-accent-hover: #38BDF8;
+  --sx-accent-muted: rgba(0, 168, 255, 0.15);
+  --sx-accent-glow: 0 0 16px rgba(0, 168, 255, 0.35);
+  --sx-accent-ring: rgba(0, 168, 255, 0.45);
+
+  /* Status Badges: Standardized to 3 tokens max */
+  --sx-status-success: #10B981; /* Emerald: Success / Active / Connected */
+  --sx-status-warning: #F59E0B; /* Amber: Sweet Spot / Warning / Balanced */
+  --sx-status-danger: #EF4444;  /* Coral Red: Critical / Alert / Off */
+
+  /* Typography & Text Contrast */
+  --sx-text-primary: #F1F5F9;   /* Pure Crisp White-Slate */
+  --sx-text-secondary: #94A3B8; /* Muted Slate, high legibility */
+  --sx-text-tertiary: #64748B;  /* Micro Tooltips / Hints / Explanations */
+  --sx-text-inverted: #0B0D11;
+  
+  /* Shadows & Elevation */
+  --sx-shadow-card: 0 4px 14px rgba(0, 0, 0, 0.45);
+  --sx-shadow-card-hover: 0 8px 24px rgba(0, 0, 0, 0.55);
+  --sx-shadow-modal: 0 20px 48px rgba(0, 0, 0, 0.75), 0 0 0 1px #1E2638;
+
+  /* ==========================================================================
+     2. TYPOGRAPHY & SPACING TOKENS
+     ========================================================================== */
+  --sx-font-sans: "Plus Jakarta Sans", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI Variable", sans-serif;
+  --sx-font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* 8pt Grid Scale */
+  --sx-space-1: 4px;
+  --sx-space-2: 8px;
+  --sx-space-3: 12px;
+  --sx-space-4: 16px;
+  --sx-space-5: 20px;
+  --sx-space-6: 24px;
+  --sx-space-8: 32px;
+
+  /* Radius Tokens */
+  --sx-radius-sm: 4px;
+  --sx-radius-md: 6px;
+  --sx-radius-lg: 8px;
+  --sx-radius-xl: 12px;
+  --sx-radius-2xl: 16px;
+  --sx-radius-full: 9999px;
+}
+
+/* ==========================================================================
+   3. REUSABLE ATOMIC UTILITIES & COMPONENTS
+   ========================================================================== */
+
+/* Technical Instrumentation Label */
+.sx-label-micro {
+  font-family: var(--sx-font-sans);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--sx-text-secondary);
+}
+
+/* Telemetry & Avionics Monospace Metric */
+.sx-metric-val {
+  font-family: var(--sx-font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--sx-text-primary);
+}
+
+/* Base Elevated Card */
+.sx-card {
+  background-color: var(--sx-surface-card);
+  border: 1px solid var(--sx-border-card);
+  border-radius: var(--sx-radius-xl);
+  box-shadow: var(--sx-shadow-card);
+  transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.sx-card:hover {
+  border-color: var(--sx-border-hover);
+  box-shadow: var(--sx-shadow-card-hover);
+}
+
+/* Primary CTA Button */
+.sx-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sx-space-2);
+  padding: 8px 16px;
+  font-family: var(--sx-font-sans);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--sx-text-inverted);
+  background: var(--sx-accent-primary);
+  border: 1px solid transparent;
+  border-radius: var(--sx-radius-lg);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 168, 255, 0.25);
+  transition: all 150ms ease;
+  user-select: none;
+}
+
+.sx-btn-primary:hover:not(:disabled) {
+  background: var(--sx-accent-hover);
+  box-shadow: var(--sx-accent-glow);
+  transform: translateY(-1px);
+}
+
+.sx-btn-primary:active:not(:disabled) {
+  transform: translateY(0px) scale(0.98);
+}
+
+.sx-btn-primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Secondary Ghost / Outline Button */
+.sx-btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sx-space-2);
+  padding: 8px 14px;
+  font-family: var(--sx-font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--sx-text-primary);
+  background: var(--sx-surface-subtle);
+  border: 1px solid var(--sx-border-card);
+  border-radius: var(--sx-radius-lg);
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+
+.sx-btn-secondary:hover:not(:disabled) {
+  background: var(--sx-surface-card-hover);
+  border-color: var(--sx-border-hover);
+  color: #FFFFFF;
+}
+
+/* Solid Non-Glass Status Pill */
+.sx-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: var(--sx-radius-full);
+  font-family: var(--sx-font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  white-space: nowrap;
+  line-height: 1.4;
+  border: 0;
+}
+
+.sx-pill-success {
+  background-color: var(--sx-status-success);
+  color: #FFFFFF;
+}
+
+.sx-pill-warning {
+  background-color: var(--sx-status-warning);
+  color: var(--sx-text-inverted);
+}
+
+.sx-pill-danger {
+  background-color: var(--sx-status-danger);
+  color: #FFFFFF;
+}
+
+.sx-pill-muted {
+  background-color: var(--sx-surface-input);
+  color: var(--sx-text-tertiary);
+  border: 1px solid var(--sx-border-input);
+}
+
+.sx-pill-cyan {
+  background-color: var(--sx-accent-primary);
+  color: var(--sx-text-inverted);
+}
+
+/* Pulsing Status Beacon */
+.sx-beacon {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.sx-beacon-live {
+  background-color: var(--sx-status-success);
+  box-shadow: 0 0 8px var(--sx-status-success);
+  animation: sx-pulse 2s infinite ease-in-out;
+}
+
+.sx-beacon-standby {
+  background-color: var(--sx-status-warning);
+  box-shadow: 0 0 6px var(--sx-status-warning);
+}
+
+@keyframes sx-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.85); }
+}
+
+/* Segmented Control (VR / 2D Switcher) */
+.sx-segmented-control {
+  display: inline-flex;
+  background-color: var(--sx-surface-input);
+  border: 1px solid var(--sx-border-card);
+  border-radius: var(--sx-radius-lg);
+  padding: 3px;
+  gap: 2px;
+  user-select: none;
+}
+
+.sx-segmented-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-family: var(--sx-font-sans);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--sx-text-secondary);
+  border-radius: var(--sx-radius-md);
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  transition: all 160ms ease;
+}
+
+.sx-segmented-item:hover:not(.active) {
+  color: var(--sx-text-primary);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.sx-segmented-item.active {
+  background-color: var(--sx-accent-primary);
+  color: var(--sx-text-inverted);
+  box-shadow: 0 1px 6px rgba(0, 168, 255, 0.35);
+}
+
+/* Custom Toggle Switch */
+.sx-switch {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.sx-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.sx-switch-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: var(--sx-border-card);
+  transition: 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: var(--sx-radius-full);
+}
+
+.sx-switch-slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background-color: #FFFFFF;
+  transition: 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+}
+
+.sx-switch input:checked + .sx-switch-slider {
+  background-color: var(--sx-accent-primary);
+}
+
+.sx-switch input:focus + .sx-switch-slider {
+  box-shadow: 0 0 0 2px var(--sx-accent-ring);
+}
+
+.sx-switch input:checked + .sx-switch-slider:before {
+  transform: translateX(16px);
+  background-color: var(--sx-text-inverted);
+}
+
+.sx-switch input:disabled + .sx-switch-slider {
+  opacity: 0.35;
+  cursor: not-allowed;
+}

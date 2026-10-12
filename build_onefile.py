@@ -21,6 +21,7 @@ pyinstaller_cmd = [
     f"--add-data={os.path.join(BASE_DIR, 'installed_airports.json')};.",
     f"--add-data={ICON_PATH};.",
     f"--add-data={os.path.join(BASE_DIR, 'web')};web",
+    f"--add-data={os.path.join(BASE_DIR, 'legal')};legal",
     f"--add-data={os.path.join(BASE_DIR, 'wildbill75-sceneryx')};wildbill75-sceneryx",
     "--collect-all=SimConnect",
     "--collect-all=pystray",

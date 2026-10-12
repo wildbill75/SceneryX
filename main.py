@@ -770,24 +770,14 @@ def update_msfs_content_xml(keep_icaos=None, restore_flight_mode=False, flight_d
                         changed = True
                         continue
 
-                    # STRICT IMMUNITY: Never re-enable packages that were UserDisabled prior to flight mode
-                    if name_lower in pre_existing_xml_lower or name_clean_lower in pre_existing_xml_lower:
-                        continue
-
                     # STRICT SAFEGUARD: Never re-enable known secondary conflicting packages
                     if name_clean_lower in all_conflict_sec_lower or name_norm in all_conflict_sec_lower:
                         continue
 
-                    # Only restore packages that were explicitly disabled during flight mode
-                    if name_lower in flight_disabled_set_lower or name_clean_lower in flight_disabled_set_lower:
-                        if elem.get('active') == 'UserDisabled':
-                            elem.set('active', 'Activated')
-                            changed = True
-                    elif full_reset and not flight_disabled_set_lower:
-                        # Full reset only when no session tracking exists and not in secondary conflict list
-                        if elem.get('active') == 'UserDisabled':
-                            elem.set('active', 'Activated')
-                            changed = True
+                    # Re-enable all scenery packages to Activated
+                    if elem.get('active') == 'UserDisabled':
+                        elem.set('active', 'Activated')
+                        changed = True
 
                 # Always guarantee all aircraft, liveries, instruments and core tools are Activated
                 for elem in tree.findall('Package'):
@@ -1123,10 +1113,70 @@ def bring_window_to_front(window_title="SceneryX"):
     except Exception:
         pass
 
+shared_splash_state = {
+    "percent": 10,
+    "text": "Scanning MSFS packages & GSX profiles..."
+}
+
+class SplashApi:
+    def __init__(self, state):
+        self._state = state
+
+    def get_splash_state(self):
+        return self._state
+
+splash_window = None
+
+def finish_splash_and_reveal_main():
+    global splash_window
+    import threading
+    def _do_switch():
+        time.sleep(0.15)
+        global splash_window
+        print("[Splash] Closing splash screen...", flush=True)
+        if splash_window:
+            try:
+                splash_window.destroy()
+            except Exception as e:
+                print(f"[Splash] Destroy warning: {e}", flush=True)
+            splash_window = None
+
+        main_win = getattr(Api, '_main_window_instance', None)
+        print(f"[Main] Revealing main window (instance: {main_win})...", flush=True)
+        if main_win:
+            try:
+                main_win.show()
+                main_win.restore()
+            except Exception as e:
+                print(f"[Main] Show warning: {e}", flush=True)
+        bring_window_to_front("SceneryX")
+        print("[Main] Transition complete!", flush=True)
+
+    threading.Thread(target=_do_switch, daemon=True).start()
+
 class Api:
+    _main_window_instance = None
+
     def __init__(self):
         self._startup_delta = {"added": [], "removed": [], "total_changes": 0}
         self._startup_scanned = False
+
+    def update_splash_progress(self, percent, text=""):
+        global shared_splash_state
+        try:
+            shared_splash_state["percent"] = percent
+            if text:
+                shared_splash_state["text"] = text
+        except Exception:
+            pass
+        return json.dumps({"status": "ok"})
+
+    def finish_splash_and_show_main(self):
+        try:
+            finish_splash_and_reveal_main()
+        except Exception as e:
+            print(f"[Splash] finish_splash_and_show_main error: {e}")
+        return json.dumps({"status": "ok"})
 
     def minimize_to_tray(self):
         if getattr(self, '_window', None):
@@ -1217,13 +1267,15 @@ class Api:
 
     def get_airports(self):
         settings = get_settings()
-        disclaimer_accepted = settings.get("disclaimer_accepted", False)
-
-        # If installed_airports.json exists and has data, user is not on first launch
-        if not disclaimer_accepted and os.path.exists(OUTPUT_JSON_PATH) and os.path.getsize(OUTPUT_JSON_PATH) > 1000:
-            disclaimer_accepted = True
-            settings["disclaimer_accepted"] = True
-            save_settings(settings)
+        disclaimer_accepted = settings.get("disclaimer_accepted", None)
+        if disclaimer_accepted is None:
+            # Migration for legacy users who already had data before disclaimer was introduced
+            if os.path.exists(OUTPUT_JSON_PATH) and os.path.getsize(OUTPUT_JSON_PATH) > 1000:
+                disclaimer_accepted = True
+                settings["disclaimer_accepted"] = True
+                save_settings(settings)
+            else:
+                disclaimer_accepted = False
 
         if not disclaimer_accepted:
             # First launch before Terms of Use accepted: don't auto-scan yet, return empty
@@ -2426,15 +2478,14 @@ class Api:
             return json.dumps({"status": "error", "message": str(e)})
 
     def restore_all_flight_sceneries(self):
-        """1-Click Flight Corridor Reversal: Restores sceneries disabled by flight mode using atomic snapshot."""
-        return self.restore_all_sceneries(full_reset=False)
+        """1-Click Flight Corridor Reversal: Restores all sceneries disabled by flight mode."""
+        return self.restore_all_sceneries(full_reset=True)
 
-    def restore_all_sceneries(self, full_reset=False):
+    def restore_all_sceneries(self, full_reset=True):
         """
         Lossless 1-Click Scenery Restoration Engine:
-        - full_reset=False: Restores packages disabled by flight mode using snapshot, preserving pre-existing disabled packages.
-        - full_reset=True: Re-enables all disabled scenery packages across all scan folders (excluding known secondary conflict packages).
-        - In both modes: 100% aircraft, livery, and utility immunity is enforced in Content.xml, snapshot is cleared, and settings updated.
+        - Re-enables all disabled scenery packages across all scan folders (excluding known secondary conflict packages).
+        - 100% aircraft, livery, and utility immunity is enforced in Content.xml, snapshot is cleared, and settings updated.
         """
         try:
             settings = get_settings()
@@ -2487,22 +2538,12 @@ class Api:
                         for item in os.listdir(td):
                             if item.endswith('.disabled'):
                                 item_clean = item[:-9]
-                                item_lower = item.lower()
                                 item_clean_lower = item_clean.lower()
                                 item_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', item_clean_lower)
-
-                                # NEVER restore packages that were disabled prior to flight mode!
-                                if item_lower in pre_existing_folders_lower or item in pre_existing_folders or item_clean_lower in pre_existing_folders_lower:
-                                    continue
 
                                 # NEVER restore known secondary conflict packages!
                                 if item_clean_lower in all_conflict_sec_lower or item_norm in all_conflict_sec_lower:
                                     continue
-
-                                # If we have tracked flight disabled folders, only restore those
-                                if flight_disabled_folders_lower:
-                                    if item_clean_lower not in flight_disabled_folders_lower and item_lower not in flight_disabled_folders_lower:
-                                        continue
 
                                 dis_p = os.path.join(td, item)
                                 # Never touch protected packages
@@ -2604,10 +2645,22 @@ class Api:
             print("Folder dialog error:", e)
         return ""
 
+    def open_legal_folder(self):
+        try:
+            legal_dir = os.path.join(os.environ.get("APPDATA", os.path.expanduser("~")), "SceneryX", "legal")
+            if not os.path.exists(legal_dir):
+                os.makedirs(legal_dir, exist_ok=True)
+            os.startfile(legal_dir)
+            return json.dumps({"status": "ok"})
+        except Exception as e:
+            print("Error in open_legal_folder:", e)
+            return json.dumps({"status": "error", "message": str(e)})
+
     def open_folder(self, path):
         try:
             if not path:
                 return False
+            path = os.path.expandvars(path)
 
             # 1. Direct path exists
             if os.path.exists(path):
@@ -3497,6 +3550,22 @@ class Api:
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
 
+    def is_onboarding_completed(self):
+        try:
+            settings = get_settings()
+            return json.dumps({"completed": bool(settings.get("has_seen_onboarding", False))})
+        except Exception as e:
+            return json.dumps({"completed": False})
+
+    def set_onboarding_completed(self, completed=True):
+        try:
+            settings = get_settings()
+            settings["has_seen_onboarding"] = bool(completed)
+            save_settings(settings)
+            return json.dumps({"status": "ok", "has_seen_onboarding": settings["has_seen_onboarding"]})
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
     def close_app(self):
         try:
             if hasattr(webview, 'windows') and webview.windows:
@@ -4301,19 +4370,16 @@ class Api:
 
     def start_flight_blackbox(self, flight_name, dep_icao, arr_icao, aircraft):
         try:
-            # Vérification et rafraîchissement automatique de SimBrief
-            sb = flight_perf_tracker.get_simbrief_flight_plan(force_refresh=True)
             st = get_settings()
             fm = st.get('flight_mode', {})
-            is_corridor = bool(fm.get('active') and fm.get('profile') in ('DIRECT', 'CORRIDOR'))
+            is_corridor = bool(fm.get('active') and fm.get('profile') in ('DIRECT', 'CORRIDOR', 'SIMBRIEF'))
+            has_active_simbrief = bool(fm.get('active') and fm.get('profile') == 'SIMBRIEF')
 
-            if sb and isinstance(sb, dict):
-                sb_orig = sb.get('origin', {}).get('icao')
-                sb_dest = sb.get('destination', {}).get('icao')
-                if not is_corridor:
-                    if sb_orig: dep_icao = sb_orig
-                    if sb_dest: arr_icao = sb_dest
-                else:
+            if has_active_simbrief:
+                sb = fm.get('simbrief_flight') or flight_perf_tracker.get_simbrief_flight_plan(force_refresh=True)
+                if sb and isinstance(sb, dict):
+                    sb_orig = sb.get('origin', {}).get('icao')
+                    sb_dest = sb.get('destination', {}).get('icao')
                     if sb_orig and (not dep_icao or dep_icao == 'DEP'): dep_icao = sb_orig
                     if sb_dest and (not arr_icao or arr_icao == 'ARR'): arr_icao = sb_dest
 
@@ -4850,7 +4916,7 @@ class Api:
         try:
             all_paths = self._get_all_community_paths()
             if not all_paths:
-                return json.dumps({"available": False, "installed": False, "message": "Dossier Community non détecté."})
+                return json.dumps({"available": False, "installed": False, "message": "Community folder not detected."})
             primary = self._get_primary_community_path()
             target_dir = os.path.join(primary, "wildbill75-sceneryx")
             installed = os.path.exists(os.path.join(target_dir, "manifest.json"))
@@ -4868,7 +4934,7 @@ class Api:
             import shutil
             all_paths = self._get_all_community_paths()
             if not all_paths:
-                return json.dumps({"success": False, "message": "Dossier Community non détecté."})
+                return json.dumps({"success": False, "message": "Community folder not detected."})
             
             # Locate wildbill75-sceneryx source folder
             base_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
@@ -4879,7 +4945,7 @@ class Api:
                 src_dir = os.path.join(os.getcwd(), "wildbill75-sceneryx")
             
             if not os.path.exists(src_dir):
-                return json.dumps({"success": False, "message": f"Dossier source introuvable: {src_dir}"})
+                return json.dumps({"success": False, "message": f"Source folder not found: {src_dir}"})
             
             targets = ["wildbill75-sceneryx"]
             for c_path in all_paths:
@@ -4917,7 +4983,7 @@ class Api:
                     except Exception:
                         pass
 
-            return json.dumps({"success": True, "message": "Panel In-Game installé avec succès dans les dossiers Community !"})
+            return json.dumps({"success": True, "message": "In-Game Panel installed successfully in Community folders!"})
         except Exception as e:
             return json.dumps({"success": False, "message": str(e)})
 
@@ -4926,14 +4992,14 @@ class Api:
             import shutil
             all_paths = self._get_all_community_paths()
             if not all_paths:
-                return json.dumps({"success": False, "message": "Dossier Community non détecté."})
+                return json.dumps({"success": False, "message": "Community folder not detected."})
             targets = ["sceneryx-ingame-panel", "wildbill75-sceneryx"]
             for c_path in all_paths:
                 for tname in targets:
                     target_dir = os.path.join(c_path, tname)
                     if os.path.exists(target_dir):
                         shutil.rmtree(target_dir)
-            return json.dumps({"success": True, "message": "Panel In-Game désinstallé de Community."})
+            return json.dumps({"success": True, "message": "In-Game Panel uninstalled from Community."})
         except Exception as e:
             return json.dumps({"success": False, "message": str(e)})
 
@@ -5011,10 +5077,13 @@ def main():
     if not ensure_single_instance():
         sys.exit(0)
 
+    base_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
     exe_dir = os.path.dirname(os.path.abspath(sys.executable)) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
     local_web = os.path.join(exe_dir, 'web')
     if os.path.exists(os.path.join(local_web, 'index.html')):
         web_dir = local_web
+    elif os.path.exists(os.path.join(base_dir, 'web', 'index.html')):
+        web_dir = os.path.join(base_dir, 'web')
     else:
         web_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'web')
     html_file = os.path.join(web_dir, 'index.html')
@@ -5073,6 +5142,7 @@ def main():
     except Exception as e:
         print(f"[Telemetry] Startup orphan benchmark check warning: {e}")
 
+    # 1. Main Application Window (Master window, initialized hidden during splash phase)
     window = webview.create_window(
         title='SceneryX',
         url=html_file,
@@ -5082,13 +5152,59 @@ def main():
         x=init_x,
         y=init_y,
         min_size=(1280, 800),
-        background_color='#0b0f19'
+        background_color='#0b0f19',
+        hidden=True
     )
     api._window = window
+    Api._main_window_instance = window
+
+    # 2. Standalone Splash Window (Child window: 640x400, frameless, centered, on top)
+    splash_width = 640
+    splash_height = 400
+    splash_x = None
+    splash_y = None
+    if 'sw' in locals() and 'sh' in locals() and sw and sh:
+        splash_x = max(0, (sw - splash_width) // 2)
+        splash_y = max(0, (sh - splash_height) // 2)
+
+    splash_html_file = os.path.join(web_dir, 'splash.html')
+    splash_api = SplashApi(shared_splash_state)
+
+    global splash_window
+    splash_window = webview.create_window(
+        title='SceneryX',
+        url=splash_html_file,
+        js_api=splash_api,
+        width=splash_width,
+        height=splash_height,
+        x=splash_x,
+        y=splash_y,
+        frameless=True,
+        on_top=True,
+        background_color='#0b0f19'
+    )
+
+    # Safety watchdog to guarantee main window reveals even if JS execution is interrupted
+    def _safety_watchdog():
+        time.sleep(25.0)
+        global splash_window
+        if splash_window is not None:
+            print("[Watchdog] Safety reveal: closing splash and revealing main window...")
+            finish_splash_and_reveal_main()
+
+    import threading
+    threading.Thread(target=_safety_watchdog, daemon=True).start()
 
     tray_icon = None
 
     def on_closing():
+        global splash_window
+        if splash_window:
+            try:
+                splash_window.destroy()
+            except Exception:
+                pass
+            splash_window = None
         if getattr(api, '_force_closing', False):
             if tray_icon:
                 try:

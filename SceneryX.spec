@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('D:\\SceneryX\\airports.json', '.'), ('D:\\SceneryX\\airport_airlines.json', '.'), ('D:\\SceneryX\\airport_routes.json', '.'), ('D:\\SceneryX\\airport_runways.json', '.'), ('D:\\SceneryX\\installed_airports.json', '.'), ('D:\\SceneryX\\icon.ico', '.'), ('D:\\SceneryX\\web', 'web'), ('D:\\SceneryX\\wildbill75-sceneryx', 'wildbill75-sceneryx')]
+datas = [('D:\\SceneryX\\airports.json', '.'), ('D:\\SceneryX\\airport_airlines.json', '.'), ('D:\\SceneryX\\airport_routes.json', '.'), ('D:\\SceneryX\\airport_runways.json', '.'), ('D:\\SceneryX\\installed_airports.json', '.'), ('D:\\SceneryX\\icon.ico', '.'), ('D:\\SceneryX\\web', 'web'), ('D:\\SceneryX\\legal', 'legal'), ('D:\\SceneryX\\wildbill75-sceneryx', 'wildbill75-sceneryx')]
 binaries = []
 hiddenimports = []
 tmp_ret = collect_all('SimConnect')
@@ -10,9 +10,6 @@ tmp_ret = collect_all('pystray')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('PIL')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-tmp_ret = collect_all('psutil')
-datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-hiddenimports += ['win32com', 'win32com.client', 'pythoncom']
 
 
 a = Analysis(

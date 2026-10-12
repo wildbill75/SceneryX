@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SceneryX</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #0b0f19;
+            color: #f8fafc;
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            border: 0;
+            outline: 0;
+        }
+
+        .splash-container {
+            width: 100%;
+            height: 100%;
+            background-color: #0b0f19;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            padding: 38px 48px 22px 48px;
+            box-sizing: border-box;
+            border: 0;
+        }
+
+        .top-spacer {
+            height: 6px;
+        }
+
+        .center-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+            width: 100%;
+        }
+
+        .logo-wrap {
+            margin-bottom: 22px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .logo-img {
+            height: 120px;
+            max-height: 125px;
+            width: auto;
+            object-fit: contain;
+            pointer-events: none;
+            filter: drop-shadow(0 6px 16px rgba(0, 0, 0, 0.45));
+        }
+
+        .status-text {
+            font-size: 12px;
+            font-weight: 500;
+            color: #cbd5e1; /* slate-300 */
+            margin-bottom: 14px;
+            height: 18px;
+            line-height: 18px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 440px;
+            letter-spacing: 0.015em;
+        }
+
+        .progress-track {
+            width: 100%;
+            max-width: 420px;
+            height: 6px;
+            background-color: #1e293b; /* slate-800 */
+            border-radius: 9999px;
+            overflow: hidden;
+            padding: 0;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 9999px;
+            background: linear-gradient(90deg, #F4DBCE 0%, #6A6EB0 100%);
+            width: 10%;
+            transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .footer {
+            width: 100%;
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            padding-right: 4px;
+        }
+
+        .copyright-text {
+            font-size: 10px;
+            color: #64748b; /* slate-500 */
+            font-weight: 500;
+            letter-spacing: 0.025em;
+        }
+    </style>
+</head>
+<body>
+    <div class="splash-container">
+        <div class="top-spacer"></div>
+
+        <div class="center-content">
+            <div class="logo-wrap">
+                <img src="splash_logo.png?v=3" alt="SceneryX" class="logo-img" />
+            </div>
+
+            <p id="splash-status-text" class="status-text">Scanning MSFS packages &amp; GSX profiles...</p>
+
+            <div class="progress-track">
+                <div id="splash-progress-bar" class="progress-fill"></div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <span class="copyright-text">v1.0.2 • &copy; 2026 Sidestick Priority</span>
+        </div>
+    </div>
+
+    <script>
+        let pollTimer = null;
+        let lastPercent = 10;
+
+        function updateFromState() {
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.get_splash_state) {
+                window.pywebview.api.get_splash_state().then(st => {
+                    if (st) {
+                        const sText = document.getElementById('splash-status-text');
+                        const sBar = document.getElementById('splash-progress-bar');
+                        if (sText && st.text) {
+                            sText.innerText = st.text;
+                        }
+                        if (sBar && typeof st.percent === 'number') {
+                            const p = Math.max(lastPercent, Math.min(100, st.percent));
+                            lastPercent = p;
+                            sBar.style.width = p + '%';
+                        }
+                    }
+                }).catch(() => {});
+            }
+        }
+
+        window.addEventListener('pywebviewready', () => {
+            updateFromState();
+            pollTimer = setInterval(updateFromState, 50);
+        });
+    </script>
+</body>
+</html>
