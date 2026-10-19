@@ -15,7 +15,7 @@ import glob
 import re
 from datetime import datetime
 from typing import List
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple
 
 from flight_memory_engine import get_memory_engine, FlightMemoryEngine
 
@@ -83,17 +83,23 @@ DEFAULT_CONFIG = {
     # Options avancées
     "cloud_recovery": True,      # Réduction temporaire des nuages si saturation GPU
     "step_size": 5,              # Pas d'ajustement par seconde (lissage anti-stutter)
-    "deadband_fps": 2            # Marge de tolérance (±2 FPS)
+    "deadband_fps": 2,           # Marge de tolérance (±2 FPS)
+    "ingame_pinned_settings": ["max_fps", "clouds", "precaching", "buildings", "trees"]
 }
+
+VALID_INGAME_PIN_KEYS = ("max_fps", "clouds", "precaching", "terrain_shadows", "buildings", "trees", "plants", "grass")
+
+
+_nominal_profile_cache: Dict[bool, Tuple[float, Dict[str, Any]]] = {}
 
 
 def get_active_profile_nominal_values(is_vr: Optional[bool] = None) -> Dict[str, Any]:
     """
-    Lecture directe ultra-rapide (<1ms) des valeurs nominales TLOD, OLOD et Nuages
-    du profil graphique actif sans bloquer avec build_msfs_settings_matrix().
-    Isole la section {GraphicsVR en mode VR et {Graphics en mode 2D.
+    Lecture directe ultra-rapide (<1ms) des valeurs nominales TLOD, OLOD, Nuages et
+    paramètres graphiques modifiables à chaud du profil graphique actif sans bloquer
+    avec build_msfs_settings_matrix(). Isole {GraphicsVR en mode VR et {Graphics en mode 2D.
     """
-    res = {"name": "Active Profile", "tlod": 100.0, "olod": 100.0, "clouds": 2, "is_vr": False}
+    global _nominal_profile_cache
     try:
         if is_vr is None:
             try:
@@ -104,33 +110,51 @@ def get_active_profile_nominal_values(is_vr: Optional[bool] = None) -> Dict[str,
             except Exception:
                 is_vr = False
 
-        res["is_vr"] = bool(is_vr)
+        vr_flag = bool(is_vr)
+        now_ts = time.time()
+        cached_entry = _nominal_profile_cache.get(vr_flag)
+        if cached_entry and (now_ts - cached_entry[0] < 2.0):
+            return dict(cached_entry[1])
 
-        import flight_rig_optimizer
-        ws_dir = flight_rig_optimizer.get_custom_profiles_dir()
+        res: Dict[str, Any] = {
+            "name": "Active Profile",
+            "tlod": 100.0,
+            "olod": 100.0,
+            "clouds": 2,
+            "precaching": 2,
+            "terrain_shadows": 256 if vr_flag else 512,
+            "buildings": 2,
+            "trees": 2,
+            "plants": 1 if vr_flag else 2,
+            "grass": 0 if vr_flag else 2,
+            "max_fps": 36 if vr_flag else 60,
+            "is_vr": vr_flag
+        }
+        appdata = os.environ.get("APPDATA", "")
+        ws_dir = os.path.join(appdata, "SceneryX", "custom_profiles")
         state_file = os.path.join(ws_dir, "active_profile.json")
-        if not os.path.exists(state_file):
-            alt_state = r"D:\SceneryX\custom_profiles\active_profile.json"
-            if os.path.exists(alt_state):
-                state_file = alt_state
         if os.path.exists(state_file):
             with open(state_file, "r", encoding="utf-8") as f:
                 sdata = json.load(f)
             aid = sdata.get("active_id")
             if aid:
                 pfile = os.path.join(ws_dir, f"{aid}.profile.json")
-                if not os.path.exists(pfile):
-                    alt_pfile = os.path.join(r"D:\SceneryX\custom_profiles", f"{aid}.profile.json")
-                    if os.path.exists(alt_pfile):
-                        pfile = alt_pfile
                 if os.path.exists(pfile):
                     with open(pfile, "r", encoding="utf-8") as pf:
                         pjson = json.load(pf)
                     res["name"] = pjson.get("name", aid)
                     content = pjson.get("content", "")
 
+                    # Extract TargetFrameRate / TargetFrameRateVR from {Video
+                    fps_key = "TargetFrameRateVR" if vr_flag else "TargetFrameRate"
+                    m_fps = re.search(rf"\b{fps_key}\s+(\d+)", content)
+                    if m_fps:
+                        fps_v = int(m_fps.group(1))
+                        if fps_v > 0:
+                            res["max_fps"] = fps_v
+
                     # Isolate section: GraphicsVR for VR, Graphics for 2D
-                    if is_vr and "{GraphicsVR" in content:
+                    if vr_flag and "{GraphicsVR" in content:
                         section = content.split("{GraphicsVR", 1)[1]
                     elif "{Graphics" in content:
                         section = content.split("{Graphics", 1)[1]
@@ -141,17 +165,217 @@ def get_active_profile_nominal_values(is_vr: Optional[bool] = None) -> Dict[str,
 
                     m_cloud = re.search(r"\{VolumetricClouds\s+Enabled\s+\d+\s+Quality\s+(\d+)", section)
                     if m_cloud:
-                        res["clouds"] = int(m_cloud.group(1))
+                        res["clouds"] = max(0, min(3, int(m_cloud.group(1))))
+                    m_prec = re.search(r"\{OffscreenTerrainPreCaching\s+Enabled\s+\d+\s+Quality\s+(\d+)", section)
+                    if m_prec:
+                        res["precaching"] = max(0, min(3, int(m_prec.group(1))))
+                    m_hfs = re.search(r"\{HeightFieldShadows\s+Enabled\s+(\d+)\s+Size\s+(\d+)", section)
+                    if m_hfs:
+                        hfs_en = int(m_hfs.group(1))
+                        hfs_sz = int(m_hfs.group(2))
+                        res["terrain_shadows"] = 0 if hfs_en == 0 else (hfs_sz if hfs_sz in (128, 256, 512, 1024, 2048) else 512)
+                    m_bldg = re.search(r"\{Buildings\s+Quality\s+(\d+)", section)
+                    if m_bldg:
+                        res["buildings"] = max(0, min(3, int(m_bldg.group(1))))
+                    m_proc = re.search(r"\{Procedural([^}]*)\}", section)
+                    if m_proc:
+                        p_body = m_proc.group(1)
+                        m_tr = re.search(r"TreesQuality\s+(\d+)", p_body)
+                        if m_tr:
+                            res["trees"] = max(0, min(3, int(m_tr.group(1))))
+                        m_pl = re.search(r"PlantsQuality\s+(\d+)", p_body)
+                        if m_pl:
+                            res["plants"] = max(0, min(3, int(m_pl.group(1))))
+                        m_gr = re.search(r"GrassQuality\s+(\d+)", p_body)
+                        if m_gr:
+                            res["grass"] = max(0, min(3, int(m_gr.group(1))))
                     m_tlod = re.search(r"\{Terrain\s+LoDFactor\s+([\d\.]+)", section)
                     if m_tlod:
                         res["tlod"] = round(float(m_tlod.group(1)) * 100.0, 1)
                     m_olod = re.search(r"\{ObjectsLoD\s+LoDFactor\s+([\d\.]+)", section)
                     if m_olod:
                         res["olod"] = round(float(m_olod.group(1)) * 100.0, 1)
+                    _nominal_profile_cache[vr_flag] = (now_ts, dict(res))
                     return res
+        _nominal_profile_cache[vr_flag] = (now_ts, dict(res))
+        return res
     except Exception as e:
         print(f"[SmartLOD] Notice fast active profile reader: {e}")
-    return res
+    return {
+        "name": "Active Profile",
+        "tlod": 100.0,
+        "olod": 100.0,
+        "clouds": 2,
+        "precaching": 2,
+        "terrain_shadows": 256 if is_vr else 512,
+        "buildings": 2,
+        "trees": 2,
+        "plants": 1 if is_vr else 2,
+        "grass": 0 if is_vr else 2,
+        "max_fps": 36 if is_vr else 60,
+        "is_vr": bool(is_vr)
+    }
+
+
+def _patch_usercfg_live_graphics(content: str, settings: Dict[str, Any], vr_flag: bool) -> str:
+    """Met à jour les blocs de settings modifiés à chaud dans une chaîne UserCfg.opt ({Graphics ou {GraphicsVR + {Video)."""
+    if not content:
+        return content
+
+    # 1. max_fps dans {Video
+    if "max_fps" in settings and settings["max_fps"] is not None:
+        try:
+            fps_v = max(15, min(240, int(settings["max_fps"])))
+            fps_key = "TargetFrameRateVR" if vr_flag else "TargetFrameRate"
+            if re.search(rf"({fps_key}\s+)\d+", content):
+                content = re.sub(rf"({fps_key}\s+)\d+", rf"\g<1>{fps_v}", content)
+            if re.search(r"(FrameLimiter\s+)\d+", content):
+                content = re.sub(r"(FrameLimiter\s+)\d+", rf"\g<1>{fps_v}", content)
+        except Exception:
+            pass
+
+    # 2. Isoler {Graphics ou {GraphicsVR
+    mode_tag = "{GraphicsVR" if vr_flag else "{Graphics\n"
+    mode_idx = content.find(mode_tag)
+    if mode_idx == -1 and not vr_flag:
+        mode_tag = "{Graphics\r\n"
+        mode_idx = content.find(mode_tag)
+    if mode_idx == -1:
+        return content
+
+    mode_end = len(content) if vr_flag else content.find("{GraphicsVR", mode_idx)
+    if mode_end == -1:
+        mode_end = len(content)
+
+    sec = content[mode_idx:mode_end]
+
+    if "clouds" in settings and settings["clouds"] is not None:
+        q = max(0, min(3, int(settings["clouds"])))
+        sec = re.sub(r"(\{VolumetricClouds\s+Enabled\s+\d+\s+Quality\s+)\d+", rf"\g<1>{q}", sec)
+
+    if "precaching" in settings and settings["precaching"] is not None:
+        q = max(0, min(3, int(settings["precaching"])))
+        sec = re.sub(r"(\{OffscreenTerrainPreCaching\s+Enabled\s+\d+\s+Quality\s+)\d+", rf"\g<1>{q}", sec)
+
+    if "terrain_shadows" in settings and settings["terrain_shadows"] is not None:
+        ts = int(settings["terrain_shadows"])
+        if ts <= 0:
+            sec = re.sub(r"(\{HeightFieldShadows\s+Enabled\s+)\d+", r"\g<1>0", sec)
+        elif ts in (128, 256, 512, 1024, 2048):
+            sec = re.sub(
+                r"(\{HeightFieldShadows\s+Enabled\s+)\d+(\s+Size\s+)\d+",
+                rf"\g<1>1\g<2>{ts}",
+                sec
+            )
+
+    if "buildings" in settings and settings["buildings"] is not None:
+        q = max(0, min(3, int(settings["buildings"])))
+        sec = re.sub(r"(\{Buildings\s+Quality\s+)\d+", rf"\g<1>{q}", sec)
+
+    # Procedural sub-block: TreesQuality, PlantsQuality, RocksQuality, GrassQuality
+    if any(k in settings and settings[k] is not None for k in ("trees", "plants", "grass")):
+        m_proc = re.search(r"(\{Procedural[^}]*\})", sec)
+        if m_proc:
+            p_block = m_proc.group(1)
+            if "trees" in settings and settings["trees"] is not None:
+                q = max(0, min(3, int(settings["trees"])))
+                p_block = re.sub(r"(TreesQuality\s+)\d+", rf"\g<1>{q}", p_block)
+            if "plants" in settings and settings["plants"] is not None:
+                q = max(0, min(3, int(settings["plants"])))
+                p_block = re.sub(r"(PlantsQuality\s+)\d+", rf"\g<1>{q}", p_block)
+            if "grass" in settings and settings["grass"] is not None:
+                q = max(0, min(3, int(settings["grass"])))
+                p_block = re.sub(r"(GrassQuality\s+)\d+", rf"\g<1>{q}", p_block)
+            sec = sec[:m_proc.start()] + p_block + sec[m_proc.end():]
+
+    return content[:mode_idx] + sec + content[mode_end:]
+
+
+_LIVE_GRAPHICS_OVERRIDES: Dict[str, int] = {}
+
+
+def get_live_graphics_overrides() -> Dict[str, int]:
+    """Retourne les overrides graphiques appliqués à chaud en vol depuis l'In-Game Panel."""
+    return dict(_LIVE_GRAPHICS_OVERRIDES)
+
+
+def clear_live_graphics_overrides(keys: Optional[List[str]] = None):
+    """Efface tous les overrides graphiques à chaud (ou une sous-liste de clés) pour revenir au profil actif."""
+    global _LIVE_GRAPHICS_OVERRIDES
+    if not keys or "all" in keys:
+        _LIVE_GRAPHICS_OVERRIDES.clear()
+    else:
+        for k in keys:
+            _LIVE_GRAPHICS_OVERRIDES.pop(str(k), None)
+
+
+def apply_live_graphics_to_profile(
+    settings: Dict[str, Any],
+    is_vr: Optional[bool] = None,
+    reset_keys: Optional[List[str]] = None
+) -> Dict[str, int]:
+    """
+    Applique les réglages graphiques modifiés à chaud en tant qu'overrides en vol et dans UserCfg.opt,
+    tout en conservant intact le fichier .profile.json du profil actif afin de permettre un Reset
+    individuel de chaque paramètre vers la valeur nominale du profil actif.
+    """
+    global _nominal_profile_cache, _LIVE_GRAPHICS_OVERRIDES
+    try:
+        if is_vr is None:
+            try:
+                import flight_memory_engine
+                mem = flight_memory_engine.get_memory_engine()
+                if mem and mem.is_attached and not mem.safe_read_only:
+                    is_vr = mem.is_vr_active()
+            except Exception:
+                is_vr = False
+        vr_flag = bool(is_vr)
+
+        nom_vals = get_active_profile_nominal_values(is_vr=vr_flag)
+        effective_settings: Dict[str, int] = {}
+
+        if reset_keys:
+            for rk in reset_keys:
+                rk_str = str(rk)
+                _LIVE_GRAPHICS_OVERRIDES.pop(rk_str, None)
+                if rk_str in nom_vals and nom_vals[rk_str] is not None:
+                    effective_settings[rk_str] = int(nom_vals[rk_str])
+
+        if isinstance(settings, dict):
+            for k in VALID_INGAME_PIN_KEYS:
+                if k in settings and settings[k] is not None and (not reset_keys or k not in reset_keys):
+                    val_int = int(settings[k])
+                    effective_settings[k] = val_int
+                    nom_v = nom_vals.get(k)
+                    if nom_v is not None and int(nom_v) == val_int:
+                        _LIVE_GRAPHICS_OVERRIDES.pop(k, None)
+                    else:
+                        _LIVE_GRAPHICS_OVERRIDES[k] = val_int
+
+        # Synchroniser UserCfg.opt sur le disque (2D et VR) sans écraser la référence .profile.json
+        if effective_settings:
+            try:
+                import flight_rig_optimizer
+                ucfg_path = flight_rig_optimizer.get_user_cfg_path()
+                if ucfg_path and os.path.exists(ucfg_path):
+                    with open(ucfg_path, "r", encoding="utf-8", errors="ignore") as uf:
+                        u_content = uf.read()
+                    if u_content:
+                        u_patched = _patch_usercfg_live_graphics(u_content, effective_settings, False)
+                        u_patched = _patch_usercfg_live_graphics(u_patched, effective_settings, True)
+                        with open(ucfg_path, "w", encoding="utf-8") as uf:
+                            uf.write(u_patched)
+            except Exception as ue:
+                print(f"[SmartLOD] Notice syncing UserCfg.opt on live graphics apply: {ue}")
+
+        return effective_settings
+    except Exception as e:
+        print(f"[SmartLOD] Warning applying live graphics override: {e}")
+        return {}
+
+
+CLOUD_QUALITY_LABELS = {0: "LOW", 1: "MEDIUM", 2: "HIGH", 3: "ULTRA"}
+CLOUD_QUALITY_TITLE_LABELS = {0: "Low", 1: "Medium", 2: "High", 3: "Ultra"}
 
 
 def get_nominal_cloud_quality() -> int:
@@ -159,7 +383,7 @@ def get_nominal_cloud_quality() -> int:
     Retourne la qualite des nuages nominale (0=Low, 1=Medium, 2=High, 3=Ultra)
     extraite ultra-rapidement du profil graphique MSFS actuellement actif dans SceneryX.
     """
-    return int(get_active_profile_nominal_values().get("clouds", 2))
+    return max(0, min(3, int(get_active_profile_nominal_values().get("clouds", 2))))
 
 
 class SmartLodController:
@@ -185,7 +409,10 @@ class SmartLodController:
         self.last_adjustment_time: float = 0.0
         self.status_message: str = "Ready (Standby)"
         self.in_cloud_reduction: bool = False
+        self.in_cloud_boost: bool = False
+        self.current_cloud_quality: int = get_nominal_cloud_quality()
         self.original_cloud_quality: Optional[int] = None
+        self._last_cloud_change_time: float = 0.0
         self.trigger_events: List[Dict[str, Any]] = []
         self._last_logged_tlod: Optional[float] = None
         self._last_phase: str = "ground"
@@ -193,7 +420,11 @@ class SmartLodController:
         # Synchroniser et appliquer le profil Smart LOD actif dès l'allumage
         self.load_active_profile_into_config()
 
-        if self.config.get("enabled", False):
+        from scanner import IS_LITE
+        if IS_LITE:
+            self.config["enabled"] = False
+            self.is_running = False
+        elif self.config.get("enabled", False):
             self.start()
 
     def load_active_profile_into_config(self):
@@ -243,7 +474,7 @@ class SmartLodController:
         except Exception as e:
             print(f"[SmartLOD] Notice initializing active profile: {e}")
 
-    def set_cloud_recovery(self, enabled: bool) -> bool:
+    def set_cloud_recovery(self, enabled: bool, restore_nominal: bool = True) -> bool:
         """Active ou désactive la récupération automatique des nuages et restaure silencieusement la valeur nominale."""
         with self._lock:
             self.config["cloud_recovery"] = bool(enabled)
@@ -257,18 +488,55 @@ class SmartLodController:
 
         if not enabled:
             self.in_cloud_reduction = False
-            def _async_restore():
-                try:
-                    nom_q = get_nominal_cloud_quality()
-                    if not self.engine.is_attached:
-                        self.engine.attach()
-                    if self.engine.is_attached and not self.engine.safe_read_only:
-                        self.engine.write_cloud_quality(nom_q)
-                        print(f"[SmartLOD] Auto Cloud Recovery turned OFF -> silently restored MSFS cloud quality to nominal ({nom_q})")
-                except Exception as e:
-                    print(f"[SmartLOD] Warning restoring cloud quality: {e}")
-            threading.Thread(target=_async_restore, daemon=True, name="AsyncCloudRestore").start()
+            self.in_cloud_boost = False
+            if restore_nominal:
+                def _async_restore():
+                    try:
+                        nom_q = get_nominal_cloud_quality()
+                        self.current_cloud_quality = nom_q
+                        if not self.engine.is_attached:
+                            self.engine.attach()
+                        if self.engine.is_attached and not self.engine.safe_read_only:
+                            self.engine.write_cloud_quality(nom_q)
+                            print(f"[SmartLOD] Auto Cloud Recovery turned OFF -> silently restored MSFS cloud quality to nominal ({nom_q})")
+                    except Exception as e:
+                        print(f"[SmartLOD] Warning restoring cloud quality: {e}")
+                threading.Thread(target=_async_restore, daemon=True, name="AsyncCloudRestore").start()
         return True
+
+    def get_ingame_pinned_settings(self) -> List[str]:
+        """Retourne la liste ordonnée (max 5) des paramètres épinglés dans le bandeau de l'In-Game Panel."""
+        with self._lock:
+            raw = self.config.get("ingame_pinned_settings")
+            if not isinstance(raw, list):
+                raw = list(DEFAULT_CONFIG["ingame_pinned_settings"])
+            cleaned = []
+            for k in raw:
+                ks = str(k).strip()
+                if ks in VALID_INGAME_PIN_KEYS and ks not in cleaned:
+                    cleaned.append(ks)
+                if len(cleaned) >= 5:
+                    break
+            return cleaned
+
+    def set_ingame_pinned_settings(self, pins: List[str]) -> List[str]:
+        """Met à jour et sauvegarde la liste (max 5) des paramètres épinglés dans l'In-Game Panel."""
+        cleaned = []
+        if isinstance(pins, list):
+            for k in pins:
+                ks = str(k).strip()
+                if ks in VALID_INGAME_PIN_KEYS and ks not in cleaned:
+                    cleaned.append(ks)
+                if len(cleaned) >= 5:
+                    break
+        with self._lock:
+            self.config["ingame_pinned_settings"] = cleaned
+            try:
+                with open(CONFIG_FILE_PATH, "w", encoding="utf-8") as f:
+                    json.dump(self.config, f, indent=4)
+            except Exception as e:
+                print(f"[SmartLOD] Erreur sauvegarde ingame_pinned_settings: {e}")
+        return cleaned
 
     def get_trigger_events(self, clear: bool = False) -> List[Dict[str, Any]]:
         with self._lock:
@@ -285,10 +553,14 @@ class SmartLodController:
         nom_vals = get_active_profile_nominal_values()
         nom_tlod = nom_vals.get("tlod", 100.0)
         nom_olod = nom_vals.get("olod", 100.0)
-        nom_cloud = nom_vals.get("clouds", 2)
+        nom_cloud = max(0, min(3, int(nom_vals.get("clouds", 2))))
         profile_name = nom_vals.get("name", "Active Profile")
 
         with self._lock:
+            if axis == "all":
+                _LIVE_GRAPHICS_OVERRIDES.clear()
+            elif axis == "clouds":
+                _LIVE_GRAPHICS_OVERRIDES.pop("clouds", None)
             if axis in ("tlod", "all"):
                 self.manual_tlod = None
                 self.current_tlod_setpoint = float(nom_tlod)
@@ -296,6 +568,8 @@ class SmartLodController:
                 self.manual_olod = None
                 self.current_olod_setpoint = float(nom_olod)
             self.in_cloud_reduction = False
+            self.in_cloud_boost = False
+            self.current_cloud_quality = nom_cloud
 
         if not self.engine.is_attached:
             self.engine.attach()
@@ -318,7 +592,8 @@ class SmartLodController:
             "manual_olod": False,
             "current_tlod": round(self.current_tlod_setpoint, 1),
             "current_olod": round(self.current_olod_setpoint, 1),
-            "cloud_quality": nom_cloud
+            "cloud_quality": nom_cloud,
+            "cloud_label": CLOUD_QUALITY_LABELS.get(nom_cloud, "HIGH")
         }
 
     def reset_manual_override(self, axis: str = "all") -> Dict[str, Any]:
@@ -457,6 +732,10 @@ class SmartLodController:
 
     def start(self):
         """Démarre la boucle de régulation daemon."""
+        from scanner import IS_LITE
+        if IS_LITE:
+            self.is_running = False
+            return
         if self.is_running:
             return
         self.is_running = True
@@ -479,8 +758,20 @@ class SmartLodController:
 
     def set_enabled(self, enabled: bool, force_kill_autofps: bool = False) -> Dict[str, Any]:
         """Active ou désactive Smart LOD avec arbitrage de conflit AutoFPS."""
+        from scanner import IS_LITE
+        if IS_LITE:
+            return {
+                "success": False,
+                "lite_locked": True,
+                "enabled": False,
+                "is_running": False,
+                "error": "Smart LOD Governor is only available in SceneryX Pro."
+            }
         if enabled:
-            # Réinitialiser les débrayages manuels pour reprendre la régulation automatique immédiate
+            # 1. Recharger systématiquement le profil Smart LOD actif pour écraser tout réglage manuel précédent
+            self.load_active_profile_into_config()
+
+            # 2. Réinitialiser les débrayages manuels pour reprendre la régulation automatique dès le 1er clic
             with self._lock:
                 self.manual_tlod = None
                 self.manual_olod = None
@@ -507,6 +798,8 @@ class SmartLodController:
                 self.dynamic_tlod_cruise = float(self.config.get(f"{pfx}_tlod_target", 200))
                 self.dynamic_olod_floor = float(self.config.get(f"{pfx}_olod_base", 100))
                 self.dynamic_olod_cruise = float(self.config.get(f"{pfx}_olod_target", 200))
+                self.current_tlod_setpoint = float(self.dynamic_tlod_floor)
+                self.current_olod_setpoint = float(self.dynamic_olod_floor)
 
             # Vérifier si AutoFPS externe tourne
             af_running, pid = self.engine.is_autofps_running()
@@ -549,7 +842,21 @@ class SmartLodController:
                 self._tick()
             except Exception:
                 pass
-            return {"success": True, "conflict": False, "enabled": True}
+            is_vr = self.engine.is_vr_active() if self.engine.is_attached else False
+            pfx = "vr" if is_vr else "2d"
+            return {
+                "success": True,
+                "conflict": False,
+                "enabled": True,
+                "current_tlod": round(self.current_tlod_setpoint, 1),
+                "current_olod": round(self.current_olod_setpoint, 1),
+                "tlod_base": int(round(getattr(self, "dynamic_tlod_floor", self.config.get(f"{pfx}_tlod_base", 100)))),
+                "tlod_target": int(round(getattr(self, "dynamic_tlod_cruise", self.config.get(f"{pfx}_tlod_target", 200)))),
+                "tlod_altitude": int(self.config.get(f"{pfx}_tlod_altitude", 3000)),
+                "olod_base": int(round(getattr(self, "dynamic_olod_floor", self.config.get(f"{pfx}_olod_base", 100)))),
+                "olod_target": int(round(getattr(self, "dynamic_olod_cruise", self.config.get(f"{pfx}_olod_target", 200)))),
+                "olod_altitude": int(self.config.get(f"{pfx}_olod_altitude", 3000)),
+            }
         else:
             nom_vals = get_active_profile_nominal_values()
             nom_tlod = int(round(float(nom_vals.get("tlod", 100.0))))
@@ -793,32 +1100,90 @@ class SmartLodController:
 
             ok_olod = self.engine.write_olod(self.current_olod_setpoint)
 
-        # 6. Auto Cloud Recovery (si active)
+        # 6. Auto Cloud Recovery & Dynamic Ultra Scaling (0=Low, 1=Medium, 2=High, 3=Ultra)
         cloud_rec_enabled = bool(self.config.get(f"{pfx}_cloud_recovery", self.config.get("cloud_recovery", True)))
+        nom_q = get_nominal_cloud_quality()
+        live_q = self.engine.read_cloud_quality() if (self.engine.is_attached and not self.engine.safe_read_only) else None
+        cur_q = max(0, min(3, int(live_q))) if live_q is not None else max(0, min(3, int(getattr(self, "current_cloud_quality", nom_q))))
+        self.current_cloud_quality = cur_q
+        now_ts = time.time()
+        last_cloud_ts = getattr(self, "_last_cloud_change_time", 0.0)
+
         if cloud_rec_enabled:
-            nom_q = get_nominal_cloud_quality()
+            # A. Heavy FPS strain: step down 1 level (down to 0=Low) with 8s cooldown
             if base_fps > 0 and base_fps < (target_fps - 5):
-                if not self.in_cloud_reduction:
-                    cur_q = self.engine.read_cloud_quality()
-                    if cur_q is None:
-                        cur_q = nom_q
-                    self.original_cloud_quality = cur_q
-                    if cur_q > 0:
-                        new_q = max(0, cur_q - 1)
-                        if self.engine.write_cloud_quality(new_q):
-                            self.in_cloud_reduction = True
-                            print(f"[SmartLOD] Cloud Recovery triggered: lowered cloud quality {cur_q} -> {new_q} (FPS: {round(base_fps)} < {target_fps - 5})")
+                if cur_q > 0 and (now_ts - last_cloud_ts >= 8.0):
+                    if self.original_cloud_quality is None:
+                        self.original_cloud_quality = nom_q
+                    new_q = max(0, cur_q - 1)
+                    if self.engine.write_cloud_quality(new_q):
+                        self.current_cloud_quality = new_q
+                        self.in_cloud_reduction = (new_q < nom_q)
+                        self.in_cloud_boost = (new_q > nom_q)
+                        self._last_cloud_change_time = now_ts
+                        self.trigger_events.append({
+                            "timestamp": datetime.now().strftime("%H:%M:%S"),
+                            "agl_ft": round(agl),
+                            "tlod": round(self.current_tlod_setpoint),
+                            "fps": round(base_fps, 1),
+                            "reason": f"Cloud Quality Step-Down: {CLOUD_QUALITY_LABELS.get(cur_q, cur_q)} -> {CLOUD_QUALITY_LABELS.get(new_q, new_q)}"
+                        })
+                        print(f"[SmartLOD] Cloud Recovery step-down: {CLOUD_QUALITY_LABELS.get(cur_q)} ({cur_q}) -> {CLOUD_QUALITY_LABELS.get(new_q)} ({new_q}) (FPS: {round(base_fps)} < {target_fps - 5})")
+            # B. Moderate strain while boosted above nominal (e.g. at Ultra when nominal is High): step back to nominal
+            elif cur_q > nom_q and ((base_fps > 0 and base_fps < (target_fps - deadband)) or mt_excess_ms > 0 or vram_saturated):
+                if now_ts - last_cloud_ts >= 6.0:
+                    new_q = max(nom_q, cur_q - 1)
+                    if self.engine.write_cloud_quality(new_q):
+                        self.current_cloud_quality = new_q
+                        self.in_cloud_reduction = (new_q < nom_q)
+                        self.in_cloud_boost = (new_q > nom_q)
+                        self._last_cloud_change_time = now_ts
+                        self.trigger_events.append({
+                            "timestamp": datetime.now().strftime("%H:%M:%S"),
+                            "agl_ft": round(agl),
+                            "tlod": round(self.current_tlod_setpoint),
+                            "fps": round(base_fps, 1),
+                            "reason": f"Cloud Quality Return to Nominal: {CLOUD_QUALITY_LABELS.get(cur_q, cur_q)} -> {CLOUD_QUALITY_LABELS.get(new_q, new_q)}"
+                        })
+                        print(f"[SmartLOD] Cloud boost stepped back to nominal: {CLOUD_QUALITY_LABELS.get(cur_q)} ({cur_q}) -> {CLOUD_QUALITY_LABELS.get(new_q)} ({new_q})")
+            # C. FPS recovered to target: step back up toward nominal, and boost up to ULTRA (3) when surplus headroom is available
             elif base_fps >= target_fps:
-                if self.in_cloud_reduction:
-                    restore_q = self.original_cloud_quality if self.original_cloud_quality is not None else nom_q
-                    if self.engine.write_cloud_quality(restore_q):
+                if cur_q < nom_q and (now_ts - last_cloud_ts >= 8.0):
+                    new_q = min(nom_q, cur_q + 1)
+                    if self.engine.write_cloud_quality(new_q):
+                        self.current_cloud_quality = new_q
+                        self.in_cloud_reduction = (new_q < nom_q)
+                        self.in_cloud_boost = (new_q > nom_q)
+                        self._last_cloud_change_time = now_ts
+                        self.trigger_events.append({
+                            "timestamp": datetime.now().strftime("%H:%M:%S"),
+                            "agl_ft": round(agl),
+                            "tlod": round(self.current_tlod_setpoint),
+                            "fps": round(base_fps, 1),
+                            "reason": f"Cloud Quality Restored: {CLOUD_QUALITY_LABELS.get(cur_q, cur_q)} -> {CLOUD_QUALITY_LABELS.get(new_q, new_q)}"
+                        })
+                        print(f"[SmartLOD] Cloud Recovery restored: {CLOUD_QUALITY_LABELS.get(cur_q)} ({cur_q}) -> {CLOUD_QUALITY_LABELS.get(new_q)} ({new_q}) (FPS: {round(base_fps)} >= {target_fps})")
+                elif cur_q < 3 and (fps_surplus > 0 or mt_headroom_ms > 0) and (not vram_saturated) and (now_ts - last_cloud_ts >= 10.0):
+                    new_q = min(3, cur_q + 1)
+                    if self.engine.write_cloud_quality(new_q):
+                        self.current_cloud_quality = new_q
                         self.in_cloud_reduction = False
-                        print(f"[SmartLOD] Cloud Recovery restored: back to nominal cloud quality {restore_q} (FPS: {round(base_fps)} >= {target_fps})")
+                        self.in_cloud_boost = (new_q > nom_q)
+                        self._last_cloud_change_time = now_ts
+                        self.trigger_events.append({
+                            "timestamp": datetime.now().strftime("%H:%M:%S"),
+                            "agl_ft": round(agl),
+                            "tlod": round(self.current_tlod_setpoint),
+                            "fps": round(base_fps, 1),
+                            "reason": f"Cloud Quality Step-Up: {CLOUD_QUALITY_LABELS.get(cur_q, cur_q)} -> {CLOUD_QUALITY_LABELS.get(new_q, new_q)}"
+                        })
+                        print(f"[SmartLOD] Cloud Quality boosted with headroom: {CLOUD_QUALITY_LABELS.get(cur_q)} ({cur_q}) -> {CLOUD_QUALITY_LABELS.get(new_q)} ({new_q}) (FPS: {round(base_fps)})")
         else:
-            if self.in_cloud_reduction:
-                nom_q = get_nominal_cloud_quality()
-                self.engine.write_cloud_quality(nom_q)
+            if self.in_cloud_reduction or self.in_cloud_boost or cur_q != nom_q:
+                if self.engine.write_cloud_quality(nom_q):
+                    self.current_cloud_quality = nom_q
                 self.in_cloud_reduction = False
+                self.in_cloud_boost = False
 
         if ok_tlod and ok_olod:
             status_parts = []
@@ -826,6 +1191,7 @@ class SmartLodController:
                 status_parts.append(f"TLOD {round(self.current_tlod_setpoint)}")
             if olod_is_active:
                 status_parts.append(f"OLOD {round(self.current_olod_setpoint)}")
+            status_parts.append(f"CLOUDS {CLOUD_QUALITY_LABELS.get(self.current_cloud_quality, 'HIGH')}")
             self.status_message = f"Smart LOD Active • {' | '.join(status_parts)} • {pfx.upper()} ({round(base_fps)} FPS)"
         else:
             self.status_message = "Erreur d'écriture mémoire"
@@ -847,7 +1213,7 @@ class SmartLodController:
             import flight_perf_tracker
             # 1. Direct from Blackbox tracker if active
             if hasattr(flight_perf_tracker, 'BLACKBOX') and flight_perf_tracker.BLACKBOX:
-                telem = flight_perf_tracker.BLACKBOX.get_telemetry()
+                telem = flight_perf_tracker.BLACKBOX.get_panel_telemetry() if hasattr(flight_perf_tracker.BLACKBOX, 'get_panel_telemetry') else flight_perf_tracker.BLACKBOX.get_telemetry()
                 if telem:
                     agl = telem.get("agl_ft") or telem.get("agl") or 0
                     res["agl_ft"] = agl
@@ -896,10 +1262,25 @@ class SmartLodController:
         """Retourne l'état complet pour l'UI Web."""
         mem_status = self.engine.get_status()
         is_af_running, af_pid = self.engine.is_autofps_running()
-        nom_vals = get_active_profile_nominal_values()
-        is_vr = self.engine.is_vr_active() if self.engine.is_attached else False
+        is_vr = self.engine.is_vr_active() if (self.engine.is_attached and not self.engine.safe_read_only) else False
+        nom_vals = get_active_profile_nominal_values(is_vr=is_vr)
         is_ext = bool(self.config.get("external_autofps", False) or (self.config.get("source") == "external_autofps") or is_af_running)
-        
+        nom_cloud_q = max(0, min(3, int(nom_vals.get("clouds", 2))))
+        override_cloud_q = _LIVE_GRAPHICS_OVERRIDES.get("clouds")
+        cloud_rec_active = bool(self.config.get("enabled", False) and self.is_running and not is_ext and self.config.get("cloud_recovery", True))
+
+        if override_cloud_q is not None and not cloud_rec_active:
+            cur_cloud_q = max(0, min(3, int(override_cloud_q)))
+            self.current_cloud_quality = cur_cloud_q
+        elif cloud_rec_active:
+            cur_cloud_q = max(0, min(3, int(getattr(self, "current_cloud_quality", nom_cloud_q))))
+        elif override_cloud_q is not None:
+            cur_cloud_q = max(0, min(3, int(override_cloud_q)))
+            self.current_cloud_quality = cur_cloud_q
+        else:
+            cur_cloud_q = nom_cloud_q
+            self.current_cloud_quality = nom_cloud_q
+
         return {
             "enabled": (self.config.get("enabled", False) and not is_ext),
             "external_autofps": is_ext,
@@ -924,7 +1305,12 @@ class SmartLodController:
             "memory": mem_status,
             "config": self.config,
             "cloud_recovery": bool(self.config.get("cloud_recovery", True)),
-            "in_cloud_reduction": self.in_cloud_reduction,
+            "current_cloud_quality": cur_cloud_q,
+            "current_cloud_label": CLOUD_QUALITY_LABELS.get(cur_cloud_q, "HIGH"),
+            "nominal_cloud_quality": nom_cloud_q,
+            "nominal_cloud_label": CLOUD_QUALITY_LABELS.get(nom_cloud_q, "HIGH"),
+            "in_cloud_reduction": bool(cloud_rec_active and cur_cloud_q < nom_cloud_q),
+            "in_cloud_boost": bool(cloud_rec_active and cur_cloud_q > nom_cloud_q),
             "trigger_events_count": len(self.trigger_events),
             "last_trigger": self.trigger_events[-1] if self.trigger_events else None
         }

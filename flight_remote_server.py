@@ -15,7 +15,165 @@ from typing import Optional, Dict, Any
 SERVER_PORT = 8383
 _server_instance: Optional[HTTPServer] = None
 _server_thread: Optional[threading.Thread] = None
+_telemetry_poller_thread: Optional[threading.Thread] = None
+_telemetry_poller_stop = threading.Event()
+_CACHED_PANEL_TELEMETRY: Dict[str, Any] = {}
+_CACHED_LOD_STATUS: Dict[str, Any] = {}
+_CACHED_ACTIVE_HIGHLIGHTS: Dict[str, Dict[str, str]] = {}
 _LAST_MANUAL_LOD: Dict[str, float] = {}
+
+
+def _compute_active_highlights_snapshot() -> Dict[str, Dict[str, str]]:
+    """Extracts 2D and VR active settings highlights (Display/Headset, AA/DLSS, Max FPS, Textures, Clouds)
+    from UserCfg.opt and VR headset software without blocking the HTTP thread."""
+    res_2d = {
+        "display": "2D : 2560x1440",
+        "aa": "DLSS Quality",
+        "max_fps": "Max FPS : 36",
+        "textures": "Textures : High",
+        "clouds": "Clouds : High"
+    }
+    res_vr = {
+        "display": "Headset : 1.00 90Hz",
+        "aa": "DLSS Balanced",
+        "max_fps": "Max FPS : 45",
+        "textures": "Textures : Medium",
+        "clouds": "Clouds : High"
+    }
+    try:
+        import os
+        import flight_rig_optimizer as fro
+        path = fro.get_user_cfg_path()
+        content = ""
+        if path and os.path.exists(path):
+            with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                content = f.read()
+            staged_dict = getattr(fro, "_staged_user_cfg_settings", {})
+            for m, staged in staged_dict.items():
+                for k, v in staged.items():
+                    content = fro.apply_setting_to_content(content, m, k, v)
+
+        if content:
+            video = fro.extract_block(content, "{Video")
+            g2d = fro.extract_block(content, "{Graphics\n") or fro.extract_block(content, "{Graphics\r\n")
+            gvr = fro.extract_block(content, "{GraphicsVR")
+
+            # 1. 2D Display Resolution
+            res_raw = fro.get_block_val(r"FullScreenResolution\s+([\d\s]+)", video, "2560 1440")
+            parts = res_raw.split() if res_raw else ["2560", "1440"]
+            if len(parts) >= 2:
+                res_2d["display"] = f"2D : {parts[0]}x{parts[1]}"
+
+            # 2. VR Headset Scale & Refresh Rate
+            vr_info = {}
+            try:
+                vr_info = fro.detect_vr_headset() or {}
+            except Exception:
+                pass
+            sw_scale = vr_info.get("software_render_scale")
+            if sw_scale is None:
+                ps_vr = fro.get_block_val(r"PrimaryScalingVR\s+([\d\.]+)", gvr, "1.0")
+                try:
+                    sw_scale = float(ps_vr)
+                    if sw_scale > 5.0:
+                        sw_scale = sw_scale / 100.0
+                except Exception:
+                    sw_scale = 1.0
+            vr_hz = vr_info.get("refresh_rate_hz") or 90
+            try:
+                res_vr["display"] = f"Headset : {float(sw_scale):.2f} {int(vr_hz)}Hz"
+            except Exception:
+                res_vr["display"] = "Headset : 1.00 90Hz"
+
+            # 3. Anti-Aliasing / DLSS (Minimal tags: TAA, DLAA, DLSS Quality, DLSS Balanced, DLSS Performance)
+            def _fmt_minimal_aa(aa_raw: str, dlss_raw: str) -> str:
+                aa_up = (aa_raw or "TAA").strip().upper()
+                dlss_up = (dlss_raw or "QUALITY").strip().upper()
+                if "DLAA" in aa_up:
+                    return "DLAA"
+                if "DLSS" in aa_up:
+                    if "ULTRA" in dlss_up:
+                        return "DLSS Ultra Perf"
+                    if "PERF" in dlss_up:
+                        return "DLSS Performance"
+                    if "BAL" in dlss_up:
+                        return "DLSS Balanced"
+                    if "DLAA" in dlss_up:
+                        return "DLAA"
+                    return "DLSS Quality"
+                if "FSR" in aa_up:
+                    return "FSR 2"
+                if "FXAA" in aa_up:
+                    return "FXAA"
+                if "OFF" in aa_up or aa_up == "NONE":
+                    return "AA : OFF"
+                return "TAA"
+
+            aa_2d_raw = fro.get_block_val(r"AntiAliasing\s+([^\r\n]+)", video, "TAA")
+            dlss_2d_raw = fro.get_block_val(r"DLSSMode\s+(\w+)", video, "QUALITY")
+            aa_vr_raw = fro.get_block_val(r"AntiAliasingVR\s+([^\r\n]+)", video, "TAA")
+            dlss_vr_raw = fro.get_block_val(r"DLSSModeVR\s+(\w+)", video, "QUALITY")
+            res_2d["aa"] = _fmt_minimal_aa(aa_2d_raw, dlss_2d_raw)
+            res_vr["aa"] = _fmt_minimal_aa(aa_vr_raw, dlss_vr_raw)
+
+            # 4. Max Frame Rate
+            fps_2d = fro.get_block_val(r"TargetFrameRate\s+(\d+)", video, "0").strip()
+            fps_vr = fro.get_block_val(r"TargetFrameRateVR\s+(\d+)", video, "0").strip()
+            res_2d["max_fps"] = f"Max FPS : {fps_2d}" if (fps_2d.isdigit() and int(fps_2d) > 0) else "Max FPS : OFF"
+            res_vr["max_fps"] = f"Max FPS : {fps_vr}" if (fps_vr.isdigit() and int(fps_vr) > 0) else "Max FPS : OFF"
+
+            # 5. Texture Resolution (0=Ultra, 1=High, 2=Medium, 3=Low)
+            tex_q_map = {"0": "Ultra", "1": "High", "2": "Medium", "3": "Low"}
+            tex_2d_raw = fro.get_block_val(r"Quality\s+(\d+)", fro.extract_block(g2d, "{Texture"), "1")
+            tex_vr_raw = fro.get_block_val(r"Quality\s+(\d+)", fro.extract_block(gvr, "{Texture"), "2")
+            res_2d["textures"] = f"Textures : {tex_q_map.get(tex_2d_raw, 'High')}"
+            res_vr["textures"] = f"Textures : {tex_q_map.get(tex_vr_raw, 'Medium')}"
+
+            # 6. Volumetric Clouds (0=Low, 1=Medium, 2=High, 3=Ultra)
+            q_map = {"0": "Low", "1": "Medium", "2": "High", "3": "Ultra"}
+            cld_2d_raw = fro.get_block_val(r"Quality\s+(\d+)", fro.extract_block(g2d, "{VolumetricClouds"), "2")
+            cld_vr_raw = fro.get_block_val(r"Quality\s+(\d+)", fro.extract_block(gvr, "{VolumetricClouds"), "2")
+            res_2d["clouds"] = f"Clouds : {q_map.get(cld_2d_raw, 'High')}"
+            res_vr["clouds"] = f"Clouds : {q_map.get(cld_vr_raw, 'High')}"
+    except Exception:
+        pass
+    return {"2d": res_2d, "vr": res_vr}
+
+
+def _panel_telemetry_background_loop():
+    """Dedicated background thread that refreshes hardware/sim telemetry at ~1.2 Hz
+    so HTTP /api/telemetry requests return instantaneously (<1ms) from RAM without
+    ever blocking on WMI COM calls, nvidia-smi subprocesses, or disk I/O."""
+    global _CACHED_PANEL_TELEMETRY, _CACHED_LOD_STATUS, _CACHED_ACTIVE_HIGHLIGHTS
+    tick_count = 0
+    while not _telemetry_poller_stop.is_set():
+        try:
+            import flight_perf_tracker
+            if hasattr(flight_perf_tracker, "BLACKBOX") and flight_perf_tracker.BLACKBOX:
+                if hasattr(flight_perf_tracker.BLACKBOX, "get_panel_telemetry"):
+                    snap = flight_perf_tracker.BLACKBOX.get_panel_telemetry()
+                else:
+                    snap = flight_perf_tracker.BLACKBOX.get_telemetry()
+                if snap:
+                    _CACHED_PANEL_TELEMETRY = dict(snap)
+        except Exception:
+            pass
+        try:
+            import flight_lod_controller
+            lod_ctrl = flight_lod_controller.get_smart_lod_controller()
+            if lod_ctrl:
+                st = lod_ctrl.get_status()
+                if st:
+                    _CACHED_LOD_STATUS = dict(st)
+        except Exception:
+            pass
+        if tick_count % 3 == 0 or not _CACHED_ACTIVE_HIGHLIGHTS:
+            try:
+                _CACHED_ACTIVE_HIGHLIGHTS = _compute_active_highlights_snapshot()
+            except Exception:
+                pass
+        tick_count += 1
+        _telemetry_poller_stop.wait(0.8)
 
 
 import socket
@@ -178,6 +336,22 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
             except Exception:
                 params = {}
             self._handle_smart_lod_cloud_recovery(params)
+        elif clean_path in ("/api/smart_lod/apply_live_graphics", "/smart_lod/apply_live_graphics"):
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+                body = self.rfile.read(length).decode("utf-8") if length > 0 else "{}"
+                params = json.loads(body)
+            except Exception:
+                params = {}
+            self._handle_apply_live_graphics(params)
+        elif clean_path in ("/api/smart_lod/save_pins", "/smart_lod/save_pins"):
+            try:
+                length = int(self.headers.get("Content-Length", 0))
+                body = self.rfile.read(length).decode("utf-8") if length > 0 else "{}"
+                params = json.loads(body)
+            except Exception:
+                params = {}
+            self._handle_save_pins(params)
         elif clean_path in ("/api/blackbox/toggle", "/blackbox/toggle"):
             self._handle_blackbox_toggle()
         else:
@@ -233,30 +407,46 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
 
     def _handle_get_telemetry(self):
         try:
-            # 1. Performance Tracker Telemetry
-            telem = {}
+            import sys
+            # 1. Performance Tracker Telemetry (non-blocking from background thread snapshot)
+            telem = dict(_CACHED_PANEL_TELEMETRY) if _CACHED_PANEL_TELEMETRY else {}
             try:
-                import flight_perf_tracker
-                telem = flight_perf_tracker.BLACKBOX.get_telemetry() or {}
+                fpt = sys.modules.get("flight_perf_tracker")
+                if fpt and hasattr(fpt, "BLACKBOX") and fpt.BLACKBOX:
+                    telem["is_tracking"] = bool(fpt.BLACKBOX.is_running)
+                    sc_client = getattr(fpt, "SIMCONNECT_CLIENT", None)
+                    sc_data = sc_client.get_data() if sc_client else {}
+                    if sc_data.get("connected") and sc_data.get("base_fps") is not None:
+                        telem["displayed_fps"] = sc_data.get("displayed_fps")
+                        telem["base_fps"] = sc_data.get("base_fps")
+                        telem["main_thread_ms"] = sc_data.get("frame_time_ms")
+                        telem["agl_ft"] = sc_data.get("agl_ft")
+                        telem["simconnect_connected"] = True
             except Exception as e:
                 print(f"[RemoteServer] Telemetry error: {e}")
 
-            # 2. Smart LOD Status
-            lod_status = {}
-            cur_tlod = None
-            cur_olod = None
+            # 2. Smart LOD Status (non-blocking from background thread snapshot + live RAM state)
+            lod_status = dict(_CACHED_LOD_STATUS) if _CACHED_LOD_STATUS else {}
+            cur_tlod = lod_status.get("current_tlod_setpoint")
+            cur_olod = lod_status.get("current_olod_setpoint")
             lod_ctrl = None
             mem = None
             try:
-                import flight_lod_controller
-                lod_ctrl = flight_lod_controller.get_smart_lod_controller()
-                lod_status = lod_ctrl.get_status() or {}
-                cur_tlod = lod_status.get("current_tlod_setpoint")
-                cur_olod = lod_status.get("current_olod_setpoint")
-                if getattr(lod_ctrl, "manual_olod", None) is not None:
-                    cur_olod = lod_ctrl.manual_olod
-                if getattr(lod_ctrl, "manual_tlod", None) is not None:
-                    cur_tlod = lod_ctrl.manual_tlod
+                flc = sys.modules.get("flight_lod_controller")
+                if flc and getattr(flc, "_global_controller", None) is not None:
+                    lod_ctrl = flc._global_controller
+                    is_ext = bool(lod_ctrl.config.get("external_autofps", False) or (lod_ctrl.config.get("source") == "external_autofps") or lod_status.get("autofps_conflict", False))
+                    lod_status["enabled"] = bool(lod_ctrl.config.get("enabled", False) and not is_ext)
+                    lod_status["is_running"] = bool(lod_ctrl.is_running and not is_ext)
+                    lod_status["external_autofps"] = is_ext
+                    cur_tlod = round(lod_ctrl.current_tlod_setpoint, 1)
+                    cur_olod = round(lod_ctrl.current_olod_setpoint, 1)
+                    lod_status["current_tlod_setpoint"] = cur_tlod
+                    lod_status["current_olod_setpoint"] = cur_olod
+                    if getattr(lod_ctrl, "manual_olod", None) is not None:
+                        cur_olod = lod_ctrl.manual_olod
+                    if getattr(lod_ctrl, "manual_tlod", None) is not None:
+                        cur_tlod = lod_ctrl.manual_tlod
             except Exception:
                 pass
 
@@ -268,15 +458,16 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
 
             # Try direct memory engine read if available and not actively regulated
             try:
-                import flight_memory_engine
-                mem = flight_memory_engine.get_memory_engine()
-                if mem.is_attached and not mem.safe_read_only:
-                    mem_tlod = mem.read_tlod()
-                    mem_olod = mem.read_olod()
-                    if mem_tlod is not None and "tlod" not in _LAST_MANUAL_LOD and not (lod_status.get("enabled") and lod_status.get("is_running")):
-                        cur_tlod = mem_tlod
-                    if mem_olod is not None and "olod" not in _LAST_MANUAL_LOD and not (lod_status.get("enabled") and lod_status.get("is_running")):
-                        cur_olod = mem_olod
+                fme = sys.modules.get("flight_memory_engine")
+                if fme and getattr(fme, "_global_memory_engine", None) is not None:
+                    mem = fme._global_memory_engine
+                    if mem.is_attached and not mem.safe_read_only:
+                        mem_tlod = mem.read_tlod()
+                        mem_olod = mem.read_olod()
+                        if mem_tlod is not None and "tlod" not in _LAST_MANUAL_LOD and not (lod_status.get("enabled") and lod_status.get("is_running")):
+                            cur_tlod = mem_tlod
+                        if mem_olod is not None and "olod" not in _LAST_MANUAL_LOD and not (lod_status.get("enabled") and lod_status.get("is_running")):
+                            cur_olod = mem_olod
             except Exception:
                 pass
 
@@ -290,12 +481,12 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
             base_fps = telem.get("base_fps")
             mt_ms = telem.get("main_thread_ms")
 
-            # Frame pacing evaluation
-            if base_fps and base_fps >= 35:
+            # Frame pacing evaluation synchronized with desktop app and tracker
+            if (base_fps is not None and base_fps >= 35) or (mt_ms is not None and mt_ms < 25.0):
                 pacing = "OPTIMAL"
-            elif base_fps and base_fps >= 25:
+            elif (base_fps is not None and base_fps >= 24) or (mt_ms is not None and mt_ms <= 35.0):
                 pacing = "ACCEPTABLE"
-            elif base_fps:
+            elif base_fps is not None or mt_ms is not None:
                 pacing = "HEAVY"
             else:
                 pacing = "OPTIMAL"
@@ -362,31 +553,86 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
             cache_mbps = telem.get("cache_read_mbps", 0.0) or 0.0
             is_tracking = bool(telem.get("is_tracking", False))
 
-            gpu_util = telem.get("gpu_util_pct", 0)
-            gpu_temp = telem.get("gpu_temp_c", 0)
-            if not gpu_temp:
-                try:
-                    import flight_perf_tracker
-                    nv = flight_perf_tracker.get_nvidia_gpu_telemetry()
-                    gpu_temp = nv.get("gpu_temp_c", 0)
-                    if not gpu_util:
-                        gpu_util = nv.get("gpu_util_pct", 0)
-                except Exception:
-                    pass
+            gpu_util = telem.get("gpu_util_pct", 0) or 0
+            gpu_temp = telem.get("gpu_temp_c", 0) or 0
             cpu_util = telem.get("cpu_pct") or telem.get("msfs_cpu_pct") or 0
-            if not cpu_util:
-                try:
-                    import psutil
-                    cpu_util = round(psutil.cpu_percent(interval=None), 1)
-                except Exception:
-                    pass
-            cpu_temp = telem.get("cpu_temp_c")
-            if not cpu_temp:
-                try:
-                    import flight_perf_tracker
-                    cpu_temp = flight_perf_tracker.get_cpu_temperature_c(cpu_util)
-                except Exception:
-                    cpu_temp = 0
+            cpu_temp = telem.get("cpu_temp_c") or 45.0
+
+            hl_snap = _CACHED_ACTIVE_HIGHLIGHTS or {}
+            active_highlights = dict(hl_snap.get("vr" if is_vr_mode else "2d") or {
+                "display": "Headset : 1.00 90Hz" if is_vr_mode else "2D : 2560x1440",
+                "aa": "DLSS Balanced" if is_vr_mode else "DLSS Quality",
+                "max_fps": "Max FPS : 45" if is_vr_mode else "Max FPS : 36",
+                "textures": "Textures : Medium" if is_vr_mode else "Textures : High",
+                "clouds": "Clouds : High"
+            })
+
+            # 8 Live-Editable Graphics Settings + Active Profile Reference + Pinned Keys
+            nom_prof_vals = {}
+            overrides = {}
+            try:
+                import flight_lod_controller as _flc_mod
+                nom_prof_vals = _flc_mod.get_active_profile_nominal_values(is_vr=is_vr_mode) or {}
+                overrides = _flc_mod.get_live_graphics_overrides() or {}
+            except Exception:
+                nom_prof_vals = {}
+                overrides = {}
+
+            # Live Cloud Quality (0=Low, 1=Medium, 2=High, 3=Ultra)
+            cloud_title_map = {0: "Low", 1: "Medium", 2: "High", 3: "Ultra"}
+            cloud_upper_map = {0: "LOW", 1: "MEDIUM", 2: "HIGH", 3: "ULTRA"}
+            nom_cloud_q = int(nom_prof_vals.get("clouds", lod_status.get("nominal_cloud_quality", 2)))
+            cur_cloud_q = None
+            if "clouds" in overrides:
+                cur_cloud_q = int(overrides["clouds"])
+            elif lod_ctrl and getattr(lod_ctrl, "current_cloud_quality", None) is not None:
+                cur_cloud_q = int(lod_ctrl.current_cloud_quality)
+            else:
+                cur_cloud_q = int(lod_status.get("current_cloud_quality", nom_cloud_q))
+            cur_cloud_q = max(0, min(3, int(cur_cloud_q)))
+            nom_cloud_q = max(0, min(3, int(nom_cloud_q)))
+            cur_cloud_label = cloud_upper_map.get(cur_cloud_q, "HIGH")
+            nom_cloud_label = cloud_upper_map.get(nom_cloud_q, "HIGH")
+            in_cloud_reduction = bool(cur_cloud_q < nom_cloud_q)
+            in_cloud_boost = bool(cur_cloud_q > nom_cloud_q)
+            active_highlights["clouds"] = f"Clouds : {cloud_title_map.get(cur_cloud_q, 'High')}"
+
+            profile_graphics = {
+                "max_fps": int(nom_prof_vals.get("max_fps", 36 if is_vr_mode else 60)),
+                "clouds": int(nom_prof_vals.get("clouds", nom_cloud_q)),
+                "precaching": int(nom_prof_vals.get("precaching", 2)),
+                "terrain_shadows": int(nom_prof_vals.get("terrain_shadows", 256 if is_vr_mode else 512)),
+                "buildings": int(nom_prof_vals.get("buildings", 2)),
+                "trees": int(nom_prof_vals.get("trees", 2)),
+                "plants": int(nom_prof_vals.get("plants", 1 if is_vr_mode else 2)),
+                "grass": int(nom_prof_vals.get("grass", 0 if is_vr_mode else 2)),
+            }
+
+            live_graphics = dict(profile_graphics)
+            live_graphics["clouds"] = int(cur_cloud_q)
+            try:
+                if mem and mem.is_attached and not mem.safe_read_only:
+                    ram_gfx = mem.read_live_graphics()
+                    if ram_gfx:
+                        for gk, gv in ram_gfx.items():
+                            if gv is not None and gk != "clouds" and gk not in overrides:
+                                live_graphics[gk] = int(gv)
+            except Exception:
+                pass
+            for ok, ov in overrides.items():
+                if ov is not None:
+                    live_graphics[ok] = int(ov)
+            live_graphics["clouds"] = int(cur_cloud_q)
+            if "max_fps" in live_graphics:
+                fps_disp = int(live_graphics["max_fps"])
+                active_highlights["max_fps"] = f"Max FPS : {fps_disp}" if fps_disp > 0 else "Max FPS : OFF"
+
+            pinned_keys = ["max_fps", "clouds", "precaching", "buildings", "trees"]
+            try:
+                if lod_ctrl and hasattr(lod_ctrl, "get_ingame_pinned_settings"):
+                    pinned_keys = lod_ctrl.get_ingame_pinned_settings()
+            except Exception:
+                pass
 
             telemetry_data = {
                 "app_running": True,
@@ -395,6 +641,10 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
                 "msfs_active": bool(telem.get("msfs_active", False)),
                 "is_vr": is_vr_mode,
                 "agl_ft": telem.get("agl_ft") or 0,
+                "active_highlights": active_highlights,
+                "live_graphics": live_graphics,
+                "profile_graphics": profile_graphics,
+                "pinned_keys": pinned_keys,
                 "perf": {
                     "displayed_fps": disp_fps,
                     "fps": base_fps,
@@ -418,11 +668,17 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
                     "axis_state": axis_state,
                     "tlod_base": tlod_floor,
                     "tlod_target": tlod_cruise,
-                    "tlod_altitude": axis_state.get("tlod_altitude", 5000),
+                    "tlod_altitude": axis_state.get("tlod_altitude", 3000),
                     "olod_base": olod_floor,
                     "olod_target": olod_cruise,
                     "olod_altitude": axis_state.get("olod_altitude", 3000),
                     "cloud_recovery": bool(lod_ctrl.config.get("cloud_recovery", True)) if lod_ctrl else True,
+                    "cloud_quality": cur_cloud_q,
+                    "cloud_label": cur_cloud_label,
+                    "nominal_cloud_quality": nom_cloud_q,
+                    "nominal_cloud_label": nom_cloud_label,
+                    "in_cloud_reduction": in_cloud_reduction,
+                    "in_cloud_boost": in_cloud_boost,
                 },
                 "external_autofps": is_ext_af,
                 "vram_used_gb": vram_used_gb,
@@ -450,7 +706,13 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
                 "smart_lod_olod_manual": olod_is_manual,
                 "smart_lod_status": status_msg,
                 "cloud_recovery": bool(lod_ctrl.config.get("cloud_recovery", True)) if lod_ctrl else True,
-                "smart_lod_cloud_recovery": bool(lod_ctrl.config.get("cloud_recovery", True)) if lod_ctrl else True
+                "smart_lod_cloud_recovery": bool(lod_ctrl.config.get("cloud_recovery", True)) if lod_ctrl else True,
+                "cloud_quality": cur_cloud_q,
+                "cloud_label": cur_cloud_label,
+                "nominal_cloud_quality": nom_cloud_q,
+                "nominal_cloud_label": nom_cloud_label,
+                "in_cloud_reduction": in_cloud_reduction,
+                "in_cloud_boost": in_cloud_boost,
             }
 
             self._send_json(200, telemetry_data)
@@ -464,7 +726,7 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
                 "is_vr": False,
                 "agl_ft": 0,
                 "perf": {"displayed_fps": None, "fps": None, "main_thread_ms": None, "frame_pacing": "OPTIMAL"},
-                "smart_lod": {"active": False, "enabled": False, "running": False, "current_tlod": 100, "current_olod": 100, "cloud_recovery": False},
+                "smart_lod": {"active": False, "enabled": False, "running": False, "current_tlod": 100, "current_olod": 100, "cloud_recovery": False, "cloud_label": "HIGH"},
                 "displayed_fps": None,
                 "base_fps": None,
                 "main_thread_ms": None,
@@ -479,12 +741,13 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
                 "smart_lod_status": "Ready (Standby)",
                 "cloud_recovery": False,
                 "smart_lod_cloud_recovery": False,
+                "cloud_label": "HIGH",
                 "error": str(e)
             }
             self._send_json(200, fallback_data)
 
     def _handle_smart_lod_toggle(self, params: Optional[Dict[str, Any]] = None):
-        global _LAST_MANUAL_LOD
+        global _LAST_MANUAL_LOD, _CACHED_LOD_STATUS
         try:
             import flight_lod_controller
             lod_ctrl = flight_lod_controller.get_smart_lod_controller()
@@ -541,6 +804,10 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
                 res["olod_base"] = nom_olod
                 res["olod_target"] = cruise_olod
                 res["nominal_profile"] = nom_vals.get("name", "Active Profile")
+            try:
+                _CACHED_LOD_STATUS = dict(lod_ctrl.get_status())
+            except Exception:
+                pass
             print(f"[RemoteServer] Smart LOD Toggle: set_enabled({new_state}) -> {res}")
             self._send_json(200, res)
         except Exception as e:
@@ -548,10 +815,11 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
             self._send_json(500, {"success": False, "error": str(e)})
 
     def _handle_smart_lod_set_lod(self, params: Dict[str, Any]):
-        global _LAST_MANUAL_LOD
+        global _LAST_MANUAL_LOD, _CACHED_LOD_STATUS
         try:
             tlod = params.get("tlod")
             olod = params.get("olod")
+            disengage_auto = bool(params.get("disengage_auto", False))
             res = {"success": True}
 
             import flight_memory_engine
@@ -577,12 +845,22 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
             try:
                 import flight_lod_controller
                 lod_ctrl = flight_lod_controller.get_smart_lod_controller()
+                if disengage_auto and lod_ctrl.config.get("enabled", False):
+                    with lod_ctrl._lock:
+                        lod_ctrl.config["enabled"] = False
+                        lod_ctrl.config["2d_tlod_active"] = False
+                        lod_ctrl.config["2d_olod_active"] = False
+                        lod_ctrl.config["vr_tlod_active"] = False
+                        lod_ctrl.config["vr_olod_active"] = False
+                    lod_ctrl.stop(detach=False)
+                    lod_ctrl.status_message = "MAN"
                 if tlod is not None:
                     lod_ctrl.manual_tlod = float(tlod)
                     lod_ctrl.current_tlod_setpoint = float(tlod)
                 if olod is not None:
                     lod_ctrl.manual_olod = float(olod)
                     lod_ctrl.current_olod_setpoint = float(olod)
+                _CACHED_LOD_STATUS = dict(lod_ctrl.get_status())
             except Exception:
                 pass
 
@@ -647,6 +925,117 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
         except Exception as e:
             self._send_json(500, {"success": False, "error": str(e)})
 
+    def _handle_apply_live_graphics(self, params: Dict[str, Any]):
+        global _CACHED_ACTIVE_HIGHLIGHTS, _CACHED_LOD_STATUS
+        try:
+            import flight_lod_controller
+            import flight_memory_engine
+
+            lod_ctrl = flight_lod_controller.get_smart_lod_controller()
+            mem = flight_memory_engine.get_memory_engine()
+            if mem and not mem.is_attached:
+                mem.attach()
+
+            is_vr = bool(mem.is_vr_active()) if (mem and mem.is_attached) else bool(params.get("is_vr", False))
+            settings = params.get("settings") if isinstance(params.get("settings"), dict) else params
+            if not isinstance(settings, dict):
+                settings = {}
+
+            raw_reset = params.get("reset_keys", [])
+            if isinstance(raw_reset, str):
+                raw_reset = [raw_reset]
+            reset_keys = [str(rk) for rk in raw_reset if rk in ("max_fps", "clouds", "precaching", "terrain_shadows", "buildings", "trees", "plants", "grass")]
+
+            clean_settings: Dict[str, int] = {}
+            for k in ("max_fps", "clouds", "precaching", "terrain_shadows", "buildings", "trees", "plants", "grass"):
+                if k in settings and settings[k] is not None and k not in reset_keys:
+                    try:
+                        clean_settings[k] = int(settings[k])
+                    except Exception:
+                        pass
+
+            # Detect whether clouds was modified by the user
+            clouds_changed = bool(params.get("clouds_changed", False))
+            if not clouds_changed and "clouds" in clean_settings:
+                prev_cloud_q = None
+                if lod_ctrl and getattr(lod_ctrl, "current_cloud_quality", None) is not None:
+                    prev_cloud_q = int(lod_ctrl.current_cloud_quality)
+                if prev_cloud_q is None:
+                    try:
+                        if mem and mem.is_attached and not mem.safe_read_only:
+                            prev_cloud_q = mem.read_cloud_quality()
+                    except Exception:
+                        pass
+                if prev_cloud_q is not None and int(prev_cloud_q) != clean_settings["clouds"]:
+                    clouds_changed = True
+
+            # 1. Persist live overrides & sync to UserCfg.opt (preserving .profile.json reference for Reset)
+            effective_settings = flight_lod_controller.apply_live_graphics_to_profile(
+                clean_settings,
+                is_vr=is_vr,
+                reset_keys=reset_keys,
+            )
+
+            # 2. If clouds was changed and Smart LOD Cloud Recovery is active -> automatically turn Cloud Recovery OFF
+            cloud_recovery_disabled = False
+            if clouds_changed and lod_ctrl:
+                lod_ctrl.set_cloud_recovery(False, restore_nominal=False)
+                lod_ctrl.current_cloud_quality = max(0, min(3, effective_settings.get("clouds", 2)))
+                cloud_recovery_disabled = True
+            elif "clouds" in effective_settings and lod_ctrl:
+                lod_ctrl.current_cloud_quality = max(0, min(3, effective_settings["clouds"]))
+
+            # 3. Update target FPS in SmartLodController config if max_fps was supplied or reset
+            if "max_fps" in effective_settings and lod_ctrl:
+                fps_val = max(15, min(240, effective_settings["max_fps"]))
+                with lod_ctrl._lock:
+                    if is_vr:
+                        lod_ctrl.config["vr_target_fps"] = fps_val
+                    else:
+                        lod_ctrl.config["ifr_target_fps"] = fps_val
+                        lod_ctrl.config["vfr_target_fps"] = fps_val
+                    try:
+                        with open(flight_lod_controller.CONFIG_FILE_PATH, "w", encoding="utf-8") as cf:
+                            json.dump(lod_ctrl.config, cf, indent=4)
+                    except Exception:
+                        pass
+
+            # 4. Write directly to MSFS RAM (Dual-Write 2D + VR)
+            ram_results = {}
+            if mem and mem.is_attached and not mem.safe_read_only and effective_settings:
+                ram_results = mem.write_live_graphics(effective_settings)
+
+            try:
+                _CACHED_ACTIVE_HIGHLIGHTS = _compute_active_highlights_snapshot()
+                if lod_ctrl:
+                    _CACHED_LOD_STATUS = dict(lod_ctrl.get_status())
+            except Exception:
+                pass
+
+            cur_cr = bool(lod_ctrl.config.get("cloud_recovery", False)) if lod_ctrl else False
+            print(f"[RemoteServer] Applied live graphics ({'VR' if is_vr else '2D'}): set={clean_settings} reset={reset_keys} eff={effective_settings} | RAM={ram_results} | CloudRec={cur_cr}")
+            self._send_json(200, {
+                "success": True,
+                "applied": effective_settings,
+                "reset_keys": reset_keys,
+                "ram_written": ram_results,
+                "cloud_recovery": cur_cr,
+                "cloud_recovery_auto_disabled": cloud_recovery_disabled
+            })
+        except Exception as e:
+            print(f"[RemoteServer] Error applying live graphics: {e}")
+            self._send_json(500, {"success": False, "error": str(e)})
+
+    def _handle_save_pins(self, params: Dict[str, Any]):
+        try:
+            import flight_lod_controller
+            lod_ctrl = flight_lod_controller.get_smart_lod_controller()
+            pins = params.get("pins", []) if isinstance(params, dict) else []
+            saved = lod_ctrl.set_ingame_pinned_settings(pins) if lod_ctrl else pins[:5]
+            self._send_json(200, {"success": True, "pinned_keys": saved})
+        except Exception as e:
+            self._send_json(500, {"success": False, "error": str(e)})
+
     def _handle_blackbox_toggle(self):
         try:
             import flight_perf_tracker
@@ -670,11 +1059,20 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
 
 def start_remote_server(port: int = SERVER_PORT) -> bool:
     """Démarre le micro-serveur REST multi-thread dans un thread d'arrière-plan."""
-    global _server_instance, _server_thread
+    global _server_instance, _server_thread, _telemetry_poller_thread
     if _server_instance is not None:
         return True
 
     try:
+        _telemetry_poller_stop.clear()
+        if _telemetry_poller_thread is None or not _telemetry_poller_thread.is_alive():
+            _telemetry_poller_thread = threading.Thread(
+                target=_panel_telemetry_background_loop,
+                daemon=True,
+                name="SceneryXPanelTelemetryPoller"
+            )
+            _telemetry_poller_thread.start()
+
         try:
             _server_instance = DualStackThreadingServer(("::", port), RemoteApiHandler)
         except Exception:
@@ -692,7 +1090,8 @@ def start_remote_server(port: int = SERVER_PORT) -> bool:
 
 def stop_remote_server():
     """Arrête le micro-serveur REST."""
-    global _server_instance, _server_thread
+    global _server_instance, _server_thread, _telemetry_poller_thread
+    _telemetry_poller_stop.set()
     if _server_instance:
         try:
             _server_instance.shutdown()

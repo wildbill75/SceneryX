@@ -528,11 +528,13 @@ class FlightMemoryEngine:
     def read_tlod(self) -> Optional[float]:
         """Retourne la valeur actuelle de Terrain LOD (ex: 100.0, 150.0, 250.0).
         En mode VR actif, lit préférentiellement l'adresse VR."""
+        if not self.is_attached or self.safe_read_only:
+            return None
         addr = self.addr_tlod_vr if (self.is_vr_active() and self.addr_tlod_vr) else self.addr_tlod
         if not addr:
             addr = self.addr_tlod or self.addr_tlod_vr
         raw = self._read_float(addr)
-        if raw is not None:
+        if raw is not None and 0.1 <= raw <= 10.0:
             # Facteur d'échelle 1.0f = 100
             return round(raw * 100.0, 1)
         return None
@@ -554,11 +556,13 @@ class FlightMemoryEngine:
     def read_olod(self) -> Optional[float]:
         """Retourne la valeur actuelle d'Object LOD (ex: 100.0, 50.0, 20.0).
         En mode VR actif, lit préférentiellement l'adresse VR."""
+        if not self.is_attached or self.safe_read_only:
+            return None
         addr = self.addr_olod_vr if (self.is_vr_active() and self.addr_olod_vr) else self.addr_olod
         if not addr:
             addr = self.addr_olod or self.addr_olod_vr
         raw = self._read_float(addr)
-        if raw is not None:
+        if raw is not None and 0.1 <= raw <= 10.0:
             return round(raw * 100.0, 1)
         return None
 
@@ -578,10 +582,15 @@ class FlightMemoryEngine:
 
     def read_cloud_quality(self) -> Optional[int]:
         """Retourne la qualité des nuages (0=Low, 1=Medium, 2=High, 3=Ultra)."""
+        if not self.is_attached or self.safe_read_only:
+            return None
         addr = self.addr_cloud_q_vr if (self.is_vr_active() and self.addr_cloud_q_vr) else self.addr_cloud_q
         if not addr:
             addr = self.addr_cloud_q or self.addr_cloud_q_vr
-        return self._read_int32(addr)
+        val = self._read_int32(addr)
+        if val is not None and 0 <= val <= 3:
+            return int(val)
+        return None
 
     def write_cloud_quality(self, quality: int) -> bool:
         """Modifie la qualité des nuages (0=Low, 1=Medium, 2=High, 3=Ultra) sur 2D et VR simultanément."""
@@ -591,17 +600,161 @@ class FlightMemoryEngine:
         ok_pc = False
         ok_vr = False
         if self.addr_cloud_q:
-            ok_pc = self._write_int32(self.addr_cloud_q, q_clamped)
+            cur_pc = self._read_int32(self.addr_cloud_q)
+            if cur_pc is not None and 0 <= cur_pc <= 3:
+                ok_pc = self._write_int32(self.addr_cloud_q, q_clamped)
         if self.addr_cloud_q_vr:
-            ok_vr = self._write_int32(self.addr_cloud_q_vr, q_clamped)
+            cur_vr = self._read_int32(self.addr_cloud_q_vr)
+            if cur_vr is not None and 0 <= cur_vr <= 3:
+                ok_vr = self._write_int32(self.addr_cloud_q_vr, q_clamped)
         return ok_pc or ok_vr
 
     def is_vr_active(self) -> bool:
         """Indique si le mode VR est actif dans le simulateur."""
-        if not self.addr_vr_mode:
+        if not self.is_attached or self.safe_read_only or not self.addr_vr_mode:
             return False
         val = self._read_int32(self.addr_vr_mode)
         return bool(val and val == 1)
+
+    def _get_live_struct_base(self, for_vr: bool = False) -> int:
+        if for_vr:
+            return self.addr_tlod_vr if self.addr_tlod_vr else 0
+        return self.addr_tlod if self.addr_tlod else 0
+
+    def read_live_graphics(self) -> Dict[str, Any]:
+        """
+        Lit en mémoire MSFS les paramètres graphiques modifiables à chaud :
+        clouds, precaching, terrain_shadows, buildings, trees, plants, grass.
+        Retourne uniquement les clés dont la valeur lue est valide.
+        """
+        out: Dict[str, Any] = {}
+        if not self.is_attached or self.safe_read_only:
+            return out
+
+        cq = self.read_cloud_quality()
+        if cq is not None and 0 <= cq <= 3:
+            out["clouds"] = int(cq)
+
+        if not self.is_2024:
+            return out
+
+        is_vr = self.is_vr_active()
+        base = self._get_live_struct_base(for_vr=is_vr) or self._get_live_struct_base(for_vr=False)
+        if not base:
+            return out
+
+        # Offsets relatifs par rapport à addr_tlod (0x358)
+        prec = self._read_int32(base + 0x10)  # 0x368
+        if prec is not None and 0 <= prec <= 3:
+            out["precaching"] = int(prec)
+
+        ts_en = self._read_int32(base + 0x34)   # 0x38C
+        ts_sz = self._read_int32(base + 0x38)   # 0x390
+        if ts_en == 0:
+            out["terrain_shadows"] = 0
+        elif ts_sz in (128, 256, 512, 1024, 2048):
+            out["terrain_shadows"] = int(ts_sz)
+
+        bldg = self._read_int32(base + 0xBC)  # 0x414
+        if bldg is not None and 0 <= bldg <= 3:
+            out["buildings"] = int(bldg)
+
+        trees = self._read_int32(base + 0xC0)  # 0x418
+        if trees is not None and 0 <= trees <= 3:
+            out["trees"] = int(trees)
+
+        plants = self._read_int32(base + 0xC4)  # 0x41C
+        if plants is not None and 0 <= plants <= 3:
+            out["plants"] = int(plants)
+
+        grass = self._read_int32(base + 0xCC)  # 0x424
+        if grass is not None and 0 <= grass <= 3:
+            out["grass"] = int(grass)
+
+        return out
+
+    def write_live_graphics(self, settings: Dict[str, Any]) -> Dict[str, bool]:
+        """
+        Écrit à chaud en RAM MSFS (Dual-Write 2D + VR) les paramètres graphiques supportés.
+        Vérifie systématiquement la cohérence de la valeur existante avant écriture.
+        """
+        results: Dict[str, bool] = {}
+        if not self.is_attached or self.safe_read_only or not isinstance(settings, dict):
+            return results
+
+        if "clouds" in settings and settings["clouds"] is not None:
+            try:
+                results["clouds"] = self.write_cloud_quality(int(settings["clouds"]))
+            except Exception:
+                results["clouds"] = False
+
+        if not self.is_2024:
+            return results
+
+        bases = [b for b in (self.addr_tlod, self.addr_tlod_vr) if b]
+        if not bases:
+            return results
+
+        def _safe_write_enum(delta: int, new_val: int, min_v: int, max_v: int) -> bool:
+            clamped = max(min_v, min(max_v, int(new_val)))
+            any_ok = False
+            for b in bases:
+                cur = self._read_int32(b + delta)
+                if cur is not None and min_v <= cur <= max_v:
+                    if self._write_int32(b + delta, clamped):
+                        any_ok = True
+            return any_ok
+
+        if "precaching" in settings and settings["precaching"] is not None:
+            try:
+                results["precaching"] = _safe_write_enum(0x10, int(settings["precaching"]), 0, 3)
+            except Exception:
+                results["precaching"] = False
+
+        if "terrain_shadows" in settings and settings["terrain_shadows"] is not None:
+            try:
+                ts_val = int(settings["terrain_shadows"])
+                any_ts_ok = False
+                for b in bases:
+                    cur_en = self._read_int32(b + 0x34)
+                    cur_sz = self._read_int32(b + 0x38)
+                    if cur_en in (0, 1) and (cur_sz in (0, 128, 256, 512, 1024, 2048)):
+                        if ts_val <= 0:
+                            ok1 = self._write_int32(b + 0x34, 0)
+                            any_ts_ok = any_ts_ok or ok1
+                        elif ts_val in (128, 256, 512, 1024, 2048):
+                            ok1 = self._write_int32(b + 0x34, 1)
+                            ok2 = self._write_int32(b + 0x38, ts_val)
+                            any_ts_ok = any_ts_ok or (ok1 and ok2)
+                results["terrain_shadows"] = any_ts_ok
+            except Exception:
+                results["terrain_shadows"] = False
+
+        if "buildings" in settings and settings["buildings"] is not None:
+            try:
+                results["buildings"] = _safe_write_enum(0xBC, int(settings["buildings"]), 0, 3)
+            except Exception:
+                results["buildings"] = False
+
+        if "trees" in settings and settings["trees"] is not None:
+            try:
+                results["trees"] = _safe_write_enum(0xC0, int(settings["trees"]), 0, 3)
+            except Exception:
+                results["trees"] = False
+
+        if "plants" in settings and settings["plants"] is not None:
+            try:
+                results["plants"] = _safe_write_enum(0xC4, int(settings["plants"]), 0, 3)
+            except Exception:
+                results["plants"] = False
+
+        if "grass" in settings and settings["grass"] is not None:
+            try:
+                results["grass"] = _safe_write_enum(0xCC, int(settings["grass"]), 0, 3)
+            except Exception:
+                results["grass"] = False
+
+        return results
 
     def get_status(self) -> Dict[str, Any]:
         """Retourne un dictionnaire complet sur l'état du moteur mémoire."""
