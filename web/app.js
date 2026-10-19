@@ -51,10 +51,177 @@ let currentlyFilteredAirports = [];
 let selectedAirport = null;
 let activeDrawerMode = 'MAP'; // 'MAP', 'COUNTRY', 'AIRPORT'
 let userRatingsMap = {};
-let currentSettings = { auto_scan_on_startup: true, scan_paths: [], camera_airport_zoom: 6.0, camera_pan_duration: 0.8 };
+let currentSettings = { auto_scan_on_startup: true, scan_paths: [], camera_airport_zoom: 8.0, camera_pan_duration: 1.1 };
 let lastFocusedIcao = null;
 let lastFocusedCountryCode = null;
 window.gsxAuditData = null;
+window.IS_LITE = false;
+
+const LITE_PRO_LOCK_SVG = `<svg class="w-3 h-3 text-[#94A3B8] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>`;
+const LITE_PRO_BADGE_INNER = `${LITE_PRO_LOCK_SVG}<span>PRO</span>`;
+const LITE_PRO_BADGE_CLASS = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#0E121A] text-[#94A3B8] border border-[#253046] inline-flex items-center gap-1';
+
+function closeUnlockProModal() {
+    const modal = document.getElementById('lite-unlock-pro-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+}
+window.closeUnlockProModal = closeUnlockProModal;
+
+function showUnlockProModal() {
+    let modal = document.getElementById('lite-unlock-pro-modal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'lite-unlock-pro-modal';
+        modal.className = 'fixed inset-0 z-[10050] hidden items-center justify-center bg-black/70 select-none';
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeUnlockProModal();
+        });
+        modal.innerHTML = `
+            <div class="w-[420px] max-w-[92vw] rounded-xl bg-[#181E2B] border border-[#253046] shadow-2xl overflow-hidden font-sans">
+                <div class="px-4 py-3 bg-[#0E121A] border-b border-[#253046] flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">SCENERYX PRO</span>
+                        <span class="${LITE_PRO_BADGE_CLASS}">${LITE_PRO_BADGE_INNER}</span>
+                    </div>
+                    <button type="button" onclick="closeUnlockProModal()" class="text-[#64748B] hover:text-[#F1F5F9] text-xs font-bold px-1.5 py-0.5 transition-colors cursor-pointer border-0 bg-transparent">✕</button>
+                </div>
+                <div class="p-4 space-y-3.5 text-left">
+                    <p class="text-xs text-[#94A3B8] leading-relaxed">
+                        This feature requires <strong class="text-[#F1F5F9]">SceneryX Pro</strong> (Flight Optimizer, Smart LOD, SimBrief &amp; In-Game Toolbar Panel).
+                    </p>
+                    <div class="p-3 rounded-lg bg-[#0E121A] border border-[#253046] flex items-center justify-between gap-3">
+                        <div class="space-y-0.5">
+                            <span class="text-xs font-bold text-[#F1F5F9] block">Launch Offer — 4.90€ <span class="text-[#64748B] line-through font-normal ml-1">9.90€</span></span>
+                            <span class="text-[10px] text-[#64748B] block">Promo code at checkout</span>
+                        </div>
+                        <span class="px-2.5 py-1 rounded bg-[#181E2B] border border-[#2D3A54] text-xs font-mono font-bold text-[#00A8FF] tracking-wider select-all shrink-0">FSTO-LAUNCH</span>
+                    </div>
+                </div>
+                <div class="px-4 py-3 bg-[#0E121A] border-t border-[#253046] flex items-center justify-end gap-2">
+                    <button type="button" onclick="closeUnlockProModal()" class="px-3.5 py-1.5 rounded-md bg-[#181E2B] hover:bg-[#253046] text-[#94A3B8] hover:text-[#F1F5F9] border border-[#253046] font-sans font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer">
+                        Close
+                    </button>
+                    <button type="button" id="lite-unlock-pro-confirm-btn" class="px-4 py-1.5 rounded-md bg-[#00A8FF] hover:bg-[#38BDF8] text-[#0B0D11] font-sans font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer border-0">
+                        Get SceneryX Pro
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        const confirmBtn = document.getElementById('lite-unlock-pro-confirm-btn');
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', () => {
+                closeUnlockProModal();
+                const proUrl = 'https://sceneryx-flightsim.com';
+                if (window.pywebview && window.pywebview.api && window.pywebview.api.open_external_url) {
+                    window.pywebview.api.open_external_url(proUrl);
+                } else {
+                    window.open(proUrl, '_blank');
+                }
+            });
+        }
+    }
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+window.showUnlockProModal = showUnlockProModal;
+
+function applyLiteEditionLocks() {
+    const isLite = !!window.IS_LITE;
+
+    // 1. Classic Sidebar Flight Optimizer (all 5 modules)
+    const cleanLabels = [
+        ['classic-lbl-smart-lod', 'SMART LOD'],
+        ['classic-lbl-graphics', 'MSFS GRAPHIC SETTINGS'],
+        ['classic-lbl-my-rig', 'MY RIG'],
+        ['classic-lbl-telemetry', 'TELEMETRY'],
+        ['classic-lbl-route', 'ROUTE OPTIMIZATION']
+    ];
+    cleanLabels.forEach(([id, text]) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = text;
+    });
+
+    const optBadgeIds = [
+        'classic-badge-smart-lod',
+        'classic-badge-graphics',
+        'classic-badge-my-rig',
+        'classic-badge-telemetry',
+        'classic-badge-route'
+    ];
+    if (isLite) {
+        optBadgeIds.forEach(id => {
+            const b = document.getElementById(id);
+            if (b) {
+                b.innerHTML = LITE_PRO_BADGE_INNER;
+                b.className = LITE_PRO_BADGE_CLASS;
+            }
+        });
+    }
+
+    // 2. Settings: SimBrief
+    const sbLabel = document.getElementById('cfg-simbrief-label') || document.querySelector('[data-i18n="settings.simbrief_section"]');
+    if (sbLabel) {
+        sbLabel.textContent = (sbLabel.textContent || 'SimBrief').replace(/\s*🔒\s*$/g, '').trim() || 'SimBrief';
+    }
+    const sbProBadge = document.getElementById('cfg-simbrief-pro-badge');
+    if (sbProBadge) {
+        if (isLite) {
+            sbProBadge.innerHTML = LITE_PRO_BADGE_INNER;
+            sbProBadge.className = LITE_PRO_BADGE_CLASS;
+        } else {
+            sbProBadge.className = 'hidden';
+        }
+    }
+    const sbInput = document.getElementById('cfg-simbrief-id');
+    if (sbInput && isLite) {
+        sbInput.value = '';
+        sbInput.readOnly = true;
+        sbInput.placeholder = 'Pilot name or id';
+        sbInput.classList.add('cursor-pointer', 'opacity-75');
+        if (!sbInput.dataset.liteLockedBound) {
+            sbInput.dataset.liteLockedBound = 'true';
+            sbInput.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                showUnlockProModal();
+            });
+            sbInput.addEventListener('focus', (e) => {
+                e.target.blur();
+                showUnlockProModal();
+            });
+        }
+    }
+
+    // 3. Settings: External AutoFPS
+    const extAfProBadge = document.getElementById('cfg-external-autofps-pro-badge');
+    const extAfTrack = document.getElementById('cfg-external-autofps-track');
+    if (extAfProBadge && extAfTrack) {
+        if (isLite) {
+            extAfProBadge.innerHTML = LITE_PRO_BADGE_INNER;
+            extAfProBadge.className = LITE_PRO_BADGE_CLASS;
+            extAfTrack.classList.add('hidden');
+        } else {
+            extAfProBadge.className = 'hidden';
+            extAfTrack.classList.remove('hidden');
+        }
+    }
+
+    // 4. Settings: In-Game Toolbar Panel
+    const ingameBtn = document.getElementById('cfg-ingame-panel-btn');
+    if (ingameBtn && isLite) {
+        ingameBtn.disabled = false;
+        ingameBtn.innerHTML = LITE_PRO_BADGE_INNER;
+        ingameBtn.className = LITE_PRO_BADGE_CLASS + ' cursor-pointer';
+    }
+}
+window.applyLiteEditionLocks = applyLiteEditionLocks;
+document.addEventListener('DOMContentLoaded', () => {
+    applyLiteEditionLocks();
+});
 
 function isClassicNavMode() {
     return !!(typeof currentSettings !== 'undefined' && currentSettings && currentSettings.navigation_style === 'classic');
@@ -103,7 +270,7 @@ function getAirportByIcao(icao) {
     if (airportsByIcao.has(clean)) return airportsByIcao.get(clean);
     if (HISTORIC_AIRPORTS[clean]) {
         const h = HISTORIC_AIRPORTS[clean];
-        return {
+        const apObj = {
             icao: clean,
             ident: clean,
             lat: h.lat,
@@ -136,8 +303,60 @@ function getAirportByIcao(icao) {
                 is_fix_patch: false,
                 version: '',
                 size_str: 'Default'
-            }]
+            }],
+            operating_airlines: [],
+            routes: {},
+            runways: []
         };
+        airportsByIcao.set(clean, apObj);
+        return apObj;
+    }
+    // Dynamic on-demand world airport resolution from worldAirportCoords
+    if (window.worldAirportCoords && window.worldAirportCoords[clean]) {
+        const w = window.worldAirportCoords[clean];
+        let englishType = 'General Aviation';
+        if (w.type === 'large_airport') englishType = 'International';
+        else if (w.type === 'medium_airport') englishType = 'Regional';
+        const apObj = {
+            icao: clean,
+            ident: clean,
+            lat: w.lat,
+            lon: w.lon,
+            name: w.name,
+            city: w.city || '',
+            country: w.country || '',
+            elevation: w.elevation || 0,
+            type: w.type || 'medium_airport',
+            english_type: englishType,
+            iata: w.iata || '',
+            pricing_type: 'Default',
+            is_default: true,
+            vendor: 'Microsoft Flight Simulator (Default)',
+            package_name: `msfs-default-${clean.toLowerCase()}`,
+            source_folder: 'MSFS - Default Procedural',
+            match_source: 'Default MSFS Procedural',
+            all_sources: [{
+                folder_name: `msfs-default-${clean.toLowerCase()}`,
+                package_path: '',
+                source_folder: 'MSFS - Default Procedural',
+                match_source: 'Default MSFS Procedural',
+                vendor: 'Microsoft Flight Simulator (Default)',
+                pricing_type: 'Default',
+                is_payware: false,
+                is_asobo_official: false,
+                is_default: true,
+                is_disabled: false,
+                is_addon: false,
+                is_fix_patch: false,
+                version: '',
+                size_str: 'Default'
+            }],
+            operating_airlines: [],
+            routes: {},
+            runways: []
+        };
+        airportsByIcao.set(clean, apObj);
+        return apObj;
     }
     return null;
 }
@@ -1194,7 +1413,7 @@ function resetCameraToStartupRegion() {
     map.stop();
     const PAN_DURATION = (currentSettings && currentSettings.camera_pan_duration !== undefined)
         ? parseFloat(currentSettings.camera_pan_duration)
-        : 0.8;
+        : 1.1;
     const regKey = currentSettings && currentSettings.camera_startup_region;
     if (regKey && regKey !== 'world' && regKey !== 'default' && REGION_VIEWPORTS[regKey]) {
         const vp = REGION_VIEWPORTS[regKey];
@@ -1210,7 +1429,7 @@ function resetCameraToDefaultView() {
     map.stop();
     const PAN_DURATION = (currentSettings && currentSettings.camera_pan_duration !== undefined)
         ? parseFloat(currentSettings.camera_pan_duration)
-        : 0.8;
+        : 1.1;
     // Priority 1: Active filter region in sidebar (user's immediate working focus)
     if (selectedRegion && REGION_VIEWPORTS[selectedRegion]) {
         const vp = REGION_VIEWPORTS[selectedRegion];
@@ -1871,7 +2090,7 @@ function focusAirportInCountryMode(ap) {
         }
         const PAN_DURATION = (currentSettings && currentSettings.camera_pan_duration !== undefined)
             ? parseFloat(currentSettings.camera_pan_duration)
-            : 0.8;
+            : 1.1;
         map.panTo([ap.lat, displayLon], { animate: true, duration: PAN_DURATION });
     }
 }
@@ -2249,18 +2468,16 @@ async function loadAirportsData() {
                     if (currentSettings.language && typeof setAppLanguage === 'function') {
                         setAppLanguage(currentSettings.language);
                     }
-                    if (currentSettings.currency) {
-                        setCurrency(currentSettings.currency);
-                    } else {
-                        setCurrency('USD');
-                    }
+                    const savedLocalCurr = (typeof localStorage !== 'undefined') ? localStorage.getItem('sceneryx_currency') : null;
+                    const effectiveCurr = currentSettings.currency || savedLocalCurr || (currentSettings.language === 'fr' ? 'EUR' : 'EUR');
+                    setCurrency(effectiveCurr);
                     loadSimBriefSettingsUI();
                     const st = currentSettings.settings || currentSettings;
                     if (st && st.flight_mode) {
                         updateFlightModeBannerUI(st.flight_mode);
                     }
                     if (typeof applyNavigationStyle === 'function') {
-                        applyNavigationStyle(currentSettings.navigation_style || 'radial');
+                        applyNavigationStyle(currentSettings.navigation_style || 'classic');
                     }
                 }
             } catch(e) {
@@ -2283,8 +2500,10 @@ async function loadAirportsData() {
                 allAirportsData = [];
             }
 
-            // Automated resilience check: If get_airports returned empty, auto-trigger a library scan
-            if ((!allAirportsData || allAirportsData.length === 0) && window.pywebview.api.rescan) {
+            const isDisclaimerAlreadyAccepted = Boolean(currentSettings && currentSettings.disclaimer_accepted);
+
+            // Automated resilience check: If get_airports returned empty (and user already accepted disclaimer), auto-trigger a library scan
+            if (isDisclaimerAlreadyAccepted && (!allAirportsData || allAirportsData.length === 0) && window.pywebview.api.rescan) {
                 console.warn("Airport database empty on startup. Triggering automated rescan to restore database...");
                 updateSplashProgress(65, "Restoring scenery database...", "Auto-Scanning");
                 const rescanRaw = await window.pywebview.api.rescan();
@@ -2311,8 +2530,8 @@ async function loadAirportsData() {
             allAirportsData = await response.json();
         }
 
-        // Guarantee historic airports (such as Berlin-Tegel EDDT) exist natively in allAirportsData
-        if (typeof HISTORIC_AIRPORTS !== 'undefined' && Array.isArray(allAirportsData)) {
+        // Guarantee historic airports (such as Berlin-Tegel EDDT) exist natively in allAirportsData once populated
+        if (typeof HISTORIC_AIRPORTS !== 'undefined' && Array.isArray(allAirportsData) && allAirportsData.length > 0) {
             for (const [hIcao, h] of Object.entries(HISTORIC_AIRPORTS)) {
                 if (!allAirportsData.some(a => a.icao === hIcao)) {
                     allAirportsData.push({
@@ -2375,8 +2594,8 @@ async function loadAirportsData() {
             ap._searchKey = buildAirportSearchKey(ap);
         });
 
-        // GSX Audit Scan directly during the splash screen!
-        if (window.pywebview && window.pywebview.api && window.pywebview.api.scan_gsx_audit) {
+        // GSX Audit Scan directly during the splash screen (if disclaimer already accepted)
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.scan_gsx_audit && (!currentSettings || currentSettings.disclaimer_accepted)) {
             updateSplashProgress(75, "Scanning GSX profile files...", "Virtuali GSX Profiles");
             try {
                 const raw = await window.pywebview.api.scan_gsx_audit();
@@ -2401,11 +2620,20 @@ async function loadAirportsData() {
         await hideSplashScreen();
         restoreFlightPlanningStateOnStartup();
         if (typeof applyNavigationStyle === 'function') {
-            applyNavigationStyle((currentSettings && currentSettings.navigation_style) || 'radial');
+            applyNavigationStyle((currentSettings && currentSettings.navigation_style) || 'classic');
         }
         const isAccepted = await checkFirstLaunchDisclaimer();
         if (isAccepted) {
             await new Promise(r => setTimeout(r, 200));
+            if (typeof checkPostPatchChangelogOnStartup === 'function') {
+                await checkPostPatchChangelogOnStartup();
+            }
+            if (typeof checkAvailablePatchOnStartup === 'function') {
+                await checkAvailablePatchOnStartup();
+            }
+            if (typeof checkResumableBlackboxOnStartup === 'function') {
+                await checkResumableBlackboxOnStartup();
+            }
             await checkStartupChanges();
 
             let hasCompletedOnboarding = false;
@@ -2419,6 +2647,9 @@ async function loadAirportsData() {
                 }
             } else {
                 await checkBackgroundToolsOnStartup();
+                if (typeof checkFirstSystemTuningScanOnStartup === 'function') {
+                    checkFirstSystemTuningScanOnStartup();
+                }
             }
         }
     } catch (err) {
@@ -2427,6 +2658,15 @@ async function loadAirportsData() {
         const isAccepted = await checkFirstLaunchDisclaimer();
         if (isAccepted) {
             await new Promise(r => setTimeout(r, 200));
+            if (typeof checkPostPatchChangelogOnStartup === 'function') {
+                await checkPostPatchChangelogOnStartup();
+            }
+            if (typeof checkAvailablePatchOnStartup === 'function') {
+                await checkAvailablePatchOnStartup();
+            }
+            if (typeof checkResumableBlackboxOnStartup === 'function') {
+                await checkResumableBlackboxOnStartup();
+            }
             await checkStartupChanges();
 
             let hasCompletedOnboarding = false;
@@ -2440,6 +2680,9 @@ async function loadAirportsData() {
                 }
             } else {
                 await checkBackgroundToolsOnStartup();
+                if (typeof checkFirstSystemTuningScanOnStartup === 'function') {
+                    checkFirstSystemTuningScanOnStartup();
+                }
             }
         }
     }
@@ -2650,6 +2893,9 @@ function setCurrency(curr) {
     if (currentSettings) {
         currentSettings.currency = curr;
     }
+    try {
+        localStorage.setItem('sceneryx_currency', curr);
+    } catch (e) {}
     updateInvestmentBanner();
     updateStats(allAirportsData);
     if (activeDrawerMode === 'AIRPORT' && selectedAirport) {
@@ -2657,10 +2903,19 @@ function setCurrency(curr) {
     } else if (activeDrawerMode === 'COUNTRY' && selectedCountryCode) {
         openCountryDrawer(selectedCountryCode);
     }
+    if (currentRadialAirport) {
+        renderRadialPrice(currentRadialAirport);
+    }
 }
 
 function previewAppCurrency(curr) {
     setCurrency(curr);
+    if (currentSettings) {
+        currentSettings.currency = curr;
+    }
+    try {
+        localStorage.setItem('sceneryx_currency', curr);
+    } catch (e) {}
 }
 
 function updateConflictNavigator() {
@@ -2681,6 +2936,35 @@ function updateConflictNavigator() {
     }
 }
 
+let pendingConflictModal = false;
+let pendingConflictModalIndex = 0;
+
+function isTourActiveOrPending() {
+    if (document.body && document.body.classList.contains('tour-active')) return true;
+    if (window.onboardingTour && window.onboardingTour.isOpen) return true;
+    const promptModal = document.getElementById('onboarding-prompt-modal');
+    if (promptModal && !promptModal.classList.contains('hidden')) return true;
+    const hasSeenLocalStorage = (localStorage.getItem('sceneryx_has_seen_onboarding') === 'true');
+    const hasSeenSettings = Boolean(typeof currentSettings !== 'undefined' && currentSettings && currentSettings.has_seen_onboarding);
+    if (!hasSeenLocalStorage && !hasSeenSettings) return true;
+    return false;
+}
+
+function triggerPendingConflictModal() {
+    if (pendingConflictModal) {
+        pendingConflictModal = false;
+        const conflictAirports = allAirportsData.filter(a => a.has_conflict);
+        if (conflictAirports.length > 0) {
+            setTimeout(() => {
+                if (!document.body.classList.contains('tour-active') && (!window.onboardingTour || !window.onboardingTour.isOpen)) {
+                    openConflictModal(pendingConflictModalIndex || 0);
+                }
+            }, 350);
+        }
+    }
+}
+window.triggerPendingConflictModal = triggerPendingConflictModal;
+
 function openConflictModal(index = 0) {
     const conflictAirports = allAirportsData.filter(a => a.has_conflict);
     const modal = document.getElementById('conflict-resolution-modal');
@@ -2691,17 +2975,34 @@ function openConflictModal(index = 0) {
         return;
     }
 
+    if (isTourActiveOrPending()) {
+        console.log("[ConflictModal] Tour active or onboarding pending; postponing conflict modal.");
+        pendingConflictModal = true;
+        pendingConflictModalIndex = index;
+        return;
+    }
+
     if (index < 0) index = 0;
     if (index >= conflictAirports.length) index = conflictAirports.length - 1;
     currentConflictIndex = index;
 
     renderConflictModalStep(currentConflictIndex);
+    modal._hasBeenDragged = false;
     modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+    if (window.windowManager) {
+        window.windowManager.register(modal);
+        window.windowManager.centerModal(modal);
+        window.windowManager.bringToFront(modal);
+    }
 }
 
 function closeConflictModal() {
     const modal = document.getElementById('conflict-resolution-modal');
-    if (modal) modal.classList.add('hidden');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.style.display = 'none';
+    }
 
     if (pendingScanIsStartup) {
         startGsxScanPhase(true);
@@ -2714,6 +3015,10 @@ function closeConflictModal() {
             pendingScanIsStartup = false;
             displayScanResults(deltaToDisplay, isStartup);
         }
+    }
+
+    if (typeof triggerPendingBackgroundToolsCheck === 'function' && pendingBackgroundToolsCheck) {
+        setTimeout(triggerPendingBackgroundToolsCheck, 400);
     }
 }
 
@@ -2784,11 +3089,11 @@ function renderConflictModalStep(index) {
     if (icaoEl) {
         icaoEl.innerText = ap.icao;
         const cat = getAirportCategory(ap);
-        let icaoColor = 'text-cyan-400';
+        let icaoColor = 'text-amber-400';
         if (cat === 'PAYWARE') icaoColor = 'text-purple-400';
         else if (cat === 'ASOBO') icaoColor = 'text-amber-400';
-        else if (cat === 'DEFAULT') icaoColor = 'text-sky-400';
-        icaoEl.className = `font-mono font-black text-2xl lg:text-3xl tracking-tight shrink-0 ${icaoColor}`;
+        else if (cat === 'DEFAULT') icaoColor = 'text-slate-300';
+        icaoEl.className = `font-sans font-black text-2xl lg:text-3xl tracking-tight shrink-0 ${icaoColor}`;
     }
     if (apNameEl) apNameEl.innerText = getCleanAirportName(ap.name, ap.city) || ap.icao;
     if (apLocEl) apLocEl.innerText = `${getCleanCityName(ap.city) || 'Unknown City'}, ${ap.country || 'Unknown Country'}`;
@@ -2808,19 +3113,19 @@ function renderConflictModalStep(index) {
             const isChecked = (i === 0);
             const safeAttrFolder = (src.folder_name || '').replace(/"/g, '&quot;');
             const titleLabel = src.vendor && src.vendor !== 'Unknown' ? src.vendor : src.folder_name;
-            const cardBorder = isChecked ? 'border-cyan-500/60 bg-slate-900 shadow-md shadow-cyan-500/10' : 'border-slate-800 bg-slate-900/60 hover:border-slate-700';
+            const cardBorder = isChecked ? 'border-blue-500 bg-[#1E293B] shadow-md ring-1 ring-blue-500/30' : 'border-[#263042] bg-[#0E121A] hover:border-slate-500 hover:bg-[#181E2B]';
 
             return `
-                <label id="conflict-card-${i}" onclick="selectConflictRadio(${i})" class="p-3.5 rounded-2xl border ${cardBorder} flex items-start gap-3.5 cursor-pointer transition-all group block">
-                    <input type="radio" name="conflict-pkg-choice" value="${safeAttrFolder}" id="conflict-radio-${i}" ${isChecked ? 'checked' : ''} class="w-4 h-4 accent-cyan-500 mt-1 cursor-pointer shrink-0">
-                    <div class="min-w-0 flex-1 space-y-1.5">
+                <label id="conflict-card-${i}" onclick="selectConflictRadio(${i})" class="p-3 rounded-xl border ${cardBorder} flex items-start gap-3 cursor-pointer transition-all group block">
+                    <input type="radio" name="conflict-pkg-choice" value="${safeAttrFolder}" id="conflict-radio-${i}" ${isChecked ? 'checked' : ''} class="w-4 h-4 accent-blue-500 mt-0.5 cursor-pointer shrink-0">
+                    <div class="min-w-0 flex-1 space-y-1">
                         <div class="flex items-center justify-between gap-2">
-                            <span class="text-xs font-bold text-white group-hover:text-cyan-300 transition-colors truncate">${titleLabel}</span>
+                            <span class="text-xs font-sans font-bold text-white group-hover:text-white transition-colors truncate">${titleLabel}</span>
                         </div>
-                        <div class="text-[11px] font-mono text-slate-300 bg-slate-950/70 border border-slate-800/80 p-2 rounded-xl break-all">
+                        <div class="text-[11px] font-sans font-medium text-slate-200 bg-[#0A0D14] border border-[#263042] px-2.5 py-1.5 rounded-lg break-all">
                             ${src.folder_name}
                         </div>
-                        <div class="flex items-center justify-between text-[11px] font-mono text-slate-400 pt-0.5">
+                        <div class="flex items-center justify-between text-[11px] font-sans text-slate-400 pt-0.5">
                             <span>${getIcon('folder', 'w-3 h-3 text-slate-500 mr-1 inline-block')}${src.source_folder || 'Community'}</span>
                             <span>${src.size_str || ''}</span>
                         </div>
@@ -2831,6 +3136,9 @@ function renderConflictModalStep(index) {
 
         sourcesCont.innerHTML = htmlSources;
     }
+
+    const modalBody = document.querySelector('#conflict-resolution-modal .modal-body');
+    if (modalBody) modalBody.scrollTop = 0;
 }
 
 function selectConflictRadio(index) {
@@ -2841,9 +3149,9 @@ function selectConflictRadio(index) {
     const cards = document.querySelectorAll('[id^="conflict-card-"]');
     cards.forEach((card, i) => {
         if (i === index) {
-            card.className = "p-3.5 rounded-2xl border border-cyan-500/60 bg-slate-900 shadow-md shadow-cyan-500/10 flex items-start gap-3.5 cursor-pointer transition-all group block";
+            card.className = "p-3 rounded-xl border border-blue-500 bg-[#1E293B] shadow-md ring-1 ring-blue-500/30 flex items-start gap-3 cursor-pointer transition-all group block";
         } else {
-            card.className = "p-3.5 rounded-2xl border border-slate-800 bg-slate-900/60 hover:border-slate-700 flex items-start gap-3.5 cursor-pointer transition-all group block";
+            card.className = "p-3 rounded-xl border border-[#263042] bg-[#0E121A] hover:border-slate-500 hover:bg-[#181E2B] flex items-start gap-3 cursor-pointer transition-all group block";
         }
     });
 }
@@ -3508,7 +3816,7 @@ function panCameraToGsxAirport(icao) {
     // Pan and center camera smoothly on airport using user-defined settings (zoom & duration)
     // Guarantee minimum zoom of 7.5 so Leaflet cluster unbundles and individual marker is visible
     const zoomToUse = Math.max(
-        (currentSettings && currentSettings.camera_airport_zoom !== undefined) ? parseFloat(currentSettings.camera_airport_zoom) : 6.0,
+        (currentSettings && currentSettings.camera_airport_zoom !== undefined) ? parseFloat(currentSettings.camera_airport_zoom) : 8.0,
         7.5
     );
     if (typeof centerMapOnAirport === 'function') {
@@ -5432,7 +5740,9 @@ function getActiveSource(ap) {
 
 function hasCustomAddonSources(ap) {
     if (!ap || !ap.all_sources) return false;
-    return ap.all_sources.some(s => !(s.is_default || s.pricing_type === 'Default' || (s.folder_name && s.folder_name.startsWith('msfs-default-'))));
+    if (ap._hasCustomAddon !== undefined) return ap._hasCustomAddon;
+    ap._hasCustomAddon = ap.all_sources.some(s => !(s.is_default || s.pricing_type === 'Default' || (s.folder_name && s.folder_name.startsWith('msfs-default-'))));
+    return ap._hasCustomAddon;
 }
 
 function getAirportPricingType(ap) {
@@ -5585,10 +5895,14 @@ function setAirportMarkerLabelFocus(icao) {
     }
     currentlyHighlightedIcao = icao || null;
     if (currentlyHighlightedIcao) {
-        const marker = airportMarkerCache.get(currentlyHighlightedIcao);
-        if (marker && marker._icon) {
-            const lbl = marker._icon.querySelector('.airport-map-label');
-            if (lbl) lbl.classList.add('label-force-visible');
+        const isRadialOnThis = !!((currentRadialAirport && currentRadialAirport.icao === currentlyHighlightedIcao) ||
+                                  (currentClassicAirport && currentClassicAirport.icao === currentlyHighlightedIcao));
+        if (!isRadialOnThis) {
+            const marker = airportMarkerCache.get(currentlyHighlightedIcao);
+            if (marker && marker._icon) {
+                const lbl = marker._icon.querySelector('.airport-map-label');
+                if (lbl) lbl.classList.add('label-force-visible');
+            }
         }
     }
 }
@@ -5610,11 +5924,13 @@ function getCustomIconKey(ap) {
     const isSimBriefAlt = (flightCorridorProfile === 'SIMBRIEF' && typeof currentSimBriefAlternates !== 'undefined' && Array.isArray(currentSimBriefAlternates) && currentSimBriefAlternates.some(a => a && a.icao === ap.icao));
     const isRouteBadgeActive = !!((typeof optimizerOrigin !== 'undefined' && optimizerOrigin && optimizerOrigin.icao === ap.icao && (typeof routeDepartureMarker !== 'undefined' && routeDepartureMarker)) ||
                                   (typeof optimizerDest !== 'undefined' && optimizerDest && optimizerDest.icao === ap.icao && (typeof routeArrivalMarker !== 'undefined' && routeArrivalMarker)));
+    const isRadialActive = !!((typeof currentRadialAirport !== 'undefined' && currentRadialAirport && currentRadialAirport.icao === ap.icao) ||
+                              (typeof currentClassicAirport !== 'undefined' && currentClassicAirport && currentClassicAirport.icao === ap.icao));
 
     if (hasAnyLabel) {
-        return `${ap.icao}_${cat}_${isApDisabled ? 1 : 0}_${hasActiveFix ? 1 : 0}_${hasConflict ? 1 : 0}_${isSimBriefAlt ? 1 : 0}_${isSelected ? 1 : 0}_${isRouteBadgeActive ? 1 : 0}_${labelKey}`;
+        return `${ap.icao}_${cat}_${isApDisabled ? 1 : 0}_${hasActiveFix ? 1 : 0}_${hasConflict ? 1 : 0}_${isSimBriefAlt ? 1 : 0}_${isSelected ? 1 : 0}_${isRouteBadgeActive ? 1 : 0}_${isRadialActive ? 1 : 0}_${labelKey}`;
     }
-    return `${cat}_${isApDisabled ? 1 : 0}_${hasActiveFix ? 1 : 0}_${hasConflict ? 1 : 0}_${isSimBriefAlt ? 1 : 0}_${isSelected ? 1 : 0}_${isRouteBadgeActive ? 1 : 0}_000`;
+    return `${cat}_${isApDisabled ? 1 : 0}_${hasActiveFix ? 1 : 0}_${hasConflict ? 1 : 0}_${isSimBriefAlt ? 1 : 0}_${isSelected ? 1 : 0}_${isRouteBadgeActive ? 1 : 0}_${isRadialActive ? 1 : 0}_000`;
 }
 
 function createCustomIcon(ap) {
@@ -5737,8 +6053,10 @@ function createCustomIcon(ap) {
         const nameSpan = (showName && safeName) ? `<span class="font-bold ${nameColorClass} text-[11px] truncate max-w-[150px]">${safeName}</span>` : '';
         const citySpan = (showCity && safeCity) ? `<span class="${cityColorClass} font-semibold text-[10px] truncate max-w-[110px]">• ${safeCity}</span>` : '';
 
+        const isRadialActive = !!((typeof currentRadialAirport !== 'undefined' && currentRadialAirport && currentRadialAirport.icao === ap.icao) ||
+                                  (typeof currentClassicAirport !== 'undefined' && currentClassicAirport && currentClassicAirport.icao === ap.icao));
         const isEndpoint = (selectedAirport && ap.icao === selectedAirport.icao) || (flightCorridorArrivalAirport && ap.icao === flightCorridorArrivalAirport.icao);
-        const isForceVisible = (currentlyHighlightedIcao && currentlyHighlightedIcao === ap.icao) || isSimBriefAlt || isEndpoint;
+        const isForceVisible = ((currentlyHighlightedIcao && currentlyHighlightedIcao === ap.icao) || isSimBriefAlt || isEndpoint) && !isRadialActive;
 
         labelHtml = `
             <div class="airport-map-label airport-label-tier-${tier} ${isForceVisible ? 'label-force-visible' : ''} inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md ${labelBgClass} shadow-md whitespace-nowrap leading-tight pointer-events-auto ml-1.5 border-0">
@@ -5759,10 +6077,12 @@ function createCustomIcon(ap) {
 
     const isRouteBadgeActive = !!((typeof optimizerOrigin !== 'undefined' && optimizerOrigin && optimizerOrigin.icao === ap.icao && (typeof routeDepartureMarker !== 'undefined' && routeDepartureMarker)) ||
                                   (typeof optimizerDest !== 'undefined' && optimizerDest && optimizerDest.icao === ap.icao && (typeof routeArrivalMarker !== 'undefined' && routeArrivalMarker)));
+    const isRadialActive = !!((typeof currentRadialAirport !== 'undefined' && currentRadialAirport && currentRadialAirport.icao === ap.icao) ||
+                              (typeof currentClassicAirport !== 'undefined' && currentClassicAirport && currentClassicAirport.icao === ap.icao));
 
     const icon = L.divIcon({
         html: combinedHtml,
-        className: `custom-map-marker ${isApDisabled && !hasActiveFix ? 'grayscale-[0.5]' : ''} ${isRouteBadgeActive ? 'route-badge-active' : ''}`,
+        className: `custom-map-marker ${isApDisabled && !hasActiveFix ? 'grayscale-[0.5]' : ''} ${isRouteBadgeActive ? 'route-badge-active' : ''} ${isRadialActive ? 'radial-active' : ''}`,
         iconSize: isCircleShape ? [22, 22] : [26, 26],
         iconAnchor: isCircleShape ? [11, 11] : [13, 13]
     });
@@ -5987,6 +6307,7 @@ function renderAirportsOnMap(airports) {
     if (fcEl) fcEl.innerText = `${airports.length} visible`;
 
     renderRouteLines(airports);
+    syncRadialAirportMarkerLabels();
 }
 
 /* ================= AIRPORT RADIAL MENU (CIRCULAR 4-QUADRANT WHEEL) ================= */
@@ -6082,6 +6403,38 @@ function closeAirportRadialMenu(keepModals = false) {
         sectorDetails.classList.remove('active-radial-sector');
     }
     isCameraPanningToRadial = false;
+    syncRadialAirportMarkerLabels();
+}
+
+function syncRadialAirportMarkerLabels() {
+    // 1. Remove .radial-active and restore visibility on all markers
+    document.querySelectorAll('.radial-active').forEach(el => el.classList.remove('radial-active'));
+
+    // 2. Identify if radial menu, classic pastille or radial modals are active and visible
+    const radialEl = document.getElementById('airport-radial-menu');
+    const isRadialOpen = !!(radialEl && !radialEl.classList.contains('hidden') && radialEl.style.display !== 'none');
+
+    // 3. Find active airport
+    const targetAp = (isRadialOpen && (currentRadialAirport || currentClassicAirport || selectedAirport)) ? (currentRadialAirport || currentClassicAirport || selectedAirport) : null;
+    if (targetAp && targetAp.icao) {
+        const m = (typeof airportMarkerCache !== 'undefined' && airportMarkerCache && airportMarkerCache.get(targetAp.icao)) || null;
+        if (m) {
+            const el = (typeof m.getElement === 'function' ? m.getElement() : m._icon);
+            if (el) {
+                el.classList.add('radial-active');
+                const lbl = el.querySelector('.airport-map-label');
+                if (lbl) lbl.classList.remove('label-force-visible');
+            }
+        }
+        if (currentRadialMarker && currentRadialMarker !== m) {
+            const el = (typeof currentRadialMarker.getElement === 'function' ? currentRadialMarker.getElement() : currentRadialMarker._icon);
+            if (el) {
+                el.classList.add('radial-active');
+                const lbl = el.querySelector('.airport-map-label');
+                if (lbl) lbl.classList.remove('label-force-visible');
+            }
+        }
+    }
 }
 
 function getWrappedAirportLatLng(ap, marker) {
@@ -6109,7 +6462,23 @@ function getWrappedAirportLatLng(ap, marker) {
 }
 
 function updateRadialMenuPosition(force = false) {
-    if (!currentRadialAirport || !map) return;
+    if (!currentRadialAirport || !map) {
+        syncRadialAirportMarkerLabels();
+        return;
+    }
+    syncRadialAirportMarkerLabels();
+
+    if (isClassicNavMode()) {
+        const radialEl = document.getElementById('airport-radial-menu');
+        if (radialEl) {
+            radialEl.classList.add('hidden');
+            radialEl.classList.remove('radial-only-core');
+            radialEl.style.display = 'none';
+            radialEl.style.left = '-9999px';
+            radialEl.style.top = '-9999px';
+        }
+        return;
+    }
 
     // Operating Airlines Modal: keep it systematically anchored under the airport regardless of radial wheel state!
     if (isAirlinesModalOpen()) {
@@ -6121,11 +6490,20 @@ function updateRadialMenuPosition(force = false) {
 
     const radialEl = document.getElementById('airport-radial-menu');
     if (!radialEl) return;
+    if (isAirlinesModalOpen()) {
+        radialEl.classList.add('hidden');
+        radialEl.style.display = 'none';
+        radialEl.style.left = '-9999px';
+        radialEl.style.top = '-9999px';
+        syncRadialAirportMarkerLabels();
+        return;
+    }
     if (typeof isFlightOptimizerModalOpen === 'function' && isFlightOptimizerModalOpen()) {
         radialEl.classList.add('hidden');
         radialEl.style.display = 'none';
         radialEl.style.left = '-9999px';
         radialEl.style.top = '-9999px';
+        syncRadialAirportMarkerLabels();
         return;
     }
     if (!force && radialEl.classList.contains('hidden')) return;
@@ -6326,7 +6704,7 @@ function updateRadialDetailsModalPosition(force = false) {
     const maxH = Math.max(200, window.innerHeight - topBound - botBound);
     modal.style.maxHeight = `${maxH}px`;
 
-    const modalWidth = modal.offsetWidth || 940;
+    const modalWidth = modal.offsetWidth || 960;
     const modalHeight = Math.min(maxH, modal.offsetHeight || 640);
     const currentZoom = (typeof map.getZoom === 'function') ? map.getZoom() : 8;
     const scale = Math.max(0.65, Math.min(1.05, currentZoom / 8.0));
@@ -6344,7 +6722,7 @@ function updateRadialDetailsModalPosition(force = false) {
     modal.style.transform = 'none';
 }
 
-function panMapToAirport(ap, forcedZoom = null) {
+function panMapToAirport(ap, forcedZoom = null, forcedDuration = null) {
     if (!map || !ap || ap.lat === undefined || ap.lon === undefined) return;
 
     let flyLat = parseFloat(ap.lat);
@@ -6358,13 +6736,15 @@ function panMapToAirport(ap, forcedZoom = null) {
     while (flyLon - mapCenterLon > 180) flyLon -= 360;
     while (flyLon - mapCenterLon < -180) flyLon += 360;
 
-    const PAN_DURATION = (currentSettings && currentSettings.camera_pan_duration !== undefined)
-        ? parseFloat(currentSettings.camera_pan_duration)
-        : 0.8;
+    const PAN_DURATION = (forcedDuration !== null && forcedDuration !== undefined)
+        ? parseFloat(forcedDuration)
+        : ((currentSettings && currentSettings.camera_pan_duration !== undefined)
+            ? parseFloat(currentSettings.camera_pan_duration)
+            : 1.1);
 
     const TARGET_AIRPORT_ZOOM = (currentSettings && currentSettings.camera_airport_zoom !== undefined)
         ? parseFloat(currentSettings.camera_airport_zoom)
-        : 6.0;
+        : 8.0;
 
     let xOffset = 0;
     if (isClassicNavMode()) {
@@ -6505,9 +6885,35 @@ function openAirportRadialMenu(ap, marker, e) {
     stagedRadialScenerySelection = null;
     currentRadialOpenZoom = (map && typeof map.getZoom === 'function') ? map.getZoom() : 8;
 
+    if (marker) {
+        const el = typeof marker.getElement === 'function' ? marker.getElement() : marker._icon;
+        if (el) {
+            el.classList.add('radial-active');
+            const lbl = el.querySelector('.airport-map-label');
+            if (lbl) lbl.classList.remove('label-force-visible');
+        }
+    }
+    syncRadialAirportMarkerLabels();
+
     // Prefetch store downloads in background so they are ready instantly if Sceneries is clicked
     prefetchRadialStores(ap);
     refreshAirportGsxStatus(ap.icao);
+
+    // If procedural airport has not loaded full routes/airlines yet, fetch on demand from backend
+    if (latestAp.is_default && (!latestAp.operating_airlines || latestAp.operating_airlines.length === 0) && window.pywebview && window.pywebview.api && window.pywebview.api.get_world_airport) {
+        window.pywebview.api.get_world_airport(latestAp.icao).then(resStr => {
+            if (resStr) {
+                try {
+                    const fullAp = JSON.parse(resStr);
+                    if (fullAp) {
+                        latestAp.operating_airlines = fullAp.operating_airlines || [];
+                        latestAp.routes = fullAp.routes || {};
+                        latestAp.runways = fullAp.runways || [];
+                    }
+                } catch(e) {}
+            }
+        }).catch(() => {});
+    }
 
     const radialEl = document.getElementById('airport-radial-menu');
     if (!radialEl) return;
@@ -6589,12 +6995,31 @@ function openAirportRadialMenu(ap, marker, e) {
 
         if (isAirlinesOpen && !isFlightPlanningMode) {
             operatingAirlinesOriginAirport = latestAp;
+            currentRadialAirport = latestAp;
+            currentRadialMarker = marker || null;
+            if (marker) {
+                const el = typeof marker.getElement === 'function' ? marker.getElement() : marker._icon;
+                if (el) {
+                    el.classList.add('radial-active');
+                }
+            }
+            syncRadialAirportMarkerLabels();
+            if (radialEl) {
+                radialEl.classList.add('hidden');
+                radialEl.style.display = 'none';
+                radialEl.style.left = '-9999px';
+                radialEl.style.top = '-9999px';
+            }
             renderRadialOperatingAirlines(latestAp, true);
             airlinesModal.classList.remove('hidden');
             if (sectorAirlines) {
                 sectorAirlines.classList.add('active-radial-sector');
             }
+            if (map && latestAp.lat && latestAp.lon) {
+                panMapToAirport(latestAp);
+            }
             updateRadialAirlinesModalPosition(true);
+            return;
         } else {
             airlinesModal.classList.add('hidden');
             airlinesModal.classList.remove('user-dragged', 'is-inverted');
@@ -6756,15 +7181,12 @@ function triggerRadialOperatingAirlines() {
     } else {
         operatingAirlinesOriginAirport = currentRadialAirport;
 
-        // Keep radial menu pastille visible and anchored
+        // Hide radial menu while Operating Airlines is open
         if (radialEl) {
-            if (isClassicNavMode()) {
-                radialEl.classList.add('radial-only-core');
-            } else {
-                radialEl.classList.remove('radial-only-core');
-            }
-            radialEl.classList.remove('hidden', 'radial-quadrants-collapsed');
-            radialEl.style.display = '';
+            radialEl.classList.add('hidden');
+            radialEl.style.display = 'none';
+            radialEl.style.left = '-9999px';
+            radialEl.style.top = '-9999px';
         }
 
         hasUserDraggedAirlinesModal = false;
@@ -6814,18 +7236,19 @@ function closeRadialAirlinesModal(event) {
         filterAirports();
         updateFilterUI();
     }
-    // Keep radial menu / pastille visible and airport selected!
+    // Keep radial menu visible only in radial mode!
     if (currentRadialAirport) {
         if (radialEl) {
             if (isClassicNavMode()) {
-                radialEl.classList.add('radial-only-core');
-            } else {
+                radialEl.classList.add('hidden');
                 radialEl.classList.remove('radial-only-core');
+                radialEl.style.display = 'none';
+            } else {
+                radialEl.classList.remove('radial-only-core', 'hidden', 'radial-quadrants-collapsed');
+                radialEl.style.display = '';
             }
-            radialEl.classList.remove('hidden', 'radial-quadrants-collapsed');
-            radialEl.style.display = '';
         }
-        if (typeof updateRadialMenuPosition === 'function') {
+        if (!isClassicNavMode() && typeof updateRadialMenuPosition === 'function') {
             updateRadialMenuPosition(true);
         }
     } else {
@@ -6837,6 +7260,7 @@ function closeRadialAirlinesModal(event) {
         currentRadialMarker = null;
         selectedAirport = null;
     }
+    syncRadialAirportMarkerLabels();
 }
 
 function initDraggableAirlinesModal() {
@@ -7024,6 +7448,13 @@ window.setAirlineDestFilterCategory = setAirlineDestFilterCategory;
 
 function toggleAirlineDestAccordion(destIcao, event) {
     if (event) event.stopPropagation();
+    const radialEl = document.getElementById('airport-radial-menu');
+    if (radialEl) {
+        radialEl.classList.add('hidden');
+        radialEl.style.display = 'none';
+        radialEl.style.left = '-9999px';
+        radialEl.style.top = '-9999px';
+    }
     if (expandedAirlineDestIcao === destIcao) {
         expandedAirlineDestIcao = null;
     } else {
@@ -7050,6 +7481,13 @@ window.toggleAirlineDestAccordion = toggleAirlineDestAccordion;
 
 function centerMapOnDestination(destIcao, event) {
     if (event) event.stopPropagation();
+    const radialEl = document.getElementById('airport-radial-menu');
+    if (radialEl) {
+        radialEl.classList.add('hidden');
+        radialEl.style.display = 'none';
+        radialEl.style.left = '-9999px';
+        radialEl.style.top = '-9999px';
+    }
     const ap = getAirportByIcao(destIcao) || (window.worldAirportCoords && window.worldAirportCoords[destIcao] ? {
         icao: destIcao,
         lat: window.worldAirportCoords[destIcao].lat,
@@ -7382,6 +7820,13 @@ function renderAirlineDestinationsList(originAp) {
 
 function radialFilterByAirline(airlineName, btnEl, event) {
     if (event) event.stopPropagation();
+    const radialEl = document.getElementById('airport-radial-menu');
+    if (radialEl) {
+        radialEl.classList.add('hidden');
+        radialEl.style.display = 'none';
+        radialEl.style.left = '-9999px';
+        radialEl.style.top = '-9999px';
+    }
     const originAp = operatingAirlinesOriginAirport || currentRadialAirport;
     if (!originAp) return;
 
@@ -7472,6 +7917,7 @@ function triggerRadialScenerySelector() {
             if (window.windowManager && (isClassicNavMode() || document.body.classList.contains('classic-nav-active'))) {
                 window.windowManager.autoTileWindows();
             }
+            syncRadialAirportMarkerLabels();
         }, 160);
     } else {
         // If Details modal is open, close it but KEEP radial menu intact
@@ -7492,6 +7938,7 @@ function triggerRadialScenerySelector() {
         if (!isClassic) {
             panMapToAirport(currentRadialAirport);
         }
+        syncRadialAirportMarkerLabels();
         updateRadialMenuPosition(true);
         if (window.windowManager && isClassic) {
             window.windowManager.autoTileWindows();
@@ -7657,6 +8104,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
 
     // 3. Fixes & Overlays (Green liseret only here!)
     if (fixSources.length > 0) {
+        html += `<div id="radial-fixes-container" class="flex flex-col gap-1.5 w-full">`;
         html += `
             <div class="flex items-center gap-2 pt-1 px-1">
                 <span class="text-xs font-sans font-bold uppercase tracking-wider text-[#94A3B8]">${t('drawer.fixes_overlays', 'Available Fixes & Overlays')}</span>
@@ -7720,6 +8168,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
                 </div>
             `;
         });
+        html += `</div>`;
     }
 
     // 4. Available Freeware Addons (Flightsim.to)
@@ -8224,15 +8673,16 @@ function closeRadialDetailsModal(event, keepRadial = true) {
     if (currentRadialAirport) {
         if (radialEl) {
             if (isClassicNavMode()) {
-                radialEl.classList.add('radial-only-core');
-            } else {
+                radialEl.classList.add('hidden');
                 radialEl.classList.remove('radial-only-core');
+                radialEl.style.display = 'none';
+            } else {
+                radialEl.classList.remove('radial-only-core', 'hidden', 'radial-quadrants-collapsed');
+                radialEl.style.display = '';
             }
-            radialEl.classList.remove('hidden', 'radial-quadrants-collapsed');
-            radialEl.style.display = '';
         }
         panMapToAirport(currentRadialAirport);
-        if (typeof updateRadialMenuPosition === 'function') {
+        if (!isClassicNavMode() && typeof updateRadialMenuPosition === 'function') {
             updateRadialMenuPosition(true);
         }
     } else if (!keepRadial) {
@@ -8245,6 +8695,7 @@ function closeRadialDetailsModal(event, keepRadial = true) {
             selectedAirport = null;
         }
     }
+    syncRadialAirportMarkerLabels();
 }
 
 function initDraggableDetailsModal() {
@@ -8309,7 +8760,20 @@ function renderRadialAirportDetails(ap) {
     const lonVal = parseFloat(ap.lon || 0);
     if (latEl) latEl.innerText = `${Math.abs(latVal).toFixed(4)}° ${latVal >= 0 ? 'N' : 'S'}`;
     if (lonEl) lonEl.innerText = `${Math.abs(lonVal).toFixed(4)}° ${lonVal >= 0 ? 'E' : 'W'}`;
-    if (catEl) catEl.innerText = formatAirportCategoryDisplay(ap);
+    if (catEl) {
+        catEl.innerText = formatAirportCategoryDisplay(ap);
+        const apCat = (typeof getAirportCategory === 'function') ? getAirportCategory(ap) : 'FREEWARE';
+        catEl.classList.remove('text-purple-400', 'text-cyan-400', 'text-amber-400', 'text-blue-400', 'text-slate-400');
+        if (apCat === 'PAYWARE') {
+            catEl.classList.add('text-purple-400');
+        } else if (apCat === 'ASOBO') {
+            catEl.classList.add('text-amber-400');
+        } else if (apCat === 'DEFAULT') {
+            catEl.classList.add('text-blue-400');
+        } else {
+            catEl.classList.add('text-cyan-400');
+        }
+    }
     const elevVal = (ap.elevation !== undefined && ap.elevation !== null)
         ? ap.elevation
         : ((ap.elevation_ft !== undefined && ap.elevation_ft !== null) ? ap.elevation_ft : 0);
@@ -9139,7 +9603,7 @@ function renderRadialPrice(ap) {
     const priceTagEl = document.getElementById('radial-price-tag');
 
     const currSymbols = { 'USD': '$', 'EUR': '€', 'GBP': '£', 'JPY': '¥', 'CAD': 'CA$', 'AUD': 'A$' };
-    const curSymbol = currSymbols[selectedCurrency] || '$';
+    const curSymbol = currSymbols[selectedCurrency] || CURRENCY_SYMBOLS[selectedCurrency] || '€';
     if (currSymEl) currSymEl.innerText = curSymbol;
 
     const pValEur = ap.price_eur || 0;
@@ -9154,7 +9618,10 @@ function renderRadialPrice(ap) {
     } else {
         tagText = `Est: ${formattedP}`;
     }
-    if (priceTagEl) priceTagEl.innerText = tagText;
+    if (priceTagEl) {
+        priceTagEl.innerText = tagText;
+        priceTagEl.className = "flex-1 text-center text-xs font-sans font-bold text-[#CBD5E1] bg-[#0E121A] border border-[#2D3A54] px-2 py-1 rounded-md truncate whitespace-nowrap";
+    }
 
     const rate = CURRENCY_RATES[selectedCurrency] || 1.0;
     const valConverted = pValEur * rate;
@@ -9568,6 +10035,10 @@ function initDraggableFlightPlanningBanner() {
 }
 
 function handleFlightPlanningAirport(ap, isInitiateFromMenu = false) {
+    if (window.IS_LITE) {
+        showUnlockProModal();
+        return;
+    }
     if (!ap) return;
 
     if (!isFlightPlanningMode) {
@@ -9627,6 +10098,10 @@ function getCorridorAddonsList() {
 }
 
 function setFlightCorridorProfile(profile) {
+    if (window.IS_LITE) {
+        showUnlockProModal();
+        return;
+    }
     if (isFlightCorridorOptimized) return;
     if (profile === 'SIMBRIEF') {
         if (currentSimBriefFlight && flightPlanningDeparture && flightPlanningDestination) {
@@ -9647,6 +10122,10 @@ function setFlightCorridorProfile(profile) {
 }
 
 async function executeFlightCorridorOptimization() {
+    if (window.IS_LITE) {
+        showUnlockProModal();
+        return;
+    }
     if (!flightPlanningDeparture || !flightPlanningDestination) {
         showToast('Please set Departure and Destination before optimizing.', 'warning');
         return;
@@ -10687,10 +11166,10 @@ function centerMapOnAirport(ap, forcedZoom = null) {
 
     const TARGET_AIRPORT_ZOOM = (currentSettings && currentSettings.camera_airport_zoom !== undefined)
         ? parseFloat(currentSettings.camera_airport_zoom)
-        : 6.0;
+        : 8.0;
     const PAN_DURATION = (currentSettings && currentSettings.camera_pan_duration !== undefined)
         ? parseFloat(currentSettings.camera_pan_duration)
-        : 0.8;
+        : 1.1;
 
     const currentZoom = map.getZoom();
 
@@ -12627,8 +13106,14 @@ function filterAirports() {
 
     const searchIso = search ? (COUNTRY_NAME_TO_ISO[search] || (search.length === 2 ? search.toUpperCase() : null)) : null;
     const normalizedSearch = (search && search.normalize) ? search.normalize('NFD').replace(/[\u0300-\u036f]/g, '') : search;
+    const allowsDefaultAirports = selectedPricing.has('Default') || !!activeRouteDestIcaos || (search && search.length >= 2) || (isGsxAuditOpen && gsxAuditForcedIcaos.size > 0);
 
     currentlyFilteredAirports = allAirportsData.filter(ap => {
+        // Fast-path: When default procedural airports are not requested (normal view without search/routes), skip pure defaults instantly
+        if (!allowsDefaultAirports && !hasCustomAddonSources(ap)) {
+            return false;
+        }
+
         // Highest Priority: Active Flight Isolation Mode (Strictly limit map and view to isolated flight sceneries)
         if (currentFlightMode && currentFlightMode.active && currentFlightMode.icaos && currentFlightMode.icaos.length > 0) {
             if (!currentFlightMode.icaos.includes(ap.icao)) {
@@ -12922,6 +13407,17 @@ function filterAirports() {
         });
     }
 
+    // Exact ICAO Search injection: if search is an ICAO code not present in filtered sceneries, inject it from worldAirportCoords
+    if (search && search.length >= 3 && search.length <= 4) {
+        const sUpper = search.toUpperCase();
+        if (!currentlyFilteredAirports.some(a => a.icao === sUpper)) {
+            const worldAp = (typeof getAirportByIcao === 'function') ? getAirportByIcao(sUpper) : null;
+            if (worldAp) {
+                currentlyFilteredAirports.push(worldAp);
+            }
+        }
+    }
+
     renderAirportsOnMap(currentlyFilteredAirports);
 
     // Keep active inspected airport radial menu / central pastille anchored and visible after filter re-render
@@ -12938,13 +13434,13 @@ function filterAirports() {
         const radialEl = document.getElementById('airport-radial-menu');
         if (radialEl) {
             if (isClassicNavMode()) {
-                radialEl.classList.add('radial-only-core');
-                radialEl.classList.remove('hidden', 'radial-quadrants-collapsed');
-                radialEl.style.display = '';
+                radialEl.classList.add('hidden');
+                radialEl.classList.remove('radial-only-core');
+                radialEl.style.display = 'none';
             } else {
                 radialEl.classList.remove('radial-only-core');
+                updateRadialMenuPosition(true);
             }
-            updateRadialMenuPosition(true);
         }
     }
 }
@@ -12968,7 +13464,16 @@ function triggerSearchFocus() {
 
     // 1. Check for exact ICAO match
     const sUpper = rawSearch.toUpperCase();
-    const exactIcaoMatch = currentlyFilteredAirports.find(a => a.icao === sUpper);
+    let exactIcaoMatch = currentlyFilteredAirports.find(a => a.icao === sUpper);
+    if (!exactIcaoMatch && typeof getAirportByIcao === 'function') {
+        exactIcaoMatch = getAirportByIcao(sUpper);
+        if (exactIcaoMatch) {
+            if (!currentlyFilteredAirports.some(a => a.icao === sUpper)) {
+                currentlyFilteredAirports.push(exactIcaoMatch);
+                renderAirportsOnMap(currentlyFilteredAirports);
+            }
+        }
+    }
     if (exactIcaoMatch) {
         focusAirportWithAnimation(exactIcaoMatch);
         return;
@@ -13649,20 +14154,20 @@ function updateFlightOptimizerRadialSectors() {
         const gEl = document.getElementById(`radial-opt-sector-${item.key}`);
         if (!gEl) return;
         const isWinOpen = isFloatingWindowOpen(item.key);
-        const isSmartLodLocked = (item.key === 'smart_lod' && isExtAutoFps);
+        const isSmartLodLocked = (!window.IS_LITE && item.key === 'smart_lod' && isExtAutoFps);
         const isDisabled = isWinOpen || isSmartLodLocked;
 
         gEl.classList.toggle('is-sector-disabled', isDisabled);
         gEl.classList.toggle('is-sector-locked-autofps', isSmartLodLocked);
 
-        const spanEl = gEl.querySelector('span');
+        const spanEl = gEl.querySelector('.radial-sector-label-text');
         if (spanEl) {
             let labelHtml = item.label;
             if (isSmartLodLocked) {
                 labelHtml = `SMART LOD<br><span class="text-amber-400 text-[9px] font-sans font-semibold">(AUTOFPS)</span>`;
             }
             spanEl.innerHTML = labelHtml;
-            spanEl.className = `text-[10.5px] font-sans font-bold tracking-wider uppercase ${isDisabled ? 'text-slate-500' : 'text-slate-200 group-hover:text-white'}`;
+            spanEl.className = `radial-sector-label-text text-[10.5px] font-sans font-bold tracking-wider uppercase ${isDisabled ? 'text-slate-500' : 'text-slate-200 group-hover:text-white'}`;
         }
     });
 }
@@ -13699,7 +14204,7 @@ function renderFlightOptimizerRadialWheel() {
         // Point 11: Check if window is currently open or locked by external AutoFPS
         const isWinOpen = isFloatingWindowOpen(item.key);
         const isExtAutoFps = isExternalAutoFpsActive();
-        const isSmartLodLocked = (item.key === 'smart_lod' && isExtAutoFps);
+        const isSmartLodLocked = (!window.IS_LITE && item.key === 'smart_lod' && isExtAutoFps);
         const disabledClass = (isWinOpen || isSmartLodLocked) ? 'is-sector-disabled' : '';
         const lockedClass = isSmartLodLocked ? 'is-sector-locked-autofps' : '';
 
@@ -13707,6 +14212,9 @@ function renderFlightOptimizerRadialWheel() {
         if (isSmartLodLocked) {
             labelHtml = `SMART LOD<br><span class="text-amber-400 text-[9px] font-sans font-semibold">(AUTOFPS)</span>`;
         }
+        const proBadgeHtml = window.IS_LITE
+            ? `<span class="mt-1 ${LITE_PRO_BADGE_CLASS}">${LITE_PRO_BADGE_INNER}</span>`
+            : '';
 
         svgHtml += `
             <g class="radial-flight-sector animate-sector-bounce ${disabledClass} ${lockedClass} pointer-events-auto cursor-pointer group"
@@ -13715,9 +14223,10 @@ function renderFlightOptimizerRadialWheel() {
                onclick="handleFlightOptimizerSectorClick('${item.key}')"
                role="button" aria-label="${item.label.replace(/<br>/gi, ' ')}">
                 <path class="radial-flight-sector-path" d="${pathD}" />
-                <foreignObject x="${(tx - 65).toFixed(1)}" y="${(ty - 25).toFixed(1)}" width="130" height="50" class="pointer-events-none">
+                <foreignObject x="${(tx - 65).toFixed(1)}" y="${(ty - 32).toFixed(1)}" width="130" height="64" class="pointer-events-none">
                     <div class="w-full h-full flex flex-col items-center justify-center text-center leading-tight px-1">
-                        <span class="text-[10.5px] font-sans font-bold tracking-wider uppercase ${(isWinOpen || isSmartLodLocked) ? 'text-slate-500' : 'text-slate-200 group-hover:text-white'}">${labelHtml}</span>
+                        <span class="radial-sector-label-text text-[10.5px] font-sans font-bold tracking-wider uppercase ${(isWinOpen || isSmartLodLocked) ? 'text-slate-500' : 'text-slate-200 group-hover:text-white'}">${labelHtml}</span>
+                        ${proBadgeHtml}
                     </div>
                 </foreignObject>
             </g>
@@ -13728,6 +14237,12 @@ function renderFlightOptimizerRadialWheel() {
 }
 
 function handleFlightOptimizerSectorClick(key) {
+    if (window.IS_LITE) {
+        if (typeof closeFilterRadialMenu === 'function') closeFilterRadialMenu();
+        if (typeof closeAirportRadialMenu === 'function') closeAirportRadialMenu(false);
+        showUnlockProModal();
+        return;
+    }
     const isExtAutoFps = isExternalAutoFpsActive();
     if (key === 'smart_lod' && isExtAutoFps) {
         showToastNotification("Smart LOD locked: MSFS AutoFPS is active in background.", "warning");
@@ -14223,6 +14738,28 @@ async function checkStartupChanges() {
         // PRIORITY 1: Check if any scenery conflicts exist!
         const conflictAirports = allAirportsData.filter(a => a.has_conflict);
         if (conflictAirports.length > 0) {
+            let hasSeenOnboarding = false;
+            if (window.onboardingTour && typeof window.onboardingTour.isOnboardingCompleted === 'function') {
+                hasSeenOnboarding = await window.onboardingTour.isOnboardingCompleted();
+            } else if (window.pywebview && window.pywebview.api && window.pywebview.api.is_onboarding_completed) {
+                try {
+                    const res = JSON.parse(await window.pywebview.api.is_onboarding_completed());
+                    hasSeenOnboarding = Boolean(res && res.completed);
+                } catch (e) {}
+            } else {
+                hasSeenOnboarding = (localStorage.getItem('sceneryx_has_seen_onboarding') === 'true');
+            }
+
+            const isTourRunning = (document.body && document.body.classList.contains('tour-active')) ||
+                                  (window.onboardingTour && window.onboardingTour.isOpen);
+
+            if (!hasSeenOnboarding || isTourRunning) {
+                console.log("[ConflictModal] Postponing startup conflict modal until onboarding tour completes or is skipped.");
+                pendingConflictModal = true;
+                pendingConflictModalIndex = 0;
+                return;
+            }
+
             openConflictModal(0);
             return;
         }
@@ -14713,6 +15250,60 @@ async function runInitialFirstLaunchScan() {
 
         allAirportsData = newAirports;
 
+        // Guarantee historic airports (such as Berlin-Tegel EDDT) exist natively in allAirportsData
+        if (typeof HISTORIC_AIRPORTS !== 'undefined' && Array.isArray(allAirportsData) && allAirportsData.length > 0) {
+            for (const [hIcao, h] of Object.entries(HISTORIC_AIRPORTS)) {
+                if (!allAirportsData.some(a => a.icao === hIcao)) {
+                    allAirportsData.push({
+                        icao: hIcao,
+                        ident: hIcao,
+                        name: h.name,
+                        city: h.city,
+                        country: h.country || 'DE',
+                        lat: h.lat,
+                        lon: h.lon,
+                        elevation: h.elevation || 122,
+                        type: h.type || 'large_airport',
+                        english_type: h.english_type || 'International',
+                        iata: h.iata || '',
+                        pricing_type: 'Default',
+                        is_default: true,
+                        vendor: 'Microsoft Flight Simulator (Default)',
+                        package_name: `msfs-default-${hIcao.toLowerCase()}`,
+                        source_folder: 'MSFS - Default Procedural',
+                        match_source: 'Default MSFS Procedural',
+                        all_sources: [{
+                            folder_name: `msfs-default-${hIcao.toLowerCase()}`,
+                            package_path: '',
+                            source_folder: 'MSFS - Default Procedural',
+                            match_source: 'Default MSFS Procedural',
+                            vendor: 'Microsoft Flight Simulator (Default)',
+                            pricing_type: 'Default',
+                            is_payware: false,
+                            is_asobo_official: false,
+                            is_default: true,
+                            is_disabled: false,
+                            is_addon: false,
+                            is_fix_patch: false,
+                            version: '',
+                            size_str: 'Default'
+                        }],
+                        is_disabled: false,
+                        has_conflict: false,
+                        conflict_count: 1,
+                        rating: 0.0,
+                        operating_airlines: ['Air Berlin', 'Lufthansa', 'Eurowings', 'Germania', 'EasyJet'],
+                        routes: {},
+                        runways: [
+                            { id: '08L/26R', length_ft: 7966, length_m: 2428, width_ft: 151, width_m: 46, surface: 'Asphalt', lighted: true, closed: false },
+                            { id: '08R/26L', length_ft: 9918, length_m: 3023, width_ft: 151, width_m: 46, surface: 'Asphalt', lighted: true, closed: false }
+                        ]
+                    });
+                }
+            }
+            isAirportsIndexDirty = true;
+        }
+
         if (progressBar) progressBar.style.width = '100%';
         if (percentText) percentText.innerText = '100%';
         if (detailText) detailText.innerText = t('rescan.complete', 'Scan Complete');
@@ -14727,6 +15318,20 @@ async function runInitialFirstLaunchScan() {
             ap._searchKey = buildAirportSearchKey(ap);
         });
 
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.scan_gsx_audit) {
+            try {
+                const raw = await window.pywebview.api.scan_gsx_audit();
+                const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                if (parsed && parsed.status === 'ok') {
+                    window.gsxAuditData = parsed.data;
+                }
+            } catch (ge) {
+                console.warn("GSX initial audit error:", ge);
+            }
+            updateGsxSidebarBadge();
+        }
+
+        rebuildAirportsByIcaoIndex();
         updateStats(allAirportsData);
         updateFilterUI();
         filterAirports();
@@ -14787,6 +15392,9 @@ function closeRescanModal() {
 
     if (window.onboardingTour && typeof window.onboardingTour.checkAutoPrompt === 'function') {
         setTimeout(() => window.onboardingTour.checkAutoPrompt(), 400);
+    }
+    if (typeof triggerPendingBackgroundToolsCheck === 'function' && pendingBackgroundToolsCheck) {
+        triggerPendingBackgroundToolsCheck();
     }
 }
 window.closeRescanModal = closeRescanModal;
@@ -15034,8 +15642,8 @@ async function openSettingsModal() {
         currentSettings = {
             auto_scan_on_startup: true,
             scan_paths: [],
-            camera_airport_zoom: 6.0,
-            camera_pan_duration: 0.8,
+            camera_airport_zoom: 8.0,
+            camera_pan_duration: 1.1,
             navigation_style: 'classic',
             theme: 'dark'
         };
@@ -15057,7 +15665,7 @@ async function openSettingsModal() {
 
     const zoomSlider = document.getElementById('cfg-camera-zoom');
     if (zoomSlider) {
-        const zVal = (currentSettings.camera_airport_zoom !== undefined) ? parseFloat(currentSettings.camera_airport_zoom) : 6.0;
+        const zVal = (currentSettings.camera_airport_zoom !== undefined) ? parseFloat(currentSettings.camera_airport_zoom) : 8.0;
         zoomSlider.value = zVal;
         const zDisp = document.getElementById('cfg-zoom-display');
         if (zDisp) zDisp.innerText = zVal.toFixed(1);
@@ -15065,7 +15673,7 @@ async function openSettingsModal() {
 
     const durSlider = document.getElementById('cfg-camera-duration');
     if (durSlider) {
-        const dVal = (currentSettings.camera_pan_duration !== undefined) ? parseFloat(currentSettings.camera_pan_duration) : 0.8;
+        const dVal = (currentSettings.camera_pan_duration !== undefined) ? parseFloat(currentSettings.camera_pan_duration) : 1.1;
         durSlider.value = dVal;
         const dDisp = document.getElementById('cfg-duration-display');
         if (dDisp) dDisp.innerText = `${dVal.toFixed(1)}s`;
@@ -15073,7 +15681,7 @@ async function openSettingsModal() {
 
     const navStyleSelect = document.getElementById('cfg-nav-style');
     if (navStyleSelect) {
-        navStyleSelect.value = currentSettings.navigation_style || 'radial';
+        navStyleSelect.value = currentSettings.navigation_style || 'classic';
     }
 
     const langSelect = document.getElementById('cfg-app-language');
@@ -15083,7 +15691,7 @@ async function openSettingsModal() {
 
     const currSelect = document.getElementById('cfg-app-currency');
     if (currSelect) {
-        currSelect.value = currentSettings.currency || selectedCurrency || 'USD';
+        currSelect.value = selectedCurrency || currentSettings.currency || 'EUR';
     }
 
     const chkIcao = document.getElementById('cfg-label-icao');
@@ -15111,6 +15719,12 @@ async function openSettingsModal() {
         chkPrivacyTelem.checked = currentSettings.send_anonymous_telemetry !== false;
     }
 
+    if (currentSettings.is_lite !== undefined) {
+        window.IS_LITE = !!currentSettings.is_lite;
+    }
+    if (typeof applyLiteEditionLocks === 'function') {
+        applyLiteEditionLocks();
+    }
     loadSimBriefSettingsUI();
     renderSettingsPathsList();
     if (typeof refreshIngamePanelStatus === 'function') {
@@ -15154,6 +15768,10 @@ function updateExternalAutoFpsSwitchUI(isActive) {
 }
 
 function toggleExternalAutoFpsSettingSwitch() {
+    if (window.IS_LITE) {
+        showUnlockProModal();
+        return;
+    }
     currentSettings.external_autofps = !currentSettings.external_autofps;
     currentSettings.dynamic_lod_engine = currentSettings.external_autofps ? 'external_autofps' : 'smart_lod';
     updateExternalAutoFpsSwitchUI(currentSettings.external_autofps);
@@ -15184,7 +15802,7 @@ function closeSettingsModal() {
     // Revert navigation style dropdown and active mode if cancelled without saving
     const navStyleSelect = document.getElementById('cfg-nav-style');
     if (navStyleSelect && typeof currentSettings !== 'undefined') {
-        const savedStyle = currentSettings.navigation_style || 'radial';
+        const savedStyle = currentSettings.navigation_style || 'classic';
         if (navStyleSelect.value !== savedStyle) {
             navStyleSelect.value = savedStyle;
             if (typeof applyNavigationStyle === 'function') {
@@ -15386,7 +16004,7 @@ async function saveSettings() {
 
         const navStyleSelect = document.getElementById('cfg-nav-style');
         if (navStyleSelect) {
-            currentSettings.navigation_style = navStyleSelect.value || 'radial';
+            currentSettings.navigation_style = navStyleSelect.value || 'classic';
             if (typeof applyNavigationStyle === 'function') {
                 applyNavigationStyle(currentSettings.navigation_style);
             }
@@ -15553,10 +16171,10 @@ function resetCameraSettingsToDefault() {
     if (regSelect) regSelect.value = 'world';
 
     const zoomSlider = document.getElementById('cfg-camera-zoom');
-    if (zoomSlider) zoomSlider.value = 6.0;
+    if (zoomSlider) zoomSlider.value = 8.0;
 
     const durSlider = document.getElementById('cfg-camera-duration');
-    if (durSlider) durSlider.value = 0.8;
+    if (durSlider) durSlider.value = 1.1;
 
     updateCameraSettingsPreview();
     if (typeof showToast === 'function') {
@@ -15865,6 +16483,17 @@ function updateClassicPanelUI() {
     });
 
     // 2. Flight Optimizer Badges (100% solid, crisp pill colors - Zero Glass Effect)
+    if (window.IS_LITE) {
+        ['classic-badge-smart-lod', 'classic-badge-graphics', 'classic-badge-my-rig', 'classic-badge-telemetry', 'classic-badge-route'].forEach(id => {
+            const b = document.getElementById(id);
+            if (b) {
+                b.innerHTML = LITE_PRO_BADGE_INNER;
+                b.className = LITE_PRO_BADGE_CLASS;
+            }
+        });
+        return;
+    }
+
     const badgeSmartLod = document.getElementById('classic-badge-smart-lod');
     if (badgeSmartLod) {
         const isExt = !!(smartLodAxisState && smartLodAxisState.external_autofps) || !!(typeof currentSettings !== 'undefined' && currentSettings.external_autofps);
@@ -15895,9 +16524,13 @@ function updateClassicPanelUI() {
 
     const badgeTelemetry = document.getElementById('classic-badge-telemetry');
     if (badgeTelemetry) {
-        const timeVal = (window.flightPerfSampleCount && window.flightPerfSampleCount > 0) ? `${Math.floor(window.flightPerfSampleCount / 60)}m` : '00:00';
-        badgeTelemetry.textContent = timeVal;
-        badgeTelemetry.className = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#161920] text-[#64748B] border border-[#2A3241]';
+        if (typeof isBlackboxRunning !== 'undefined' && isBlackboxRunning) {
+            badgeTelemetry.textContent = window.currentBlackboxElapsedStr || '00:00';
+            badgeTelemetry.className = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#10B981] text-white shadow-sm';
+        } else {
+            badgeTelemetry.textContent = '00:00';
+            badgeTelemetry.className = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#161920] text-[#64748B] border border-[#2A3241]';
+        }
     }
 
     if (typeof updateClassicSidebarRouteBadge === 'function') {
@@ -15914,6 +16547,7 @@ function showClassicAirportView(ap) {
     if (typeof airportMarkerCache !== 'undefined' && airportMarkerCache.has(ap.icao)) {
         currentRadialMarker = airportMarkerCache.get(ap.icao);
     }
+    syncRadialAirportMarkerLabels();
 
     // Reveal Header Card and Actions Section, Hide Flight Optimizer
     const headerCard = document.getElementById('classic-ap-header-card');
@@ -16050,77 +16684,14 @@ function showClassicAirportView(ap) {
         gsxEl.innerHTML = '&rarr;';
     }
 
-    // 7. Screen 4: Reveal and Anchor Radial Central Pastille on Map Marker in Classic Mode
+    // 7. Standard / Classic Mode: keep radial menu and center pastille hidden so map view stays unobstructed
     const radialEl = document.getElementById('airport-radial-menu');
     if (radialEl) {
-        radialEl.classList.add('radial-only-core');
-        radialEl.classList.remove('hidden', 'radial-quadrants-collapsed');
-        radialEl.style.display = '';
-
-        const icaoEl = document.getElementById('radial-icao');
-        const badgeEl = document.getElementById('radial-badge');
-        const nameEl = document.getElementById('radial-name');
-        const cityEl = document.getElementById('radial-city');
-        const iataVal = (ap.iata && ap.iata.trim() && ap.iata.trim() !== '—' && ap.iata.trim() !== '-') ? ap.iata.trim().toUpperCase() : '';
-        const codesStr = iataVal ? `${ap.icao}/${iataVal}` : (ap.icao || '');
-        if (icaoEl) icaoEl.innerText = codesStr;
-        if (nameEl) nameEl.innerText = (typeof getCleanAirportName === 'function' ? getCleanAirportName(ap.name, ap.city) : ap.name) || ap.icao;
-
-        let apIsoCode = ((ap.country || ap.iso_country || '').toString()).toUpperCase().trim();
-        if (!apIsoCode || apIsoCode.length !== 2) {
-            for (const [code, name] of Object.entries(ISO_TO_COUNTRY_NAME)) {
-                if (name.toLowerCase() === (ap.country || '').toLowerCase()) {
-                    apIsoCode = code;
-                    break;
-                }
-            }
-        }
-        const resolvedCountryName = (typeof getLocalizedCountryName === 'function') ? getLocalizedCountryName(apIsoCode, ap.country) : (ISO_TO_COUNTRY_NAME[apIsoCode] || ap.country || 'Unknown Country');
-        const cleanCity = (typeof getCleanCityName === 'function') ? getCleanCityName(ap.city) : ap.city;
-        if (cityEl) cityEl.innerText = `${cleanCity || 'Unknown City'}, ${resolvedCountryName}`;
-
-        let rBadgeLabel = 'FREEWARE';
-        let rBadgeClass = 'bg-cyan-600 text-white font-bold';
-        let rIcaoColor = 'text-cyan-400';
-
-        if (ap.has_conflict) {
-            rBadgeLabel = `⚠️ CONFLICT (${ap.conflict_count || 2})`;
-            rBadgeClass = 'bg-rose-600 text-white font-black animate-pulse';
-            rIcaoColor = 'text-rose-400';
-        } else if (ap.is_disabled) {
-            rBadgeLabel = 'DISABLED';
-            rBadgeClass = 'bg-slate-700 text-slate-300 font-bold';
-            rIcaoColor = 'text-slate-400';
-        } else if (cat === 'ASOBO') {
-            rBadgeLabel = 'ASOBO / MICROSOFT';
-            rBadgeClass = 'bg-amber-500 text-slate-950 font-black';
-            rIcaoColor = 'text-amber-400';
-        } else if (cat === 'PAYWARE') {
-            rBadgeLabel = ap.vendor ? `PAYWARE • ${ap.vendor}` : 'PAYWARE';
-            rBadgeClass = 'bg-purple-600 text-white font-bold';
-            rIcaoColor = 'text-purple-400';
-        } else if (cat === 'DEFAULT') {
-            rBadgeLabel = 'DEFAULT MSFS';
-            rBadgeClass = 'bg-blue-600 text-white font-bold';
-            rIcaoColor = 'text-blue-400';
-        } else {
-            rBadgeLabel = ap.vendor ? `FREEWARE • ${ap.vendor}` : 'FREEWARE';
-            rBadgeClass = 'bg-cyan-600 text-white font-bold';
-            rIcaoColor = 'text-cyan-400';
-        }
-
-        if (badgeEl) {
-            badgeEl.innerText = rBadgeLabel;
-            badgeEl.className = `text-[11px] font-mono font-black px-3 py-1 rounded-full border-0 tracking-wide uppercase truncate max-w-[210px] shadow-sm ${rBadgeClass}`;
-        }
-        if (icaoEl) {
-            icaoEl.innerText = codesStr;
-            icaoEl.className = `font-mono font-black text-3xl tracking-tight leading-none ${rIcaoColor}`;
-        }
-
-        if (typeof updateRadialMenuPosition === 'function') {
-            updateRadialMenuPosition(true);
-        }
+        radialEl.classList.add('hidden');
+        radialEl.classList.remove('radial-only-core');
+        radialEl.style.display = 'none';
+        radialEl.style.left = '-9999px';
+        radialEl.style.top = '-9999px';
     }
 
     if (typeof prefetchRadialStores === 'function') {
@@ -16181,6 +16752,7 @@ function closeClassicAirportView() {
         currentRadialAirport = null;
         selectedAirport = null;
     }
+    syncRadialAirportMarkerLabels();
     updateClassicPanelUI();
     if (window.windowManager) {
         window.windowManager.autoTileWindows(true);
@@ -16516,7 +17088,7 @@ function showCustomModal(titleOrObj, messageStr, typeStr = 'info') {
     if (typeof titleOrObj === 'object' && titleOrObj && titleOrObj.width) {
         modal.style.width = titleOrObj.width;
     } else {
-        modal.style.width = '380px';
+        modal.style.width = '540px';
     }
 
     const titleEl = document.getElementById('custom-modal-title');
@@ -16538,7 +17110,7 @@ function showCustomModal(titleOrObj, messageStr, typeStr = 'info') {
         if (typeof titleOrObj === 'object' && titleOrObj && titleOrObj.messageBoxClass) {
             msgEl.className = titleOrObj.messageBoxClass;
         } else {
-            msgEl.className = "text-xs font-semibold text-slate-200 leading-relaxed bg-slate-950/70 p-4 rounded-2xl border border-slate-800/70 font-sans break-words max-h-64 overflow-y-auto space-y-1 text-center";
+            msgEl.className = "p-4 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-300 leading-relaxed font-sans break-words max-h-80 overflow-y-auto space-y-2 text-left";
         }
 
         if (typeof message === 'string') {
@@ -16562,58 +17134,51 @@ function showCustomModal(titleOrObj, messageStr, typeStr = 'info') {
         if (loadingContainer) loadingContainer.classList.add('hidden');
         if (confirmBtn) {
             confirmBtn.innerText = confirmText;
-            confirmBtn.classList.remove('hidden');
             if (typeof titleOrObj === 'object' && titleOrObj && titleOrObj.confirmClass) {
                 confirmBtn.className = titleOrObj.confirmClass;
             } else {
-                confirmBtn.className = "px-5 py-1.5 text-center rounded-xl bg-blue-600 hover:bg-blue-500 text-white typo-action-btn font-semibold text-xs uppercase transition-all border-0 cursor-pointer shadow-md";
+                confirmBtn.className = "px-5 py-2 text-center rounded-md bg-cyan-500 hover:bg-cyan-400 text-slate-950 typo-action-btn font-bold text-xs uppercase transition-colors border-0 cursor-pointer";
             }
+            confirmBtn.classList.remove('hidden');
         }
         if (secondaryBtn) {
             if (showSecondary) {
                 secondaryBtn.innerText = secondaryText;
-                secondaryBtn.classList.remove('hidden');
                 if (typeof titleOrObj === 'object' && titleOrObj && titleOrObj.secondaryClass) {
                     secondaryBtn.className = titleOrObj.secondaryClass;
                 } else {
-                    secondaryBtn.className = "px-4 py-1.5 text-center rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 hover:text-white typo-action-btn font-semibold uppercase transition-all cursor-pointer text-xs";
+                    secondaryBtn.className = "px-4 py-2 text-center rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white typo-action-btn font-normal uppercase transition-colors cursor-pointer text-xs";
                 }
+                secondaryBtn.classList.remove('hidden');
             } else {
                 secondaryBtn.classList.add('hidden');
             }
         }
         if (cancelBtn) {
             cancelBtn.innerText = cancelText;
-            cancelBtn.classList.toggle('hidden', !showCancel);
             if (typeof titleOrObj === 'object' && titleOrObj && titleOrObj.cancelClass) {
                 cancelBtn.className = titleOrObj.cancelClass;
             } else {
-                cancelBtn.className = "px-5 py-1.5 text-center rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-slate-300 hover:text-white typo-action-btn text-xs font-semibold uppercase transition-all cursor-pointer";
+                cancelBtn.className = "px-4 py-2 text-center rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white typo-action-btn text-xs font-normal uppercase transition-colors cursor-pointer";
             }
+            cancelBtn.classList.toggle('hidden', !showCancel);
         }
     }
 
     const iconBg = document.getElementById('custom-modal-icon-bg');
-
-
     const iconEl = document.getElementById('custom-modal-icon');
 
-
     if (iconBg && iconEl) {
-        iconBg.className = "w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-inner ";
-        iconEl.className = "fa-solid text-lg ";
+        iconBg.className = "w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-slate-950 border border-slate-800";
+        iconEl.className = "fa-solid text-base text-slate-300";
         if (type === 'loading') {
-            iconBg.classList.add('bg-emerald-500/10', 'border', 'border-emerald-500/30');
-            iconEl.className = "fa-solid fa-spinner fa-spin text-lg text-emerald-400";
+            iconEl.className = "fa-solid fa-spinner fa-spin text-base text-cyan-400";
         } else if (type === 'success') {
-            iconBg.classList.add('bg-emerald-500/10', 'border', 'border-emerald-500/20');
-            iconEl.classList.add('fa-circle-check', 'text-emerald-400');
+            iconEl.classList.add('fa-circle-check');
         } else if (type === 'error') {
-            iconBg.classList.add('bg-red-500/10', 'border', 'border-red-500/20');
-            iconEl.classList.add('fa-triangle-exclamation', 'text-red-400');
+            iconEl.classList.add('fa-triangle-exclamation');
         } else {
-            iconBg.classList.add('bg-cyan-500/10', 'border', 'border-cyan-500/20');
-            iconEl.classList.add('fa-circle-info', 'text-cyan-400');
+            iconEl.classList.add('fa-circle-info');
         }
     }
 
@@ -16681,12 +17246,268 @@ function promptClosingFlightMode() {
     });
 }
 
+function promptClosingActiveMonitoring() {
+    showCustomModal({
+        title: t('exit.monitoring_title', 'Flight Monitoring Active'),
+        message: t('exit.monitoring_msg', 'Flight monitoring is active. Keep this session to resume later, or end it now?'),
+        type: 'info',
+        confirmText: t('exit.keep_monitoring', 'Keep for Resume'),
+        secondaryText: t('exit.end_monitoring', 'End Monitoring'),
+        cancelText: t('common.cancel', 'Cancel'),
+        showCancel: true,
+        onConfirm: async () => {
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.resolve_monitoring_on_exit) {
+                try {
+                    const raw = await window.pywebview.api.resolve_monitoring_on_exit(true);
+                    const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                    if (res && res.needs_flight_mode_prompt) {
+                        promptClosingFlightMode();
+                    }
+                } catch (e) {
+                    console.error("Error resolving monitoring on exit:", e);
+                }
+            }
+        },
+        onSecondary: async () => {
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.resolve_monitoring_on_exit) {
+                try {
+                    const raw = await window.pywebview.api.resolve_monitoring_on_exit(false);
+                    const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                    if (res && res.needs_flight_mode_prompt) {
+                        promptClosingFlightMode();
+                    }
+                } catch (e) {
+                    console.error("Error ending monitoring on exit:", e);
+                }
+            }
+        },
+        onCancel: () => {}
+    });
+}
+window.promptClosingActiveMonitoring = promptClosingActiveMonitoring;
+
+function renderPatchChangelogMarkdown(mdText) {
+    if (!mdText) return '';
+    const normalizedMd = String(mdText).replace(/\bRC_v?/g, 'PRO_');
+    const escapeHtml = (str) => String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    const formatInline = (str) => escapeHtml(str)
+        .replace(/\*\*(.+?)\*\*/g, '<strong class="text-slate-100 font-bold">$1</strong>')
+        .replace(/`([^`]+)`/g, '<span class="text-slate-100 font-semibold">$1</span>');
+
+    const lines = normalizedMd.split(/\r?\n/);
+    let html = '<div class="space-y-2.5 text-left">';
+    let inList = false;
+
+    for (const rawLine of lines) {
+        const line = rawLine.trim();
+        if (!line || line === '---') {
+            if (inList) {
+                html += '</ul>';
+                inList = false;
+            }
+            continue;
+        }
+        if (line.startsWith('# ')) {
+            if (inList) { html += '</ul>'; inList = false; }
+            html += `<div class="text-xs font-bold text-slate-100 pb-2 border-b border-slate-800">${formatInline(line.slice(2))}</div>`;
+        } else if (line.startsWith('## ') || line.startsWith('### ')) {
+            if (inList) { html += '</ul>'; inList = false; }
+            html += `<div class="text-xs font-bold text-slate-100 pt-1.5">${formatInline(line.replace(/^#+\s*/, ''))}</div>`;
+        } else if (line.startsWith('- ') || line.startsWith('* ')) {
+            if (!inList) {
+                html += '<ul class="space-y-1.5 pl-4 list-disc marker:text-slate-500 text-xs text-slate-300 leading-relaxed">';
+                inList = true;
+            }
+            html += `<li>${formatInline(line.slice(2))}</li>`;
+        } else {
+            if (inList) { html += '</ul>'; inList = false; }
+            html += `<p class="text-xs text-slate-300 leading-relaxed">${formatInline(line)}</p>`;
+        }
+    }
+    if (inList) html += '</ul>';
+    html += '</div>';
+    return html;
+}
+
+async function checkPostPatchChangelogOnStartup() {
+    if (window.IS_LITE) return;
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.check_post_patch_changelog) return;
+    try {
+        const raw = await window.pywebview.api.check_post_patch_changelog();
+        const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (!res || !res.has_changelog) return;
+
+        const ver = String(res.version || 'PRO_1.1.1').replace(/^RC_v?/i, 'PRO_');
+        const htmlContent = renderPatchChangelogMarkdown(res.changelog_md || '');
+
+        await new Promise((resolve) => {
+            showCustomModal({
+                title: `Patch ${ver} Installed — Release Notes`,
+                message: htmlContent,
+                type: 'success',
+                width: '540px',
+                messageBoxClass: 'p-4 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-300 leading-relaxed font-sans break-words max-h-80 overflow-y-auto space-y-2.5 text-left',
+                confirmText: 'Continue to SceneryX',
+                showCancel: false,
+                onConfirm: async () => {
+                    try {
+                        if (window.pywebview.api.acknowledge_post_patch_changelog) {
+                            await window.pywebview.api.acknowledge_post_patch_changelog();
+                        }
+                    } catch (e) {
+                        console.warn("Could not acknowledge post-patch changelog:", e);
+                    }
+                    resolve();
+                }
+            });
+        });
+    } catch (e) {
+        console.warn("Could not check post-patch changelog on startup:", e);
+    }
+}
+window.checkPostPatchChangelogOnStartup = checkPostPatchChangelogOnStartup;
+
+async function checkAvailablePatchOnStartup() {
+    if (window.IS_LITE) return;
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.check_available_patch) return;
+    try {
+        const raw = await window.pywebview.api.check_available_patch();
+        const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (!res || !res.has_patch) return;
+
+        const curVer = String(res.current_version || 'PRO_1.1.0').replace(/^RC_v?/i, 'PRO_');
+        const patchVer = String(res.patch_version || 'PRO_1.1.1').replace(/^RC_v?/i, 'PRO_');
+        const installerPath = res.installer_path || '';
+        const downloadUrl = res.download_url || '';
+        const changelogHtml = res.changelog_md ? renderPatchChangelogMarkdown(res.changelog_md) : '';
+        const promptMsg = changelogHtml
+            ? `<div class="mb-3 text-slate-200 font-medium">SceneryX <span class="text-sky-400 font-bold">${curVer}</span> is currently installed. Do you want to install patch <span class="text-emerald-400 font-bold">${patchVer}</span> now?</div><div class="p-3 rounded-lg bg-slate-950/90 border border-slate-800 max-h-64 overflow-y-auto space-y-2 text-left">${changelogHtml}</div>`
+            : `SceneryX ${curVer} is currently installed. Do you want to install patch ${patchVer} now?`;
+
+        await new Promise((resolve) => {
+            showCustomModal({
+                title: `Patch ${patchVer} Available`,
+                message: promptMsg,
+                type: 'info',
+                width: '540px',
+                confirmText: `Install Patch ${patchVer}`,
+                cancelText: t('common.cancel', 'Cancel'),
+                showCancel: true,
+                onConfirm: async () => {
+                    try {
+                        showCustomModal({
+                            title: `Installing Patch ${patchVer}...`,
+                            message: installerPath
+                                ? `Launching patch ${patchVer} installer... SceneryX will restart automatically.`
+                                : `Downloading patch ${patchVer} from SceneryX Updates... SceneryX will restart automatically once installed.`,
+                            type: 'loading',
+                            width: '540px'
+                        });
+                        const instRaw = await window.pywebview.api.install_available_patch(installerPath, downloadUrl, patchVer);
+                        const instRes = typeof instRaw === 'string' ? JSON.parse(instRaw) : instRaw;
+                        if (instRes && instRes.status && instRes.status !== 'ok') {
+                            closeCustomModal();
+                            if (instRes.status !== 'cancelled') {
+                                showCustomModal({
+                                    title: 'Patch Installation Error',
+                                    message: instRes.message || 'Could not download or launch the patch installer.',
+                                    type: 'error',
+                                    width: '540px'
+                                });
+                            }
+                        }
+                    } catch (e) {
+                        closeCustomModal();
+                        console.error("Error launching patch installer:", e);
+                    }
+                    resolve();
+                },
+                onCancel: () => {
+                    resolve();
+                }
+            });
+        });
+    } catch (e) {
+        console.warn("Could not check available patch on startup:", e);
+    }
+}
+window.checkAvailablePatchOnStartup = checkAvailablePatchOnStartup;
+
+async function checkResumableBlackboxOnStartup() {
+    if (typeof startBlackboxTelemetryPolling === 'function') {
+        startBlackboxTelemetryPolling();
+    }
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.get_resumable_blackbox_session) return;
+    try {
+        const raw = await window.pywebview.api.get_resumable_blackbox_session();
+        const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (!res || !res.has_resumable) return;
+
+        await new Promise((resolve) => {
+            showCustomModal({
+                title: t('startup.resume_monitoring_title', 'Interrupted Monitoring Session'),
+                message: t('startup.resume_monitoring_msg', 'A flight monitoring session was interrupted. Do you want to resume it or end it now?'),
+                type: 'info',
+                confirmText: t('startup.btn_resume_monitoring', 'Resume'),
+                cancelText: t('startup.btn_end_monitoring', 'End Session'),
+                showCancel: true,
+                onConfirm: async () => {
+                    try {
+                        const rStr = await window.pywebview.api.resume_flight_blackbox();
+                        const rObj = typeof rStr === 'string' ? JSON.parse(rStr) : rStr;
+                        if (rObj && rObj.status === 'resumed') {
+                            isBlackboxRunning = true;
+                            const btn = document.getElementById('opt-btn-record');
+                            const btnText = document.getElementById('opt-rec-btn-text');
+                            if (btnText) btnText.textContent = "STOP MONITORING";
+                            if (btn) btn.className = "h-8 sm:h-9 px-3 sm:px-3.5 rounded-md bg-[#EF4444] hover:bg-rose-500 text-white font-sans font-bold tracking-wider text-xs transition-all cursor-pointer active:scale-95 inline-flex items-center justify-center shadow-md uppercase leading-none select-none whitespace-nowrap shrink-0";
+                            if (typeof startBlackboxTelemetryPolling === 'function') {
+                                startBlackboxTelemetryPolling();
+                            }
+                            if (typeof showToast === 'function') {
+                                showToast("Flight monitoring resumed.", "success");
+                            }
+                        }
+                    } catch (e) {
+                        console.error("Error resuming flight blackbox:", e);
+                    }
+                    resolve();
+                },
+                onCancel: async () => {
+                    try {
+                        await window.pywebview.api.end_resumable_blackbox_session(true);
+                        if (typeof refreshBenchmarksList === 'function') {
+                            refreshBenchmarksList();
+                        }
+                        if (typeof showToast === 'function') {
+                            showToast("Monitoring session ended.", "info");
+                        }
+                    } catch (e) {
+                        console.error("Error ending resumable blackbox session:", e);
+                    }
+                    resolve();
+                }
+            });
+        });
+    } catch (e) {
+        console.warn("Could not check resumable blackbox session on startup:", e);
+    }
+}
+window.checkResumableBlackboxOnStartup = checkResumableBlackboxOnStartup;
+
 /* ================= SIMBRIEF FLIGHT OPTIMIZER UI ENGINE ================= */
 
 let currentSimBriefFlight = null;
 let currentSimBriefAlternates = [];
 
 function loadSimBriefSettingsUI() {
+    if (window.IS_LITE) {
+        if (typeof applyLiteEditionLocks === 'function') applyLiteEditionLocks();
+        return;
+    }
     if (!currentSettings) return;
     const currentSbUser = currentSettings.simbrief_username || currentSettings.simbrief_userid || '';
     const sbInput = document.getElementById('cfg-simbrief-id');
@@ -16728,6 +17549,10 @@ function updateSimBriefStatusUI(status) {
 }
 
 async function validateSimBriefFieldQuietly(val) {
+    if (window.IS_LITE) {
+        showUnlockProModal();
+        return;
+    }
     val = (val || '').trim();
     if (!val) {
         currentSettings.simbrief_username = '';
@@ -16758,6 +17583,10 @@ async function validateSimBriefFieldQuietly(val) {
 
 let isSyncingSimBrief = false;
 async function syncSimBriefFlightPlan() {
+    if (window.IS_LITE) {
+        showUnlockProModal();
+        return;
+    }
     if (isSyncingSimBrief) return;
     const sbUser = currentSettings.simbrief_username || currentSettings.simbrief_userid || 
                    (currentSettings.settings && (currentSettings.settings.simbrief_username || currentSettings.settings.simbrief_userid)) || '';
@@ -17728,6 +18557,10 @@ function isFlightOptimizerModalOpen() {
 }
 
 function handleAirportRouteSelection(ap) {
+    if (window.IS_LITE) {
+        showUnlockProModal();
+        return;
+    }
     if (!ap) return;
     const wasOpen = isFlightOptimizerModalOpen();
     hasUserDraggedOptimizerModal = false;
@@ -18193,8 +19026,24 @@ class WindowManager {
             modalEl.style.top = `${top}px`;
             modalEl.style.transform = 'none';
         } else {
-            // Dialog modals (e.g. Export, Stores, Conflicts, Settings, Disclaimer, Legal, Rescan) must always be centered, not tiled as column utilities
-            const isDialog = modalEl.id === 'export-modal' || modalEl.id === 'payware-stores-modal' || modalEl.id === 'smart-lod-conflict-modal' || modalEl.id === 'settings-modal' || modalEl.id === 'disclaimer-modal' || modalEl.id === 'legal-modal' || modalEl.id === 'rescan-modal';
+            // Dialog modals (e.g. Conflict, Export, Stores, Settings, Disclaimer, Legal, Rescan, etc.) must always be centered
+            const isAirportModal = modalEl.id === 'radial-details-modal' || modalEl.id === 'radial-airlines-modal' || modalEl.id === 'radial-sceneries-extension' || modalEl.id === 'gsx-audit-modal';
+            const isDialog = !isAirportModal && (
+                modalEl.id === 'conflict-resolution-modal' ||
+                modalEl.id === 'export-modal' ||
+                modalEl.id === 'payware-stores-modal' ||
+                modalEl.id === 'smart-lod-conflict-modal' ||
+                modalEl.id === 'settings-modal' ||
+                modalEl.id === 'disclaimer-modal' ||
+                modalEl.id === 'legal-modal' ||
+                modalEl.id === 'rescan-modal' ||
+                modalEl.id === 'background-tools-modal' ||
+                modalEl.id === 'custom-modal' ||
+                modalEl.id === 'opt-hz-cadence-modal' ||
+                modalEl.id === 'opt-setting-info-modal' ||
+                modalEl.id === 'opt-framelimiter-conflict-modal' ||
+                modalEl.id === 'unified-user-cfg-modal'
+            );
             const hasExplicitPos = modalEl._hasBeenDragged || (modalEl.style.left && modalEl.style.left !== 'auto' && modalEl.style.left !== '50%');
             if (isDialog) {
                 if (!modalEl._hasBeenDragged) this.centerModal(modalEl);
@@ -18289,22 +19138,30 @@ class WindowManager {
         const topBound = baseTopBound + routeH;
         const availableH = Math.max(240, window.innerHeight - topBound - botBound);
 
-        // Column candidates (routeOpt and reportViewer are strictly excluded from columns)
-        const unpinnedRig = (!isRigPinned && isWinOpen(pinnedRig)) ? pinnedRig : null;
+        // Column candidates (routeOpt, reportViewer are horizontal/standalone)
         const isGsxOpen = isWinOpen(gsxModal);
         const isSceneriesOpen = isClassic && isWinOpen(sceneriesExt);
-        const columnWindows = [
-            gsxModal,
-            isClassic ? sceneriesExt : null,
+        const allCandidates = [
+            pinnedRig,
             smartLod,
             telemetry,
             graphics,
-            unpinnedRig,
-            isClassic ? detailsModal : null,
-            isClassic ? airlinesModal : null,
             remotePanel,
-            bugReport
+            bugReport,
+            gsxModal,
+            isClassic ? sceneriesExt : null,
+            isClassic ? detailsModal : null,
+            isClassic ? airlinesModal : null
         ].filter(Boolean).filter(isWinOpen);
+
+        // Sort candidates chronologically based on when they were opened
+        const columnWindows = allCandidates.sort((a, b) => {
+            const idxA = openFloatingWindowsOrder.indexOf(a);
+            const idxB = openFloatingWindowsOrder.indexOf(b);
+            const orderA = idxA === -1 ? 999 : idxA;
+            const orderB = idxB === -1 ? 999 : idxB;
+            return orderA - orderB;
+        });
 
         if (!isClassic) {
             if (isWinOpen(sceneriesExt) && typeof updateRadialMenuPosition === 'function') {
@@ -18320,9 +19177,25 @@ class WindowManager {
 
         if (columnWindows.length === 0) return;
 
+        const getPreferredWidth = (win) => {
+            if (!win) return 600;
+            if (win.id === 'float-win-graphics') return Math.min(960, Math.max(760, Math.floor(availableW * 0.54)));
+            if (win.id === 'float-win-my-rig') return 700;
+            if (win.id === 'float-win-smart-lod') return 620;
+            if (win.id === 'float-win-telemetry') return 640;
+            if (win.id === 'float-win-remote-panel') return 560;
+            if (win.id === 'float-win-bug-report') return 640;
+            if (win.id === 'radial-details-modal') return 960;
+            if (win.id === 'radial-sceneries-extension') return 460;
+            if (win.id === 'radial-airlines-modal') return 560;
+            if (win.id === 'gsx-audit-modal') return 480;
+            return parseInt(win.style.width) || win.offsetWidth || 600;
+        };
+
         const applyWinBounds = (winEl, left, top, width, height) => {
             if (!winEl) return;
             if (!force && winEl._hasBeenDragged) return;
+            winEl.style.transition = 'left 0.35s cubic-bezier(0.16, 1, 0.3, 1), top 0.35s cubic-bezier(0.16, 1, 0.3, 1), width 0.35s cubic-bezier(0.16, 1, 0.3, 1)';
             winEl.style.left = `${Math.round(left)}px`;
             winEl.style.top = `${Math.round(top)}px`;
             if (width !== null) winEl.style.width = `${Math.round(width)}px`;
@@ -18343,7 +19216,10 @@ class WindowManager {
 
         const getWinNaturalH = (winEl, fallback = 220) => {
             if (!winEl) return fallback;
-            if (winEl.id === 'float-win-my-rig') return 210;
+            if (winEl.id === 'float-win-my-rig') {
+                const h = winEl.offsetHeight || winEl.scrollHeight;
+                return (h && h > 200) ? Math.min(availableH, h) : 580;
+            }
             if (winEl.id === 'float-win-smart-lod') return 520;
             if (winEl.id === 'radial-details-modal') return Math.min(availableH, winEl.scrollHeight || winEl.offsetHeight || 300);
             if (winEl.id === 'radial-sceneries-extension') return Math.min(availableH, winEl.scrollHeight || winEl.offsetHeight || 320);
@@ -18352,14 +19228,16 @@ class WindowManager {
             return fallback;
         };
 
-        // 1. Single Column Window
+        // 1. Single Column Window (Centered horizontally & vertically)
         if (columnWindows.length === 1) {
             const single = columnWindows[0];
-            const isFill = this.isViewportFillWindow(single);
-            const defaultW = isFill 
-                ? (single.id === 'float-win-graphics' ? 960 : 580)
-                : (single.id === 'float-win-my-rig' ? availableW : (single.id === 'float-win-smart-lod' ? 620 : (single.id === 'radial-sceneries-extension' ? 460 : (single.id === 'radial-details-modal' ? 880 : 560))));
-            applyWinBounds(single, minLeft, topBound, Math.min(defaultW, availableW), isFill ? availableH : null);
+            const isFit = this.isContentFitWindow(single);
+            const prefW = getPreferredWidth(single);
+            const targetW = Math.min(prefW, availableW);
+            const targetLeft = Math.max(minLeft, Math.round((window.innerWidth - targetW) / 2));
+            const winH = isFit ? Math.min(availableH, getWinNaturalH(single)) : availableH;
+            const targetTop = Math.max(topBound, Math.round((window.innerHeight - winH) / 2));
+            applyWinBounds(single, targetLeft, targetTop, targetW, isFit ? null : availableH);
             return;
         }
 
@@ -18375,7 +19253,7 @@ class WindowManager {
             const remainingLeft = col2Left + col2W + gap;
             const remainingW = window.innerWidth - remainingLeft - rightMargin;
 
-            const activeUtilities = [smartLod, telemetry, graphics, unpinnedRig, remotePanel, bugReport].filter(Boolean).filter(isWinOpen);
+            const activeUtilities = [smartLod, telemetry, graphics, remotePanel, bugReport].filter(Boolean).filter(isWinOpen);
             if (activeUtilities.length === 1) {
                 const uW = activeUtilities[0].id === 'float-win-graphics' ? Math.min(940, remainingW) : (activeUtilities[0].id === 'float-win-smart-lod' ? Math.min(620, remainingW) : (activeUtilities[0].id === 'float-win-telemetry' ? Math.min(640, remainingW) : Math.min(560, remainingW)));
                 applyWinBounds(activeUtilities[0], remainingLeft, topBound, uW, this.isViewportFillWindow(activeUtilities[0]) ? availableH : null);
@@ -18431,9 +19309,9 @@ class WindowManager {
             const remainingLeft = minLeft + primaryW + gap;
             const remainingW = window.innerWidth - remainingLeft - rightMargin;
 
-            const activeUtilities = [smartLod, telemetry, graphics, unpinnedRig, remotePanel, detailsModal, airlinesModal, bugReport].filter(Boolean).filter(isWinOpen);
+            const activeUtilities = [smartLod, telemetry, graphics, remotePanel, detailsModal, airlinesModal, bugReport].filter(Boolean).filter(isWinOpen);
             if (activeUtilities.length === 1) {
-                const uW = activeUtilities[0].id === 'float-win-graphics' ? Math.min(940, remainingW) : (activeUtilities[0].id === 'float-win-smart-lod' ? Math.min(620, remainingW) : (activeUtilities[0].id === 'float-win-telemetry' ? Math.min(640, remainingW) : (activeUtilities[0].id === 'radial-details-modal' ? Math.min(880, remainingW) : (activeUtilities[0].id === 'radial-airlines-modal' ? Math.min(560, remainingW) : Math.min(560, remainingW)))));
+                const uW = activeUtilities[0].id === 'float-win-graphics' ? Math.min(940, remainingW) : (activeUtilities[0].id === 'float-win-smart-lod' ? Math.min(620, remainingW) : (activeUtilities[0].id === 'float-win-telemetry' ? Math.min(640, remainingW) : (activeUtilities[0].id === 'radial-details-modal' ? Math.min(960, remainingW) : (activeUtilities[0].id === 'radial-airlines-modal' ? Math.min(560, remainingW) : Math.min(560, remainingW)))));
                 applyWinBounds(activeUtilities[0], remainingLeft, topBound, uW, this.isViewportFillWindow(activeUtilities[0]) ? availableH : null);
             } else if (activeUtilities.length === 2) {
                 const hasGfx = activeUtilities.some(w => w.id === 'float-win-graphics');
@@ -18483,81 +19361,146 @@ class WindowManager {
             return;
         }
 
-        // 4. No Tall Windows Open (Utilities only: Smart LOD, Telemetry, Graphics, My Rig, Remote, etc.)
+        // 4. Multi-Window Dynamic Centering & Sliding (Utilities & Flight Optimizer Modules)
         if (!isGsxOpen && !isSceneriesOpen && columnWindows.length >= 2) {
             if (columnWindows.length === 2) {
-                const hasGraphics = columnWindows.some(w => w.id === 'float-win-graphics');
-                if (hasGraphics && availableW >= 1200) {
-                    const gfxWin = columnWindows.find(w => w.id === 'float-win-graphics');
-                    const otherWin = columnWindows.find(w => w !== gfxWin);
-                    const gfxW = Math.min(960, Math.max(780, Math.floor(availableW * 0.54)));
-                    const defaultOtherW = otherWin.id === 'float-win-smart-lod' ? 620 : (otherWin.id === 'float-win-telemetry' ? 640 : (otherWin.id === 'float-win-my-rig' ? 780 : 640));
-                    const otherW = Math.min(defaultOtherW, availableW - gfxW - gap);
-                    applyWinBounds(gfxWin, minLeft, topBound, gfxW, availableH);
-                    applyWinBounds(otherWin, minLeft + gfxW + gap, topBound, otherW, this.isContentFitWindow(otherWin) ? null : availableH);
-                } else if (availableW >= 1140) {
-                    const utilW = Math.min(620, Math.max(600, Math.floor((availableW - gap) / 2)));
-                    applyWinBounds(columnWindows[0], minLeft, topBound, utilW, this.isContentFitWindow(columnWindows[0]) ? null : availableH);
-                    applyWinBounds(columnWindows[1], minLeft + utilW + gap, topBound, utilW, this.isContentFitWindow(columnWindows[1]) ? null : availableH);
+                const w0 = columnWindows[0]; // First window opened
+                const w1 = columnWindows[1]; // Second window opened (slides left)
+                let prefW0 = getPreferredWidth(w0);
+                let prefW1 = getPreferredWidth(w1);
+
+                if (prefW0 + gap + prefW1 <= availableW) {
+                    const totalW = prefW0 + gap + prefW1;
+                    const startX = Math.max(minLeft, Math.round((window.innerWidth - totalW) / 2));
+                    
+                    const isFit0 = this.isContentFitWindow(w0);
+                    const h0 = isFit0 ? Math.min(availableH, getWinNaturalH(w0)) : availableH;
+                    const top0 = Math.max(topBound, Math.round((window.innerHeight - h0) / 2));
+                    applyWinBounds(w0, startX, top0, prefW0, isFit0 ? null : availableH);
+
+                    const isFit1 = this.isContentFitWindow(w1);
+                    const h1 = isFit1 ? Math.min(availableH, getWinNaturalH(w1)) : availableH;
+                    const top1 = Math.max(topBound, Math.round((window.innerHeight - h1) / 2));
+                    applyWinBounds(w1, startX + prefW0 + gap, top1, prefW1, isFit1 ? null : availableH);
+                } else if (availableW >= 880) {
+                    const scale = (availableW - gap) / (prefW0 + prefW1);
+                    const scaledW0 = Math.max(400, Math.floor(prefW0 * scale));
+                    const scaledW1 = Math.max(400, availableW - gap - scaledW0);
+                    const totalW = scaledW0 + gap + scaledW1;
+                    const startX = Math.max(minLeft, Math.round((window.innerWidth - totalW) / 2));
+
+                    const isFit0 = this.isContentFitWindow(w0);
+                    const h0 = isFit0 ? Math.min(availableH, getWinNaturalH(w0)) : availableH;
+                    const top0 = Math.max(topBound, Math.round((window.innerHeight - h0) / 2));
+                    applyWinBounds(w0, startX, top0, scaledW0, isFit0 ? null : availableH);
+
+                    const isFit1 = this.isContentFitWindow(w1);
+                    const h1 = isFit1 ? Math.min(availableH, getWinNaturalH(w1)) : availableH;
+                    const top1 = Math.max(topBound, Math.round((window.innerHeight - h1) / 2));
+                    applyWinBounds(w1, startX + scaledW0 + gap, top1, scaledW1, isFit1 ? null : availableH);
                 } else {
-                    const utilW = Math.min(640, Math.max(600, availableW));
-                    const isWin0Fit = this.isContentFitWindow(columnWindows[0]);
-                    applyWinBounds(columnWindows[0], minLeft, topBound, utilW, isWin0Fit ? null : Math.floor((availableH - gap) * 0.49));
-                    const win0H = isWin0Fit ? getWinNaturalH(columnWindows[0]) : Math.floor((availableH - gap) * 0.49);
-                    const win1Top = topBound + win0H + gap;
-                    applyWinBounds(columnWindows[1], minLeft, win1Top, utilW, this.isContentFitWindow(columnWindows[1]) ? null : (availableH - (win1Top - topBound)));
+                    const utilW = Math.min(Math.max(prefW0, prefW1), availableW);
+                    const startX = Math.max(minLeft, Math.round((window.innerWidth - utilW) / 2));
+                    const isFit0 = this.isContentFitWindow(w0);
+                    const halfH = Math.floor((availableH - gap) * 0.49);
+                    applyWinBounds(w0, startX, topBound, utilW, isFit0 ? null : halfH);
+                    const actualH0 = isFit0 ? getWinNaturalH(w0) : halfH;
+                    const top1 = topBound + actualH0 + gap;
+                    applyWinBounds(w1, startX, top1, utilW, this.isContentFitWindow(w1) ? null : Math.max(200, availableH - actualH0 - gap));
                 }
                 return;
             }
-            if (columnWindows.length >= 3) {
-                const hasGraphics = columnWindows.some(w => w.id === 'float-win-graphics');
-                if (hasGraphics && availableW >= 1350) {
-                    const gfxWin = columnWindows.find(w => w.id === 'float-win-graphics');
-                    const otherWins = columnWindows.filter(w => w !== gfxWin);
-                    const gfxW = Math.min(960, Math.max(780, Math.floor(availableW * 0.54)));
-                    applyWinBounds(gfxWin, minLeft, topBound, gfxW, availableH);
 
-                    const rightLeft = minLeft + gfxW + gap;
-                    const rightW = window.innerWidth - rightLeft - rightMargin;
+            if (columnWindows.length === 3) {
+                const w0 = columnWindows[0];
+                const w1 = columnWindows[1];
+                const w2 = columnWindows[2];
+                const prefW0 = getPreferredWidth(w0);
+                const prefW1 = getPreferredWidth(w1);
+                const prefW2 = getPreferredWidth(w2);
 
-                    if (otherWins.length === 2) {
-                        const rigWin = otherWins.find(w => w.id === 'float-win-my-rig') || otherWins[0];
-                        const secondWin = otherWins.find(w => w !== rigWin) || otherWins[1];
-                        const rigW = Math.min(rigWin.id === 'float-win-my-rig' ? 780 : 640, rightW);
-                        applyWinBounds(rigWin, rightLeft, topBound, rigW, this.isContentFitWindow(rigWin) ? null : Math.floor((availableH - gap) * 0.45));
+                if (prefW0 + gap + prefW1 + gap + prefW2 <= availableW) {
+                    const totalW = prefW0 + gap + prefW1 + gap + prefW2;
+                    const startX = Math.max(minLeft, Math.round((window.innerWidth - totalW) / 2));
+                    
+                    const isFit0 = this.isContentFitWindow(w0);
+                    const h0 = isFit0 ? Math.min(availableH, getWinNaturalH(w0)) : availableH;
+                    const top0 = Math.max(topBound, Math.round((window.innerHeight - h0) / 2));
+                    applyWinBounds(w0, startX, top0, prefW0, isFit0 ? null : availableH);
 
-                        const rigH = getWinNaturalH(rigWin, 210);
-                        const secondTop = topBound + rigH + gap;
-                        const secondDefaultW = secondWin.id === 'float-win-smart-lod' ? 620 : 640;
-                        const secondW = Math.min(secondDefaultW, rightW);
-                        const secondRemH = Math.max(200, availableH - rigH - gap);
-                        applyWinBounds(secondWin, rightLeft, secondTop, secondW, this.isContentFitWindow(secondWin) ? null : secondRemH);
-                        return;
-                    }
+                    const isFit1 = this.isContentFitWindow(w1);
+                    const h1 = isFit1 ? Math.min(availableH, getWinNaturalH(w1)) : availableH;
+                    const top1 = Math.max(topBound, Math.round((window.innerHeight - h1) / 2));
+                    applyWinBounds(w1, startX + prefW0 + gap, top1, prefW1, isFit1 ? null : availableH);
+
+                    const isFit2 = this.isContentFitWindow(w2);
+                    const h2 = isFit2 ? Math.min(availableH, getWinNaturalH(w2)) : availableH;
+                    const top2 = Math.max(topBound, Math.round((window.innerHeight - h2) / 2));
+                    applyWinBounds(w2, startX + prefW0 + gap + prefW1 + gap, top2, prefW2, isFit2 ? null : availableH);
+                    return;
                 }
 
-                // General 2-column multi-stacking
-                const uColW = Math.min(560, Math.floor((availableW - gap) * 0.5));
-                const isWin0Fit = this.isContentFitWindow(columnWindows[0]);
-                applyWinBounds(columnWindows[0], minLeft, topBound, uColW, isWin0Fit ? null : Math.floor((availableH - gap) * 0.49));
-                const win0H = isWin0Fit ? getWinNaturalH(columnWindows[0]) : Math.floor((availableH - gap) * 0.49);
-                const win1Top = topBound + win0H + gap;
-                applyWinBounds(columnWindows[1], minLeft, win1Top, uColW, this.isContentFitWindow(columnWindows[1]) ? null : (availableH - (win1Top - topBound)));
+                // Balanced 2-Column layout: Window 0 on left column (or Graphics if present), Windows 1 & 2 stacked on right column
+                const hasGfx = columnWindows.some(w => w.id === 'float-win-graphics');
+                const col1Win = hasGfx ? columnWindows.find(w => w.id === 'float-win-graphics') : w0;
+                const rightWins = columnWindows.filter(w => w !== col1Win);
+                const col2Win0 = rightWins[0];
+                const col2Win1 = rightWins[1];
 
-                const col2Left = minLeft + uColW + gap;
-                const col2W = Math.min(560, window.innerWidth - col2Left - rightMargin);
-                if (columnWindows.length === 3) {
-                    applyWinBounds(columnWindows[2], col2Left, topBound, col2W, this.isContentFitWindow(columnWindows[2]) ? null : availableH);
-                } else {
-                    const isWin2Fit = this.isContentFitWindow(columnWindows[2]);
-                    applyWinBounds(columnWindows[2], col2Left, topBound, col2W, isWin2Fit ? null : Math.floor((availableH - gap) * 0.49));
-                    const win2H = isWin2Fit ? getWinNaturalH(columnWindows[2]) : Math.floor((availableH - gap) * 0.49);
-                    const win3Top = topBound + win2H + gap;
-                    applyWinBounds(columnWindows[3], col2Left, win3Top, col2W, this.isContentFitWindow(columnWindows[3]) ? null : (availableH - (win3Top - topBound)));
-                }
+                const col1PrefW = getPreferredWidth(col1Win);
+                const col2PrefW = Math.max(getPreferredWidth(col2Win0), getPreferredWidth(col2Win1));
+
+                const col1W = Math.min(col1PrefW, Math.floor((availableW - gap) * 0.52));
+                const col2W = Math.min(col2PrefW, availableW - gap - col1W);
+                const totalW = col1W + gap + col2W;
+                const startX = Math.max(minLeft, Math.round(minLeft + (availableW - totalW) / 2));
+
+                // Column 1 (Left)
+                const isFitCol1 = this.isContentFitWindow(col1Win);
+                const col1H = isFitCol1 ? Math.min(availableH, getWinNaturalH(col1Win)) : availableH;
+                const col1Top = Math.max(topBound, Math.round(topBound + Math.max(0, (availableH - col1H) / 2)));
+                applyWinBounds(col1Win, startX, col1Top, col1W, isFitCol1 ? null : availableH);
+
+                // Column 2 (Right): Stacked
+                const col2Left = startX + col1W + gap;
+                const isFit2_0 = this.isContentFitWindow(col2Win0);
+                const h2_0 = isFit2_0 ? Math.min(Math.floor((availableH - gap) * 0.48), getWinNaturalH(col2Win0)) : Math.floor((availableH - gap) * 0.48);
+                applyWinBounds(col2Win0, col2Left, topBound, col2W, isFit2_0 ? null : h2_0);
+
+                const actualH2_0 = isFit2_0 ? getWinNaturalH(col2Win0) : h2_0;
+                const top2_1 = topBound + actualH2_0 + gap;
+                const isFit2_1 = this.isContentFitWindow(col2Win1);
+                const remH2_1 = Math.max(200, availableH - actualH2_0 - gap);
+                applyWinBounds(col2Win1, col2Left, top2_1, col2W, isFit2_1 ? null : remH2_1);
+                return;
+            }
+
+            if (columnWindows.length >= 4) {
+                // 2-Column general grid, centered
+                const colW = Math.min(580, Math.floor((availableW - gap) * 0.5));
+                const totalW = colW * 2 + gap;
+                const startX = Math.max(minLeft, Math.round(minLeft + (availableW - totalW) / 2));
+                const col2Left = startX + colW + gap;
+
+                // Column 1 (wins 0 and 1)
+                const isFit0 = this.isContentFitWindow(columnWindows[0]);
+                const halfH = Math.floor((availableH - gap) * 0.49);
+                applyWinBounds(columnWindows[0], startX, topBound, colW, isFit0 ? null : halfH);
+                const actualH0 = isFit0 ? getWinNaturalH(columnWindows[0]) : halfH;
+                const top1 = topBound + actualH0 + gap;
+                applyWinBounds(columnWindows[1], startX, top1, colW, this.isContentFitWindow(columnWindows[1]) ? null : Math.max(200, availableH - actualH0 - gap));
+
+                // Column 2 (wins 2 and 3)
+                const isFit2 = this.isContentFitWindow(columnWindows[2]);
+                applyWinBounds(columnWindows[2], col2Left, topBound, colW, isFit2 ? null : halfH);
+                const actualH2 = isFit2 ? getWinNaturalH(columnWindows[2]) : halfH;
+                const top3 = topBound + actualH2 + gap;
+                applyWinBounds(columnWindows[3], col2Left, top3, colW, this.isContentFitWindow(columnWindows[3]) ? null : Math.max(200, availableH - actualH2 - gap));
+
+                // Overflow > 4 cascaded on column 2
                 for (let i = 4; i < columnWindows.length; i++) {
-                    const offset = (i - 3) * 20;
-                    applyWinBounds(columnWindows[i], col2Left + offset, topBound + offset, col2W, null);
+                    const offset = (i - 3) * 24;
+                    applyWinBounds(columnWindows[i], col2Left + offset, topBound + offset, colW, null);
                 }
                 return;
             }
@@ -18574,101 +19517,135 @@ class WindowManager {
 
     centerModal(modalEl) {
         if (!modalEl) return;
-        if (modalEl.id === 'settings-modal') {
+        const id = modalEl.id;
+
+        // Skip modals explicitly anchored to airports on the map
+        if (id === 'radial-details-modal' || id === 'radial-sceneries-extension' || id === 'radial-airlines-modal' || id === 'gsx-audit-modal') {
+            return;
+        }
+
+        // All non-airport modals are dead-centered across the entire screen
+        modalEl.style.left = '50%';
+        modalEl.style.top = '50%';
+        modalEl.style.transform = 'translate(-50%, -50%)';
+        modalEl.style.right = 'auto';
+        modalEl.style.bottom = 'auto';
+
+        if (id === 'conflict-resolution-modal') {
+            modalEl.style.width = '580px';
+            modalEl.style.zIndex = '5000';
+            return;
+        }
+        if (id === 'float-win-my-rig') {
+            modalEl.style.width = '700px';
+            modalEl.style.height = 'auto';
+            modalEl.style.zIndex = '4500';
+            return;
+        }
+        if (id === 'settings-modal') {
             modalEl.style.width = '680px';
-            modalEl.style.left = '50%';
-            modalEl.style.top = '50%';
-            modalEl.style.transform = 'translate(-50%, -50%)';
-            modalEl.style.right = 'auto';
-            modalEl.style.bottom = 'auto';
             modalEl.style.zIndex = '5000';
             const backdrop = document.getElementById('settings-modal-backdrop') || document.getElementById('settings-backdrop');
             if (backdrop) backdrop.style.zIndex = '4999';
             return;
         }
-        if (modalEl.id === 'disclaimer-modal') {
+        if (id === 'disclaimer-modal') {
             modalEl.style.width = '680px';
-            modalEl.style.left = '50%';
-            modalEl.style.top = '50%';
-            modalEl.style.transform = 'translate(-50%, -50%)';
-            modalEl.style.right = 'auto';
-            modalEl.style.bottom = 'auto';
             modalEl.style.zIndex = '6000';
             const backdrop = document.getElementById('disclaimer-backdrop');
             if (backdrop) backdrop.style.zIndex = '5999';
             return;
         }
-        if (modalEl.id === 'legal-modal') {
+        if (id === 'legal-modal') {
             modalEl.style.width = '840px';
-            modalEl.style.left = '50%';
-            modalEl.style.top = '50%';
-            modalEl.style.transform = 'translate(-50%, -50%)';
-            modalEl.style.right = 'auto';
-            modalEl.style.bottom = 'auto';
             modalEl.style.zIndex = '7000';
             const backdrop = document.getElementById('legal-backdrop');
             if (backdrop) backdrop.style.zIndex = '6999';
             return;
         }
-        if (modalEl.id === 'rescan-modal') {
+        if (id === 'rescan-modal') {
             modalEl.style.width = '540px';
-            modalEl.style.left = '50%';
-            modalEl.style.top = '50%';
-            modalEl.style.transform = 'translate(-50%, -50%)';
-            modalEl.style.right = 'auto';
-            modalEl.style.bottom = 'auto';
             modalEl.style.zIndex = '5000';
             const backdrop = document.getElementById('rescan-backdrop');
             if (backdrop) backdrop.style.zIndex = '4999';
             return;
         }
-        if (modalEl.id === 'radial-details-modal') {
-            modalEl.style.width = '880px';
+        if (id === 'export-modal') {
+            modalEl.style.width = '480px';
+            modalEl.style.zIndex = '5000';
+            return;
         }
-        const topBound = 126;
-        const botBound = 84;
-        const maxAllowedH = Math.max(200, window.innerHeight - topBound - botBound);
-        modalEl.style.maxHeight = `${maxAllowedH}px`;
-
-        if (modalEl.id === 'float-win-route-opt' || modalEl.dataset?.modalId === 'float-win-route-opt') {
+        if (id === 'payware-stores-modal') {
+            modalEl.style.width = '580px';
+            modalEl.style.zIndex = '5000';
+            return;
+        }
+        if (id === 'smart-lod-conflict-modal') {
+            modalEl.style.width = '520px';
+            modalEl.style.zIndex = '5000';
+            return;
+        }
+        if (id === 'background-tools-modal') {
+            modalEl.style.width = '560px';
+            modalEl.style.zIndex = '5000';
+            return;
+        }
+        if (id === 'custom-modal') {
+            modalEl.style.width = '380px';
+            modalEl.style.zIndex = '6000';
+            return;
+        }
+        if (id === 'opt-hz-cadence-modal') {
+            modalEl.style.width = '576px';
+            modalEl.style.zIndex = '5000';
+            return;
+        }
+        if (id === 'opt-setting-info-modal') {
+            modalEl.style.width = '660px';
+            modalEl.style.zIndex = '5000';
+            return;
+        }
+        if (id === 'opt-framelimiter-conflict-modal') {
+            modalEl.style.width = '540px';
+            modalEl.style.zIndex = '5000';
+            return;
+        }
+        if (id === 'unified-user-cfg-modal') {
+            modalEl.style.width = '580px';
+            modalEl.style.zIndex = '5000';
+            return;
+        }
+        if (id === 'float-win-bug-report') {
+            modalEl.style.width = '640px';
+            modalEl.style.zIndex = '4500';
+            return;
+        }
+        if (id === 'float-win-report-viewer') {
+            modalEl.style.width = `${Math.min(1080, window.innerWidth - 32)}px`;
+            modalEl.style.zIndex = '2800';
+            return;
+        }
+        if (id === 'float-win-route-opt' || modalEl.dataset?.modalId === 'float-win-route-opt') {
             modalEl.style.width = 'fit-content';
+            return;
         }
-        if (modalEl.id === 'float-win-my-rig') {
-            modalEl.style.height = 'auto';
-            modalEl.style.width = '780px';
-        }
-        if (modalEl.id === 'float-win-graphics') {
+        if (id === 'float-win-graphics') {
             modalEl.style.width = '960px';
+            return;
         }
-        if (modalEl.id === 'float-win-smart-lod') {
+        if (id === 'float-win-smart-lod') {
             modalEl.style.height = 'auto';
             modalEl.style.width = '620px';
+            return;
         }
-        if (this.isContentFitWindow(modalEl)) {
-            modalEl.style.height = 'auto';
-        }
-        const rect = modalEl.getBoundingClientRect();
-        const w = rect.width || modalEl.offsetWidth || parseInt(modalEl.style.width) || 540;
-        const h = Math.min(maxAllowedH, rect.height || parseInt(modalEl.style.height) || modalEl.offsetHeight || 400);
-
-        const isClassicOpen = document.body.classList.contains('classic-nav-active') || (document.getElementById('classic-flight-ops-panel') && !document.getElementById('classic-flight-ops-panel').classList.contains('hidden'));
-        const minLeft = isClassicOpen ? 304 : 16;
-        const availableW = window.innerWidth - minLeft - 16;
-        const left = Math.max(minLeft, Math.min(window.innerWidth - w - 16, Math.floor(minLeft + Math.max(0, (availableW - w) / 2))));
-
-        const availableH = window.innerHeight - topBound - botBound;
-        const centeredTop = Math.floor(topBound + Math.max(0, (availableH - h) / 2));
-        const top = Math.max(topBound, Math.min(window.innerHeight - botBound - h, centeredTop));
-
-        modalEl.style.left = `${left}px`;
-        modalEl.style.top = `${top}px`;
-        modalEl.style.right = 'auto';
-        modalEl.style.bottom = 'auto';
-        modalEl.style.transform = 'none';
     }
 
     bringToFront(modalEl) {
         if (!modalEl) return;
+        if (modalEl.id === 'conflict-resolution-modal') {
+            modalEl.style.zIndex = '5000';
+            return;
+        }
         if (modalEl.id === 'settings-modal') {
             modalEl.style.zIndex = '5000';
             const backdrop = document.getElementById('settings-modal-backdrop') || document.getElementById('settings-backdrop');
@@ -18718,6 +19695,7 @@ class WindowManager {
             if (modalEl.classList.contains('is-pinned')) return;
             if (e.target.closest('button') || e.target.closest('input') || e.target.closest('select') || e.target.closest('textarea')) return;
             this.bringToFront(modalEl);
+            modalEl.style.transition = 'none';
 
             const rect = modalEl.getBoundingClientRect();
             this._dragState = {
@@ -18745,6 +19723,7 @@ class WindowManager {
             e.preventDefault();
             e.stopPropagation();
             this.bringToFront(modalEl);
+            modalEl.style.transition = 'none';
 
             const rect = modalEl.getBoundingClientRect();
             const computed = window.getComputedStyle(modalEl);
@@ -18836,10 +19815,16 @@ class WindowManager {
     }
 
     _onGlobalMouseUp() {
+        if (this._dragState && this._dragState.modalEl) {
+            this._dragState.modalEl.style.transition = '';
+        }
         if (this._resizeState) {
             const { modalEl } = this._resizeState;
-            if (modalEl && this.isContentFitWindow(modalEl)) {
-                modalEl.style.height = 'auto';
+            if (modalEl) {
+                modalEl.style.transition = '';
+                if (this.isContentFitWindow(modalEl)) {
+                    modalEl.style.height = 'auto';
+                }
             }
         }
         this._dragState = null;
@@ -18937,6 +19922,9 @@ class WindowManager {
         modalEl._hasBeenDragged = false;
         modalEl.style.height = 'auto';
         this.activeModals.delete(modalEl);
+        if (typeof openFloatingWindowsOrder !== 'undefined') {
+            openFloatingWindowsOrder = openFloatingWindowsOrder.filter(el => el !== modalEl);
+        }
         // Clear dragged flag on remaining active windows so layout snaps back cleanly
         document.querySelectorAll('.sceneryx-modal.floating-window').forEach(el => {
             el._hasBeenDragged = false;
@@ -18950,6 +19938,7 @@ const windowManager = new WindowManager();
 window.windowManager = windowManager;
 
 let topFloatingZIndex = 2500;
+let openFloatingWindowsOrder = [];
 
 function bringFloatingWindowToFront(winEl) {
     if (!winEl) return;
@@ -18995,9 +19984,23 @@ const FLOATING_DEFAULT_OFFSETS = {
     'report-viewer': { x: 310, y: 126 }
 };
 
+const LITE_LOCKED_FLOATING_WINDOWS = new Set([
+    'smart_lod', 'graphics', 'my_rig', 'rig', 'telemetry', 'route',
+    'remote_panel', 'report_viewer', 'report-viewer',
+    'float-win-smart-lod', 'float-win-graphics', 'float-win-my-rig',
+    'float-win-telemetry', 'float-win-route-opt', 'float-win-remote-panel',
+    'float-win-report-viewer'
+]);
+
 function toggleFloatingWindow(winKey, event) {
     if (event && typeof event.stopPropagation === 'function') event.stopPropagation();
     const elId = (typeof FLOATING_WINDOW_MAP !== 'undefined' && FLOATING_WINDOW_MAP[winKey]) ? FLOATING_WINDOW_MAP[winKey] : winKey;
+    if (window.IS_LITE && (LITE_LOCKED_FLOATING_WINDOWS.has(winKey) || LITE_LOCKED_FLOATING_WINDOWS.has(elId))) {
+        if (!(window.onboardingTour && window.onboardingTour.isOpen)) {
+            showUnlockProModal();
+        }
+        return;
+    }
     const winEl = document.getElementById(elId);
     if (!winEl) return;
     const isOpen = !winEl.classList.contains('hidden') && winEl.style.display !== 'none';
@@ -19020,6 +20023,12 @@ window.addEventListener('message', function (event) {
 
 function openFloatingWindow(winKey, targetAp = null) {
     const elId = FLOATING_WINDOW_MAP[winKey] || winKey;
+    if (window.IS_LITE && (LITE_LOCKED_FLOATING_WINDOWS.has(winKey) || LITE_LOCKED_FLOATING_WINDOWS.has(elId))) {
+        if (!(window.onboardingTour && window.onboardingTour.isOpen)) {
+            showUnlockProModal();
+            return;
+        }
+    }
     const winEl = document.getElementById(elId);
     if (!winEl) {
         console.warn('Floating window not found:', winKey, elId);
@@ -19064,6 +20073,18 @@ function openFloatingWindow(winKey, targetAp = null) {
                 const left = Math.max(minLeft, Math.floor(minLeft + Math.max(0, (availableW - targetW) / 2)));
                 winEl.style.left = `${left}px`;
                 winEl.style.top = `${effectiveTopBound}px`;
+            } else if (winKey === 'my_rig' || winKey === 'rig' || elId === 'float-win-my-rig') {
+                const targetW = 700;
+                winEl.style.width = `${targetW}px`;
+                winEl.style.height = 'auto';
+                winEl.style.transform = 'none';
+                const isClassic = document.body.classList.contains('classic-nav-active') || (document.getElementById('classic-flight-ops-panel') && !document.getElementById('classic-flight-ops-panel').classList.contains('hidden'));
+                const minLeft = isClassic ? 304 : 20;
+                const targetLeft = Math.max(minLeft, Math.round((window.innerWidth - targetW) / 2));
+                const estH = 580;
+                const targetTop = Math.max(topBound, Math.round((window.innerHeight - estH) / 2));
+                winEl.style.left = `${targetLeft}px`;
+                winEl.style.top = `${targetTop}px`;
             } else if (winKey === 'report_viewer' || winKey === 'report-viewer' || elId === 'float-win-report-viewer') {
                 const targetW = Math.min(1080, window.innerWidth - 32);
                 const left = Math.max(16, Math.floor((window.innerWidth - targetW) / 2));
@@ -19097,6 +20118,13 @@ function openFloatingWindow(winKey, targetAp = null) {
     winEl.classList.remove('hidden');
     winEl._hasBeenDragged = false;
     bringFloatingWindowToFront(winEl);
+
+    // Track chronological open order
+    if (typeof openFloatingWindowsOrder !== 'undefined') {
+        openFloatingWindowsOrder = openFloatingWindowsOrder.filter(el => el !== winEl);
+        openFloatingWindowsOrder.push(winEl);
+    }
+
     if (window.windowManager) {
         window.windowManager.autoTileWindows(true);
     }
@@ -19107,6 +20135,7 @@ function openFloatingWindow(winKey, targetAp = null) {
 
     if (winKey === 'my_rig' || winKey === 'rig') {
         if (typeof loadRigDiagnostics === 'function') loadRigDiagnostics();
+        if (typeof loadSystemTuningStatus === 'function') loadSystemTuningStatus(false);
     } else if (winKey === 'graphics') {
         if (typeof openGraphicsSettingsModal === 'function') {
             openGraphicsSettingsModal();
@@ -19161,6 +20190,9 @@ function closeFloatingWindow(winKey) {
         winEl.classList.add('hidden');
         winEl.style.height = 'auto';
         winEl._hasBeenDragged = false;
+        if (typeof openFloatingWindowsOrder !== 'undefined') {
+            openFloatingWindowsOrder = openFloatingWindowsOrder.filter(el => el !== winEl);
+        }
     }
     if (!wasOpen) return;
     // Cleanly untag dragged flag on remaining active windows so layout snaps back
@@ -19920,6 +20952,11 @@ function updateOptimizerSavings() {
 function updateClassicSidebarRouteBadge() {
     const badgeRoute = document.getElementById('classic-badge-route');
     if (!badgeRoute) return;
+    if (window.IS_LITE) {
+        badgeRoute.innerHTML = LITE_PRO_BADGE_INNER;
+        badgeRoute.className = LITE_PRO_BADGE_CLASS;
+        return;
+    }
 
     const dep = (typeof optimizerOrigin !== 'undefined' && optimizerOrigin) ||
                 (typeof flightPlanningDeparture !== 'undefined' && flightPlanningDeparture) ||
@@ -19974,6 +21011,10 @@ function swapOptimizerRouteAirports() {
 }
 
 async function setOptimizerMode(mode) {
+    if (window.IS_LITE) {
+        showUnlockProModal();
+        return;
+    }
     optimizerMode = mode;
     flightCorridorProfile = mode;
     isFlightPlanningMode = true;
@@ -20022,6 +21063,10 @@ async function setOptimizerMode(mode) {
 }
 
 function applyOptimizerRouteSceneries() {
+    if (window.IS_LITE) {
+        showUnlockProModal();
+        return;
+    }
     if (!optimizerOrigin) {
         if (typeof showToast === 'function') showToast("Please select at least a Departure airport.", "warning");
         return;
@@ -20487,13 +21532,9 @@ async function loadRigDiagnostics(profileId = null) {
             if (cpuCoresEl) {
                 const cores = det.cpu.cores || 8;
                 const threads = det.cpu.threads || 16;
-                let coreColor = 'text-emerald-400';
-                if (cores < 6) coreColor = 'text-rose-400';
-                else if (cores < 8) coreColor = 'text-amber-400';
-                else if (cores < 16) coreColor = 'text-sky-400';
                 cpuCoresEl.innerHTML = `
-                    <span class="px-2 py-0.5 rounded-lg text-[10.5px] font-mono font-bold tabular-nums bg-slate-800 border border-slate-700/60 ${coreColor} uppercase whitespace-nowrap leading-none">${cores} CORES</span>
-                    <span class="px-2 py-0.5 rounded-lg text-[10.5px] font-mono font-bold tabular-nums bg-slate-800 border border-slate-700/60 text-slate-300 uppercase whitespace-nowrap leading-none">${threads} THREADS</span>
+                    <span class="px-2 py-0.5 rounded text-[11px] font-sans font-semibold bg-[#181E2B] text-[#94A3B8] border border-[#253046] uppercase whitespace-nowrap leading-none">${cores} Cores</span>
+                    <span class="px-2 py-0.5 rounded text-[11px] font-sans font-semibold bg-[#181E2B] text-[#94A3B8] border border-[#253046] uppercase whitespace-nowrap leading-none">${threads} Threads</span>
                 `;
             }
         }
@@ -20505,20 +21546,14 @@ async function loadRigDiagnostics(profileId = null) {
             gpuNameEl.title = det.gpu.name || det.gpu.name_simplified || '';
             if (gpuVramEl) {
                 const vramGb = det.gpu.vram_total_gb || 0;
-                let vramColor = 'text-emerald-400';
-                if (vramGb < 8) vramColor = 'text-rose-400';
-                else if (vramGb < 12) vramColor = 'text-amber-400';
-                else if (vramGb < 16) vramColor = 'text-sky-400';
-
                 const isDriverCurrent = det.gpu.is_driver_current !== false;
-                const driverColor = isDriverCurrent ? 'text-emerald-400' : 'text-amber-400';
                 const driverTitle = isDriverCurrent 
                     ? `Driver ${det.gpu.driver_version} (Up to date)` 
                     : `Driver ${det.gpu.driver_version} (Outdated - Latest: ${det.gpu.latest_driver_version || 'newer'})`;
 
                 gpuVramEl.innerHTML = `
-                    <span class="px-2 py-0.5 rounded-lg text-[10.5px] font-mono font-bold tabular-nums bg-slate-800 border border-slate-700/60 ${vramColor} uppercase whitespace-nowrap leading-none">${vramGb} GB VRAM</span>
-                    <span class="px-2 py-0.5 rounded-lg text-[10.5px] font-mono font-bold uppercase tracking-wider bg-slate-800 border border-slate-700/60 ${driverColor} whitespace-nowrap leading-none" title="${driverTitle}">DRIVER ${det.gpu.driver_version || 'LATEST'}</span>
+                    <span class="px-2 py-0.5 rounded text-[11px] font-sans font-semibold bg-[#181E2B] text-[#94A3B8] border border-[#253046] uppercase whitespace-nowrap leading-none">${vramGb} GB VRAM</span>
+                    <span class="px-2 py-0.5 rounded text-[11px] font-sans font-semibold bg-[#181E2B] text-[#94A3B8] border border-[#253046] uppercase whitespace-nowrap leading-none" title="${driverTitle}">Driver ${det.gpu.driver_version || 'Latest'}</span>
                 `;
             }
         }
@@ -20535,13 +21570,13 @@ async function loadRigDiagnostics(profileId = null) {
                     displayResEl.innerHTML = det.all_displays.map(d => {
                         const isSel = (d.id === activeId || String(d.index) === String(activeId));
                         const hz = d.refresh_rate_int || 60;
-                        const bgClass = isSel ? 'pill-soft-sky text-white shadow-sm' : 'pill-soft-slate text-slate-200 hover:bg-slate-600';
-                        return `<button type="button" onclick="selectCadenceDisplay('${d.id}')" class="px-2 py-0.5 rounded-full text-[10.5px] font-bold tabular-nums uppercase tracking-wider ${bgClass} transition-colors cursor-pointer border-0 leading-none" title="${d.formatted || d.id}">${d.id} (${hz} HZ)</button>`;
+                        const bgClass = isSel ? 'bg-[#10B981] text-[#0E121A]' : 'bg-[#181E2B] text-[#94A3B8] hover:text-[#F1F5F9] border border-[#253046]';
+                        return `<button type="button" onclick="selectCadenceDisplay('${d.id}')" class="px-2 py-0.5 rounded text-[11px] font-sans font-bold uppercase ${bgClass} transition-colors cursor-pointer border-0 leading-none" title="${d.formatted || d.id}">${d.id} (${hz} Hz)</button>`;
                     }).join('');
                 } else {
                     displayResEl.innerHTML = `
-                        <span class="px-2 py-0.5 rounded-full text-[10.5px] font-bold tabular-nums pill-soft-cyan uppercase leading-none">${det.display.refresh_rate_int || 60} HZ</span>
-                        <span class="px-2 py-0.5 rounded-lg text-[10.5px] font-semibold tabular-nums bg-slate-800 text-slate-300 uppercase leading-none">${det.display.width}x${det.display.height}</span>
+                        <span class="px-2 py-0.5 rounded text-[11px] font-sans font-bold uppercase bg-[#10B981] text-[#0E121A] leading-none">${det.display.refresh_rate_int || 60} Hz</span>
+                        <span class="px-2 py-0.5 rounded text-[11px] font-sans font-semibold bg-[#181E2B] text-[#94A3B8] border border-[#253046] uppercase leading-none">${det.display.width}x${det.display.height}</span>
                     `;
                 }
             }
@@ -20556,8 +21591,7 @@ async function loadRigDiagnostics(profileId = null) {
                 vrNameEl.textContent = (vrHeadset.name || 'VR HEADSET').toUpperCase();
                 if (vrHzEl) {
                     const hz = vrHeadset.refresh_rate_hz || 72;
-                    const vrColor = hz >= 72 ? 'text-emerald-400' : 'text-amber-400';
-                    vrHzEl.innerHTML = `<span class="px-2 py-0.5 rounded-lg text-[10.5px] font-mono font-bold tabular-nums bg-slate-800 border border-slate-700/60 ${vrColor} uppercase whitespace-nowrap leading-none">${hz} HZ ACTIVE</span>`;
+                    vrHzEl.innerHTML = `<span class="px-2 py-0.5 rounded text-[11px] font-sans font-bold uppercase bg-[#10B981] text-[#0E121A] whitespace-nowrap leading-none">${hz} Hz Active</span>`;
                 }
                 if (vrHeadset.refresh_rate_hz) {
                     currentVrRefreshRate = vrHeadset.refresh_rate_hz;
@@ -20565,7 +21599,7 @@ async function loadRigDiagnostics(profileId = null) {
             } else {
                 vrNameEl.textContent = 'NONE DETECTED';
                 if (vrHzEl) {
-                    vrHzEl.innerHTML = `<span class="px-2 py-0.5 rounded-lg text-[10.5px] font-sans font-bold uppercase tracking-wider bg-slate-800 border border-slate-700/60 text-slate-400 whitespace-nowrap leading-none">DESKTOP MODE</span>`;
+                    vrHzEl.innerHTML = `<span class="px-2 py-0.5 rounded text-[11px] font-sans font-semibold uppercase bg-[#181E2B] text-[#94A3B8] border border-[#253046] whitespace-nowrap leading-none">Desktop Mode</span>`;
                 }
             }
         }
@@ -20577,14 +21611,10 @@ async function loadRigDiagnostics(profileId = null) {
             ramValEl.textContent = `${det.ram.total_gb || 32} GB RAM`;
             if (ramBadgesEl) {
                 const speedMhz = det.ram.speed_mhz || 3200;
-                let speedColor = 'text-emerald-400';
-                if (speedMhz < 3000) speedColor = 'text-amber-400';
-                else if (speedMhz < 3600) speedColor = 'text-sky-400';
                 const isXmp = !!det.ram.is_xmp_active;
-                const xmpColor = isXmp ? 'text-emerald-400' : 'text-amber-400';
                 ramBadgesEl.innerHTML = `
-                    <span class="px-2 py-0.5 rounded-lg text-[10.5px] font-mono font-bold tabular-nums bg-slate-800 border border-slate-700/60 ${speedColor} uppercase whitespace-nowrap leading-none">${speedMhz} MHZ</span>
-                    <span class="px-2 py-0.5 rounded-lg text-[10.5px] font-mono font-bold uppercase tracking-wider bg-slate-800 border border-slate-700/60 ${xmpColor} whitespace-nowrap leading-none">${isXmp ? 'XMP ON' : 'XMP OFF'}</span>
+                    <span class="px-2 py-0.5 rounded text-[11px] font-sans font-semibold bg-[#181E2B] text-[#94A3B8] border border-[#253046] uppercase whitespace-nowrap leading-none">${speedMhz} MHz</span>
+                    <span class="px-2 py-0.5 rounded text-[11px] font-sans font-semibold ${isXmp ? 'bg-[#10B981] text-[#0E121A]' : 'bg-[#181E2B] text-[#94A3B8] border border-[#253046]'} uppercase whitespace-nowrap leading-none">${isXmp ? 'XMP Enabled' : 'XMP Disabled'}</span>
                 `;
             }
         }
@@ -20593,25 +21623,22 @@ async function loadRigDiagnostics(profileId = null) {
         const miscBadgesEl = document.getElementById('opt-detected-misc-badges');
         if (miscBadgesEl) {
             const isRbar = !!det.rbar_active;
-            const rbarColor = isRbar ? 'text-emerald-400' : 'text-amber-400';
             const isHags = !!det.hags_active;
-            const hagsColor = isHags ? 'text-emerald-400' : 'text-amber-400';
             
             const dlssObj = det.dlss || {};
             const dlssVer = dlssObj.version || '3.10';
             const isDlssCurrent = dlssObj.is_up_to_date !== false;
-            const dlssColor = isDlssCurrent ? 'text-emerald-400' : 'text-amber-400';
             const dlssTitle = isDlssCurrent 
                 ? `DLSS ${dlssVer} (Up to date)` 
                 : `DLSS ${dlssVer} (Outdated - Latest: ${dlssObj.latest_version || 'newer'})`;
 
             let html = `
-                <span class="px-2 py-0.5 rounded-lg text-[10.5px] font-mono font-bold uppercase tracking-wider bg-slate-800 border border-slate-700/60 ${rbarColor} whitespace-nowrap leading-none">R-BAR ${isRbar ? 'ON' : 'OFF'}</span>
-                <span class="px-2 py-0.5 rounded-lg text-[10.5px] font-mono font-bold uppercase tracking-wider bg-slate-800 border border-slate-700/60 ${hagsColor} whitespace-nowrap leading-none">HAGS ${isHags ? 'ON' : 'OFF'}</span>
-                <span class="px-2 py-0.5 rounded-lg text-[10.5px] font-mono font-bold uppercase tracking-wider bg-slate-800 border border-slate-700/60 ${dlssColor} whitespace-nowrap leading-none" title="${dlssTitle}">DLSS ${dlssVer}</span>
+                <span class="px-2 py-0.5 rounded text-[11px] font-sans font-semibold ${isRbar ? 'bg-[#10B981] text-[#0E121A]' : 'bg-[#181E2B] text-[#94A3B8] border border-[#253046]'} uppercase whitespace-nowrap leading-none">ReBAR ${isRbar ? 'ON' : 'OFF'}</span>
+                <span class="px-2 py-0.5 rounded text-[11px] font-sans font-semibold ${isHags ? 'bg-[#10B981] text-[#0E121A]' : 'bg-[#181E2B] text-[#94A3B8] border border-[#253046]'} uppercase whitespace-nowrap leading-none">HAGS ${isHags ? 'ON' : 'OFF'}</span>
+                <span class="px-2 py-0.5 rounded text-[11px] font-sans font-semibold bg-[#181E2B] text-[#94A3B8] border border-[#253046] uppercase whitespace-nowrap leading-none" title="${dlssTitle}">DLSS ${dlssVer}</span>
             `;
             if (dlssObj.frame_gen_version) {
-                html += `<span class="px-2 py-0.5 rounded-lg text-[10.5px] font-mono font-bold uppercase tracking-wider bg-slate-800 border border-slate-700/60 text-emerald-400 whitespace-nowrap leading-none" title="Frame Generation DLL active">FRAME GEN</span>`;
+                html += `<span class="px-2 py-0.5 rounded text-[11px] font-sans font-bold bg-[#10B981] text-[#0E121A] uppercase whitespace-nowrap leading-none" title="Frame Generation DLL active">Frame Gen</span>`;
             }
             miscBadgesEl.innerHTML = html;
         }
@@ -20627,11 +21654,11 @@ async function loadRigDiagnostics(profileId = null) {
             if (storageBadgeEl) {
                 storageBadgeEl.textContent = (s.tier || 'NVMe SSD').toUpperCase();
                 if (s.is_hdd) {
-                    storageBadgeEl.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-[#EF4444] text-[#0F1115] shadow-sm animate-pulse whitespace-nowrap leading-none select-none';
+                    storageBadgeEl.className = 'px-2 py-0.5 rounded text-[10px] font-sans font-bold uppercase bg-[#EF4444] text-white shrink-0';
                 } else if (s.is_nvme) {
-                    storageBadgeEl.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-[#10B981] text-[#0F1115] shadow-sm whitespace-nowrap leading-none select-none';
+                    storageBadgeEl.className = 'px-2 py-0.5 rounded text-[10px] font-sans font-bold uppercase bg-[#10B981] text-[#0E121A] shrink-0';
                 } else {
-                    storageBadgeEl.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-[#00A8FF] text-[#0F1115] shadow-sm whitespace-nowrap leading-none select-none';
+                    storageBadgeEl.className = 'px-2 py-0.5 rounded text-[10px] font-sans font-bold uppercase bg-[#334155] text-[#F1F5F9] shrink-0';
                 }
             }
             if (storageNameEl) {
@@ -20640,12 +21667,9 @@ async function loadRigDiagnostics(profileId = null) {
             }
             if (storageDetailsEl) {
                 const freeGb = s.free_gb || 0;
-                let freeColor = 'text-emerald-400';
-                if (freeGb < 40) freeColor = 'text-rose-400';
-                else if (freeGb < 100) freeColor = 'text-amber-400';
                 storageDetailsEl.innerHTML = `
-                    <span class="px-2 py-0.5 rounded-md text-[10.5px] font-mono font-bold tabular-nums bg-[#161920] border border-[#242B38] ${freeColor} uppercase whitespace-nowrap leading-none">${freeGb} GB FREE</span>
-                    <span class="px-2 py-0.5 rounded-md text-[10.5px] font-mono font-bold tabular-nums bg-[#161920] border border-[#242B38] text-slate-400 uppercase whitespace-nowrap leading-none">${s.total_gb || 0} GB TOTAL</span>
+                    <span class="px-2 py-0.5 rounded text-[11px] font-sans font-semibold bg-[#181E2B] text-[#94A3B8] border border-[#253046] uppercase whitespace-nowrap leading-none">${freeGb} GB Free</span>
+                    <span class="px-2 py-0.5 rounded text-[11px] font-sans font-semibold bg-[#181E2B] text-[#94A3B8] border border-[#253046] uppercase whitespace-nowrap leading-none">${s.total_gb || 0} GB Total</span>
                 `;
             }
             if (storageWarningEl) {
@@ -20668,13 +21692,13 @@ async function loadRigDiagnostics(profileId = null) {
                 if (net.is_wifi) {
                     const sigTxt = (net.wifi_signal_pct !== null && net.wifi_signal_pct !== undefined) ? ` (${net.wifi_signal_pct}%)` : '';
                     netBadgeEl.textContent = `WI-FI${sigTxt}`;
-                    netBadgeEl.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-[#F59E0B] text-[#0F1115] shadow-sm whitespace-nowrap leading-none select-none';
+                    netBadgeEl.className = 'px-2 py-0.5 rounded text-[10px] font-sans font-bold uppercase bg-[#F59E0B] text-[#0E121A] shrink-0';
                 } else if (net.is_connected) {
                     netBadgeEl.textContent = 'ETHERNET';
-                    netBadgeEl.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-[#10B981] text-[#0F1115] shadow-sm whitespace-nowrap leading-none select-none';
+                    netBadgeEl.className = 'px-2 py-0.5 rounded text-[10px] font-sans font-bold uppercase bg-[#10B981] text-[#0E121A] shrink-0';
                 } else {
                     netBadgeEl.textContent = 'OFFLINE';
-                    netBadgeEl.className = 'px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-[#EF4444] text-[#0F1115] shadow-sm whitespace-nowrap leading-none select-none';
+                    netBadgeEl.className = 'px-2 py-0.5 rounded text-[10px] font-sans font-bold uppercase bg-[#EF4444] text-white shrink-0';
                 }
             }
             if (netSpeedEl) {
@@ -20683,18 +21707,13 @@ async function loadRigDiagnostics(profileId = null) {
                 netSpeedEl.title = `${net.adapter_name || 'Network Adapter'} (${net.connection_name || ''})`;
             }
             if (netDetailsEl) {
-                let pingColor = 'text-emerald-400';
                 let pingTxt = 'Online';
                 if (net.ping_ms !== null && net.ping_ms !== undefined) {
                     pingTxt = `${net.ping_ms} MS`;
-                    if (net.ping_ms >= 120) pingColor = 'text-rose-400';
-                    else if (net.ping_ms >= 60) pingColor = 'text-amber-400';
-                    else if (net.ping_ms >= 30) pingColor = 'text-sky-400';
-                    else pingColor = 'text-emerald-400';
                 }
                 netDetailsEl.innerHTML = `
-                    <span class="px-2 py-0.5 rounded-md text-[10.5px] font-mono font-bold tabular-nums bg-[#161920] border border-[#242B38] ${pingColor} uppercase whitespace-nowrap leading-none">${pingTxt} PING</span>
-                    <span class="px-2 py-0.5 rounded-md text-[10.5px] font-mono font-bold tabular-nums bg-[#161920] border border-[#242B38] text-slate-300 uppercase whitespace-nowrap truncate max-w-[150px] leading-none" title="${net.adapter_name || ''}">${net.adapter_name || 'Adapter Active'}</span>
+                    <span class="px-2 py-0.5 rounded text-[11px] font-sans font-semibold bg-[#181E2B] text-[#94A3B8] border border-[#253046] uppercase whitespace-nowrap leading-none">${pingTxt} Ping</span>
+                    <span class="px-2 py-0.5 rounded text-[11px] font-sans font-semibold bg-[#181E2B] text-[#94A3B8] border border-[#253046] uppercase whitespace-nowrap truncate max-w-[150px] leading-none" title="${net.adapter_name || ''}">${net.adapter_name || 'Active'}</span>
                 `;
             }
         }
@@ -20706,29 +21725,49 @@ async function loadRigDiagnostics(profileId = null) {
         if (det.system_balance) {
             const b = det.system_balance;
             let tierColorClass = 'text-emerald-400';
-            if (b.color === 'amber' || b.color === 'yellow') {
-                tierColorClass = 'text-amber-400';
-            } else if (b.color === 'orange') {
-                tierColorClass = 'text-orange-400';
-            } else if (b.color === 'rose' || b.color === 'red') {
+            let badgeBgClass = 'bg-[#10B981] text-[#0E121A]';
+            const tierLower = (b.tier || '').toLowerCase();
+            const colorLower = (b.color || '').toLowerCase();
+            const statusLower = (b.status || '').toLowerCase();
+
+            if (colorLower === 'rose' || colorLower === 'red' || statusLower.includes('bottleneck') || tierLower.includes('severe') || tierLower.includes('critical')) {
                 tierColorClass = 'text-rose-400';
+                badgeBgClass = 'bg-[#EF4444] text-white';
+            } else if (colorLower === 'orange' || tierLower.includes('suboptimal') || tierLower.includes('risk')) {
+                tierColorClass = 'text-orange-400';
+                badgeBgClass = 'bg-[#F97316] text-[#0E121A]';
+            } else if (colorLower === 'amber' || colorLower === 'yellow' || tierLower.includes('acceptable') || tierLower.includes('constrained')) {
+                tierColorClass = 'text-amber-400';
+                badgeBgClass = 'bg-[#F59E0B] text-[#0E121A]';
+            } else {
+                // Optimal / Optimum / Elite / Balanced / Good
+                tierColorClass = 'text-emerald-400';
+                badgeBgClass = 'bg-[#10B981] text-[#0E121A]';
             }
 
             if (balanceBadge) {
                 balanceBadge.textContent = b.tier;
-                balanceBadge.className = 'px-3 py-1 rounded-full text-xs font-mono font-bold uppercase tracking-wider bg-[#161920] border border-[#242B38] ' + tierColorClass;
+                balanceBadge.className = 'px-3 py-1 rounded text-xs font-sans font-bold uppercase tracking-wider bg-[#161920] border border-[#242B38] ' + tierColorClass;
             }
             if (pinnedTag) {
                 pinnedTag.textContent = (b.tier || 'OPTIMUM').toUpperCase();
-                pinnedTag.className = 'hidden px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold tracking-wider uppercase bg-[#10B981] text-[#0F1115] shadow-sm';
+                pinnedTag.className = 'hidden px-2.5 py-0.5 rounded text-[10px] font-sans font-bold tracking-wider uppercase ' + badgeBgClass;
+            }
+            const hwBar = document.getElementById('rig-specs-summary-bar');
+            const hwBadge = document.getElementById('opt-rig-summary-badge');
+            const tooltipContent = b.summary + (b.advice ? ' — ' + b.advice : '');
+            if (hwBar) {
+                hwBar.title = tooltipContent;
+            }
+            if (hwBadge) {
+                hwBadge.title = tooltipContent;
+                hwBadge.textContent = (b.tier || 'OPTIMAL').toUpperCase();
+                hwBadge.className = 'px-3 py-1 rounded text-xs font-bold uppercase tracking-wider shrink-0 ' + badgeBgClass;
             }
             if (balanceDesc) {
-                balanceDesc.textContent = b.summary;
-                balanceDesc.title = b.advice || b.summary;
-                balanceDesc.className = `text-sm md:text-base font-semibold ${tierColorClass} block leading-relaxed`;
-                if (balanceDesc.parentElement) {
-                    balanceDesc.parentElement.className = 'pt-0.5 pb-1';
-                }
+                balanceDesc.textContent = "Hardware baseline automatically detected: CPU, GPU, RAM, NVMe & Display.";
+                balanceDesc.title = tooltipContent;
+                balanceDesc.className = "text-[11px] text-[#94A3B8] truncate";
             }
 
             const debriefHwTier = document.getElementById('opt-debrief-hw-tier');
@@ -20775,6 +21814,850 @@ async function loadRigDiagnostics(profileId = null) {
         console.error("Error loading Rig diagnostics:", e);
     }
 }
+
+// =========================================================================
+// MY RIG & SYSTEM OPTIMIZER (OUT-OF-SIM HARDWARE & OS TUNING)
+// =========================================================================
+let currentRigTab = 'tuning';
+let systemTuningData = null;
+let simMaintenanceData = null;
+
+function switchRigTab(tabName) {
+    currentRigTab = tabName;
+    const tuningView = document.getElementById('rig-view-tuning');
+    const specsView = document.getElementById('rig-view-specs');
+    const maintView = document.getElementById('rig-view-maintenance');
+    const btnTuning = document.getElementById('rig-tab-btn-tuning');
+    const btnSpecs = document.getElementById('rig-tab-btn-specs');
+    const btnMaint = document.getElementById('rig-tab-btn-maintenance');
+
+    const activeTabClass = 'px-3 py-1 rounded text-xs font-bold uppercase tracking-wider bg-[#1E2638] text-[#F1F5F9] transition-colors border-0 cursor-pointer';
+    const inactiveTabClass = 'px-3 py-1 rounded text-xs font-semibold uppercase tracking-wider bg-transparent text-[#94A3B8] hover:text-[#F1F5F9] transition-colors border-0 cursor-pointer';
+
+    if (tuningView) tuningView.classList.toggle('hidden', tabName !== 'tuning');
+    if (specsView) specsView.classList.toggle('hidden', tabName !== 'specs');
+    if (maintView) maintView.classList.toggle('hidden', tabName !== 'maintenance');
+
+    if (btnTuning) btnTuning.className = (tabName === 'tuning') ? activeTabClass : inactiveTabClass;
+    if (btnSpecs) btnSpecs.className = (tabName === 'specs') ? activeTabClass : inactiveTabClass;
+    if (btnMaint) btnMaint.className = (tabName === 'maintenance') ? activeTabClass : inactiveTabClass;
+
+    if (tabName === 'tuning') {
+        if (!systemTuningData) {
+            loadSystemTuningStatus(false);
+        }
+    } else if (tabName === 'specs') {
+        if (typeof loadRigDiagnostics === 'function') {
+            loadRigDiagnostics();
+        }
+    } else if (tabName === 'maintenance') {
+        loadSimMaintenanceStatus(false);
+    }
+    if (window.windowManager) {
+        requestAnimationFrame(() => {
+            window.windowManager.autoTileWindows();
+        });
+    }
+}
+window.switchRigTab = switchRigTab;
+
+async function loadSystemTuningStatus(showScanAnimation = false) {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.get_system_tuning_status) return;
+
+    const banner = document.getElementById('rig-scan-banner');
+    const progressBar = document.getElementById('rig-scan-progress-bar');
+    const container = document.getElementById('rig-tuning-cards-container');
+
+    if (showScanAnimation && banner) {
+        banner.classList.remove('hidden');
+        if (progressBar) progressBar.style.width = '25%';
+        await new Promise(r => setTimeout(r, 100));
+        if (progressBar) progressBar.style.width = '65%';
+    }
+
+    try {
+        const resStr = await window.pywebview.api.get_system_tuning_status();
+        const data = typeof resStr === 'string' ? JSON.parse(resStr) : resStr;
+        systemTuningData = data;
+
+        if (showScanAnimation && progressBar) {
+            progressBar.style.width = '100%';
+            await new Promise(r => setTimeout(r, 150));
+        }
+
+        renderSystemTuning(data);
+        if (window.windowManager) {
+            requestAnimationFrame(() => {
+                window.windowManager.autoTileWindows();
+            });
+        }
+    } catch (err) {
+        console.error("Error loading system tuning status:", err);
+        if (container) {
+            container.innerHTML = `
+                <div class="p-3 rounded bg-[#0E121A] border border-[#EF4444]/40 text-xs text-[#EF4444]">
+                    Erreur lors de l'analyse du système: ${err.message || err}
+                </div>
+            `;
+        }
+    } finally {
+        if (banner) banner.classList.add('hidden');
+    }
+}
+window.loadSystemTuningStatus = loadSystemTuningStatus;
+
+function renderSystemTuning(data) {
+    if (!data) return;
+
+    // 1. Update Header Readiness Badge (Hidden as requested: no redundant score pill)
+    const badge = document.getElementById('opt-system-readiness-badge');
+    if (badge) {
+        badge.classList.add('hidden');
+        badge.style.display = 'none';
+    }
+
+    // 2. Update Summary Bar
+    const titleEl = document.getElementById('rig-summary-title');
+    const subtitleEl = document.getElementById('rig-summary-subtitle');
+    const applyAllBtn = document.getElementById('rig-btn-apply-all');
+
+    const recommendedCount = (data.checks || []).filter(c => c.status === 'recommended').length;
+
+    const badgeEl = document.getElementById('rig-summary-badge');
+
+    if (titleEl) {
+        titleEl.textContent = 'WINDOWS DIAGNOSIS';
+    }
+    if (subtitleEl) {
+        if (recommendedCount > 0) {
+            subtitleEl.textContent = `${data.checks.length} system parameters analyzed • ${recommendedCount} action${recommendedCount > 1 ? 's' : ''} recommended for your hardware`;
+        } else {
+            subtitleEl.textContent = `${data.checks.length} system parameters analyzed • Automatically tuned for your detected hardware`;
+        }
+    }
+    if (badgeEl) {
+        if (recommendedCount > 0) {
+            badgeEl.className = 'px-3 py-1 rounded text-xs font-bold uppercase tracking-wider bg-[#F59E0B] text-[#0E121A] shrink-0';
+            badgeEl.textContent = `${recommendedCount} ACTION${recommendedCount > 1 ? 'S' : ''}`;
+        } else {
+            badgeEl.className = 'px-3 py-1 rounded text-xs font-bold uppercase tracking-wider bg-[#10B981] text-[#0E121A] shrink-0';
+            badgeEl.textContent = 'OPTIMAL';
+        }
+    }
+    if (applyAllBtn) {
+        if (recommendedCount > 0 && data.can_one_click_optimize) {
+            applyAllBtn.classList.remove('hidden');
+            applyAllBtn.textContent = `OPTIMIZE ALL (${recommendedCount})`;
+        } else {
+            applyAllBtn.classList.add('hidden');
+        }
+    }
+
+    // 3. Render Checks Cards
+    const container = document.getElementById('rig-tuning-cards-container');
+    if (!container) return;
+
+    if (!data.checks || data.checks.length === 0) {
+        container.innerHTML = `<div class="p-3 text-center text-xs text-[#94A3B8]">No settings detected.</div>`;
+        return;
+    }
+
+    let html = '';
+    data.checks.forEach(check => {
+        const isOptimal = check.status === 'optimal' || check.is_optimal;
+        const isRecommended = check.status === 'recommended';
+        const isNotActive = check.status === 'not_active' || (check.id === 'rbar' && !isOptimal);
+        const tooltip = check.tooltip || '';
+
+        // Status badge: strictly centered in fixed width column (Point 6 & Point 8)
+        let statusBadgeHtml = '';
+        if (isOptimal) {
+            statusBadgeHtml = `<span class="w-[90px] py-1 text-center rounded text-[11px] font-sans font-bold uppercase tracking-wider bg-[#10B981] text-[#0E121A] inline-block select-none" title="${tooltip || 'Setting is optimally configured'}">Optimal</span>`;
+        } else if (isNotActive) {
+            statusBadgeHtml = `<span class="w-[90px] py-1 text-center rounded text-[11px] font-sans font-bold uppercase tracking-wider bg-[#F59E0B] text-[#0E121A] inline-block cursor-help select-none" title="${tooltip || 'Re-Size BAR is not active in UEFI BIOS. Enable Above 4G Decoding and Re-Size BAR in motherboard BIOS.'}">Not Active</span>`;
+        } else if (isRecommended) {
+            statusBadgeHtml = `<span class="w-[90px] py-1 text-center rounded text-[11px] font-sans font-bold uppercase tracking-wider bg-[#F59E0B] text-[#0E121A] inline-block select-none" title="${tooltip || 'Action recommended'}">Action</span>`;
+        } else {
+            statusBadgeHtml = `<span class="w-[90px] py-1 text-center rounded text-[11px] font-sans font-semibold uppercase tracking-wider bg-[#334155] text-[#F1F5F9] inline-block select-none">Info</span>`;
+        }
+
+        // Action button & switch rendering (Point 7 & Point 8)
+        // All clickable buttons named 'SETTINGS' with contextual tooltip. ReBAR has NO switch/button.
+        let actionBtnHtml = '';
+        if (check.action_type === 'toggle_game_mode' || check.id === 'game_mode') {
+            const isChecked = isOptimal;
+            actionBtnHtml = `
+                <button type="button" role="switch" aria-checked="${isChecked}" onclick="toggleGameModeDirectly(${isChecked})" class="relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full transition-colors duration-200 ease-in-out focus:outline-none ${isChecked ? 'bg-[#10B981]' : 'bg-[#334155]'}" title="Toggle Windows Game Mode On / Off">
+                    <span class="pointer-events-none inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition duration-200 ease-in-out mt-[3px] ml-[3px] ${isChecked ? 'translate-x-4' : 'translate-x-0'}"></span>
+                </button>
+            `;
+        } else if (check.action_type === 'set_power_plan' || check.id === 'power_plan') {
+            actionBtnHtml = `<button onclick="openWindowsPowerOptions()" class="w-[84px] py-1 rounded text-[11px] font-sans font-bold uppercase tracking-wider text-center bg-[#1E2638] hover:bg-[#2A364F] text-[#F1F5F9] border border-[#334155] transition-colors cursor-pointer whitespace-nowrap" title="Opens Windows Control Panel: Power Options">SETTINGS</button>`;
+        } else if (check.action_type === 'open_hags_modal' || check.action_type === 'open_hags' || check.action_type === 'open_windows_graphics' || check.id === 'hags') {
+            actionBtnHtml = `<button onclick="openHagsSettingsModal()" class="w-[84px] py-1 rounded text-[11px] font-sans font-bold uppercase tracking-wider text-center bg-[#1E2638] hover:bg-[#2A364F] text-[#F1F5F9] border border-[#334155] transition-colors cursor-pointer whitespace-nowrap" title="Opens GPU Scheduling (HAGS) settings and options">SETTINGS</button>`;
+        } else if (check.action_type === 'open_shader_cache_modal' || check.action_type === 'open_shader_cache' || check.id === 'shader_cache') {
+            actionBtnHtml = `<button onclick="openShaderCacheModal()" class="w-[84px] py-1 rounded text-[11px] font-sans font-bold uppercase tracking-wider text-center bg-[#1E2638] hover:bg-[#2A364F] text-[#F1F5F9] border border-[#334155] transition-colors cursor-pointer whitespace-nowrap" title="Configure DirectX Shader Cache size, open NVIDIA Control Panel or purge cache">SETTINGS</button>`;
+        } else if (check.action_type === 'open_gpu_driver_modal' || check.action_type === 'launch_gpu_app' || check.action_type === 'open_gpu_app' || check.id === 'gpu_app' || check.id === 'gpu_driver') {
+            actionBtnHtml = `<button onclick="openGpuDriverModal()" class="w-[84px] py-1 rounded text-[11px] font-sans font-bold uppercase tracking-wider text-center bg-[#1E2638] hover:bg-[#2A364F] text-[#F1F5F9] border border-[#334155] transition-colors cursor-pointer whitespace-nowrap" title="Manage GPU Driver, check updates or open NVIDIA Control Panel">SETTINGS</button>`;
+        }
+
+        const categoryTag = check.short_title || check.category || 'SYSTEM';
+        const displayVal = check.value_label || check.current_display || '';
+        const descText = check.desc || check.recommendation || '';
+
+        html += `
+            <div class="p-3 rounded-lg bg-[#0E121A] border border-[#253046] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div class="space-y-0.5 flex-1 min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B]">${categoryTag}</span>
+                        <span class="text-[#253046]">•</span>
+                        <span class="text-xs font-sans font-bold text-[#F1F5F9] truncate">${check.title}</span>
+                        <span class="text-xs font-sans font-semibold text-[#94A3B8]">${displayVal}</span>
+                    </div>
+                    <div class="text-[11px] font-sans text-[#94A3B8] leading-snug">
+                        ${descText}
+                    </div>
+                </div>
+                <div class="flex items-center gap-3 self-end sm:self-center shrink-0">
+                    <div class="w-[96px] flex items-center justify-center shrink-0">
+                        ${statusBadgeHtml}
+                    </div>
+                    <div class="w-[88px] flex items-center justify-end shrink-0">
+                        ${actionBtnHtml}
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+}
+window.renderSystemTuning = renderSystemTuning;
+
+function toggleRebarSwitch(isCurrentlyOn) {
+    if (isCurrentlyOn) {
+        if (typeof showToast === 'function') {
+            showToast("Re-Size BAR is active in UEFI BIOS. To modify it, consult the BIOS Guide.", "info");
+        }
+        showRebarBiosGuide();
+    } else {
+        showRebarBiosGuide();
+    }
+}
+window.toggleRebarSwitch = toggleRebarSwitch;
+
+async function openWindowsPowerOptions() {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.open_windows_power_options) return;
+    try {
+        await window.pywebview.api.open_windows_power_options();
+    } catch (e) {
+        console.error("Error opening Windows power options:", e);
+    }
+}
+window.openWindowsPowerOptions = openWindowsPowerOptions;
+
+async function openShaderCacheSettings() {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.open_shader_cache_settings) return;
+    try {
+        await window.pywebview.api.open_shader_cache_settings();
+    } catch (e) {
+        console.error("Error opening shader cache settings:", e);
+    }
+}
+window.openShaderCacheSettings = openShaderCacheSettings;
+
+async function toggleGameModeDirectly(currentState) {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.set_system_game_mode) return;
+    try {
+        const nextState = !currentState;
+        const resStr = await window.pywebview.api.set_system_game_mode(nextState);
+        const res = typeof resStr === 'string' ? JSON.parse(resStr) : resStr;
+        const isSuccess = res && (res.status === 'success' || res.success === true);
+        if (isSuccess) {
+            if (typeof showToast === 'function') {
+                showToast(nextState ? "Windows Game Mode enabled." : "Windows Game Mode disabled.", 'success');
+            }
+            await loadSystemTuningStatus(false);
+        } else {
+            const errMsg = (res && (res.message || res.error)) ? (res.message || res.error) : 'Unable to toggle Windows Game Mode';
+            if (typeof showToast === 'function') {
+                showToast(`Error: ${errMsg}`, 'error');
+            }
+        }
+    } catch (e) {
+        console.error("Error toggling Game Mode:", e);
+        if (typeof showToast === 'function') {
+            showToast(`Error: ${e.message || e}`, 'error');
+        }
+    }
+}
+window.toggleGameModeDirectly = toggleGameModeDirectly;
+
+async function setPowerPlanDirectly(planKeyOrGuid) {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.set_system_power_plan) return;
+    try {
+        let guid = planKeyOrGuid;
+        if (planKeyOrGuid === 'high') {
+            guid = '8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c';
+        }
+        const resStr = await window.pywebview.api.set_system_power_plan(guid);
+        const res = typeof resStr === 'string' ? JSON.parse(resStr) : resStr;
+        const isSuccess = res && (res.status === 'success' || res.success === true);
+        if (isSuccess) {
+            if (typeof showToast === 'function') {
+                showToast(`Power plan activated: ${res.plan_name || 'High Performance'}.`, 'success');
+            }
+            await loadSystemTuningStatus(false);
+        } else {
+            const errMsg = (res && (res.message || res.error)) ? (res.message || res.error) : 'Unable to set Windows power plan';
+            if (typeof showToast === 'function') {
+                showToast(`Error: ${errMsg}`, 'error');
+            }
+        }
+    } catch (e) {
+        console.error("Error setting Power Plan:", e);
+        if (typeof showToast === 'function') {
+            showToast(`Error: ${e.message || e}`, 'error');
+        }
+    }
+}
+window.setPowerPlanDirectly = setPowerPlanDirectly;
+
+async function applyAllSystemTweaks() {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.apply_all_recommended_system_tweaks) return;
+    try {
+        const resStr = await window.pywebview.api.apply_all_recommended_system_tweaks();
+        const res = typeof resStr === 'string' ? JSON.parse(resStr) : resStr;
+        const isSuccess = res && (res.status === 'success' || res.success === true);
+        if (isSuccess) {
+            const count = (res.applied || res.applied_tweaks || []).length;
+            if (typeof showToast === 'function') {
+                showToast(`${count} system optimization(s) applied.`, 'success');
+            }
+            await loadSystemTuningStatus(false);
+        } else {
+            const errMsg = (res && (res.message || res.error)) ? (res.message || res.error) : 'Unable to apply all tweaks';
+            if (typeof showToast === 'function') {
+                showToast(`Error: ${errMsg}`, 'error');
+            }
+        }
+    } catch (e) {
+        console.error("Error applying all tweaks:", e);
+        if (typeof showToast === 'function') {
+            showToast(`Error: ${e.message || e}`, 'error');
+        }
+    }
+}
+window.applyAllSystemTweaks = applyAllSystemTweaks;
+
+async function openWindowsGraphicsSettings() {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.open_windows_graphics_settings) return;
+    try {
+        await window.pywebview.api.open_windows_graphics_settings();
+    } catch (e) {
+        console.error("Error opening Windows graphics settings:", e);
+    }
+}
+window.openWindowsGraphicsSettings = openWindowsGraphicsSettings;
+
+async function launchGpuControlApp() {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.launch_gpu_control_app) return;
+    try {
+        const resStr = await window.pywebview.api.launch_gpu_control_app();
+        const res = typeof resStr === 'string' ? JSON.parse(resStr) : resStr;
+        if (res && (res.status === 'success' || res.status === 'ok')) {
+            if (typeof showToast === 'function') {
+                showToast(`Launched GPU Control Application: ${res.app || 'NVIDIA App'}`, 'success');
+            }
+        }
+    } catch (e) {
+        console.error("Error launching GPU control app:", e);
+    }
+}
+window.launchGpuControlApp = launchGpuControlApp;
+
+function showRebarBiosGuide() {
+    const modal = document.getElementById('rebar-bios-guide-modal');
+    if (modal) modal.classList.remove('hidden');
+}
+window.showRebarBiosGuide = showRebarBiosGuide;
+
+function closeRebarBiosGuide() {
+    const modal = document.getElementById('rebar-bios-guide-modal');
+    if (modal) modal.classList.add('hidden');
+}
+window.closeRebarBiosGuide = closeRebarBiosGuide;
+
+function openHagsSettingsModal() {
+    const modal = document.getElementById('modal-hags-settings');
+    if (!modal) return;
+
+    let isHagsOn = false;
+    if (systemTuningData && Array.isArray(systemTuningData.checks)) {
+        const hagsCheck = systemTuningData.checks.find(c => c.id === 'hags');
+        if (hagsCheck) {
+            isHagsOn = !!hagsCheck.is_optimal;
+        }
+    } else if (systemTuningData && typeof systemTuningData.hags_enabled !== 'undefined') {
+        isHagsOn = !!systemTuningData.hags_enabled;
+    }
+
+    const statusText = document.getElementById('hags-modal-status-text');
+    const statusBadge = document.getElementById('hags-modal-status-badge');
+    const toggleLabel = document.getElementById('hags-modal-toggle-label');
+
+    if (statusText) {
+        statusText.innerText = isHagsOn ? 'Hardware-Accelerated GPU Scheduling (HAGS): OPTIMAL (ON)' : 'Hardware-Accelerated GPU Scheduling (HAGS): DISABLED (OFF)';
+    }
+    if (statusBadge) {
+        if (isHagsOn) {
+            statusBadge.className = 'px-3 py-1 rounded text-[11px] font-bold uppercase tracking-wider bg-emerald-500 text-slate-950';
+            statusBadge.innerText = 'OPTIMAL (ON)';
+        } else {
+            statusBadge.className = 'px-3 py-1 rounded text-[11px] font-bold uppercase tracking-wider bg-amber-500 text-slate-950';
+            statusBadge.innerText = 'DISABLED (OFF)';
+        }
+    }
+    if (toggleLabel) {
+        toggleLabel.innerText = isHagsOn ? 'Disable HAGS via Registry (UAC Elevation)' : 'Enable HAGS via Registry (UAC Elevation)';
+    }
+
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+    if (window.modalWindowManager) {
+        window.modalWindowManager.bringToFront(modal);
+        if (!modal._hasBeenDragged) {
+            window.modalWindowManager.centerModal(modal);
+        }
+    }
+}
+window.openHagsSettingsModal = openHagsSettingsModal;
+
+function closeHagsSettingsModal() {
+    const modal = document.getElementById('modal-hags-settings');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.style.display = 'none';
+    }
+}
+window.closeHagsSettingsModal = closeHagsSettingsModal;
+
+async function openWindowsGraphicsSettingsFromModal() {
+    await openWindowsGraphicsSettings();
+    if (typeof showToast === 'function') {
+        showToast("Windows Graphics Settings opened. Note: Any HAGS change requires a full PC reboot.", 'info');
+    }
+}
+window.openWindowsGraphicsSettingsFromModal = openWindowsGraphicsSettingsFromModal;
+
+async function toggleHagsViaUac() {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.set_system_hags) return;
+    let isCurrentlyOn = false;
+    if (systemTuningData && Array.isArray(systemTuningData.checks)) {
+        const hagsCheck = systemTuningData.checks.find(c => c.id === 'hags');
+        if (hagsCheck) isCurrentlyOn = !!hagsCheck.is_optimal;
+    } else if (systemTuningData && typeof systemTuningData.hags_enabled !== 'undefined') {
+        isCurrentlyOn = !!systemTuningData.hags_enabled;
+    }
+    const targetState = !isCurrentlyOn;
+    try {
+        if (typeof showToast === 'function') {
+            showToast("Requesting Windows UAC elevation...", 'info');
+        }
+        const resStr = await window.pywebview.api.set_system_hags(targetState);
+        const data = typeof resStr === 'string' ? JSON.parse(resStr) : resStr;
+        const opResult = (data && data.operation_result) ? data.operation_result : data;
+
+        if (opResult && opResult.success) {
+            if (typeof showToast === 'function') {
+                showToast(targetState 
+                    ? "HAGS enabled in registry. Please restart your PC to apply changes." 
+                    : "HAGS disabled in registry. Please restart your PC to apply changes.", 
+                    'success'
+                );
+            }
+            await loadSystemTuningStatus(false);
+            openHagsSettingsModal();
+        } else {
+            const msg = (opResult && opResult.message) ? opResult.message : "Registry write failed or UAC elevation cancelled.";
+            if (typeof showToast === 'function') {
+                showToast(`Information: ${msg}`, 'warning');
+            }
+        }
+    } catch (e) {
+        console.error("Error setting HAGS via UAC:", e);
+        if (typeof showToast === 'function') {
+            showToast(`Error: ${e.message || e}`, 'error');
+        }
+    }
+}
+window.toggleHagsViaUac = toggleHagsViaUac;
+
+function openShaderCacheModal() {
+    const modal = document.getElementById('modal-shader-cache-settings');
+    if (!modal) return;
+
+    let sizeMb = 0;
+    if (systemTuningData && Array.isArray(systemTuningData.checks)) {
+        const sc = systemTuningData.checks.find(c => c.id === 'shader_cache');
+        if (sc && sc.value_label) {
+            const m = sc.value_label.match(/([\d\.]+)\s*MB/i);
+            if (m) sizeMb = parseFloat(m[1]);
+        }
+    }
+    const sizeEl = document.getElementById('shader-modal-size-val');
+    if (sizeEl) {
+        sizeEl.innerText = sizeMb > 0 ? `${sizeMb} MB` : '0 MB';
+    }
+
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+    if (window.modalWindowManager) {
+        window.modalWindowManager.bringToFront(modal);
+        if (!modal._hasBeenDragged) {
+            window.modalWindowManager.centerModal(modal);
+        }
+    }
+}
+window.openShaderCacheModal = openShaderCacheModal;
+
+function closeShaderCacheModal() {
+    const modal = document.getElementById('modal-shader-cache-settings');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.style.display = 'none';
+    }
+}
+window.closeShaderCacheModal = closeShaderCacheModal;
+
+async function openNvidiaControlPanelDirect() {
+    await launchGpuControlApp();
+}
+window.openNvidiaControlPanelDirect = openNvidiaControlPanelDirect;
+
+async function openNvidiaAppDirect() {
+    await launchGpuControlApp();
+}
+window.openNvidiaAppDirect = openNvidiaAppDirect;
+
+async function openWindowsDiskCleanupDirect() {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.open_windows_disk_cleanup) return;
+    try {
+        await window.pywebview.api.open_windows_disk_cleanup();
+        if (typeof showToast === 'function') {
+            showToast('Opening Windows Disk Cleanup (cleanmgr.exe)...', 'info');
+        }
+    } catch (e) {
+        console.error("Error opening Windows Disk Cleanup:", e);
+    }
+}
+window.openWindowsDiskCleanupDirect = openWindowsDiskCleanupDirect;
+
+async function purgeShaderCacheDirect() {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.purge_shader_cache) return;
+    try {
+        const resStr = await window.pywebview.api.purge_shader_cache();
+        const res = typeof resStr === 'string' ? JSON.parse(resStr) : resStr;
+        if (res && res.success) {
+            const freed = res.freed_mb || 0;
+            const count = res.deleted_files || 0;
+            if (typeof showToast === 'function') {
+                showToast(`Shader cache purged: ${freed} MB freed (${count} files removed).`, 'success');
+            }
+            const sizeEl = document.getElementById('shader-modal-size-val');
+            if (sizeEl) sizeEl.innerText = '0 MB';
+            await loadSystemTuningStatus(false);
+        } else {
+            const msg = (res && res.error) ? res.error : "Unable to delete some locked cache files.";
+            if (typeof showToast === 'function') {
+                showToast(`Partial cleanup: ${msg}`, 'warning');
+            }
+        }
+    } catch (e) {
+        console.error("Error purging shader cache:", e);
+        if (typeof showToast === 'function') {
+            showToast(`Error: ${e.message || e}`, 'error');
+        }
+    }
+}
+window.purgeShaderCacheDirect = purgeShaderCacheDirect;
+
+function openGpuDriverModal() {
+    const modal = document.getElementById('modal-gpu-driver-settings');
+    if (!modal) return;
+
+    let gpuName = 'NVIDIA GeForce RTX';
+    let currentDrv = 'Detected';
+    let latestDrv = 'Up to date';
+    let isOptimal = true;
+
+    if (window._systemHardwareSpecs && window._systemHardwareSpecs.detected && window._systemHardwareSpecs.detected.gpu) {
+        const g = window._systemHardwareSpecs.detected.gpu;
+        if (g.name) gpuName = g.name;
+        if (g.driver_version) currentDrv = g.driver_version;
+        if (g.latest_driver_version) latestDrv = g.latest_driver_version;
+        if (g.is_driver_outdated) isOptimal = false;
+    } else if (systemTuningData && Array.isArray(systemTuningData.checks)) {
+        const gp = systemTuningData.checks.find(c => c.id === 'gpu_app' || c.id === 'gpu_driver');
+        if (gp) {
+            isOptimal = !!gp.is_optimal;
+            if (gp.value_label) currentDrv = gp.value_label;
+        }
+    }
+
+    const nameEl = document.getElementById('gpu-modal-name');
+    const curDrvEl = document.getElementById('gpu-modal-current-drv');
+    const latDrvEl = document.getElementById('gpu-modal-latest-drv');
+    const badgeEl = document.getElementById('gpu-modal-status-badge');
+
+    if (nameEl) nameEl.innerText = gpuName;
+    if (curDrvEl) curDrvEl.innerText = currentDrv;
+    if (latDrvEl) latDrvEl.innerText = latestDrv;
+    if (badgeEl) {
+        if (isOptimal) {
+            badgeEl.className = 'px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-500 text-slate-950';
+            badgeEl.innerText = 'OPTIMAL';
+        } else {
+            badgeEl.className = 'px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-amber-500 text-slate-950';
+            badgeEl.innerText = 'UPDATE RECOMMENDED';
+        }
+    }
+
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+    if (window.modalWindowManager) {
+        window.modalWindowManager.bringToFront(modal);
+        if (!modal._hasBeenDragged) {
+            window.modalWindowManager.centerModal(modal);
+        }
+    }
+}
+window.openGpuDriverModal = openGpuDriverModal;
+
+function closeGpuDriverModal() {
+    const modal = document.getElementById('modal-gpu-driver-settings');
+    if (modal) {
+        modal.classList.add('hidden');
+        modal.style.display = 'none';
+    }
+}
+window.closeGpuDriverModal = closeGpuDriverModal;
+
+function openExternalUrl(url) {
+    if (!url) return;
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.open_external_url) {
+        window.pywebview.api.open_external_url(url);
+    } else {
+        window.open(url, '_blank');
+    }
+}
+window.openExternalUrl = openExternalUrl;
+
+// =========================================================================
+// TAB 3: SIM MAINTENANCE (SAFE UPDATE MODE + MSFS & SHADER CACHE CLEANER)
+// =========================================================================
+
+async function loadSimMaintenanceStatus(showFeedback = false) {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.get_sim_maintenance_status) return;
+    const container = document.getElementById('rig-maint-cards-container');
+    try {
+        const resStr = await window.pywebview.api.get_sim_maintenance_status();
+        const data = typeof resStr === 'string' ? JSON.parse(resStr) : resStr;
+        if (data && data.status === 'success') {
+            simMaintenanceData = data;
+            renderSimMaintenance(data);
+            if (showFeedback && typeof showToast === 'function') {
+                showToast(`Maintenance scan complete: ${data.total_reclaimable_formatted || '0 B'} reclaimable across ${data.cleanable_categories || 0} cache categories.`, 'info');
+            }
+        }
+        if (window.windowManager) {
+            requestAnimationFrame(() => {
+                window.windowManager.autoTileWindows();
+            });
+        }
+    } catch (err) {
+        console.error("Error loading sim maintenance status:", err);
+        if (container) {
+            container.innerHTML = `
+                <div class="p-3 rounded bg-[#0E121A] border border-[#EF4444]/40 text-xs text-[#EF4444]">
+                    Error scanning MSFS caches: ${err.message || err}
+                </div>
+            `;
+        }
+    }
+}
+window.loadSimMaintenanceStatus = loadSimMaintenanceStatus;
+
+function renderSimMaintenance(data) {
+    if (!data) return;
+    const safeUpdate = data.safe_update || {};
+    const isQuarantined = !!safeUpdate.is_quarantined;
+
+    const safeBar = document.getElementById('rig-maint-safe-update-bar');
+    const safeBadge = document.getElementById('rig-maint-safe-badge');
+    const safeSub = document.getElementById('rig-maint-safe-subtitle');
+    const safeBtn = document.getElementById('rig-btn-safe-update');
+
+    if (safeBar) {
+        safeBar.className = 'p-3.5 rounded-lg bg-[#181E2B] border border-[#253046] flex items-center justify-between gap-3';
+    }
+    if (safeBadge) {
+        if (isQuarantined) {
+            safeBadge.className = 'px-2 py-0.5 rounded text-[10px] font-sans font-bold uppercase tracking-wider bg-[#F59E0B] text-[#0E121A]';
+            safeBadge.innerText = 'QUARANTINED';
+        } else {
+            safeBadge.className = 'px-2 py-0.5 rounded text-[10px] font-sans font-bold uppercase tracking-wider bg-[#10B981] text-[#0E121A]';
+            safeBadge.innerText = 'READY';
+        }
+    }
+    if (safeSub) {
+        safeSub.innerText = safeUpdate.summary_text || 'Park your Community folders before updating MSFS, then restore them in one click.';
+    }
+    if (safeBtn) {
+        if (isQuarantined) {
+            safeBtn.className = 'px-3.5 py-1.5 rounded text-xs font-bold uppercase tracking-wider bg-[#F59E0B] hover:bg-[#D97706] text-[#0E121A] transition-colors cursor-pointer border-0 whitespace-nowrap';
+            safeBtn.innerText = 'RESTORE COMMUNITY';
+        } else {
+            safeBtn.className = 'px-3.5 py-1.5 rounded text-xs font-bold uppercase tracking-wider bg-[#10B981] hover:bg-[#059669] text-[#0E121A] transition-colors cursor-pointer border-0 whitespace-nowrap';
+            safeBtn.innerText = 'PREPARE FOR UPDATE';
+        }
+    }
+
+    const sumSub = document.getElementById('rig-maint-summary-subtitle');
+    const purgeAllBtn = document.getElementById('rig-btn-purge-all-caches');
+    const totalFmt = data.total_reclaimable_formatted || '0 B';
+    const cleanableCount = data.cleanable_categories || 0;
+
+    if (sumSub) {
+        if (cleanableCount > 0) {
+            sumSub.innerText = `${cleanableCount} cache categor${cleanableCount === 1 ? 'y' : 'ies'} with ${totalFmt} of temporary or compiled data ready to clean.`;
+        } else {
+            sumSub.innerText = 'All MSFS & GPU shader caches are clean (0 B to remove).';
+        }
+    }
+    if (purgeAllBtn) {
+        if (cleanableCount > 0) {
+            purgeAllBtn.className = 'px-3.5 py-1.5 rounded text-xs font-bold uppercase tracking-wider bg-[#10B981] hover:bg-[#059669] text-[#0E121A] transition-colors cursor-pointer border-0 whitespace-nowrap';
+        } else {
+            purgeAllBtn.className = 'px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider bg-[#181E2B] text-[#64748B] border border-[#253046] cursor-default whitespace-nowrap';
+        }
+    }
+
+    const container = document.getElementById('rig-maint-cards-container');
+    if (!container) return;
+
+    const items = Array.isArray(data.items) ? data.items : [];
+    container.innerHTML = items.map(item => {
+        const isClean = !!item.is_clean;
+        const valColor = isClean ? 'text-[#10B981]' : 'text-[#F59E0B]';
+        const btnHtml = isClean
+            ? `<span class="bg-[#181E2B] text-[#64748B] border border-[#253046] text-[10px] font-sans font-bold uppercase px-2.5 py-1 rounded tracking-wide shrink-0">CLEAN</span>`
+            : `<button onclick="runSimMaintenanceAction('${item.id}')" class="px-3 py-1 rounded text-[11px] font-sans font-bold uppercase tracking-wider bg-[#181E2B] hover:bg-[#253046] text-[#F1F5F9] border border-[#2D3A54] transition-colors cursor-pointer shrink-0">${item.action_label || 'PURGE'}</button>`;
+
+        return `
+            <div class="p-3 rounded-lg bg-[#0E121A] border border-[#253046] flex items-center justify-between gap-3">
+                <div class="space-y-0.5 min-w-0 flex-1">
+                    <span class="text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B] block">${item.category || 'MAINTENANCE'}</span>
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <span class="text-xs font-bold text-[#F1F5F9]">${item.title}</span>
+                        <span class="text-[11px] font-semibold ${valColor}">${item.value_label || ''}</span>
+                    </div>
+                    <div class="text-[11px] text-[#94A3B8] leading-snug">${item.desc || ''}</div>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    ${btnHtml}
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+window.renderSimMaintenance = renderSimMaintenance;
+
+async function toggleCommunitySafeUpdateMode() {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.toggle_community_safe_update_mode) return;
+    try {
+        const resStr = await window.pywebview.api.toggle_community_safe_update_mode();
+        const res = typeof resStr === 'string' ? JSON.parse(resStr) : resStr;
+        if (res && res.status === 'success') {
+            if (res.maintenance) {
+                simMaintenanceData = res.maintenance;
+                renderSimMaintenance(res.maintenance);
+            } else {
+                await loadSimMaintenanceStatus(false);
+            }
+            if (typeof showToast === 'function') {
+                showToast(res.message || 'Safe Update Mode updated.', 'success');
+            }
+        } else {
+            if (typeof showToast === 'function') {
+                showToast((res && res.message) ? res.message : 'Unable to toggle Safe Update Mode.', 'warning');
+            }
+        }
+    } catch (err) {
+        console.error("Error toggling Safe Update Mode:", err);
+        if (typeof showToast === 'function') {
+            showToast(`Error: ${err.message || err}`, 'error');
+        }
+    }
+}
+window.toggleCommunitySafeUpdateMode = toggleCommunitySafeUpdateMode;
+
+async function runSimMaintenanceAction(actionId) {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.run_sim_maintenance_action) return;
+    try {
+        const resStr = await window.pywebview.api.run_sim_maintenance_action(actionId);
+        const res = typeof resStr === 'string' ? JSON.parse(resStr) : resStr;
+        if (res && res.status === 'success') {
+            if (res.maintenance) {
+                simMaintenanceData = res.maintenance;
+                renderSimMaintenance(res.maintenance);
+            } else {
+                await loadSimMaintenanceStatus(false);
+            }
+            if (typeof showToast === 'function') {
+                showToast(res.message || 'Maintenance cleanup complete.', 'success');
+            }
+        } else {
+            if (typeof showToast === 'function') {
+                showToast((res && res.message) ? res.message : 'Maintenance action blocked.', 'warning');
+            }
+        }
+    } catch (err) {
+        console.error("Error running maintenance action:", err);
+        if (typeof showToast === 'function') {
+            showToast(`Error: ${err.message || err}`, 'error');
+        }
+    }
+}
+window.runSimMaintenanceAction = runSimMaintenanceAction;
+
+let pendingSystemTuningPopup = false;
+function checkFirstSystemTuningScanOnStartup(force = false) {
+    if (window.IS_LITE) return;
+    try {
+        const hasSeen = localStorage.getItem('sceneryx_has_seen_system_tuning');
+        if (force || hasSeen !== 'true') {
+            const bgModal = document.getElementById('background-tools-modal');
+            const isBgOpen = bgModal && !bgModal.classList.contains('hidden') && bgModal.style.display !== 'none';
+            if (isBgOpen) {
+                pendingSystemTuningPopup = true;
+                return;
+            }
+            localStorage.setItem('sceneryx_has_seen_system_tuning', 'true');
+            pendingSystemTuningPopup = false;
+            setTimeout(() => {
+                if (typeof openFloatingWindow === 'function') {
+                    openFloatingWindow('my_rig');
+                    if (typeof switchRigTab === 'function') switchRigTab('tuning');
+                    if (typeof loadSystemTuningStatus === 'function') loadSystemTuningStatus(true);
+                }
+            }, 400);
+        }
+    } catch (e) {
+        console.warn("Error checking first system tuning scan:", e);
+    }
+}
+window.checkFirstSystemTuningScanOnStartup = checkFirstSystemTuningScanOnStartup;
 
 function switchMsfsGraphicsMode(mode, resetPage = false) {
     currentMsfsGraphicsMode = mode;
@@ -23056,43 +24939,79 @@ function closeHzCadenceModal() {
 }
 
 async function selectCadenceDisplay(displayId) {
+    if (!displayId) return;
     localStorage.setItem('sceneryx_selected_display_id', displayId);
+
+    // 1. Immediately calculate 1/2 sync target FPS for the selected display
+    let screenHz = 60;
+    let screenName = `${displayId} Monitor`;
+    let targetFps = 60;
+
+    const allDisplays = (rigDiagnosticsData && rigDiagnosticsData.detected && Array.isArray(rigDiagnosticsData.detected.all_displays))
+        ? rigDiagnosticsData.detected.all_displays
+        : [];
+
+    const found = allDisplays.find(d => d.id === displayId || String(d.index) === String(displayId));
+    if (found) {
+        screenHz = found.refresh_rate_int || Math.round(found.refresh_rate_hz || 60);
+        screenName = found.formatted || found.name || `${screenHz} Hz Monitor`;
+    }
+
+    if (screenHz >= 240) targetFps = 120;
+    else if (screenHz >= 180) targetFps = 90;
+    else if (screenHz >= 165) targetFps = 82;
+    else if (screenHz >= 144) targetFps = 72;
+    else if (screenHz >= 120) targetFps = 60;
+    else if (screenHz >= 75) targetFps = Math.round(screenHz / 2);
+    else targetFps = 60;
+
+    // 2. Single-click guarantee: immediately write target frame rate into UserCfg.opt
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.update_msfs_setting) {
+        try {
+            await window.pywebview.api.update_msfs_setting('2D', 'max_frame_rate', String(targetFps));
+        } catch (e) {
+            console.warn("[DisplayCadence] Could not update max_frame_rate:", e);
+        }
+    }
+
+    // 3. Immediately update in-memory settings matrix so UI reflects the new target FPS instantly
+    if (msfsSettingsMatrixData && msfsSettingsMatrixData.matrix_2d) {
+        const it2D = msfsSettingsMatrixData.matrix_2d.find(x => x.key === 'max_frame_rate');
+        if (it2D) {
+            it2D.value = `${targetFps} FPS`;
+            it2D.raw_value = String(targetFps);
+            it2D.is_active = true;
+            it2D.rating_color = 'emerald';
+            it2D.rating_label = 'OPTIMUM';
+            it2D.tag_reason = `Display refresh rate: ${screenHz} Hz. 1/2 sync target locks framerate to exact sub-multiple.`;
+            it2D.rec_guidance = `${targetFps} FPS — Display refresh rate divided by 2 (${screenHz}Hz / 2)`;
+        }
+    }
+
+    // 4. Reload full diagnostics to update MY RIG card and all settings
     await loadRigDiagnostics();
 
-    // Dynamically refresh cadence modal targets if open
+    // 5. If cadence modal is open, dynamically refresh its elements
     const modal = document.getElementById('opt-hz-cadence-modal');
     if (modal && modal.style.display !== 'none' && rigDiagnosticsData && rigDiagnosticsData.detected) {
         const det = rigDiagnosticsData.detected;
         const disp = det.display;
-        const screenHz = disp ? Math.round(disp.refresh_rate_hz || disp.refresh_rate_int || 60) : 60;
-        const screenName = (disp && disp.formatted) ? disp.formatted : `${screenHz} Hz Monitor`;
-        let screenTargetFps = 60;
-        if (screenHz >= 240) screenTargetFps = 120;
-        else if (screenHz >= 180) screenTargetFps = 90;
-        else if (screenHz >= 165) screenTargetFps = 82;
-        else if (screenHz >= 144) screenTargetFps = 72;
-        else if (screenHz >= 120) screenTargetFps = 60;
-        else if (screenHz >= 75) screenTargetFps = Math.round(screenHz / 2);
-        else screenTargetFps = 60;
+        const sHz = disp ? Math.round(disp.refresh_rate_hz || disp.refresh_rate_int || screenHz) : screenHz;
+        const sName = (disp && disp.formatted) ? disp.formatted : screenName;
 
         const scrHzEl = document.getElementById('cadence-detected-2d-hz');
         const scrDescEl = document.getElementById('cadence-detected-2d-desc');
         const scrTargetEl = document.getElementById('cadence-target-2d-fps');
-        if (scrHzEl) scrHzEl.textContent = `${screenHz} Hz`;
-        if (scrDescEl) scrDescEl.textContent = screenName;
-        if (scrTargetEl) scrTargetEl.textContent = `${screenTargetFps} FPS (1/2 SYNC)`;
+        if (scrHzEl) scrHzEl.textContent = `${sHz} Hz`;
+        if (scrDescEl) scrDescEl.textContent = sName;
+        if (scrTargetEl) scrTargetEl.textContent = `${targetFps} FPS (1/2 SYNC)`;
 
-        // Automatically update TargetFrameRate in UserCfg.opt for this display
-        if (window.pywebview && window.pywebview.api && window.pywebview.api.update_msfs_setting) {
-            await window.pywebview.api.update_msfs_setting('2D', 'max_frame_rate', String(screenTargetFps));
-        }
-
-        // Re-render display selector cards
+        // Re-render display selector cards in modal
         if (det.all_displays && det.all_displays.length > 1) {
             const displaysList = document.getElementById('cadence-displays-list');
             if (displaysList) {
                 displaysList.innerHTML = det.all_displays.map(d => {
-                    const isSel = (d.id === disp.id || String(d.index) === String(disp.id));
+                    const isSel = (d.id === (disp ? disp.id : displayId) || String(d.index) === String(disp ? disp.id : displayId));
                     return `
                         <div onclick="selectCadenceDisplay('${d.id}')" class="p-2.5 rounded-xl border ${isSel ? 'bg-cyan-950/70 border-cyan-500 text-white font-bold' : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'} cursor-pointer transition-all flex items-center justify-between text-xs">
                             <div class="truncate">
@@ -23599,7 +25518,7 @@ function renderCustomProfilesDropdownList() {
     let toolbarHtml = '';
     if (hasMultiSelection) {
         toolbarHtml = `
-            <div class="sticky top-0 z-20 px-3 py-1.5 bg-slate-900 border-b border-slate-700/80 flex items-center justify-between text-xs backdrop-blur-md">
+            <div class="sticky top-0 z-20 px-3 py-1.5 bg-[#0f172a] border-b border-[#334155] flex items-center justify-between text-xs">
                 <div class="flex items-center gap-2">
                     <span class="text-blue-400 font-semibold text-[11px]">${multiSelectedProfileIds.size} selected</span>
                     <button onclick="event.stopPropagation(); clearProfileMultiSelection();" class="text-slate-400 hover:text-white underline text-[10px] cursor-pointer">Clear</button>
@@ -23619,16 +25538,30 @@ function renderCustomProfilesDropdownList() {
         const isCurrentActive = Boolean(p.is_active || (activeProfile && p.id === activeProfile.id));
         const dateFormatted = formatProfileDate(p.created_at);
         const activeBadge = isCurrentActive 
-            ? `<span class="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-600 text-white shadow-sm uppercase tracking-wider whitespace-nowrap leading-none">ACTIVE</span>`
+            ? `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#10b981] text-white uppercase tracking-wider whitespace-nowrap leading-none select-none">ACTIVE</span>`
             : '';
 
-        let rowBgClass = 'hover:bg-slate-800';
+        let modeBadge = '';
+        if (p.id === 'profile_vr_airliner_glass_cockpit' || (p.name && p.name.includes('Airliner'))) {
+            modeBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#0284c7] text-white leading-none tracking-wider whitespace-nowrap select-none">TAA - LINER</span>`;
+        } else if (p.id === 'profile_vr_bush_fast_vfr' || (p.name && p.name.includes('Bush'))) {
+            modeBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#d97706] text-white leading-none tracking-wider whitespace-nowrap select-none">OFXR - BUSH</span>`;
+        } else if (p.id === 'profile_vr_headset_standard' || (p.name && p.name.includes('VR Headset'))) {
+            modeBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#7c3aed] text-white leading-none tracking-wider whitespace-nowrap select-none">VR</span>`;
+        } else if (p.id === 'profile_2d_display_standard' || (p.name && p.name.includes('2D Display'))) {
+            modeBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-[#475569] text-white leading-none tracking-wider whitespace-nowrap select-none">2D</span>`;
+        } else if (p.tag) {
+            const cleanTag = String(p.tag).replace(/\s*•\s*/g, ' - ').trim();
+            modeBadge = `<span class="px-1.5 py-0.5 rounded text-[9px] font-semibold bg-[#475569] text-white leading-none whitespace-nowrap select-none">${escapeHtml(cleanTag)}</span>`;
+        }
+
+        let rowBgClass = 'bg-[#181E2B] hover:bg-[#20293A]';
         if (isMultiSelected) {
-            rowBgClass = 'bg-blue-600/25 border-l-2 border-blue-400 hover:bg-blue-600/30';
+            rowBgClass = 'bg-[#1E293B] border-l-2 border-[#38BDF8] hover:bg-[#27354D]';
         } else if (isCurrentActive) {
-            rowBgClass = 'bg-slate-800/80 border-l-2 border-emerald-500 hover:bg-slate-800';
+            rowBgClass = 'bg-[#1E2638] border-l-2 border-[#10B981] hover:bg-[#253046]';
         } else if (p.id === selectedProfileId) {
-            rowBgClass = 'bg-slate-800/40 border-l-2 border-slate-500 hover:bg-slate-800';
+            rowBgClass = 'bg-[#1C2333] border-l-2 border-[#64748B] hover:bg-[#232D42]';
         }
 
         const checkboxIcon = hasMultiSelection
@@ -23643,7 +25576,10 @@ function renderCustomProfilesDropdownList() {
                 <div class="flex items-center min-w-0 pr-2">
                     ${checkboxIcon}
                     <div class="flex flex-col min-w-0">
-                        <span class="typo-input-val font-semibold text-xs text-slate-100 truncate">${escapeHtml(p.name)}</span>
+                        <div class="flex items-center gap-1.5">
+                            <span class="typo-input-val font-semibold text-xs text-slate-100 truncate">${escapeHtml(p.name)}</span>
+                            ${modeBadge}
+                        </div>
                         <span class="typo-metadata tabular-nums text-[10px] text-slate-400">${dateFormatted}</span>
                     </div>
                 </div>
@@ -23651,12 +25587,12 @@ function renderCustomProfilesDropdownList() {
                     ${activeBadge}
                     <button onclick="event.stopPropagation(); requestRenameCustomProfile('${p.id}')"
                             title="Rename '${escapeHtml(p.name)}'"
-                            class="w-6 h-6 flex items-center justify-center rounded-md hover:bg-slate-700 text-slate-400 hover:text-blue-400 transition-colors cursor-pointer border-0 bg-transparent">
+                            class="w-6 h-6 flex items-center justify-center rounded-md hover:bg-[#253046] text-slate-400 hover:text-[#38BDF8] transition-colors cursor-pointer border-0 bg-transparent">
                         <i class="fa-solid fa-pen text-[10px] pointer-events-none"></i>
                     </button>
                     <button onclick="event.stopPropagation(); requestDeleteCustomProfileById('${p.id}')"
                             title="Delete '${escapeHtml(p.name)}' (${dateFormatted})"
-                            class="w-6 h-6 flex items-center justify-center rounded-md hover:bg-blue-500/20 text-slate-400 hover:text-blue-400 transition-colors cursor-pointer border-0 bg-transparent">
+                            class="w-6 h-6 flex items-center justify-center rounded-md hover:bg-[#3B1824] text-slate-400 hover:text-rose-400 transition-colors cursor-pointer border-0 bg-transparent">
                         <i class="fa-solid fa-trash-can text-xs pointer-events-none"></i>
                     </button>
                 </div>
@@ -23730,6 +25666,10 @@ function toggleProfileDropdown(event) {
         listEl.style.left = `${rect.left}px`;
         listEl.style.width = `${rect.width}px`;
         listEl.style.zIndex = '99999';
+        listEl.style.backgroundColor = '#181E2B';
+        listEl.style.backdropFilter = 'none';
+        listEl.style.webkitBackdropFilter = 'none';
+        listEl.style.opacity = '1';
 
         // Check if opening downwards would be cramped (less than 220px) and there's more space above
         if (spaceBelow < 220 && spaceAbove > spaceBelow) {
@@ -23944,6 +25884,7 @@ let modalOfxrTargetFps = 36;
 let pendingBackgroundToolsCheck = false;
 
 async function checkBackgroundToolsOnStartup() {
+    if (window.IS_LITE) return;
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.check_background_tools) return;
 
     // If onboarding tour has not been seen yet, postpone background tools modal!
@@ -23959,7 +25900,11 @@ async function checkBackgroundToolsOnStartup() {
         hasSeenOnboarding = (localStorage.getItem('sceneryx_has_seen_onboarding') === 'true');
     }
 
-    if (!hasSeenOnboarding) {
+    const conflictModal = document.getElementById('conflict-resolution-modal');
+    const isConflictOpen = conflictModal && !conflictModal.classList.contains('hidden');
+    const rescanModal = document.getElementById('rescan-modal');
+    const isRescanOpen = rescanModal && !rescanModal.classList.contains('hidden');
+    if (!hasSeenOnboarding || pendingConflictModal || isConflictOpen || isRescanOpen) {
         pendingBackgroundToolsCheck = true;
         return;
     }
@@ -23971,10 +25916,20 @@ async function checkBackgroundToolsOnStartup() {
         if (!data) return;
 
         // If user selected "Remember my choice", skip modal
-        if (data.remember_choice) return;
+        if (data.remember_choice) {
+            if (typeof checkFirstSystemTuningScanOnStartup === 'function') {
+                checkFirstSystemTuningScanOnStartup();
+            }
+            return;
+        }
 
         // If neither AutoFPS nor OFXR is running, nothing to prompt
-        if (!data.autofps_running && !data.ofxr_running) return;
+        if (!data.autofps_running && !data.ofxr_running) {
+            if (typeof checkFirstSystemTuningScanOnStartup === 'function') {
+                checkFirstSystemTuningScanOnStartup();
+            }
+            return;
+        }
 
         openBackgroundToolsModal(data);
     } catch (e) {
@@ -23988,6 +25943,10 @@ function triggerPendingBackgroundToolsCheck() {
         setTimeout(() => {
             checkBackgroundToolsOnStartup();
         }, 600);
+    } else {
+        if (typeof checkFirstSystemTuningScanOnStartup === 'function') {
+            checkFirstSystemTuningScanOnStartup();
+        }
     }
 }
 window.triggerPendingBackgroundToolsCheck = triggerPendingBackgroundToolsCheck;
@@ -24076,6 +26035,11 @@ function closeBackgroundToolsModal() {
     if (modal) {
         modal.classList.add('hidden');
         modal.classList.remove('flex');
+    }
+    if (pendingSystemTuningPopup || localStorage.getItem('sceneryx_has_seen_system_tuning') !== 'true') {
+        if (typeof checkFirstSystemTuningScanOnStartup === 'function') {
+            checkFirstSystemTuningScanOnStartup(true);
+        }
     }
 }
 
@@ -24860,6 +26824,10 @@ async function openUserCfgFolderLocation() {
 // -------------------------------------------------------------------------
 
 async function toggleBlackboxRecording() {
+    if (window.IS_LITE) {
+        showUnlockProModal();
+        return;
+    }
     if (!window.pywebview || !window.pywebview.api) return;
     const btn = document.getElementById('opt-btn-record');
     const btnText = document.getElementById('opt-rec-btn-text');
@@ -24893,8 +26861,18 @@ async function toggleBlackboxRecording() {
         try {
             const resStr = await window.pywebview.api.start_flight_blackbox(flightName, dep, arr, studio);
             isBlackboxRunning = true;
+            window.currentBlackboxElapsedStr = "00:00";
+            window._telemetryFpsHistory = [];
             if (btnText) btnText.textContent = "STOP MONITORING";
             if (btn) btn.className = "h-8 sm:h-9 px-3 sm:px-3.5 rounded-md bg-[#EF4444] hover:bg-rose-500 text-white font-sans font-bold tracking-wider text-xs transition-all cursor-pointer active:scale-95 inline-flex items-center justify-center shadow-md uppercase leading-none select-none whitespace-nowrap shrink-0";
+            const sideBadge = document.getElementById('classic-badge-telemetry');
+            if (sideBadge) {
+                sideBadge.textContent = "00:00";
+                sideBadge.className = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#10B981] text-white shadow-sm';
+            }
+            if (typeof startBlackboxTelemetryPolling === 'function') {
+                startBlackboxTelemetryPolling();
+            }
             if (typeof showToast === 'function') showToast("Flight telemetry monitoring started!", "success");
         } catch (e) {
             if (typeof showToast === 'function') showToast("Error starting recording: " + e, "error");
@@ -24904,11 +26882,24 @@ async function toggleBlackboxRecording() {
             const resStr = await window.pywebview.api.stop_flight_blackbox();
             const res = typeof resStr === 'string' ? JSON.parse(resStr) : resStr;
             isBlackboxRunning = false;
+            window.currentBlackboxElapsedStr = "00:00";
+            window._telemetryFpsHistory = [];
+            drawTelemetrySparkline('opt-sparkline-canvas', []);
+            const trendEl = document.getElementById('opt-trend-delta');
+            if (trendEl) {
+                trendEl.textContent = 'STANDBY';
+                trendEl.className = 'text-[10px] font-mono font-bold text-[#94A3B8]';
+            }
             if (btnText) btnText.textContent = "START MONITORING";
             if (btn) btn.className = "h-8 sm:h-9 px-3 sm:px-3.5 rounded-md bg-[#00A8FF] hover:bg-[#38BDF8] text-[#0F1115] font-sans font-bold tracking-wider text-xs transition-all cursor-pointer active:scale-95 inline-flex items-center justify-center shadow-md uppercase leading-none select-none whitespace-nowrap shrink-0";
             
             const timerEl = document.getElementById('opt-blackbox-timer');
             if (timerEl) timerEl.textContent = "00:00";
+            const sideBadge = document.getElementById('classic-badge-telemetry');
+            if (sideBadge) {
+                sideBadge.textContent = "00:00";
+                sideBadge.className = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#161920] text-[#64748B] border border-[#2A3241]';
+            }
 
             const acEl = document.getElementById('opt-live-aircraft');
             if (acEl) { acEl.textContent = "Not detected"; acEl.title = "Not detected"; }
@@ -24996,38 +26987,68 @@ function drawTelemetrySparkline(canvasId, dataPoints) {
 }
 
 function startBlackboxTelemetryPolling() {
+    if (window.IS_LITE) return;
     if (blackboxTelemetryInterval) clearInterval(blackboxTelemetryInterval);
+    let idleTickCounter = 0;
     blackboxTelemetryInterval = setInterval(async () => {
         const modal = document.getElementById('flight-optimizer-modal');
         const floatTelem = document.getElementById('float-win-telemetry');
         const isTelemOpen = (modal && !modal.classList.contains('hidden') && currentOptimizerTab === 'blackbox') ||
                             (floatTelem && !floatTelem.classList.contains('hidden'));
-        if (!isTelemOpen && !isBlackboxRunning) return;
+        if (!isTelemOpen && !isBlackboxRunning) {
+            idleTickCounter = (idleTickCounter + 1) % 2;
+            if (idleTickCounter !== 0) return;
+        }
         if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.get_live_blackbox_telemetry) return;
 
         try {
             const resStr = await window.pywebview.api.get_live_blackbox_telemetry();
             const telem = JSON.parse(resStr);
+            if (!telem || telem.error) return;
 
-            // 1. Live Timer
+            // 1. Live Timer (Floating window + Sidebar TELEMETRY badge)
             const timerEl = document.getElementById('opt-blackbox-timer');
-            if (timerEl) {
-                if (telem.is_tracking && telem.elapsed_str) {
-                    timerEl.textContent = telem.elapsed_str;
-                } else if (!telem.is_tracking) {
-                    timerEl.textContent = "00:00";
+            const sideBadge = document.getElementById('classic-badge-telemetry');
+            if (telem.is_tracking) {
+                const elStr = telem.elapsed_str || "00:00";
+                window.currentBlackboxElapsedStr = elStr;
+                if (timerEl) timerEl.textContent = elStr;
+                if (sideBadge) {
+                    sideBadge.textContent = elStr;
+                    sideBadge.className = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#10B981] text-white shadow-sm';
+                }
+            } else {
+                window.currentBlackboxElapsedStr = "00:00";
+                if (timerEl) timerEl.textContent = "00:00";
+                if (sideBadge) {
+                    sideBadge.textContent = "00:00";
+                    sideBadge.className = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#161920] text-[#64748B] border border-[#2A3241]';
                 }
             }
 
-            // 2. Auto-stop transition detection
-            if (isBlackboxRunning && !telem.is_tracking) {
+            // 2. Bidirectional transition detection (In-Game Panel <-> SceneryX Desktop)
+            if (!isBlackboxRunning && telem.is_tracking) {
+                isBlackboxRunning = true;
+                window._telemetryFpsHistory = [];
+                const btn = document.getElementById('opt-btn-record');
+                const btnText = document.getElementById('opt-rec-btn-text');
+                if (btnText) btnText.textContent = "STOP MONITORING";
+                if (btn) btn.className = "h-8 sm:h-9 px-3 sm:px-3.5 rounded-md bg-[#EF4444] hover:bg-rose-500 text-white font-sans font-bold tracking-wider text-xs transition-all cursor-pointer active:scale-95 inline-flex items-center justify-center shadow-md uppercase leading-none select-none whitespace-nowrap shrink-0";
+            } else if (isBlackboxRunning && !telem.is_tracking) {
                 isBlackboxRunning = false;
+                window._telemetryFpsHistory = [];
+                drawTelemetrySparkline('opt-sparkline-canvas', []);
+                const trendEl = document.getElementById('opt-trend-delta');
+                if (trendEl) {
+                    trendEl.textContent = 'STANDBY';
+                    trendEl.className = 'text-[10px] font-mono font-bold text-[#94A3B8]';
+                }
                 const btn = document.getElementById('opt-btn-record');
                 const btnText = document.getElementById('opt-rec-btn-text');
                 if (btnText) btnText.textContent = "START MONITORING";
-                if (btn) btn.className = "h-9 px-4 rounded-md bg-cyan-600 hover:bg-cyan-500 text-white font-bold tracking-wider text-xs transition-all cursor-pointer active:scale-95 inline-flex items-center justify-center shadow-md shadow-cyan-950/30 btn-elevate uppercase leading-none select-none";
+                if (btn) btn.className = "h-8 sm:h-9 px-3 sm:px-3.5 rounded-md bg-[#00A8FF] hover:bg-[#38BDF8] text-[#0F1115] font-sans font-bold tracking-wider text-xs transition-all cursor-pointer active:scale-95 inline-flex items-center justify-center shadow-md uppercase leading-none select-none whitespace-nowrap shrink-0";
                 if (typeof showToast === 'function') {
-                    showToast("Flight ended. Monitoring stopped automatically.", "info");
+                    showToast("Flight monitoring stopped.", "info");
                 }
                 refreshBenchmarksList();
             }
@@ -25089,8 +27110,8 @@ function startBlackboxTelemetryPolling() {
             // 5. Performance Monitoring HUD Metrics
             const fpsVal = document.getElementById('live-fps-val');
             const fpsBase = document.getElementById('live-fps-base');
-            if (fpsVal) fpsVal.textContent = telem.displayed_fps !== null ? `${telem.displayed_fps}` : '--';
-            if (fpsBase) fpsBase.textContent = telem.base_fps !== null ? `${telem.base_fps}` : '--';
+            if (fpsVal) fpsVal.textContent = (telem.displayed_fps !== null && telem.displayed_fps !== undefined) ? `${telem.displayed_fps}` : '--';
+            if (fpsBase) fpsBase.textContent = (telem.base_fps !== null && telem.base_fps !== undefined) ? `${telem.base_fps}` : '--';
 
             const mtVal = document.getElementById('live-mt-val');
             if (mtVal) {
@@ -25136,29 +27157,38 @@ function startBlackboxTelemetryPolling() {
                 cacheVal.textContent = (telem.cache_read_mbps !== undefined && telem.cache_read_mbps !== null) ? Number(telem.cache_read_mbps).toFixed(1) : '0.0';
             }
 
-            // Pacing status pill
+            // Pacing status pill - synchronized with in-game panel
             const pacingEl = document.getElementById('opt-pacing-status');
             if (pacingEl) {
-                const mt = telem.main_thread_ms;
-                if (mt !== null && mt !== undefined) {
-                    if (mt < 20) {
-                        pacingEl.textContent = 'OPTIMAL';
-                        pacingEl.className = 'px-2.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-[#059669] text-white';
-                    } else if (mt < 26) {
-                        pacingEl.textContent = 'GOOD';
-                        pacingEl.className = 'px-2.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-emerald-600 text-white';
-                    } else if (mt < 33.3) {
-                        pacingEl.textContent = 'FAIR';
-                        pacingEl.className = 'px-2.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-amber-600 text-white';
+                let pacing = telem.frame_pacing || (telem.perf && telem.perf.frame_pacing);
+                if (!pacing) {
+                    const baseFps = telem.base_fps;
+                    const mt = telem.main_thread_ms;
+                    if ((baseFps !== null && baseFps !== undefined && baseFps >= 35) || (mt !== null && mt !== undefined && mt < 25.0)) {
+                        pacing = 'OPTIMAL';
+                    } else if ((baseFps !== null && baseFps !== undefined && baseFps >= 24) || (mt !== null && mt !== undefined && mt <= 35.0)) {
+                        pacing = 'ACCEPTABLE';
+                    } else if (baseFps !== null || mt !== null) {
+                        pacing = 'HEAVY';
                     } else {
-                        pacingEl.textContent = 'HEAVY';
-                        pacingEl.className = 'px-2.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-rose-600 text-white';
+                        pacing = 'OPTIMAL';
                     }
+                }
+                pacing = String(pacing).toUpperCase();
+                if (pacing === 'OPTIMAL' || pacing === 'FLUIDE') {
+                    pacingEl.textContent = 'OPTIMAL';
+                    pacingEl.className = 'px-2.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-[#059669] text-white';
+                } else if (pacing === 'ACCEPTABLE' || pacing === 'GOOD' || pacing === 'FAIR' || pacing === 'CHARGE' || pacing === 'CHARGÉ') {
+                    pacingEl.textContent = 'ACCEPTABLE';
+                    pacingEl.className = 'px-2.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-amber-600 text-white';
+                } else {
+                    pacingEl.textContent = 'HEAVY';
+                    pacingEl.className = 'px-2.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-rose-600 text-white';
                 }
             }
 
-            // 6. Live 30s Sparkline & Trend Delta
-            if (telem.displayed_fps !== null && telem.displayed_fps !== undefined) {
+            // 6. Live 30s Sparkline & Trend Delta (ONLY while monitoring is active)
+            if (telem.is_tracking && telem.displayed_fps !== null && telem.displayed_fps !== undefined) {
                 window._telemetryFpsHistory = window._telemetryFpsHistory || [];
                 window._telemetryFpsHistory.push(Number(telem.displayed_fps));
                 if (window._telemetryFpsHistory.length > 30) {
@@ -25186,6 +27216,16 @@ function startBlackboxTelemetryPolling() {
                             trendEl.className = 'text-[10px] font-mono font-bold text-slate-300';
                         }
                     }
+                }
+            } else if (!telem.is_tracking) {
+                if (window._telemetryFpsHistory && window._telemetryFpsHistory.length > 0) {
+                    window._telemetryFpsHistory = [];
+                }
+                drawTelemetrySparkline('opt-sparkline-canvas', []);
+                const trendEl = document.getElementById('opt-trend-delta');
+                if (trendEl && trendEl.textContent !== 'STANDBY') {
+                    trendEl.textContent = 'STANDBY';
+                    trendEl.className = 'text-[10px] font-mono font-bold text-[#94A3B8]';
                 }
             }
 
@@ -25355,7 +27395,7 @@ function renderBenchmarksDropdownList() {
     let toolbarHtml = '';
     if (hasMultiSelection) {
         toolbarHtml = `
-            <div class="sticky top-0 z-20 px-3 py-1.5 bg-slate-900 border-b border-slate-700/80 flex items-center justify-between text-xs backdrop-blur-md">
+            <div class="sticky top-0 z-20 px-3 py-1.5 bg-[#0f172a] border-b border-[#334155] flex items-center justify-between text-xs">
                 <div class="flex items-center gap-2 font-mono">
                     <span class="text-cyan-400 font-semibold text-[11px]">${multiSelectedBenchmarkFiles.size} selected</span>
                     <button onclick="event.stopPropagation(); clearBenchmarkMultiSelection();" class="text-slate-400 hover:text-white underline text-[10px] cursor-pointer">Clear</button>
@@ -25375,11 +27415,11 @@ function renderBenchmarksDropdownList() {
         const isCurrentActive = selectedBenchmarkFilename === item.filename;
         const isNew = isBenchmarkReportNew(item.filename);
 
-        let rowBgClass = 'hover:bg-slate-800/80';
+        let rowBgClass = 'bg-[#181E2B] hover:bg-[#20293A]';
         if (isMultiSelected) {
-            rowBgClass = 'bg-cyan-600/25 border-l-2 border-cyan-400 hover:bg-cyan-600/30';
+            rowBgClass = 'bg-[#1E293B] border-l-2 border-cyan-400 hover:bg-[#27354D]';
         } else if (isCurrentActive) {
-            rowBgClass = 'bg-slate-800/60 hover:bg-slate-800';
+            rowBgClass = 'bg-[#1E2638] border-l-2 border-cyan-500 hover:bg-[#253046]';
         }
 
         const checkboxIcon = hasMultiSelection
@@ -25410,7 +27450,7 @@ function renderBenchmarksDropdownList() {
                     </button>
                     <button onclick="event.stopPropagation(); requestDeleteBenchmarkByFilename('${escapeJsStr(item.filename)}')"
                             title="Delete '${escapeHtml(item.filename)}'"
-                            class="w-6 h-6 flex items-center justify-center rounded-md hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-colors cursor-pointer border-0 bg-transparent">
+                            class="w-6 h-6 flex items-center justify-center rounded-md hover:bg-[#3B1824] text-slate-400 hover:text-rose-400 transition-colors cursor-pointer border-0 bg-transparent">
                         <i class="fa-solid fa-trash-can text-xs pointer-events-none"></i>
                     </button>
                 </div>
@@ -25567,65 +27607,117 @@ function formatCleanRouteDisplay(report) {
     if (!report) return "Direct";
 
     const icaoCityMap = {
-        'KEWR': 'Newark',
-        'KJFK': 'New York',
-        'KLGA': 'New York',
-        'KTEB': 'Teterboro',
-        'KFRG': 'Farmingdale',
-        'KHPN': 'White Plains',
-        'KISP': 'Islip',
-        'KBOS': 'Boston',
-        'KORD': 'Chicago',
-        'KMDW': 'Chicago',
-        'KLAX': 'Los Angeles',
-        'KSFO': 'San Francisco',
-        'KOAK': 'Oakland',
-        'KSJC': 'San Jose',
-        'KMIA': 'Miami',
-        'KFLL': 'Fort Lauderdale',
-        'KMCO': 'Orlando',
-        'KATL': 'Atlanta',
-        'KDFW': 'Dallas',
-        'KDAL': 'Dallas',
-        'KIAH': 'Houston',
-        'KHOU': 'Houston',
-        'KDEN': 'Denver',
-        'KSEA': 'Seattle',
-        'KPHX': 'Phoenix',
-        'KLAS': 'Las Vegas',
-        'EGLL': 'London',
-        'EGKK': 'London',
-        'EGSS': 'London',
-        'EGGW': 'London',
-        'EGLC': 'London',
-        'LFPG': 'Paris',
-        'LFPO': 'Paris',
-        'LFOB': 'Beauvais',
-        'EDDF': 'Frankfurt',
-        'EDDM': 'Munich',
-        'EDDB': 'Berlin',
-        'EHAM': 'Amsterdam',
-        'EBBR': 'Brussels',
-        'LSZH': 'Zurich',
-        'LSGG': 'Geneva',
-        'LOWW': 'Vienna',
-        'LIRF': 'Rome',
-        'LIMC': 'Milan',
-        'LEMD': 'Madrid',
-        'LEBL': 'Barcelona',
-        'LPPT': 'Lisbon',
-        'OMDB': 'Dubai',
-        'OMDW': 'Dubai',
-        'OTHH': 'Doha',
-        'RJTT': 'Tokyo',
-        'RJAA': 'Tokyo',
-        'VHHH': 'Hong Kong',
-        'WSSS': 'Singapore',
-        'YSSY': 'Sydney',
-        'YMML': 'Melbourne',
-        'CYVR': 'Vancouver',
-        'CYYZ': 'Toronto',
-        'CYUL': 'Montreal'
+        // North America
+        'KEWR': 'Newark', 'KJFK': 'New York', 'KLGA': 'New York', 'KTEB': 'Teterboro',
+        'KFRG': 'Farmingdale', 'KHPN': 'White Plains', 'KISP': 'Islip', 'KBOS': 'Boston',
+        'KORD': 'Chicago', 'KMDW': 'Chicago', 'KLAX': 'Los Angeles', 'KSFO': 'San Francisco',
+        'KOAK': 'Oakland', 'KSJC': 'San Jose', 'KMIA': 'Miami', 'KFLL': 'Fort Lauderdale',
+        'KMCO': 'Orlando', 'KATL': 'Atlanta', 'KDFW': 'Dallas', 'KDAL': 'Dallas',
+        'KIAH': 'Houston', 'KHOU': 'Houston', 'KDEN': 'Denver', 'KSEA': 'Seattle',
+        'KPHX': 'Phoenix', 'KLAS': 'Las Vegas', 'KIAD': 'Washington', 'KDCA': 'Washington',
+        'KBWI': 'Baltimore', 'KDTW': 'Detroit', 'KMSP': 'Minneapolis', 'KSTL': 'St. Louis',
+        'KCLT': 'Charlotte', 'KPHL': 'Philadelphia', 'KTPA': 'Tampa', 'KSAN': 'San Diego',
+        'KPDX': 'Portland', 'KSLC': 'Salt Lake City', 'KAUS': 'Austin', 'KBNA': 'Nashville',
+        'KRDU': 'Raleigh', 'KCVG': 'Cincinnati', 'KPIT': 'Pittsburgh', 'KCLE': 'Cleveland',
+        'KMKE': 'Milwaukee', 'KMSY': 'New Orleans', 'KBDL': 'Hartford', 'KPVD': 'Providence',
+        'KSNA': 'Santa Ana', 'KPBI': 'West Palm Beach', 'KRSW': 'Fort Myers', 'PHNL': 'Honolulu',
+        'PANC': 'Anchorage', 'CYVR': 'Vancouver', 'CYYZ': 'Toronto', 'CYUL': 'Montreal',
+        'CYYC': 'Calgary', 'CYEG': 'Edmonton', 'CYOW': 'Ottawa', 'CYHZ': 'Halifax', 'CYWG': 'Winnipeg',
+        'MMMX': 'Mexico City', 'MMSM': 'Mexico City', 'MMUN': 'Cancun', 'MMTJ': 'Tijuana', 'MMGL': 'Guadalajara',
+        // UK & Ireland
+        'EGLL': 'London', 'EGKK': 'London', 'EGSS': 'London', 'EGGW': 'London', 'EGLC': 'London',
+        'EGCC': 'Manchester', 'EGBB': 'Birmingham', 'EGPH': 'Edinburgh', 'EGPF': 'Glasgow',
+        'EGPK': 'Glasgow', 'EGGD': 'Bristol', 'EGGP': 'Liverpool', 'EGNT': 'Newcastle',
+        'EGNX': 'East Midlands', 'EGNM': 'Leeds', 'EGAA': 'Belfast', 'EGFF': 'Cardiff',
+        'EGPD': 'Aberdeen', 'EIDW': 'Dublin', 'EICK': 'Cork', 'EINN': 'Shannon', 'EIKN': 'Knock',
+        // France
+        'LFPG': 'Paris', 'LFPO': 'Paris', 'LFPB': 'Paris', 'LFOB': 'Beauvais',
+        'LFLL': 'Lyon', 'LFLY': 'Lyon', 'LFML': 'Marseille', 'LFMN': 'Nice',
+        'LFBO': 'Toulouse', 'LFBD': 'Bordeaux', 'LFRS': 'Nantes', 'LFQQ': 'Lille',
+        'LFSB': 'Basel-Mulhouse', 'LFST': 'Strasbourg', 'LFRB': 'Brest', 'LFRN': 'Rennes',
+        'LFMT': 'Montpellier', 'LFKJ': 'Ajaccio', 'LFKB': 'Bastia', 'LFKC': 'Calvi',
+        'LFKF': 'Figari', 'LFTH': 'Toulon', 'LFJL': 'Metz-Nancy', 'LFOP': 'Rouen',
+        'LFOT': 'Tours', 'LFOJ': 'Orleans', 'LFBP': 'Pau', 'LFBT': 'Tarbes-Lourdes',
+        'LFMP': 'Perpignan', 'LFTW': 'Nimes', 'LFBL': 'Limoges', 'LFBI': 'Poitiers',
+        'LFLS': 'Grenoble', 'LFLB': 'Chambery', 'LFLP': 'Annecy', 'LFMD': 'Cannes',
+        'LFBZ': 'Biarritz', 'LFBH': 'La Rochelle', 'LFRK': 'Caen', 'LFRG': 'Deauville',
+        'LFLC': 'Clermont-Ferrand', 'LFMU': 'Beziers', 'LFMK': 'Carcassonne', 'LFOK': 'Vatry',
+        // Germany, Benelux, Switzerland, Austria
+        'EDDF': 'Frankfurt', 'EDFH': 'Frankfurt-Hahn', 'EDDM': 'Munich', 'EDDB': 'Berlin',
+        'EDDT': 'Berlin', 'EDDL': 'Dusseldorf', 'EDDH': 'Hamburg', 'EDDS': 'Stuttgart',
+        'EDDK': 'Cologne', 'EDDV': 'Hannover', 'EDDP': 'Leipzig', 'EDDN': 'Nuremberg',
+        'EDDW': 'Bremen', 'EDLW': 'Dortmund', 'EDDG': 'Munster', 'EDSB': 'Karlsruhe',
+        'EDJA': 'Memmingen', 'EDNY': 'Friedrichshafen', 'EDLP': 'Paderborn', 'EDVK': 'Kassel',
+        'EHAM': 'Amsterdam', 'EHEH': 'Eindhoven', 'EHRD': 'Rotterdam', 'EHBK': 'Maastricht',
+        'EBBR': 'Brussels', 'EBCI': 'Charleroi', 'EBOS': 'Ostend', 'ELLX': 'Luxembourg',
+        'LSZH': 'Zurich', 'LSGG': 'Geneva', 'LSZB': 'Bern', 'LSZA': 'Lugano', 'LSZS': 'St. Moritz',
+        'LOWW': 'Vienna', 'LOWI': 'Innsbruck', 'LOWS': 'Salzburg', 'LOWG': 'Graz', 'LOWL': 'Linz', 'LOWK': 'Klagenfurt',
+        // Southern Europe (Greece, Italy, Spain, Portugal, Malta, Cyprus)
+        'LGAV': 'Athens', 'LGTS': 'Thessaloniki', 'LGIR': 'Heraklion', 'LGSA': 'Chania',
+        'LGRP': 'Rhodes', 'LGKR': 'Corfu', 'LGSR': 'Santorini', 'LGMK': 'Mykonos',
+        'LGKO': 'Kos', 'LGZA': 'Zakynthos', 'LGKF': 'Kefalonia', 'LGSK': 'Skiathos',
+        'LGSM': 'Samos', 'LGMT': 'Mytilene', 'LGPZ': 'Preveza', 'LGKL': 'Kalamata',
+        'LCLK': 'Larnaca', 'LCPH': 'Paphos', 'LCEN': 'Nicosia', 'LMML': 'Malta',
+        'LIRF': 'Rome', 'LIRA': 'Rome', 'LIMC': 'Milan', 'LIML': 'Milan', 'LIME': 'Bergamo',
+        'LIPZ': 'Venice', 'LIPH': 'Treviso', 'LIPE': 'Bologna', 'LIRN': 'Naples',
+        'LICC': 'Catania', 'LICJ': 'Palermo', 'LIRQ': 'Florence', 'LIRP': 'Pisa',
+        'LIMF': 'Turin', 'LIMJ': 'Genoa', 'LIPX': 'Verona', 'LIBD': 'Bari', 'LIBR': 'Brindisi',
+        'LIEE': 'Cagliari', 'LIEO': 'Olbia', 'LIEA': 'Alghero', 'LICA': 'Lamezia Terme',
+        'LIPQ': 'Trieste', 'LIPR': 'Rimini', 'LIRI': 'Salerno', 'LICT': 'Trapani',
+        'LEMD': 'Madrid', 'LEBL': 'Barcelona', 'LEPA': 'Palma de Mallorca', 'LEMG': 'Malaga',
+        'LEAL': 'Alicante', 'LEVC': 'Valencia', 'LEZL': 'Seville', 'LEBB': 'Bilbao',
+        'LEIB': 'Ibiza', 'LEMH': 'Menorca', 'LEGE': 'Girona', 'LERS': 'Reus',
+        'LEST': 'Santiago de Compostela', 'LEAS': 'Asturias', 'LEMI': 'Murcia', 'LEZG': 'Zaragoza',
+        'GCLP': 'Gran Canaria', 'GCTS': 'Tenerife', 'GCXO': 'Tenerife', 'GCRR': 'Lanzarote',
+        'GCFV': 'Fuerteventura', 'GCLA': 'La Palma', 'LPPT': 'Lisbon', 'LPPR': 'Porto',
+        'LPFR': 'Faro', 'LPMA': 'Madeira', 'LPPD': 'Ponta Delgada', 'LXGB': 'Gibraltar',
+        // Nordics, Baltics, Central & Eastern Europe, Balkans
+        'ESSA': 'Stockholm', 'ESSB': 'Stockholm', 'ESKN': 'Stockholm', 'ESOW': 'Stockholm',
+        'ESGG': 'Gothenburg', 'ESMS': 'Malmo', 'EKCH': 'Copenhagen', 'EKBI': 'Billund',
+        'EKYT': 'Aalborg', 'ENGM': 'Oslo', 'ENTO': 'Oslo', 'ENBR': 'Bergen',
+        'ENVA': 'Trondheim', 'ENZV': 'Stavanger', 'ENTC': 'Tromso', 'EFHK': 'Helsinki',
+        'EFRO': 'Rovaniemi', 'EFTP': 'Tampere', 'EFOU': 'Oulu', 'BIKF': 'Reykjavik', 'BIRK': 'Reykjavik',
+        'EETN': 'Tallinn', 'EVRA': 'Riga', 'EYVI': 'Vilnius', 'EYKA': 'Kaunas',
+        'EPWA': 'Warsaw', 'EPMO': 'Warsaw', 'EPKK': 'Krakow', 'EPGD': 'Gdansk',
+        'EPKT': 'Katowice', 'EPWR': 'Wroclaw', 'EPPO': 'Poznan', 'LKPR': 'Prague',
+        'LHBP': 'Budapest', 'LZIB': 'Bratislava', 'LJLJ': 'Ljubljana', 'LDZA': 'Zagreb',
+        'LDSP': 'Split', 'LDDU': 'Dubrovnik', 'LDZD': 'Zadar', 'LDPL': 'Pula',
+        'LYBE': 'Belgrade', 'LYPG': 'Podgorica', 'LYTV': 'Tivat', 'LQSA': 'Sarajevo',
+        'LWSK': 'Skopje', 'LATI': 'Tirana', 'LROP': 'Bucharest', 'LRBS': 'Bucharest',
+        'LRCL': 'Cluj-Napoca', 'LRTR': 'Timisoara', 'LRIA': 'Iasi', 'LBSF': 'Sofia',
+        'LBWN': 'Varna', 'LBBG': 'Burgas', 'LUKK': 'Chisinau', 'ULLI': 'St. Petersburg',
+        'UUEE': 'Moscow', 'UUDD': 'Moscow', 'UUWW': 'Moscow',
+        // Turkey, Middle East & Africa
+        'LTFM': 'Istanbul', 'LTFJ': 'Istanbul', 'LTBA': 'Istanbul', 'LTAI': 'Antalya',
+        'LTAC': 'Ankara', 'LTBJ': 'Izmir', 'LTBS': 'Dalaman', 'LTFE': 'Bodrum',
+        'OMDB': 'Dubai', 'OMDW': 'Dubai', 'OMAA': 'Abu Dhabi', 'OMSJ': 'Sharjah',
+        'OTHH': 'Doha', 'OERK': 'Riyadh', 'OEJN': 'Jeddah', 'OEDF': 'Dammam',
+        'OEMA': 'Medina', 'OOMS': 'Muscat', 'OBBI': 'Bahrain', 'OKKK': 'Kuwait City',
+        'OJAI': 'Amman', 'OLBA': 'Beirut', 'LLBG': 'Tel Aviv', 'LLER': 'Eilat',
+        'HECA': 'Cairo', 'HEGN': 'Hurghada', 'HESH': 'Sharm El Sheikh', 'HEBA': 'Alexandria',
+        'GMMN': 'Casablanca', 'GMMX': 'Marrakech', 'GMAD': 'Agadir', 'GMTT': 'Tangier',
+        'GMME': 'Rabat', 'GMFF': 'Fes', 'DTTA': 'Tunis', 'DTTJ': 'Djerba', 'DTMB': 'Monastir',
+        'DAAG': 'Algiers', 'DAOO': 'Oran', 'GOBD': 'Dakar', 'FACT': 'Cape Town',
+        'FAOR': 'Johannesburg', 'FALE': 'Durban', 'FIMP': 'Mauritius', 'FMEE': 'Saint-Denis', 'FSIA': 'Mahe',
+        // Asia-Pacific & South America
+        'RJTT': 'Tokyo', 'RJAA': 'Tokyo', 'RJBB': 'Osaka', 'RJOO': 'Osaka',
+        'RJGG': 'Nagoya', 'RJFF': 'Fukuoka', 'RJCC': 'Sapporo', 'ROAH': 'Okinawa',
+        'RKSI': 'Seoul', 'RKSS': 'Seoul', 'RKPK': 'Busan', 'RKPC': 'Jeju',
+        'VHHH': 'Hong Kong', 'VMMC': 'Macau', 'RCTP': 'Taipei', 'RCSS': 'Taipei',
+        'ZBAA': 'Beijing', 'ZBAD': 'Beijing', 'ZSPD': 'Shanghai', 'ZSSS': 'Shanghai',
+        'ZGGG': 'Guangzhou', 'ZGSZ': 'Shenzhen', 'ZUUU': 'Chengdu', 'RPLL': 'Manila',
+        'RPVM': 'Cebu', 'WSSS': 'Singapore', 'WMKK': 'Kuala Lumpur', 'VTBS': 'Bangkok',
+        'VTBD': 'Bangkok', 'VTSP': 'Phuket', 'VVNB': 'Hanoi', 'VVTS': 'Ho Chi Minh City',
+        'WIII': 'Jakarta', 'WADD': 'Bali', 'VIDP': 'New Delhi', 'VABB': 'Mumbai',
+        'VOBL': 'Bengaluru', 'VOMM': 'Chennai', 'VOHS': 'Hyderabad', 'VECC': 'Kolkata',
+        'VCBI': 'Colombo', 'VRMM': 'Male', 'VNKT': 'Kathmandu',
+        'YSSY': 'Sydney', 'YMML': 'Melbourne', 'YBBN': 'Brisbane', 'YPPH': 'Perth',
+        'YPAD': 'Adelaide', 'NZAA': 'Auckland', 'NZCH': 'Christchurch', 'NZWN': 'Wellington', 'NZQN': 'Queenstown',
+        'SBGR': 'Sao Paulo', 'SBSP': 'Sao Paulo', 'SBKP': 'Campinas', 'SBGL': 'Rio de Janeiro',
+        'SBRJ': 'Rio de Janeiro', 'SBBR': 'Brasilia', 'SAEZ': 'Buenos Aires', 'SABE': 'Buenos Aires',
+        'SCEL': 'Santiago', 'SKBO': 'Bogota', 'SPJC': 'Lima', 'SPIM': 'Lima',
+        'SEQM': 'Quito', 'MPTO': 'Panama City', 'MROC': 'San Jose', 'TNCM': 'Sint Maarten',
+        'TFFR': 'Pointe-a-Pitre', 'TFFF': 'Fort-de-France', 'SOCA': 'Cayenne'
     };
 
     function cleanCity(icao, rawName) {
@@ -25645,27 +27737,31 @@ function formatCleanRouteDisplay(report) {
     let arrName = report.arr_name || (report.session_info && report.session_info.arr_name);
 
     const rawRoute = report.route_display || (report.session_info && report.session_info.route_display) || '';
-    if ((!depIcao || !arrIcao) && rawRoute) {
-        const parts = rawRoute.split(/\s*(?:➔|->|→|-)\s*/);
+    if (rawRoute) {
+        const parts = rawRoute.split(/\s+(?:➔|->|→|-)\s+|\s*(?:➔|->|→)\s*/);
         if (parts.length >= 2) {
             const m1 = parts[0].match(/([A-Z0-9]{4})/i);
-            const m2 = parts[1].match(/([A-Z0-9]{4})/i);
-            if (m1) depIcao = m1[1].toUpperCase();
-            if (m2) arrIcao = m2[1].toUpperCase();
+            const m2 = parts[1].match(/([A-Z0-9]{4}|UNKNOWN)/i);
+            if (m1 && !depIcao) depIcao = m1[1].toUpperCase();
+            if (m2 && !arrIcao) arrIcao = m2[1].toUpperCase();
             const n1 = parts[0].match(/\((.*?)\)/);
             const n2 = parts[1].match(/\((.*?)\)/);
-            if (n1 && !depName) depName = n1[1];
-            if (n2 && !arrName) arrName = n2[1];
+            if (n1 && (!depName || depName.toUpperCase() === depName)) depName = n1[1];
+            if (n2 && (!arrName || arrName.toUpperCase() === arrName)) arrName = n2[1];
         }
     }
 
     if (depIcao && arrIcao && arrIcao !== 'ARR') {
-        const depCity = cleanCity(depIcao, depName);
-        const arrCity = cleanCity(arrIcao, arrName);
-        return `${depIcao} (${depCity}) - ${arrIcao} (${arrCity})`;
+        const depUpper = String(depIcao).toUpperCase().trim();
+        const arrUpper = String(arrIcao).toUpperCase().trim();
+        const depFmt = (depUpper === 'UNKNOWN' || depUpper === 'UNK') ? 'UNKNOWN' : `${depUpper} (${cleanCity(depUpper, depName)})`;
+        const arrFmt = (arrUpper === 'UNKNOWN' || arrUpper === 'UNK') ? 'UNKNOWN' : `${arrUpper} (${cleanCity(arrUpper, arrName)})`;
+        return `${depFmt} - ${arrFmt}`;
     } else if (depIcao && depIcao !== 'DEP') {
-        const depCity = cleanCity(depIcao, depName);
-        return `${depIcao} (${depCity})`;
+        const depUpper = String(depIcao).toUpperCase().trim();
+        if (depUpper === 'UNKNOWN' || depUpper === 'UNK') return 'UNKNOWN';
+        const depCity = cleanCity(depUpper, depName);
+        return `${depUpper} (${depCity})`;
     } else if (rawRoute) {
         return rawRoute.replace(/\s*(?:➔|->|→)\s*/g, ' - ');
     }
@@ -26161,26 +28257,10 @@ function initModalChartInstances(report) {
 
     const commonZoomPlugin = {
         zoom: {
-            limits: {
-                x: {
-                    min: 'original',
-                    max: 'original',
-                    minRange: 2
-                }
-            },
-            pan: {
-                enabled: true,
-                mode: 'x',
-                modifierKey: null
-            },
+            pan: { enabled: false },
             zoom: {
-                wheel: {
-                    enabled: true,
-                    speed: 0.08
-                },
-                pinch: {
-                    enabled: true
-                },
+                wheel: { enabled: false },
+                pinch: { enabled: false },
                 mode: 'x'
             }
         },
@@ -26198,6 +28278,158 @@ function initModalChartInstances(report) {
             bodyFont: { family: 'system-ui, -apple-system, sans-serif', size: 10 }
         }
     };
+
+    function attachSmartChartZoomAndPan(chart, totalPoints) {
+        if (!chart || !chart.canvas || totalPoints < 2) return;
+        const canvas = chart.canvas;
+        const maxIdx = Math.max(1, totalPoints - 1);
+        const MIN_SPAN = Math.min(maxIdx, 20); // Hard stop at 20 samples (~10s window) so curves never vanish
+
+        chart.options.scales.x.min = 0;
+        chart.options.scales.x.max = maxIdx;
+
+        let lastWheelTime = 0;
+        let wheelStreak = 0;
+        let isDragging = false;
+        let dragStartX = 0;
+        let dragStartMin = 0;
+        let dragStartMax = maxIdx;
+
+        function getBounds() {
+            const xOpt = chart.options.scales.x || {};
+            const cMin = (typeof xOpt.min === 'number' && !isNaN(xOpt.min)) ? Math.max(0, Math.min(maxIdx, Math.round(xOpt.min))) : 0;
+            const cMax = (typeof xOpt.max === 'number' && !isNaN(xOpt.max)) ? Math.max(cMin, Math.min(maxIdx, Math.round(xOpt.max))) : maxIdx;
+            return { min: cMin, max: cMax, span: Math.max(1, cMax - cMin) };
+        }
+
+        chart.resetZoom = function () {
+            chart.options.scales.x.min = 0;
+            chart.options.scales.x.max = maxIdx;
+            chart.update('none');
+        };
+
+        canvas.addEventListener('wheel', function (e) {
+            const area = chart.chartArea;
+            if (!area) return;
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+            if (mouseX < area.left || mouseX > area.right || mouseY < area.top || mouseY > area.bottom) return;
+
+            e.preventDefault();
+            e.stopPropagation();
+
+            const zoomIn = e.deltaY < 0;
+            const bounds = getBounds();
+
+            // Hard stops at min and max zoom
+            if (zoomIn && bounds.span <= MIN_SPAN) return;
+            if (!zoomIn && bounds.min <= 0 && bounds.max >= maxIdx) return;
+
+            const now = performance.now();
+            const dt = now - lastWheelTime;
+            lastWheelTime = now;
+
+            if (dt < 140) {
+                wheelStreak = Math.min(8, wheelStreak + 1);
+            } else {
+                wheelStreak = 0;
+            }
+
+            // Velocity acceleration factor based on wheel rotation speed
+            let velBoost = 1.0;
+            if (dt < 45) {
+                velBoost = 2.4 + wheelStreak * 0.18;
+            } else if (dt < 95) {
+                velBoost = 1.85 + wheelStreak * 0.12;
+            } else if (dt < 180) {
+                velBoost = 1.35;
+            }
+
+            // Duration scaling factor so long flights (e.g., 1h30+) zoom in effortlessly
+            const durationBoost = totalPoints > 600
+                ? 1.0 + Math.min(0.75, Math.log10(totalPoints / 600) * 0.42)
+                : 1.0;
+            const spanRatio = bounds.span / maxIdx;
+            const zoomFraction = Math.min(0.62, 0.16 * durationBoost * velBoost * (0.82 + 0.38 * spanRatio));
+
+            let newSpan;
+            if (zoomIn) {
+                newSpan = Math.max(MIN_SPAN, Math.round(bounds.span * (1 - zoomFraction)));
+                if (newSpan >= bounds.span) newSpan = Math.max(MIN_SPAN, bounds.span - 1);
+            } else {
+                newSpan = Math.min(maxIdx, Math.round(bounds.span / (1 - zoomFraction)));
+                if (newSpan <= bounds.span) newSpan = Math.min(maxIdx, bounds.span + 1);
+            }
+
+            const anchorRatio = Math.max(0, Math.min(1, (mouseX - area.left) / Math.max(1, area.right - area.left)));
+            const anchorIdx = bounds.min + anchorRatio * bounds.span;
+
+            let newMin = Math.round(anchorIdx - anchorRatio * newSpan);
+            let newMax = newMin + newSpan;
+            if (newMin < 0) {
+                newMin = 0;
+                newMax = Math.min(maxIdx, newSpan);
+            }
+            if (newMax > maxIdx) {
+                newMax = maxIdx;
+                newMin = Math.max(0, maxIdx - newSpan);
+            }
+
+            chart.options.scales.x.min = newMin;
+            chart.options.scales.x.max = newMax;
+            chart.update('none');
+        }, { passive: false });
+
+        canvas.addEventListener('mousedown', function (e) {
+            if (e.button !== 0) return;
+            const area = chart.chartArea;
+            if (!area) return;
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            if (mouseX < area.left || mouseX > area.right) return;
+            const bounds = getBounds();
+            if (bounds.span >= maxIdx) return;
+            isDragging = true;
+            dragStartX = e.clientX;
+            dragStartMin = bounds.min;
+            dragStartMax = bounds.max;
+            canvas.style.cursor = 'grabbing';
+        });
+
+        window.addEventListener('mousemove', function (e) {
+            if (!isDragging) return;
+            const area = chart.chartArea;
+            if (!area) return;
+            const areaWidth = Math.max(1, area.right - area.left);
+            const span = dragStartMax - dragStartMin;
+            const dx = e.clientX - dragStartX;
+            const indexDelta = Math.round((-dx / areaWidth) * span);
+
+            let newMin = dragStartMin + indexDelta;
+            let newMax = dragStartMax + indexDelta;
+            if (newMin < 0) {
+                newMin = 0;
+                newMax = span;
+            }
+            if (newMax > maxIdx) {
+                newMax = maxIdx;
+                newMin = Math.max(0, maxIdx - span);
+            }
+            if (chart.options.scales.x.min !== newMin || chart.options.scales.x.max !== newMax) {
+                chart.options.scales.x.min = newMin;
+                chart.options.scales.x.max = newMax;
+                chart.update('none');
+            }
+        });
+
+        window.addEventListener('mouseup', function () {
+            if (isDragging) {
+                isDragging = false;
+                canvas.style.cursor = '';
+            }
+        });
+    }
 
     // 1. FPS Chart
     const fpsCanvas = document.getElementById('modal-fps-chart');
@@ -26263,6 +28495,7 @@ function initModalChartInstances(report) {
                 plugins: commonZoomPlugin
             }
         });
+        attachSmartChartZoomAndPan(chart1, times.length);
         reportViewerCharts.push(chart1);
         buildModalChartLegend(chart1, 'modal-legend-0', 0);
         fpsCanvas.ondblclick = () => chart1.resetZoom();
@@ -26354,6 +28587,7 @@ function initModalChartInstances(report) {
                 plugins: commonZoomPlugin
             }
         });
+        attachSmartChartZoomAndPan(chart2, times.length);
         reportViewerCharts.push(chart2);
         buildModalChartLegend(chart2, 'modal-legend-1', 1);
         perfCanvas.ondblclick = () => chart2.resetZoom();
@@ -26412,6 +28646,7 @@ function initModalChartInstances(report) {
                 plugins: commonZoomPlugin
             }
         });
+        attachSmartChartZoomAndPan(chart3, times.length);
         reportViewerCharts.push(chart3);
         buildModalChartLegend(chart3, 'modal-legend-2', 2);
         lodCanvas.ondblclick = () => chart3.resetZoom();
@@ -26448,6 +28683,7 @@ function initModalChartInstances(report) {
                 plugins: commonZoomPlugin
             }
         });
+        attachSmartChartZoomAndPan(chart4, times.length);
         reportViewerCharts.push(chart4);
         buildModalChartLegend(chart4, 'modal-legend-3', 3);
         ioCanvas.ondblclick = () => chart4.resetZoom();
@@ -26742,12 +28978,15 @@ function updateSmartLodUIFromStatus(status) {
     const isExtAutoFps = !!(smartLodAxisState && smartLodAxisState.external_autofps) || !!(typeof currentSettings !== 'undefined' && (currentSettings.external_autofps || currentSettings.dynamic_lod_engine === 'external_autofps'));
 
     const wasActive = window.smartLodActive;
-    window.smartLodActive = isExtAutoFps ? false : !!(status.enabled && status.is_running);
+    window.smartLodActive = (window.IS_LITE || isExtAutoFps) ? false : !!(status.enabled && status.is_running);
 
     // Direct synchronous update of the Classic Sidebar Smart LOD Badge
     const badgeSmartLod = document.getElementById('classic-badge-smart-lod');
     if (badgeSmartLod) {
-        if (isExtAutoFps) {
+        if (window.IS_LITE) {
+            badgeSmartLod.innerHTML = LITE_PRO_BADGE_INNER;
+            badgeSmartLod.className = LITE_PRO_BADGE_CLASS;
+        } else if (isExtAutoFps) {
             badgeSmartLod.textContent = 'AUTOFPS';
             badgeSmartLod.className = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#F59E0B] text-[#0F1115] shadow-sm';
         } else if (window.smartLodActive) {
@@ -26806,6 +29045,22 @@ function updateSmartLodUIFromStatus(status) {
             modalLiveOlod.textContent = Math.round(status.current_olod_setpoint);
         } else {
             modalLiveOlod.textContent = '--';
+        }
+    }
+    const modalLiveClouds = document.getElementById('smart-lod-modal-live-clouds');
+    if (modalLiveClouds) {
+        if (!isExtAutoFps && status.current_cloud_label) {
+            modalLiveClouds.textContent = String(status.current_cloud_label).toUpperCase();
+            if (status.in_cloud_reduction) {
+                modalLiveClouds.style.color = '#fbbf24';
+            } else if (status.in_cloud_boost) {
+                modalLiveClouds.style.color = '#10b981';
+            } else {
+                modalLiveClouds.style.color = '#00A8FF';
+            }
+        } else {
+            modalLiveClouds.textContent = '--';
+            modalLiveClouds.style.color = '#00A8FF';
         }
     }
 
@@ -26878,6 +29133,7 @@ function updateSmartLodUIFromStatus(status) {
 }
 
 async function onDesktopCloudRecoveryChange(checked) {
+    if (window.IS_LITE) return;
     if (window.pywebview && window.pywebview.api && window.pywebview.api.set_smart_lod_cloud_recovery) {
         try {
             await window.pywebview.api.set_smart_lod_cloud_recovery(checked);
@@ -26914,6 +29170,7 @@ async function refreshSmartLodStatus() {
 }
 
 async function pollSmartLodTelemetry() {
+    if (window.IS_LITE) return;
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.get_smart_lod_status) return;
     try {
         const resStr = await window.pywebview.api.get_smart_lod_status();
@@ -26934,6 +29191,10 @@ setInterval(() => {
 }, 1000);
 
 async function toggleSmartLodActive() {
+    if (window.IS_LITE) {
+        showUnlockProModal();
+        return;
+    }
     const isExtAutoFps = !!(smartLodAxisState && smartLodAxisState.external_autofps) || !!(typeof currentSettings !== 'undefined' && (currentSettings.external_autofps || currentSettings.dynamic_lod_engine === 'external_autofps'));
     if (isExtAutoFps) {
         showToastNotification("Smart LOD locked: MSFS AutoFPS is active in background.", "warning");
@@ -27086,10 +29347,10 @@ function renderSmartLodProfilesDropdownList() {
     let headerHtml = '';
     if (multiCount > 0) {
         headerHtml = `
-            <div class="px-2.5 py-1.5 bg-slate-800/90 border-b border-slate-700/80 flex items-center justify-between gap-2 text-[10px] text-cyan-300">
+            <div class="px-2.5 py-1.5 bg-[#0F172A] border-b border-[#334155] flex items-center justify-between gap-2 text-[10px] text-cyan-300">
                 <span><b>${multiCount}</b> selected</span>
                 <div class="flex items-center gap-1.5">
-                    <button type="button" onclick="deleteMultiSelectedSmartLodProfiles(event)" class="px-2 py-0.5 rounded bg-rose-600/80 hover:bg-rose-500 text-white font-semibold transition-colors cursor-pointer border-0">
+                    <button type="button" onclick="deleteMultiSelectedSmartLodProfiles(event)" class="px-2 py-0.5 rounded bg-rose-600 hover:bg-rose-500 text-white font-semibold transition-colors cursor-pointer border-0">
                         Delete (${multiCount})
                     </button>
                     <button type="button" onclick="multiSelectedSmartLodProfileIds.clear(); renderSmartLodProfilesDropdownList();" class="px-1.5 py-0.5 text-slate-400 hover:text-white transition-colors cursor-pointer border-0 bg-transparent">
@@ -27109,7 +29370,7 @@ function renderSmartLodProfilesDropdownList() {
             : '';
 
         return `
-            <div class="group flex items-center justify-between px-2.5 py-2 cursor-pointer transition-colors ${isSelected ? 'bg-cyan-950/40 text-cyan-200' : 'hover:bg-slate-800/80 text-slate-300'}"
+            <div class="group flex items-center justify-between px-2.5 py-2 cursor-pointer transition-colors ${isSelected ? 'bg-[#162C3D] text-cyan-200' : 'bg-[#181E2B] hover:bg-[#20293A] text-slate-300'}"
                  onclick="handleSmartLodProfileRowClick('${p.id}', ${index}, event)">
                 <div class="flex items-center gap-2 min-w-0 flex-1">
                     <input type="checkbox"
@@ -27129,13 +29390,13 @@ function renderSmartLodProfilesDropdownList() {
                 <div class="flex items-center gap-1 opacity-80 group-hover:opacity-100 shrink-0 ml-2">
                     <button type="button"
                             onclick="promptRenameSmartLodProfile('${p.id}', event)"
-                            class="w-6 h-6 flex items-center justify-center rounded text-slate-400 hover:text-white hover:bg-slate-700/60 transition-colors border-0 bg-transparent cursor-pointer"
+                            class="w-6 h-6 flex items-center justify-center rounded text-slate-400 hover:text-white hover:bg-[#253046] transition-colors border-0 bg-transparent cursor-pointer"
                             title="Rename Profile">
                         <svg class="w-3 h-3 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                     </button>
                     <button type="button"
                             onclick="deleteSmartLodProfile('${p.id}', event)"
-                            class="w-6 h-6 flex items-center justify-center rounded text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 transition-colors border-0 bg-transparent cursor-pointer"
+                            class="w-6 h-6 flex items-center justify-center rounded text-slate-400 hover:text-rose-400 hover:bg-[#3B1824] transition-colors border-0 bg-transparent cursor-pointer"
                             title="Delete Profile">
                         <svg class="w-3 h-3 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                     </button>
@@ -27587,11 +29848,19 @@ function deleteMultiSelectedSmartLodProfiles(event) {
 let isIngamePanelInstalled = false;
 
 async function refreshIngamePanelStatus() {
+    const btn = document.getElementById('cfg-ingame-panel-btn');
+    if (window.IS_LITE) {
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = LITE_PRO_BADGE_INNER;
+            btn.className = LITE_PRO_BADGE_CLASS + ' cursor-pointer';
+        }
+        return;
+    }
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.get_ingame_panel_status) return;
     try {
         const resStr = await window.pywebview.api.get_ingame_panel_status();
         const res = JSON.parse(resStr);
-        const btn = document.getElementById('cfg-ingame-panel-btn');
         if (!btn) return;
 
         if (!res.available) {
@@ -27616,6 +29885,10 @@ async function refreshIngamePanelStatus() {
 }
 
 async function toggleIngamePanelInstall() {
+    if (window.IS_LITE) {
+        showUnlockProModal();
+        return;
+    }
     if (!window.pywebview || !window.pywebview.api) return;
     try {
         if (isIngamePanelInstalled) {
@@ -27730,7 +30003,7 @@ class OnboardingTourController {
                     }
                     const headerCard = document.getElementById('classic-ap-header-card');
                     if (headerCard) headerCard.classList.add('hidden');
-                    await new Promise(r => setTimeout(r, 220));
+                    await new Promise(r => setTimeout(r, 30));
                 },
                 async beforeExit(direction) {
                     if (direction === 'next') {
@@ -27750,7 +30023,7 @@ class OnboardingTourController {
                         if (typeof closeSettingsModal === 'function') {
                             closeSettingsModal();
                         }
-                        await new Promise(r => setTimeout(r, 260));
+                        await new Promise(r => setTimeout(r, 30));
                     }
                 }
             },
@@ -27767,7 +30040,7 @@ class OnboardingTourController {
                     const modal = document.getElementById('settings-modal');
                     if (modal && !modal.classList.contains('hidden')) {
                         if (typeof closeSettingsModal === 'function') closeSettingsModal();
-                        await new Promise(r => setTimeout(r, 200));
+                        await new Promise(r => setTimeout(r, 30));
                     }
                     const radialEl = document.getElementById('airport-radial-menu');
                     if (radialEl) {
@@ -27798,7 +30071,7 @@ class OnboardingTourController {
                     if (sInput) {
                         sInput.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                     }
-                    await new Promise(r => setTimeout(r, 220));
+                    await new Promise(r => setTimeout(r, 30));
                 },
                 async beforeExit() {}
             },
@@ -27820,18 +30093,28 @@ class OnboardingTourController {
                     if (expModal) {
                         expModal.classList.remove('hidden');
                         expModal.classList.add('flex');
+                        expModal.style.setProperty('display', 'flex', 'important');
+                        expModal.style.setProperty('visibility', 'visible', 'important');
+                        expModal.style.setProperty('opacity', '1', 'important');
+                        expModal.style.setProperty('z-index', '9996', 'important');
                         if (window.windowManager) {
                             window.windowManager.centerModal(expModal);
-                            window.windowManager.bringToFront(expModal);
                         }
                     }
-                    await new Promise(r => setTimeout(r, 260));
+                    await new Promise(r => setTimeout(r, 40));
                 },
                 async beforeExit(direction) {
+                    const expModal = document.getElementById('export-modal');
+                    if (expModal) {
+                        expModal.style.removeProperty('z-index');
+                        expModal.style.removeProperty('display');
+                        expModal.style.removeProperty('visibility');
+                        expModal.style.removeProperty('opacity');
+                    }
                     if (typeof closeExportModal === 'function') {
                         closeExportModal();
                     }
-                    await new Promise(r => setTimeout(r, 180));
+                    await new Promise(r => setTimeout(r, 30));
                 }
             },
             // STEP 5: Quick Toolbar Actions (Rescan, Settings, Window Reorder)
@@ -27844,23 +30127,26 @@ class OnboardingTourController {
                 defaultBody: 'Quick utility tools at your fingertips: Rescan Packages detects newly added or removed Community/Official add-ons without restarting; Settings gives instant access to simulator folders and preferences; and Auto-Tile automatically organizes all open floating windows.',
                 preferredPlacement: 'top',
                 async beforeEnter() {
-                    if (window.onboardingTour) window.onboardingTour._cleanupOpenedModals();
+                    if (window.onboardingTour) {
+                        window.onboardingTour._cleanupOpenedModals();
+                        window.onboardingTour._hideLfpgReticle();
+                    }
                     if (typeof closeExportModal === 'function') closeExportModal();
                     const tbActions = document.getElementById('bottom-toolbar-actions');
                     if (tbActions) {
                         tbActions.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                     }
-                    await new Promise(r => setTimeout(r, 220));
+                    await new Promise(r => setTimeout(r, 30));
                 },
                 async beforeExit() {}
             },
-            // STEP 6: Interactive Airport Hub (e.g. LPMA on Map)
+            // STEP 6: Interactive Airport Hub (e.g. LFPG on Map)
             {
-                id: 'lpma_map_hub',
-                targetSelector: '#radial-core',
+                id: 'lfpg_map_hub',
+                targetSelector: '#tour-lfpg-spotlight-target',
                 titleKey: 'onboarding.step6_title',
                 bodyKey: 'onboarding.step6_body',
-                defaultTitle: 'Interactive Airport Hub',
+                defaultTitle: 'Interactive Airport Hub (Paris CDG • LFPG)',
                 defaultBody: 'Every airport is represented on the world map by an interactive hub. Click any airport to center the camera, inspect its orientation, and view its connected route network.',
                 preferredPlacement: 'bottom',
                 async beforeEnter() {
@@ -27868,18 +30154,25 @@ class OnboardingTourController {
                     const headerCard = document.getElementById('classic-ap-header-card');
                     if (headerCard) headerCard.classList.add('hidden');
 
-                    const ap = window.onboardingTour ? window.onboardingTour._getLpmaAirport() : null;
+                    const radialEl = document.getElementById('airport-radial-menu');
+                    if (radialEl) {
+                        radialEl.classList.add('hidden');
+                        radialEl.style.display = 'none';
+                    }
+
+                    const ap = window.onboardingTour ? window.onboardingTour._getLfpgTourAirport() : null;
                     if (ap) {
                         currentRadialAirport = ap;
                         selectedAirport = ap;
+                        currentClassicAirport = ap;
                         if (typeof panMapToAirport === 'function') {
-                            panMapToAirport(ap, 7.5);
+                            panMapToAirport(ap, 10.5, 0.35);
                         } else {
                             const lMap = (window.onboardingTour && typeof window.onboardingTour._getLeafletMap === 'function')
                                 ? window.onboardingTour._getLeafletMap()
                                 : null;
                             if (lMap && ap.lat && ap.lon) {
-                                lMap.flyTo([ap.lat, ap.lon], 7.5, { duration: 0.8 });
+                                lMap.flyTo([ap.lat, ap.lon], 10.5, { duration: 0.35 });
                             }
                         }
                         if (typeof setAirportMarkerLabelFocus === 'function') {
@@ -27888,23 +30181,18 @@ class OnboardingTourController {
                         if (typeof updateRadialCoreBadge === 'function') {
                             updateRadialCoreBadge(ap);
                         }
-                        const radialEl = document.getElementById('airport-radial-menu');
-                        if (radialEl) {
-                            radialEl.classList.add('radial-only-core');
-                            radialEl.classList.remove('hidden', 'radial-quadrants-collapsed');
-                            radialEl.style.display = '';
-                            if (typeof updateRadialMenuPosition === 'function') {
-                                updateRadialMenuPosition(true);
-                            }
-                        }
                     }
-                    await new Promise(r => setTimeout(r, 250));
+
+                    if (window.onboardingTour) {
+                        window.onboardingTour._showLfpgReticle();
+                    }
+                    await new Promise(r => setTimeout(r, 50));
                 },
                 async beforeExit() {}
             },
             // STEP 7: Airport Identity & Specifications (Sidebar Card)
             {
-                id: 'lpma_sidebar_card',
+                id: 'lfpg_sidebar_card',
                 targetSelector: '#classic-ap-header-card',
                 titleKey: 'onboarding.step7_title',
                 bodyKey: 'onboarding.step7_body',
@@ -27912,25 +30200,37 @@ class OnboardingTourController {
                 defaultBody: 'Inspect all essential airport data in the sidebar: ICAO & IATA codes, active status, scenery vendor, field elevation, and GPS coordinates.',
                 preferredPlacement: 'right',
                 async beforeEnter() {
-                    if (window.onboardingTour) window.onboardingTour._cleanupOpenedModals();
-                    const ap = window.onboardingTour ? window.onboardingTour._getLpmaAirport() : null;
-                    if (ap && (!currentClassicAirport || currentClassicAirport.icao !== ap.icao)) {
+                    if (window.onboardingTour) {
+                        window.onboardingTour._cleanupOpenedModals();
+                        window.onboardingTour._showLfpgReticle();
+                    }
+                    const ap = window.onboardingTour ? window.onboardingTour._getLfpgTourAirport() : null;
+                    if (ap) {
+                        currentClassicAirport = ap;
+                        currentRadialAirport = ap;
+                        selectedAirport = ap;
                         if (typeof showClassicAirportView === 'function') {
                             showClassicAirportView(ap);
                         }
+                    }
+                    const radialEl = document.getElementById('airport-radial-menu');
+                    if (radialEl) {
+                        radialEl.classList.add('hidden');
+                        radialEl.classList.remove('radial-only-core');
+                        radialEl.style.display = 'none';
                     }
                     const card = document.getElementById('classic-ap-header-card');
                     if (card) {
                         card.classList.remove('hidden');
                         card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                     }
-                    await new Promise(r => setTimeout(r, 200));
+                    await new Promise(r => setTimeout(r, 30));
                 },
                 async beforeExit() {}
             },
             // STEP 8: Airport Details (Docked Modal)
             {
-                id: 'lpma_details_modal',
+                id: 'lfpg_details_modal',
                 targetSelector: '#radial-details-modal',
                 titleKey: 'onboarding.step8_title',
                 bodyKey: 'onboarding.step8_body',
@@ -27938,63 +30238,215 @@ class OnboardingTourController {
                 defaultBody: 'Inspect complete runway specifications (dimensions, asphalt surface, threshold coordinates, lighting), field elevation, and linked GSX profile status.',
                 preferredPlacement: 'right',
                 async beforeEnter() {
-                    if (window.onboardingTour) window.onboardingTour._cleanupOpenedModals();
-                    const ap = window.onboardingTour ? window.onboardingTour._getLpmaAirport() : null;
-                    if (ap && (!currentClassicAirport || currentClassicAirport.icao !== ap.icao)) {
+                    if (window.onboardingTour) {
+                        window.onboardingTour._cleanupOpenedModals();
+                        window.onboardingTour._showLfpgReticle();
+                    }
+                    const ap = window.onboardingTour ? window.onboardingTour._getLfpgTourAirport() : null;
+                    if (ap) {
+                        currentRadialAirport = ap;
+                        selectedAirport = ap;
+                        currentClassicAirport = ap;
                         if (typeof showClassicAirportView === 'function') {
                             showClassicAirportView(ap);
                         }
                     }
-                    const radialEl = document.getElementById('airport-radial-menu');
-                    if (radialEl) {
-                        radialEl.classList.remove('hidden');
-                        radialEl.style.display = '';
+                    if (typeof isClassicNavMode === 'function' && !isClassicNavMode()) {
+                        const radialEl = document.getElementById('airport-radial-menu');
+                        if (radialEl) {
+                            radialEl.classList.remove('hidden');
+                            radialEl.style.display = '';
+                        }
                     }
-                    if (typeof openClassicAirportModal === 'function') {
+                    const dModal = document.getElementById('radial-details-modal');
+                    if (typeof renderRadialAirportDetails === 'function') {
+                        renderRadialAirportDetails(ap);
+                    } else if (typeof openClassicAirportModal === 'function') {
                         openClassicAirportModal('details');
                     }
-                    if (window.windowManager) {
-                        window.windowManager.autoTileWindows(true);
+                    if (dModal) {
+                        dModal.classList.remove('hidden');
+                        dModal.style.display = 'flex';
+                        const vpH = window.innerHeight;
+                        const vpW = window.innerWidth;
+                        const dWidth = Math.min(840, Math.max(540, vpW - 400));
+                        const dTop = Math.max(340, Math.round(vpH * 0.44));
+                        const dHeight = Math.max(260, vpH - dTop - 84);
+                        const dLeft = Math.max(300, Math.round((vpW - dWidth) / 2));
+                        dModal.style.left = `${dLeft}px`;
+                        dModal.style.top = `${dTop}px`;
+                        dModal.style.width = `${dWidth}px`;
+                        dModal.style.height = `${dHeight}px`;
+                        dModal.style.maxHeight = `${dHeight}px`;
+                        dModal._hasBeenDragged = true;
                     }
-                    await new Promise(r => setTimeout(r, 260));
+                    if (ap && typeof panMapToAirport === 'function') {
+                        panMapToAirport(ap, 10.5, 0.35);
+                    }
+                    await new Promise(r => setTimeout(r, 40));
+                },
+                async beforeExit() {
+                    const dModal = document.getElementById('radial-details-modal');
+                    if (dModal) dModal._hasBeenDragged = false;
+                }
+            },
+            // STEP 9: Available Add-ons (Main Sceneries) (Docked Modal)
+            {
+                id: 'lfpg_addons_modal',
+                targetSelector: '#radial-sceneries-extension',
+                titleKey: 'onboarding.step9_sceneries_title',
+                bodyKey: 'onboarding.step9_sceneries_body',
+                defaultTitle: 'Available Add-ons (Main Sceneries)',
+                defaultBody: 'Browse all detected scenery packages for this airport. Full sceneries (Payware, Freeware, Asobo, Default) are mutually exclusive: selecting one activates it and deactivates others to prevent visual conflicts and crashes.',
+                preferredPlacement: 'right',
+                async beforeEnter() {
+                    if (window.onboardingTour) {
+                        window.onboardingTour._cleanupOpenedModals();
+                        window.onboardingTour._showLfpgReticle();
+                    }
+                    const ap = window.onboardingTour ? window.onboardingTour._getLfpgTourAirport() : null;
+                    if (ap) {
+                        currentRadialAirport = ap;
+                        selectedAirport = ap;
+                        currentClassicAirport = ap;
+                        if (typeof showClassicAirportView === 'function') {
+                            showClassicAirportView(ap);
+                        }
+                        // Pre-populate simMarket payware store cache for LFPG to match Screen 2
+                        if (typeof radialStoreCache !== 'undefined') {
+                            radialStoreCache['LFPG'] = [
+                                {
+                                    name: 'simMarket',
+                                    store_key: 'simmarket',
+                                    title: 'LFPG - PARIS CHARLES DE GAULLE AIRPORT MSFS',
+                                    vendor: 'Illuminators',
+                                    price: 11.76,
+                                    currency: 'EUR',
+                                    found: true,
+                                    url: 'https://secure.simmarket.com/illuminators-lfpg-paris-charles-de-gaulle-msfs.phtml'
+                                }
+                            ];
+                        }
+                    }
+                    if (typeof isClassicNavMode === 'function' && !isClassicNavMode()) {
+                        const radialEl = document.getElementById('airport-radial-menu');
+                        if (radialEl) {
+                            radialEl.classList.remove('hidden');
+                            radialEl.style.display = '';
+                        }
+                    }
+                    const extEl = document.getElementById('radial-sceneries-extension');
+                    if (extEl && ap) {
+                        if (typeof renderRadialSceneriesExtension === 'function') {
+                            renderRadialSceneriesExtension(ap, false);
+                        }
+                        extEl.classList.remove('hidden');
+                        extEl.classList.add('flex');
+                        extEl.style.setProperty('display', 'flex', 'important');
+                        extEl.style.setProperty('visibility', 'visible', 'important');
+                        extEl.style.setProperty('opacity', '1', 'important');
+                        extEl.style.setProperty('z-index', '9996', 'important');
+                        extEl.style.setProperty('pointer-events', 'auto', 'important');
+
+                        if (typeof panMapToAirport === 'function') {
+                            panMapToAirport(ap, 10.5, 0.35);
+                        }
+
+                        const reticlePos = window.onboardingTour ? window.onboardingTour._positionLfpgReticle() : null;
+                        const cx = reticlePos ? reticlePos.screenX : Math.round(window.innerWidth * 0.52);
+                        const cy = reticlePos ? reticlePos.screenY : Math.round(window.innerHeight * 0.5);
+
+                        // Strictly pop to the LEFT of the pulsing circle reticle
+                        const circleLeftEdge = cx - 95;
+                        const extWidth = Math.min(420, Math.max(330, circleLeftEdge - 28));
+                        const extLeft = Math.max(16, circleLeftEdge - 16 - extWidth);
+                        const extHeight = Math.min(window.innerHeight - 212, 540);
+                        const extTop = Math.max(126, Math.min(window.innerHeight - 84 - extHeight, cy - Math.round(extHeight / 2)));
+
+                        extEl.style.left = `${Math.round(extLeft)}px`;
+                        extEl.style.top = `${Math.round(extTop)}px`;
+                        extEl.style.width = `${Math.round(extWidth)}px`;
+                        extEl.style.maxHeight = `${extHeight}px`;
+                        extEl._hasBeenDragged = true;
+                    }
+                    await new Promise(r => setTimeout(r, 40));
                 },
                 async beforeExit() {}
             },
-            // STEP 9: Available Add-ons (Docked Modal)
+            // STEP 10: Available Fixes & Overlays (Docked Modal Section)
             {
-                id: 'lpma_addons_modal',
-                targetSelector: '#radial-sceneries-extension',
-                titleKey: 'onboarding.step9_title',
-                bodyKey: 'onboarding.step9_body',
-                defaultTitle: 'Available Add-ons',
-                defaultBody: 'Browse all detected scenery packages for this airport (Payware, Freeware, and Streamed). Enable, disable, or isolate specific scenery versions with a single click.',
+                id: 'lfpg_fixes_modal',
+                targetSelector: '#radial-fixes-container',
+                titleKey: 'onboarding.step10_fixes_title',
+                bodyKey: 'onboarding.step10_fixes_body',
+                defaultTitle: 'Available Fixes & Overlays',
+                defaultBody: 'Unlike full sceneries, the Available Fixes & Overlays section groups stackable enhancements (custom GSX profiles, taxiway corrections, night lighting, photogrammetry fixes). Each has an independent green switch toggle to run simultaneously on top of your main scenery.',
                 preferredPlacement: 'right',
                 async beforeEnter() {
-                    if (window.onboardingTour) window.onboardingTour._cleanupOpenedModals();
-                    const ap = window.onboardingTour ? window.onboardingTour._getLpmaAirport() : null;
-                    if (ap && (!currentClassicAirport || currentClassicAirport.icao !== ap.icao)) {
+                    const ap = window.onboardingTour ? window.onboardingTour._getLfpgTourAirport() : null;
+                    if (ap) {
+                        currentRadialAirport = ap;
+                        selectedAirport = ap;
+                        currentClassicAirport = ap;
                         if (typeof showClassicAirportView === 'function') {
                             showClassicAirportView(ap);
                         }
                     }
-                    const radialEl = document.getElementById('airport-radial-menu');
-                    if (radialEl) {
-                        radialEl.classList.remove('hidden');
-                        radialEl.style.display = '';
+                    if (window.onboardingTour) {
+                        window.onboardingTour._showLfpgReticle();
                     }
-                    if (typeof openClassicAirportModal === 'function') {
-                        openClassicAirportModal('sceneries');
+                    const extEl = document.getElementById('radial-sceneries-extension');
+                    if (extEl && ap) {
+                        if (extEl.classList.contains('hidden') || !extEl.innerHTML.trim()) {
+                            if (typeof renderRadialSceneriesExtension === 'function') {
+                                renderRadialSceneriesExtension(ap, false);
+                            }
+                        }
+                        extEl.classList.remove('hidden');
+                        extEl.classList.add('flex');
+                        extEl.style.setProperty('display', 'flex', 'important');
+                        extEl.style.setProperty('visibility', 'visible', 'important');
+                        extEl.style.setProperty('opacity', '1', 'important');
+                        extEl.style.setProperty('z-index', '9996', 'important');
+                        extEl.style.setProperty('pointer-events', 'auto', 'important');
+
+                        const reticlePos = window.onboardingTour ? window.onboardingTour._positionLfpgReticle() : null;
+                        const cx = reticlePos ? reticlePos.screenX : Math.round(window.innerWidth * 0.52);
+                        const cy = reticlePos ? reticlePos.screenY : Math.round(window.innerHeight * 0.5);
+
+                        const circleLeftEdge = cx - 95;
+                        const extWidth = Math.min(420, Math.max(330, circleLeftEdge - 28));
+                        const extLeft = Math.max(16, circleLeftEdge - 16 - extWidth);
+                        const extHeight = Math.min(window.innerHeight - 212, 540);
+                        const extTop = Math.max(126, Math.min(window.innerHeight - 84 - extHeight, cy - Math.round(extHeight / 2)));
+
+                        extEl.style.left = `${Math.round(extLeft)}px`;
+                        extEl.style.top = `${Math.round(extTop)}px`;
+                        extEl.style.width = `${Math.round(extWidth)}px`;
+                        extEl.style.maxHeight = `${extHeight}px`;
+                        extEl._hasBeenDragged = true;
                     }
-                    if (window.windowManager) {
-                        window.windowManager.autoTileWindows(true);
+                    const fixesContainer = document.getElementById('radial-fixes-container');
+                    if (fixesContainer) {
+                        fixesContainer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                     }
-                    await new Promise(r => setTimeout(r, 260));
+                    await new Promise(r => setTimeout(r, 40));
                 },
-                async beforeExit() {}
+                async beforeExit(direction) {
+                    const extEl = document.getElementById('radial-sceneries-extension');
+                    if (extEl && direction === 'next') {
+                        extEl._hasBeenDragged = false;
+                        extEl.style.removeProperty('z-index');
+                        extEl.style.removeProperty('display');
+                        extEl.style.removeProperty('visibility');
+                        extEl.style.removeProperty('opacity');
+                        extEl.style.removeProperty('pointer-events');
+                    }
+                }
             },
-            // STEP 10: Operating Airlines (Docked Modal)
+            // STEP 11: Operating Airlines (Docked Modal)
             {
-                id: 'lpma_airlines_modal',
+                id: 'lfpg_airlines_modal',
                 targetSelector: '#radial-airlines-modal',
                 titleKey: 'onboarding.step10_title',
                 bodyKey: 'onboarding.step10_body',
@@ -28002,17 +30454,23 @@ class OnboardingTourController {
                 defaultBody: 'Discover real-world commercial carriers operating scheduled flights at this airport. Click any airline or destination to plot the route network directly across the world map.',
                 preferredPlacement: 'right',
                 async beforeEnter() {
-                    if (window.onboardingTour) window.onboardingTour._cleanupOpenedModals();
-                    const ap = window.onboardingTour ? window.onboardingTour._getLpmaAirport() : null;
-                    if (ap && (!currentClassicAirport || currentClassicAirport.icao !== ap.icao)) {
+                    if (window.onboardingTour) {
+                        window.onboardingTour._cleanupOpenedModals();
+                        window.onboardingTour._hideLfpgReticle();
+                    }
+                    const ap = window.onboardingTour ? window.onboardingTour._getLfpgTourAirport() : null;
+                    if (ap) {
                         if (typeof showClassicAirportView === 'function') {
                             showClassicAirportView(ap);
                         }
+                        currentRadialAirport = ap;
                     }
-                    const radialEl = document.getElementById('airport-radial-menu');
-                    if (radialEl) {
-                        radialEl.classList.remove('hidden');
-                        radialEl.style.display = '';
+                    if (typeof isClassicNavMode === 'function' && !isClassicNavMode()) {
+                        const radialEl = document.getElementById('airport-radial-menu');
+                        if (radialEl) {
+                            radialEl.classList.remove('hidden');
+                            radialEl.style.display = '';
+                        }
                     }
                     if (typeof openClassicAirportModal === 'function') {
                         openClassicAirportModal('airlines');
@@ -28020,7 +30478,7 @@ class OnboardingTourController {
                     if (window.windowManager) {
                         window.windowManager.autoTileWindows(true);
                     }
-                    await new Promise(r => setTimeout(r, 260));
+                    await new Promise(r => setTimeout(r, 40));
                 },
                 async beforeExit() {}
             },
@@ -28124,8 +30582,15 @@ class OnboardingTourController {
                         radialEl.classList.add('hidden');
                         radialEl.style.display = 'none';
                     }
+                    currentClassicAirport = null;
+                    currentRadialAirport = null;
+                    selectedAirport = null;
                     const headerCard = document.getElementById('classic-ap-header-card');
                     if (headerCard) headerCard.classList.add('hidden');
+                    const actionsSec = document.getElementById('classic-ap-actions-section');
+                    if (actionsSec) actionsSec.classList.add('hidden');
+                    const flightOptSec = document.getElementById('classic-flight-optimizer-section');
+                    if (flightOptSec) flightOptSec.classList.remove('hidden');
                     document.querySelectorAll('[id^="classic-sub-"]').forEach(el => el.classList.add('hidden'));
                     document.querySelectorAll('[id^="classic-chevron-"]').forEach(el => el.style.transform = 'rotate(0deg)');
 
@@ -28137,7 +30602,7 @@ class OnboardingTourController {
                         win.classList.remove('hidden');
                         win.style.display = 'flex';
                     }
-                    await new Promise(r => setTimeout(r, 260));
+                    await new Promise(r => setTimeout(r, 40));
                 },
                 async beforeExit(direction) {
                     if (typeof closeFloatingWindow === 'function') {
@@ -28164,7 +30629,7 @@ class OnboardingTourController {
                         win.classList.remove('hidden');
                         win.style.display = 'flex';
                     }
-                    await new Promise(r => setTimeout(r, 260));
+                    await new Promise(r => setTimeout(r, 40));
                 },
                 async beforeExit(direction) {
                     if (typeof closeFloatingWindow === 'function') {
@@ -28192,7 +30657,7 @@ class OnboardingTourController {
                         win.classList.remove('hidden');
                         win.style.display = 'flex';
                     }
-                    await new Promise(r => setTimeout(r, 260));
+                    await new Promise(r => setTimeout(r, 40));
                 },
                 async beforeExit(direction) {
                     if (direction === 'prev') {
@@ -28244,7 +30709,7 @@ class OnboardingTourController {
                             window.windowManager.centerModal(bModal);
                         }
                     }
-                    await new Promise(r => setTimeout(r, 260));
+                    await new Promise(r => setTimeout(r, 40));
                 },
                 async beforeExit(direction) {
                     if (typeof closeBackgroundToolsModal === 'function') {
@@ -28257,14 +30722,14 @@ class OnboardingTourController {
                     }
                 }
             },
-            // STEP 21: My Rig (Hardware Specs Audit)
+            // STEP 21: My Rig (System Optimizer & Windows Tuning)
             {
-                id: 'my_rig',
+                id: 'my_rig_tuning',
                 targetSelector: '#float-win-my-rig',
-                titleKey: 'onboarding.step_my_rig_title',
-                bodyKey: 'onboarding.step_my_rig_body',
-                defaultTitle: 'Hardware Specs Audit',
-                defaultBody: 'Real-time audit of your hardware components: Processor (CPU), Graphics Card (GPU), RAM, high-speed NVMe storage, network bandwidth, and detected VR headsets to evaluate your system baseline.',
+                titleKey: 'onboarding.step_system_optimizer_title',
+                bodyKey: 'onboarding.step_system_optimizer_body',
+                defaultTitle: 'System Optimizer (OS & GPU Tuning)',
+                defaultBody: 'Fine-tune your Windows operating system and graphics settings outside the simulator: Hardware-Accelerated GPU Scheduling (HAGS), Windows Game Mode, Ultimate/High Performance power plan, DirectX Shader Cache (10 GB recommended), and GPU driver updates.',
                 preferredPlacement: 'right',
                 async beforeEnter() {
                     if (window.onboardingTour) window.onboardingTour._cleanupOpenedModals();
@@ -28272,17 +30737,53 @@ class OnboardingTourController {
                     if (typeof openFloatingWindow === 'function') {
                         openFloatingWindow('my_rig');
                     }
+                    if (typeof switchRigTab === 'function') {
+                        switchRigTab('tuning');
+                    }
                     const win = document.getElementById('float-win-my-rig');
                     if (win) {
                         win.classList.remove('hidden');
                         win.style.display = 'flex';
                     }
-                    await new Promise(r => setTimeout(r, 260));
+                    await new Promise(r => setTimeout(r, 40));
                 },
                 async beforeExit(direction) {
                     if (direction === 'prev') {
                         if (typeof closeFloatingWindow === 'function') {
                             closeFloatingWindow('my_rig');
+                        }
+                    }
+                }
+            },
+            // STEP 22: My Rig (Hardware Specs Audit)
+            {
+                id: 'my_rig',
+                targetSelector: '#float-win-my-rig',
+                titleKey: 'onboarding.step_my_rig_title',
+                bodyKey: 'onboarding.step_my_rig_body',
+                defaultTitle: 'Hardware Specs & Tailored Baseline',
+                defaultBody: "SceneryX automatically detects your full hardware architecture (CPU cores & threads, GPU architecture & dedicated VRAM, RAM speed & XMP, NVMe storage, and display refresh cadence). All sim LOD profiles, frame rate limiters, and performance recommendations are dynamically tailored to match your specific hardware baseline.",
+                preferredPlacement: 'right',
+                async beforeEnter() {
+                    if (window.onboardingTour) window.onboardingTour._cleanupOpenedModals();
+                    if (typeof closeBackgroundToolsModal === 'function') closeBackgroundToolsModal();
+                    if (typeof openFloatingWindow === 'function') {
+                        openFloatingWindow('my_rig');
+                    }
+                    if (typeof switchRigTab === 'function') {
+                        switchRigTab('specs');
+                    }
+                    const win = document.getElementById('float-win-my-rig');
+                    if (win) {
+                        win.classList.remove('hidden');
+                        win.style.display = 'flex';
+                    }
+                    await new Promise(r => setTimeout(r, 40));
+                },
+                async beforeExit(direction) {
+                    if (direction === 'prev') {
+                        if (typeof switchRigTab === 'function') {
+                            switchRigTab('tuning');
                         }
                     }
                 }
@@ -28305,16 +30806,24 @@ class OnboardingTourController {
                             rigWin.style.display = 'flex';
                         }
                     }
+                    if (typeof switchRigTab === 'function') {
+                        switchRigTab('specs');
+                    }
+                    await new Promise(r => setTimeout(r, 30));
                     const card = document.getElementById('opt-rig-card-display') || document.querySelector('.rig-card-display');
                     if (card) {
                         card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                     }
-                    await new Promise(r => setTimeout(r, 260));
+                    await new Promise(r => setTimeout(r, 30));
                 },
                 async beforeExit(direction) {
                     if (direction === 'next') {
                         if (typeof closeFloatingWindow === 'function') {
                             closeFloatingWindow('my_rig');
+                        }
+                    } else if (direction === 'prev') {
+                        if (typeof switchRigTab === 'function') {
+                            switchRigTab('specs');
                         }
                     }
                 }
@@ -28340,13 +30849,13 @@ class OnboardingTourController {
                     if (section) {
                         section.scrollIntoView({ behavior: 'smooth', block: 'center' });
                     }
-                    await new Promise(r => setTimeout(r, 240));
+                    await new Promise(r => setTimeout(r, 40));
                 },
                 async beforeExit(direction) {
                     if (typeof closeSettingsModal === 'function') {
                         closeSettingsModal();
                     }
-                    await new Promise(r => setTimeout(r, 200));
+                    await new Promise(r => setTimeout(r, 30));
                 }
             },
             // STEP 24: In-Game Panel in Cockpit
@@ -28378,7 +30887,7 @@ class OnboardingTourController {
                         win.classList.remove('hidden');
                         win.style.display = 'flex';
                     }
-                    await new Promise(r => setTimeout(r, 260));
+                    await new Promise(r => setTimeout(r, 40));
                 },
                 async beforeExit(direction) {
                     if (typeof closeFloatingWindow === 'function') {
@@ -28473,7 +30982,7 @@ class OnboardingTourController {
                             renderReportInViewerModal(demoReport);
                         }
                     }
-                    await new Promise(r => setTimeout(r, 280));
+                    await new Promise(r => setTimeout(r, 40));
                 },
                 async beforeExit(direction) {
                     if (typeof closeFloatingWindow === 'function') {
@@ -28494,15 +31003,197 @@ class OnboardingTourController {
         return null;
     }
 
+    _isLfpgTourActive() {
+        return this.isOpen && this.currentStepIndex >= 5 && this.currentStepIndex <= 9;
+    }
+
+    _positionLfpgReticle() {
+        const reticleEl = document.getElementById('tour-lfpg-spotlight-target');
+        const lfpgCutout = document.getElementById('tour-mask-lfpg-cutout');
+        const lMap = this._getLeafletMap();
+        if (!lMap) return null;
+        const ap = this._getLfpgTourAirport();
+        if (!ap || ap.lat === undefined || ap.lon === undefined) return null;
+
+        let wrappedLatLng = [ap.lat, ap.lon];
+        if (typeof getWrappedAirportLatLng === 'function') {
+            wrappedLatLng = getWrappedAirportLatLng(ap);
+        }
+        let pt = null;
+        try {
+            pt = lMap.latLngToContainerPoint(wrappedLatLng);
+        } catch(e) {}
+        if (!pt) return null;
+
+        const mapContainer = (typeof lMap.getContainer === 'function') ? lMap.getContainer() : document.getElementById('map');
+        const mapRect = mapContainer ? mapContainer.getBoundingClientRect() : { left: 0, top: 0 };
+        const screenX = Math.round(mapRect.left + pt.x);
+        const screenY = Math.round(mapRect.top + pt.y);
+
+        if (reticleEl) {
+            reticleEl.style.left = `${screenX}px`;
+            reticleEl.style.top = `${screenY}px`;
+        }
+        if (lfpgCutout) {
+            lfpgCutout.setAttribute('cx', screenX);
+            lfpgCutout.setAttribute('cy', screenY);
+            if (this._isLfpgTourActive()) {
+                lfpgCutout.setAttribute('r', '95');
+            } else if (reticleEl && !reticleEl.classList.contains('hidden') && reticleEl.style.display !== 'none') {
+                lfpgCutout.setAttribute('r', '95');
+            } else {
+                lfpgCutout.setAttribute('r', '0');
+            }
+        }
+        return { screenX, screenY };
+    }
+
+    _showLfpgReticle() {
+        const reticleEl = document.getElementById('tour-lfpg-spotlight-target');
+        if (reticleEl) {
+            reticleEl.classList.remove('hidden');
+            reticleEl.style.display = 'flex';
+        }
+        const lfpgCutout = document.getElementById('tour-mask-lfpg-cutout');
+        if (lfpgCutout) {
+            lfpgCutout.setAttribute('r', '95');
+        }
+        this._positionLfpgReticle();
+    }
+
+    _hideLfpgReticle() {
+        const reticleEl = document.getElementById('tour-lfpg-spotlight-target');
+        if (reticleEl) {
+            reticleEl.classList.add('hidden');
+            reticleEl.style.display = 'none';
+        }
+        const lfpgCutout = document.getElementById('tour-mask-lfpg-cutout');
+        if (lfpgCutout) {
+            lfpgCutout.setAttribute('r', '0');
+        }
+    }
+
+    _getLfpgTourAirport() {
+        return {
+            icao: 'LFPG',
+            iata: 'CDG',
+            name: 'Charles de Gaulle International Airport',
+            city: "Paris (Roissy-en-France, Val-d'Oise)",
+            country: 'FR',
+            iso_country: 'FR',
+            lat: 49.00896,
+            lon: 2.554117,
+            elevation: 392,
+            elevation_ft: 392,
+            type: 'large_airport',
+            english_type: 'International',
+            pricing_type: 'Asobo',
+            vendor: 'Microsoft / Asobo',
+            world_update_name: 'World Update IV: France & Benelux',
+            package_name: 'fs24-asobo-airport-lfpg-paris-charles-de-gaulle',
+            package_path: 'C:\\Users\\Bertrand\\AppData\\Local\\Packages\\Microsoft.Limitless_8wekyb3d8bbwe\\LocalCache\\Packages\\StreamedPackages\\fs24-asobo-airport-lfpg-paris-charles-de-gaulle',
+            source_folder: 'MSFS 2024 - StreamedPackages',
+            match_source: 'Folder ICAO (LFPG)',
+            is_payware: false,
+            is_asobo_official: true,
+            is_disabled: false,
+            is_addon: false,
+            is_fix_patch: false,
+            version: '',
+            size_str: 'Streamed',
+            rating: 4.8,
+            price_eur: 0.0,
+            is_custom_price: false,
+            has_conflict: false,
+            conflict_count: 3,
+            has_gsx_profile: true,
+            gsx_profile_filename: 'lfpg-test.ini',
+            gsx_profile_path: 'C:\\Users\\Bertrand\\AppData\\Roaming\\Virtuali\\GSX\\MSFS\\lfpg-test.ini',
+            bundled_gsx_profile: null,
+            all_sources: [
+                {
+                    folder_name: "fs24-asobo-airport-lfpg-paris-charles-de-gaulle",
+                    package_path: "C:\\Users\\Bertrand\\AppData\\Local\\Packages\\Microsoft.Limitless_8wekyb3d8bbwe\\LocalCache\\Packages\\StreamedPackages\\fs24-asobo-airport-lfpg-paris-charles-de-gaulle",
+                    source_folder: "MSFS 2024 - StreamedPackages",
+                    match_source: "Folder ICAO (LFPG)",
+                    vendor: "Microsoft / Asobo",
+                    pricing_type: "Asobo",
+                    is_payware: false,
+                    is_asobo_official: true,
+                    is_disabled: false,
+                    is_addon: false,
+                    is_fix_patch: false,
+                    version: "",
+                    size_str: "Streamed",
+                    world_update_name: "World Update IV: France & Benelux"
+                },
+                {
+                    folder_name: "stalex-airport-lfpg-charlesdegaulle",
+                    package_path: "C:\\Users\\Bertrand\\AppData\\Local\\Packages\\Microsoft.Limitless_8wekyb3d8bbwe\\LocalCache\\Packages\\Community\\stalex-airport-lfpg-charlesdegaulle",
+                    source_folder: "MSFS 2024 - Community",
+                    match_source: "Folder ICAO (LFPG)",
+                    vendor: "Stalex",
+                    pricing_type: "Freeware / Flightsim.to",
+                    is_payware: false,
+                    is_asobo_official: false,
+                    is_disabled: false,
+                    is_addon: true,
+                    is_fix_patch: true,
+                    version: "v1.0.2",
+                    size_str: "42.9 MB",
+                    world_update_name: "World Update IV: France & Benelux"
+                },
+                {
+                    folder_name: "xavios-charles-de-gaulle",
+                    package_path: "C:\\Users\\Bertrand\\AppData\\Local\\Packages\\Microsoft.Limitless_8wekyb3d8bbwe\\LocalCache\\Packages\\Community2024\\xavios-charles-de-gaulle",
+                    source_folder: "MSFS 2024 - Community2024",
+                    match_source: "Manifest Title (LFPG)",
+                    vendor: "XAVIOS",
+                    pricing_type: "Freeware / Flightsim.to",
+                    is_payware: false,
+                    is_asobo_official: false,
+                    is_disabled: false,
+                    is_addon: true,
+                    is_fix_patch: true,
+                    version: "v0.0.0",
+                    size_str: "1.2 MB",
+                    world_update_name: "World Update IV: France & Benelux"
+                }
+            ],
+            runways: [
+                { id: "08L/26R", length_ft: 13829, length_m: 4215, width_ft: 148, width_m: 45, surface: "Asphalt", lighted: true, closed: false },
+                { id: "09R/27L", length_ft: 13780, length_m: 4200, width_ft: 148, width_m: 45, surface: "Asphalt", lighted: true, closed: false },
+                { id: "08R/26L", length_ft: 8858, length_m: 2700, width_ft: 197, width_m: 60, surface: "Concrete", lighted: true, closed: false },
+                { id: "09L/27R", length_ft: 8858, length_m: 2700, width_ft: 197, width_m: 60, surface: "Asphalt", lighted: true, closed: false },
+                { id: "08H/26H", length_ft: 1444, length_m: 440, width_ft: 99, width_m: 30, surface: "Grass", lighted: false, closed: false }
+            ],
+            operating_airlines: [
+                "Air France",
+                "easyJet",
+                "Delta Air Lines",
+                "Lufthansa",
+                "British Airways",
+                "Emirates",
+                "Qatar Airways",
+                "United Airlines",
+                "Turkish Airlines"
+            ],
+            routes: {
+                "Air France": ["KJFK", "KLAX", "EGLL", "EDDF", "LEMD", "LIRF", "EHAM", "EBBR", "OMDB", "RJAA", "VHHH"],
+                "easyJet": ["EGLL", "EGKK", "EGCC", "LEBL", "LEMD", "LFMN", "LIRN", "LIMC", "LPPT"],
+                "Delta Air Lines": ["KATL", "KBOS", "KDTW", "KJFK", "KLAX", "KMSP", "KSEA", "KSLC"],
+                "Lufthansa": ["EDDF", "EDDM", "EDDL"],
+                "British Airways": ["EGLL"],
+                "Emirates": ["OMDB"],
+                "Qatar Airways": ["OTHH"],
+                "United Airlines": ["KEWR", "KIAD", "KORD", "KSFO"],
+                "Turkish Airlines": ["LTFM"]
+            }
+        };
+    }
+
     _getLpmaAirport() {
-        let ap = (typeof getAirportByIcao === 'function') ? getAirportByIcao('LPMA') : null;
-        if (!ap && typeof allAirportsData !== 'undefined' && Array.isArray(allAirportsData)) {
-            ap = allAirportsData.find(a => (a.icao || '').toUpperCase() === 'LPMA');
-        }
-        if (!ap && typeof allAirportsData !== 'undefined' && Array.isArray(allAirportsData) && allAirportsData.length > 0) {
-            ap = allAirportsData.find(a => a.pricing_type === 'Payware' || a.pricing_type === 'Freeware') || allAirportsData[0];
-        }
-        return ap;
+        return this._getLfpgTourAirport();
     }
 
     _cleanupFloatingWindows() {
@@ -28540,12 +31231,19 @@ class OnboardingTourController {
         const sceneriesExt = document.getElementById('radial-sceneries-extension');
         if (sceneriesExt) {
             sceneriesExt.classList.add('hidden');
-            sceneriesExt.style.opacity = '';
+            sceneriesExt.style.removeProperty('z-index');
+            sceneriesExt.style.removeProperty('display');
+            sceneriesExt.style.removeProperty('visibility');
+            sceneriesExt.style.removeProperty('opacity');
+            sceneriesExt.style.removeProperty('pointer-events');
             const bodyEl = document.getElementById('radial-sceneries-extension-body');
             if (bodyEl) bodyEl.innerHTML = '';
             if (typeof stagedRadialScenerySelection !== 'undefined') stagedRadialScenerySelection = null;
         }
         this._cleanupFloatingWindows();
+        if (!this.isOpen || this.currentStepIndex < 5 || this.currentStepIndex > 9) {
+            this._hideLfpgReticle();
+        }
         if (window.windowManager) {
             window.windowManager.autoTileWindows();
         }
@@ -28558,10 +31256,15 @@ class OnboardingTourController {
             radialEl.classList.add('hidden');
             radialEl.style.display = 'none';
         }
+        currentClassicAirport = null;
+        currentRadialAirport = null;
+        selectedAirport = null;
         const headerCard = document.getElementById('classic-ap-header-card');
         if (headerCard) headerCard.classList.add('hidden');
         const actionsSec = document.getElementById('classic-ap-actions-section');
         if (actionsSec) actionsSec.classList.add('hidden');
+        const flightOptSec = document.getElementById('classic-flight-optimizer-section');
+        if (flightOptSec) flightOptSec.classList.remove('hidden');
         const filtersSec = document.getElementById('classic-filters-section');
         if (filtersSec) filtersSec.classList.remove('hidden');
 
@@ -28581,7 +31284,7 @@ class OnboardingTourController {
         if (itemEl) {
             itemEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
-        await new Promise(r => setTimeout(r, 220));
+        await new Promise(r => setTimeout(r, 40));
     }
 
     async isOnboardingCompleted() {
@@ -28660,17 +31363,43 @@ class OnboardingTourController {
         }
         if (markSeen) {
             this.markCompleted();
-            if (typeof triggerPendingBackgroundToolsCheck === 'function') {
-                triggerPendingBackgroundToolsCheck();
+            if (typeof triggerPendingConflictModal === 'function') {
+                triggerPendingConflictModal();
+            }
+            if (!window.IS_LITE) {
+                if (typeof triggerPendingBackgroundToolsCheck === 'function') {
+                    triggerPendingBackgroundToolsCheck();
+                }
+                setTimeout(() => {
+                    if (typeof checkFirstSystemTuningScanOnStartup === 'function') {
+                        checkFirstSystemTuningScanOnStartup(true);
+                    } else if (typeof openFloatingWindow === 'function') {
+                        openFloatingWindow('my_rig');
+                        if (typeof switchRigTab === 'function') switchRigTab('tuning');
+                        if (typeof loadSystemTuningStatus === 'function') loadSystemTuningStatus(true);
+                    }
+                }, 600);
             }
         }
     }
 
     async start(stepIndex = 0) {
         try {
+            if (!this._allSteps) {
+                this._allSteps = this.steps.slice();
+            }
+            this.steps = this._allSteps.slice();
             this.dismissPrompt(false);
             this.isOpen = true;
             this.currentStepIndex = stepIndex;
+
+            // Ensure any active conflict modal is hidden and postponed during tour
+            const conflictModal = document.getElementById('conflict-resolution-modal');
+            if (conflictModal && !conflictModal.classList.contains('hidden')) {
+                conflictModal.classList.add('hidden');
+                pendingConflictModal = true;
+                pendingConflictModalIndex = currentConflictIndex || 0;
+            }
 
             document.body.classList.add('tour-active');
 
@@ -28701,6 +31430,9 @@ class OnboardingTourController {
 
     _handleResize() {
         if (!this.isOpen) return;
+        if (this._isLfpgTourActive()) {
+            this._positionLfpgReticle();
+        }
         this.updateSpotlight();
     }
 
@@ -28711,6 +31443,9 @@ class OnboardingTourController {
 
     _handleMapMove() {
         if (!this.isOpen || !this._activeTargetEl) return;
+        if (this._isLfpgTourActive()) {
+            this._positionLfpgReticle();
+        }
         this.updateSpotlight();
     }
 
@@ -28721,6 +31456,26 @@ class OnboardingTourController {
     async goToStep(index, direction = 'next') {
         try {
             if (index < 0 || index >= this.steps.length) return;
+
+            // Stop any ongoing tracking animation from previous step
+            if (this._trackingRafId) {
+                cancelAnimationFrame(this._trackingRafId);
+                this._trackingRafId = null;
+            }
+
+            const glow = document.getElementById('tour-spotlight-glow');
+            if (glow) {
+                glow.style.opacity = '0';
+            }
+
+            const nextStep = this.steps[index];
+            if (nextStep && nextStep.targetSelector === '#tour-lfpg-spotlight-target') {
+                const cutout = document.getElementById('tour-mask-cutout');
+                if (cutout) {
+                    cutout.setAttribute('width', 0);
+                    cutout.setAttribute('height', 0);
+                }
+            }
 
             // Run exit hook of previous step if changing
             if (this._activeTargetEl && this.steps[this.currentStepIndex] && typeof this.steps[this.currentStepIndex].beforeExit === 'function') {
@@ -28739,7 +31494,8 @@ class OnboardingTourController {
             this._renderTooltip(step, index);
 
             // Update Spotlight Target & Cutout
-            await this._focusTarget(step.targetSelector, step.preferredPlacement);
+            let targetSel = step.targetSelector;
+            await this._focusTarget(targetSel, step.preferredPlacement);
         } catch (err) {
             console.error("[OnboardingTour] Error during goToStep:", index, err);
         }
@@ -28757,9 +31513,42 @@ class OnboardingTourController {
         const totalSteps = this.steps.length;
         const stepCounterText = `${index + 1}/${totalSteps}`;
 
+        const proStepIds = new Set([
+            'route_optimization', 'smart_lod', 'graphics_settings',
+            'bg_tools_ofxr_autofps', 'my_rig_tuning', 'my_rig',
+            'my_rig_display', 'ingame_panel_install', 'ingame_panel_cockpit',
+            'flight_report'
+        ]);
+        const isProStepInLite = !!(window.IS_LITE && step && proStepIds.has(step.id));
+        const rawTitle = (typeof t === 'function') ? t(step.titleKey, step.defaultTitle) : step.defaultTitle;
+        const rawBody = (typeof t === 'function') ? t(step.bodyKey, step.defaultBody) : step.defaultBody;
+
         if (badge) badge.innerText = stepCounterText;
-        if (titleEl) titleEl.innerText = (typeof t === 'function') ? t(step.titleKey, step.defaultTitle) : step.defaultTitle;
-        if (bodyEl) bodyEl.innerText = (typeof t === 'function') ? t(step.bodyKey, step.defaultBody) : step.defaultBody;
+        if (titleEl) {
+            if (isProStepInLite) {
+                titleEl.className = 'text-xs font-bold text-[#F1F5F9] uppercase tracking-wide leading-snug flex items-center justify-between gap-2 w-full';
+                titleEl.innerHTML = `<span class="truncate">${rawTitle}</span><span class="${LITE_PRO_BADGE_CLASS}">${LITE_PRO_BADGE_INNER}</span>`;
+            } else {
+                titleEl.className = 'text-xs font-bold text-[#F1F5F9] uppercase tracking-wide leading-snug';
+                titleEl.innerText = rawTitle;
+            }
+        }
+        if (bodyEl) {
+            if (isProStepInLite) {
+                bodyEl.innerHTML = '';
+                const descSpan = document.createElement('span');
+                descSpan.textContent = rawBody;
+                const proNote = document.createElement('span');
+                proNote.className = 'block mt-2 pt-2 border-t border-[#1E2638] text-[11px] font-semibold text-[#94A3B8]';
+                proNote.textContent = (typeof t === 'function')
+                    ? t('onboarding.pro_only_note', 'Available exclusively in SceneryX Pro.')
+                    : 'Available exclusively in SceneryX Pro.';
+                bodyEl.appendChild(descSpan);
+                bodyEl.appendChild(proNote);
+            } else {
+                bodyEl.innerText = rawBody;
+            }
+        }
 
         if (prevBtn) {
             if (index === 0) {
@@ -28776,7 +31565,7 @@ class OnboardingTourController {
 
         if (nextLabel) {
             if (index === totalSteps - 1) {
-                nextLabel.innerHTML = `<i class="fa-solid fa-check text-[11px] mr-1.5"></i>${(typeof t === 'function') ? t('onboarding.btn_finish', 'Finish') : 'Finish'}`;
+                nextLabel.innerText = (typeof t === 'function') ? t('onboarding.btn_finish', 'Finish') : 'Finish';
             } else {
                 nextLabel.innerText = (typeof t === 'function') ? t('onboarding.btn_next', 'Next') : 'Next';
             }
@@ -28786,12 +31575,21 @@ class OnboardingTourController {
     async _focusTarget(selector, preferredPlacement = 'right') {
         let targetEl = document.querySelector(selector);
 
-        // Small polling retry in case element was transitioning or just rendered
-        if (!targetEl) {
-            for (let i = 0; i < 10; i++) {
-                await new Promise(r => setTimeout(r, 60));
+        // Ultra-fast readiness check (compatible with fixed-position modals where offsetParent is null)
+        const isElReady = (el) => {
+            if (!el || !el.isConnected) return false;
+            if (el.classList.contains('hidden')) return false;
+            if (el.style.display === 'none') return false;
+            if (el.style.visibility === 'hidden') return false;
+            const r = el.getBoundingClientRect();
+            return r.width > 0 && r.height > 0;
+        };
+
+        if (!isElReady(targetEl)) {
+            for (let i = 0; i < 6; i++) {
+                await new Promise(r => setTimeout(r, 15));
                 targetEl = document.querySelector(selector);
-                if (targetEl) break;
+                if (isElReady(targetEl)) break;
             }
         }
 
@@ -28810,6 +31608,10 @@ class OnboardingTourController {
         }
 
         this._activeTargetEl = targetEl;
+        if (targetEl.id === 'tour-lfpg-spotlight-target') {
+            this._positionLfpgReticle();
+        }
+
         const computedPos = window.getComputedStyle(targetEl).position;
         if (computedPos === 'static') {
             targetEl.style.position = 'relative';
@@ -28818,7 +31620,7 @@ class OnboardingTourController {
         targetEl.classList.add('tour-spotlight-target');
 
         // Dynamically track target element during entrance animations, window tiling and map pan
-        this._startTargetTracking(preferredPlacement, 1200);
+        this._startTargetTracking(preferredPlacement, 260);
     }
 
     _centerTooltipFallback() {
@@ -28831,19 +31633,33 @@ class OnboardingTourController {
         }
     }
 
-    _startTargetTracking(preferredPlacement, durationMs = 750) {
+    _startTargetTracking(preferredPlacement, durationMs = 260) {
         if (this._trackingRafId) {
             cancelAnimationFrame(this._trackingRafId);
             this._trackingRafId = null;
         }
+        const cutout = document.getElementById('tour-mask-cutout');
+        const glow = document.getElementById('tour-spotlight-glow');
+        if (cutout) cutout.style.transition = 'none';
+        if (glow) glow.style.transition = 'none';
+
         const startTime = performance.now();
         const track = () => {
-            if (!this.isOpen || !this._activeTargetEl) return;
+            if (!this.isOpen || !this._activeTargetEl) {
+                if (cutout) cutout.style.transition = '';
+                if (glow) glow.style.transition = '';
+                return;
+            }
+            if (this._isLfpgTourActive()) {
+                this._positionLfpgReticle();
+            }
             this.updateSpotlight(preferredPlacement);
             if (performance.now() - startTime < durationMs) {
                 this._trackingRafId = requestAnimationFrame(track);
             } else {
                 this._trackingRafId = null;
+                if (cutout) cutout.style.transition = '';
+                if (glow) glow.style.transition = '';
                 this.updateSpotlight(preferredPlacement);
             }
         };
@@ -28851,8 +31667,37 @@ class OnboardingTourController {
     }
 
     updateSpotlight(overridePlacement = null) {
-        if (!this._activeTargetEl) return;
+        if (!this.isOpen || !this._activeTargetEl) return;
         const rect = this._activeTargetEl.getBoundingClientRect();
+
+        // Zero-rect / offscreen guard: Never update cutout to a hidden, collapsed, or offscreen element!
+        if (rect.width < 8 || rect.height < 8 || rect.bottom <= 0 || rect.right <= 0 || rect.left <= -500 || rect.top <= -500) {
+            return;
+        }
+
+        if (this._isLfpgTourActive()) {
+            this._positionLfpgReticle();
+        }
+
+        // SPECIAL CASE: Step 6 (LFPG reticle on map) -> NO RECTANGULAR CADRE OR GLOW!
+        if (this._activeTargetEl.id === 'tour-lfpg-spotlight-target') {
+            const cutout = document.getElementById('tour-mask-cutout');
+            const glow = document.getElementById('tour-spotlight-glow');
+            if (cutout) {
+                cutout.setAttribute('width', 0);
+                cutout.setAttribute('height', 0);
+            }
+            if (glow) {
+                glow.setAttribute('width', 0);
+                glow.setAttribute('height', 0);
+                glow.setAttribute('opacity', '0');
+                glow.style.opacity = '0';
+            }
+            const placement = overridePlacement || (this.steps[this.currentStepIndex] ? this.steps[this.currentStepIndex].preferredPlacement : 'bottom');
+            this._positionTooltip(rect, placement);
+            return;
+        }
+
         const pad = 6;
         const x = Math.max(0, rect.left - pad);
         const y = Math.max(0, rect.top - pad);
@@ -28887,6 +31732,7 @@ class OnboardingTourController {
             glow.setAttribute('height', h);
             glow.setAttribute('rx', rx);
             glow.setAttribute('ry', rx);
+            glow.style.opacity = '1';
             glow.setAttribute('opacity', '1');
         }
 
@@ -28907,6 +31753,40 @@ class OnboardingTourController {
 
         let left = 0;
         let top = 0;
+
+        // Custom Layout for Step 9 & 10 (LFPG Add-ons & Fixes):
+        // 3-Column Layout: Available Addons modal on Left, LFPG pulsing circle in Center, Tooltip Card on Right!
+        if (this.currentStepIndex === 8 || this.currentStepIndex === 9) {
+            const reticlePos = this._positionLfpgReticle();
+            const cx = reticlePos ? reticlePos.screenX : Math.round(vpW * 0.55);
+            const cy = reticlePos ? reticlePos.screenY : Math.round(vpH * 0.5);
+
+            // Dock strictly to the right of the pulsing circle
+            left = cx + 110;
+            if (left + tooltipW > vpW - margin) {
+                left = vpW - tooltipW - margin;
+            }
+            top = Math.max(126, Math.min(vpH - tooltipH - margin, cy - Math.round(tooltipH / 2)));
+
+            card.style.left = `${Math.round(left)}px`;
+            card.style.top = `${Math.round(top)}px`;
+            return;
+        }
+
+        // Custom Layout for Step 8 (Airport Details modal):
+        // Details modal is positioned lower; place tooltip card to the right of the modal if room, or top-right
+        if (this.currentStepIndex === 7) {
+            if (targetRect.right + pad + tooltipW <= vpW - margin) {
+                left = targetRect.right + pad;
+                top = Math.max(126, Math.min(vpH - tooltipH - margin, targetRect.top));
+            } else {
+                left = vpW - tooltipW - margin;
+                top = Math.max(126, targetRect.top);
+            }
+            card.style.left = `${Math.round(left)}px`;
+            card.style.top = `${Math.round(top)}px`;
+            return;
+        }
 
         let placement = preferredPlacement;
         if (placement === 'right' && (targetRect.right + pad + tooltipW > vpW - margin)) {
@@ -28961,8 +31841,8 @@ class OnboardingTourController {
         this._cleanupOpenedModals();
         await this.markCompleted();
         this.hide();
-        if (typeof triggerPendingBackgroundToolsCheck === 'function') {
-            triggerPendingBackgroundToolsCheck();
+        if (typeof triggerPendingConflictModal === 'function') {
+            triggerPendingConflictModal();
         }
         if (typeof showToast === 'function') {
             const toastMsg = (typeof t === 'function')
@@ -28970,14 +31850,46 @@ class OnboardingTourController {
                 : 'Onboarding tour completed! You can replay it anytime from Settings.';
             showToast(toastMsg, 'success', 3800);
         }
+        if (!window.IS_LITE) {
+            if (typeof triggerPendingBackgroundToolsCheck === 'function') {
+                triggerPendingBackgroundToolsCheck();
+            }
+            setTimeout(() => {
+                if (typeof checkFirstSystemTuningScanOnStartup === 'function') {
+                    checkFirstSystemTuningScanOnStartup(true);
+                } else if (typeof openFloatingWindow === 'function') {
+                    openFloatingWindow('my_rig');
+                    if (typeof switchRigTab === 'function') switchRigTab('tuning');
+                    if (typeof loadSystemTuningStatus === 'function') loadSystemTuningStatus(true);
+                }
+            }, 600);
+        }
     }
 
     async skip() {
+        if (this._isContextualMode) {
+            this.hide();
+            return;
+        }
         this._cleanupOpenedModals();
         await this.markCompleted();
         this.hide();
-        if (typeof triggerPendingBackgroundToolsCheck === 'function') {
-            triggerPendingBackgroundToolsCheck();
+        if (typeof triggerPendingConflictModal === 'function') {
+            triggerPendingConflictModal();
+        }
+        if (!window.IS_LITE) {
+            if (typeof triggerPendingBackgroundToolsCheck === 'function') {
+                triggerPendingBackgroundToolsCheck();
+            }
+            setTimeout(() => {
+                if (typeof checkFirstSystemTuningScanOnStartup === 'function') {
+                    checkFirstSystemTuningScanOnStartup(true);
+                } else if (typeof openFloatingWindow === 'function') {
+                    openFloatingWindow('my_rig');
+                    if (typeof switchRigTab === 'function') switchRigTab('tuning');
+                    if (typeof loadSystemTuningStatus === 'function') loadSystemTuningStatus(true);
+                }
+            }, 600);
         }
     }
 
@@ -28995,8 +31907,87 @@ class OnboardingTourController {
         }
     }
 
+    async showContextualStep(contextKey = 'settings') {
+        if (!contextKey) return;
+        this.isOpen = true;
+        this._isContextualMode = true;
+
+        document.body.classList.add('tour-active');
+        const overlay = document.getElementById('onboarding-tour-overlay');
+        if (overlay) overlay.classList.remove('hidden');
+
+        // Neutral spotlight glow (no blue/cyan)
+        const glow = document.getElementById('tour-spotlight-glow');
+        if (glow) {
+            glow.setAttribute('stroke', '#64748B');
+            glow.setAttribute('stroke-width', '1.5');
+        }
+
+        window.removeEventListener('resize', this._boundHandleResize);
+        window.addEventListener('resize', this._boundHandleResize);
+        window.removeEventListener('scroll', this._boundHandleScroll, true);
+        window.addEventListener('scroll', this._boundHandleScroll, true);
+
+        let title = 'Folders & Settings';
+        let body = 'Configure your MSFS Community & Official packages paths, GSX profile directory, navigation mode (Classic vs Radial), camera pan & zoom speeds, and install the in-game toolbar panel.';
+        let targetSelector = '#settings-modal';
+        let preferredPlacement = 'bottom';
+
+        if (contextKey === 'settings') {
+            title = (typeof t === 'function') ? t('onboarding.context_settings_title', 'Folders & Settings') : 'Folders & Settings';
+            body = (typeof t === 'function') ? t('onboarding.context_settings_body', 'Configure your MSFS Community & Official packages paths, GSX profile directory, navigation mode (Classic vs Radial), camera pan & zoom speeds, and install the in-game toolbar panel.') : 'Configure your MSFS Community & Official packages paths, GSX profile directory, navigation mode (Classic vs Radial), camera pan & zoom speeds, and install the in-game toolbar panel.';
+            targetSelector = '#settings-modal';
+            preferredPlacement = 'bottom';
+        } else if (contextKey === 'my_rig') {
+            const isTuningActive = !document.getElementById('rig-view-tuning')?.classList.contains('hidden');
+            const isMaintActive = !document.getElementById('rig-view-maintenance')?.classList.contains('hidden');
+            if (isTuningActive) {
+                title = (typeof t === 'function') ? t('onboarding.step_system_optimizer_title', 'System Optimizer (Windows OS & GPU Tuning)') : 'System Optimizer (Windows OS & GPU Tuning)';
+                body = (typeof t === 'function') ? t('onboarding.step_system_optimizer_body', 'System Optimizer audits and tunes 7 critical Windows OS and GPU parameters outside of MSFS (HAGS for DLSS 3 Frame Gen, Game Mode, Ultimate Power Plan, Re-Size BAR, Shader Cache quota, GPU Drivers, and Core Isolation) to ensure maximum framerate stability.') : 'System Optimizer audits and tunes 7 critical Windows OS and GPU parameters outside of MSFS (HAGS for DLSS 3 Frame Gen, Game Mode, Ultimate Power Plan, Re-Size BAR, Shader Cache quota, GPU Drivers, and Core Isolation) to ensure maximum framerate stability.';
+            } else if (isMaintActive) {
+                title = 'Update & Cache Cleaner (Safe Update Mode & Cache Purge)';
+                body = 'Protect your Community folders in 1 click before any MSFS World Update or Sim Update (instant atomic folder quarantine + SceneryIndexes refresh), and purge compiled WASM aircraft binaries, Rolling Cache, StreamedPackages/ModelLib caches, and DirectX/GPU shaders without losing your aircraft configurations.';
+            } else {
+                title = (typeof t === 'function') ? t('onboarding.step_my_rig_title', 'Hardware Specs & Tailored Baseline') : 'Hardware Specs & Tailored Baseline';
+                body = (typeof t === 'function') ? t('onboarding.step_my_rig_body', "SceneryX automatically detects your full hardware architecture (CPU cores & threads, GPU architecture & dedicated VRAM, RAM speed & XMP, NVMe storage, and display refresh cadence). All sim LOD profiles, frame rate limiters, and performance recommendations are dynamically tailored to match your specific hardware baseline.") : "SceneryX automatically detects your full hardware architecture (CPU cores & threads, GPU architecture & dedicated VRAM, RAM speed & XMP, NVMe storage, and display refresh cadence). All sim LOD profiles, frame rate limiters, and performance recommendations are dynamically tailored to match your specific hardware baseline.";
+            }
+            targetSelector = '#float-win-my-rig';
+            preferredPlacement = 'right';
+        }
+
+        const titleEl = document.getElementById('tour-step-title');
+        const bodyEl = document.getElementById('tour-step-body');
+        const badgeEl = document.getElementById('tour-step-badge');
+        const prevBtn = document.getElementById('tour-btn-prev');
+        const skipBtn = document.getElementById('tour-btn-skip');
+        const nextBtn = document.getElementById('tour-btn-next');
+        const nextLabel = document.getElementById('tour-btn-next-label');
+
+        if (titleEl) titleEl.innerText = title;
+        if (bodyEl) bodyEl.innerText = body;
+        if (badgeEl) {
+            badgeEl.innerText = (typeof t === 'function') ? t('common.help', 'HELP') : 'HELP';
+            badgeEl.className = 'font-mono text-xs font-bold text-slate-300 tracking-wider select-none';
+        }
+        if (prevBtn) prevBtn.classList.add('hidden');
+        if (skipBtn) skipBtn.classList.add('hidden');
+        if (nextBtn) {
+            nextBtn.className = 'px-4 py-1.5 rounded-md text-xs font-semibold text-white bg-slate-700 hover:bg-slate-600 transition-all cursor-pointer shadow-sm border border-slate-600';
+            nextBtn.onclick = () => {
+                this.hide();
+            };
+        }
+        if (nextLabel) {
+            nextLabel.innerText = (typeof t === 'function') ? t('onboarding.context_got_it', 'Got It') : 'Got It';
+        }
+
+        await this._focusTarget(targetSelector, preferredPlacement);
+    }
+
     hide() {
+        const wasContextual = !!this._isContextualMode;
         this.isOpen = false;
+        this._isContextualMode = false;
         document.body.classList.remove('tour-active');
         window.removeEventListener('resize', this._boundHandleResize);
         window.removeEventListener('scroll', this._boundHandleScroll, true);
@@ -29013,16 +32004,35 @@ class OnboardingTourController {
             lMap.off('zoomend', this._boundHandleMapMove);
         }
 
-        this._cleanupOpenedModals();
+        if (!wasContextual) {
+            this._cleanupOpenedModals();
 
-        const radialEl = document.getElementById('airport-radial-menu');
-        if (radialEl) {
-            radialEl.classList.add('hidden');
-            radialEl.style.display = 'none';
+            currentClassicAirport = null;
+            currentRadialAirport = null;
+            selectedAirport = null;
+            if (typeof closeClassicAirportView === 'function') {
+                closeClassicAirportView();
+            } else {
+                const headerCard = document.getElementById('classic-ap-header-card');
+                if (headerCard) headerCard.classList.add('hidden');
+                const actionsSec = document.getElementById('classic-ap-actions-section');
+                if (actionsSec) actionsSec.classList.add('hidden');
+                const flightOptSec = document.getElementById('classic-flight-optimizer-section');
+                if (flightOptSec) flightOptSec.classList.remove('hidden');
+            }
+            if (typeof updateClassicPanelUI === 'function') {
+                updateClassicPanelUI();
+            }
+
+            const radialEl = document.getElementById('airport-radial-menu');
+            if (radialEl) {
+                radialEl.classList.add('hidden');
+                radialEl.style.display = 'none';
+            }
+
+            document.querySelectorAll('[id^="classic-sub-"]').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('[id^="classic-chevron-"]').forEach(el => el.style.transform = 'rotate(0deg)');
         }
-
-        document.querySelectorAll('[id^="classic-sub-"]').forEach(el => el.classList.add('hidden'));
-        document.querySelectorAll('[id^="classic-chevron-"]').forEach(el => el.style.transform = 'rotate(0deg)');
 
         if (this._activeTargetEl) {
             this._activeTargetEl.classList.remove('tour-spotlight-target');
@@ -29046,13 +32056,73 @@ class OnboardingTourController {
             glow.setAttribute('opacity', '0');
         }
 
+        const reticleEl = document.getElementById('tour-lfpg-spotlight-target');
+        if (reticleEl) {
+            reticleEl.classList.add('hidden');
+            reticleEl.style.display = 'none';
+        }
+
         const overlay = document.getElementById('onboarding-tour-overlay');
         if (overlay) overlay.classList.add('hidden');
+
+        // Restore card controls to normal tour state
+        const prevBtn = document.getElementById('tour-btn-prev');
+        if (prevBtn) prevBtn.classList.remove('hidden');
+        const skipBtn = document.getElementById('tour-btn-skip');
+        if (skipBtn) skipBtn.classList.remove('hidden');
+        const nextBtn = document.getElementById('tour-btn-next');
+        if (nextBtn) {
+            nextBtn.onclick = () => {
+                window.onboardingTour && window.onboardingTour.next();
+            };
+            nextBtn.className = 'px-4 py-1.5 rounded-md text-xs font-bold text-slate-950 bg-cyan-500 hover:bg-cyan-400 shadow-sm transition-all cursor-pointer';
+        }
     }
 }
 
+function showContextHelp(menuKey = 'settings') {
+    if (window.onboardingTour) {
+        window.onboardingTour.showContextualStep(menuKey);
+    }
+}
+window.showContextHelp = showContextHelp;
+
 window.onboardingTour = new OnboardingTourController();
 window.startOnboardingTour = () => window.onboardingTour && window.onboardingTour.start();
+
+async function restartInteractiveTourFromSettings() {
+    closeSettingsModal();
+    if (window.onboardingTour) {
+        window.onboardingTour.currentStepIndex = 0;
+        setTimeout(() => {
+            window.onboardingTour.start(0);
+        }, 250);
+    }
+}
+window.restartInteractiveTourFromSettings = restartInteractiveTourFromSettings;
+
+async function resetOnboardingPromptFromSettings() {
+    try {
+        localStorage.removeItem('sceneryx_onboarding_completed');
+        if (window.onboardingTour) {
+            window.onboardingTour.hasSeenOnboarding = false;
+        }
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.get_settings && window.pywebview.api.save_settings) {
+            const res = await window.pywebview.api.get_settings();
+            let cfg = typeof res === 'string' ? JSON.parse(res) : res;
+            if (cfg) {
+                cfg.onboarding_completed = false;
+                await window.pywebview.api.save_settings(JSON.stringify(cfg));
+            }
+        }
+        if (typeof showToast === 'function') {
+            showToast(t('settings.reset_tour_prompt_success', 'Welcome prompt has been reset! It will appear on next launch.'), 'success');
+        }
+    } catch (e) {
+        console.error("Error resetting onboarding prompt:", e);
+    }
+}
+window.resetOnboardingPromptFromSettings = resetOnboardingPromptFromSettings;
 
 window.addEventListener('keydown', function(e) {
     if (e.key === 'Escape' && window.onboardingTour && window.onboardingTour.isOpen) {

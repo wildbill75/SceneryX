@@ -3,6 +3,7 @@ import sys
 import time
 import json
 import re
+import threading
 import urllib.request
 import webbrowser
 import webview
@@ -10,7 +11,7 @@ from datetime import datetime
 import flight_rig_optimizer
 import flight_perf_tracker
 import flight_bug_reporter
-from scanner import run_scan, get_settings, save_settings, load_ratings, save_rating, save_custom_price, save_custom_category, load_custom_prices, get_estimated_price, get_default_gsx_path, load_airport_database, SPECIAL_BUNDLE_MAP, OUTPUT_JSON_PATH, compute_scan_delta, build_library_snapshot, SNAPSHOT_JSON_PATH, get_resource_file_path, audit_all_gsx_profiles, audit_single_airport_gsx, extract_icao_from_gsx_filename, find_bundled_gsx, USER_DATA_DIR
+from scanner import run_scan, get_settings, save_settings, load_ratings, save_rating, save_custom_price, save_custom_category, load_custom_prices, get_estimated_price, get_default_gsx_path, load_airport_database, SPECIAL_BUNDLE_MAP, OUTPUT_JSON_PATH, compute_scan_delta, build_library_snapshot, SNAPSHOT_JSON_PATH, get_resource_file_path, audit_all_gsx_profiles, audit_single_airport_gsx, extract_icao_from_gsx_filename, find_bundled_gsx, USER_DATA_DIR, IS_LITE, APP_VERSION
 
 try:
     import webview.platforms.winforms as wf
@@ -432,6 +433,11 @@ def sanitize_msfs_content_xml():
                     continue
                 name_clean = name[:-9] if name.endswith('.disabled') else name
                 if name.lower().endswith('.disabled'):
+                    tree.remove(elem)
+                    changed = True
+                    continue
+
+                if re.search(r'[-_\s.](copy|copie|backup|bak)(\b|\d*)', name.lower()):
                     tree.remove(elem)
                     changed = True
                     continue
@@ -1160,6 +1166,33 @@ class Api:
     def __init__(self):
         self._startup_delta = {"added": [], "removed": [], "total_changes": 0}
         self._startup_scanned = False
+        threading.Thread(target=self._auto_sync_installed_ingame_panel, daemon=True).start()
+        threading.Thread(target=self._auto_preload_simbrief_ofp, daemon=True).start()
+
+    def _auto_preload_simbrief_ofp(self):
+        try:
+            flight_perf_tracker.get_simbrief_flight_plan(force_refresh=True)
+        except Exception:
+            pass
+
+    def _auto_sync_installed_ingame_panel(self):
+        try:
+            import shutil
+            all_paths = self._get_all_community_paths()
+            if not all_paths:
+                return
+            base_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
+            src_dir = os.path.join(base_dir, "wildbill75-sceneryx")
+            if not os.path.exists(src_dir):
+                src_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wildbill75-sceneryx")
+            if not os.path.exists(src_dir):
+                return
+            for c_path in all_paths:
+                target_dir = os.path.join(c_path, "wildbill75-sceneryx")
+                if os.path.exists(os.path.join(target_dir, "manifest.json")):
+                    shutil.copytree(src_dir, target_dir, dirs_exist_ok=True)
+        except Exception:
+            pass
 
     def update_splash_progress(self, percent, text=""):
         global shared_splash_state
@@ -1267,15 +1300,7 @@ class Api:
 
     def get_airports(self):
         settings = get_settings()
-        disclaimer_accepted = settings.get("disclaimer_accepted", None)
-        if disclaimer_accepted is None:
-            # Migration for legacy users who already had data before disclaimer was introduced
-            if os.path.exists(OUTPUT_JSON_PATH) and os.path.getsize(OUTPUT_JSON_PATH) > 1000:
-                disclaimer_accepted = True
-                settings["disclaimer_accepted"] = True
-                save_settings(settings)
-            else:
-                disclaimer_accepted = False
+        disclaimer_accepted = settings.get("disclaimer_accepted", False)
 
         if not disclaimer_accepted:
             # First launch before Terms of Use accepted: don't auto-scan yet, return empty
@@ -1297,23 +1322,35 @@ class Api:
             airports = run_scan()
             self._startup_delta = compute_scan_delta(airports, update_snapshot=True)
             self._startup_scanned = True
-            return json.dumps(airports, ensure_ascii=False)
+            if os.path.exists(OUTPUT_JSON_PATH):
+                try:
+                    with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
+                        return f.read()
+                except Exception:
+                    pass
+            return json.dumps(airports, separators=(',', ':'), ensure_ascii=False)
 
         if os.path.exists(OUTPUT_JSON_PATH):
             try:
                 with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
-                    airports = json.load(f)
-                    if airports and len(airports) > 0:
+                    content = f.read()
+                    if content and len(content) > 10:
                         self._startup_delta = {"added": [], "removed": [], "total_changes": 0}
                         self._startup_scanned = True
-                        return json.dumps(airports, ensure_ascii=False)
+                        return content
             except Exception as e:
                 print("Error reading cached installed_airports.json, performing fresh scan:", e)
 
         airports = run_scan()
         self._startup_delta = compute_scan_delta(airports, update_snapshot=True)
         self._startup_scanned = True
-        return json.dumps(airports, ensure_ascii=False)
+        if os.path.exists(OUTPUT_JSON_PATH):
+            try:
+                with open(OUTPUT_JSON_PATH, 'r', encoding='utf-8') as f:
+                    return f.read()
+            except Exception:
+                pass
+        return json.dumps(airports, separators=(',', ':'), ensure_ascii=False)
 
     def initial_scan(self):
         """
@@ -1324,11 +1361,12 @@ class Api:
         current_snapshot = build_library_snapshot(airports)
         try:
             with open(SNAPSHOT_JSON_PATH, 'w', encoding='utf-8') as f:
-                json.dump(current_snapshot, f, indent=2, ensure_ascii=False)
+                json.dump(current_snapshot, f, separators=(',', ':'), ensure_ascii=False)
         except Exception as e:
             print("Error saving initial library snapshot:", e)
         self._startup_delta = {"added": [], "removed": [], "total_changes": 0}
-        return json.dumps({"airports": airports, "delta": self._startup_delta}, ensure_ascii=False)
+        self._startup_scanned = True
+        return json.dumps({"airports": airports, "delta": self._startup_delta}, separators=(',', ':'), ensure_ascii=False)
 
     def get_startup_delta(self):
         delta = getattr(self, '_startup_delta', None)
@@ -1338,6 +1376,9 @@ class Api:
 
     def get_world_airport_coords(self):
         try:
+            if hasattr(Api, '_CACHED_WORLD_AIRPORT_COORDS') and Api._CACHED_WORLD_AIRPORT_COORDS is not None:
+                return Api._CACHED_WORLD_AIRPORT_COORDS
+
             AIRPORTS_DB_CACHE, _, _ = load_airport_database()
             coords = {}
             for icao, ap in AIRPORTS_DB_CACHE.items():
@@ -1358,7 +1399,8 @@ class Api:
                     'country': 'Germany',
                     'type': 'large_airport'
                 }
-            return json.dumps(coords, ensure_ascii=False)
+            Api._CACHED_WORLD_AIRPORT_COORDS = json.dumps(coords, separators=(',', ':'), ensure_ascii=False)
+            return Api._CACHED_WORLD_AIRPORT_COORDS
         except Exception as e:
             print("Error returning world_airport_coords:", e)
             return json.dumps({})
@@ -1378,13 +1420,28 @@ class Api:
             print("Error in get_airport_runways:", e)
             return json.dumps([])
 
+    def get_world_airport(self, icao):
+        """Returns on-demand synthesized metadata for any default MSFS procedural airport in the world."""
+        try:
+            from scanner import create_default_procedural_airport
+            clean = (icao or '').strip().upper()
+            if not clean:
+                return json.dumps(None)
+            ap = create_default_procedural_airport(clean)
+            return json.dumps(ap, ensure_ascii=False)
+        except Exception as e:
+            print(f"Error in get_world_airport({icao}):", e)
+            return json.dumps(None)
+
     def rescan(self):
         airports = run_scan()
         delta = compute_scan_delta(airports, update_snapshot=True)
         self._startup_delta = delta
-        return json.dumps({"airports": airports, "delta": delta}, ensure_ascii=False)
+        return json.dumps({"airports": airports, "delta": delta}, separators=(',', ':'), ensure_ascii=False)
 
     def fetch_simbrief(self, identifier):
+        if IS_LITE:
+            return json.dumps({"status": "locked", "is_lite": True, "message": "SimBrief Integration is only available in SceneryX Pro."})
         identifier = str(identifier).strip()
         if not identifier:
             return json.dumps({"status": "error", "message": "Identifier empty"})
@@ -1607,6 +1664,15 @@ class Api:
         try:
             data = json.loads(settings_json)
             updated = save_settings(data)
+            if hasattr(self, '_tray_icon') and self._tray_icon:
+                try:
+                    import pystray
+                    self._tray_icon.menu = pystray.Menu(
+                        pystray.MenuItem('Show SceneryX', getattr(self, '_on_tray_show', lambda: None), default=True),
+                        pystray.MenuItem('Quit', getattr(self, '_on_tray_quit', lambda: None))
+                    )
+                except Exception as ex:
+                    print(f"[Tray] Dynamic language update error: {ex}")
             return json.dumps({"status": "ok", "settings": updated}, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
@@ -1626,8 +1692,16 @@ class Api:
                 for ap in airports:
                     if ap['icao'] == icao:
                         ap['rating'] = r_float if r_float > 0 else 0
+                compact_p = json.dumps(airports, separators=(',', ':'), ensure_ascii=False)
                 with open(OUTPUT_JSON_PATH, 'w', encoding='utf-8') as f:
-                    json.dump(airports, f, indent=2, ensure_ascii=False)
+                    f.write(compact_p)
+                local_json = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'installed_airports.json')
+                if os.path.exists(local_json) and os.path.abspath(local_json) != os.path.abspath(OUTPUT_JSON_PATH):
+                    try:
+                        with open(local_json, 'w', encoding='utf-8') as f:
+                            f.write(compact_p)
+                    except Exception:
+                        pass
 
             return json.dumps({"status": "ok", "ratings": ratings})
         except Exception as e:
@@ -1912,7 +1986,7 @@ class Api:
                         if is_core_or_library_package(clean):
                             continue
 
-                        if clean_lower in seen:
+                        if clean_lower in seen or re.search(r'[-_\s.](copy|copie|backup|bak)(\b|\d*)', clean_lower):
                             to_remove.append(p)
                             changed = True
                             continue
@@ -2171,8 +2245,16 @@ class Api:
 
             if os.path.exists(OUTPUT_JSON_PATH):
                 try:
+                    compact_p = json.dumps(airports, separators=(',', ':'), ensure_ascii=False)
                     with open(OUTPUT_JSON_PATH, 'w', encoding='utf-8') as f:
-                        json.dump(airports, f, indent=2, ensure_ascii=False)
+                        f.write(compact_p)
+                    local_json = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'installed_airports.json')
+                    if os.path.exists(local_json) and os.path.abspath(local_json) != os.path.abspath(OUTPUT_JSON_PATH):
+                        try:
+                            with open(local_json, 'w', encoding='utf-8') as f:
+                                f.write(compact_p)
+                        except Exception:
+                            pass
                 except Exception:
                     pass
 
@@ -2247,9 +2329,13 @@ class Api:
             return json.dumps({"status": "error", "message": str(e)})
 
     def optimize_flight(self, keep_icaos_json):
+        if IS_LITE:
+            return json.dumps({"status": "locked", "is_lite": True, "message": "Flight Plan Optimizer is only available in SceneryX Pro."})
         return self.optimize_flight_mode(keep_icaos_json)
 
     def optimize_flight_mode(self, keep_icaos_json):
+        if IS_LITE:
+            return json.dumps({"status": "locked", "is_lite": True, "message": "Flight Plan Optimizer is only available in SceneryX Pro."})
         try:
             raw_param = json.loads(keep_icaos_json)
             dep_icao = ''
@@ -4368,6 +4454,132 @@ class Api:
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
 
+    def get_system_tuning_status(self):
+        try:
+            res = flight_rig_optimizer.get_system_tuning_status()
+            return json.dumps(res, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    def get_sim_maintenance_status(self):
+        try:
+            res = flight_rig_optimizer.get_sim_maintenance_status()
+            return json.dumps(res, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    def toggle_community_safe_update_mode(self, target_action=None):
+        try:
+            res = flight_rig_optimizer.toggle_community_safe_update_mode(target_action)
+            return json.dumps(res, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    def run_sim_maintenance_action(self, action_id):
+        try:
+            res = flight_rig_optimizer.run_sim_maintenance_action(str(action_id))
+            return json.dumps(res, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    def set_system_game_mode(self, enable):
+        try:
+            ok = flight_rig_optimizer.set_windows_game_mode(bool(enable))
+            refreshed = flight_rig_optimizer.get_system_tuning_status()
+            refreshed["status"] = "success" if ok else "error"
+            refreshed["success"] = ok
+            refreshed["message"] = "Game mode updated successfully." if ok else "Failed to update Game mode in Windows registry."
+            return json.dumps(refreshed, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e), "success": False}, ensure_ascii=False)
+
+    def set_system_power_plan(self, plan_guid):
+        try:
+            ok = flight_rig_optimizer.set_windows_power_plan(str(plan_guid))
+            refreshed = flight_rig_optimizer.get_system_tuning_status()
+            refreshed["status"] = "success" if ok else "error"
+            refreshed["success"] = ok
+            refreshed["message"] = "Power plan updated successfully." if ok else "Failed to activate power plan."
+            return json.dumps(refreshed, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e), "success": False}, ensure_ascii=False)
+
+    def open_windows_graphics_settings(self):
+        try:
+            ok = flight_rig_optimizer.open_windows_graphics_settings()
+            return json.dumps({"status": "ok" if ok else "error"}, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    def launch_gpu_control_app(self):
+        try:
+            ok = flight_rig_optimizer.launch_gpu_control_app()
+            return json.dumps({"status": "ok" if ok else "error"}, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    def open_windows_power_options(self):
+        try:
+            ok = flight_rig_optimizer.open_windows_power_options()
+            return json.dumps({"status": "ok" if ok else "error"}, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    def open_shader_cache_settings(self):
+        try:
+            ok = flight_rig_optimizer.open_shader_cache_settings()
+            return json.dumps({"status": "ok" if ok else "error"}, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    def set_system_hags(self, enable):
+        try:
+            res = flight_rig_optimizer.set_windows_hags(bool(enable))
+            refreshed = flight_rig_optimizer.get_system_tuning_status()
+            refreshed["operation_result"] = res
+            return json.dumps(refreshed, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e), "success": False}, ensure_ascii=False)
+
+    def purge_shader_cache(self):
+        try:
+            res = flight_rig_optimizer.purge_shader_cache()
+            return json.dumps(res, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e), "success": False}, ensure_ascii=False)
+
+    def open_nvidia_control_panel(self):
+        try:
+            ok = flight_rig_optimizer.open_nvidia_control_panel()
+            return json.dumps({"status": "ok" if ok else "error"}, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    def open_windows_disk_cleanup(self):
+        try:
+            ok = flight_rig_optimizer.open_windows_disk_cleanup()
+            return json.dumps({"status": "ok" if ok else "error"}, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    def open_external_url(self, url):
+        try:
+            import webbrowser
+            if url and (url.startswith("http://") or url.startswith("https://")):
+                webbrowser.open(url)
+                return json.dumps({"status": "ok"}, ensure_ascii=False)
+            return json.dumps({"status": "error", "message": "Invalid URL protocol"}, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    def apply_all_recommended_system_tweaks(self):
+        try:
+            res = flight_rig_optimizer.apply_all_recommended_system_tweaks()
+            res["status"] = "success"
+            return json.dumps(res, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e), "success": False}, ensure_ascii=False)
+
     def start_flight_blackbox(self, flight_name, dep_icao, arr_icao, aircraft):
         try:
             st = get_settings()
@@ -4395,6 +4607,401 @@ class Api:
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
 
+    def get_resumable_blackbox_session(self):
+        try:
+            res = flight_perf_tracker.BLACKBOX.get_resumable_session()
+            return json.dumps(res, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"has_resumable": False, "error": str(e)}, ensure_ascii=False)
+
+    def resume_flight_blackbox(self):
+        try:
+            res = flight_perf_tracker.BLACKBOX.resume_session()
+            return json.dumps(res, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    def end_resumable_blackbox_session(self, generate_report=True):
+        try:
+            res = flight_perf_tracker.BLACKBOX.end_resumable_session(generate_report=bool(generate_report))
+            return json.dumps(res, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    def resolve_monitoring_on_exit(self, keep_for_resume=True):
+        try:
+            if keep_for_resume:
+                flight_perf_tracker.BLACKBOX.suspend_for_resume()
+            else:
+                flight_perf_tracker.BLACKBOX.stop()
+
+            st = get_settings()
+            fm = st.get('flight_mode', {})
+            if isinstance(fm, dict) and fm.get('active'):
+                return json.dumps({"status": "ok", "needs_flight_mode_prompt": True}, ensure_ascii=False)
+
+            self.exit_app(False)
+            return json.dumps({"status": "ok", "needs_flight_mode_prompt": False}, ensure_ascii=False)
+        except Exception as e:
+            self.exit_app(False)
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    def _parse_version_tuple(self, ver_str):
+        if not ver_str:
+            return (0, 0, 0)
+        m = re.search(r'(\d+)\.(\d+)\.(\d+)', str(ver_str))
+        if m:
+            return (int(m.group(1)), int(m.group(2)), int(m.group(3)))
+        return (0, 0, 0)
+
+    @staticmethod
+    def _normalize_version_tag(ver_str):
+        if not ver_str:
+            return ver_str
+        return re.sub(r'^RC_v?', 'PRO_', str(ver_str).strip(), flags=re.IGNORECASE)
+
+    def _get_current_app_version(self):
+        if IS_LITE:
+            return APP_VERSION
+        # 1. Read bundled web/index.html version string first
+        try:
+            html_path = get_resource_file_path(os.path.join('web', 'index.html'))
+            if html_path and os.path.exists(html_path):
+                with open(html_path, 'r', encoding='utf-8', errors='ignore') as f:
+                    content = f.read()
+                m = re.search(r'title="SceneryX\s+((?:PRO_|LITE_|RC_(?:v)?)\d+\.\d+\.\d+(?:-LITE)?)"', content)
+                if not m:
+                    m = re.search(r'((?:PRO_|LITE_|RC_(?:v)?)\d+\.\d+\.\d+(?:-LITE)?)\s*(?:•\s*)?&copy;', content)
+                if m:
+                    return self._normalize_version_tag(m.group(1).strip())
+        except Exception:
+            pass
+        # 2. Fallback to Windows Registry
+        try:
+            import winreg
+            for root in (winreg.HKEY_LOCAL_MACHINE, winreg.HKEY_CURRENT_USER):
+                try:
+                    with winreg.OpenKey(root, r"Software\SceneryX") as key:
+                        val, _ = winreg.QueryValueEx(key, "Version")
+                        if val:
+                            return self._normalize_version_tag(str(val).strip())
+                except Exception:
+                    continue
+        except Exception:
+            pass
+        return self._normalize_version_tag(APP_VERSION or ("LITE_1.1.0" if IS_LITE else "PRO_1.1.0"))
+
+    PATCHES_REPO_RAW_BASE = "https://raw.githubusercontent.com/wildbill75/SceneryX/Updates/patches"
+    PATCHES_MANIFEST_URL = "https://raw.githubusercontent.com/wildbill75/SceneryX/Updates/patches/version.json"
+
+    _PATCH_1_1_1_CHANGELOG_BODY = (
+        "**Release Date:** October 18, 2026\n"
+        "**Channel:** `Updates/patches`\n\n"
+        "## What's New & Fixed\n\n"
+        "### 1. My Rig — Update & Cache Cleaner\n"
+        "- **Safe Update Mode (Community Quarantine):** Added 1-click Community folder quarantine (`PREPARE FOR UPDATE` / restore) in **My Rig > Update & Cache Cleaner** to safely park and restore your Community add-ons before and after MSFS Sim Updates.\n"
+        "- **MSFS & GPU Shader Cache Cleaner:** Added real-time scanning and 1-click cleanup (`PURGE ALL CACHES` or individual purge) for MSFS SceneryIndexes, Rolling Cache, StreamedPackages cache, WASM/Aircraft state caches, and DirectX / NVIDIA / AMD GPU Shader Caches.\n\n"
+        "### 2. Live Telemetry & MSFS In-Game Panel Synchronization\n"
+        "- **Bi-Directional Monitoring Sync:** Starting or stopping Flight Monitoring from either the MSFS In-Game Panel or the SceneryX desktop app now synchronizes immediately across both interfaces.\n"
+        "- **Real-Time Sidebar Counter:** Fixed the `TELEMETRY` elapsed time counter badge (`00:01`, `00:02`...) in the left navigation bar so it updates live as soon as monitoring starts.\n"
+        "- **30S Trend Sparkline Control:** Clicking `STOP MONITORING` now immediately halts the live `30S TREND` graph and returns the telemetry display to `STANDBY`.\n"
+        "- **Post-Flight Report Generation:** Resolved an issue where stopping telemetry from the In-Game Panel did not trigger flight report generation in SceneryX.\n\n"
+        "### 3. Route & Airport City Name Harmonization & Onboarding Fix\n"
+        "- **Clean Metropolitan City Names:** Harmonized airport city labels across SimBrief plans, Live Flight Monitoring, and Post-Flight Reports (e.g., `LGAV (Athens)` instead of municipality names like `Spata-Artemida`).\n"
+        "- **Onboarding Flight Optimizer Restore:** Fixed an issue where the `FLIGHT OPTIMIZER` sidebar menu remained hidden at the end of the interactive onboarding tour until clicking on the map.\n\n"
+        "### 4. Automated Update & Patch Pipeline\n"
+        "- **Unified Versioning (`PRO_1.1.1`):** Unified release versioning into `PRO_X.X.X` and `LITE_X.X.X`.\n"
+        "- **Automatic Update Detection:** SceneryX automatically checks the `Updates/patches` Git branch on startup and offers 1-click patch installation while preserving all user settings, custom profiles, and scenery states.\n"
+        "- **Post-Update Changelog Modal:** Displays the patch release notes (`README.md`) automatically after installing an update."
+    )
+
+    _PATCH_1_1_2_CHANGELOG_BODY = (
+        "**Release Date:** October 19, 2026\n"
+        "**Channel:** `Updates/patches`\n\n"
+        "## What's New & Fixed\n\n"
+        "### 1. MSFS In-Game Panel — Live Graphics Tuning Accordion & 5-Pin Header\n"
+        "- **Live RAM Graphics Tuning (No Restart Required):** Added an expandable accordion in the MSFS In-Game Panel allowing real-time in-flight adjustment of the 8 live-modifiable MSFS graphics settings (`Max FPS`, `Volumetric Clouds`, `Terrain Pre-Caching`, `Terrain Shadows`, `Buildings`, `Trees`, `Plants`, and `Grass`).\n"
+        "- **Dual-Write RAM + Profile Persistence:** Clicking `APPLY` injects the changes directly into MSFS memory (2D & VR) and automatically saves them into your active SceneryX profile and `UserCfg.opt`.\n"
+        "- **Customizable 5-Pin Top Bar:** Pin up to 5 favorite parameters to keep their live values visible at a glance when the accordion is collapsed.\n"
+        "- **Smart Cloud Override Protection:** Manually changing `Volumetric Clouds` and clicking `APPLY` while in flight automatically turns `Auto Cloud Recovery` `OFF` so your manual cloud setting is respected.\n\n"
+        "### 2. Smart LOD & Auto Cloud Recovery Enhancements\n"
+        "- **Live Cloud Quality Display & Ultra Boost:** Added real-time `LIVE : LOW / MEDIUM / HIGH / ULTRA` cloud quality indicators in both the MSFS In-Game Panel and the SceneryX Smart LOD window, with automatic recovery and boost up to `ULTRA` when GPU headroom allows.\n"
+        "- **Instant Smart LOD Re-Engagement:** Resolved an issue in the In-Game Panel where re-enabling `SMART LOD REGULATION` (`ON`) after manual slider overrides required toggling `ON/OFF` twice to resume automatic regulation.\n\n"
+        "### 3. Post-Flight Report — Velocity-Aware Timeline Zoom & Pan\n"
+        "- **Duration-Scaled & Velocity-Aware Wheel Zoom:** Redesigned the Post-Flight Report chart zoom to scale dynamically with flight duration and mouse wheel scroll speed, making zooming into long flights effortless.\n"
+        "- **Hard-Stop Minimum Window (No Disappearing Graphs):** Added a strict minimum 8-sample zoom floor (`minSpan`) and synchronized drag-to-pan across all flight report charts so curves never disappear at maximum zoom."
+    )
+
+    DEFAULT_PATCH_CHANGELOGS = {
+        "PRO_1.1.1": "# SceneryX — Patch PRO_1.1.1 (Day-One Update)\n\n" + _PATCH_1_1_1_CHANGELOG_BODY,
+        "PRO_1.1.2": "# SceneryX — Patch PRO_1.1.2\n\n" + _PATCH_1_1_2_CHANGELOG_BODY,
+    }
+
+    def _fetch_remote_text(self, url, timeout=3.5):
+        try:
+            sep = "&" if "?" in url else "?"
+            bust_url = f"{url}{sep}t={int(time.time())}"
+            req = urllib.request.Request(
+                bust_url,
+                headers={"User-Agent": "SceneryX-Updater/1.1", "Cache-Control": "no-cache"}
+            )
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                if resp.status == 200:
+                    return resp.read().decode("utf-8-sig", errors="replace")
+        except Exception:
+            pass
+        return None
+
+    def _get_patch_changelog_markdown(self, version_tag, readme_url=None):
+        if not version_tag:
+            return ""
+        norm_tag = self._normalize_version_tag(version_tag)
+        # Strictly fetch remote README.md from the Git Updates/patches branch
+        urls_to_try = []
+        if readme_url:
+            urls_to_try.append(readme_url)
+        urls_to_try.append(f"{self.PATCHES_REPO_RAW_BASE}/patches/{norm_tag}/README.md")
+        urls_to_try.append(f"{self.PATCHES_REPO_RAW_BASE}/README.md")
+        for u in urls_to_try:
+            txt = self._fetch_remote_text(u, timeout=5.0)
+            if txt and len(txt.strip()) > 20:
+                return re.sub(r'\bRC_v?', 'PRO_', txt.strip())
+
+        return self.DEFAULT_PATCH_CHANGELOGS.get(
+            norm_tag,
+            f"# SceneryX — Patch {norm_tag}\n\nPatch **{norm_tag}** has been successfully installed.\nAll your user settings, custom profiles, and scenery configurations have been preserved."
+        )
+
+    def check_available_patch(self):
+        if IS_LITE:
+            return json.dumps({"has_patch": False, "current_version": APP_VERSION, "is_lite": True}, ensure_ascii=False)
+        try:
+            current_ver = self._get_current_app_version()
+            cur_tuple = self._parse_version_tuple(current_ver)
+            if cur_tuple == (0, 0, 0):
+                return json.dumps({"has_patch": False}, ensure_ascii=False)
+
+            # Strictly check remote GitHub Updates/patches branch manifest
+            raw_manifest = self._fetch_remote_text(self.PATCHES_MANIFEST_URL, timeout=5.0)
+            if raw_manifest:
+                try:
+                    mdata = json.loads(raw_manifest)
+                    rem_ver = self._normalize_version_tag(mdata.get("latest_version") or mdata.get("version"))
+                    rem_tuple = self._parse_version_tuple(rem_ver)
+                    if rem_ver and rem_tuple > cur_tuple:
+                        best_ver = str(rem_ver).strip()
+                        download_url = mdata.get("download_url") or f"{self.PATCHES_REPO_RAW_BASE}/patches/{best_ver}/SceneryX_{best_ver}_Setup.exe"
+                        readme_url = mdata.get("readme_url") or f"{self.PATCHES_REPO_RAW_BASE}/patches/{best_ver}/README.md"
+                        changelog_md = self._get_patch_changelog_markdown(best_ver, readme_url=readme_url)
+                        return json.dumps({
+                            "has_patch": True,
+                            "current_version": current_ver,
+                            "patch_version": best_ver,
+                            "installer_path": "",
+                            "download_url": download_url,
+                            "readme_url": readme_url,
+                            "changelog_md": changelog_md
+                        }, ensure_ascii=False)
+                except Exception:
+                    pass
+
+            return json.dumps({"has_patch": False, "current_version": current_ver}, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"has_patch": False, "error": str(e)}, ensure_ascii=False)
+
+    def install_available_patch(self, installer_path=None, download_url=None, patch_version=None):
+        if IS_LITE:
+            return json.dumps({"status": "locked", "is_lite": True, "message": "Automatic patch updates are only used in SceneryX Pro."}, ensure_ascii=False)
+        try:
+            current_ver = self._get_current_app_version()
+            readme_url = None
+            if not patch_version or not download_url:
+                raw = json.loads(self.check_available_patch())
+                if not download_url:
+                    download_url = raw.get("download_url")
+                if not patch_version:
+                    patch_version = raw.get("patch_version")
+                readme_url = raw.get("readme_url")
+
+            patch_version = self._normalize_version_tag(patch_version or "PRO_1.1.1")
+            if not download_url:
+                return json.dumps({"status": "error", "message": "Remote patch download URL not found on Git (Updates/patches)."}, ensure_ascii=False)
+
+            # Strictly download from remote Updates/patches Git branch
+            updates_dir = os.path.join(USER_DATA_DIR, "updates")
+            os.makedirs(updates_dir, exist_ok=True)
+            ver_tag = patch_version
+            target_exe = os.path.join(updates_dir, f"SceneryX_{ver_tag}_Setup.exe")
+            part_exe = target_exe + ".part"
+            if os.path.exists(part_exe):
+                try:
+                    os.remove(part_exe)
+                except Exception:
+                    pass
+
+            sep = "&" if "?" in download_url else "?"
+            bust_dl_url = f"{download_url}{sep}t={int(time.time())}"
+            req = urllib.request.Request(
+                bust_dl_url,
+                headers={"User-Agent": "SceneryX-Updater/1.1", "Cache-Control": "no-cache"}
+            )
+            with urllib.request.urlopen(req, timeout=180) as resp, open(part_exe, "wb") as out_f:
+                while True:
+                    chunk = resp.read(262144)
+                    if not chunk:
+                        break
+                    out_f.write(chunk)
+            if os.path.exists(part_exe) and os.path.getsize(part_exe) > 5 * 1024 * 1024:
+                os.replace(part_exe, target_exe)
+                installer_path = target_exe
+            else:
+                if os.path.exists(part_exe):
+                    os.remove(part_exe)
+                return json.dumps({"status": "error", "message": "Downloaded patch file from Git is incomplete or invalid."}, ensure_ascii=False)
+
+            # Persist pending changelog marker so the post-patch changelog modal opens right after restart
+            try:
+                ver_tag = patch_version
+                changelog_md = self._get_patch_changelog_markdown(ver_tag, readme_url=readme_url)
+                os.makedirs(USER_DATA_DIR, exist_ok=True)
+                pending_path = os.path.join(USER_DATA_DIR, "pending_changelog.json")
+                with open(pending_path, "w", encoding="utf-8") as pf:
+                    json.dump({
+                        "version": ver_tag,
+                        "previous_version": current_ver,
+                        "changelog_md": changelog_md
+                    }, pf, indent=2, ensure_ascii=False)
+                settings = get_settings()
+                settings["pending_changelog_version"] = ver_tag
+                save_settings(settings)
+            except Exception:
+                pass
+
+            import ctypes
+            work_dir = os.path.dirname(os.path.abspath(installer_path))
+            ret = ctypes.windll.shell32.ShellExecuteW(
+                None,
+                "open",
+                str(installer_path),
+                "/SILENT /AUTOPATCH",
+                work_dir,
+                1
+            )
+            if int(ret) <= 32:
+                ret = ctypes.windll.shell32.ShellExecuteW(
+                    None,
+                    "runas",
+                    str(installer_path),
+                    "/SILENT /AUTOPATCH",
+                    work_dir,
+                    1
+                )
+            if int(ret) <= 32:
+                return json.dumps({"status": "cancelled", "code": int(ret)}, ensure_ascii=False)
+
+            self.exit_app(False)
+            return json.dumps({"status": "ok"}, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
+    def check_post_patch_changelog(self):
+        if IS_LITE:
+            return json.dumps({"has_changelog": False, "version": APP_VERSION, "is_lite": True}, ensure_ascii=False)
+        try:
+            current_ver = self._get_current_app_version()
+            cur_tuple = self._parse_version_tuple(current_ver)
+            pending_path = os.path.join(USER_DATA_DIR, "pending_changelog.json")
+            settings = get_settings()
+            last_seen = settings.get("last_seen_version")
+            pending_ver = settings.get("pending_changelog_version")
+
+            cached_md = None
+            has_pending_marker = False
+
+            # 1. Check pending_changelog.json written by updater or Inno Setup
+            if os.path.isfile(pending_path):
+                try:
+                    with open(pending_path, "r", encoding="utf-8", errors="ignore") as f:
+                        pdata = json.load(f)
+                    pver = self._normalize_version_tag(pdata.get("version"))
+                    if not pver or pver == current_ver or self._parse_version_tuple(pver) == cur_tuple:
+                        has_pending_marker = True
+                        cached_md = pdata.get("changelog_md")
+                except Exception:
+                    has_pending_marker = True
+
+            # 2. Check Windows Registry PendingChangelogVersion written by Inno Setup
+            if not has_pending_marker:
+                try:
+                    import winreg
+                    for root in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
+                        try:
+                            with winreg.OpenKey(root, r"Software\SceneryX") as key:
+                                val, _ = winreg.QueryValueEx(key, "PendingChangelogVersion")
+                                if val and (self._normalize_version_tag(str(val).strip()) == current_ver or self._parse_version_tuple(val) == cur_tuple):
+                                    has_pending_marker = True
+                                    break
+                        except Exception:
+                            continue
+                except Exception:
+                    pass
+
+            # 3. Check settings.json pending_changelog_version or version upgrade transition
+            if not has_pending_marker:
+                if pending_ver and (self._normalize_version_tag(pending_ver) == current_ver or self._parse_version_tuple(pending_ver) == cur_tuple):
+                    has_pending_marker = True
+                elif last_seen and self._parse_version_tuple(last_seen) > (0, 0, 0) and cur_tuple > self._parse_version_tuple(last_seen):
+                    has_pending_marker = True
+
+            # If this is the first launch of a base install (no marker), record last_seen_version
+            if not has_pending_marker:
+                if last_seen != current_ver:
+                    settings["last_seen_version"] = current_ver
+                    save_settings(settings)
+                return json.dumps({"has_changelog": False, "version": current_ver}, ensure_ascii=False)
+
+            changelog_md = self._get_patch_changelog_markdown(current_ver)
+            if not changelog_md and cached_md:
+                changelog_md = re.sub(r'\bRC_v?', 'PRO_', str(cached_md))
+
+            return json.dumps({
+                "has_changelog": True,
+                "version": current_ver,
+                "changelog_md": changelog_md
+            }, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"has_changelog": False, "error": str(e)}, ensure_ascii=False)
+
+    def acknowledge_post_patch_changelog(self):
+        try:
+            current_ver = self._get_current_app_version()
+            pending_path = os.path.join(USER_DATA_DIR, "pending_changelog.json")
+            if os.path.isfile(pending_path):
+                try:
+                    os.remove(pending_path)
+                except Exception:
+                    pass
+
+            try:
+                import winreg
+                for root in (winreg.HKEY_CURRENT_USER, winreg.HKEY_LOCAL_MACHINE):
+                    try:
+                        with winreg.OpenKey(root, r"Software\SceneryX", 0, winreg.KEY_SET_VALUE) as key:
+                            winreg.DeleteValue(key, "PendingChangelogVersion")
+                    except Exception:
+                        continue
+            except Exception:
+                pass
+
+            settings = get_settings()
+            settings["last_seen_version"] = current_ver
+            if "pending_changelog_version" in settings:
+                del settings["pending_changelog_version"]
+            save_settings(settings)
+            return json.dumps({"status": "ok"}, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)}, ensure_ascii=False)
+
     def get_live_blackbox_telemetry(self):
         try:
             telemetry = flight_perf_tracker.BLACKBOX.get_telemetry()
@@ -4411,14 +5018,13 @@ class Api:
 
     def list_flight_benchmarks(self):
         try:
-            base_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
-            bench_dir = os.path.join(base_dir, 'benchmarks')
+            import flight_perf_tracker
+            bench_dir = flight_perf_tracker.get_benchmarks_directory()
             if not os.path.exists(bench_dir):
                 return json.dumps([], ensure_ascii=False)
 
             # Auto-recover any orphan CSVs (e.g. from CTD or abrupt close) before listing
             try:
-                import flight_perf_tracker
                 flight_perf_tracker.recover_orphan_benchmarks(bench_dir)
             except Exception as e:
                 print(f"[Telemetry] Orphan check during list error: {e}")
@@ -4441,8 +5047,8 @@ class Api:
 
     def open_benchmark_report(self, filename_or_path):
         try:
-            base_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
-            bench_dir = os.path.join(base_dir, 'benchmarks')
+            import flight_perf_tracker
+            bench_dir = flight_perf_tracker.get_benchmarks_directory()
             if not os.path.isabs(filename_or_path):
                 p = os.path.join(bench_dir, filename_or_path)
             else:
@@ -4464,8 +5070,8 @@ class Api:
 
     def delete_flight_benchmark(self, filename):
         try:
-            base_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
-            bench_dir = os.path.join(base_dir, 'benchmarks')
+            import flight_perf_tracker
+            bench_dir = flight_perf_tracker.get_benchmarks_directory()
             if isinstance(filename, list):
                 files_to_delete = filename
             else:
@@ -4509,8 +5115,8 @@ class Api:
 
     def rename_flight_benchmark(self, old_filename, new_filename):
         try:
-            base_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
-            bench_dir = os.path.join(base_dir, 'benchmarks')
+            import flight_perf_tracker
+            bench_dir = flight_perf_tracker.get_benchmarks_directory()
             safe_old = os.path.basename(old_filename)
             clean_new = os.path.basename(new_filename.strip())
             if not clean_new:
@@ -4553,6 +5159,8 @@ class Api:
             return json.dumps({"error": str(e)}, ensure_ascii=False)
 
     def set_smart_lod_enabled(self, enabled, force_kill_autofps=False):
+        if IS_LITE:
+            return json.dumps({"success": False, "status": "locked", "is_lite": True, "error": "Smart LOD Governor is only available in SceneryX Pro."}, ensure_ascii=False)
         try:
             import flight_lod_controller
             ctrl = flight_lod_controller.get_smart_lod_controller()
@@ -4562,6 +5170,8 @@ class Api:
             return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
 
     def set_smart_lod_cloud_recovery(self, enabled):
+        if IS_LITE:
+            return json.dumps({"success": False, "status": "locked", "is_lite": True, "error": "Smart LOD Governor is only available in SceneryX Pro."}, ensure_ascii=False)
         try:
             import flight_lod_controller
             ctrl = flight_lod_controller.get_smart_lod_controller()
@@ -4571,6 +5181,8 @@ class Api:
             return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
 
     def save_smart_lod_config(self, config_json_str):
+        if IS_LITE:
+            return json.dumps({"success": False, "status": "locked", "is_lite": True, "error": "Smart LOD Governor is only available in SceneryX Pro."}, ensure_ascii=False)
         try:
             import flight_lod_controller
             cfg = json.loads(config_json_str) if isinstance(config_json_str, str) else config_json_str
@@ -4589,6 +5201,8 @@ class Api:
             return json.dumps({"error": str(e)}, ensure_ascii=False)
 
     def set_smart_lod_axis_state(self, mode, axis, enabled=None, target=None, altitude=None, base=None):
+        if IS_LITE:
+            return json.dumps({"status": "locked", "is_lite": True, "error": "Smart LOD Governor is only available in SceneryX Pro."}, ensure_ascii=False)
         try:
             import flight_lod_controller
             st = flight_lod_controller.set_smart_lod_axis_state(mode, axis, enabled=enabled, target=target, altitude=altitude, base=base)
@@ -4597,6 +5211,8 @@ class Api:
             return json.dumps({"error": str(e)}, ensure_ascii=False)
 
     def set_external_autofps(self, enabled):
+        if IS_LITE:
+            return json.dumps({"success": False, "status": "locked", "is_lite": True, "error": "External AutoFPS integration is only available in SceneryX Pro."}, ensure_ascii=False)
         try:
             import flight_lod_controller
             ok = flight_lod_controller.set_external_autofps(bool(enabled))
@@ -4605,6 +5221,8 @@ class Api:
             return json.dumps({"success": False, "error": str(e)}, ensure_ascii=False)
 
     def reset_smart_lod_to_profile(self, axis="all"):
+        if IS_LITE:
+            return json.dumps({"success": False, "status": "locked", "is_lite": True, "error": "Smart LOD Governor is only available in SceneryX Pro."}, ensure_ascii=False)
         try:
             import flight_lod_controller
             res = flight_lod_controller.reset_smart_lod_to_profile(axis)
@@ -4930,6 +5548,8 @@ class Api:
             return json.dumps({"available": False, "installed": False, "error": str(e)}, ensure_ascii=False)
 
     def install_ingame_panel(self):
+        if IS_LITE:
+            return json.dumps({"success": False, "status": "locked", "is_lite": True, "message": "The MSFS In-Game Toolbar Panel is only available in SceneryX Pro."}, ensure_ascii=False)
         try:
             import shutil
             all_paths = self._get_all_community_paths()
@@ -5028,35 +5648,7 @@ def ensure_single_instance():
                 ctypes.windll.user32.ShowWindow(hwnd, SW_RESTORE)
                 ctypes.windll.user32.SetForegroundWindow(hwnd)
 
-            # 2. Determine user's preferred language (settings fallback to Windows UI locale)
-            lang = 'en'
-            try:
-                st = get_settings()
-                lang = (st.get('language') or '').lower()
-            except Exception:
-                pass
-
-            if not lang:
-                try:
-                    lang_id = ctypes.windll.kernel32.GetUserDefaultUILanguage()
-                    if (lang_id & 0xFF) == 0x0C:  # LANG_FRENCH
-                        lang = 'fr'
-                    elif (lang_id & 0xFF) == 0x07:  # LANG_GERMAN
-                        lang = 'de'
-                    elif (lang_id & 0xFF) == 0x0A:  # LANG_SPANISH
-                        lang = 'es'
-                    else:
-                        lang = 'en'
-                except Exception:
-                    lang = 'en'
-
-            messages = {
-                'fr': "SceneryX est déjà ouvert.\n\nUne seule instance de l'application peut être exécutée à la fois.",
-                'en': "SceneryX is already running.\n\nOnly one instance of the application can run at a time.",
-                'de': "SceneryX wird bereits ausgeführt.\n\nEs kann nur eine Instanz der Anwendung gleichzeitig ausgeführt werden.",
-                'es': "SceneryX ya está abierto.\n\nSolo se puede ejecutar una instancia de la aplicación a la vez."
-            }
-            msg = messages.get(lang, messages['en'])
+            msg = "SceneryX is already running.\n\nOnly one instance of the application can run at a time."
             title = "SceneryX"
 
             # MB_OK (0x0) | MB_ICONWARNING (0x30) | MB_TOPMOST (0x40000) | MB_SETFOREGROUND (0x10000)
@@ -5074,6 +5666,38 @@ def ensure_single_instance():
 
 
 def main():
+    # Headless CLI routines (used by uninstaller and automated fresh-user reset scripts)
+    if any(arg in sys.argv for arg in ['--restore-defaults', '--restore-silent', '--uninstall-cleanup']):
+        print("[SceneryX CLI] Headless rollback requested. Running non-destructive sim restoration...", flush=True)
+        try:
+            api = Api()
+            print("[SceneryX CLI] 0/3 Restoring Community folder if quarantined in Safe Update Mode...", flush=True)
+            try:
+                flight_rig_optimizer.toggle_community_safe_update_mode(target_action="restore", force_when_running=True)
+            except Exception as _e:
+                print(f"[SceneryX CLI] Safe Update restore notice: {_e}", flush=True)
+            print("[SceneryX CLI] 1/3 Restoring physical sceneries and Content.xml...", flush=True)
+            api.restore_all_sceneries(full_reset=True)
+            print("[SceneryX CLI] 2/3 Restoring original UserCfg.opt...", flush=True)
+            api.restore_original_user_cfg()
+            print("[SceneryX CLI] 3/3 Removing in-game toolbar panel from Community folder...", flush=True)
+            api.uninstall_ingame_panel()
+            print("[SceneryX CLI] Rollback finished successfully! Stock MSFS defaults restored.", flush=True)
+        except Exception as e:
+            print(f"[SceneryX CLI] Error during rollback: {e}", flush=True)
+        os._exit(0)
+
+    if '--setup-profiles' in sys.argv:
+        print("[SceneryX CLI] Scanning rig hardware and calibrating standard profiles...", flush=True)
+        try:
+            appdata_dir = os.path.join(os.environ.get('APPDATA', ''), 'SceneryX')
+            has_existing = os.path.exists(os.path.join(appdata_dir, 'settings.json'))
+            flight_rig_optimizer.generate_default_rig_profiles(preserve_active=has_existing, missing_only=has_existing)
+            print("[SceneryX CLI] Standard profiles successfully generated.", flush=True)
+        except Exception as e:
+            print(f"[SceneryX CLI] Profile generation error: {e}", flush=True)
+        os._exit(0)
+
     if not ensure_single_instance():
         sys.exit(0)
 
@@ -5214,8 +5838,8 @@ def main():
             try:
                 import flight_perf_tracker
                 if flight_perf_tracker.BLACKBOX.is_running:
-                    print("[Telemetry] Force closing: auto-saving blackbox report...")
-                    flight_perf_tracker.BLACKBOX.stop()
+                    print("[Telemetry] Force closing: suspending blackbox session for resume...")
+                    flight_perf_tracker.BLACKBOX.suspend_for_resume()
             except Exception:
                 pass
             try:
@@ -5234,6 +5858,15 @@ def main():
                 print(f"[Tray] Hide window error: {e}")
             return False
 
+        try:
+            import flight_perf_tracker
+            if flight_perf_tracker.BLACKBOX.is_running:
+                import threading
+                threading.Timer(0.05, lambda: window.evaluate_js('promptClosingActiveMonitoring()')).start()
+                return False
+        except Exception:
+            pass
+
         fm = st.get('flight_mode', {})
         if isinstance(fm, dict) and fm.get('active'):
             import threading
@@ -5245,13 +5878,6 @@ def main():
                 tray_icon.stop()
             except Exception:
                 pass
-        try:
-            import flight_perf_tracker
-            if flight_perf_tracker.BLACKBOX.is_running:
-                print("[Telemetry] Closing: auto-saving blackbox report...")
-                flight_perf_tracker.BLACKBOX.stop()
-        except Exception:
-            pass
         try:
             flight_rig_optimizer.ensure_active_profile_applied()
         except Exception as e:
@@ -5296,16 +5922,18 @@ def main():
 
             def on_tray_quit(icon, item):
                 try:
-                    api._force_closing = True
-                    if icon:
-                        icon.stop()
+                    import flight_perf_tracker
+                    if flight_perf_tracker.BLACKBOX.is_running:
+                        on_tray_show(icon, item)
+                        import threading
+                        threading.Timer(0.1, lambda: window.evaluate_js('promptClosingActiveMonitoring()')).start()
+                        return
                 except Exception:
                     pass
                 try:
-                    import flight_perf_tracker
-                    if flight_perf_tracker.BLACKBOX.is_running:
-                        print("[Telemetry] Tray quit: auto-saving blackbox report...")
-                        flight_perf_tracker.BLACKBOX.stop()
+                    api._force_closing = True
+                    if icon:
+                        icon.stop()
                 except Exception:
                     pass
                 try:
@@ -5322,11 +5950,13 @@ def main():
                 os._exit(0)
 
             tray_menu = pystray.Menu(
-                pystray.MenuItem('Afficher SceneryX', on_tray_show, default=True),
-                pystray.MenuItem('Quitter', on_tray_quit)
+                pystray.MenuItem('Show SceneryX', on_tray_show, default=True),
+                pystray.MenuItem('Quit', on_tray_quit)
             )
             tray_icon = pystray.Icon('SceneryX', tray_image, 'SceneryX', tray_menu)
             api._tray_icon = tray_icon
+            api._on_tray_show = on_tray_show
+            api._on_tray_quit = on_tray_quit
 
             import threading
             def run_tray():
