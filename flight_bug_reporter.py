@@ -294,9 +294,16 @@ def capture_window_screenshot() -> Optional[Image.Image]:
 
 def get_current_system_snapshot() -> Dict[str, Any]:
     """Rassemble l'état actuel anonymisé de la machine, du simulateur et des profils."""
+    app_ver = "PRO_1.1.1"
+    try:
+        from scanner import APP_VERSION
+        if APP_VERSION:
+            app_ver = APP_VERSION
+    except Exception:
+        pass
     snapshot: Dict[str, Any] = {
         "timestamp": datetime.now().isoformat(),
-        "sceneryx_version": "v1.0.1",
+        "sceneryx_version": app_ver,
         "python_version": sys.version.split()[0],
         "platform": sys.platform,
         "machine_id": get_anonymous_machine_id()

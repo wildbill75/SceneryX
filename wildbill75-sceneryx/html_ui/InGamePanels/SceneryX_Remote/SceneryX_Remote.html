@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <title>SCENERY X</title>
     <link rel="stylesheet" href="/SCSS/common.css" />
-    <link rel="stylesheet" href="SceneryX_Remote.css?v=118" />
+    <link rel="stylesheet" href="SceneryX_Remote.css?v=119" />
     <script type="text/javascript" src="/JS/coherent.js"></script>
     <script type="text/javascript" src="/JS/common.js"></script>
     <script type="text/javascript" src="/JS/buttons.js"></script>
@@ -16,14 +16,14 @@
     <link rel="import" href="/templates/tabMenu/tabMenu.html" />
     <link rel="import" href="/templates/ingameUi/ingameUi.html" />
     <link rel="import" href="/templates/ingameUiHeader/ingameUiHeader.html" />
-    <script type="text/javascript" src="SceneryX_Remote.js?v=118"></script>
+    <script type="text/javascript" src="SceneryX_Remote.js?v=119"></script>
 </head>
 <body class="border-box">
     <ingamepanel-sceneryx>
         <ingame-ui id="SceneryX_Remote" panel-id="PANEL_SCENERYX" title="SCENERY X"
                    class="ingameUiFrame panelInvisible"
                    resize="both"
-                   min-width="440" min-height="220">
+                   min-width="500" min-height="320">
 
             <!-- OFFLINE VIEW -->
             <div id="disconnected-view" class="offline-box">
@@ -43,7 +43,7 @@
                             <span class="hl-tag" data-pin-key="trees">Trees : High</span>
                         </div>
                         <button type="button" id="live-gfx-accordion-btn" class="gfx-accordion-btn" title="Expand / Collapse Live Graphics Settings">
-                            <svg id="live-gfx-accordion-chevron" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <svg id="live-gfx-accordion-chevron" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                 <polyline points="6 9 12 15 18 9"></polyline>
                             </svg>
                         </button>
@@ -55,7 +55,7 @@
                             <!-- 1. Max FPS (Manual Input + Common Presets Dropdown) -->
                             <div class="lgfx-item" id="lgfx-item-max_fps">
                                 <button type="button" class="lgfx-pin-btn pinned" id="lgfx-pin-max_fps" data-key="max_fps" title="Pin / Unpin in header (max 5)" onclick="window.onToggleLiveGfxPin && window.onToggleLiveGfxPin('max_fps', event)">
-                                    <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M12 17v5"></path>
                                         <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1 1 1 0 0 1 1 1z"></path>
                                     </svg>
@@ -65,13 +65,13 @@
                                     <input type="text" id="lgfx-input-max_fps" class="lgfx-combo-input" value="36" maxlength="3" title="Enter custom FPS (15-240)" oninput="window.onLiveGfxManualFpsInput && window.onLiveGfxManualFpsInput(this.value)" onclick="event.stopPropagation()" />
                                     <span class="lgfx-combo-unit">FPS</span>
                                     <button type="button" class="lgfx-combo-btn" id="lgfx-ddbtn-max_fps" title="Common FPS Presets" onclick="window.onToggleLiveGfxDropdown && window.onToggleLiveGfxDropdown('max_fps', event)">
-                                        <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                             <polyline points="6 9 12 15 18 9"></polyline>
                                         </svg>
                                     </button>
                                 </div>
                                 <button type="button" class="lgfx-reset-btn" id="lgfx-reset-max_fps" title="Reset to Active Profile" onclick="window.onResetLiveGfxItem && window.onResetLiveGfxItem('max_fps', event)">
-                                    <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M3 12a9 9 0 1 0 3-6.7L3 8"></path>
                                         <polyline points="3 3 3 8 8 8"></polyline>
                                     </svg>
@@ -96,7 +96,7 @@
                             <!-- 2. Volumetric Clouds -->
                             <div class="lgfx-item" id="lgfx-item-clouds">
                                 <button type="button" class="lgfx-pin-btn pinned" id="lgfx-pin-clouds" data-key="clouds" title="Pin / Unpin in header (max 5)" onclick="window.onToggleLiveGfxPin && window.onToggleLiveGfxPin('clouds', event)">
-                                    <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M12 17v5"></path>
                                         <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1 1 1 0 0 1 1 1z"></path>
                                     </svg>
@@ -104,12 +104,12 @@
                                 <span class="lgfx-label">Clouds</span>
                                 <button type="button" class="lgfx-dd-trigger" id="lgfx-ddbtn-clouds" onclick="window.onToggleLiveGfxDropdown && window.onToggleLiveGfxDropdown('clouds', event)">
                                     <span id="lgfx-val-clouds">High</span>
-                                    <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                         <polyline points="6 9 12 15 18 9"></polyline>
                                     </svg>
                                 </button>
                                 <button type="button" class="lgfx-reset-btn" id="lgfx-reset-clouds" title="Reset to Active Profile" onclick="window.onResetLiveGfxItem && window.onResetLiveGfxItem('clouds', event)">
-                                    <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M3 12a9 9 0 1 0 3-6.7L3 8"></path>
                                         <polyline points="3 3 3 8 8 8"></polyline>
                                     </svg>
@@ -125,7 +125,7 @@
                             <!-- 3. Terrain Pre-Caching -->
                             <div class="lgfx-item" id="lgfx-item-precaching">
                                 <button type="button" class="lgfx-pin-btn pinned" id="lgfx-pin-precaching" data-key="precaching" title="Pin / Unpin in header (max 5)" onclick="window.onToggleLiveGfxPin && window.onToggleLiveGfxPin('precaching', event)">
-                                    <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M12 17v5"></path>
                                         <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1 1 1 0 0 1 1 1z"></path>
                                     </svg>
@@ -133,12 +133,12 @@
                                 <span class="lgfx-label">Pre-Cache</span>
                                 <button type="button" class="lgfx-dd-trigger" id="lgfx-ddbtn-precaching" onclick="window.onToggleLiveGfxDropdown && window.onToggleLiveGfxDropdown('precaching', event)">
                                     <span id="lgfx-val-precaching">High</span>
-                                    <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                         <polyline points="6 9 12 15 18 9"></polyline>
                                     </svg>
                                 </button>
                                 <button type="button" class="lgfx-reset-btn" id="lgfx-reset-precaching" title="Reset to Active Profile" onclick="window.onResetLiveGfxItem && window.onResetLiveGfxItem('precaching', event)">
-                                    <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M3 12a9 9 0 1 0 3-6.7L3 8"></path>
                                         <polyline points="3 3 3 8 8 8"></polyline>
                                     </svg>
@@ -154,7 +154,7 @@
                             <!-- 4. Terrain Shadows -->
                             <div class="lgfx-item" id="lgfx-item-terrain_shadows">
                                 <button type="button" class="lgfx-pin-btn" id="lgfx-pin-terrain_shadows" data-key="terrain_shadows" title="Pin / Unpin in header (max 5)" onclick="window.onToggleLiveGfxPin && window.onToggleLiveGfxPin('terrain_shadows', event)">
-                                    <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M12 17v5"></path>
                                         <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1 1 1 0 0 1 1 1z"></path>
                                     </svg>
@@ -162,12 +162,12 @@
                                 <span class="lgfx-label">Terr. Shd</span>
                                 <button type="button" class="lgfx-dd-trigger" id="lgfx-ddbtn-terrain_shadows" onclick="window.onToggleLiveGfxDropdown && window.onToggleLiveGfxDropdown('terrain_shadows', event)">
                                     <span id="lgfx-val-terrain_shadows">512</span>
-                                    <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                         <polyline points="6 9 12 15 18 9"></polyline>
                                     </svg>
                                 </button>
                                 <button type="button" class="lgfx-reset-btn" id="lgfx-reset-terrain_shadows" title="Reset to Active Profile" onclick="window.onResetLiveGfxItem && window.onResetLiveGfxItem('terrain_shadows', event)">
-                                    <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M3 12a9 9 0 1 0 3-6.7L3 8"></path>
                                         <polyline points="3 3 3 8 8 8"></polyline>
                                     </svg>
@@ -185,7 +185,7 @@
                             <!-- 5. Buildings -->
                             <div class="lgfx-item" id="lgfx-item-buildings">
                                 <button type="button" class="lgfx-pin-btn pinned" id="lgfx-pin-buildings" data-key="buildings" title="Pin / Unpin in header (max 5)" onclick="window.onToggleLiveGfxPin && window.onToggleLiveGfxPin('buildings', event)">
-                                    <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M12 17v5"></path>
                                         <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1 1 1 0 0 1 1 1z"></path>
                                     </svg>
@@ -193,12 +193,12 @@
                                 <span class="lgfx-label">Buildings</span>
                                 <button type="button" class="lgfx-dd-trigger" id="lgfx-ddbtn-buildings" onclick="window.onToggleLiveGfxDropdown && window.onToggleLiveGfxDropdown('buildings', event)">
                                     <span id="lgfx-val-buildings">High</span>
-                                    <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                         <polyline points="6 9 12 15 18 9"></polyline>
                                     </svg>
                                 </button>
                                 <button type="button" class="lgfx-reset-btn" id="lgfx-reset-buildings" title="Reset to Active Profile" onclick="window.onResetLiveGfxItem && window.onResetLiveGfxItem('buildings', event)">
-                                    <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M3 12a9 9 0 1 0 3-6.7L3 8"></path>
                                         <polyline points="3 3 3 8 8 8"></polyline>
                                     </svg>
@@ -214,7 +214,7 @@
                             <!-- 6. Trees -->
                             <div class="lgfx-item" id="lgfx-item-trees">
                                 <button type="button" class="lgfx-pin-btn pinned" id="lgfx-pin-trees" data-key="trees" title="Pin / Unpin in header (max 5)" onclick="window.onToggleLiveGfxPin && window.onToggleLiveGfxPin('trees', event)">
-                                    <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M12 17v5"></path>
                                         <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1 1 1 0 0 1 1 1z"></path>
                                     </svg>
@@ -222,12 +222,12 @@
                                 <span class="lgfx-label">Trees</span>
                                 <button type="button" class="lgfx-dd-trigger" id="lgfx-ddbtn-trees" onclick="window.onToggleLiveGfxDropdown && window.onToggleLiveGfxDropdown('trees', event)">
                                     <span id="lgfx-val-trees">High</span>
-                                    <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                         <polyline points="6 9 12 15 18 9"></polyline>
                                     </svg>
                                 </button>
                                 <button type="button" class="lgfx-reset-btn" id="lgfx-reset-trees" title="Reset to Active Profile" onclick="window.onResetLiveGfxItem && window.onResetLiveGfxItem('trees', event)">
-                                    <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M3 12a9 9 0 1 0 3-6.7L3 8"></path>
                                         <polyline points="3 3 3 8 8 8"></polyline>
                                     </svg>
@@ -243,7 +243,7 @@
                             <!-- 7. Plants -->
                             <div class="lgfx-item" id="lgfx-item-plants">
                                 <button type="button" class="lgfx-pin-btn" id="lgfx-pin-plants" data-key="plants" title="Pin / Unpin in header (max 5)" onclick="window.onToggleLiveGfxPin && window.onToggleLiveGfxPin('plants', event)">
-                                    <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M12 17v5"></path>
                                         <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1 1 1 0 0 1 1 1z"></path>
                                     </svg>
@@ -251,12 +251,12 @@
                                 <span class="lgfx-label">Plants</span>
                                 <button type="button" class="lgfx-dd-trigger" id="lgfx-ddbtn-plants" onclick="window.onToggleLiveGfxDropdown && window.onToggleLiveGfxDropdown('plants', event)">
                                     <span id="lgfx-val-plants">High</span>
-                                    <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                         <polyline points="6 9 12 15 18 9"></polyline>
                                     </svg>
                                 </button>
                                 <button type="button" class="lgfx-reset-btn" id="lgfx-reset-plants" title="Reset to Active Profile" onclick="window.onResetLiveGfxItem && window.onResetLiveGfxItem('plants', event)">
-                                    <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M3 12a9 9 0 1 0 3-6.7L3 8"></path>
                                         <polyline points="3 3 3 8 8 8"></polyline>
                                     </svg>
@@ -272,7 +272,7 @@
                             <!-- 8. Grass & Bushes -->
                             <div class="lgfx-item" id="lgfx-item-grass">
                                 <button type="button" class="lgfx-pin-btn" id="lgfx-pin-grass" data-key="grass" title="Pin / Unpin in header (max 5)" onclick="window.onToggleLiveGfxPin && window.onToggleLiveGfxPin('grass', event)">
-                                    <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg viewBox="0 0 24 24" width="13" height="13" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M12 17v5"></path>
                                         <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1 1 1 0 0 1 1 1z"></path>
                                     </svg>
@@ -280,12 +280,12 @@
                                 <span class="lgfx-label">Grass</span>
                                 <button type="button" class="lgfx-dd-trigger" id="lgfx-ddbtn-grass" onclick="window.onToggleLiveGfxDropdown && window.onToggleLiveGfxDropdown('grass', event)">
                                     <span id="lgfx-val-grass">Low</span>
-                                    <svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                         <polyline points="6 9 12 15 18 9"></polyline>
                                     </svg>
                                 </button>
                                 <button type="button" class="lgfx-reset-btn" id="lgfx-reset-grass" title="Reset to Active Profile" onclick="window.onResetLiveGfxItem && window.onResetLiveGfxItem('grass', event)">
-                                    <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
                                         <path d="M3 12a9 9 0 1 0 3-6.7L3 8"></path>
                                         <polyline points="3 3 3 8 8 8"></polyline>
                                     </svg>

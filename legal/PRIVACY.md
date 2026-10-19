@@ -45,9 +45,9 @@ SceneryX integrates with selected third-party flight simulation services strictl
 - **Data Used:** Only your public SimBrief **Pilot ID** or **Username** is used to request the active route.
 - **Security:** SceneryX **never** asks for, receives, or stores your Navigraph or SimBrief password. All requests are made via standard encrypted HTTPS.
 
-3.2. **Lemon Squeezy (License & Activation):**
-- **Purpose:** If you purchase a license for SceneryX, your license key is validated upon first activation through Lemon Squeezy's secure licensing API.
-- **Security:** Communications occur directly over encrypted HTTPS (`api.lemonsqueezy.com`). SceneryX **never** touches, receives, processes, or stores your credit card numbers, PayPal credentials, or billing address. All payment processing is handled exclusively by Lemon Squeezy acting as Merchant of Record.
+3.2. **Gumroad (License & Activation):**
+- **Purpose:** If you purchase a license for SceneryX, your license key is validated upon first activation through Gumroad's secure licensing API.
+- **Security:** Communications occur directly over encrypted HTTPS (`api.gumroad.com`). SceneryX **never** touches, receives, processes, or stores your credit card numbers, PayPal credentials, or billing address. All payment processing is handled exclusively by Gumroad acting as Merchant of Record.
 
 3.3. **Store Lookups & Scenery Searches (Flightsim.to, Orbx, Contrail, SimMarket):**
 - **Purpose:** When you click to check for scenery updates or explore catalog listings, SceneryX constructs a search query URL.

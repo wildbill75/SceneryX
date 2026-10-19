@@ -1,0 +1,105 @@
+FLIGHT OPTIMIZER>MSFS GRAPHIC SETTINGS
+
+La génération du usercfg.opt ne fonctionne pas du tout. Si tu compares les 2 screen on voit bien côté usercfg.opt que les valeurs ne correspondent pas du tout. En revanche certaines valeurs fonctionnent bien comme le TARGET FRAME RATE VR et 2D. Ce qui ne fonctionne pas à coup sur c’est l’ANTI ALIASING & UPSCALING : J’ai beau mettre TAA il garde DLLS (BALANCCED). Le reste semble fonctionner. Je vérifie en changeant les paramètre dans SCENERY X et le fichier usercfg.opt ouvert dans Notepad++ et il me demande de recharger avec les modifs et ça fais bien les changements. Il est à noter que le fichier usercfg.opt possède bien des lignes distinctes pour le Target Frame rate VR et 2D ce que je ne croyais pas. Pareil pour les paramètres DLSS MODE et FSRMode, on a bien les valeurs distinctes. Je n’ai pas tout vérifié mais il faut que tu refasses une grosse pas dessus.
+
+Du coup, il faut que le user comprenne qu’il peut régler indépendamment les paramètres pour la 2D et la VR mais qu’au final il générera qu’un seul fichier et surtout regrouper les paramètres communs aux 2 modes VR/2D et ceux qui ne le sont pas. Par exemple dans VR on a la possibilité de régler la résolution alors que non puisque c’est du côté du headset qu’on règle ça en externe. Pour des paramètres comme texture résolution on l’a 2 fois en 2D et en VR alors qu’il ne peut se régler qu’une fois. Bref il faut peut-être repenser notre présentation et faire un bloc général pour tous les settings communs et séparer ensuite ceux qui sont unique pour chaque mode 2D/VR.
+
+FLIGHT OPTIMIZER>OPTIMIZE PROFILE
+
+Il faut laisser tomber impérativement la création d’un backup et la fenêtre « GRAPHIC PROFILE OPTIMIZED ». Ça ne sert à rien. Plutôt que » OPTIMIZE PROFILE », il faut un bouton « SAVE PROFILE » et là au lieu des fenêtres « GRAPHIC PROFILES OPTIMIZED » et « RESTORE USER.OPT BACKUP », on reste sur la fenêtre principale et sous le bloc des réglages une zone de sauvegarde. Le fichier par défaut va porter un nom par défaut (à déterminer) et le user peut le changer. Il clique sur save et son profil va se ranger dans une liste à menu déroulant. Il peut changer autant de fois qu’il veut et faire des profils, il se stackeront dans la liste déroulante, le plus récent en premier. Il ne reste plus qu’un faire un bouton « activate profile » en face que chaque item de la liste et ça sera le profil actif. Il faut déplacer le bouton « RESTORE ORIGINAL CFG » dans la zone « SAVE PROFILE ». Donc plus de fichiers backups, simplement des fichiers customs qu’il faut stocker chez nous et dès que le bouton « ACTIVATE » est cliqué pour un profil c’est ce fichier qui viendra remplacer le « usercfg.opt » dans MSFS. 
+
+(Fenêtres à supprimer)
+
+FLIGHT OPTIMIZER>REGLAGES OUBLIES
+
+Il faut les intégrer dans les bon slots. Pour le « FOVEATED RENDERING » & « FOVEATED SCALE » à vérifier si ça ne concerne que la VR.
+
+FLIGHT OPTIMIZER>IFR/GA
+
+Je ne sais vraiment pas si c’est utile. Il faut le virer car tu l’as déjà mis dans les infos de chaque réglage . Ensuite le user fera ses suvegardes comme il le souhaite et activera le profil adéquat.
+
+FLIGHT OPTIMIZER>PACING & PERFORMANCE PROJECTION
+
+Ce bloc d’info est trop confus. Il faut simplifier considérablement ces infos. Déjà tout regrouper en un seul bloc et ne pas répéter par exemple « optimal balance » et « OPTIMAL » Juste un mot qui résume la situation et l’impact du réglage en reprenant le lexique qu’on utilise pour chaque réglage. Un petit texte concis. 2 Phrases max et en dessous, tu divises le bloc en deux colonnes : Les plus et les moins. Une ligne par topic avec le cadre du tag selon la couleur du lexique : rouge et ambre pour les moins (jaune et vert pour les plus. C’est tout. Pas de « hardware assement », « MSFS GRAPHICS ADVISORY » etc. Simple et percutant.
+
+SMART LOD
+
+Alors j’ai testé mais je ne sais pas trop si ça a bien fonctionné. Pas de retours affichés dans les debriefs de télémétrie.  Il faudrait indiquer les déclenchements dans les graphiques et bien analyser les gains ou pertes de FPS et main thread selon qu’on a passé les seuils définis.
+
+REORGANISTION DES MENUS « FLIGHT OPTIMIZER », « ROUTE », « HARDWARE » et « TELEMETRY »
+
+Le Menu s’appelle désormais « FLIGHT OPTIMIZER » et devra non plus être accessible via le menu radial d’un aéroport mais avec le clic droit des filtres. Ce qui va changer pour le clic droit des filtres : Au premier clic droit un rond central divisé en 2 demi-cercles horizontalement : «FILTERS » en haut, «FLIGHT OPTIMIZER » Le clic sur « filtre » nous ouvre les filtres exactement comme ils sont aujourd’hui.
+
+Le clic  «FLIGHT OPTIMIZER » va générer des nouveaux boutons en quartiers égaux avec les même propriété et animation bounce que pour les autres menus radiaux.
+
+1 « MY RIG »
+
+2 « MSFS GRAPHIC SETTINGS »
+
+3 « SMART LOD »
+
+4 « TELEMETRY »
+
+5 « PERFORMANCE ASSEMENT »
+
+6 « ROUTE OPTIMIZATION »
+
+Chaque élément va s’ouvrir en modale déplaçable avec une taille adaptée à son contenu. L’ouverture de plusieurs autres éléments de «FLIGHT OPTIMIZER » ne doit jamais fermer les autres. Le user doit pouvoir garder les 6 fenêtres ouvertes tout le temps et les arranger comme il le souhaite. Une icône « X » en haut à droite ferme l’élément. Ensuite chaque fenêtre aura son titre en blanc gras en haut gauche avec son icône de handle.
+
+On verra au cas par cas mais tu remets tout ce que je t’ai décrit plus haut pour chaque item.
+
+Ça veut dire que la radiale « aéroport » n’aura plus que 3 tiers.
+
+Explication de ma démarche : En fait, toute cette partie optimisation ne concerne pas un aéroport en particulier mais c’est général donc ça n’a rien à faire dans le menu aéroport. Pour moi ce sont des options globales au même titre que les filtres.
+
+TERMINER ET FIXER LE PROBLEME DU PANEL INGAME
+
+Après plusieurs tentatives de ta part le in game panel apparait bien mais ne se connecte pas à sceneryX.  Sinon niveau look c’est horrible.
+
+Le cadre de la modale style MSFS natif c’est parfait. Mais pourquoi tu me colle cette horreur de fenêtre grise ? Je veux que la totalité des infos et des boutons soient dans le style MSFS. Déjà il faut mettre le nom du tool dans le header de la fenêtre MSFS avec leur typo. Pas de « offline » / « online » Si scenery x n’est pas lancé un simple texte en blanc au milieu de la fenêtre qui dit : »Please launch Scenery X »
+
+Le nom du tool sera juste « SCENERY X » en majuscule
+
+Ensuite il faut que tu organises graphiquement la fenêtre comme la référence que je te donne
+
+Pour le logo je te passerais le bon SVG. Il faudra qu’il soit uniquement en blanc sur fond transparent
+
+Et n’oublies pas d’écrire le titre mouse over comme l’exemple ci-dessous
+
+LES REGLES D’OR : 
+
+Pas d’icones fantaisistes à par celles que je te donne en SVG
+
+Pas de tag, encadrés avec liseré et glass effect
+
+Pas de redondances d’informations. Tu as souvent tendance à répéter la même information au même endroit.
+
+Pas de bouton « exit » si on a une « X » en haut à droite.
+
+De manière générale pas de cadres en liseré autour des icones. Je préfère ne rien mettre et c’est la mouse over qui illumine l’icone
+
+Pas de textes trop longs. Synthétise à mort.
+
+Pas de sous-titre sous un intitulé de titre. Il faut systématiquement avoir recourt aux infos bulles si on a besoin de donner plus de feedback
+
+Respecte vraiment les codes couleurs : Vert, Ambre, Jaune, et Rouge pour indiquer la notion de bon vers mauvais.
+
+Tout les textes doivent être en Anglais c’est la langue de référence.
+
+Respecte les couleurs des mouse over de chaque bouton. Le standard c’est bouton bleu ciel fond uni, pas de liseré typo blanc et plus brillant sur me mouse over.
+
+Harmoniser les types , couleur et tailles de police de manière que chaque type d’élément soit immédiatement indentifiables
+
+Les titres principaux ou secondaire toujours en majuscule. Blanc et gris.
+
+Les tags jamais de liseré.
+
+Typiquement ce genre d’ajout :
+
+-Deux informations à 2 endroits alors que le simple bouton « INSTALLER » suffit. Une fois installé le bouton devient alors « UNINSTALL ».
+
+-Pas d’explication inutile avec en plus le rajout du chemin d’accès on s’en fout !!! Mets une infobulle concise qui explique ce que c’est.  Mets juste « IN GAME TOOLBAR PANEL »
+
+Faire une passe générale pour corriger ce qui existe déjà Il faut qu’on s’éloigne le plus possible du look « vibe coding » qui commence à se voir beaucoup trop.
+
+Dis-moi comment tu comptes t’organiser. Ne suis pas mes directives dans l’ordre de la numérotation mais propose moi un plan d’attaque cohérent.

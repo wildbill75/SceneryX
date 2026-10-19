@@ -725,6 +725,31 @@
             opacity: 0 !important;
         }
 
+        /* Strict suppression of airport label and marker icon when radial menu, central pastille or radial modals are open over it */
+        .custom-map-marker.radial-active,
+        .radial-active {
+            pointer-events: none !important;
+        }
+        .custom-map-marker.radial-active .airport-map-label,
+        .custom-map-marker.radial-active .airport-map-label.label-force-visible,
+        .radial-active .airport-map-label,
+        .radial-active .airport-map-label.label-force-visible {
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            width: 0 !important;
+            max-width: 0 !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            border: 0 !important;
+            pointer-events: none !important;
+        }
+        .custom-map-marker.radial-active .custom-marker-wrapper > div:first-child,
+        .radial-active .custom-marker-wrapper > div:first-child {
+            opacity: 0 !important;
+            visibility: hidden !important;
+        }
+
         /* ================= COUNTRY MODE PROGRESSIVE DISCLOSURE ================= */
         /* En Mode Pays uniquement: Affichage des tags Ã  un niveau de zoom plus large
            (Zoom >= 3 pour International / Regional / General Aviation, Zoom >= 6 pour Heliports / Seaplanes). */
@@ -1168,19 +1193,7 @@
             gap: 8px !important;
         }
 
-        #float-win-my-rig.is-pinned #my-rig-pin-btn {
-            color: #ffffff !important;
-            background: #334155 !important;
-            width: 22px !important;
-            height: 22px !important;
-            border-radius: 5px !important;
-        }
 
-        #float-win-my-rig.is-pinned #my-rig-pin-btn i {
-            color: #f1f5f9 !important;
-            transform: rotate(-45deg);
-            font-size: 11px !important;
-        }
 
         #float-win-my-rig.is-pinned .modal-close-btn {
             width: 22px !important;
@@ -2098,11 +2111,11 @@
         /* SceneryX Onboarding & Interactive Spotlight Tour Styles */
         #tour-mask-cutout,
         #tour-spotlight-glow {
-            transition: x 0.35s cubic-bezier(0.16, 1, 0.3, 1),
-                        y 0.35s cubic-bezier(0.16, 1, 0.3, 1),
-                        width 0.35s cubic-bezier(0.16, 1, 0.3, 1),
-                        height 0.35s cubic-bezier(0.16, 1, 0.3, 1),
-                        opacity 0.25s ease-in-out;
+            transition: x 0.16s cubic-bezier(0.16, 1, 0.3, 1),
+                        y 0.16s cubic-bezier(0.16, 1, 0.3, 1),
+                        width 0.16s cubic-bezier(0.16, 1, 0.3, 1),
+                        height 0.16s cubic-bezier(0.16, 1, 0.3, 1),
+                        opacity 0.12s ease-out;
         }
         body.tour-active .sceneryx-modal,
         body.tour-active .sceneryx-modal *,
@@ -2172,7 +2185,7 @@
 
             <!-- Bottom Right Version & Copyright -->
             <div class="w-full flex justify-end pt-1">
-                <span class="text-[10px] text-[#64748B] font-medium tracking-wide">v1.0.2 • &copy; 2026 Sidestick Priority</span>
+                <span class="text-[10px] text-[#64748B] font-medium tracking-wide">PRO_1.1.3 • &copy; 2026 Sidestick Priority</span>
             </div>
 
         </div>
@@ -2183,8 +2196,8 @@
         <!-- LEFT: BRANDING LOGO -->
         <div class="flex items-center shrink-0 z-10">
             <div class="flex items-end gap-2.5">
-                <img src="header_logo.png?v=3" alt="SceneryX" class="h-10 lg:h-11 w-auto object-contain select-none pointer-events-none drop-shadow-sm" />
-                <span class="typo-metadata text-[11px] font-mono font-medium text-[#64748B] leading-none mb-1" title="SceneryX v1.0.2">v1.0.2</span>
+                <img src="header_logo.png?v=4" alt="SceneryX" class="h-10 lg:h-11 w-auto object-contain select-none pointer-events-none drop-shadow-sm" />
+                <span class="typo-metadata text-[11px] font-mono font-medium text-[#64748B] leading-none mb-1" title="SceneryX PRO_1.1.3">PRO_1.1.3</span>
             </div>
         </div>
 
@@ -2231,7 +2244,8 @@
                 <!-- Left Nav Arrow (Discrete, appears on hover) -->
                 <button id="fun-stats-prev-btn" onclick="event.stopPropagation(); prevFunStatsSlide()"
                         class="opacity-0 group-hover/ticker:opacity-80 hover:opacity-100 transition-opacity p-1 text-slate-400 hover:text-cyan-400 cursor-pointer border-0 bg-transparent shrink-0 active:scale-90"
-                        title="Previous fact">
+                        tabindex="-1"
+                        aria-label="Previous fact">
                     <span data-icon="chevron-left" class="w-4 h-4 block"></span>
                 </button>
 
@@ -2247,7 +2261,8 @@
                 <!-- Right Nav Arrow (Discrete, appears on hover) -->
                 <button id="fun-stats-next-btn" onclick="event.stopPropagation(); nextFunStatsSlide()"
                         class="opacity-0 group-hover/ticker:opacity-80 hover:opacity-100 transition-opacity p-1 text-slate-400 hover:text-cyan-400 cursor-pointer border-0 bg-transparent shrink-0 active:scale-90"
-                        title="Next fact">
+                        tabindex="-1"
+                        aria-label="Next fact">
                     <span data-icon="chevron-right" class="w-4 h-4 block"></span>
                 </button>
 
@@ -2531,24 +2546,24 @@
                     <span class="text-[10px] font-sans font-black uppercase tracking-widest text-[#64748B] block px-1">FLIGHT OPTIMIZER</span>
                     <div class="space-y-1.5">
                         <button type="button" onclick="toggleFloatingWindow('smart_lod', event)" id="classic-btn-smart-lod" class="w-full h-10 px-3.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-all flex items-center justify-between cursor-pointer group shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
-                            <span class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">SMART LOD</span>
-                            <span id="classic-badge-smart-lod" class="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-[#0E121A] text-[#64748B] border border-[#2D3A54]">OFF</span>
+                            <span id="classic-lbl-smart-lod" class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">SMART LOD</span>
+                            <span id="classic-badge-smart-lod" class="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#0E121A] text-[#94A3B8] border border-[#253046] inline-flex items-center gap-1"><svg class="w-3 h-3 text-[#94A3B8] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg><span>PRO</span></span>
                         </button>
                         <button type="button" onclick="toggleFloatingWindow('graphics', event)" id="classic-btn-graphics" class="w-full h-10 px-3.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-all flex items-center justify-between cursor-pointer group shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
-                            <span class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">MSFS GRAPHIC SETTINGS</span>
-                            <span id="classic-badge-graphics" class="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-[#0E121A] text-[#94A3B8] border border-[#2D3A54]">2D</span>
+                            <span id="classic-lbl-graphics" class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">MSFS GRAPHIC SETTINGS</span>
+                            <span id="classic-badge-graphics" class="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#0E121A] text-[#94A3B8] border border-[#253046] inline-flex items-center gap-1"><svg class="w-3 h-3 text-[#94A3B8] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg><span>PRO</span></span>
                         </button>
                         <button type="button" onclick="toggleFloatingWindow('my_rig', event)" id="classic-btn-my-rig" class="w-full h-10 px-3.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-all flex items-center justify-between cursor-pointer group shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
-                            <span class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">MY RIG</span>
-                            <span id="classic-badge-my-rig" class="text-[10px] font-mono font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-[#10B981] text-[#0B0D11] shadow-sm">OPTIMUM</span>
+                            <span id="classic-lbl-my-rig" class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">MY RIG</span>
+                            <span id="classic-badge-my-rig" class="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#0E121A] text-[#94A3B8] border border-[#253046] inline-flex items-center gap-1"><svg class="w-3 h-3 text-[#94A3B8] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg><span>PRO</span></span>
                         </button>
                         <button type="button" onclick="toggleFloatingWindow('telemetry', event)" id="classic-btn-telemetry" class="w-full h-10 px-3.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-all flex items-center justify-between cursor-pointer group shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
-                            <span class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">TELEMETRY</span>
-                            <span id="classic-badge-telemetry" class="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-[#0E121A] text-[#64748B] border border-[#2D3A54]">00:00</span>
+                            <span id="classic-lbl-telemetry" class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">TELEMETRY</span>
+                            <span id="classic-badge-telemetry" class="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#0E121A] text-[#94A3B8] border border-[#253046] inline-flex items-center gap-1"><svg class="w-3 h-3 text-[#94A3B8] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg><span>PRO</span></span>
                         </button>
                         <button type="button" onclick="toggleFloatingWindow('route', event)" id="classic-btn-route" class="w-full h-10 px-3.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-all flex items-center justify-between cursor-pointer group shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
-                            <span class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">ROUTE OPTIMIZATION</span>
-                            <span id="classic-badge-route" class="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-[#0E121A] text-[#64748B] border border-[#2D3A54]">OFF</span>
+                            <span id="classic-lbl-route" class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">ROUTE OPTIMIZATION</span>
+                            <span id="classic-badge-route" class="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#0E121A] text-[#94A3B8] border border-[#253046] inline-flex items-center gap-1"><svg class="w-3 h-3 text-[#94A3B8] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg><span>PRO</span></span>
                         </button>
                     </div>
                 </div>
@@ -2833,7 +2848,7 @@
             <div id="radial-details-modal"
                  data-modal-id="radial-details-modal"
                  class="sceneryx-modal floating-window absolute hidden flex-col bg-[#12161F] border border-[#1E2638] rounded-xl shadow-[0_16px_40px_rgba(0,0,0,0.6)] overflow-hidden select-none pointer-events-auto z-[1550]"
-                 style="min-width: 560px; width: 880px; height: auto; max-width: 95vw; max-height: calc(100vh - 212px);">
+                 style="min-width: 600px; width: 960px; height: auto; max-width: 96vw; max-height: calc(100vh - 212px);">
                 
                 <!-- Drag Handle & Modal Header -->
                 <div id="radial-details-modal-header" class="modal-header floating-win-header h-[42px] px-4 bg-[#12161F] border-b border-[#1E2638] flex items-center justify-between cursor-move select-none">
@@ -2867,9 +2882,9 @@
                                         <span class="text-[9px] text-[#64748B] uppercase font-bold block mb-0.5" data-i18n="drawer.longitude">Longitude</span>
                                         <span id="radial-detail-lon" class="text-xs font-sans font-bold text-[#F1F5F9] truncate block">0.0000</span>
                                     </div>
-                                    <div class="p-2 rounded-md bg-[#0E121A] border border-[#2D3A54] min-w-0">
+                                    <div class="px-2 py-2 rounded-md bg-[#0E121A] border border-[#2D3A54] min-w-0 flex flex-col justify-center">
                                         <span class="text-[9px] text-[#64748B] uppercase font-bold block mb-0.5" data-i18n="drawer.category">Category</span>
-                                        <span id="radial-detail-category" class="text-[11px] sm:text-xs font-sans font-bold text-cyan-400 truncate block uppercase">INTERNATIONAL</span>
+                                        <span id="radial-detail-category" class="text-xs font-sans font-bold text-cyan-400 block uppercase tracking-tight whitespace-nowrap">INTERNATIONAL</span>
                                     </div>
                                     <div class="p-2 rounded-md bg-[#0E121A] border border-[#2D3A54]">
                                         <span class="text-[9px] text-[#64748B] uppercase font-bold block mb-0.5" data-i18n="drawer.elevation">Elevation</span>
@@ -2893,14 +2908,14 @@
                                 <span class="text-[10.5px] font-sans font-bold uppercase tracking-wider text-[#64748B] block" data-i18n="drawer.price_value">Scenery Price / Value</span>
                                 <div class="flex items-center gap-2 pt-0.5">
                                     <div class="relative w-28 shrink-0">
-                                        <span id="radial-price-curr-symbol" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-sm font-sans font-bold text-white">$</span>
+                                        <span id="radial-price-curr-symbol" class="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs font-sans font-normal text-slate-400 select-none pointer-events-none">$</span>
                                         <input type="number" step="any" id="radial-price-input" data-i18n-placeholder="drawer.price_placeholder" placeholder="Price Paid"
                                                class="w-full bg-[#0E121A] border border-[#2D3A54] rounded-md pl-6 pr-2 py-1 text-xs font-sans font-bold text-white placeholder:text-[#64748B] focus:outline-none focus:border-[#38BDF8]">
                                     </div>
                                     <span id="radial-price-tag" class="flex-1 text-center text-xs font-sans font-bold text-[#CBD5E1] bg-[#0E121A] border border-[#2D3A54] px-2 py-1 rounded-md truncate whitespace-nowrap">
                                         Est: €19.99
                                     </span>
-                                    <button onclick="saveRadialCustomPrice()" data-i18n="drawer.save_price" class="px-3 py-1 rounded-md bg-[#12161F] hover:bg-[#181E2B] text-[#38BDF8] hover:text-white border border-[#253046] text-xs font-bold font-sans transition-colors cursor-pointer shrink-0" title="Save Price">
+                                    <button onclick="saveRadialCustomPrice()" data-i18n="drawer.save_price" class="px-3 py-1 rounded-md bg-sky-600 hover:bg-sky-500 text-white border border-sky-500 text-xs font-bold font-sans transition-colors cursor-pointer shrink-0 shadow-sm" title="Save Price">
                                         Save
                                     </button>
                                     <button onclick="resetRadialCustomPrice()" class="px-2.5 py-1 rounded-md bg-[#12161F] hover:bg-[#181E2B] text-[#94A3B8] hover:text-white text-xs font-sans font-bold transition-colors flex items-center justify-center shrink-0 cursor-pointer border border-[#253046]" title="Reset to Estimated Catalog Price">
@@ -3266,7 +3281,7 @@
                             <div id="accordion-content-price" class="px-4 pb-4 pt-1 space-y-3 border-t border-slate-800/50">
                                 <div class="flex items-center gap-2 pt-1">
                                     <div class="relative w-36 shrink-0">
-                                        <span id="drawer-price-curr-symbol" class="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-mono font-extrabold text-white">$</span>
+                                        <span id="drawer-price-curr-symbol" class="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-mono font-normal text-slate-400 select-none pointer-events-none">$</span>
                                         <input type="number" step="any" id="drawer-price-input" data-i18n-placeholder="drawer.price_placeholder" placeholder="Price Paid" 
                                                class="w-full bg-slate-900/85 border border-slate-700/60 rounded-md pl-8 pr-2.5 py-2 text-xs sm:text-sm font-mono font-bold text-white placeholder:text-slate-500 input-dark">
                                     </div>
@@ -3441,8 +3456,11 @@
             <div class="flex items-center gap-2">
                 <h3 class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase" data-i18n="settings.title">FOLDER LOCATIONS &amp; GSX</h3>
             </div>
-            <div class="flex items-center gap-1">
-                <button onclick="closeSettingsModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white text-base transition-opacity">
+            <div class="flex items-center gap-1.5">
+                <button type="button" onclick="showContextHelp('settings')" data-i18n-title="settings.help_btn_title" title="Settings Guide &amp; Help" class="w-7 h-7 rounded-lg bg-[#181E2B] hover:bg-[#242E42] text-slate-200 hover:text-white border border-[#2D3A54] hover:border-slate-500 flex items-center justify-center transition-all cursor-pointer shadow-sm select-none">
+                    <span class="font-sans font-bold text-xs leading-none select-none">?</span>
+                </button>
+                <button onclick="closeSettingsModal()" title="Close" class="modal-close-btn w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-white text-base transition-opacity">
                     ✕
                 </button>
             </div>
@@ -3483,8 +3501,11 @@
                 </div>
 
                 <!-- SIMBRIEF INTEGRATION CONFIG -->
-                <div class="pt-3 border-t border-slate-800/80 space-y-2">
-                    <label data-i18n="settings.simbrief_section" class="typo-section-title text-slate-400 block">SimBrief</label>
+                <div id="cfg-simbrief-section" class="pt-3 border-t border-slate-800/80 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <label id="cfg-simbrief-label" data-i18n="settings.simbrief_section" class="typo-section-title text-slate-400 block">SimBrief</label>
+                        <span id="cfg-simbrief-pro-badge" class="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#0E121A] text-[#94A3B8] border border-[#253046] inline-flex items-center gap-1"><svg class="w-3 h-3 text-[#94A3B8] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg><span>PRO</span></span>
+                    </div>
                     <div class="relative flex items-center">
                         <input type="text" id="cfg-simbrief-id" data-i18n-placeholder="settings.simbrief_placeholder" placeholder="Pilot name or id" class="w-full bg-slate-900 border border-slate-700/60 rounded-md pl-3.5 pr-28 py-2 typo-input-val text-slate-200 focus:outline-none focus:border-slate-400 focus:bg-slate-800 transition-colors">
                         <div id="sb-status-indicator" class="absolute right-3.5 flex items-center gap-1.5 pointer-events-none select-none">
@@ -3548,9 +3569,9 @@
                     <div class="space-y-1.5">
                         <div class="flex items-center justify-between">
                             <label data-i18n="settings.airport_zoom" class="typo-setting-label text-slate-300">Airport Selection Zoom</label>
-                            <span id="cfg-zoom-display" class="typo-metric font-semibold text-slate-200">6.0</span>
+                            <span id="cfg-zoom-display" class="typo-metric font-semibold text-slate-200">8.0</span>
                         </div>
-                        <input type="range" id="cfg-camera-zoom" min="4.0" max="12.0" step="0.5" value="6.0" oninput="updateCameraSettingsPreview()" class="w-full accent-slate-400 cursor-pointer">
+                        <input type="range" id="cfg-camera-zoom" min="4.0" max="12.0" step="0.5" value="8.0" oninput="updateCameraSettingsPreview()" class="w-full accent-slate-400 cursor-pointer">
                         <div class="flex justify-between">
                             <span data-i18n="settings.zoom_wide" class="typo-metadata">Wide (4.0)</span>
                             <span data-i18n="settings.zoom_regional" class="typo-metadata">Regional (6.0)</span>
@@ -3562,9 +3583,9 @@
                     <div class="space-y-1.5">
                         <div class="flex items-center justify-between">
                             <label data-i18n="settings.pan_duration" class="typo-setting-label text-slate-300">Camera Pan Duration</label>
-                            <span id="cfg-duration-display" class="typo-metric font-semibold text-slate-200">0.8s</span>
+                            <span id="cfg-duration-display" class="typo-metric font-semibold text-slate-200">1.1s</span>
                         </div>
-                        <input type="range" id="cfg-camera-duration" min="0.2" max="2.0" step="0.1" value="0.8" oninput="updateCameraSettingsPreview()" class="w-full accent-slate-400 cursor-pointer">
+                        <input type="range" id="cfg-camera-duration" min="0.2" max="2.0" step="0.1" value="1.1" oninput="updateCameraSettingsPreview()" class="w-full accent-slate-400 cursor-pointer">
                         <div class="flex justify-between">
                             <span data-i18n="settings.speed_fast" class="typo-metadata">Fast (0.2s)</span>
                             <span data-i18n="settings.speed_smooth" class="typo-metadata">Smooth (0.8s)</span>
@@ -3582,14 +3603,32 @@
                             <span data-i18n="settings.nav_style_metadata" class="typo-metadata">Radial Hub or Classic Side Panel</span>
                         </div>
                         <select id="cfg-nav-style" onchange="previewNavStyle(this.value)" data-i18n-title="settings.nav_style_tooltip" title="Switch between tactical radial hub or docked flight sidebar" class="w-full bg-slate-900 border border-slate-700/60 rounded-md px-3.5 py-2 typo-input-val text-slate-200 cursor-pointer focus:outline-none focus:border-slate-400">
+                            <option value="classic" selected data-i18n="settings.nav_style_classic">Classic Side Panel (Navigraph Flight Ops style)</option>
                             <option value="radial" data-i18n="settings.nav_style_radial">Tactical Radial Menu (Center Hub on Map)</option>
-                            <option value="classic" data-i18n="settings.nav_style_classic">Classic Side Panel (Navigraph Flight Ops style)</option>
                         </select>
                     </div>
-                    <div class="pt-1">
-                        <button type="button" onclick="closeSettingsModal(); window.onboardingTour && window.onboardingTour.start();" class="w-full py-2 px-3 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700/80 text-slate-200 text-xs font-semibold flex items-center justify-center cursor-pointer transition-colors shadow-sm">
-                            <span data-i18n="settings.start_tour_btn">Launch Interactive Tour</span>
-                        </button>
+                </div>
+
+                <!-- INTERACTIVE TOUR & ASSISTANCE SECTION -->
+                <div id="settings-interactive-tour-section" class="pt-4 border-t border-slate-800/80 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <label data-i18n="settings.start_tour" class="typo-section-title text-slate-400 block font-semibold">
+                            <span data-i18n="settings.start_tour">Interactive Guided Tour</span>
+                        </label>
+                    </div>
+                    <div class="bg-slate-950/80 p-3.5 rounded-lg border border-slate-800/80 flex items-center justify-between gap-4">
+                        <div class="space-y-0.5">
+                            <span data-i18n="settings.tour_card_title" class="text-xs font-bold text-slate-200 block">Guided Walkthrough (25 Steps)</span>
+                            <span data-i18n="settings.tour_card_sub" class="text-[11px] text-slate-400 block">Explore the entire UI, airport cards, Smart LOD, in-game panel, scenery export &amp; tools.</span>
+                        </div>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <button type="button" onclick="resetOnboardingPromptFromSettings()" data-i18n-title="settings.reset_tour_prompt_tooltip" title="Reset welcome prompt so it asks on next application launch" class="px-3 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700/70 text-xs font-medium transition-colors cursor-pointer">
+                                <span data-i18n="settings.reset_tour_prompt_btn">Reset Prompt</span>
+                            </button>
+                            <button type="button" onclick="restartInteractiveTourFromSettings()" class="px-3.5 py-1.5 rounded-md bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-400 hover:to-sky-400 text-slate-950 font-bold text-xs flex items-center justify-center transition-all cursor-pointer shadow-md shadow-cyan-950/30 active:scale-[0.98]">
+                                <span data-i18n="settings.start_tour_btn">Launch Tour Now</span>
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -3600,11 +3639,8 @@
                         <div class="flex items-center justify-between">
                             <label data-i18n="settings.language_label" class="typo-setting-label text-slate-300">Application Language</label>
                         </div>
-                        <select id="cfg-app-language" onchange="previewAppLanguage(this.value)" class="w-full bg-slate-900 border border-slate-700/60 rounded-md px-3.5 py-2 typo-input-val text-slate-200 cursor-pointer focus:outline-none focus:border-slate-400">
-                            <option value="en">English (Default)</option>
-                            <option value="fr">French (Français)</option>
-                            <option value="de">German (Deutsch)</option>
-                            <option value="es">Spanish (Español)</option>
+                        <select id="cfg-app-language" disabled class="w-full bg-slate-900 border border-slate-700/60 rounded-md px-3.5 py-2 typo-input-val text-slate-200 cursor-default opacity-80 focus:outline-none">
+                            <option value="en" selected>English</option>
                         </select>
                     </div>
                 </div>
@@ -3643,18 +3679,19 @@
                 </div>
 
                 <!-- DYNAMIC LOD & PERFORMANCE ENGINE SETTINGS -->
-                <div class="pt-4 border-t border-slate-800/80 space-y-3">
+                <div id="cfg-external-autofps-section" class="pt-4 border-t border-slate-800/80 space-y-3">
                     <div class="flex items-center justify-between">
                         <label class="typo-section-title text-slate-400 block">Dynamic LOD &amp; Performance Engine</label>
                     </div>
 
-                    <div class="flex items-center justify-between bg-slate-950/80 p-3.5 rounded-lg border border-slate-700/60">
+                    <div onclick="toggleExternalAutoFpsSettingSwitch()" class="flex items-center justify-between bg-slate-950/80 p-3.5 rounded-lg border border-slate-700/60 cursor-pointer">
                         <div>
-                            <label onclick="toggleExternalAutoFpsSettingSwitch()" class="typo-setting-label text-slate-200 cursor-pointer block font-semibold">External AutoFPS (MSFS_AutoFPS.exe)</label>
+                            <label class="typo-setting-label text-slate-200 cursor-pointer block font-semibold">External AutoFPS (MSFS_AutoFPS.exe)</label>
                             <span class="typo-metadata text-slate-400 block mt-0.5">Delegate dynamic LOD regulation exclusively to the external MSFS_AutoFPS utility instead of SceneryX Smart LOD</span>
                         </div>
-                        <div id="cfg-external-autofps-switch" onclick="toggleExternalAutoFpsSettingSwitch()" class="relative inline-flex items-center shrink-0 cursor-pointer p-1 rounded-xl transition-colors" title="Toggle External AutoFPS usage">
-                            <div id="cfg-external-autofps-track" class="w-10 h-5 rounded-full transition-colors duration-200 ease-in-out p-0.5 bg-slate-700">
+                        <div id="cfg-external-autofps-switch" class="relative inline-flex items-center shrink-0 cursor-pointer p-1 rounded-xl transition-colors" title="Toggle External AutoFPS usage">
+                            <span id="cfg-external-autofps-pro-badge" class="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#0E121A] text-[#94A3B8] border border-[#253046] inline-flex items-center gap-1"><svg class="w-3 h-3 text-[#94A3B8] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg><span>PRO</span></span>
+                            <div id="cfg-external-autofps-track" class="hidden w-10 h-5 rounded-full transition-colors duration-200 ease-in-out p-0.5 bg-slate-700">
                                 <div id="cfg-external-autofps-thumb" class="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out translate-x-0"></div>
                             </div>
                         </div>
@@ -3662,13 +3699,13 @@
                 </div>
 
                 <!-- MSFS IN-GAME TOOLBAR PANEL -->
-                <div id="cfg-ingame-panel-section" class="pt-4 border-t border-slate-800/80 flex items-center justify-between">
+                <div id="cfg-ingame-panel-section" onclick="if (window.IS_LITE) showUnlockProModal();" class="pt-4 border-t border-slate-800/80 flex items-center justify-between cursor-pointer">
                     <div>
-                        <label class="typo-section-title text-slate-300 block">In-Game Toolbar Panel</label>
+                        <label class="typo-section-title text-slate-300 block cursor-pointer">In-Game Toolbar Panel</label>
                         <span class="typo-metadata text-slate-500 block">In-flight HUD remote toolbar panel for MSFS (2D &amp; VR)</span>
                     </div>
-                    <button type="button" id="cfg-ingame-panel-btn" onclick="toggleIngamePanelInstall()" class="px-4 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700/60 typo-action-btn font-semibold transition-colors cursor-pointer">
-                        INSTALL
+                    <button type="button" id="cfg-ingame-panel-btn" onclick="event.stopPropagation(); toggleIngamePanelInstall()" class="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#0E121A] text-[#94A3B8] border border-[#253046] inline-flex items-center gap-1 cursor-pointer">
+                        <svg class="w-3 h-3 text-[#94A3B8] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg><span>PRO</span>
                     </button>
                 </div>
 
@@ -3843,61 +3880,57 @@
     <!-- CONFLICT RESOLUTION MODAL -->
     <div id="conflict-resolution-modal"
          data-modal-id="conflict-resolution-modal"
-         class="sceneryx-modal absolute hidden flex-col bg-slate-900/90 backdrop-blur-md border border-slate-700/60 rounded-xl shadow-2xl overflow-hidden z-[2050] select-none"
-         style="min-width: 440px; width: 560px; height: auto; max-width: 95vw; max-height: 85vh;">
+         class="sceneryx-modal absolute hidden flex-col bg-[#12161F] border border-[#263042] rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.7)] overflow-hidden z-[2050] select-none font-sans"
+         style="min-width: 460px; width: 580px; height: auto; max-width: 95vw; max-height: 88vh; left: 50%; top: 50%; transform: translate(-50%, -50%);">
         <!-- Drag Handle Header -->
-        <div class="modal-header h-[42px] px-4 bg-slate-950 border-b border-slate-800/80 flex items-center justify-between cursor-move select-none">
+        <div class="modal-header h-[42px] px-4 bg-[#0D1117] border-b border-[#263042] flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-amber-400"></span>
-                <h3 class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase flex items-center gap-2">
+                <h3 class="text-[#F1F5F9] text-xs font-sans font-bold tracking-wide uppercase flex items-center gap-2">
                     <span data-i18n="conflict.modal_title">SCENERY CONFLICT DETECTED</span>
-                    <span id="conflict-modal-step-index-title" class="typo-metric font-semibold text-amber-400">1/1</span>
+                    <span id="conflict-modal-step-index-title" class="font-sans font-semibold text-slate-400 text-xs">1/1</span>
                 </h3>
             </div>
             <div class="flex items-center gap-2">
-                <div id="conflict-modal-step-nav" class="hidden items-center gap-1 bg-slate-950 px-2 py-0.5 rounded-md border border-slate-800">
-                    <button onclick="navigateConflictStep(-1)" title="Previous Conflict" class="w-5 h-5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-xs transition-colors cursor-pointer border-0">
+                <div id="conflict-modal-step-nav" class="hidden items-center gap-1 bg-[#181E2B] px-2 py-0.5 rounded-md border border-[#263042]">
+                    <button onclick="navigateConflictStep(-1)" title="Previous Conflict" class="w-5 h-5 rounded-md bg-[#222B3D] hover:bg-[#2D3952] text-slate-300 hover:text-white flex items-center justify-center text-xs transition-colors cursor-pointer border-0">
                         <span data-icon="chevron-left" class="w-3 h-3 block"></span>
                     </button>
-                    <span id="conflict-modal-step-index" class="typo-metric font-semibold text-slate-300 px-1 text-xs">1/1</span>
-                    <button onclick="navigateConflictStep(1)" title="Next Conflict" class="w-5 h-5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white flex items-center justify-center text-xs transition-colors cursor-pointer border-0">
+                    <span id="conflict-modal-step-index" class="font-sans font-semibold text-slate-300 px-1 text-xs">1/1</span>
+                    <button onclick="navigateConflictStep(1)" title="Next Conflict" class="w-5 h-5 rounded-md bg-[#222B3D] hover:bg-[#2D3952] text-slate-300 hover:text-white flex items-center justify-center text-xs transition-colors cursor-pointer border-0">
                         <span data-icon="chevron-right" class="w-3 h-3 block"></span>
                     </button>
                 </div>
-                <button onclick="closeConflictModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity">
+                <button onclick="closeConflictModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity border-0 bg-transparent cursor-pointer">
                     <i class="fa-solid fa-xmark text-sm"></i>
                 </button>
             </div>
         </div>
 
         <!-- Scrollable Content Body -->
-        <div class="modal-body flex-1 p-4 overflow-y-auto custom-scrollbar space-y-4">
+        <div class="modal-body flex-1 p-4 overflow-y-auto custom-scrollbar space-y-3.5">
             <!-- Airport Identity Card -->
-            <div class="p-3.5 rounded-lg bg-slate-800/85 border border-slate-700/80 flex items-center gap-4">
-                <span id="conflict-modal-icao" class="typo-metric font-bold text-2xl lg:text-3xl tracking-tight shrink-0 text-amber-400">ICAO</span>
+            <div class="p-3.5 rounded-lg bg-[#181E2B] border border-[#263042] flex items-center gap-4 shrink-0">
+                <span id="conflict-modal-icao" class="font-sans font-black text-2xl lg:text-3xl tracking-tight shrink-0 text-amber-400">ICAO</span>
                 <div class="min-w-0">
-                    <h4 id="conflict-modal-ap-name" class="typo-section-title font-semibold text-white truncate">Airport Full Name</h4>
-                    <p id="conflict-modal-ap-location" class="typo-metadata truncate">City, Country</p>
+                    <h4 id="conflict-modal-ap-name" class="font-sans font-bold text-white truncate text-sm">Airport Full Name</h4>
+                    <p id="conflict-modal-ap-location" class="font-sans text-xs text-slate-400 truncate">City, Country</p>
                 </div>
             </div>
 
             <!-- Explainer text -->
-            <p data-i18n="conflict.modal_explainer" class="text-xs text-slate-300 leading-relaxed">
+            <p data-i18n="conflict.modal_explainer" class="text-xs text-slate-300 leading-relaxed shrink-0 font-sans">
                 Multiple active base sceneries are installed for this airport. Choose which scenery you want to keep active (the other will be safely disabled):
             </p>
 
             <!-- Conflicting Sources Container (Radio items injected dynamically) -->
-            <div id="conflict-modal-sources-container" class="space-y-3 max-h-72 overflow-y-auto pr-1">
+            <div id="conflict-modal-sources-container" class="space-y-2.5 font-sans">
                 <!-- Injected dynamically by renderConflictModalStep() -->
             </div>
         </div>
 
         <!-- Modal Footer Action Buttons -->
-        <div class="px-4 py-3 bg-slate-900/60 border-t border-slate-800 flex items-center justify-between shrink-0">
-            <button id="conflict-modal-next-gsx-btn" onclick="proceedFromConflictToGsxScan()" class="px-4 py-2 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white typo-action-btn font-semibold transition-colors cursor-pointer border border-slate-700/60 btn-elevate text-xs">
-                Next (Scan GSX) â†’
-            </button>
-            <button id="conflict-modal-submit-btn" onclick="applyConflictSelection()" class="px-5 py-2 rounded-md bg-cyan-600 hover:bg-cyan-500 text-white typo-action-btn font-semibold transition-all cursor-pointer border-0 active:scale-98 btn-elevate text-xs">
+        <div class="px-4 py-3 bg-[#0D1117] border-t border-[#263042] flex items-center justify-end shrink-0">
+            <button id="conflict-modal-submit-btn" onclick="applyConflictSelection()" class="px-5 py-2 rounded-md bg-[#181E2B] hover:bg-[#253046] text-white border border-[#334155] hover:border-slate-400 font-sans font-semibold transition-all cursor-pointer active:scale-98 text-xs shadow-sm">
                 <span data-i18n="conflict.btn_apply">Apply Choice</span>
             </button>
         </div>
@@ -4006,106 +4039,244 @@
     <!-- 6 INDEPENDENT FLOATING WINDOWS (FLIGHT OPTIMIZER MODULES)         -->
     <!-- ================================================================= -->
 
-    <!-- 1. MY RIG (HARDWARE SPECS & STATUS) -->
+    <!-- 1. MY RIG & SYSTEM OPTIMIZER (HARDWARE & OUT-OF-SIM TUNING) -->
     <div id="float-win-my-rig"
          data-modal-id="float-win-my-rig"
          class="sceneryx-modal floating-window absolute hidden flex-col bg-[#12161F] border border-[#1E2638] rounded-xl shadow-[0_16px_40px_rgba(0,0,0,0.6)] overflow-hidden z-[1200] select-none"
-         style="min-width: 480px; width: 780px; height: auto; max-width: 96vw; max-height: calc(100vh - 212px);">
+         style="min-width: 440px; width: 700px; height: auto; max-width: 96vw; max-height: calc(100vh - 120px);">
         <!-- Drag Handle Header -->
         <div class="modal-header floating-win-header h-[42px] px-4 bg-[#12161F] border-b border-[#1E2638] flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2">
-                <h3 class="typo-window-header text-[#F1F5F9] text-xs font-sans font-bold tracking-wider uppercase">MY RIG HARDWARE</h3>
-                <span id="opt-rig-pinned-tag" class="hidden px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold tracking-wider uppercase bg-[#10B981] text-white shadow-sm">OPTIMUM</span>
+                <h3 class="typo-window-header text-[#F1F5F9] text-xs font-sans font-bold tracking-wider uppercase">MY RIG &amp; SYSTEM</h3>
             </div>
             <div class="flex items-center gap-1.5">
-                <button id="my-rig-pin-btn" onclick="togglePinRigWindow()" title="Pin to top (Horizontal HUD)" class="w-7 h-7 rounded-md flex items-center justify-center text-[#94A3B8] hover:text-[#F1F5F9] hover:bg-[#181E2B] transition-colors cursor-pointer border-0">
-                    <i class="fa-solid fa-thumbtack text-xs"></i>
+                <button type="button" onclick="showContextHelp('my_rig')" data-i18n-title="my_rig.help_btn_title" title="Rig &amp; System Guide &amp; Help" class="w-7 h-7 rounded-md bg-[#181E2B] hover:bg-[#242E42] text-slate-200 hover:text-white border border-[#2D3A54] hover:border-slate-500 flex items-center justify-center transition-all cursor-pointer shadow-sm select-none">
+                    <i class="fa-solid fa-question text-xs"></i>
                 </button>
                 <button onclick="closeFloatingWindow('my_rig')" title="Close" class="modal-close-btn w-7 h-7 rounded-md flex items-center justify-center text-[#94A3B8] hover:text-[#F1F5F9] hover:bg-[#181E2B] transition-colors cursor-pointer border-0">
                     <i class="fa-solid fa-xmark text-sm"></i>
                 </button>
             </div>
         </div>
+
+        <!-- Navigation Tabs Bar -->
+        <div class="px-4 py-2 bg-[#0E121A] border-b border-[#1E2638] flex items-center justify-between gap-2">
+            <div class="flex items-center gap-1.5 flex-wrap">
+                <button id="rig-tab-btn-tuning" onclick="switchRigTab('tuning')" class="px-3 py-1 rounded text-xs font-bold uppercase tracking-wider bg-[#1E2638] text-[#F1F5F9] transition-colors border-0 cursor-pointer">
+                    System Optimizer
+                </button>
+                <button id="rig-tab-btn-specs" onclick="switchRigTab('specs')" class="px-3 py-1 rounded text-xs font-semibold uppercase tracking-wider bg-transparent text-[#94A3B8] hover:text-[#F1F5F9] transition-colors border-0 cursor-pointer">
+                    Hardware Specs
+                </button>
+                <button id="rig-tab-btn-maintenance" onclick="switchRigTab('maintenance')" class="px-3 py-1 rounded text-xs font-semibold uppercase tracking-wider bg-transparent text-[#94A3B8] hover:text-[#F1F5F9] transition-colors border-0 cursor-pointer">
+                    Update &amp; Cache Cleaner
+                </button>
+            </div>
+            <button id="rig-btn-rescan" onclick="if (currentRigTab === 'maintenance') { loadSimMaintenanceStatus(true); } else { loadSystemTuningStatus(true); }" class="px-3 py-1 rounded text-[11px] font-sans font-bold uppercase tracking-wider bg-[#181E2B] hover:bg-[#222B3D] text-[#94A3B8] hover:text-[#F1F5F9] border border-[#253046] transition-colors cursor-pointer shrink-0">
+                Scan System
+            </button>
+        </div>
         
         <!-- Scrollable Content Body -->
-        <div class="modal-body flex-1 p-4 overflow-y-auto custom-scrollbar space-y-3.5">
-            <div class="rig-content-wrapper p-4 rounded-lg bg-[#181E2B] border border-[#253046] space-y-3 shadow-sm">
-                <div class="rig-full-desc-block pb-0.5">
-                    <p id="opt-rig-summary-desc" class="text-xs typo-metadata text-[#94A3B8] leading-relaxed">High-end CPU, GPU, and RAM perfectly balanced for complex flight sim operations.</p>
-                </div>
-                <div class="rig-cards-grid grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs pt-1">
-                    <div class="rig-card-item rig-card-cpu p-3.5 rounded-lg bg-[#0E121A] border border-[#2D3A54] space-y-2">
-                        <div class="rig-card-top flex flex-col gap-0.5">
-                            <span class="typo-setting-label text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B] block">CPU</span>
-                            <div id="opt-detected-cpu-name" class="typo-metric font-bold text-[#F1F5F9] truncate text-sm tracking-normal">Detecting...</div>
-                        </div>
-                        <div id="opt-detected-cpu-cores" class="rig-card-bottom flex items-center gap-2 pt-1 flex-wrap typo-metadata text-[#94A3B8] font-mono text-xs">--</div>
-                    </div>
-                    <div class="rig-card-item rig-card-gpu p-3.5 rounded-lg bg-[#0E121A] border border-[#2D3A54] space-y-2">
-                        <div class="rig-card-top flex flex-col gap-0.5">
-                            <span class="typo-setting-label text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B] block">GPU</span>
-                            <div id="opt-detected-gpu-name" class="typo-metric font-bold text-[#F1F5F9] truncate text-sm tracking-normal">Detecting...</div>
-                        </div>
-                        <div id="opt-detected-gpu-vram" class="rig-card-bottom flex items-center gap-2 pt-1 flex-wrap typo-metadata text-[#94A3B8] font-mono text-xs">--</div>
-                    </div>
-                    <div class="rig-card-item rig-card-storage p-3.5 rounded-lg bg-[#0E121A] border border-[#2D3A54] space-y-2 flex flex-col justify-between">
-                        <div class="rig-storage-content space-y-2">
-                            <div class="rig-card-top flex flex-col gap-0.5">
-                                <div class="flex items-center justify-between gap-1.5">
-                                    <span class="typo-setting-label text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B] block"><span class="rig-full-label">Storage / MSFS Drive</span><span class="rig-short-label hidden">STORAGE</span></span>
-                                    <span id="opt-detected-storage-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-[#10B981] text-white shadow-sm">NVMe SSD</span>
-                                </div>
-                                <div id="opt-detected-storage-name" class="typo-metric font-bold text-[#F1F5F9] truncate text-sm tracking-normal mt-0.5">Detecting...</div>
-                            </div>
-                            <div id="opt-detected-storage-details" class="rig-card-bottom flex items-center gap-2 pt-1 flex-wrap typo-metadata text-[#94A3B8] font-mono text-xs">--</div>
-                        </div>
-                        <div id="opt-detected-storage-warning" class="hidden mt-2 p-2.5 rounded-lg bg-[#2A1518] border border-[#EF4444]/40 text-[#EF4444] text-xs leading-tight typo-metadata">
-                            <i class="fa-solid fa-triangle-exclamation mr-1 text-[#EF4444]"></i>
-                            <span>CRITICAL: MSFS on mechanical HDD! Severe streaming stutters and slow load times. Move to SSD recommended.</span>
-                        </div>
-                    </div>
-                    <div class="rig-card-item rig-card-network p-3.5 rounded-lg bg-[#0E121A] border border-[#2D3A54] space-y-2">
-                        <div class="rig-network-content space-y-2">
-                            <div class="rig-card-top flex flex-col gap-0.5">
-                                <div class="flex items-center justify-between gap-1.5">
-                                    <span class="typo-setting-label text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B] block"><span class="rig-full-label">Network / Internet</span><span class="rig-short-label hidden">NET</span></span>
-                                    <span id="opt-detected-net-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-[#10B981] text-white shadow-sm">ETHERNET</span>
-                                </div>
-                                <div id="opt-detected-net-speed" class="typo-metric font-bold text-[#F1F5F9] truncate text-sm tracking-normal mt-0.5">Detecting...</div>
-                            </div>
-                            <div id="opt-detected-net-details" class="rig-card-bottom flex items-center gap-2 pt-1 flex-wrap typo-metadata text-[#94A3B8] font-mono text-xs">--</div>
-                        </div>
-                    </div>
-                    <div class="rig-card-item rig-card-ram p-3.5 rounded-lg bg-[#0E121A] border border-[#2D3A54] space-y-2">
-                        <div class="rig-card-top flex flex-col gap-0.5">
-                            <span class="typo-setting-label text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B] block">RAM</span>
-                            <div id="opt-detected-ram-val" class="typo-metric font-bold text-[#F1F5F9] truncate text-sm md:text-base tracking-normal">--</div>
-                        </div>
-                        <div id="opt-detected-ram-badges" class="rig-card-bottom flex items-center gap-2 pt-1 flex-wrap typo-metadata text-[#94A3B8] font-mono text-xs">--</div>
-                    </div>
-                    <div id="opt-rig-card-display" class="rig-card-item rig-card-display p-3.5 rounded-lg bg-[#0E121A] border border-[#2D3A54] space-y-2">
-                        <div class="rig-card-top flex flex-col gap-0.5">
-                            <span class="typo-setting-label text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B] block">Display</span>
-                            <div id="opt-detected-display-hz" class="typo-metric font-bold text-[#F1F5F9] truncate text-sm md:text-base tracking-normal">Detecting...</div>
-                        </div>
-                        <div id="opt-detected-display-res" class="rig-card-bottom flex items-center gap-2 pt-1 flex-wrap typo-metadata text-[#94A3B8] font-mono text-xs">--</div>
-                        <div id="opt-detected-display-switcher" class="hidden flex items-center gap-2 pt-1 flex-wrap"></div>
-                    </div>
-                    <div class="rig-card-item rig-card-vr p-3.5 rounded-lg bg-[#0E121A] border border-[#2D3A54] space-y-2">
-                        <div class="rig-card-top flex flex-col gap-0.5">
-                            <span class="typo-setting-label text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B] block"><span class="rig-full-label">VR Headset</span><span class="rig-short-label hidden">VR</span></span>
-                            <div id="opt-detected-vr-name" class="typo-metric font-bold text-[#F1F5F9] truncate text-sm md:text-base tracking-normal">Detecting...</div>
-                        </div>
-                        <div id="opt-detected-vr-hz" class="rig-card-bottom flex items-center gap-2 pt-1 flex-wrap typo-metadata text-[#94A3B8] font-mono text-xs">--</div>
-                    </div>
-                    <div class="rig-card-item rig-card-drivers p-3.5 rounded-lg bg-[#0E121A] border border-[#2D3A54] space-y-2 col-span-1 sm:col-span-2">
-                        <div class="rig-card-top flex flex-col gap-0.5">
-                            <span class="typo-setting-label text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B] block"><span class="rig-full-label">Drivers &amp; Runtime Accelerators</span><span class="rig-short-label hidden">DRIVERS</span></span>
-                            <div id="opt-detected-driver-title" class="typo-metric font-bold text-[#F1F5F9] truncate text-sm tracking-normal">DirectX 12 • GPU Scheduling</div>
-                        </div>
-                        <div id="opt-detected-misc-badges" class="rig-card-bottom flex items-center gap-2 pt-1 flex-wrap typo-metadata text-[#94A3B8] font-mono text-xs">--</div>
+        <div class="modal-body flex-1 p-4 overflow-y-auto custom-scrollbar space-y-3">
+            <!-- TAB 1: SYSTEM OPTIMIZER (OUT OF MSFS) -->
+            <div id="rig-view-tuning" class="space-y-2.5">
+                <!-- Scan Progress Banner -->
+                <div id="rig-scan-banner" class="hidden p-3 rounded-lg bg-[#0E121A] border border-[#253046] text-center space-y-2">
+                    <div class="text-xs font-bold uppercase tracking-wider text-[#F1F5F9]">Scanning system and hardware...</div>
+                    <div class="w-full bg-[#181E2B] h-1.5 rounded overflow-hidden">
+                        <div id="rig-scan-progress-bar" class="bg-[#10B981] h-full transition-all duration-300 w-1/3"></div>
                     </div>
                 </div>
+
+                <!-- Readiness Summary Bar -->
+                <div id="rig-tuning-summary-bar" class="p-3.5 rounded-lg bg-[#181E2B] border border-[#253046] flex items-center justify-between gap-3">
+                    <div class="space-y-0.5 min-w-0 flex-1">
+                        <div class="text-xs font-bold uppercase tracking-wider text-[#F1F5F9]" id="rig-summary-title">WINDOWS DIAGNOSIS</div>
+                        <div class="text-[11px] text-[#94A3B8]" id="rig-summary-subtitle">Detecting Windows OS and GPU settings for optimal MSFS performance.</div>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <button id="rig-btn-apply-all" onclick="applyAllSystemTweaks()" class="hidden px-3.5 py-1.5 rounded text-xs font-bold uppercase tracking-wider bg-[#10B981] hover:bg-[#059669] text-[#0E121A] transition-colors cursor-pointer border-0 whitespace-nowrap">
+                            Optimize All
+                        </button>
+                        <span id="rig-summary-badge" class="px-3 py-1 rounded text-xs font-bold uppercase tracking-wider bg-[#10B981] text-[#0E121A] shrink-0">OPTIMAL</span>
+                    </div>
+                </div>
+
+                <!-- Tuning Checks Cards Container -->
+                <div id="rig-tuning-cards-container" class="space-y-2">
+                    <div class="p-4 rounded-lg bg-[#0E121A] border border-[#253046] text-center text-xs text-[#94A3B8]">
+                        Loading system settings...
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: HARDWARE SPECS (VERTICAL LIST LAYOUT - POINT 9) -->
+            <div id="rig-view-specs" class="hidden space-y-2.5">
+                <!-- Hardware Baseline Banner with Tooltip and Right-Justified Pill -->
+                <div id="rig-specs-summary-bar" class="p-3.5 rounded-lg bg-[#181E2B] border border-[#253046] flex items-center justify-between gap-3 cursor-help" title="High-end CPU, GPU, and RAM perfectly balanced for complex flight sim operations.">
+                    <div class="space-y-0.5 min-w-0 flex-1">
+                        <div class="text-xs font-bold uppercase tracking-wider text-[#F1F5F9]" id="opt-rig-summary-title">RIG ARCHITECTURE</div>
+                        <div id="opt-rig-summary-desc" class="text-[11px] text-[#94A3B8] truncate" title="High-end CPU, GPU, and RAM perfectly balanced for complex flight sim operations.">Hardware baseline automatically detected: CPU, GPU, RAM, NVMe &amp; Display.</div>
+                    </div>
+                    <span id="opt-rig-summary-badge" class="px-3 py-1 rounded text-xs font-bold uppercase tracking-wider bg-[#10B981] text-[#0E121A] shrink-0" title="High-end CPU, GPU, and RAM perfectly balanced for complex flight sim operations.">OPTIMAL</span>
+                </div>
+
+                <div class="space-y-2">
+                    <!-- CPU Row -->
+                    <div class="p-3 rounded-lg bg-[#0E121A] border border-[#253046] flex items-center justify-between gap-3">
+                        <div class="space-y-0.5 min-w-0">
+                            <span class="text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B] block">Processor (CPU)</span>
+                            <div id="opt-detected-cpu-name" class="text-xs font-bold text-[#F1F5F9] truncate">Detecting...</div>
+                            <div id="opt-detected-cpu-cores" class="text-[11px] text-[#94A3B8] flex items-center gap-1.5 flex-wrap">--</div>
+                        </div>
+                        <span class="bg-[#10B981] text-[#0E121A] text-[10px] font-sans font-bold uppercase px-2 py-0.5 rounded tracking-wide shrink-0">Optimal</span>
+                    </div>
+
+                    <!-- GPU Row -->
+                    <div class="p-3 rounded-lg bg-[#0E121A] border border-[#253046] flex items-center justify-between gap-3">
+                        <div class="space-y-0.5 min-w-0">
+                            <span class="text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B] block">Graphics Card (GPU)</span>
+                            <div id="opt-detected-gpu-name" class="text-xs font-bold text-[#F1F5F9] truncate">Detecting...</div>
+                            <div id="opt-detected-gpu-vram" class="text-[11px] text-[#94A3B8] flex items-center gap-1.5 flex-wrap">--</div>
+                        </div>
+                        <span class="bg-[#10B981] text-[#0E121A] text-[10px] font-sans font-bold uppercase px-2 py-0.5 rounded tracking-wide shrink-0">Optimal</span>
+                    </div>
+
+                    <!-- RAM Row -->
+                    <div class="p-3 rounded-lg bg-[#0E121A] border border-[#253046] flex items-center justify-between gap-3">
+                        <div class="space-y-0.5 min-w-0">
+                            <span class="text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B] block">System Memory (RAM)</span>
+                            <div id="opt-detected-ram-val" class="text-xs font-bold text-[#F1F5F9] truncate">--</div>
+                            <div id="opt-detected-ram-badges" class="text-[11px] text-[#94A3B8] flex items-center gap-1.5 flex-wrap">--</div>
+                        </div>
+                        <span class="bg-[#10B981] text-[#0E121A] text-[10px] font-sans font-bold uppercase px-2 py-0.5 rounded tracking-wide shrink-0">Optimal</span>
+                    </div>
+
+                    <!-- Storage Row -->
+                    <div class="p-3 rounded-lg bg-[#0E121A] border border-[#253046] flex items-center justify-between gap-3">
+                        <div class="space-y-0.5 min-w-0">
+                            <span class="text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B] block">Storage / MSFS Drive</span>
+                            <div id="opt-detected-storage-name" class="text-xs font-bold text-[#F1F5F9] truncate">Detecting...</div>
+                            <div id="opt-detected-storage-details" class="text-[11px] text-[#94A3B8] flex items-center gap-1.5 flex-wrap">--</div>
+                            <div id="opt-detected-storage-warning" class="hidden text-xs text-[#EF4444] pt-0.5">MSFS on mechanical HDD! Move to SSD recommended.</div>
+                        </div>
+                        <span id="opt-detected-storage-badge" class="bg-[#10B981] text-[#0E121A] text-[10px] font-sans font-bold uppercase px-2 py-0.5 rounded tracking-wide shrink-0">NVMe SSD</span>
+                    </div>
+
+                    <!-- Display Row -->
+                    <div id="opt-rig-card-display" class="p-3 rounded-lg bg-[#0E121A] border border-[#253046] flex items-center justify-between gap-3">
+                        <div class="space-y-0.5 min-w-0">
+                            <span class="text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B] block">Primary Display &amp; Cadence</span>
+                            <div id="opt-detected-display-hz" class="text-xs font-bold text-[#F1F5F9] truncate">Detecting...</div>
+                            <div id="opt-detected-display-res" class="text-[11px] text-[#94A3B8] flex items-center gap-1.5 flex-wrap">--</div>
+                            <div id="opt-detected-display-switcher" class="hidden flex items-center gap-1.5 pt-0.5 flex-wrap"></div>
+                        </div>
+                        <span class="bg-[#10B981] text-[#0E121A] text-[10px] font-sans font-bold uppercase px-2 py-0.5 rounded tracking-wide shrink-0">Calibrated</span>
+                    </div>
+
+                    <!-- VR Headset Row -->
+                    <div class="p-3 rounded-lg bg-[#0E121A] border border-[#253046] flex items-center justify-between gap-3">
+                        <div class="space-y-0.5 min-w-0">
+                            <span class="text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B] block">VR Headset</span>
+                            <div id="opt-detected-vr-name" class="text-xs font-bold text-[#F1F5F9] truncate">Detecting...</div>
+                            <div id="opt-detected-vr-hz" class="text-[11px] text-[#94A3B8] flex items-center gap-1.5 flex-wrap">--</div>
+                        </div>
+                        <span class="bg-[#334155] text-[#F1F5F9] text-[10px] font-sans font-semibold uppercase px-2 py-0.5 rounded tracking-wide shrink-0">Info</span>
+                    </div>
+
+                    <!-- Network Row -->
+                    <div class="p-3 rounded-lg bg-[#0E121A] border border-[#253046] flex items-center justify-between gap-3">
+                        <div class="space-y-0.5 min-w-0">
+                            <span class="text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B] block">Network &amp; Latency</span>
+                            <div id="opt-detected-net-speed" class="text-xs font-bold text-[#F1F5F9] truncate">Detecting...</div>
+                            <div id="opt-detected-net-details" class="text-[11px] text-[#94A3B8] flex items-center gap-1.5 flex-wrap">--</div>
+                        </div>
+                        <span id="opt-detected-net-badge" class="bg-[#10B981] text-[#0E121A] text-[10px] font-sans font-bold uppercase px-2 py-0.5 rounded tracking-wide shrink-0">Ethernet</span>
+                    </div>
+
+                    <!-- Drivers Row -->
+                    <div class="p-3 rounded-lg bg-[#0E121A] border border-[#253046] flex items-center justify-between gap-3">
+                        <div class="space-y-0.5 min-w-0">
+                            <span class="text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B] block">Runtime Accelerators</span>
+                            <div id="opt-detected-driver-title" class="text-xs font-bold text-[#F1F5F9] truncate">DirectX 12 • GPU Scheduling</div>
+                            <div id="opt-detected-misc-badges" class="text-[11px] text-[#94A3B8] flex items-center gap-1.5 flex-wrap">--</div>
+                        </div>
+                        <span class="bg-[#10B981] text-[#0E121A] text-[10px] font-sans font-bold uppercase px-2 py-0.5 rounded tracking-wide shrink-0">Active</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: UPDATE & CACHE CLEANER (SAFE UPDATE MODE & CACHE PURGE) -->
+            <div id="rig-view-maintenance" class="hidden space-y-2.5">
+                <!-- Safe Update Mode (Community Quarantine) Banner -->
+                <div id="rig-maint-safe-update-bar" class="p-3.5 rounded-lg bg-[#181E2B] border border-[#253046] flex items-center justify-between gap-3">
+                    <div class="space-y-0.5 min-w-0 flex-1">
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <span class="text-xs font-bold uppercase tracking-wider text-[#F1F5F9]" id="rig-maint-safe-title">SAFE UPDATE MODE (COMMUNITY QUARANTINE)</span>
+                            <span id="rig-maint-safe-badge" class="px-2 py-0.5 rounded text-[10px] font-sans font-bold uppercase tracking-wider bg-[#10B981] text-[#0E121A]">READY</span>
+                        </div>
+                        <div class="text-[11px] text-[#94A3B8]" id="rig-maint-safe-subtitle">Park your Community folders before updating MSFS, then restore them in one click.</div>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <button id="rig-btn-safe-update" onclick="toggleCommunitySafeUpdateMode()" class="px-3.5 py-1.5 rounded text-xs font-bold uppercase tracking-wider bg-[#10B981] hover:bg-[#059669] text-[#0E121A] transition-colors cursor-pointer border-0 whitespace-nowrap">
+                            PREPARE FOR UPDATE
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Cache Cleaner Summary Bar -->
+                <div id="rig-maint-summary-bar" class="p-3 rounded-lg bg-[#0E121A] border border-[#253046] flex items-center justify-between gap-3">
+                    <div class="space-y-0.5 min-w-0 flex-1">
+                        <div class="text-xs font-bold uppercase tracking-wider text-[#F1F5F9]" id="rig-maint-summary-title">MSFS &amp; SHADER CACHE CLEANER</div>
+                        <div class="text-[11px] text-[#94A3B8]" id="rig-maint-summary-subtitle">Scanning simulator and GPU caches...</div>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                        <button id="rig-btn-purge-all-caches" onclick="runSimMaintenanceAction('purge_all')" class="px-3 py-1.5 rounded text-xs font-bold uppercase tracking-wider bg-[#1E2638] hover:bg-[#253046] text-[#F1F5F9] border border-[#2D3A54] transition-colors cursor-pointer whitespace-nowrap">
+                            PURGE ALL CACHES
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 6 Cache Action Cards Container -->
+                <div id="rig-maint-cards-container" class="space-y-2">
+                    <div class="p-4 rounded-lg bg-[#0E121A] border border-[#253046] text-center text-xs text-[#94A3B8]">
+                        Scanning MSFS caches...
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ReBAR BIOS Guide Modal (Embedded) -->
+        <div id="rebar-bios-guide-modal" class="hidden absolute inset-0 bg-[#12161F] z-50 p-5 flex flex-col justify-between">
+            <div class="space-y-3">
+                <div class="flex items-center justify-between border-b border-[#1E2638] pb-2">
+                    <h4 class="text-xs font-bold uppercase tracking-wider text-[#F1F5F9]">Resizable BAR BIOS Activation Guide</h4>
+                    <button onclick="closeRebarBiosGuide()" class="text-[#94A3B8] hover:text-[#F1F5F9] border-0 bg-transparent cursor-pointer text-xs font-bold">Close</button>
+                </div>
+                <div class="space-y-2 text-xs text-[#94A3B8]">
+                    <div class="p-2.5 rounded bg-[#0E121A] border border-[#253046]">
+                        <span class="font-bold text-[#F1F5F9] block mb-0.5">Step 1: Enter UEFI BIOS</span>
+                        Restart your PC and press <span class="font-semibold text-[#F1F5F9]">Del</span> or <span class="font-semibold text-[#F1F5F9]">F2</span> during boot.
+                    </div>
+                    <div class="p-2.5 rounded bg-[#0E121A] border border-[#253046]">
+                        <span class="font-bold text-[#F1F5F9] block mb-0.5">Step 2: Enable Above 4G Decoding</span>
+                        Navigate to Advanced / PCI Subsystem Settings and set <span class="font-semibold text-[#F1F5F9]">Above 4G Decoding</span> to <span class="text-[#10B981] font-bold">Enabled</span>.
+                    </div>
+                    <div class="p-2.5 rounded bg-[#0E121A] border border-[#253046]">
+                        <span class="font-bold text-[#F1F5F9] block mb-0.5">Step 3: Enable Re-Size BAR Support</span>
+                        Set <span class="font-semibold text-[#F1F5F9]">Re-Size BAR Support</span> to <span class="text-[#10B981] font-bold">Auto</span> or <span class="text-[#10B981] font-bold">Enabled</span>.
+                    </div>
+                    <div class="p-2.5 rounded bg-[#0E121A] border border-[#253046]">
+                        <span class="font-bold text-[#F1F5F9] block mb-0.5">Step 4: Save &amp; Restart</span>
+                        Press <span class="font-semibold text-[#F1F5F9]">F10</span> to save changes and restart into Windows.
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-end pt-2 border-t border-[#1E2638]">
+                <button onclick="closeRebarBiosGuide()" class="px-4 py-1.5 rounded text-xs font-bold uppercase bg-[#181E2B] hover:bg-[#253046] text-[#F1F5F9] border border-[#253046] transition-colors cursor-pointer">
+                    Got it
+                </button>
             </div>
         </div>
 
@@ -4292,7 +4463,7 @@
                             <!-- Dropdown List Menu -->
                             <div id="opt-profile-dropdown-list"
                                  onwheel="event.stopPropagation();"
-                                 style="overscroll-behavior: contain;"
+                                 style="overscroll-behavior: contain; background-color: #181E2B !important; opacity: 1 !important; backdrop-filter: none !important; -webkit-backdrop-filter: none !important;"
                                  class="hidden fixed max-h-56 overflow-y-auto custom-scrollbar bg-[#181E2B] border border-[#253046] rounded-md shadow-2xl z-[99999] py-1 typo-input-val text-xs divide-y divide-[#1E2638]">
                             </div>
                             <!-- Hidden legacy select for API compatibility -->
@@ -4538,10 +4709,13 @@
                             </div>
                             <div class="flex items-center gap-2">
                                 <label for="smart-lod-cloud-recovery" class="typo-setting-label text-xs text-[#94A3B8] cursor-pointer">Auto Cloud Recovery</label>
+                                <span class="text-[9.5px] font-mono font-bold text-[#94A3B8] bg-[#12161F] px-2 py-0.5 rounded-full border border-[#1E2638] shrink-0" title="Live Volumetric Cloud Quality in MSFS (steps down under FPS strain or boosts up to Ultra when headroom allows)">
+                                    LIVE: <span id="smart-lod-modal-live-clouds" class="text-[#00A8FF] font-mono font-bold">--</span>
+                                </span>
                                 <input type="checkbox" id="smart-lod-cloud-recovery" checked onchange="window.onDesktopCloudRecoveryChange && window.onDesktopCloudRecoveryChange(this.checked); updatePerformanceCockpitGauges()" class="w-4 h-4 accent-[#00A8FF] rounded cursor-pointer">
                             </div>
                         </div>
-                        <span class="typo-metadata text-[10px] text-[#64748B] block leading-tight">Dynamic LOD governor setpoint &amp; adaptive cloud reduction under heavy frame strain</span>
+                        <span class="typo-metadata text-[10px] text-[#64748B] block leading-tight">Dynamic LOD governor setpoint &amp; adaptive cloud scaling (down under strain, up to Ultra when headroom allows)</span>
                     </div>
                 </div>
             </div>
@@ -5079,7 +5253,7 @@
         </div>
 
         <div class="modal-body flex-1 p-0 overflow-hidden bg-slate-950 flex flex-col items-center">
-            <img id="remote-panel-cockpit-img" src="media_ingame_panel.png?v=3" alt="In-Game Panel in Cockpit" class="w-full h-auto object-cover max-h-[580px] rounded-b-xl select-none block" />
+            <img id="remote-panel-cockpit-img" src="media_ingame_panel.png?v=4" alt="In-Game Panel in Cockpit" class="w-full h-auto object-contain max-h-[580px] rounded-b-xl select-none block" />
             <iframe id="remote-panel-preview-frame" src="in_game_panel/index.html" class="w-full border-0 hidden" style="width: 100%; min-width: 480px; height: 410px; border: none; overflow: hidden; background: #162032;" scrolling="no"></iframe>
         </div>
 
@@ -5099,14 +5273,14 @@
     <!-- EXPORT COLLECTION MODAL -->
     <div id="export-modal"
          data-modal-id="export-modal"
-         class="sceneryx-modal absolute hidden flex-col bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden z-[2000] select-none"
-         style="min-width: 380px; width: 480px; height: auto; max-width: 95vw; max-height: calc(100vh - 212px);">
+         class="sceneryx-modal absolute hidden flex-col bg-[#12161F] border border-[#263042] rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.7)] overflow-hidden z-[2000] select-none"
+         style="min-width: 380px; width: 480px; height: auto; max-width: 95vw; max-height: calc(100vh - 212px); left: 50%; top: 50%; transform: translate(-50%, -50%);">
         <!-- Drag Handle Header -->
-        <div class="modal-header h-[42px] px-4 bg-slate-950 border-b border-slate-800/80 flex items-center justify-between cursor-move select-none">
+        <div class="modal-header h-[42px] px-4 bg-[#0D1117] border-b border-[#263042] flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2">
                 <h3 data-i18n="export.title" class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">SCENERY COLLECTION</h3>
             </div>
-            <button onclick="closeExportModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity">
+            <button onclick="closeExportModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity border-0 bg-transparent cursor-pointer">
                 <i class="fa-solid fa-xmark text-sm"></i>
             </button>
         </div>
@@ -5118,13 +5292,13 @@
                 <label data-i18n="export.scope" class="typo-section-title text-slate-400 block">Export Scope</label>
                 <div class="grid grid-cols-2 gap-2 text-xs">
                     <label title="Export your entire scenery collection (Payware, Freeware & Asobo)." 
-                           class="p-3 rounded-lg bg-slate-950/60 border border-slate-800 flex items-center gap-2.5 cursor-pointer hover:border-slate-500 transition-all group">
+                           class="p-3 rounded-lg bg-[#0E121A] border border-[#263042] flex items-center gap-2.5 cursor-pointer hover:border-slate-500 transition-all group">
                         <input type="radio" name="export-scope" value="all" checked class="accent-cyan-500">
                         <span data-i18n="export.all" class="typo-setting-label font-semibold text-slate-200 group-hover:text-cyan-300">All Sceneries</span>
                     </label>
 
                     <label title="Export only the sceneries currently visible on the map based on active filters (e.g. Payware only, GSX profile, etc.)." 
-                           class="p-3 rounded-lg bg-slate-950/60 border border-slate-800 flex items-center gap-2.5 cursor-pointer hover:border-slate-500 transition-all group">
+                           class="p-3 rounded-lg bg-[#0E121A] border border-[#263042] flex items-center gap-2.5 cursor-pointer hover:border-slate-500 transition-all group">
                         <input type="radio" name="export-scope" value="filtered" class="accent-cyan-500">
                         <span data-i18n="export.filtered" class="typo-setting-label font-semibold text-slate-200 group-hover:text-cyan-300">Filtered List</span>
                     </label>
@@ -5132,7 +5306,7 @@
             </div>
 
             <!-- Scope Description Explainer Box -->
-            <div id="export-scope-desc" class="p-3.5 rounded-lg bg-slate-950/50 border border-slate-800/80">
+            <div id="export-scope-desc" class="p-3.5 rounded-lg bg-[#181E2B] border border-[#263042]">
                 <p id="export-scope-text" data-i18n="export.scope_all_desc" class="text-sm font-medium text-slate-300 leading-relaxed">Exports your entire scenery collection (physical sceneries & streamed Marketplace).</p>
             </div>
 
@@ -5140,14 +5314,14 @@
             <div class="space-y-2.5 pt-1">
                 <button onclick="triggerExportCollection('csv')" 
                         title="Generates a CSV / Excel spreadsheet compatible with Volanta, Elevatex, and Google Sheets."
-                        class="w-full p-3.5 rounded-lg bg-slate-900/70 hover:bg-slate-800 border border-slate-700/80 hover:border-slate-500 transition-all group shadow-sm text-left btn-elevate">
+                        class="w-full p-3.5 rounded-lg bg-[#181E2B] hover:bg-[#222B3D] border border-[#263042] hover:border-slate-500 transition-all group shadow-sm text-left btn-elevate cursor-pointer">
                     <div data-i18n="export.csv_title" class="typo-action-btn font-semibold text-slate-200 group-hover:text-cyan-300 transition-colors text-xs">Export CSV Spreadsheet</div>
                     <div data-i18n="export.csv_subtitle" class="typo-metadata mt-0.5">Excel, Volanta & Elevatex compatible</div>
                 </button>
 
                 <button onclick="triggerExportCollection('json')" 
                         title="Saves a complete raw JSON metadata backup for re-importing or custom automation."
-                        class="w-full p-3.5 rounded-lg bg-slate-900/70 hover:bg-slate-800 border border-slate-700/80 hover:border-slate-500 transition-all group shadow-sm text-left btn-elevate">
+                        class="w-full p-3.5 rounded-lg bg-[#181E2B] hover:bg-[#222B3D] border border-[#263042] hover:border-slate-500 transition-all group shadow-sm text-left btn-elevate cursor-pointer">
                     <div data-i18n="export.json_title" class="typo-action-btn font-semibold text-slate-200 group-hover:text-cyan-300 transition-colors text-xs">Export JSON Backup</div>
                     <div data-i18n="export.json_subtitle" class="typo-metadata mt-0.5">Structured backup for flight sim apps</div>
                 </button>
@@ -5167,14 +5341,14 @@
     <!-- PAYWARE STORES SELECTION MODAL -->
     <div id="payware-stores-modal"
          data-modal-id="payware-stores-modal"
-         class="sceneryx-modal absolute hidden flex-col bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden z-[2000] select-none"
-         style="min-width: 400px; width: 580px; height: auto; max-width: 95vw; max-height: calc(100vh - 212px);">
+         class="sceneryx-modal absolute hidden flex-col bg-[#12161F] border border-[#263042] rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.7)] overflow-hidden z-[2000] select-none"
+         style="min-width: 400px; width: 580px; height: auto; max-width: 95vw; max-height: calc(100vh - 212px); left: 50%; top: 50%; transform: translate(-50%, -50%);">
         <!-- Drag Handle Header -->
-        <div class="modal-header h-[42px] px-4 bg-slate-950 border-b border-slate-800/80 flex items-center justify-between cursor-move select-none">
+        <div class="modal-header h-[42px] px-4 bg-[#0D1117] border-b border-[#263042] flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2 min-w-0">
                 <h3 data-i18n="stores.title" class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase truncate">PAYWARE SCENERY SEARCH</h3>
             </div>
-            <button onclick="closePaywareStoresModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity shrink-0">
+            <button onclick="closePaywareStoresModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity shrink-0 border-0 bg-transparent cursor-pointer">
                 <i class="fa-solid fa-xmark text-sm"></i>
             </button>
         </div>
@@ -5200,38 +5374,38 @@
     <!-- SMART LOD AUTOFPS CONFLICT MODAL -->
     <div id="smart-lod-conflict-modal"
          data-modal-id="smart-lod-conflict-modal"
-         class="sceneryx-modal absolute hidden flex-col bg-slate-900/90 backdrop-blur-md border border-slate-700/60 rounded-xl shadow-2xl overflow-hidden z-[3100] select-none"
-         style="min-width: 400px; width: 520px; height: auto; max-width: 95vw; max-height: calc(100vh - 212px);">
+         class="sceneryx-modal absolute hidden flex-col bg-[#12161F] border border-[#263042] rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.7)] overflow-hidden z-[3100] select-none"
+         style="min-width: 400px; width: 520px; height: auto; max-width: 95vw; max-height: calc(100vh - 212px); left: 50%; top: 50%; transform: translate(-50%, -50%);">
         <!-- Drag Handle Header -->
-        <div class="modal-header h-[42px] px-4 bg-slate-950 border-b border-slate-800/80 flex items-center justify-between cursor-move select-none">
+        <div class="modal-header h-[42px] px-4 bg-[#0D1117] border-b border-[#263042] flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2">
                 <span class="w-2 h-2 rounded-full bg-amber-400"></span>
                 <h3 class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">AUTOFPS CONFLICT DETECTED</h3>
             </div>
-            <button onclick="closeSmartLodConflictModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity">
+            <button onclick="closeSmartLodConflictModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity border-0 bg-transparent cursor-pointer">
                 <i class="fa-solid fa-xmark text-sm"></i>
             </button>
         </div>
 
         <!-- Scrollable Content Body -->
-        <div class="modal-body flex-1 p-4 overflow-y-auto custom-scrollbar space-y-3 text-xs text-slate-300 leading-relaxed">
+        <div class="modal-body flex-1 p-4 overflow-y-auto custom-scrollbar space-y-3 text-xs text-slate-300 leading-relaxed font-sans">
             <p>
                 L'application externe <strong class="text-white">MSFS_AutoFPS</strong> est actuellement active en arriÃ¨re-plan.
             </p>
             <p class="text-slate-400">
                 Deux gestionnaires dynamiques ne peuvent pas Ã©crire simultanÃ©ment dans la mÃ©moire de MSFS sans provoquer des conflits d'asservissement, des saccades ou des instabilitÃ©s.
             </p>
-            <div class="p-3 rounded-lg bg-slate-950/80 border border-slate-800 text-[11px] text-cyan-300 font-mono">
+            <div class="p-3 rounded-lg bg-[#0E121A] border border-[#263042] text-[11px] text-cyan-300 font-sans">
                 Pour engager <strong>Smart LOD</strong>, SceneryX doit arrÃªter l'instance d'AutoFPS externe.
             </div>
         </div>
 
         <!-- Footer -->
-        <div class="px-4 py-3 bg-slate-900/60 border-t border-slate-800 flex items-center justify-end gap-3 shrink-0">
-            <button onclick="closeSmartLodConflictModal()" class="px-4 py-2 rounded-md bg-slate-800 text-slate-200 border border-slate-700/80 hover:bg-slate-700 hover:text-white typo-action-btn font-semibold transition-colors cursor-pointer text-xs">
+        <div class="px-4 py-3 bg-[#0D1117] border-t border-[#263042] flex items-center justify-end gap-3 shrink-0">
+            <button onclick="closeSmartLodConflictModal()" class="px-4 py-2 rounded-md bg-[#181E2B] text-slate-200 border border-[#263042] hover:bg-[#253046] hover:text-white font-sans font-semibold transition-colors cursor-pointer text-xs">
                 Conserver AutoFPS
             </button>
-            <button onclick="resolveAutoFpsConflict('kill_and_enable')" class="px-5 py-2 rounded-md bg-cyan-500 text-slate-950 font-semibold hover:bg-cyan-400 active:scale-[0.98] shadow-md shadow-cyan-950/30 typo-action-btn uppercase tracking-[0.02em] transition-all cursor-pointer text-xs">
+            <button onclick="resolveAutoFpsConflict('kill_and_enable')" class="px-5 py-2 rounded-md bg-cyan-500 text-slate-950 font-semibold hover:bg-cyan-400 active:scale-[0.98] shadow-md shadow-cyan-950/30 font-sans uppercase tracking-[0.02em] transition-all cursor-pointer text-xs">
                 Fermer AutoFPS &amp; Activer Smart LOD
             </button>
         </div>
@@ -5240,7 +5414,7 @@
         <div class="modal-resize-handle absolute bottom-0 right-0 w-4 h-4 cursor-se-resize flex items-end justify-end p-1">
             <svg class="w-2.5 h-2.5 text-slate-600 pointer-events-none" viewBox="0 0 6 6" fill="currentColor">
                 <circle cx="5" cy="5" r="0.8"/>
-                <circle cx="3" cy="5" r="0.8"/>
+                <circle cx="3" cy="3" r="0.8"/>
                 <circle cx="5" cy="3" r="0.8"/>
             </svg>
         </div>
@@ -5249,21 +5423,21 @@
     <!-- SYSTEM NOTICE & NOTIFICATION MODAL -->
     <div id="custom-modal"
          data-modal-id="custom-modal"
-         class="sceneryx-modal absolute hidden flex-col bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden z-[2500] select-none font-sans"
-         style="min-width: 320px; width: 380px; height: auto; max-width: 95vw; max-height: 85vh;">
+         class="sceneryx-modal absolute hidden flex-col bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden z-[2500] select-none font-sans"
+         style="min-width: 420px; width: 540px; height: auto; max-width: 95vw; max-height: 85vh; left: 50%; top: 50%; transform: translate(-50%, -50%);">
         <!-- Drag Handle Header -->
-        <div class="modal-header h-[42px] px-4 bg-slate-950 border-b border-slate-800/80 flex items-center justify-between cursor-move select-none shrink-0">
+        <div class="modal-header h-[42px] px-4 bg-slate-950 border-b border-slate-800 flex items-center justify-between cursor-move select-none shrink-0">
             <div class="flex items-center gap-2">
-                <h3 id="custom-modal-title" class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">NOTIFICATION</h3>
+                <h3 id="custom-modal-title" class="typo-window-header text-slate-100 text-xs font-bold tracking-wide uppercase">NOTIFICATION</h3>
             </div>
-            <button onclick="cancelCustomModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity">
+            <button onclick="cancelCustomModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-colors">
                 <i class="fa-solid fa-xmark text-sm"></i>
             </button>
         </div>
 
         <!-- Content Message Box -->
-        <div class="modal-body flex-1 p-4 overflow-y-auto custom-scrollbar space-y-3">
-            <div id="custom-modal-message" class="text-xs font-semibold text-slate-200 leading-relaxed bg-slate-950/70 p-4 rounded-lg border border-slate-700/60 font-sans break-words text-center space-y-1">
+        <div class="modal-body flex-1 p-4 bg-slate-900 overflow-y-auto custom-scrollbar space-y-3">
+            <div id="custom-modal-message" class="p-4 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-300 leading-relaxed font-sans break-words text-center space-y-2">
                 Message content...
             </div>
             <!-- Dynamic Brand Loading Gauge for Loading State Modals -->
@@ -5273,14 +5447,14 @@
         </div>
 
         <!-- Footer Action Buttons -->
-        <div class="px-4 py-3 bg-slate-900/60 border-t border-slate-800 flex items-center justify-center gap-3 shrink-0">
-            <button id="custom-modal-cancel-btn" onclick="cancelCustomModal()" data-i18n="modal.cancel" class="px-5 py-1.5 text-center rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700/80 text-slate-200 hover:text-white typo-action-btn font-semibold uppercase transition-colors hidden cursor-pointer text-xs">
+        <div class="px-4 py-3 bg-slate-900 border-t border-slate-800 flex items-center justify-end gap-2.5 shrink-0">
+            <button id="custom-modal-cancel-btn" onclick="cancelCustomModal()" data-i18n="modal.cancel" class="px-4 py-2 text-center rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white typo-action-btn font-normal uppercase transition-colors hidden cursor-pointer text-xs">
                 Cancel
             </button>
-            <button id="custom-modal-secondary-btn" onclick="secondaryCustomModal()" class="px-5 py-1.5 text-center rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700/80 text-slate-200 hover:text-white typo-action-btn font-semibold uppercase transition-colors hidden cursor-pointer text-xs">
+            <button id="custom-modal-secondary-btn" onclick="secondaryCustomModal()" class="px-4 py-2 text-center rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 hover:text-white typo-action-btn font-normal uppercase transition-colors hidden cursor-pointer text-xs">
                 Secondary
             </button>
-            <button id="custom-modal-confirm-btn" onclick="confirmCustomModal()" data-i18n="modal.ok" class="px-5 py-1.5 text-center rounded-md bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold typo-action-btn uppercase transition-all border-0 cursor-pointer shadow-md shadow-cyan-950/30 text-xs active:scale-[0.98]">
+            <button id="custom-modal-confirm-btn" onclick="confirmCustomModal()" data-i18n="modal.ok" class="px-5 py-2 text-center rounded-md bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold typo-action-btn uppercase transition-colors border-0 cursor-pointer text-xs">
                 OK
             </button>
         </div>
@@ -5504,7 +5678,7 @@
                 <section class="space-y-1.5">
                     <h4 class="typo-section-title text-slate-100 font-bold uppercase tracking-wide text-xs block mb-1">3. Third-Party APIs &amp; External Services</h4>
                     <p><strong class="text-slate-100 font-bold">SimBrief (Navigraph):</strong> <span class="text-slate-300 font-normal">SceneryX queries SimBrief's public API strictly using your public Pilot ID or Username to download active Operational Flight Plan (OFP) routes. We never request, process, or store your account password.</span></p>
-                    <p><strong class="text-slate-100 font-bold">Lemon Squeezy (License Activation):</strong> <span class="text-slate-300 font-normal">Software activation keys are validated directly with Lemon Squeezy over encrypted HTTPS (</span><code class="text-slate-200 font-mono font-normal text-[11px] px-1 py-0.5 rounded bg-slate-950 border border-slate-800">api.lemonsqueezy.com</code><span class="text-slate-300 font-normal">). SceneryX never collects, handles, or stores any credit cards, banking details, or billing addresses.</span></p>
+                    <p><strong class="text-slate-100 font-bold">Gumroad (License Activation):</strong> <span class="text-slate-300 font-normal">Software activation keys are validated directly with Gumroad over encrypted HTTPS (</span><code class="text-slate-200 font-mono font-normal text-[11px] px-1 py-0.5 rounded bg-slate-950 border border-slate-800">api.gumroad.com</code><span class="text-slate-300 font-normal">). SceneryX never collects, handles, or stores any credit cards, banking details, or billing addresses.</span></p>
                     <p><strong class="text-slate-100 font-bold">Store Lookups (Flightsim.to, Orbx, Contrail):</strong> <span class="text-slate-300 font-normal">Clicking store links opens search URLs directly inside your default web browser without passing telemetry.</span></p>
                 </section>
 
@@ -5599,11 +5773,11 @@
     </div>
 
     <!-- UNIFIED USERCFG.OPT & FEEDBACK MODAL (SEAMLESS 2-WAY NAVIGATION) -->
-    <div id="unified-user-cfg-modal" class="sceneryx-modal absolute hidden flex-col bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden z-50 select-none"
+    <div id="unified-user-cfg-modal" class="sceneryx-modal absolute hidden flex-col bg-[#12161F] border border-[#263042] rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.7)] overflow-hidden z-50 select-none font-sans"
          data-modal-id="unified-user-cfg-modal"
-         style="min-width: 360px; min-height: 240px; width: 580px; max-width: 95vw;">
+         style="min-width: 360px; min-height: 240px; width: 580px; max-width: 95vw; left: 50%; top: 50%; transform: translate(-50%, -50%);">
         <!-- Drag Handle Header -->
-        <div class="modal-header h-[42px] px-4 bg-slate-950 border-b border-slate-800/80 flex items-center justify-between cursor-move select-none shrink-0">
+        <div class="modal-header h-[42px] px-4 bg-[#0D1117] border-b border-[#263042] flex items-center justify-between cursor-move select-none shrink-0">
             <div class="flex items-center gap-2">
                 <h3 id="unified-modal-title" class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">GRAPHICS PROFILE OPTIMIZED</h3>
             </div>
@@ -5696,16 +5870,16 @@
     </div>
 
     <!-- HARDWARE DISPLAY CADENCE CALIBRATION MODAL -->
-    <div id="opt-hz-cadence-modal" class="sceneryx-modal absolute hidden flex-col bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden z-50 select-none font-sans"
+    <div id="opt-hz-cadence-modal" class="sceneryx-modal absolute hidden flex-col bg-[#12161F] border border-[#263042] rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.7)] overflow-hidden z-50 select-none font-sans"
          data-modal-id="opt-hz-cadence-modal"
-         style="min-width: 360px; min-height: 240px; width: 576px; max-width: 95vw;">
+         style="min-width: 360px; min-height: 240px; width: 576px; max-width: 95vw; left: 50%; top: 50%; transform: translate(-50%, -50%);">
         <!-- Drag Handle Header -->
-        <div class="modal-header h-[42px] px-4 bg-slate-950 border-b border-slate-800/80 flex items-center justify-between cursor-move select-none shrink-0">
+        <div class="modal-header h-[42px] px-4 bg-[#0D1117] border-b border-[#263042] flex items-center justify-between cursor-move select-none shrink-0">
             <div class="flex items-center gap-2">
                 <h3 id="cadence-modal-title" class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">DISPLAY REFRESH CADENCE</h3>
             </div>
             <div class="flex items-center gap-1">
-                <button onclick="closeHzCadenceModal()" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity">
+                <button onclick="closeHzCadenceModal()" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity border-0 bg-transparent cursor-pointer">
                     <i class="fa-solid fa-xmark text-sm"></i>
                 </button>
             </div>
@@ -5724,28 +5898,28 @@
             <!-- Detected Hardware & Targets Grid -->
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <!-- 2D Display Card -->
-                <div class="p-3.5 rounded-lg bg-slate-800/85 border border-slate-700/60 space-y-2">
+                <div class="p-3.5 rounded-lg bg-[#181E2B] border border-[#263042] space-y-2">
                     <div class="flex items-center justify-between text-xs">
                         <span class="typo-section-title text-slate-400">2D Monitor</span>
-                        <span id="cadence-detected-2d-hz" class="typo-metric text-emerald-400 font-semibold text-xs tabular-nums">-- Hz</span>
+                        <span id="cadence-detected-2d-hz" class="font-sans text-emerald-400 font-semibold text-xs tabular-nums">-- Hz</span>
                     </div>
-                    <div id="cadence-detected-2d-desc" class="typo-metadata text-xs text-slate-300 font-medium truncate">Desktop Display</div>
-                    <div class="pt-2 border-t border-slate-700/40 flex items-center justify-between">
-                        <span class="typo-metadata text-slate-400">Target 1/2 Sync:</span>
-                        <span id="cadence-target-2d-fps" class="px-2.5 py-1 rounded-full pill-soft-emerald typo-metric text-xs font-semibold tabular-nums whitespace-nowrap">-- FPS (1/2 SYNC)</span>
+                    <div id="cadence-detected-2d-desc" class="font-sans text-xs text-slate-300 font-medium truncate">Desktop Display</div>
+                    <div class="pt-2 border-t border-[#263042] flex items-center justify-between">
+                        <span class="font-sans text-xs text-slate-400">Target 1/2 Sync:</span>
+                        <span id="cadence-target-2d-fps" class="px-2.5 py-1 rounded bg-[#064E3B] text-[#A7F3D0] border border-[#059669] font-sans text-xs font-semibold tabular-nums whitespace-nowrap">-- FPS (1/2 SYNC)</span>
                     </div>
                 </div>
 
                 <!-- VR Headset Card -->
-                <div class="p-3.5 rounded-lg bg-slate-800/85 border border-slate-700/60 space-y-2">
+                <div class="p-3.5 rounded-lg bg-[#181E2B] border border-[#263042] space-y-2">
                     <div class="flex items-center justify-between text-xs">
                         <span class="typo-section-title text-slate-400">VR Headset</span>
-                        <span id="cadence-detected-vr-hz" class="typo-metric text-cyan-400 font-semibold text-xs tabular-nums">-- Hz</span>
+                        <span id="cadence-detected-vr-hz" class="font-sans text-cyan-400 font-semibold text-xs tabular-nums">-- Hz</span>
                     </div>
-                    <div id="cadence-detected-vr-desc" class="typo-metadata text-xs text-slate-300 font-medium truncate">VR Headset</div>
-                    <div class="pt-2 border-t border-slate-700/40 flex items-center justify-between">
-                        <span class="typo-metadata text-slate-400">Target 1/2 Sync:</span>
-                        <span id="cadence-target-vr-fps" class="px-2.5 py-1 rounded-full pill-soft-cyan typo-metric text-xs font-semibold tabular-nums whitespace-nowrap">-- FPS (1/2 SYNC)</span>
+                    <div id="cadence-detected-vr-desc" class="font-sans text-xs text-slate-300 font-medium truncate">VR Headset</div>
+                    <div class="pt-2 border-t border-[#263042] flex items-center justify-between">
+                        <span class="font-sans text-xs text-slate-400">Target 1/2 Sync:</span>
+                        <span id="cadence-target-vr-fps" class="px-2.5 py-1 rounded bg-[#0E7490] text-cyan-200 border border-cyan-600 font-sans text-xs font-semibold tabular-nums whitespace-nowrap">-- FPS (1/2 SYNC)</span>
                     </div>
                 </div>
             </div>
@@ -5769,16 +5943,16 @@
     </div>
 
     <!-- DEDICATED SETTING DETAILED INFO MODAL -->
-    <div id="opt-setting-info-modal" class="sceneryx-modal absolute hidden flex-col bg-slate-900/95 backdrop-blur-md border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden z-50 select-none font-sans"
+    <div id="opt-setting-info-modal" class="sceneryx-modal absolute hidden flex-col bg-[#12161F] border border-[#263042] rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.7)] overflow-hidden z-50 select-none font-sans"
          data-modal-id="opt-setting-info-modal"
-         style="min-width: 420px; width: 660px; max-width: 95vw; height: auto; max-height: 88vh;">
+         style="min-width: 420px; width: 660px; max-width: 95vw; height: auto; max-height: 88vh; left: 50%; top: 50%; transform: translate(-50%, -50%);">
         <!-- Drag Handle Header -->
-        <div class="modal-header h-[42px] px-4 bg-slate-950 border-b border-slate-800/80 flex items-center justify-between cursor-move select-none shrink-0 gap-3">
+        <div class="modal-header h-[42px] px-4 bg-[#0D1117] border-b border-[#263042] flex items-center justify-between cursor-move select-none shrink-0 gap-3">
             <div class="flex items-center gap-2 min-w-0 flex-1">
                 <span id="opt-info-title" class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase truncate">SETTING NAME</span>
             </div>
             <div class="flex items-center gap-1 shrink-0">
-                <button onclick="closeSettingInfoModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity">
+                <button onclick="closeSettingInfoModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity border-0 bg-transparent cursor-pointer">
                     <i class="fa-solid fa-xmark text-sm"></i>
                 </button>
             </div>
@@ -5794,35 +5968,35 @@
             <!-- Performance Impact Summary (CPU & GPU) -->
             <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
                 <!-- CPU Impact -->
-                <div class="p-3 rounded-lg bg-slate-900/60 border border-slate-700/50 space-y-2">
+                <div class="p-3 rounded-lg bg-[#181E2B] border border-[#263042] space-y-2">
                     <div class="flex items-center justify-between text-xs">
                         <span class="text-slate-400 font-medium">CPU / Mainthread Impact</span>
-                        <span id="opt-info-cpu-pill" class="px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-slate-800 text-slate-300 border border-slate-700">LOW</span>
+                        <span id="opt-info-cpu-pill" class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-[#222B3D] text-slate-300 border border-[#334155]">LOW</span>
                     </div>
-                    <div class="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                    <div class="w-full h-1.5 rounded-full bg-[#0E121A] overflow-hidden">
                         <div id="opt-info-cpu-bar" class="h-full rounded-full bg-slate-400 transition-all duration-200" style="width: 25%;"></div>
                     </div>
                 </div>
 
                 <!-- GPU Impact -->
-                <div class="p-3 rounded-lg bg-slate-900/60 border border-slate-700/50 space-y-2">
+                <div class="p-3 rounded-lg bg-[#181E2B] border border-[#263042] space-y-2">
                     <div class="flex items-center justify-between text-xs">
                         <span class="text-slate-400 font-medium">GPU / VRAM Impact</span>
-                        <span id="opt-info-gpu-pill" class="px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-slate-800 text-slate-300 border border-slate-700">LOW</span>
+                        <span id="opt-info-gpu-pill" class="px-2 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-[#222B3D] text-slate-300 border border-[#334155]">LOW</span>
                     </div>
-                    <div class="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden">
+                    <div class="w-full h-1.5 rounded-full bg-[#0E121A] overflow-hidden">
                         <div id="opt-info-gpu-bar" class="h-full rounded-full bg-slate-400 transition-all duration-200" style="width: 25%;"></div>
                     </div>
                 </div>
             </div>
 
             <!-- Recommendations: Single dual-row block -->
-            <div class="bg-slate-900/60 border border-slate-700/50 rounded-lg p-3 space-y-2.5">
+            <div class="bg-[#181E2B] border border-[#263042] rounded-lg p-3 space-y-2.5">
                 <div class="flex items-start gap-3">
                     <span class="text-slate-300 font-semibold text-xs shrink-0 w-24">IFR Liners:</span>
                     <p id="opt-info-liner" class="text-slate-300 text-xs leading-relaxed select-text"></p>
                 </div>
-                <div class="border-t border-slate-800/80 pt-2.5 flex items-start gap-3">
+                <div class="border-t border-[#263042] pt-2.5 flex items-start gap-3">
                     <span class="text-slate-300 font-semibold text-xs shrink-0 w-24">VFR GA:</span>
                     <p id="opt-info-ga" class="text-slate-300 text-xs leading-relaxed select-text"></p>
                 </div>
@@ -5842,14 +6016,14 @@
     <!-- MSFS FRAME LIMITER CONFLICT MODAL -->
     <div id="opt-framelimiter-conflict-modal"
          data-modal-id="opt-framelimiter-conflict-modal"
-         class="sceneryx-modal absolute hidden flex-col bg-slate-900 border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden z-[2600] select-none font-sans"
-         style="min-width: 440px; width: 540px; max-width: 95vw; height: auto; max-height: 90vh;">
+         class="sceneryx-modal absolute hidden flex-col bg-[#12161F] border border-[#263042] rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.7)] overflow-hidden z-[2600] select-none font-sans"
+         style="min-width: 440px; width: 540px; max-width: 95vw; height: auto; max-height: 90vh; left: 50%; top: 50%; transform: translate(-50%, -50%);">
         <!-- Drag Handle Header -->
-        <div class="modal-header h-[42px] px-4 bg-slate-950 border-b border-slate-800/80 flex items-center justify-between cursor-move select-none shrink-0 gap-3">
+        <div class="modal-header h-[42px] px-4 bg-[#0D1117] border-b border-[#263042] flex items-center justify-between cursor-move select-none shrink-0 gap-3">
             <div class="flex items-center gap-2 min-w-0 flex-1">
                 <span class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase truncate">FRAME LIMITER CONFLICT</span>
             </div>
-            <button onclick="closeFrameLimiterConflictModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity">
+            <button onclick="closeFrameLimiterConflictModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity border-0 bg-transparent cursor-pointer">
                 <i class="fa-solid fa-xmark text-sm"></i>
             </button>
         </div>
@@ -5864,7 +6038,7 @@
             <div class="grid grid-cols-1 gap-2 pt-1">
                 <!-- Option 1: 2D Target -->
                 <button id="opt-conflict-btn-2d" onclick="resolveFrameLimiterConflict('2D')"
-                        class="p-3 rounded-lg bg-slate-800 hover:bg-slate-750 border border-slate-700 hover:border-slate-500 text-left transition-all cursor-pointer group flex items-center justify-between"
+                        class="p-3 rounded-lg bg-[#181E2B] hover:bg-[#253046] border border-[#263042] hover:border-slate-500 text-left transition-all cursor-pointer group flex items-center justify-between"
                         title="Sets engine FrameLimiter to the 2D sync target and turns OFF the VR limiter for this profile.">
                     <span id="opt-conflict-lbl-2d" class="text-xs font-semibold text-slate-200 group-hover:text-white">Enforce 2D Target</span>
                     <i class="fa-solid fa-chevron-right text-slate-500 group-hover:text-slate-300 transition-colors pl-2"></i>
@@ -5872,7 +6046,7 @@
 
                 <!-- Option 2: VR Target -->
                 <button id="opt-conflict-btn-vr" onclick="resolveFrameLimiterConflict('VR')"
-                        class="p-3 rounded-lg bg-slate-800 hover:bg-slate-750 border border-slate-700 hover:border-slate-500 text-left transition-all cursor-pointer group flex items-center justify-between"
+                        class="p-3 rounded-lg bg-[#181E2B] hover:bg-[#253046] border border-[#263042] hover:border-slate-500 text-left transition-all cursor-pointer group flex items-center justify-between"
                         title="Sets engine FrameLimiter to the VR sync target and turns OFF the 2D limiter for this profile.">
                     <span id="opt-conflict-lbl-vr" class="text-xs font-semibold text-slate-200 group-hover:text-white">Enforce VR Target</span>
                     <i class="fa-solid fa-chevron-right text-slate-500 group-hover:text-slate-300 transition-colors pl-2"></i>
@@ -5880,7 +6054,7 @@
 
                 <!-- Option 3: Uncapped -->
                 <button id="opt-conflict-btn-off" onclick="resolveFrameLimiterConflict('OFF')"
-                        class="p-3 rounded-lg bg-slate-800 hover:bg-slate-750 border border-slate-700 hover:border-slate-500 text-left transition-all cursor-pointer group flex items-center justify-between"
+                        class="p-3 rounded-lg bg-[#181E2B] hover:bg-[#253046] border border-[#263042] hover:border-slate-500 text-left transition-all cursor-pointer group flex items-center justify-between"
                         title="Disables MSFS internal limiter; ideal if pacing is governed by RivaTuner or NVIDIA Control Panel.">
                     <span class="text-xs font-semibold text-slate-200 group-hover:text-white">Run Uncapped (OFF)</span>
                     <i class="fa-solid fa-chevron-right text-slate-500 group-hover:text-slate-300 transition-colors pl-2"></i>
@@ -5889,8 +6063,8 @@
         </div>
 
         <!-- Modal Footer -->
-        <div class="px-5 py-3 bg-slate-900/80 border-t border-slate-800 flex items-center justify-end gap-3 shrink-0">
-            <button onclick="closeFrameLimiterConflictModal()" class="px-4 py-1.5 rounded-md bg-slate-800 text-slate-200 border border-slate-700/80 hover:bg-slate-700 hover:text-white typo-action-btn text-xs font-semibold uppercase transition-colors cursor-pointer">
+        <div class="px-5 py-3 bg-[#0D1117] border-t border-[#263042] flex items-center justify-end gap-3 shrink-0">
+            <button onclick="closeFrameLimiterConflictModal()" class="px-4 py-1.5 rounded-md bg-[#181E2B] text-slate-200 border border-[#263042] hover:bg-[#253046] hover:text-white font-sans text-xs font-semibold uppercase transition-colors cursor-pointer">
                 Cancel
             </button>
         </div>
@@ -5899,12 +6073,12 @@
     <!-- BACKGROUND TOOLS DETECTION & CONFLICT MODAL -->
     <div id="background-tools-modal"
          data-modal-id="background-tools-modal"
-         class="sceneryx-modal absolute hidden flex-col bg-slate-900 border border-slate-800 rounded-xl shadow-2xl overflow-hidden z-[2600] select-none font-sans"
-         style="min-width: 440px; width: 560px; max-width: 95vw; height: auto; max-height: 90vh;">
+         class="sceneryx-modal absolute hidden flex-col bg-[#12161F] border border-[#263042] rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.7)] overflow-hidden z-[2600] select-none font-sans"
+         style="min-width: 440px; width: 560px; max-width: 95vw; height: auto; max-height: 90vh; left: 50%; top: 50%; transform: translate(-50%, -50%);">
         <!-- Drag Handle Header -->
-        <div class="modal-header h-[42px] px-4 bg-slate-950 border-b border-slate-800/80 flex items-center justify-between cursor-move select-none shrink-0 gap-3">
+        <div class="modal-header h-[42px] px-4 bg-[#0D1117] border-b border-[#263042] flex items-center justify-between cursor-move select-none shrink-0 gap-3">
             <span class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase truncate">EXTERNAL TOOLS DETECTED</span>
-            <button onclick="closeBackgroundToolsModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity">
+            <button onclick="closeBackgroundToolsModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity border-0 bg-transparent cursor-pointer">
                 <i class="fa-solid fa-xmark text-sm"></i>
             </button>
         </div>
@@ -5978,7 +6152,172 @@
         </div>
     </div>
 
-    <!-- ONBOARDING PROMPT BACKDROP & MODAL -->
+    <!-- HAGS SETTINGS MODAL -->
+    <div id="modal-hags-settings"
+         data-modal-id="modal-hags-settings"
+         class="sceneryx-modal absolute hidden flex-col bg-[#12161F] border border-[#263042] rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.7)] overflow-hidden z-[2600] select-none font-sans"
+         style="min-width: 440px; width: 560px; max-width: 95vw; height: auto; max-height: 90vh; left: 50%; top: 50%; transform: translate(-50%, -50%);">
+        <div class="modal-header h-[42px] px-4 bg-[#0D1117] border-b border-[#263042] flex items-center justify-between cursor-move select-none shrink-0 gap-3">
+            <div class="flex items-center gap-2 min-w-0 flex-1">
+                <span class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase truncate">GPU SCHEDULING (HAGS)</span>
+            </div>
+            <button onclick="closeHagsSettingsModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity border-0 bg-transparent cursor-pointer">
+                <i class="fa-solid fa-xmark text-sm"></i>
+            </button>
+        </div>
+        <div class="modal-body flex-1 p-5 overflow-y-auto custom-scrollbar space-y-4 text-xs text-slate-200">
+            <div class="p-3.5 rounded-lg bg-[#0E121A] border border-[#263042] flex items-center justify-between gap-3">
+                <div class="space-y-0.5">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500">WINDOWS DISPLAY SUBSYSTEM</span>
+                    <div id="hags-modal-status-text" class="text-xs font-bold text-slate-100">Hardware-Accelerated GPU Scheduling (HAGS)</div>
+                </div>
+                <span id="hags-modal-status-badge" class="px-3 py-1 rounded text-[11px] font-bold uppercase tracking-wider bg-emerald-500 text-slate-950">OPTIMAL (ON)</span>
+            </div>
+            <p class="text-slate-300 text-xs leading-relaxed font-normal">
+                Hardware-Accelerated GPU Scheduling (HAGS) delegates VRAM scheduling directly to the GPU, reducing display latency and strictly required for DLSS 3 Frame Generation in MSFS 2024 / 2020. Note: Any change in Windows requires a full PC reboot to take effect.
+            </p>
+            <div class="grid grid-cols-1 gap-2 pt-1">
+                <button type="button" onclick="openWindowsGraphicsSettingsFromModal()"
+                        class="p-3 rounded-lg bg-[#181E2B] hover:bg-[#253046] border border-[#263042] hover:border-slate-500 text-left transition-all cursor-pointer group flex items-center justify-between">
+                    <div>
+                        <div class="text-xs font-semibold text-slate-200 group-hover:text-white">Open Windows Graphics Settings</div>
+                        <div class="text-[11px] text-slate-400">Direct access to the HAGS toggle in Windows 11 / 10</div>
+                    </div>
+                    <i class="fa-solid fa-arrow-up-right-from-square text-slate-500 group-hover:text-slate-300 pl-2"></i>
+                </button>
+                <button type="button" onclick="toggleHagsViaUac()"
+                        class="p-3 rounded-lg bg-[#181E2B] hover:bg-[#253046] border border-[#263042] hover:border-slate-500 text-left transition-all cursor-pointer group flex items-center justify-between">
+                    <div>
+                        <div id="hags-modal-toggle-label" class="text-xs font-semibold text-slate-200 group-hover:text-white">Toggle HAGS via Registry (UAC Elevation)</div>
+                        <div class="text-[11px] text-slate-400">Directly modifies HwSchMode in system registry</div>
+                    </div>
+                    <i class="fa-solid fa-shield-halved text-slate-500 group-hover:text-slate-300 pl-2"></i>
+                </button>
+            </div>
+        </div>
+        <div class="px-5 py-3 bg-[#0D1117] border-t border-[#263042] flex items-center justify-end gap-3 shrink-0">
+            <button onclick="closeHagsSettingsModal()" class="px-4 py-1.5 rounded-md bg-[#181E2B] text-slate-200 border border-[#263042] hover:bg-[#253046] hover:text-white font-sans text-xs font-semibold uppercase transition-colors cursor-pointer">
+                Close
+            </button>
+        </div>
+    </div>
+
+    <!-- SHADER CACHE SETTINGS MODAL -->
+    <div id="modal-shader-cache-settings"
+         data-modal-id="modal-shader-cache-settings"
+         class="sceneryx-modal absolute hidden flex-col bg-[#12161F] border border-[#263042] rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.7)] overflow-hidden z-[2600] select-none font-sans"
+         style="min-width: 440px; width: 560px; max-width: 95vw; height: auto; max-height: 90vh; left: 50%; top: 50%; transform: translate(-50%, -50%);">
+        <div class="modal-header h-[42px] px-4 bg-[#0D1117] border-b border-[#263042] flex items-center justify-between cursor-move select-none shrink-0 gap-3">
+            <div class="flex items-center gap-2 min-w-0 flex-1">
+                <span class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase truncate">DIRECTX SHADER CACHE</span>
+            </div>
+            <button onclick="closeShaderCacheModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity border-0 bg-transparent cursor-pointer">
+                <i class="fa-solid fa-xmark text-sm"></i>
+            </button>
+        </div>
+        <div class="modal-body flex-1 p-5 overflow-y-auto custom-scrollbar space-y-4 text-xs text-slate-200">
+            <div class="p-3.5 rounded-lg bg-[#0E121A] border border-[#263042] flex items-center justify-between gap-3">
+                <div class="space-y-0.5">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500">CURRENT DISK OCCUPANCY</span>
+                    <div class="text-xs font-bold text-slate-100"><span id="shader-modal-size-val">--</span> on disk</div>
+                </div>
+                <span class="px-3 py-1 rounded text-[11px] font-bold uppercase tracking-wider bg-emerald-500 text-slate-950">RECOMMENDED: 10 GB</span>
+            </div>
+            <p class="text-slate-300 text-xs leading-relaxed font-normal">
+                To eliminate micro-stutters and frame drops when flying over dense sceneries in MSFS, set the <strong>Shader Cache Size</strong> to <strong>10 GB</strong> or <strong>Unlimited</strong> in your GPU control app. The value above indicates the current size of cached shaders stored on disk.
+            </p>
+            <div class="grid grid-cols-1 gap-2 pt-1">
+                <button type="button" onclick="openNvidiaAppDirect()"
+                        class="p-3 rounded-lg bg-[#181E2B] hover:bg-[#253046] border border-[#263042] hover:border-slate-500 text-left transition-all cursor-pointer group flex items-center justify-between">
+                    <div>
+                        <div class="text-xs font-semibold text-slate-200 group-hover:text-white">Open NVIDIA App</div>
+                        <div class="text-[11px] text-slate-400">Graphics &gt; Global Settings &gt; Shader Cache Size (Recommended: 10 GB or Unlimited)</div>
+                    </div>
+                    <i class="fa-solid fa-arrow-up-right-from-square text-slate-500 group-hover:text-slate-300 pl-2"></i>
+                </button>
+                <button type="button" onclick="purgeShaderCacheDirect()"
+                        class="p-3 rounded-lg bg-[#181E2B] hover:bg-[#253046] border border-[#263042] hover:border-slate-500 text-left transition-all cursor-pointer group flex items-center justify-between">
+                    <div>
+                        <div class="text-xs font-semibold text-slate-200 group-hover:text-white">Purge DirectX &amp; NVIDIA Shader Caches</div>
+                        <div class="text-[11px] text-slate-400">Safely clears accumulated or corrupted shaders in D3DSCache and DXCache</div>
+                    </div>
+                    <i class="fa-solid fa-broom text-slate-400 group-hover:text-slate-200 pl-2"></i>
+                </button>
+                <button type="button" onclick="openWindowsDiskCleanupDirect()"
+                        class="p-3 rounded-lg bg-[#181E2B] hover:bg-[#253046] border border-[#263042] hover:border-slate-500 text-left transition-all cursor-pointer group flex items-center justify-between">
+                    <div>
+                        <div class="text-xs font-semibold text-slate-200 group-hover:text-white">Windows Disk Cleanup (cleanmgr.exe)</div>
+                        <div class="text-[11px] text-slate-400">Official Windows utility to empty DirectX Shader Cache</div>
+                    </div>
+                    <i class="fa-solid fa-hard-drive text-slate-500 group-hover:text-slate-300 pl-2"></i>
+                </button>
+            </div>
+        </div>
+        <div class="px-5 py-3 bg-[#0D1117] border-t border-[#263042] flex items-center justify-end gap-3 shrink-0">
+            <button onclick="closeShaderCacheModal()" class="px-4 py-1.5 rounded-md bg-[#181E2B] text-slate-200 border border-[#263042] hover:bg-[#253046] hover:text-white font-sans text-xs font-semibold uppercase transition-colors cursor-pointer">
+                Close
+            </button>
+        </div>
+    </div>
+
+    <!-- GPU DRIVER SETTINGS MODAL -->
+    <div id="modal-gpu-driver-settings"
+         data-modal-id="modal-gpu-driver-settings"
+         class="sceneryx-modal absolute hidden flex-col bg-[#12161F] border border-[#263042] rounded-xl shadow-[0_20px_50px_rgba(0,0,0,0.7)] overflow-hidden z-[2600] select-none font-sans"
+         style="min-width: 440px; width: 560px; max-width: 95vw; height: auto; max-height: 90vh; left: 50%; top: 50%; transform: translate(-50%, -50%);">
+        <div class="modal-header h-[42px] px-4 bg-[#0D1117] border-b border-[#263042] flex items-center justify-between cursor-move select-none shrink-0 gap-3">
+            <div class="flex items-center gap-2 min-w-0 flex-1">
+                <span class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase truncate">GPU DRIVER &amp; CONTROL PANEL</span>
+            </div>
+            <button onclick="closeGpuDriverModal()" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity border-0 bg-transparent cursor-pointer">
+                <i class="fa-solid fa-xmark text-sm"></i>
+            </button>
+        </div>
+        <div class="modal-body flex-1 p-5 overflow-y-auto custom-scrollbar space-y-4 text-xs text-slate-200">
+            <div class="p-3.5 rounded-lg bg-[#0E121A] border border-[#263042] space-y-2">
+                <div class="flex items-center justify-between">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500">DETECTED GRAPHICS CARD</span>
+                    <span id="gpu-modal-status-badge" class="px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-500 text-slate-950">OPTIMAL</span>
+                </div>
+                <div id="gpu-modal-name" class="text-xs font-bold text-slate-100">GPU Detected</div>
+                <div class="grid grid-cols-2 gap-2 pt-1 text-[11px] font-mono text-slate-400 border-t border-[#1E2638]">
+                    <div>Current Driver: <span id="gpu-modal-current-drv" class="text-slate-200 font-bold">--</span></div>
+                    <div>Latest Available: <span id="gpu-modal-latest-drv" class="text-slate-200 font-bold">--</span></div>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 gap-2 pt-1">
+                <button type="button" onclick="openNvidiaAppDirect()"
+                        class="p-3 rounded-lg bg-[#181E2B] hover:bg-[#253046] border border-[#263042] hover:border-slate-500 text-left transition-all cursor-pointer group flex items-center justify-between">
+                    <div>
+                        <div class="text-xs font-semibold text-slate-200 group-hover:text-white">Open NVIDIA App</div>
+                        <div class="text-[11px] text-slate-400">Check for updates, manage graphics profiles and 3D settings</div>
+                    </div>
+                    <i class="fa-solid fa-arrow-up-right-from-square text-slate-500 group-hover:text-slate-300 pl-2"></i>
+                </button>
+                <button type="button" onclick="openExternalUrl('https://www.nvidia.com/download/index.aspx')"
+                        class="p-3 rounded-lg bg-[#181E2B] hover:bg-[#253046] border border-[#263042] hover:border-slate-500 text-left transition-all cursor-pointer group flex items-center justify-between">
+                    <div>
+                        <div class="text-xs font-semibold text-slate-200 group-hover:text-white">NVIDIA Official Website (Driver Downloads)</div>
+                        <div class="text-[11px] text-slate-400">Download the latest certified WHQL Game Ready drivers</div>
+                    </div>
+                    <i class="fa-solid fa-download text-slate-500 group-hover:text-slate-300 pl-2"></i>
+                </button>
+                <button type="button" onclick="openExternalUrl('https://www.techpowerup.com/gpu-specs/')"
+                        class="p-3 rounded-lg bg-[#181E2B] hover:bg-[#253046] border border-[#263042] hover:border-slate-500 text-left transition-all cursor-pointer group flex items-center justify-between">
+                    <div>
+                        <div class="text-xs font-semibold text-slate-200 group-hover:text-white">TechPowerUp GPU Specs Database</div>
+                        <div class="text-[11px] text-slate-400">View detailed architecture, VRAM bandwidth, and clock specs</div>
+                    </div>
+                    <i class="fa-solid fa-chart-line text-slate-500 group-hover:text-slate-300 pl-2"></i>
+                </button>
+            </div>
+        </div>
+        <div class="px-5 py-3 bg-[#0D1117] border-t border-[#263042] flex items-center justify-end gap-3 shrink-0">
+            <button onclick="closeGpuDriverModal()" class="px-4 py-1.5 rounded-md bg-[#181E2B] text-slate-200 border border-[#263042] hover:bg-[#253046] hover:text-white font-sans text-xs font-semibold uppercase transition-colors cursor-pointer">
+                Close
+            </button>
+        </div>
+    </div>
     <div id="onboarding-prompt-backdrop" class="fixed inset-0 bg-slate-950/80 hidden" style="z-index: 9980;"></div>
     <div id="onboarding-prompt-modal" class="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[480px] max-w-[calc(100vw-32px)] bg-slate-900 border border-slate-700/80 rounded-xl shadow-2xl hidden flex-col select-none overflow-hidden" style="z-index: 9985;">
         <!-- Header Bar -->
@@ -6018,44 +6357,52 @@
                 <mask id="tour-spotlight-mask">
                     <rect x="0" y="0" width="100%" height="100%" fill="white" />
                     <rect id="tour-mask-cutout" x="0" y="0" width="0" height="0" rx="8" ry="8" fill="black" />
+                    <circle id="tour-mask-lfpg-cutout" cx="-9999" cy="-9999" r="0" fill="black" />
                 </mask>
             </defs>
             <rect x="0" y="0" width="100%" height="100%" fill="rgba(2, 6, 23, 0.78)" mask="url(#tour-spotlight-mask)" />
-            <rect id="tour-spotlight-glow" x="0" y="0" width="0" height="0" rx="8" ry="8" fill="none" stroke="#00A8FF" stroke-width="1.5" opacity="0" />
+            <rect id="tour-spotlight-glow" x="0" y="0" width="0" height="0" rx="8" ry="8" fill="none" stroke="#64748B" stroke-width="1.5" opacity="0" />
         </svg>
 
+        <!-- TOUR AIRPORT TARGET RETICLE & HIGHLIGHT (LFPG HUB SPOTLIGHT) -->
+        <div id="tour-lfpg-spotlight-target" class="hidden pointer-events-none absolute w-[180px] h-[180px] -translate-x-1/2 -translate-y-1/2 flex items-center justify-center select-none" style="z-index: 9995; left: -9999px; top: -9999px;">
+            <!-- Glowing illuminated circular radar pulse ring -->
+            <div class="absolute inset-0 rounded-full border-2 border-cyan-400 shadow-[0_0_35px_rgba(56,189,248,0.7)] bg-cyan-400/10 backdrop-blur-[1px] animate-pulse"></div>
+            <div class="absolute inset-3 rounded-full border border-cyan-400/30"></div>
+        </div>
+
         <!-- Floating Tour Tooltip Card (Standard SceneryX Card Surface & Controls) -->
-        <div id="tour-tooltip-card" class="absolute pointer-events-auto w-[360px] max-w-[calc(100vw-32px)] bg-slate-900 border border-slate-700/80 rounded-xl shadow-2xl p-4 text-left flex flex-col gap-3 transition-all duration-200" style="z-index: 9998 !important;">
+        <div id="tour-tooltip-card" class="absolute pointer-events-auto w-[360px] max-w-[calc(100vw-32px)] bg-[#12161F] border border-[#253046] rounded-lg shadow-2xl p-4 text-left flex flex-col gap-3 transition-all duration-200" style="z-index: 9998 !important;">
             <!-- Header row: Step counter tag + Exit button -->
-            <div class="flex items-center justify-between pb-2 border-b border-slate-800/80">
-                <span id="tour-step-badge" class="font-mono text-xs font-semibold text-slate-400 tracking-wider select-none">
+            <div class="flex items-center justify-between pb-2 border-b border-[#1E2638]">
+                <span id="tour-step-badge" class="font-mono text-xs font-semibold text-[#94A3B8] tracking-wider select-none">
                     1/25
                 </span>
-                <button type="button" onclick="window.onboardingTour && window.onboardingTour.skip()" class="text-slate-400 hover:text-white w-6 h-6 rounded flex items-center justify-center hover:bg-slate-800 transition-colors cursor-pointer text-xs" data-i18n-title="onboarding.btn_exit_tooltip" title="Close tour">
+                <button type="button" onclick="window.onboardingTour && window.onboardingTour.skip()" class="text-[#94A3B8] hover:text-[#F1F5F9] w-6 h-6 rounded flex items-center justify-center hover:bg-[#181E2B] transition-colors cursor-pointer text-xs border-0 bg-transparent" data-i18n-title="onboarding.btn_exit_tooltip" title="Close tour">
                     ✕
                 </button>
             </div>
 
             <!-- Title & Body -->
             <div class="space-y-1.5">
-                <h3 id="tour-step-title" class="text-xs font-bold text-slate-100 uppercase tracking-wide leading-snug">
+                <h3 id="tour-step-title" class="text-xs font-bold text-[#F1F5F9] uppercase tracking-wide leading-snug">
                     Step Title
                 </h3>
-                <p id="tour-step-body" class="text-xs text-slate-300 leading-relaxed">
+                <p id="tour-step-body" class="text-xs text-[#94A3B8] leading-relaxed">
                     Step description goes here...
                 </p>
             </div>
 
-            <!-- Controls row: Skip (ghost), Prev (ghost), Next / Finish (cyan) -->
-            <div class="flex items-center justify-between pt-2 border-t border-slate-800/80 mt-0.5">
-                <button id="tour-btn-skip" type="button" onclick="window.onboardingTour && window.onboardingTour.skip()" class="text-xs font-medium text-slate-400 hover:text-slate-200 cursor-pointer transition-colors bg-transparent border-0 px-1 py-1" data-i18n="onboarding.btn_skip_tour">
+            <!-- Controls row: Skip (ghost), Prev (flat), Next / Finish (solid cyan) -->
+            <div class="flex items-center justify-between pt-2 border-t border-[#1E2638] mt-0.5">
+                <button id="tour-btn-skip" type="button" onclick="window.onboardingTour && window.onboardingTour.skip()" class="text-xs font-medium text-[#94A3B8] hover:text-[#F1F5F9] cursor-pointer transition-colors bg-transparent border-0 px-1 py-1" data-i18n="onboarding.btn_skip_tour">
                     Skip Tour
                 </button>
                 <div class="flex items-center gap-2">
-                    <button id="tour-btn-prev" type="button" onclick="window.onboardingTour && window.onboardingTour.prev()" class="px-3 py-1.5 rounded-md text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700/60 transition-all cursor-pointer" data-i18n="onboarding.btn_prev">
+                    <button id="tour-btn-prev" type="button" onclick="window.onboardingTour && window.onboardingTour.prev()" class="px-3 py-1.5 rounded-md text-xs font-semibold text-[#94A3B8] hover:text-[#F1F5F9] bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] transition-colors cursor-pointer" data-i18n="onboarding.btn_prev">
                         Previous
                     </button>
-                    <button id="tour-btn-next" type="button" onclick="window.onboardingTour && window.onboardingTour.next()" class="px-4 py-1.5 rounded-md text-xs font-bold text-slate-950 bg-cyan-500 hover:bg-cyan-400 shadow-sm transition-all cursor-pointer">
+                    <button id="tour-btn-next" type="button" onclick="window.onboardingTour && window.onboardingTour.next()" class="px-4 py-1.5 rounded-md text-xs font-bold text-[#0B0D11] bg-[#00A8FF] hover:bg-[#38BDF8] transition-colors cursor-pointer border-0">
                         <span id="tour-btn-next-label">Next</span>
                     </button>
                 </div>
@@ -6075,6 +6422,6 @@
     <!-- WORLD CAPITALS DATABASE SCRIPT -->
     <script src="capitals_data.js?v=1.0.5"></script>
     <!-- MAIN APP JS SCRIPT -->
-    <script src="app.js?v=1.0.27"></script>
+    <script src="app.js?v=1.0.29"></script>
 </body>
 </html>

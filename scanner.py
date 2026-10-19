@@ -3,6 +3,10 @@ import sys
 import json
 import re
 
+# Edition Configuration Flag (True = SceneryX Lite funnel edition, False = SceneryX Pro full edition)
+IS_LITE = False
+APP_VERSION = "LITE_1.1.3" if IS_LITE else "PRO_1.1.3"
+
 def get_resource_file_path(filename):
     if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
         return os.path.join(sys._MEIPASS, filename)
@@ -122,6 +126,50 @@ def get_content_xml_path():
             return c
     _CACHED_CONTENT_XML_PATH = paths[0] if paths else ''
     return _CACHED_CONTENT_XML_PATH
+
+def sanitize_content_xml_files():
+    """
+    Sanitizes all MSFS Content.xml files:
+    1. Removes any duplicate packages.
+    2. Strips any corrupt or invalid .disabled elements.
+    3. Removes ghost user backup copies matching (copy, copie, backup, bak).
+    """
+    for xml_path in get_content_xml_paths():
+        if not os.path.exists(xml_path):
+            continue
+        try:
+            import xml.etree.ElementTree as ET
+            with open(xml_path, 'r', encoding='utf-8', errors='ignore') as f:
+                content = f.read()
+            tree = ET.fromstring(content)
+            changed = False
+            for elem in list(tree.findall('Package')):
+                name = elem.get('name', '')
+                if not name:
+                    continue
+                if name.lower().endswith('.disabled'):
+                    tree.remove(elem)
+                    changed = True
+                    continue
+                if re.search(r'[-_\s.(](copy|copie|backup|bak)(\b|\d*|\))', name.lower()):
+                    tree.remove(elem)
+                    changed = True
+                    continue
+            if changed:
+                seen_exact = set()
+                for elem in list(tree.findall('Package')):
+                    n = elem.get('name', '').strip().lower()
+                    if n in seen_exact:
+                        tree.remove(elem)
+                    else:
+                        seen_exact.add(n)
+                ET.indent(tree, space='  ')
+                xml_str = ET.tostring(tree, encoding='unicode')
+                with open(xml_path, 'w', encoding='utf-8') as f:
+                    f.write('<?xml version="1.0" encoding="utf-8"?>\n' + xml_str.strip() + '\n')
+        except Exception:
+            pass
+
 
 # Auto-migrate any existing legacy config files from local executable folder to %APPDATA%/SceneryX/
 for filename, target_path in [
@@ -1026,6 +1074,16 @@ def find_bundled_gsx(package_path, icao=None):
             if depth >= 3:
                 dirs.clear()
                 continue
+
+            # Fast pruning: skip heavy 3D scenery, textures, sounds and materials
+            dirs[:] = [
+                d for d in dirs 
+                if d.lower() not in (
+                    'scenery', 'texture', 'model', 'modellib', 'sound',
+                    'material-libs', 'html_ui', 'effects', 'simobjects',
+                    'vegetation', 'cgl', 'world'
+                )
+            ]
 
             r_name = os.path.basename(root).lower()
             is_gsx_dir = 'gsx' in r_name
@@ -1960,6 +2018,49 @@ def audit_single_airport_gsx(icao, gsx_dir=None, ap=None, airports_db=None):
         'bundled_gsx_profile': ap.get('bundled_gsx_profile') if ap else None
     }
 
+def detect_system_language_and_currency():
+    """
+    Detects user currency from installer registry or Windows UI language.
+    Language is strictly locked to 'en' for English-only release.
+    """
+    det_curr = "USD"
+    # 1. Check registry key written during Inno Setup installation
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\SceneryX") as k:
+            inst_lang, _ = winreg.QueryValueEx(k, "InstallerLanguage")
+            if inst_lang:
+                inst_lang = str(inst_lang).lower()
+                if "french" in inst_lang or "german" in inst_lang or "spanish" in inst_lang:
+                    det_curr = "EUR"
+                elif "english" in inst_lang or "en" in inst_lang:
+                    det_curr = "USD"
+    except Exception:
+        pass
+
+    # 2. Check Windows UI language for currency fallback
+    try:
+        import ctypes
+        lang_id = ctypes.windll.kernel32.GetUserDefaultUILanguage() & 0x3FF
+        if lang_id in (12, 7, 10):  # French, German, Spanish
+            det_curr = "EUR"
+        elif lang_id == 9:  # English
+            det_curr = "USD"
+    except Exception:
+        pass
+
+    # 3. Check Python locale
+    try:
+        import locale
+        loc = locale.getdefaultlocale()[0] or ""
+        loc_l = loc.lower()
+        if loc_l.startswith("fr") or loc_l.startswith("de") or loc_l.startswith("es"):
+            det_curr = "EUR"
+    except Exception:
+        pass
+
+    return "en", det_curr
+
 def get_settings():
     if os.path.exists(SETTINGS_JSON_PATH):
         try:
@@ -1972,22 +2073,40 @@ def get_settings():
                 if not settings.get("gsx_profile_path"):
                     settings["gsx_profile_path"] = get_default_gsx_path()
                 if "navigation_style" not in settings:
-                    settings["navigation_style"] = "radial"
+                    settings["navigation_style"] = "classic"
                 if "has_seen_onboarding" not in settings:
                     settings["has_seen_onboarding"] = False
+                if "camera_airport_zoom" not in settings:
+                    settings["camera_airport_zoom"] = 8.0
+                if "camera_pan_duration" not in settings:
+                    settings["camera_pan_duration"] = 1.1
+                if "language" not in settings or "currency" not in settings:
+                    _, det_curr = detect_system_language_and_currency()
+                    if "currency" not in settings:
+                        settings["currency"] = det_curr
+                settings["language"] = "en"
+                settings["is_lite"] = IS_LITE
+                settings["app_version"] = APP_VERSION
                 return settings
         except Exception:
             pass
 
     default_paths = auto_detect_default_paths()
     has_existing_db = os.path.exists(OUTPUT_JSON_PATH) and os.path.getsize(OUTPUT_JSON_PATH) > 1000
+    _, det_curr = detect_system_language_and_currency()
     settings = {
         "auto_scan_on_startup": True,
         "scan_paths": default_paths,
         "gsx_profile_path": get_default_gsx_path(),
-        "navigation_style": "radial",
+        "navigation_style": "classic",
         "has_seen_onboarding": False,
-        "disclaimer_accepted": True if has_existing_db else False
+        "language": "en",
+        "currency": det_curr,
+        "camera_airport_zoom": 8.0,
+        "camera_pan_duration": 1.1,
+        "disclaimer_accepted": True if has_existing_db else False,
+        "is_lite": IS_LITE,
+        "app_version": APP_VERSION
     }
     save_settings(settings)
     return settings
@@ -2151,7 +2270,124 @@ def determine_pricing(source_folder, folder_name, vendor, manifest_data, icao=No
 
     return "Freeware / Flightsim.to", False
 
+def ensure_airlines_and_routes_loaded():
+    global _AIRLINES_DB_CACHE, _ROUTES_DB_CACHE, _RUNWAYS_DB_CACHE
+    if _AIRLINES_DB_CACHE is None:
+        p = get_resource_file_path("airport_airlines.json")
+        if os.path.exists(p):
+            try:
+                with open(p, 'r', encoding='utf-8') as f:
+                    _AIRLINES_DB_CACHE = json.load(f)
+            except Exception as e:
+                print("Error loading airport_airlines.json:", e)
+                _AIRLINES_DB_CACHE = {}
+        else:
+            _AIRLINES_DB_CACHE = {}
+
+    if _ROUTES_DB_CACHE is None:
+        p = get_resource_file_path("airport_routes.json")
+        if os.path.exists(p):
+            try:
+                with open(p, 'r', encoding='utf-8') as f:
+                    _ROUTES_DB_CACHE = json.load(f)
+            except Exception as e:
+                print("Error loading airport_routes.json:", e)
+                _ROUTES_DB_CACHE = {}
+        else:
+            _ROUTES_DB_CACHE = {}
+
+    if _RUNWAYS_DB_CACHE is None:
+        p = get_resource_file_path("airport_runways.json")
+        if os.path.exists(p):
+            try:
+                with open(p, 'r', encoding='utf-8') as f:
+                    _RUNWAYS_DB_CACHE = json.load(f)
+            except Exception as e:
+                print("Error loading airport_runways.json:", e)
+                _RUNWAYS_DB_CACHE = {}
+        else:
+            _RUNWAYS_DB_CACHE = {}
+
+def create_default_procedural_airport(d_icao: str, ap_info: dict = None, ratings: dict = None) -> dict:
+    """Synthesizes on-demand metadata for any default MSFS procedural airport in the world."""
+    ensure_airlines_and_routes_loaded()
+    clean_icao = (d_icao or '').strip().upper()
+    if not clean_icao:
+        return {}
+    if not ap_info:
+        airports_db, _, _ = load_airport_database()
+        ap_info = airports_db.get(clean_icao) if airports_db else None
+    if not ap_info:
+        return None
+    if ratings is None:
+        ratings = load_ratings()
+
+    raw_type = ap_info.get('type', 'airport')
+    if raw_type == 'large_airport':
+        english_type = "International"
+    elif raw_type == 'medium_airport':
+        english_type = "Regional"
+    else:
+        english_type = "General Aviation"
+
+    airlines_db = _AIRLINES_DB_CACHE or {}
+    routes_db = _ROUTES_DB_CACHE or {}
+    runways_db = _RUNWAYS_DB_CACHE or {}
+
+    return {
+        "icao": clean_icao,
+        "ident": clean_icao,
+        "name": ap_info.get('name', ''),
+        "city": ap_info.get('city', ''),
+        "country": ap_info.get('country', ''),
+        "lat": ap_info.get('lat', 0.0),
+        "lon": ap_info.get('lon', 0.0),
+        "type": raw_type,
+        "english_type": english_type,
+        "vendor": "Microsoft Flight Simulator (Default)",
+        "pricing_type": "Default",
+        "is_payware": False,
+        "is_asobo_official": False,
+        "is_default": True,
+        "is_custom_price": False,
+        "price_eur": 0.0,
+        "package_name": f"msfs-default-{clean_icao.lower()}",
+        "package_path": "",
+        "source_folder": "MSFS - Default Procedural",
+        "version": "",
+        "size_str": "Default",
+        "match_source": "Default MSFS Procedural",
+        "all_sources": [{
+            "folder_name": f"msfs-default-{clean_icao.lower()}",
+            "package_path": "",
+            "source_folder": "MSFS - Default Procedural",
+            "match_source": "Default MSFS Procedural",
+            "vendor": "Microsoft Flight Simulator (Default)",
+            "pricing_type": "Default",
+            "is_payware": False,
+            "is_asobo_official": False,
+            "is_default": True,
+            "is_disabled": False,
+            "is_addon": False,
+            "is_fix_patch": False,
+            "version": "",
+            "size_str": "Default"
+        }],
+        "is_disabled": False,
+        "has_conflict": False,
+        "conflict_count": 1,
+        "rating": ratings.get(clean_icao, 0.0),
+        "operating_airlines": airlines_db.get(clean_icao, []),
+        "routes": routes_db.get(clean_icao, {}),
+        "runways": runways_db.get(clean_icao, []),
+        "has_gsx_profile": False,
+        "gsx_profile_filename": "",
+        "gsx_profile_path": "",
+        "bundled_gsx_profile": None
+    }
+
 def run_scan():
+    sanitize_content_xml_files()
     airports, city_index, name_index = load_airport_database()
     if not airports:
         print("Airport database not found!")
@@ -2231,6 +2467,7 @@ def run_scan():
     # Dynamic discovery of StreamedPackages & Official packages listed in Content.xml
     def _normalize_streamed_pkg(f_name):
         c = f_name[:-9] if f_name.lower().endswith('.disabled') else f_name
+        c = re.sub(r'[-_\s]+(copy|copie|backup)(\b|\d*)', '', c, flags=re.IGNORECASE)
         n = RE_CLEAN_PREFIX.sub('', c.lower())
         n = re.sub(r'-(airport|scenery|pack|project)-', '-', n)
         n = re.sub(r'-(munich|istanbul|london|paris|frankfurt|berlin|tokyo|chicago|newyork|barcelona|madrid|rome)-', '-', n)
@@ -2238,9 +2475,12 @@ def run_scan():
 
     existing_norms = {_normalize_streamed_pkg(f) for _, f, _, _ in all_packages}
     for pkg_name, clean_f, is_dis in content_xml_packages:
-        # Ignore uninstalled 3rd-party community packages left over in Content.xml
         p_lower = pkg_name.lower()
-        if p_lower.startswith('community') or 'community' in p_lower:
+        # Ignore uninstalled 3rd-party community packages and user backup copies left over in Content.xml
+        if 'community' in p_lower or re.search(r'[-_\s](copy|copie|backup)(\b|\d*)', p_lower):
+            continue
+        # In MSFS 2024, only genuine official streamed packages (fs20-, fs24-, asobo-, microsoft-) can exist without a physical folder on disk
+        if not p_lower.startswith(('fs20-', 'fs24-', 'asobo-', 'microsoft-')):
             continue
         fn_norm = _normalize_streamed_pkg(clean_f)
         if fn_norm not in existing_norms:
@@ -3018,11 +3258,21 @@ def run_scan():
 
     detected_airports = list(detected_map.values())
 
+    # Fast single-pass compact serialization (saves ~9 seconds and 10+ MB disk space)
+    compact_payload = json.dumps(detected_airports, separators=(',', ':'), ensure_ascii=False)
     with open(OUTPUT_JSON_PATH, 'w', encoding='utf-8') as f:
-        json.dump(detected_airports, f, indent=2, ensure_ascii=False)
+        f.write(compact_payload)
+
+    local_json = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'installed_airports.json')
+    if os.path.exists(local_json) and os.path.abspath(local_json) != os.path.abspath(OUTPUT_JSON_PATH):
+        try:
+            with open(local_json, 'w', encoding='utf-8') as f:
+                f.write(compact_payload)
+        except Exception:
+            pass
 
     save_folder_size_cache(folder_size_cache)
-    print(f"Scan complete: {len(detected_airports)} unique airports saved.")
+    print(f"Scan complete: {len(detected_airports)} unique sceneries saved.")
     return detected_airports
 
 def build_library_snapshot(airports):
@@ -3042,13 +3292,26 @@ def build_library_snapshot(airports):
             if not fn or fn.startswith('msfs-default-') or s.get('pricing_type') == 'Default':
                 continue
 
-            # Ephemeral cloud-streaming packages from MSFS 2024 should never trigger user library alerts
             src_folder = s.get('source_folder', '')
-            if 'streamed' in src_folder.lower():
-                continue
-
             clean_fn = fn[:-9] if fn.lower().endswith('.disabled') else fn
-            clean_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', clean_fn.lower())
+            fn_l = clean_fn.lower()
+            pkg_path = s.get('package_path', '')
+
+            # In MSFS 2024 StreamedPackages, only skip base Asobo/Microsoft official streamed airports
+            # or ghost Content.xml entries without a physical folder on disk.
+            # Genuine Marketplace / Store 3rd-party airports in StreamedPackages MUST be tracked!
+            if 'streamed' in src_folder.lower():
+                is_asobo_base = (
+                    s.get('is_asobo_official', False)
+                    or s.get('pricing_type') in ('Asobo', 'Asobo / MS')
+                    or fn_l.startswith(('asobo-', 'microsoft-', 'fs20-asobo-', 'fs20-microsoft-', 'fs24-asobo-', 'fs24-microsoft-'))
+                    or 'asobo-airport-' in fn_l
+                    or 'microsoft-airport-' in fn_l
+                )
+                if is_asobo_base or not pkg_path or not os.path.isdir(pkg_path):
+                    continue
+
+            clean_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn_l)
             key = f"pkg:{icao.lower()}:{clean_norm}"
 
             p_type = s.get('pricing_type') or ('Payware' if s.get('is_payware') else ('Asobo' if s.get('is_asobo_official') else 'Freeware'))
@@ -3061,7 +3324,8 @@ def build_library_snapshot(airports):
                 "name": name,
                 "type": p_type,
                 "vendor": s.get('vendor', '') or ap.get('vendor', ''),
-                "source_folder": s.get('source_folder', '') or ap.get('source_folder', ''),
+                "source_folder": src_folder or ap.get('source_folder', ''),
+                "package_path": pkg_path,
                 "is_patch": s.get('is_fix_patch', False) or s.get('is_addon', False)
             }
 
@@ -3096,7 +3360,7 @@ def compute_scan_delta(new_airports, update_snapshot=True):
         if update_snapshot:
             try:
                 with open(SNAPSHOT_JSON_PATH, 'w', encoding='utf-8') as f:
-                    json.dump(current_snapshot, f, indent=2, ensure_ascii=False)
+                    json.dump(current_snapshot, f, separators=(',', ':'), ensure_ascii=False)
             except Exception as e:
                 print("Error saving initial library snapshot:", e)
         return {"added": [], "removed": [], "total_changes": 0}
@@ -3108,17 +3372,42 @@ def compute_scan_delta(new_airports, update_snapshot=True):
         print("Error reading library_snapshot.json:", e)
         prev_snapshot = {}
 
+    # Backward-compatible migration: if prev_snapshot was saved before StreamedPackages Store tracking,
+    # only report StreamedPackages folders created/updated within the last 12 hours as newly added,
+    # while silently seeding older pre-existing Store folders into the snapshot.
+    import time
+    had_streamed_in_prev = any('streamed' in (v.get('source_folder') or '').lower() for v in prev_snapshot.values() if isinstance(v, dict))
+    now_ts = time.time()
+
     added = []
     for k, item in current_snapshot.items():
-        if 'streamed' in item.get('source_folder', '').lower():
-            continue
         if k not in prev_snapshot:
+            if not had_streamed_in_prev and 'streamed' in (item.get('source_folder') or '').lower():
+                p_path = item.get('package_path', '')
+                if p_path and os.path.exists(p_path):
+                    try:
+                        st = os.stat(p_path)
+                        age_hours = (now_ts - max(st.st_ctime, st.st_mtime)) / 3600.0
+                        if age_hours > 12.0:
+                            continue
+                    except Exception:
+                        pass
             added.append(item)
 
     removed = []
     for k, item in prev_snapshot.items():
-        if 'streamed' in item.get('source_folder', '').lower():
+        if not isinstance(item, dict):
             continue
+        if 'streamed' in (item.get('source_folder') or '').lower():
+            fn_l = (item.get('folder_name') or '').lower()
+            is_asobo_base = (
+                item.get('type') in ('Asobo', 'Asobo / MS')
+                or fn_l.startswith(('asobo-', 'microsoft-', 'fs20-asobo-', 'fs20-microsoft-', 'fs24-asobo-', 'fs24-microsoft-'))
+                or 'asobo-airport-' in fn_l
+                or 'microsoft-airport-' in fn_l
+            )
+            if is_asobo_base:
+                continue
         if k not in current_snapshot:
             removed.append(item)
 
@@ -3131,7 +3420,7 @@ def compute_scan_delta(new_airports, update_snapshot=True):
     if update_snapshot:
         try:
             with open(SNAPSHOT_JSON_PATH, 'w', encoding='utf-8') as f:
-                json.dump(current_snapshot, f, indent=2, ensure_ascii=False)
+                json.dump(current_snapshot, f, separators=(',', ':'), ensure_ascii=False)
         except Exception as e:
             print("Error updating library snapshot:", e)
 

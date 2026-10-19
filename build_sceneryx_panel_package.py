@@ -75,9 +75,9 @@ def build_spb(
     numeric_chunk.extend(struct.pack("<II", 9, 3))
     numeric_chunk.extend(struct.pack("<If", 10, 4.0))
     numeric_chunk.extend(struct.pack("<If", 11, 4.0))
-    numeric_chunk.extend(struct.pack("<If", 12, 32.0))
-    numeric_chunk.extend(struct.pack("<If", 13, 25.5))
-    numeric_chunk.extend(struct.pack("<If", 14, 24.0))
+    numeric_chunk.extend(struct.pack("<If", 12, 37.0))
+    numeric_chunk.extend(struct.pack("<If", 13, 34.0))
+    numeric_chunk.extend(struct.pack("<If", 14, 26.0))
     numeric_chunk.extend(struct.pack("<If", 15, 2.0))
     children.extend(numeric_chunk)
 

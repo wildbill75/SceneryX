@@ -1,355 +1,135 @@
-================================================================================
-SCENERYX — Next-Generation MSFS Scenery & Collection Manager
-================================================================================
+# ✈️ SceneryX — Next-Generation MSFS Performance & Scenery Suite
 
-Version   : 1.0.0
-Platform  : Windows 10 / Windows 11 (64-bit)
-Simulator : Microsoft Flight Simulator 2020 & 2024
-License   : Freeware / Personal Non-Commercial Use
-Website   : https://github.com/wildbill75/SceneryX
+![Platform](https://img.shields.io/badge/Platform-Windows%2010%20%2F%2011%20(64--bit)-blue.svg?style=flat-square)
+![Simulator](https://img.shields.io/badge/Simulator-MSFS%202020%20%7C%20MSFS%202024-emerald.svg?style=flat-square)
+![Architecture](https://img.shields.io/badge/Architecture-x64%20Native%20Desktop-orange.svg?style=flat-square)
+![Release](https://img.shields.io/badge/Release-RC__v1.0.8-sky.svg?style=flat-square)
+![License](https://img.shields.io/badge/License-Gumroad%20Validated-yellow.svg?style=flat-square)
 
-================================================================================
-SOMMAIRE / TABLE OF CONTENTS
-================================================================================
-1. English Documentation
-2. Documentation en Français
-3. Deutsche Dokumentation
-4. Documentación en Español
-5. Legal Mentions & Disclaimers / Mentions Légales
+**SceneryX** est une suite logicielle tout-en-un de nouvelle génération conçue spécifiquement pour les pilotes et passionnés de **Microsoft Flight Simulator (MSFS 2020 & MSFS 2024)**. 
 
-================================================================================
-1. ENGLISH DOCUMENTATION
-================================================================================
+Elle réunit au sein d'une interface cockpit dark ultra-réactive :
+1. **La gestion et l'exploration visuelle** de l'ensemble de votre bibliothèque de scènes (Payware, Freeware communautaire, Asobo et scènes streamées MSFS 2024).
+2. **Le comparateur de prix en direct** sur plus de 15 boutiques mondiales de simulation de vol.
+3. **Le régulateur dynamique de LOD (Smart LOD)** garantissant fluidité absolue et élimination des micro-saccades en vol.
+4. **L'optimiseur graphique MSFS & audit matériel** calibrant automatiquement votre UserCfg.opt à la cadence exacte de vos écrans et casques VR.
+5. **L'isolateur de scènes par corridor SimBrief** libérant de précieux gigaoctets de mémoire RAM et VRAM.
+6. **Le panneau HUD In-Game** déployable directement dans la barre d'outils cockpit de MSFS en 2D et Réalité Virtuelle.
+7. **L'enregistreur de vol télémétrique (Blackbox)** fournissant des rapports graphiques complets de fluidité (FPS réels, 1% Low, latence CPU MainThread et consommation VRAM).
 
-1.1 OVERVIEW
-SceneryX is a modern, high-performance desktop suite designed specifically 
-for Microsoft Flight Simulator (MSFS 2020 and MSFS 2024) pilots and enthusiasts. 
-It bridges the gap between scenery library management, collection financial 
-tracking, and real-time marketplace price comparison across major flight 
-simulation stores.
+---
 
-Built with a native single-executable architecture and an ultra-responsive 
-dark cockpit interface, SceneryX empowers flight simmers to catalog, inspect, 
-audit, and organize hundreds of installed airport add-ons seamlessly.
+## 📑 Sommaire / Table of Contents
 
-1.2 KEY FEATURES
+- [Piliers Fonctionnels](#-piliers-fonctionnels)
+  - [1. Exploration Mondiale & Gestionnaire de Scènes](#1-exploration-mondiale--gestionnaire-de-scènes)
+  - [2. Comparateur de Prix Payware en Direct](#2-comparateur-de-prix-payware-en-direct)
+  - [3. Régulateur Dynamique Smart LOD & Auto Cloud Recovery](#3-régulateur-dynamique-smart-lod--auto-cloud-recovery)
+  - [4. Optimisation Graphique & Audit Matériel "My Rig"](#4-optimisation-graphique--audit-matériel-my-rig)
+  - [5. Optimiseur de Route de Vol & Isolation SimBrief](#5-optimiseur-de-route-de-vol--isolation-simbrief)
+  - [6. Panneau Toolbar In-Game (HUD Cockpit 2D & VR)](#6-panneau-toolbar-in-game-hud-cockpit-2d--vr)
+  - [7. Rapports de Performance & Télémétrie en Vol](#7-rapports-de-performance--télémétrie-en-vol)
+- [Configuration Requise](#-configuration-requise)
+- [Installation & Activation](#-installation--activation)
+- [Documentation Utilisateur](#-documentation-utilisateur)
+- [Raccourcis Clavier](#-raccourcis-clavier)
+- [Support & Mentions Légales](#-support--mentions-légales)
 
-* Interactive Global 3D/2D Airport Map:
-  - Leaflet & MarkerCluster integration dynamically visualizes all installed 
-    sceneries globally with fluid cluster breakdown by region and airport density.
-  - Smooth camera pan and zoom transitions with user-customizable speed 
-    (Fast, Smooth, Cinematic) and default airport zoom depth (Wide, Regional, Runway).
-  - Customizable startup viewport: choose your default opening focus (World, 
-    Western Europe, North America, Asia, Oceania, etc.) in Settings.
-  - Rich hover previews: inspect ICAO, city, country, status (Payware, Freeware, 
-    Asobo), and active GSX profile presence.
+---
 
-* Deep Dual Simulator Scanning (MSFS 2020 & 2024):
-  - Scans local Community folders, Official packages, and MSFS 2024 
-    StreamedPackages (cloud-streamed assets).
-  - Multi-path configurator: add, name, enable, or disable custom scenery 
-    folders independently.
-  - Accurate metadata extraction: reads layout files, manifest files, airport 
-    coordinates, runways, and package identity.
-  - GSX Pro profile auto-matching: automatically detects and links your .ini 
-    GSX ground handling profiles located in %APPDATA%\Virtuali\GSX\MSFS.
+## 🚀 Piliers Fonctionnels
 
-* Financial & Collection Investment Dashboard:
-  - Live summary banner calculating your cumulative investment across all payware sceneries.
-  - Multi-currency system: switch seamlessly between USD ($), EUR (€), GBP (£), 
-    and AUD (A$) in Settings; all monetary values across the entire application update reactively.
-  - Custom price override: manually adjust the price paid for any airport 
-    (individual purchases, discounts, bundles) via the airport details drawer.
-  - Country investment drawer: drill down by country to inspect total spending, 
-    total airports owned, and a dedicated list of sceneries with one-click map focus.
+### 1. Exploration Mondiale & Gestionnaire de Scènes
+* **Mappemonde Interactive Vectorielle** : Cartographie fluide (Leaflet & MarkerCluster) avec clustering dynamique des aérodromes par densité régionale.
+* **Deux Ergonomies au Choix** :
+  * **Sidebar Classique (Flight Ops)** : Panneau latéral rétractable avec filtres avancés (Modèle économique, Source Community/Official, 11 Régions mondiales, Types de terrain, Profils GSX, Notes communautaires).
+  * **Hub Radial Tactique** : Menu circulaire futuriste centré sur chaque aéroport avec 4 quadrants d'accès instantané (Scènes, Lignes aériennes, Pistes, GSX).
+* **Détection Multi-Simulateurs** : Analyse conjointe des dossiers `Community`, `Official` et `StreamedPackages` (MSFS 2024).
+* **Gestionnaire d'Add-ons & Conflits** : Activation/désactivation chirurgicale de scènes concurrentes sur un même terrain sans quitter l'application.
+* **Gestion Complète GSX Pro** : Détection automatique des profils `.ini`, résolution des doublons et glisser-déposer de profils directement sur la carte.
 
-* Live Payware Store Price Comparator:
-  - Live product availability and price query across 15+ flight simulation 
-    marketplaces and official developer stores (simMarket, Orbx Direct, 
-    Flightbeam Studios, iniBuilds Store, Aerosoft Shop, France VFR, FlyTampa, 
-    FSDreamTeam, Jetstream Designs, LatinVFR, Pyreegue Dev Co., NZA Simulations, 
-    Drzewiecki Design, Contrail, Flightsim.to).
-  - Cheapest first (ascending sort): automatically sorts matching stores from 
-    lowest price to highest price in your selected currency.
-  - Official developer studio recognition [OFFICIAL DEV]: highlights official 
-    developer stores with golden badges and elevates them when prices are competitive.
-  - Smart anti-false-positive engine: rigorously excludes vintage/retro packages 
-    (e.g. 1935 Geneva), city landmark packs (e.g. Paris Landmarks), GSX profile packs, 
-    liveries, textures, night lighting packs, and legacy simulator versions (FSX, P3D, X-Plane).
-  - Non-closing modal workflow: keeps the comparator modal open when clicking external 
-    links to let you cross-check multiple vendors without interruption.
+### 2. Comparateur de Prix Payware en Direct
+* **Veille Tarifaire Temps Réel** : Requête en direct sur 15+ marketplaces (simMarket, Orbx Direct, Flightbeam, iniBuilds, Aerosoft, France VFR, FlyTampa, FSDreamTeam, Jetstream, LatinVFR, Pyreegue, NZA, Drzewiecki, Contrail, Flightsim.to).
+* **Tri Croissant Intelligent** : Présentation du meilleur tarif en tête avec conversion de devises instantanée (USD `$`, EUR `€`, GBP `£`, AUD `A$`).
+* **Badge Développeur Officiel** : Mise en valeur dorée `[OFFICIAL DEV]` pour privilégier l'achat direct auprès des créateurs de scènes.
+* **Filtre Anti Faux-Positifs** : Exclusion stricte des packs de livrées, textures, éclairages, villes 3D et anciennes versions FSX/P3D.
 
-* Multi-Format Exports & Backups:
-  - CSV spreadsheet: export your entire catalog or active filtered view into an 
-    Excel-, Volanta-, and Elevatex-compatible CSV.
-  - JSON full backup: export complete raw structured metadata for database backup 
-    or custom automation.
+### 3. Régulateur Dynamique Smart LOD & Auto Cloud Recovery
+* **Régulation par Altitude** : Ajustement progressif automatique du Terrain LOD (TLOD) et Objects LOD (OLOD) selon 3 phases de vol (Sol/Approche, Montée/Descente, Croisière).
+* **Auto Cloud Recovery** : Réduction temporaire automatique de la densité des nuages volumétriques lors d'un passage en couche dense pour préserver la cadence d'images.
+* **Détection de Conflit AutoFPS** : Système de sécurité prévenant la double injection en mémoire en cas de présence simultanée de l'outil externe MSFS AutoFPS.
+* **Support Natif OFXR Frame Gen** : Détection du pont OpenXR Toolkit et Frame Generation VR pour un verrouillage parfait de la cadence à 1/2 ou 1/3 Sync.
 
-* Native Display & Ergonomics:
-  - Display resolution adaptation: detects primary monitor resolution (1080p, 1440p / 2K, 
-    2160p / 4K) and scales window proportions automatically.
-  - Balanced geometry: calculates symmetrical margins taking into account the Windows 
-    taskbar for pixel-perfect visual centering.
-  - 4 full languages: English, Français, Deutsch, and Español.
+### 4. Optimisation Graphique & Audit Matériel "My Rig"
+* **Audit Matériel en Temps Réel** : Diagnostic CPU (cœurs/threads), GPU (modèle, VRAM, version pilote), RAM (fréquence + statut XMP/EXPO), Stockage NVMe (espace libre MSFS), et visqueux VR.
+* **Cadence 1/2 Sync Écran & VR** : Détection automatique de la fréquence de vos moniteurs (60 Hz, 120 Hz, 144 Hz, 165 Hz, 180 Hz, 240 Hz) et calcul automatique du cap de FPS idéal (ex. 180 Hz ➔ 90 FPS, 165 Hz ➔ 82 FPS). Bascule d'écran en **un seul clic**.
+* **Éditeur Sécurisé de UserCfg.opt** : Modification directe des paramètres graphiques MSFS (DLSS, Frame Generation, Reflex, Textures, V-Sync) avec système de sauvegarde et de restauration (Rollback) en 1 clic.
 
-================================================================================
-2. DOCUMENTATION EN FRANÇAIS
-================================================================================
+### 5. Optimiseur de Route de Vol & Isolation SimBrief
+* **Import Direct SimBrief** : Chargement automatique de l'OFP actif via votre identifiant pilote ou nom d'utilisateur.
+* **Corridor Dynamique d'Isolation** : Définition d'un couloir de vol personnalisable (de 25 NM à 150 NM) le long de votre trajectoire.
+* **Économiseur de RAM & VRAM** : Désactivation temporaire en un clic de tous les aéroports situés hors de votre corridor de vol, prévenant les fuites mémoire et crashs DirectX (DXGI_ERROR_DEVICE_REMOVED).
 
-2.1 PRÉSENTATION
-SceneryX est une suite logicielle de bureau moderne et performante conçue pour 
-les pilotes et passionnés de Microsoft Flight Simulator (MSFS 2020 et MSFS 2024). 
-Elle réunit au sein d'une même interface la gestion de votre bibliothèque de scènes, 
-le suivi financier de vos investissements et la comparaison en direct des prix 
-sur les principales boutiques spécialisées.
+### 6. Panneau Toolbar In-Game (HUD Cockpit 2D & VR)
+* **Intégration Cockpit Dédiée** : Panneau léger déployable directement dans le simulateur via le bouton d'installation des Paramètres.
+* **Contrôles en Vol** : Ajustement des curseurs TLOD et OLOD en direct, bascule de l'Auto Cloud Recovery et surveillance des métriques matérielles sans changer de fenêtre.
+* **Parfaite Compatibilité VR** : Conçu pour s'intégrer harmonieusement dans les casques de réalité virtuelle sans impacter la fluidité.
 
-Distribué sous forme d'un exécutable unique autonome et doté d'une interface sombre 
-style cockpit en verre dépoli (glassmorphism), SceneryX vous permet d'auditer, 
-cataloguer et organiser des centaines d'aéroports en toute simplicité.
+### 7. Rapports de Performance & Télémétrie en Vol
+* **Enregistreur Télémétrique Haute Fréquence** : Capture continue des métriques clés (FPS réels, FPS de base sans Frame Gen, 1% Low, latence MainThread CPU en millisecondes, charge GPU, utilisation VRAM et RAM).
+* **Rapports Détaillés & Graphiques** : Analyse post-vol interactive avec repérage précis des micro-saccades, des goulots d'étranglement (CPU vs GPU bound) et conseils personnalisés d'optimisation.
 
-2.2 FONCTIONNALITÉS PRINCIPALES
+---
 
-* Carte Globale Interactive 3D/2D :
-  - Intégration Leaflet & MarkerCluster : affichage fluide de tous vos aéroports 
-    installés avec regroupement dynamique par grappes selon la région et le zoom.
-  - Caméra cinématique : transitions de panoramique et de zoom ultra-fluides avec 
-    vitesse réglable (Rapide, Fluide, Cinématique) et niveau de zoom par défaut 
-    (Large, Régional, Piste).
-  - Région de démarrage personnalisable : définissez votre cadrage géographique 
-    initial (Monde, Europe de l'Ouest, Amérique du Nord, Asie, Océanie, etc.).
-  - Infobulles au survol : survolez n'importe quel aéroport pour consulter son 
-    code OACI, sa ville, son pays, son type (Payware, Freeware, Asobo) et la 
-    présence d'un profil GSX actif.
+## 💻 Configuration Requise
 
-* Analyse Approfondie Multi-Simulateurs (MSFS 2020 & 2024) :
-  - Gestionnaire multi-répertoires : analyse les dossiers Community, Official 
-    et les scènes en streaming de MSFS 2024 (StreamedPackages).
-  - Personnalisation des chemins : ajoutez des dossiers personnalisés, nommez-les 
-    et activez ou désactivez leur analyse à la demande.
-  - Extraction précise des données : lecture des manifestes, coordonnées GPS, 
-    orientation des pistes et métadonnées du package.
-  - Liaison automatique GSX Pro : détecte automatiquement les profils de 
-    manutention au sol .ini présents dans %APPDATA%\Virtuali\GSX\MSFS.
+| Composant | Configuration Minimale | Configuration Recommandée |
+| :--- | :--- | :--- |
+| **Système d'exploitation** | Windows 10 (64-bit, 20H2+) | Windows 11 (64-bit, 23H2+) |
+| **Simulateur** | MSFS 2020 ou MSFS 2024 | MSFS 2020 / MSFS 2024 (Dossiers Community accessibles) |
+| **Processeur** | 6 cœurs physiques (ex. i5-10400 / Ryzen 3600) | 8+ cœurs (ex. i7-13700K / Ryzen 7800X3D) |
+| **Mémoire Vive (RAM)** | 16 Go DDR4 (3200 MHz) | 32 Go ou 64 Go DDR5 avec XMP/EXPO activé |
+| **Carte Graphique** | 8 Go VRAM (NVIDIA RTX 2060 / AMD RX 6600) | 12+ Go VRAM (RTX 4070 / RTX 4080 / RTX 4090 / RX 7900) |
+| **Stockage** | SSD NVMe avec au moins 2 Go libres pour l'app | SSD NVMe PCIe 4.0 avec 50+ Go libres pour MSFS Packages |
+| **Affichage** | Résolution minimale 1920x1080 | 2560x1440 ou 4K avec G-Sync / FreeSync |
 
-* Suivi Financier & Tableau de Bord d'Investissement :
-  - Bannière d'investissement global : calcul instantané du montant cumulé 
-    dépensé sur l'ensemble de vos scènes paywares.
-  - Gestion multi-devises : basculez entre USD ($), EUR (€), GBP (£) et AUD (A$) 
-    dans les Paramètres ; tous les chiffres et symboles se mettent à jour instantanément.
-  - Personnalisation du prix d'achat : ajustez manuellement le tarif payé pour 
-    chaque aéroport (promotions, achats groupés) via le volet latéral.
-  - Tiroir d'investissement par pays : classement par pays affichant le montant 
-    total investi, le nombre de plateformes possédées et la liste cliquable des scènes.
+---
 
-* Comparateur de Prix & Boutiques Officielles en Direct :
-  - Agrégateur multi-boutiques : interrogation en temps réel de plus de 15 boutiques 
-    spécialisées et studios créateurs (simMarket, Orbx Direct, Flightbeam Studios, 
-    iniBuilds Store, Aerosoft Shop, France VFR, FlyTampa, FSDreamTeam, Jetstream Designs, 
-    LatinVFR, Pyreegue Dev Co., NZA Simulations, Drzewiecki Design, Contrail, Flightsim.to).
-  - Tri du moins cher au plus cher : classement automatique par tarif croissant 
-    dans la devise de votre choix.
-  - Reconnaissance des studios officiels [OFFICIAL DEV] : mise en valeur des boutiques 
-    officielles avec badge doré et couronne.
-  - Moteur anti-faux-positifs : écarte automatiquement les scènes d'époque (Genève 1935), 
-    les packs de monuments/villes (Paris Landmarks), les livrées, textures, sons, 
-    profils GSX et versions pour anciens simulateurs (FSX, P3D, X-Plane).
-  - Navigation continue : la modale reste ouverte lors d'un clic pour vous permettre 
-    d'ouvrir plusieurs boutiques en parallèle.
+## 📦 Installation & Activation
 
-* Sauvegardes & Exports Multi-Formats :
-  - Export tableur CSV : fichier tableur complet compatible avec Excel, Google Sheets, 
-    Volanta et Elevatex.
-  - Sauvegarde JSON complète : export structuré de l'intégralité de vos métadonnées 
-    pour archivage ou automatisation.
+1. Téléchargez la dernière version d'installation : **`SceneryX_RC_v1.0.8_Setup.exe`**.
+2. Exécutez l'installeur avec les privilèges Administrateur.
+3. Lisez et acceptez le contrat de licence (EULA).
+4. À l'écran d'activation, renseignez votre clé de licence Gumroad (ou clé permanente de test `SCNX-MASTER-2026-OK`).
+5. L'installeur configure automatiquement les dossiers dans `%APPDATA%\SceneryX` et génère vos profils standard optimisés (2D Display Standard et VR Headset Standard) d'après votre matériel.
+6. Lancez SceneryX : l'audit initial détecte immédiatement vos dossiers MSFS et vos équipements.
 
-* Ergonomie & Affichage Natif :
-  - Détection automatique de la résolution : adaptation sur écrans 1080p, 1440p (2K) et 4K.
-  - Centrage au pixel près : calcul des marges horizontales et verticales prenant 
-    en compte la barre des tâches Windows.
-  - 4 langues disponibles : Français, Anglais, Allemand et Espagnol.
+---
 
-================================================================================
-3. DEUTSCHE DOKUMENTATION
-================================================================================
+## 📖 Documentation Utilisateur
 
-3.1 ÜBERSICHT
-SceneryX ist eine moderne, hochperformante Desktop-Suite für Microsoft Flight 
-Simulator (MSFS 2020 und MSFS 2024). Sie vereint Szenerieverwaltung, finanzielle 
-Erfassung Ihrer Add-on-Ausgaben und Echtzeit-Preisvergleiche führender 
-Flugsimulations-Shops in einer eleganten Benutzeroberfläche.
+Pour une prise en main visuelle pas à pas, deux documents complets sont mis à votre disposition :
 
-Als eigenständige ausführbare Datei mit dunklem Cockpit-Design konzipiert, 
-bietet SceneryX vollständige Übersicht und Kontrolle über Hunderte von 
-Flughafenszenerien.
+* **[USER_MANUAL.md](docs/USER_MANUAL.md)** : Le manuel complet en Markdown avec tous les encarts de capture d'écran détaillés.
+* **[SceneryX_User_Manual.docx](docs/SceneryX_User_Manual.docx)** : Le document Word officiel préformaté avec emplacements dédiés pour intégrer vos captures d'écran et imprimer ou exporter en PDF.
 
-3.2 HAUPTFUNKTIONEN
+---
 
-* Interaktive Globale 3D/2D-Weltkarte:
-  - Leaflet & MarkerCluster: dynamische Visualisierung aller installierten 
-    Flughäfen weltweit mit intelligenter Gruppierung.
-  - Kinematische Kamerasteuerung: weiche Kamerafahrten mit anpassbarer 
-    Geschwindigkeit (Schnell, Sanft, Kinematisch) und Standard-Zoomtiefe (Weit, Regional, Landebahn).
-  - Einstellbare Startregion: definieren Sie Ihren bevorzugten geografischen 
-    Einstiegspunkt (Welt, Westeuropa, Nordamerika, Asien, Ozeanien usw.) in den Einstellungen.
-  - Detaillierte Vorschau: überfahren Sie Marker mit der Maus, um ICAO-Code, Stadt, 
-    Land, Typ (Payware, Freeware, Asobo) und GSX-Profile einzusehen.
+## ⌨️ Raccourcis Clavier
 
-* Umfassender Scan für MSFS 2020 & 2024:
-  - Multi-Pfad-Verwaltung: scannt Community-, Official- und MSFS 2024 
-    StreamedPackages-Verzeichnisse.
-  - Benutzerdefinierte Pfade: beliebige Ordner hinzufügen, benennen und aktivieren oder deaktivieren.
-  - Exakte Metadaten: auslesen von Layouts, Koordinaten, Start- und Landebahnen und Paketdaten.
-  - Automatische GSX Pro Profilzuordnung: erkennt verknüpfte .ini-Profile 
-    in %APPDATA%\Virtuali\GSX\MSFS.
+| Raccourci | Action |
+| :--- | :--- |
+| **Échap (`Esc`)** | Ferme la modale, le drawer ou la bulle d'aide contextuelle active |
+| **Entrée (`Enter`)** | Valide la recherche dans la barre d'aéroports mondiale |
+| **Clic Molette / Glisser** | Déplacement panoramique fluide sur la carte du monde |
+| **Molette Haut / Bas** | Zoom avant / Zoom arrière sur les aéroports et clusters |
+| **Double Clic Aéroport** | Centre la caméra et ouvre la vue détaillée du terrain |
 
-* Finanz- und Sammlungs-Dashboard:
-  - Gesamtausgaben-Übersicht: Live-Anzeige der kumulierten Gesamtausgaben aller Payware-Szenerien.
-  - Multi-Währungssystem: umschalten zwischen USD ($), EUR (€), GBP (£) und AUD (A$); 
-    alle Beträge in der Anwendung werden sofort umgerechnet.
-  - Manueller Preisabgleich: überschreiben Sie bezahlte Preise für individuelle 
-    Angebote oder Bundles in den Flughafendetails.
-  - Länder-Investitionsansicht: detaillierte Länderanalyse mit Gesamtausgaben, 
-    Anzahl der Flughäfen und Direktfokus auf der Karte.
+---
 
-* Live-Shop-Preisvergleich & Entwickler-Stores:
-  - Multi-Shop-Aggregator: Echtzeit-Verfügbarkeits- und Preisprüfung bei über 15 Stores 
-    (simMarket, Orbx Direct, Flightbeam Studios, iniBuilds Store, Aerosoft Shop, 
-    France VFR, FlyTampa, FSDreamTeam, Jetstream Designs, LatinVFR, Pyreegue, 
-    NZA Simulations, Drzewiecki Design, Contrail, Flightsim.to).
-  - Günstigster Preis zuerst: automatische Sortierung aufsteigend nach dem besten 
-    Preis in Ihrer gewählten Währung.
-  - Hervorhebung offizieller Studios [OFFICIAL DEV]: goldene Abzeichen für direkte Entwickler-Websites.
-  - Intelligenter Falsch-Positiv-Filter: schließt historische Retro-Szenerien (Genf 1935), 
-    Stadt-Wahrzeichen (Paris Landmarks), Lackierungen, Profile und ältere Simulatoren 
-    (FSX, P3D, X-Plane) zuverlässig aus.
-  - Paralleles Stöbern: das Vergleichsfenster bleibt nach dem Klick geöffnet für 
-    bequemes Vergleichen im Browser.
+## 🛡️ Support & Mentions Légales
 
-* Exporte & Datensicherung:
-  - CSV-Export: kompatibel mit Excel, Google Tabellen, Volanta und Elevatex.
-  - JSON-Komplettsicherung: vollständiger strukturierter Metadatenexport für Backups und Werkzeuge.
-
-* Anzeige & Ergonomie:
-  - Automatische Auflösungserkennung: automatische Größenanpassung auf 1080p-, 1440p (2K)- 
-    und 4K-Monitoren.
-  - Perfekt zentriert: exakt berechnete Ränder unter Berücksichtigung der Windows-Taskleiste.
-  - 4 vollständige Sprachen: Deutsch, Englisch, Französisch und Spanisch.
-
-================================================================================
-4. DOCUMENTACIÓN EN ESPAÑOL
-================================================================================
-
-4.1 RESUMEN
-SceneryX es una suite de escritorio moderna y de alto rendimiento diseñada 
-específicamente para pilotos y aficionados de Microsoft Flight Simulator 
-(MSFS 2020 y MSFS 2024). Integra en un único entorno la gestión de bibliotecas 
-de escenarios, el control de inversión financiera en complementos y la comparación 
-de precios en tiendas especializadas en tiempo real.
-
-Distribuido como un archivo ejecutable único con una interfaz oscura estilo cabina 
-en vidrio esmerilado (glassmorphism), SceneryX facilita la organización y auditoría 
-de cientos de aeropuertos instalados.
-
-4.2 CARACTERÍSTICAS PRINCIPALES
-
-* Mapa Global Interactivo 3D/2D:
-  - Integración Leaflet & MarkerCluster: visualización fluida de todos los aeropuertos 
-    instalados con agrupación dinámica por regiones.
-  - Control cinemático de cámara: movimientos suaves de desplazamiento y zoom con 
-    velocidad configurable (Rápido, Suave, Cinemático) y profundidad de zoom 
-    predeterminada (Amplio, Regional, Pista).
-  - Región inicial configurable: seleccione su encuadre geográfico predeterminado 
-    (Mundo, Europa Occidental, Norteamérica, Asia, Oceanía, etc.).
-  - Vistas previas al pasar el cursor: consulte código OACI, ciudad, país, categoría 
-    (Payware, Freeware, Asobo) y perfiles GSX activos.
-
-* Escaneo Profundo Multi-Simulador (MSFS 2020 & 2024):
-  - Gestor multi-directorio: escanea carpetas Community, Official y paquetes 
-    transmitidos de MSFS 2024 (StreamedPackages).
-  - Rutas personalizadas: añada, nombre y active o desactive carpetas según sus necesidades.
-  - Metadatos precisos: extracción de pistas, coordenadas geográficas y datos de manifiesto.
-  - Detección automática de perfiles GSX Pro: vincula automáticamente los perfiles .ini 
-    ubicados en %APPDATA%\Virtuali\GSX\MSFS.
-
-* Panel de Control Financiero y Colección:
-  - Gasto total acumulado: indicador superior en tiempo real con la suma total 
-    invertida en escenarios de pago.
-  - Sistema multidivisa: cambie entre USD ($), EUR (€), GBP (£) y AUD (A$); todos 
-    los importes y símbolos se recalculan de inmediato.
-  - Precio personalizable: modifique el importe pagado por cada aeropuerto 
-    (ofertas, paquetes) en la ficha técnica.
-  - Desglose por país: consulta de inversión total, cantidad de aeropuertos y lista 
-    interactiva con enfoque directo en el mapa.
-
-* Comparador de Precios en Tiendas Oficiales:
-  - Agregador de tiendas en vivo: consulta en tiempo real en más de 15 tiendas y 
-    estudios oficiales (simMarket, Orbx Direct, Flightbeam Studios, iniBuilds Store, 
-    Aerosoft Shop, France VFR, FlyTampa, FSDreamTeam, Jetstream Designs, LatinVFR, 
-    Pyreegue, NZA Simulations, Drzewiecki Design, Contrail, Flightsim.to).
-  - Orden ascendente (más barato primero): ordena automáticamente las tiendas 
-    desde el precio más económico.
-  - Reconocimiento de estudios oficiales [OFFICIAL DEV]: distintivo dorado para 
-    tiendas oficiales de los desarrolladores.
-  - Filtro inteligente anti-falsos positivos: bloquea paquetes retro (Ginebra 1935), 
-    monumentos urbanos (Paris Landmarks), libreas, texturas, perfiles GSX y 
-    simuladores anteriores (FSX, P3D, X-Plane).
-  - Consulta continua: la ventana emergente no se cierra al abrir un enlace, 
-    permitiendo contrastar varias ofertas simultáneamente.
-
-* Exportación y Copias de Seguridad:
-  - Hoja de cálculo CSV: exportación compatible con Excel, Google Sheets, Volanta y Elevatex.
-  - Copia de seguridad JSON: exportación estructurada de metadatos completos para respaldo.
-
-* Ergonomía y Visualización:
-  - Detección automática de pantalla: adaptación a resoluciones 1080p, 1440p (2K) y 4K.
-  - Centrado al píxel: márgenes calculados equilibrados teniendo en cuenta la barra 
-    de tareas de Windows.
-  - 4 idiomas completos: Español, Inglés, Francés y Alemán.
-
-================================================================================
-5. LEGAL MENTIONS & DISCLAIMERS / MENTIONS LÉGALES
-================================================================================
-
-5.1 GENERAL DISCLAIMER / CLAUSE DE NON-RESPONSABILITÉ
-SceneryX is an independent, non-commercial software suite provided on an "AS IS" 
-and "AS AVAILABLE" basis, without warranty of any kind, either express or implied, 
-including but not limited to the implied warranties of merchantability, fitness 
-for a particular purpose, or non-infringement.
-
-The authors and copyright holders shall in no event be held liable for any claim, 
-damages, data loss, file system corruption, simulator instability, or other liability 
-arising from, out of, or in connection with the software or the use or other dealings 
-in the software. Users interact with simulator configurations, Community packages, 
-and Content.xml entirely at their own discretion and risk.
-
-5.2 TRADEMARK NOTICES & NON-AFFILIATION
-- Microsoft, Microsoft Flight Simulator, MSFS 2020, MSFS 2024, Windows, and the 
-  Windows Logo are registered trademarks or trademarks of Microsoft Corporation 
-  in the United States and/or other countries.
-- Asobo Studio is a registered trademark of Asobo Studio SAS.
-- Lockheed Martin and Prepar3D are registered trademarks of Lockheed Martin Corporation.
-- Laminar Research and X-Plane are registered trademarks of Laminar Research.
-- GSX Pro and FSDreamTeam are registered trademarks of VIRTUALI s.a.s.
-- simMarket, Orbx, Aerosoft, iniBuilds, Flightbeam, FlyTampa, Flightsim.to, France VFR, 
-  and other third-party vendor names and logos are trademarks of their respective owners.
-- SceneryX is an independent community project and is NOT affiliated with, authorized, 
-  sponsored, or endorsed by Microsoft Corporation, Asobo Studio, or any third-party 
-  developer or storefront mentioned.
-
-5.3 DATA PRIVACY & LOCAL PROCESSING
-- 100% Local Processing: SceneryX does NOT collect, harvest, store, or transmit any 
-  personal identifying information, simulator telemetry, credentials, or analytical data.
-- External Web Queries: Network traffic generated by SceneryX is strictly restricted 
-  to public search endpoints of flight simulation storefronts (to check add-on 
-  availability and pricing).
-- No user data is stored on remote servers; all settings and library databases 
-  reside strictly on your local machine (%APPDATA%\SceneryX and application directory).
-
-5.4 LICENSE & REDISTRIBUTION
-SceneryX is distributed for free personal, non-commercial use. Modifying, 
-reverse-engineering, decompiling, or redistributing the software for commercial 
-gain without explicit prior written authorization from the copyright owner is prohibited.
-
---------------------------------------------------------------------------------
-Developed with precision for the global flight simulation community.
-================================================================================
+* **Éditeur** : Sidestick Priority
+* **Dépôt Officiel** : [https://github.com/wildbill75/SceneryX](https://github.com/wildbill75/SceneryX)
+* **Détection & Respect des Fichiers Originaux** : SceneryX effectue systématiquement une copie de sauvegarde non altérée de votre `UserCfg.opt` avant toute première modification (`UserCfg_Original_Pristine.opt.bak`). Vous pouvez restaurer vos réglages d'origine à tout moment en un clic.
+* **Marques déposées** : Microsoft Flight Simulator est une marque déposée de Microsoft Corporation. GSX Pro est un produit de FSDreamTeam. SceneryX est un utilitaire indépendant développé pour la communauté des simulateurs de vol.

@@ -30817,6 +30817,41 @@ class OnboardingTourController {
                     await new Promise(r => setTimeout(r, 30));
                 },
                 async beforeExit(direction) {
+                    if (direction === 'prev') {
+                        if (typeof switchRigTab === 'function') {
+                            switchRigTab('specs');
+                        }
+                    }
+                }
+            },
+            // STEP 25: Update & Cache Cleaner in My Rig
+            {
+                id: 'my_rig_maintenance',
+                targetSelector: '#float-win-my-rig',
+                titleKey: 'onboarding.step_rig_maintenance_title',
+                bodyKey: 'onboarding.step_rig_maintenance_body',
+                defaultTitle: 'Update & Cache Cleaner (Safe Update & Cache Purge)',
+                defaultBody: 'Protect your Community folders in 1 click before any MSFS Sim or World Update (atomic folder quarantine + instant restoration), and purge SceneryIndexes, compiled aircraft WASM binaries, Rolling Cache, StreamedPackages/ModelLib caches, and DirectX/GPU shaders to eliminate post-update micro-stutters.',
+                preferredPlacement: 'right',
+                async beforeEnter() {
+                    if (window.onboardingTour) window.onboardingTour._cleanupOpenedModals();
+                    if (typeof closeBackgroundToolsModal === 'function') closeBackgroundToolsModal();
+                    if (typeof openFloatingWindow === 'function') {
+                        openFloatingWindow('my_rig');
+                    }
+                    if (typeof switchRigTab === 'function') {
+                        switchRigTab('maintenance');
+                    }
+                    const win = document.getElementById('float-win-my-rig');
+                    if (win) {
+                        win.classList.remove('hidden');
+                        win.style.display = 'flex';
+                        const body = win.querySelector('.modal-body');
+                        if (body) body.scrollTop = 0;
+                    }
+                    await new Promise(r => setTimeout(r, 40));
+                },
+                async beforeExit(direction) {
                     if (direction === 'next') {
                         if (typeof closeFloatingWindow === 'function') {
                             closeFloatingWindow('my_rig');
@@ -30828,7 +30863,7 @@ class OnboardingTourController {
                     }
                 }
             },
-            // STEP 23: In-Game Panel Install in Settings
+            // STEP 26: In-Game Panel Install in Settings
             {
                 id: 'ingame_panel_install',
                 targetSelector: '#cfg-ingame-panel-section',
@@ -30858,7 +30893,7 @@ class OnboardingTourController {
                     await new Promise(r => setTimeout(r, 30));
                 }
             },
-            // STEP 24: In-Game Panel in Cockpit
+            // STEP 27: In-Game Panel in Cockpit (Smart LOD & Performance Telemetry)
             {
                 id: 'ingame_panel_cockpit',
                 targetSelector: '#float-win-remote-panel',
@@ -30871,6 +30906,7 @@ class OnboardingTourController {
                     if (window.onboardingTour) window.onboardingTour._cleanupOpenedModals();
                     const img = document.getElementById('remote-panel-cockpit-img');
                     if (img) {
+                        img.src = 'media_ingame_panel.png?v=4';
                         img.classList.remove('hidden');
                         img.style.display = 'block';
                     }
@@ -30890,12 +30926,58 @@ class OnboardingTourController {
                     await new Promise(r => setTimeout(r, 40));
                 },
                 async beforeExit(direction) {
-                    if (typeof closeFloatingWindow === 'function') {
-                        closeFloatingWindow('remote_panel');
+                    if (direction === 'prev') {
+                        if (typeof closeFloatingWindow === 'function') {
+                            closeFloatingWindow('remote_panel');
+                        }
                     }
                 }
             },
-            // STEP 25: Flight Performance Report
+            // STEP 28: In-Game Panel Live Graphics Tuning (Hot-Swappable Settings)
+            {
+                id: 'ingame_panel_live_graphics',
+                targetSelector: '#float-win-remote-panel',
+                titleKey: 'onboarding.step_ingame_live_graphics_title',
+                bodyKey: 'onboarding.step_ingame_live_graphics_body',
+                defaultTitle: 'In-Flight Live Graphics Controls',
+                defaultBody: 'Expand the top quick-bar inside the cockpit panel to hot-swap MSFS graphics settings in real time (Max FPS, Clouds, Pre-Cache, Terrain Shadows, Buildings, Trees, Plants, Grass) without pausing your flight. Pin up to 5 favorite badges to the compact header, apply changes on the fly, or click any reset icon (↺) to restore your pre-flight baseline.',
+                preferredPlacement: 'right',
+                async beforeEnter() {
+                    if (window.onboardingTour) window.onboardingTour._cleanupOpenedModals();
+                    const img = document.getElementById('remote-panel-cockpit-img');
+                    if (img) {
+                        img.src = 'media_ingame_panel_live_graphics.png?v=1';
+                        img.classList.remove('hidden');
+                        img.style.display = 'block';
+                    }
+                    const frame = document.getElementById('remote-panel-preview-frame');
+                    if (frame) {
+                        frame.classList.add('hidden');
+                        frame.style.display = 'none';
+                    }
+                    if (typeof openFloatingWindow === 'function') {
+                        openFloatingWindow('remote_panel');
+                    }
+                    const win = document.getElementById('float-win-remote-panel');
+                    if (win) {
+                        win.classList.remove('hidden');
+                        win.style.display = 'flex';
+                    }
+                    await new Promise(r => setTimeout(r, 40));
+                },
+                async beforeExit(direction) {
+                    const img = document.getElementById('remote-panel-cockpit-img');
+                    if (img) {
+                        img.src = 'media_ingame_panel.png?v=4';
+                    }
+                    if (direction === 'next') {
+                        if (typeof closeFloatingWindow === 'function') {
+                            closeFloatingWindow('remote_panel');
+                        }
+                    }
+                }
+            },
+            // STEP 29: Flight Performance Report
             {
                 id: 'flight_report',
                 targetSelector: '#float-win-report-viewer',
@@ -31516,8 +31598,8 @@ class OnboardingTourController {
         const proStepIds = new Set([
             'route_optimization', 'smart_lod', 'graphics_settings',
             'bg_tools_ofxr_autofps', 'my_rig_tuning', 'my_rig',
-            'my_rig_display', 'ingame_panel_install', 'ingame_panel_cockpit',
-            'flight_report'
+            'my_rig_display', 'my_rig_maintenance', 'ingame_panel_install',
+            'ingame_panel_cockpit', 'ingame_panel_live_graphics', 'flight_report'
         ]);
         const isProStepInLite = !!(window.IS_LITE && step && proStepIds.has(step.id));
         const rawTitle = (typeof t === 'function') ? t(step.titleKey, step.defaultTitle) : step.defaultTitle;
@@ -31945,8 +32027,8 @@ class OnboardingTourController {
                 title = (typeof t === 'function') ? t('onboarding.step_system_optimizer_title', 'System Optimizer (Windows OS & GPU Tuning)') : 'System Optimizer (Windows OS & GPU Tuning)';
                 body = (typeof t === 'function') ? t('onboarding.step_system_optimizer_body', 'System Optimizer audits and tunes 7 critical Windows OS and GPU parameters outside of MSFS (HAGS for DLSS 3 Frame Gen, Game Mode, Ultimate Power Plan, Re-Size BAR, Shader Cache quota, GPU Drivers, and Core Isolation) to ensure maximum framerate stability.') : 'System Optimizer audits and tunes 7 critical Windows OS and GPU parameters outside of MSFS (HAGS for DLSS 3 Frame Gen, Game Mode, Ultimate Power Plan, Re-Size BAR, Shader Cache quota, GPU Drivers, and Core Isolation) to ensure maximum framerate stability.';
             } else if (isMaintActive) {
-                title = 'Update & Cache Cleaner (Safe Update Mode & Cache Purge)';
-                body = 'Protect your Community folders in 1 click before any MSFS World Update or Sim Update (instant atomic folder quarantine + SceneryIndexes refresh), and purge compiled WASM aircraft binaries, Rolling Cache, StreamedPackages/ModelLib caches, and DirectX/GPU shaders without losing your aircraft configurations.';
+                title = (typeof t === 'function') ? t('onboarding.step_rig_maintenance_title', 'Update & Cache Cleaner (Safe Update & Cache Purge)') : 'Update & Cache Cleaner (Safe Update & Cache Purge)';
+                body = (typeof t === 'function') ? t('onboarding.step_rig_maintenance_body', 'Protect your Community folders in 1 click before any MSFS Sim or World Update (atomic folder quarantine + instant restoration), and purge SceneryIndexes, compiled aircraft WASM binaries, Rolling Cache, StreamedPackages/ModelLib caches, and DirectX/GPU shaders to eliminate post-update micro-stutters.') : 'Protect your Community folders in 1 click before any MSFS Sim or World Update (atomic folder quarantine + instant restoration), and purge SceneryIndexes, compiled aircraft WASM binaries, Rolling Cache, StreamedPackages/ModelLib caches, and DirectX/GPU shaders to eliminate post-update micro-stutters.';
             } else {
                 title = (typeof t === 'function') ? t('onboarding.step_my_rig_title', 'Hardware Specs & Tailored Baseline') : 'Hardware Specs & Tailored Baseline';
                 body = (typeof t === 'function') ? t('onboarding.step_my_rig_body', "SceneryX automatically detects your full hardware architecture (CPU cores & threads, GPU architecture & dedicated VRAM, RAM speed & XMP, NVMe storage, and display refresh cadence). All sim LOD profiles, frame rate limiters, and performance recommendations are dynamically tailored to match your specific hardware baseline.") : "SceneryX automatically detects your full hardware architecture (CPU cores & threads, GPU architecture & dedicated VRAM, RAM speed & XMP, NVMe storage, and display refresh cadence). All sim LOD profiles, frame rate limiters, and performance recommendations are dynamically tailored to match your specific hardware baseline.";

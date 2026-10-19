@@ -414,10 +414,7 @@ def get_latest_online_versions(force: bool = False) -> Dict[str, Optional[str]]:
     if not has_valid_cache or force:
         if not _online_versions_cache["fetching"]:
             _online_versions_cache["fetching"] = True
-            t = threading.Thread(target=_fetch_online_versions_worker, daemon=True)
-            t.start()
-            if _online_versions_cache["driver"] is None and _online_versions_cache["dlss"] is None:
-                t.join(timeout=1.8)
+            threading.Thread(target=_fetch_online_versions_worker, daemon=True).start()
 
     return {
         "driver": _online_versions_cache.get("driver"),
@@ -448,9 +445,14 @@ try:
 except Exception:
     pass
 
+_cached_gpu_info = None
 
-def detect_gpu_info() -> Dict[str, Any]:
-    """Détecte la carte graphique NVIDIA/AMD, VRAM totale et Re-Size BAR."""
+def detect_gpu_info(force: bool = False) -> Dict[str, Any]:
+    """Détecte la carte graphique NVIDIA/AMD, VRAM totale et Re-Size BAR (mis en cache)."""
+    global _cached_gpu_info
+    if _cached_gpu_info is not None and not force:
+        return dict(_cached_gpu_info)
+
     result = {
         "name": "Unknown GPU",
         "name_simplified": "UNKNOWN GPU",
@@ -532,6 +534,7 @@ def detect_gpu_info() -> Dict[str, Any]:
         result["is_driver_current"] = True
 
     result["driver_status"] = "optimum" if result["is_driver_current"] else "acceptable"
+    _cached_gpu_info = dict(result)
     return result
 
 
@@ -902,12 +905,472 @@ def detect_windows_hags() -> bool:
         return False
 
 
+def detect_windows_game_mode() -> bool:
+    """Vérifie si le Mode Jeu Windows est actif dans le registre utilisateur."""
+    try:
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\GameBar") as key:
+            val, _ = winreg.QueryValueEx(key, "AutoGameModeEnabled")
+            return bool(val)
+    except Exception:
+        return False
+
+
+def set_windows_game_mode(enable: bool) -> bool:
+    """Active ou désactive le Mode Jeu Windows à chaud sans élévation de privilège."""
+    try:
+        key_path = r"Software\Microsoft\GameBar"
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, key_path) as key:
+            winreg.SetValueEx(key, "AutoGameModeEnabled", 0, winreg.REG_DWORD, 1 if enable else 0)
+            winreg.SetValueEx(key, "AllowAutoGameMode", 0, winreg.REG_DWORD, 1 if enable else 0)
+        return True
+    except Exception as e:
+        print("Error setting game mode:", e)
+        return False
+
+
+def detect_windows_power_plan() -> Dict[str, Any]:
+    """Détecte le plan d'alimentation Windows actif et les profils disponibles en 1 seul appel."""
+    result = {
+        "active_guid": "",
+        "active_name": "Inconnu",
+        "is_high_perf": False,
+        "available_plans": []
+    }
+    try:
+        list_out = subprocess.check_output(['powercfg', '/list'], text=True, stderr=subprocess.DEVNULL, creationflags=CREATE_NO_WINDOW)
+        matches = re.findall(r'GUID:\s+([a-f0-9\-]+)\s+\((.+?)\)(\s*\*?)', list_out)
+        for guid, name, star in matches:
+            clean_name = name.strip()
+            is_active = '*' in star
+            if is_active:
+                result["active_guid"] = guid.strip()
+                result["active_name"] = clean_name
+                result["is_high_perf"] = any(k in clean_name.lower() for k in ['high', 'ultimate', 'perform', 'élevé'])
+            result["available_plans"].append({
+                "guid": guid.strip(),
+                "name": clean_name,
+                "is_active": is_active
+            })
+    except Exception:
+        pass
+    return result
+
+
+def set_windows_power_plan(plan_guid: str) -> bool:
+    """Active un plan d'alimentation Windows en 1 clic sans UAC."""
+    try:
+        subprocess.check_call(['powercfg', '/setactive', plan_guid], stderr=subprocess.DEVNULL, creationflags=CREATE_NO_WINDOW)
+        return True
+    except Exception as e:
+        print("Error setting power plan:", e)
+        return False
+
+
+def detect_windows_vbs() -> bool:
+    """Vérifie si la sécurité basée sur la virtualisation (VBS/HVCI) est active."""
+    try:
+        with winreg.OpenKey(winreg.HKEY_LOCAL_MACHINE, r"SYSTEM\CurrentControlSet\Control\DeviceGuard\Scenarios\HypervisorEnforcedCodeIntegrity") as k:
+            v, _ = winreg.QueryValueEx(k, "Enabled")
+            return bool(v)
+    except Exception:
+        return False
+
+
+def detect_shader_cache_info() -> Dict[str, Any]:
+    """Mesure la taille du cache de nuanceurs DirectX et NVIDIA sur disque."""
+    local_app_data = os.environ.get("LOCALAPPDATA", "")
+    user_profile = os.environ.get("USERPROFILE", "")
+    target_dirs = []
+    if local_app_data:
+        target_dirs.extend([
+            os.path.join(local_app_data, "D3DSCache"),
+            os.path.join(local_app_data, "NVIDIA", "DXCache"),
+            os.path.join(local_app_data, "NVIDIA", "GLCache")
+        ])
+    if user_profile:
+        target_dirs.append(os.path.join(user_profile, "AppData", "LocalLow", "NVIDIA", "PerDriverVersion", "DXCache"))
+
+    size_bytes = 0
+    file_count = 0
+    for d in target_dirs:
+        if os.path.isdir(d):
+            try:
+                for root, _, files in os.walk(d):
+                    for f in files:
+                        try:
+                            fp = os.path.join(root, f)
+                            size_bytes += os.path.getsize(fp)
+                            file_count += 1
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+
+    size_mb = round(size_bytes / (1024 * 1024), 1)
+    primary_dir = os.path.join(local_app_data, "NVIDIA", "DXCache") if local_app_data else "N/A"
+    return {
+        "folder": primary_dir if os.path.exists(primary_dir) else "DirectX / GPU Cache",
+        "size_mb": size_mb,
+        "file_count": file_count,
+        "recommended": "10 GB or Unlimited"
+    }
+
+
+def detect_gpu_control_app() -> Dict[str, Any]:
+    """Détecte l'application de contrôle GPU (NVIDIA App, Panneau de config NVIDIA, AMD)."""
+    nvidia_app = r"C:\Program Files\NVIDIA Corporation\NVIDIA App\CEF\NVIDIA App.exe"
+    if os.path.exists(nvidia_app):
+        return {
+            "installed": True,
+            "name": "NVIDIA App",
+            "path": nvidia_app,
+            "type": "nvidia"
+        }
+    nvcpl = r"C:\Program Files\NVIDIA Corporation\Control Panel Client\nvcplui.exe"
+    if os.path.exists(nvcpl):
+        return {
+            "installed": True,
+            "name": "NVIDIA Control Panel",
+            "path": nvcpl,
+            "type": "nvidia"
+        }
+    amd_cpl = r"C:\Program Files\AMD\CNext\CNext\RadeonSoftware.exe"
+    if os.path.exists(amd_cpl):
+        return {
+            "installed": True,
+            "name": "AMD Adrenalin",
+            "path": amd_cpl,
+            "type": "amd"
+        }
+    return {
+        "installed": False,
+        "name": "Not detected",
+        "path": None,
+        "type": "unknown"
+    }
+
+
+def launch_gpu_control_app() -> bool:
+    """Lance l'application de contrôle graphique installée avec menu complet (NVIDIA App / Panneau NVIDIA / AMD)."""
+    # 1. Direct NVIDIA App executable with full GUI & sidebar menu
+    nvidia_app = r"C:\Program Files\NVIDIA Corporation\NVIDIA App\CEF\NVIDIA App.exe"
+    if os.path.exists(nvidia_app):
+        try:
+            subprocess.Popen([nvidia_app], close_fds=True)
+            return True
+        except Exception:
+            pass
+
+    # 2. NVIDIA App protocol without frameless sub-route
+    try:
+        os.startfile('nvidiaapp://')
+        return True
+    except Exception:
+        pass
+
+    # 3. Detect other apps or fallback
+    app_info = detect_gpu_control_app()
+    if app_info["installed"] and app_info["path"] and os.path.exists(app_info["path"]):
+        try:
+            subprocess.Popen([app_info["path"]], close_fds=True)
+            return True
+        except Exception:
+            pass
+
+    return open_nvidia_control_panel()
+
+
+def open_windows_graphics_settings() -> bool:
+    """Ouvre la page Paramètres Graphiques Windows (switch HAGS direct sous Windows 11)."""
+    try:
+        os.system("start ms-settings:display-advancedgraphics-default || start ms-settings:display-advancedgraphics")
+        return True
+    except Exception:
+        return False
+
+
+def set_windows_hags(enable: bool) -> Dict[str, Any]:
+    """Active ou désactive HAGS dans le registre Windows via élévation UAC."""
+    global _cached_hardware_specs
+    _cached_hardware_specs = None
+    try:
+        val = 2 if enable else 1
+        ps_cmd = f'Start-Process reg.exe -ArgumentList \'add "HKLM\\SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers" /v HwSchMode /t REG_DWORD /d {val} /f\' -Verb RunAs -Wait'
+        subprocess.run(['powershell', '-WindowStyle', 'Hidden', '-Command', ps_cmd], capture_output=True, text=True, creationflags=CREATE_NO_WINDOW)
+        actual = detect_windows_hags()
+        _cached_hardware_specs = None
+        return {
+            "success": actual == enable,
+            "hags_enabled": actual,
+            "reboot_required": True,
+            "message": "GPU Scheduling (HAGS) updated in Windows registry. A PC restart is required for Windows to apply the change." if actual == enable else "User cancelled UAC elevation or registry write failed."
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "hags_enabled": detect_windows_hags(),
+            "reboot_required": False,
+            "message": str(e)
+        }
+
+
+def open_windows_power_options() -> bool:
+    """Ouvre le Panneau de configuration des Options d'Alimentation Windows."""
+    try:
+        subprocess.Popen(['control.exe', '/name', 'Microsoft.PowerOptions'], shell=False)
+        return True
+    except Exception:
+        try:
+            os.system("start ms-settings:powersleep")
+            return True
+        except Exception:
+            return False
+
+
+def open_nvidia_control_panel(tab: str = "manage_3d") -> bool:
+    """Ouvre le Panneau de Configuration NVIDIA classique (nvcplui.exe) ou bascule sur NVIDIA App si non installé."""
+    try:
+        nvcpl_paths = [
+            r"C:\Program Files\NVIDIA Corporation\Control Panel Client\nvcplui.exe",
+            r"C:\Windows\System32\nvcplui.exe",
+            r"C:\Program Files (x86)\NVIDIA Corporation\Control Panel Client\nvcplui.exe"
+        ]
+        for p in nvcpl_paths:
+            if os.path.exists(p):
+                subprocess.Popen([p], close_fds=True)
+                return True
+
+        # Si le client Win32 classique nvcplui.exe est absent (systèmes modernes avec NVIDIA App),
+        # basculer proprement sur NVIDIA App (qui le remplace officiellement)
+        return launch_gpu_control_app()
+    except Exception:
+        return launch_gpu_control_app()
+
+
+def open_windows_disk_cleanup() -> bool:
+    """Ouvre l'utilitaire Nettoyage de disque Windows (cleanmgr.exe)."""
+    try:
+        subprocess.Popen(['cleanmgr.exe'], close_fds=True)
+        return True
+    except Exception:
+        return False
+
+
+def purge_shader_cache() -> Dict[str, Any]:
+    """Purge en toute sécurité les caches de shaders DirectX et NVIDIA corrompus ou saturés."""
+    freed_bytes = 0
+    deleted_files = 0
+    errors = 0
+    local_app_data = os.environ.get("LOCALAPPDATA", "")
+    user_profile = os.environ.get("USERPROFILE", "")
+    
+    target_dirs = []
+    if local_app_data:
+        target_dirs.extend([
+            os.path.join(local_app_data, "D3DSCache"),
+            os.path.join(local_app_data, "NVIDIA", "DXCache"),
+            os.path.join(local_app_data, "NVIDIA", "GLCache")
+        ])
+    if user_profile:
+        target_dirs.append(os.path.join(user_profile, "AppData", "LocalLow", "NVIDIA", "PerDriverVersion", "DXCache"))
+    
+    for d in target_dirs:
+        if os.path.isdir(d):
+            for root, dirs, files in os.walk(d):
+                for f in files:
+                    fp = os.path.join(root, f)
+                    try:
+                        sz = os.path.getsize(fp)
+                        os.remove(fp)
+                        freed_bytes += sz
+                        deleted_files += 1
+                    except Exception:
+                        errors += 1
+                        
+    return {
+        "success": deleted_files > 0 or errors == 0,
+        "freed_bytes": freed_bytes,
+        "freed_mb": round(freed_bytes / (1024 * 1024), 1),
+        "deleted_files": deleted_files,
+        "errors": errors
+    }
+
+
+def open_shader_cache_settings() -> bool:
+    """Ouvre l'application GPU sur la page de configuration Global Settings (Shader Cache)."""
+    return launch_gpu_control_app()
+
+
+def get_system_tuning_status() -> Dict[str, Any]:
+    """Scanne et diagnostique l'ensemble des paramètres Windows OS & GPU en anglais."""
+    hags = detect_windows_hags()
+    game_mode = detect_windows_game_mode()
+    power_plan = detect_windows_power_plan()
+    vbs = detect_windows_vbs()
+    gpu_app = detect_gpu_control_app()
+    shader_cache = detect_shader_cache_info()
+    gpu_info = detect_gpu_info()
+    rbar = gpu_info.get("is_rbar_active", False)
+    bar1_mb = gpu_info.get("bar1_memory_mb", 0)
+
+    score = 0
+    checks = []
+
+    # 1. HAGS (25%)
+    if hags:
+        score += 25
+    checks.append({
+        "id": "hags",
+        "title": "GPU Scheduling (HAGS)",
+        "short_title": "HAGS",
+        "value_label": "ENABLED" if hags else "DISABLED",
+        "status": "optimal" if hags else "recommended",
+        "is_optimal": hags,
+        "desc": "Required for DLSS 3 Frame Generation and lower display latency." if hags else "GPU Scheduling is DISABLED. Enable HAGS to unlock DLSS 3 Frame Generation in MSFS (Requires PC reboot).",
+        "action_type": "open_hags_modal",
+        "action_label": "SETTINGS",
+        "tooltip": "Hardware-Accelerated GPU Scheduling status. Click to configure, open Windows Settings or toggle via UAC."
+    })
+
+    # 2. Windows Game Mode (25%)
+    if game_mode:
+        score += 25
+    checks.append({
+        "id": "game_mode",
+        "title": "Windows Game Mode",
+        "short_title": "Game Mode",
+        "value_label": "ENABLED" if game_mode else "DISABLED",
+        "status": "optimal" if game_mode else "recommended",
+        "is_optimal": game_mode,
+        "desc": "Prioritizes CPU and GPU resources for MSFS and pauses background tasks.",
+        "action_type": "toggle_game_mode",
+        "action_label": "SETTINGS",
+        "tooltip": "Toggle Windows Game Mode On / Off"
+    })
+
+    # 3. Power Plan (25%)
+    is_high_perf = power_plan.get("is_high_perf", False)
+    if is_high_perf:
+        score += 25
+    checks.append({
+        "id": "power_plan",
+        "title": "Windows Power Plan",
+        "short_title": "Power Plan",
+        "value_label": power_plan.get("active_name", "Balanced").upper(),
+        "status": "optimal" if is_high_perf else "recommended",
+        "is_optimal": is_high_perf,
+        "desc": "Prevents CPU core parking and clock throttling during flight.",
+        "action_type": "set_power_plan",
+        "action_label": "SETTINGS",
+        "tooltip": "Opens Windows Control Panel: Power Options",
+        "available_plans": power_plan.get("available_plans", [])
+    })
+
+    # 4. Re-Size BAR (25%)
+    if rbar:
+        score += 25
+    rbar_val = f"ACTIVE ({round(bar1_mb / 1024.0, 1)} GB)" if (rbar and bar1_mb > 0) else ("ACTIVE" if rbar else "NOT ACTIVE")
+    checks.append({
+        "id": "rbar",
+        "title": "Re-Size BAR (ReBAR)",
+        "short_title": "ReBAR",
+        "value_label": rbar_val,
+        "status": "optimal" if rbar else "not_active",
+        "is_optimal": rbar,
+        "desc": "Gives CPU direct full access to GPU VRAM for smoother asset streaming." if rbar else "Re-Size BAR is not active. Enable 'Above 4G Decoding' and 'Re-Size BAR Support' in motherboard UEFI BIOS.",
+        "action_type": "none",
+        "action_label": "",
+        "tooltip": "Re-Size BAR is active in UEFI BIOS." if rbar else "Re-Size BAR not active: Enter motherboard UEFI BIOS, enable 'Above 4G Decoding' and 'Re-Size BAR Support', then save and reboot."
+    })
+
+    # 5. DirectX Shader Cache
+    checks.append({
+        "id": "shader_cache",
+        "title": "DirectX Shader Cache",
+        "short_title": "Shader Cache",
+        "value_label": f"{shader_cache['size_mb']} MB (Recommended 10 GB or Unlimited)",
+        "status": "optimal",
+        "is_optimal": True,
+        "desc": "DX12 compilation cache. Set to 10 GB or Unlimited in GPU App to eliminate stutters.",
+        "action_type": "open_shader_cache_modal",
+        "action_label": "SETTINGS",
+        "tooltip": "Configure Shader Cache size (10 GB recommended), open NVIDIA Control Panel or purge cache"
+    })
+
+    # 6. GPU Control App
+    checks.append({
+        "id": "gpu_app",
+        "title": "GPU Driver & Control Panel",
+        "short_title": "GPU Panel",
+        "value_label": gpu_app["name"].upper(),
+        "status": "optimal" if gpu_app["installed"] else "acceptable",
+        "is_optimal": gpu_app["installed"],
+        "desc": f"{gpu_app['name']} available to manage graphics profiles and 3D settings.",
+        "action_type": "open_gpu_driver_modal",
+        "action_label": "SETTINGS",
+        "tooltip": "Manage GPU Driver, check updates or open NVIDIA Control Panel"
+    })
+
+    # 7. VBS / HVCI
+    is_vbs_off = not vbs
+    checks.append({
+        "id": "vbs",
+        "title": "Virtualization-Based Security (VBS)",
+        "short_title": "VBS / HVCI",
+        "value_label": "DISABLED (0% LOSS)" if is_vbs_off else "ENABLED (CPU OVERHEAD)",
+        "status": "optimal" if is_vbs_off else "acceptable",
+        "is_optimal": is_vbs_off,
+        "desc": "Core isolation virtualization. Disabled gives maximum CPU throughput in MSFS.",
+        "action_type": "none",
+        "action_label": "",
+        "tooltip": "Core isolation virtualization status in Windows Security"
+    })
+
+    can_one_click = (not game_mode) or (not is_high_perf)
+
+    return {
+        "readiness_score": score,
+        "score_status": "optimal" if score >= 75 else ("recommended" if score >= 50 else "critical"),
+        "checks": checks,
+        "can_one_click_optimize": can_one_click,
+        "hags_active": hags,
+        "hags_enabled": hags
+    }
+
+
+def apply_all_recommended_system_tweaks() -> Dict[str, Any]:
+    """Active immédiatement tous les réglages modifiables à chaud sans redémarrage."""
+    tweaks_applied = []
+
+    # 1. Mode Jeu Windows
+    if not detect_windows_game_mode():
+        if set_windows_game_mode(True):
+            tweaks_applied.append("Windows Game Mode enabled")
+
+    # 2. Plan d'Alimentation
+    power_plan = detect_windows_power_plan()
+    if not power_plan.get("is_high_perf", False):
+        plans = power_plan.get("available_plans", [])
+        target_plan = next((p for p in plans if "ultimate" in p["name"].lower()), None)
+        if not target_plan:
+            target_plan = next((p for p in plans if "high" in p["name"].lower() or "élevé" in p["name"].lower()), None)
+        if target_plan:
+            if set_windows_power_plan(target_plan["guid"]):
+                tweaks_applied.append(f"Power plan activated ({target_plan['name']})")
+
+    refreshed = get_system_tuning_status()
+    refreshed["status"] = "success"
+    refreshed["applied"] = tweaks_applied
+    refreshed["applied_tweaks"] = tweaks_applied
+    return refreshed
+
+
 def detect_dlss_version() -> Dict[str, Any]:
     """Détecte la version DLSS et Frame Generation active via DLSS Swapper."""
     result = {
-        "version": "Inconnue",
-        "frame_gen_version": "Inconnue",
-        "source": "Non détecté",
+        "version": "Unknown",
+        "frame_gen_version": "Unknown",
+        "source": "Not detected",
         "latest_version": None,
         "is_up_to_date": True,
         "dlss_status": "optimum"
@@ -1480,83 +1943,51 @@ def get_custom_profiles_dir() -> str:
     return profiles_dir
 
 
-def _sync_and_recover_custom_profiles(profiles_dir: str):
-    """Initializes custom profiles only if user directory is completely empty."""
-    existing = glob.glob(os.path.join(profiles_dir, "*.profile.json"))
-    if existing:
-        return
-
-    candidates = []
-    ws_dir = r"D:\SceneryX\custom_profiles"
-    if os.path.exists(ws_dir) and os.path.abspath(ws_dir) != os.path.abspath(profiles_dir):
-        candidates.append(ws_dir)
-    base_cp = os.path.join(os.path.dirname(os.path.abspath(__file__)), "custom_profiles")
-    if os.path.exists(base_cp) and os.path.abspath(base_cp) != os.path.abspath(profiles_dir):
-        candidates.append(base_cp)
-
-    for src_dir in candidates:
-        try:
-            for pfile in glob.glob(os.path.join(src_dir, "*.profile.json")):
-                fname = os.path.basename(pfile)
-                dst = os.path.join(profiles_dir, fname)
-                if not os.path.exists(dst):
-                    try:
-                        shutil.copy2(pfile, dst)
-                    except Exception:
-                        pass
-            state_dst = os.path.join(profiles_dir, "active_profile.json")
-            state_src = os.path.join(src_dir, "active_profile.json")
-            if not os.path.exists(state_dst) and os.path.exists(state_src):
-                try:
-                    shutil.copy2(state_src, state_dst)
-                except Exception:
-                    pass
-        except Exception:
-            pass
+def cleanup_legacy_profiles(profiles_dir: str):
+    """
+    Wipes out legacy development profiles from previous installations and locations.
+    Only allows modern standard profiles ('2D Display Standard', 'VR Headset Standard')
+    and user-created custom profiles.
+    """
+    legacy_patterns = [
+        "VR OFXR*",
+        "Default 2D Profile*",
+        "Default VR Profile*",
+        "VR TAA*",
+        "profile_default_*"
+    ]
+    for pattern in legacy_patterns:
+        for f in glob.glob(os.path.join(profiles_dir, f"{pattern}.profile.json")):
+            try:
+                os.remove(f)
+            except Exception:
+                pass
 
 
 def get_active_profile_id() -> str:
     """Returns the ID of the currently active profile. If none active, defaults to newest."""
     profiles_dir = get_custom_profiles_dir()
-    _sync_and_recover_custom_profiles(profiles_dir)
-    ws_dir = r"D:\SceneryX\custom_profiles"
+    cleanup_legacy_profiles(profiles_dir)
 
     state_file = os.path.join(profiles_dir, "active_profile.json")
-    ws_state = os.path.join(ws_dir, "active_profile.json")
-
-    candidates = []
     if os.path.exists(state_file):
         try:
-            candidates.append((state_file, os.path.getmtime(state_file)))
-        except Exception:
-            pass
-    if os.path.exists(ws_state):
-        try:
-            candidates.append((ws_state, os.path.getmtime(ws_state)))
-        except Exception:
-            pass
-
-    candidates.sort(key=lambda x: x[1], reverse=True)
-
-    for sf, _ in candidates:
-        try:
-            with open(sf, "r", encoding="utf-8") as f:
+            with open(state_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 active_id = data.get("active_id", "")
                 if active_id:
                     target_file = os.path.join(profiles_dir, f"{active_id}.profile.json")
-                    ws_file = os.path.join(ws_dir, f"{active_id}.profile.json")
-                    if os.path.exists(target_file) or os.path.exists(ws_file):
-                        set_active_profile_id(active_id)
+                    if os.path.exists(target_file):
                         return active_id
         except Exception:
             pass
 
     all_profiles = glob.glob(os.path.join(profiles_dir, "*.profile.json"))
-    if not all_profiles and os.path.exists(ws_dir):
-        all_profiles = glob.glob(os.path.join(ws_dir, "*.profile.json"))
-
     if all_profiles:
+        std_2d = os.path.join(profiles_dir, "profile_2d_display_standard.profile.json")
+        if os.path.exists(std_2d):
+            set_active_profile_id("profile_2d_display_standard")
+            return "profile_2d_display_standard"
         newest = max(all_profiles, key=os.path.getmtime)
         base = os.path.basename(newest)
         newest_id = base[:-len(".profile.json")]
@@ -1573,13 +2004,6 @@ def set_active_profile_id(profile_id: str):
             json.dump({"active_id": profile_id, "updated_at": datetime.now().isoformat()}, f, indent=2)
     except Exception:
         pass
-    ws_state = r"D:\SceneryX\custom_profiles\active_profile.json"
-    if os.path.exists(os.path.dirname(ws_state)) and os.path.abspath(os.path.dirname(ws_state)) != os.path.abspath(profiles_dir):
-        try:
-            with open(ws_state, "w", encoding="utf-8") as f:
-                json.dump({"active_id": profile_id, "updated_at": datetime.now().isoformat()}, f, indent=2)
-        except Exception:
-            pass
 
 
 def ensure_active_profile_applied(user_cfg_path: Optional[str] = None) -> Dict[str, Any]:
@@ -1589,18 +2013,19 @@ def ensure_active_profile_applied(user_cfg_path: Optional[str] = None) -> Dict[s
         return {"status": "error", "message": "UserCfg.opt not found on system."}
 
     profiles_dir = get_custom_profiles_dir()
-    _sync_and_recover_custom_profiles(profiles_dir)
+    cleanup_legacy_profiles(profiles_dir)
     active_id = get_active_profile_id()
+    if not active_id:
+        profiles = generate_default_rig_profiles(path)
+        if profiles:
+            active_id = profiles[0].get("id", "")
+
     if not active_id:
         return {"status": "skipped", "message": "No active profile defined."}
 
     profile_file = os.path.join(profiles_dir, f"{active_id}.profile.json")
     if not os.path.exists(profile_file):
-        ws_file = os.path.join(r"D:\SceneryX\custom_profiles", f"{active_id}.profile.json")
-        if os.path.exists(ws_file):
-            profile_file = ws_file
-        else:
-            return {"status": "error", "message": f"Profile file for '{active_id}' not found."}
+        return {"status": "error", "message": f"Profile file for '{active_id}' not found."}
 
     try:
         with open(profile_file, "r", encoding="utf-8", errors="ignore") as pf:
@@ -1643,7 +2068,7 @@ def has_staged_settings() -> bool:
 def get_custom_profiles() -> List[Dict[str, Any]]:
     """Lists all saved custom profiles, sorted newest first."""
     profiles_dir = get_custom_profiles_dir()
-    _sync_and_recover_custom_profiles(profiles_dir)
+    cleanup_legacy_profiles(profiles_dir)
     files = glob.glob(os.path.join(profiles_dir, "*.profile.json"))
     profiles = []
     active_id = get_active_profile_id()
@@ -1695,11 +2120,7 @@ def check_profile_changes(profile_id: str, user_cfg_path: Optional[str] = None) 
     profiles_dir = get_custom_profiles_dir()
     profile_file = os.path.join(profiles_dir, f"{profile_id}.profile.json")
     if not os.path.exists(profile_file):
-        ws_file = os.path.join(r"D:\SceneryX\custom_profiles", f"{profile_id}.profile.json")
-        if os.path.exists(ws_file):
-            profile_file = ws_file
-        else:
-            return {"status": "error", "message": "Profile not found."}
+        return {"status": "error", "message": "Profile not found."}
 
     try:
         with open(profile_file, "r", encoding="utf-8", errors="ignore") as f:
@@ -1742,11 +2163,7 @@ def rename_custom_profile(profile_id: str, new_name: str) -> Dict[str, Any]:
     profiles_dir = get_custom_profiles_dir()
     old_file = os.path.join(profiles_dir, f"{profile_id}.profile.json")
     if not os.path.exists(old_file):
-        ws_file = os.path.join(r"D:\SceneryX\custom_profiles", f"{profile_id}.profile.json")
-        if os.path.exists(ws_file):
-            old_file = ws_file
-        else:
-            return {"status": "error", "message": "Profile not found."}
+        return {"status": "error", "message": "Profile not found."}
 
     try:
         with open(old_file, "r", encoding="utf-8") as f:
@@ -1762,19 +2179,6 @@ def rename_custom_profile(profile_id: str, new_name: str) -> Dict[str, Any]:
         if os.path.abspath(old_file) != os.path.abspath(new_file) and os.path.exists(old_file):
             try:
                 os.remove(old_file)
-            except Exception:
-                pass
-
-        # Mirror to D:\SceneryX\custom_profiles
-        ws_dir = r"D:\SceneryX\custom_profiles"
-        if os.path.exists(ws_dir):
-            ws_new = os.path.join(ws_dir, f"{clean_name}.profile.json")
-            ws_old = os.path.join(ws_dir, f"{profile_id}.profile.json")
-            try:
-                with open(ws_new, "w", encoding="utf-8") as f_ws:
-                    json.dump(pdata, f_ws, indent=2, ensure_ascii=False)
-                if os.path.abspath(ws_old) != os.path.abspath(ws_new) and os.path.exists(ws_old):
-                    os.remove(ws_old)
             except Exception:
                 pass
 
@@ -1825,12 +2229,6 @@ def save_custom_profile(profile_name: str, overwrite_id: Optional[str] = None, u
                         os.remove(old_file)
                     except Exception:
                         pass
-                    ws_old = os.path.join(r"D:\SceneryX\custom_profiles", f"{overwrite_id}.profile.json")
-                    if os.path.exists(ws_old):
-                        try:
-                            os.remove(ws_old)
-                        except Exception:
-                            pass
 
             profile_file = new_file
             profile_data = {
@@ -1863,15 +2261,6 @@ def save_custom_profile(profile_name: str, overwrite_id: Optional[str] = None, u
 
         with open(profile_file, "w", encoding="utf-8") as pf:
             json.dump(profile_data, pf, indent=2, ensure_ascii=False)
-
-        # Mirror to D:\SceneryX\custom_profiles if accessible
-        ws_dir = r"D:\SceneryX\custom_profiles"
-        if os.path.exists(ws_dir) and os.path.abspath(ws_dir) != os.path.abspath(profiles_dir):
-            try:
-                with open(os.path.join(ws_dir, f"{profile_id}.profile.json"), "w", encoding="utf-8") as pf_ws:
-                    json.dump(profile_data, pf_ws, indent=2, ensure_ascii=False)
-            except Exception:
-                pass
 
         # Also write the updated content directly to UserCfg.opt so saving a profile applies it immediately
         with open(path, "w", encoding="utf-8") as f_cfg:
@@ -1934,6 +2323,16 @@ def activate_custom_profile(profile_id: str, user_cfg_path: Optional[str] = None
         set_active_profile_id(profile_id)
         clear_staged_settings()
 
+        # Synchronize OFXR Frame Generation mode if defined in profile
+        if "ofxr_mode" in profile_data:
+            try:
+                from scanner import get_settings, save_settings
+                st = get_settings()
+                st["ofxr_mode"] = str(profile_data["ofxr_mode"]).upper()
+                save_settings(st)
+            except Exception:
+                pass
+
         # Resynchronize live MSFS memory and Smart LOD controller setpoints if active
         try:
             import flight_lod_controller
@@ -1970,12 +2369,6 @@ def delete_custom_profile(profile_id: str) -> Dict[str, Any]:
             if os.path.exists(profile_file):
                 os.remove(profile_file)
                 deleted_count += 1
-            ws_file = os.path.join(r"D:\SceneryX\custom_profiles", f"{pid}.profile.json")
-            if os.path.exists(ws_file):
-                try:
-                    os.remove(ws_file)
-                except Exception:
-                    pass
             if active_id == pid:
                 active_was_deleted = True
         except Exception as e:
@@ -2639,12 +3032,6 @@ def generate_default_rig_profiles(user_cfg_path: Optional[str] = None) -> List[D
     path = user_cfg_path or get_user_cfg_path()
     profiles_dir = get_custom_profiles_dir()
     os.makedirs(profiles_dir, exist_ok=True)
-    ws_dir = r"D:\SceneryX\custom_profiles"
-    if os.path.exists(os.path.dirname(ws_dir)):
-        try:
-            os.makedirs(ws_dir, exist_ok=True)
-        except Exception:
-            pass
 
     # Read base UserCfg.opt content if available
     base_content = ""
@@ -2833,12 +3220,12 @@ def generate_default_rig_profiles(user_cfg_path: Optional[str] = None) -> List[D
     t_vr = (now - timedelta(seconds=1)).strftime("%Y-%m-%d %H:%M:%S")
     t_2d = now.strftime("%Y-%m-%d %H:%M:%S")
 
-    id_vr = "profile_default_vr"
-    id_2d = "profile_default_2d"
+    id_vr = "profile_vr_headset_standard"
+    id_2d = "profile_2d_display_standard"
 
     prof_2d = {
         "id": id_2d,
-        "name": "Default 2D Profile",
+        "name": "2D Display Standard",
         "created_at": t_2d,
         "updated_at": t_2d,
         "content": content_2d,
@@ -2846,7 +3233,7 @@ def generate_default_rig_profiles(user_cfg_path: Optional[str] = None) -> List[D
     }
     prof_vr = {
         "id": id_vr,
-        "name": "Default VR Profile",
+        "name": "VR Headset Standard",
         "created_at": t_vr,
         "updated_at": t_vr,
         "content": content_vr,
@@ -2854,16 +3241,9 @@ def generate_default_rig_profiles(user_cfg_path: Optional[str] = None) -> List[D
     }
 
     # Clean up obsolete default profile files if present
-    for obsolete_id in ["profile_default_shared", "profile_default_3d"]:
-        for d in [profiles_dir, ws_dir]:
-            fpath = os.path.join(d, f"{obsolete_id}.profile.json")
-            if os.path.exists(fpath):
-                try:
-                    os.remove(fpath)
-                except Exception:
-                    pass
+    cleanup_legacy_profiles(profiles_dir)
 
-    # Save both profiles to profiles_dir and mirror to workspace
+    # Save both standard profiles to profiles_dir
     for pdata in [prof_2d, prof_vr]:
         pfile = os.path.join(profiles_dir, f"{pdata['id']}.profile.json")
         try:
@@ -2871,17 +3251,11 @@ def generate_default_rig_profiles(user_cfg_path: Optional[str] = None) -> List[D
                 json.dump(pdata, pf, indent=2, ensure_ascii=False)
         except Exception:
             pass
-        if os.path.exists(ws_dir) and os.path.abspath(ws_dir) != os.path.abspath(profiles_dir):
-            try:
-                with open(os.path.join(ws_dir, f"{pdata['id']}.profile.json"), "w", encoding="utf-8") as pf:
-                    json.dump(pdata, pf, indent=2, ensure_ascii=False)
-            except Exception:
-                pass
 
-    # Set Default 2D Profile as the active profile
+    # Set 2D Display Standard as the active profile
     set_active_profile_id(id_2d)
 
-    # Immediately activate Default 2D Profile in MSFS UserCfg.opt on disk
+    # Immediately activate 2D Display Standard in MSFS UserCfg.opt on disk
     if path and os.path.exists(path):
         try:
             ensure_original_user_cfg_backup(path)
@@ -8727,18 +9101,17 @@ def update_msfs_user_cfg_setting(mode: str, setting_key: str, new_value: Any, us
         active_id = get_active_profile_id()
         if active_id:
             profiles_dir = get_custom_profiles_dir()
-            for pdir in [profiles_dir, r"D:\SceneryX\custom_profiles"]:
-                pfile = os.path.join(pdir, f"{active_id}.profile.json")
-                if os.path.exists(pfile):
-                    try:
-                        with open(pfile, "r", encoding="utf-8") as pf:
-                            pdata = json.load(pf)
-                        pdata["content"] = content
-                        pdata["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                        with open(pfile, "w", encoding="utf-8") as pf:
-                            json.dump(pdata, pf, indent=2)
-                    except Exception:
-                        pass
+            pfile = os.path.join(profiles_dir, f"{active_id}.profile.json")
+            if os.path.exists(pfile):
+                try:
+                    with open(pfile, "r", encoding="utf-8") as pf:
+                        pdata = json.load(pf)
+                    pdata["content"] = content
+                    pdata["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    with open(pfile, "w", encoding="utf-8") as pf:
+                        json.dump(pdata, pf, indent=2)
+                except Exception:
+                    pass
 
         return {
             "status": "success",
@@ -9215,6 +9588,727 @@ def get_full_rig_diagnostics(flight_profile: str = 'LINER', vr_refresh_rate: int
         "recommended_profile": initial_profile,
         "settings_matrix": matrix_data,
         "backups": backups
+    }
+
+
+# ==============================================================================
+# MSFS UPDATE & CACHE MAINTENANCE ENGINE (SAFE UPDATE QUARANTINE + CACHE PURGE)
+# ==============================================================================
+
+def _format_maintenance_bytes(size_bytes: int) -> str:
+    if size_bytes <= 0:
+        return "0 B"
+    if size_bytes < 1024:
+        return f"{size_bytes} B"
+    kb = size_bytes / 1024.0
+    if kb < 1024.0:
+        return f"{kb:.1f} KB"
+    mb = kb / 1024.0
+    if mb < 1024.0:
+        return f"{mb:.1f} MB"
+    gb = mb / 1024.0
+    return f"{gb:.2f} GB"
+
+
+def _is_msfs_running_now() -> bool:
+    """Checks via Win32 Toolhelp32 snapshot (~2ms) if FlightSimulator2024.exe or FlightSimulator.exe is active."""
+    try:
+        TH32CS_SNAPPROCESS = 0x00000002
+        class PROCESSENTRY32(ctypes.Structure):
+            _fields_ = [
+                ('dwSize', ctypes.wintypes.DWORD),
+                ('cntUsage', ctypes.wintypes.DWORD),
+                ('th32ProcessID', ctypes.wintypes.DWORD),
+                ('th32DefaultHeapID', ctypes.c_void_p),
+                ('th32ModuleID', ctypes.wintypes.DWORD),
+                ('cntThreads', ctypes.wintypes.DWORD),
+                ('th32ParentProcessID', ctypes.wintypes.DWORD),
+                ('pcPriClassBase', ctypes.c_long),
+                ('dwFlags', ctypes.wintypes.DWORD),
+                ('szExeFile', ctypes.c_char * 260)
+            ]
+        hSnap = ctypes.windll.kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
+        if hSnap and hSnap != -1:
+            pe = PROCESSENTRY32()
+            pe.dwSize = ctypes.sizeof(PROCESSENTRY32)
+            found = False
+            if ctypes.windll.kernel32.Process32First(hSnap, ctypes.byref(pe)):
+                while True:
+                    exe_lower = pe.szExeFile.decode('utf-8', errors='ignore').lower()
+                    if exe_lower in ('flightsimulator2024.exe', 'flightsimulator.exe'):
+                        found = True
+                        break
+                    if not ctypes.windll.kernel32.Process32Next(hSnap, ctypes.byref(pe)):
+                        break
+            ctypes.windll.kernel32.CloseHandle(hSnap)
+            return found
+    except Exception:
+        pass
+    return False
+
+
+def _get_all_msfs_localcache_dirs() -> List[str]:
+    """Returns all existing MSFS 2024 / 2020 LocalCache / Roaming root directories on this machine."""
+    candidates = [
+        os.path.expandvars(r"%LOCALAPPDATA%\Packages\Microsoft.Limitless_8wekyb3d8bbwe\LocalCache"),
+        os.path.expandvars(r"%APPDATA%\Microsoft Flight Simulator 2024"),
+        os.path.expandvars(r"%LOCALAPPDATA%\Packages\Microsoft.FlightSimulator_8wekyb3d8bbwe\LocalCache"),
+        os.path.expandvars(r"%APPDATA%\Microsoft Flight Simulator")
+    ]
+    cfg_path = get_user_cfg_path()
+    if cfg_path and os.path.exists(cfg_path):
+        cfg_dir = os.path.dirname(cfg_path)
+        if cfg_dir not in candidates:
+            candidates.insert(0, cfg_dir)
+
+    seen = set()
+    existing = []
+    for c in candidates:
+        norm = os.path.normpath(c)
+        if norm.lower() not in seen and os.path.isdir(norm):
+            seen.add(norm.lower())
+            existing.append(norm)
+    return existing
+
+
+def _get_safe_update_state_path() -> str:
+    appdata = os.environ.get('APPDATA') or os.path.expanduser("~")
+    sdir = os.path.join(appdata, "SceneryX")
+    os.makedirs(sdir, exist_ok=True)
+    return os.path.join(sdir, "safe_update_state.json")
+
+
+def _discover_community_folders() -> List[Dict[str, Any]]:
+    """
+    Discovers all active or quarantined MSFS Community folders from SceneryX settings and UserCfg.opt.
+    Recognizes `<Community>_SceneryX_SafeBackup` siblings automatically even without state file.
+    """
+    raw_candidates = []
+    try:
+        from scanner import get_settings
+        st = get_settings()
+        for sp in st.get("scan_paths", []):
+            p = sp.get("path", "") if isinstance(sp, dict) else str(sp)
+            if p:
+                base = os.path.basename(os.path.normpath(p)).lower()
+                if base.startswith("community"):
+                    raw_candidates.append(os.path.normpath(p))
+    except Exception:
+        pass
+
+    # Also inspect InstalledPackagesPath in UserCfg.opt
+    for lc_dir in _get_all_msfs_localcache_dirs():
+        ucfg = os.path.join(lc_dir, "UserCfg.opt")
+        if os.path.isfile(ucfg):
+            try:
+                with open(ucfg, "r", encoding="utf-8", errors="ignore") as f:
+                    for line in f:
+                        if "InstalledPackagesPath" in line and not line.strip().startswith("//"):
+                            parts = line.split('"')
+                            if len(parts) >= 2:
+                                pkg_root = parts[1].strip()
+                                if os.path.isdir(pkg_root):
+                                    for sub in ("Community", "Community2024"):
+                                        cp = os.path.join(pkg_root, sub)
+                                        if os.path.isdir(cp) or os.path.isdir(cp + "_SceneryX_SafeBackup"):
+                                            raw_candidates.append(os.path.normpath(cp))
+            except Exception:
+                pass
+
+    # Also include any saved paths from safe_update_state.json
+    state_file = _get_safe_update_state_path()
+    if os.path.isfile(state_file):
+        try:
+            with open(state_file, "r", encoding="utf-8") as sf:
+                sdata = json.load(sf)
+            for entry in sdata.get("folders", []):
+                orig = entry.get("original")
+                if orig:
+                    raw_candidates.append(os.path.normpath(orig))
+        except Exception:
+            pass
+
+    seen = set()
+    results = []
+    for c in raw_candidates:
+        if c.endswith("_SceneryX_SafeBackup"):
+            c = c[:-len("_SceneryX_SafeBackup")]
+        key = c.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        backup_path = c + "_SceneryX_SafeBackup"
+        is_quarantined = os.path.isdir(backup_path)
+        if not os.path.isdir(c) and not is_quarantined:
+            continue
+
+        target_for_count = backup_path if is_quarantined else c
+        addon_count = 0
+        try:
+            with os.scandir(target_for_count) as it:
+                for entry in it:
+                    try:
+                        if entry.is_dir(follow_symlinks=False) or entry.is_symlink() or getattr(entry, 'is_junction', lambda: False)():
+                            addon_count += 1
+                        elif entry.is_dir(follow_symlinks=True):
+                            addon_count += 1
+                    except Exception:
+                        # Broken symlink or protected junction is still a folder entry in Community
+                        addon_count += 1
+        except Exception:
+            pass
+
+        results.append({
+            "name": os.path.basename(c),
+            "path": c,
+            "backup_path": backup_path,
+            "is_quarantined": is_quarantined,
+            "addon_count": addon_count,
+            "folder_count": addon_count
+        })
+
+    # If MSFS 2024 Community folders exist, exclude legacy MSFS 2020 package paths to avoid duplicate "Community" confusion
+    msfs24_results = [r for r in results if "microsoft.flightsimulator_8wekyb3d8bbwe" not in r["path"].lower()]
+    if msfs24_results:
+        results = msfs24_results
+
+    return results
+
+
+def _scan_dir_shallow_or_bounded(folder: str, max_files: int = 8000, ext_filter: Optional[set] = None, exclude_exts: Optional[set] = None) -> Tuple[int, int, List[str]]:
+    """Fast bounded directory scanner returning (file_count, total_bytes, matched_file_paths)."""
+    if not os.path.isdir(folder):
+        return 0, 0, []
+    count = 0
+    total_bytes = 0
+    matched = []
+    stack = [folder]
+    while stack and count < max_files:
+        curr = stack.pop()
+        try:
+            with os.scandir(curr) as it:
+                for entry in it:
+                    try:
+                        if entry.is_dir(follow_symlinks=False):
+                            stack.append(entry.path)
+                        elif entry.is_file(follow_symlinks=False):
+                            ext = os.path.splitext(entry.name)[1].lower()
+                            if ext_filter is not None and ext not in ext_filter:
+                                continue
+                            if exclude_exts is not None and ext in exclude_exts:
+                                continue
+                            sz = entry.stat(follow_symlinks=False).st_size
+                            count += 1
+                            total_bytes += sz
+                            matched.append(entry.path)
+                            if count >= max_files:
+                                break
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+    return count, total_bytes, matched
+
+
+def _collect_scenery_indexes_files() -> Tuple[int, int, List[str]]:
+    files = []
+    total_bytes = 0
+    for lc in _get_all_msfs_localcache_dirs():
+        sidx = os.path.join(lc, "SceneryIndexes")
+        if os.path.isdir(sidx):
+            try:
+                with os.scandir(sidx) as it:
+                    for entry in it:
+                        if entry.is_file() and entry.name.lower().endswith(".dat"):
+                            try:
+                                sz = entry.stat().st_size
+                                total_bytes += sz
+                                files.append(entry.path)
+                            except Exception:
+                                pass
+            except Exception:
+                pass
+    return len(files), total_bytes, files
+
+
+def _collect_wasm_compiled_files() -> Tuple[int, int, List[str]]:
+    r"""
+    Finds compiled WASM binaries (.wasm, .dll, .obj, .o, .pdb, .bin, .cache, .tmp) inside aircraft `work`
+    or WASM cache directories in LocalCache\Packages while strictly preserving user calibration/state files
+    (.ini, .cfg, .json, .xml, .txt, .dat, .fms, .rte, .pln).
+    """
+    compiled_exts = {'.wasm', '.dll', '.obj', '.o', '.pdb', '.bin', '.cache', '.tmp', '.lib', '.exp'}
+    protected_exts = {'.ini', '.cfg', '.json', '.xml', '.txt', '.dat', '.fms', '.rte', '.pln', '.sav'}
+    all_files = []
+    total_bytes = 0
+
+    for lc in _get_all_msfs_localcache_dirs():
+        for sub_rel in (r"Packages\Community", r"Packages\Official", r"Packages\StreamedPackages", r"SimObjects\Airplanes"):
+            parent_dir = os.path.join(lc, sub_rel)
+            if not os.path.isdir(parent_dir):
+                continue
+            try:
+                with os.scandir(parent_dir) as it:
+                    for pkg_entry in it:
+                        if not pkg_entry.is_dir(follow_symlinks=False):
+                            continue
+                        for target_dir in (pkg_entry.path, os.path.join(pkg_entry.path, "work")):
+                            if not os.path.isdir(target_dir):
+                                continue
+                            try:
+                                with os.scandir(target_dir) as wit:
+                                    for fentry in wit:
+                                        if fentry.is_file(follow_symlinks=False):
+                                            ext = os.path.splitext(fentry.name)[1].lower()
+                                            if ext in compiled_exts and ext not in protected_exts:
+                                                try:
+                                                    sz = fentry.stat(follow_symlinks=False).st_size
+                                                    total_bytes += sz
+                                                    all_files.append(fentry.path)
+                                                except Exception:
+                                                    pass
+                            except Exception:
+                                pass
+            except Exception:
+                pass
+    seen = set()
+    unique_files = []
+    for p in all_files:
+        np = os.path.normpath(p).lower()
+        if np not in seen:
+            seen.add(np)
+            unique_files.append(p)
+    return len(unique_files), total_bytes, unique_files
+
+
+def _collect_rolling_cache_files() -> Tuple[int, int, List[str]]:
+    candidates = []
+    for lc in _get_all_msfs_localcache_dirs():
+        rc = os.path.join(lc, "ROLLINGCACHE.CCC")
+        if os.path.isfile(rc):
+            candidates.append(rc)
+        ucfg = os.path.join(lc, "UserCfg.opt")
+        if os.path.isfile(ucfg):
+            try:
+                with open(ucfg, "r", encoding="utf-8", errors="ignore") as f:
+                    for line in f:
+                        if "RollingCachePath" in line and not line.strip().startswith("//"):
+                            parts = line.split('"')
+                            if len(parts) >= 2 and os.path.isdir(parts[1].strip()):
+                                custom_rc = os.path.join(parts[1].strip(), "ROLLINGCACHE.CCC")
+                                if os.path.isfile(custom_rc):
+                                    candidates.append(custom_rc)
+            except Exception:
+                pass
+    seen = set()
+    files = []
+    total_bytes = 0
+    for c in candidates:
+        nc = os.path.normpath(c)
+        if nc.lower() not in seen and os.path.isfile(nc):
+            seen.add(nc.lower())
+            try:
+                total_bytes += os.path.getsize(nc)
+                files.append(nc)
+            except Exception:
+                pass
+    return len(files), total_bytes, files
+
+
+def _collect_streamed_and_modellib_cache() -> Tuple[int, int, List[str]]:
+    target_dirs = []
+    for lc in _get_all_msfs_localcache_dirs():
+        for rel in ("ModelLibCache", r"Packages\StreamedPackages"):
+            d = os.path.join(lc, rel)
+            if os.path.isdir(d):
+                target_dirs.append(d)
+    total_files = 0
+    total_bytes = 0
+    all_files = []
+    for d in target_dirs:
+        c, b, fl = _scan_dir_shallow_or_bounded(d, max_files=4000)
+        total_files += c
+        total_bytes += b
+        all_files.extend(fl)
+    return total_files, total_bytes, all_files
+
+
+def _collect_gpu_shader_caches() -> Tuple[int, int, List[str]]:
+    shader_dirs = [
+        os.path.expandvars(r"%LOCALAPPDATA%\D3DSCache"),
+        os.path.expandvars(r"%LOCALAPPDATA%\NVIDIA\DXCache"),
+        os.path.expandvars(r"%LOCALAPPDATA%\NVIDIA\GLCache"),
+        os.path.expandvars(r"%LOCALAPPDATA%\AMD\DxCache"),
+        os.path.expandvars(r"%LOCALAPPDATA%\AMD\DxcCache")
+    ]
+    total_files = 0
+    total_bytes = 0
+    all_files = []
+    for d in shader_dirs:
+        if os.path.isdir(d):
+            c, b, fl = _scan_dir_shallow_or_bounded(d, max_files=4000)
+            total_files += c
+            total_bytes += b
+            all_files.extend(fl)
+    return total_files, total_bytes, all_files
+
+
+def _collect_obsolete_usercfg_backups() -> Tuple[int, int, List[str]]:
+    files = []
+    total_bytes = 0
+    for lc in _get_all_msfs_localcache_dirs():
+        for fpath in glob.glob(os.path.join(lc, "UserCfg.opt.backup_*")):
+            if os.path.isfile(fpath) and os.path.basename(fpath) != "UserCfg.opt.original":
+                try:
+                    total_bytes += os.path.getsize(fpath)
+                    files.append(fpath)
+                except Exception:
+                    pass
+    return len(files), total_bytes, files
+
+
+def get_sim_maintenance_status() -> Dict[str, Any]:
+    """
+    Returns full diagnostic state for Tab 3 'Sim Maintenance' (Update & Cache Cleaner):
+    - Safe Update Mode status (Community folder quarantine)
+    - 6 targeted MSFS / GPU cache categories with real-time file counts and disk sizes
+    """
+    msfs_running = _is_msfs_running_now()
+    comm_folders = _discover_community_folders()
+    is_quarantined = any(f["is_quarantined"] for f in comm_folders)
+    total_addons = sum(f["addon_count"] for f in comm_folders)
+
+    idx_count, idx_bytes, _ = _collect_scenery_indexes_files()
+    wasm_count, wasm_bytes, _ = _collect_wasm_compiled_files()
+    rc_count, rc_bytes, _ = _collect_rolling_cache_files()
+    strm_count, strm_bytes, _ = _collect_streamed_and_modellib_cache()
+    shd_count, shd_bytes, _ = _collect_gpu_shader_caches()
+    bak_count, bak_bytes, _ = _collect_obsolete_usercfg_backups()
+
+    items = [
+        {
+            "id": "scenery_indexes",
+            "category": "WORLD UPDATE",
+            "title": "SceneryIndexes Cache",
+            "value_label": f"• {idx_count} file{'s' if idx_count != 1 else ''} ({_format_maintenance_bytes(idx_bytes)})" if idx_count > 0 else "• Clean (0 B)",
+            "desc": "Forces MSFS to rebuild its internal scenery index (*.dat) on next boot. Fixes elevation spikes, duplicate buildings, and airport priority glitches after a World Update.",
+            "count": idx_count,
+            "size_bytes": idx_bytes,
+            "size_formatted": _format_maintenance_bytes(idx_bytes),
+            "action_label": "PURGE",
+            "is_clean": idx_count == 0
+        },
+        {
+            "id": "wasm_cache",
+            "category": "AIRCRAFT WASM",
+            "title": "WASM Compiled Aircraft Cache",
+            "value_label": f"• {wasm_count} binar{'ies' if wasm_count != 1 else 'y'} ({_format_maintenance_bytes(wasm_bytes)})" if wasm_count > 0 else "• Clean (0 B)",
+            "desc": "Clears compiled WASM binary caches (.wasm/.dll/.obj) for complex airliners (PMDG, Fenix, iniBuilds) after Sim Updates while preserving your throttle calibrations and user configs.",
+            "count": wasm_count,
+            "size_bytes": wasm_bytes,
+            "size_formatted": _format_maintenance_bytes(wasm_bytes),
+            "action_label": "PURGE",
+            "is_clean": wasm_count == 0
+        },
+        {
+            "id": "rolling_cache",
+            "category": "TERRAIN & DEM",
+            "title": "MSFS Rolling Cache (ROLLINGCACHE.CCC)",
+            "value_label": f"• {_format_maintenance_bytes(rc_bytes)}" if rc_count > 0 else "• Not Present (0 B)",
+            "desc": "Deletes the monolithic ROLLINGCACHE.CCC file so new World Update photogrammetry and DEM elevation tiles stream cleanly without terrain tearing or stutters.",
+            "count": rc_count,
+            "size_bytes": rc_bytes,
+            "size_formatted": _format_maintenance_bytes(rc_bytes),
+            "action_label": "DELETE",
+            "is_clean": rc_count == 0
+        },
+        {
+            "id": "streamed_modellib",
+            "category": "MSFS 2024 CACHE",
+            "title": "Streamed Packages & ModelLib Cache",
+            "value_label": f"• {strm_count} file{'s' if strm_count != 1 else ''} ({_format_maintenance_bytes(strm_bytes)})" if strm_count > 0 else "• Clean (0 B)",
+            "desc": "Purges cached StreamedPackages and ModelLibCache in LocalCache. Resolves pink checkerboard textures and corrupted streamed airports or aircraft after updates.",
+            "count": strm_count,
+            "size_bytes": strm_bytes,
+            "size_formatted": _format_maintenance_bytes(strm_bytes),
+            "action_label": "PURGE",
+            "is_clean": strm_count == 0
+        },
+        {
+            "id": "shader_caches",
+            "category": "DIRECTX & GPU",
+            "title": "DirectX 12 & GPU Shader Cache",
+            "value_label": f"• {shd_count} file{'s' if shd_count != 1 else ''} ({_format_maintenance_bytes(shd_bytes)})" if shd_count > 0 else "• Clean (0 B)",
+            "desc": "Directly purges unlocked DirectX (D3DSCache) and NVIDIA/AMD (DXCache/GLCache) compiled shaders in 1 click. Remedy #1 against post-update and post-driver micro-stutters.",
+            "count": shd_count,
+            "size_bytes": shd_bytes,
+            "size_formatted": _format_maintenance_bytes(shd_bytes),
+            "action_label": "PURGE",
+            "is_clean": shd_count == 0
+        },
+        {
+            "id": "config_backups",
+            "category": "LOCALCACHE",
+            "title": "Obsolete UserCfg.opt Backups",
+            "value_label": f"• {bak_count} backup{'s' if bak_count != 1 else ''} ({_format_maintenance_bytes(bak_bytes)})" if bak_count > 0 else "• Clean (0 B)",
+            "desc": "Removes obsolete timestamped UserCfg.opt.backup_* files from LocalCache while strictly protecting your active UserCfg.opt and pristine UserCfg.opt.original.",
+            "count": bak_count,
+            "size_bytes": bak_bytes,
+            "size_formatted": _format_maintenance_bytes(bak_bytes),
+            "action_label": "CLEAN",
+            "is_clean": bak_count == 0
+        }
+    ]
+
+    total_reclaimable = idx_bytes + wasm_bytes + rc_bytes + strm_bytes + shd_bytes + bak_bytes
+    cleanable_categories = sum(1 for it in items if not it["is_clean"])
+
+    if len(comm_folders) >= 2:
+        f0 = comm_folders[0]
+        rest_parts = " and ".join(f"{f['addon_count']} in {f.get('name', os.path.basename(f['path']))}" for f in comm_folders[1:])
+        f0_name = f0.get("name", os.path.basename(f0["path"]))
+        if is_quarantined:
+            summary_text = f"{f0['addon_count']} folders have been quarantined in {f0_name} and {rest_parts}. Click Restore Community after updating MSFS."
+        else:
+            summary_text = f"{f0['addon_count']} folders detected in {f0_name} and {rest_parts}. Park your Community folders before updating MSFS, then restore them in one click."
+    elif len(comm_folders) == 1:
+        f0 = comm_folders[0]
+        f0_name = f0.get("name", os.path.basename(f0["path"]))
+        if is_quarantined:
+            summary_text = f"{f0['addon_count']} folders have been quarantined in {f0_name}. Click Restore Community after updating MSFS."
+        else:
+            summary_text = f"{f0['addon_count']} folders detected in {f0_name}. Park your Community folder before updating MSFS, then restore it in one click."
+    else:
+        summary_text = "No Community folder detected. Check your paths in Settings."
+
+    return {
+        "status": "success",
+        "msfs_running": msfs_running,
+        "safe_update": {
+            "is_quarantined": is_quarantined,
+            "protected_addons_count": total_addons,
+            "folders": comm_folders,
+            "summary_text": summary_text,
+            "status_badge": "QUARANTINED" if is_quarantined else "READY",
+            "button_label": "RESTORE COMMUNITY" if is_quarantined else "PREPARE FOR UPDATE"
+        },
+        "items": items,
+        "cleanable_categories": cleanable_categories,
+        "total_reclaimable_bytes": total_reclaimable,
+        "total_reclaimable_formatted": _format_maintenance_bytes(total_reclaimable)
+    }
+
+
+def toggle_community_safe_update_mode(target_action: Optional[str] = None, force_when_running: bool = False) -> Dict[str, Any]:
+    """
+    Atomically parks (`quarantine`) or restores (`restore`) all MSFS Community folders via os.rename,
+    and automatically purges SceneryIndexes (*.dat) so MSFS starts with a fresh index.
+    """
+    if not force_when_running and _is_msfs_running_now():
+        return {
+            "status": "error",
+            "message": "MSFS is currently running. Please close the simulator before toggling Safe Update Mode."
+        }
+
+    comm_folders = _discover_community_folders()
+    if not comm_folders:
+        return {
+            "status": "error",
+            "message": "No MSFS Community folder detected. Please verify your paths in Settings."
+        }
+
+    currently_quarantined = any(f["is_quarantined"] for f in comm_folders)
+    action = target_action or ("restore" if currently_quarantined else "quarantine")
+    state_file = _get_safe_update_state_path()
+
+    if action == "quarantine":
+        parked_records = []
+        try:
+            for item in comm_folders:
+                orig = item["path"]
+                bak = item["backup_path"]
+                if os.path.isdir(orig) and not os.path.exists(bak):
+                    os.rename(orig, bak)
+                    os.makedirs(orig, exist_ok=True)
+                    parked_records.append({
+                        "name": item.get("name", os.path.basename(orig)),
+                        "original": orig,
+                        "backup": bak,
+                        "addon_count": item["addon_count"]
+                    })
+                elif os.path.isdir(bak):
+                    os.makedirs(orig, exist_ok=True)
+                    parked_records.append({
+                        "name": item.get("name", os.path.basename(orig)),
+                        "original": orig,
+                        "backup": bak,
+                        "addon_count": item["addon_count"]
+                    })
+
+            with open(state_file, "w", encoding="utf-8") as sf:
+                json.dump({
+                    "active": True,
+                    "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    "folders": parked_records
+                }, sf, indent=2)
+
+            _, _, idx_files = _collect_scenery_indexes_files()
+            for f in idx_files:
+                try:
+                    os.remove(f)
+                except Exception:
+                    pass
+
+            refreshed = get_sim_maintenance_status()
+            return {
+                "status": "success",
+                "mode": "quarantined",
+                "message": refreshed["safe_update"]["summary_text"],
+                "maintenance": refreshed
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Failed to park Community folder (check if a file is open in Explorer): {e}",
+                "maintenance": get_sim_maintenance_status()
+            }
+    else:
+        try:
+            for item in comm_folders:
+                orig = item["path"]
+                bak = item["backup_path"]
+                if os.path.isdir(bak):
+                    if os.path.isdir(orig):
+                        try:
+                            with os.scandir(orig) as it:
+                                for entry in it:
+                                    dest = os.path.join(bak, entry.name)
+                                    if not os.path.exists(dest):
+                                        shutil.move(entry.path, dest)
+                        except Exception:
+                            pass
+                        shutil.rmtree(orig, ignore_errors=True)
+                    os.rename(bak, orig)
+
+            if os.path.isfile(state_file):
+                try:
+                    os.remove(state_file)
+                except Exception:
+                    pass
+
+            _, _, idx_files = _collect_scenery_indexes_files()
+            for f in idx_files:
+                try:
+                    os.remove(f)
+                except Exception:
+                    pass
+
+            refreshed = get_sim_maintenance_status()
+            return {
+                "status": "success",
+                "mode": "restored",
+                "message": "Community folders restored and SceneryIndexes refreshed!",
+                "maintenance": refreshed
+            }
+        except Exception as e:
+            return {
+                "status": "error",
+                "message": f"Failed to restore Community folder: {e}",
+                "maintenance": get_sim_maintenance_status()
+            }
+
+
+def run_sim_maintenance_action(action_id: str) -> Dict[str, Any]:
+    """
+    Executes one of the maintenance cleanup tasks (`scenery_indexes`, `wasm_cache`,
+    `rolling_cache`, `streamed_modellib`, `shader_caches`, `config_backups`, or `purge_all`).
+    """
+    action_id = (action_id or "").strip().lower()
+    sim_dependent = {"scenery_indexes", "wasm_cache", "rolling_cache", "streamed_modellib", "purge_all"}
+    if action_id in sim_dependent and _is_msfs_running_now():
+        return {
+            "status": "error",
+            "message": "MSFS is currently running. Please close the simulator before purging simulator caches."
+        }
+
+    targets_to_run = []
+    if action_id == "purge_all":
+        targets_to_run = ["scenery_indexes", "wasm_cache", "rolling_cache", "streamed_modellib", "shader_caches", "config_backups"]
+    else:
+        targets_to_run = [action_id]
+
+    deleted_count = 0
+    freed_bytes = 0
+    skipped_locked = 0
+
+    for tid in targets_to_run:
+        files = []
+        empty_dirs_to_prune = []
+        if tid == "scenery_indexes":
+            _, _, files = _collect_scenery_indexes_files()
+        elif tid == "wasm_cache":
+            _, _, files = _collect_wasm_compiled_files()
+        elif tid == "rolling_cache":
+            _, _, files = _collect_rolling_cache_files()
+        elif tid == "streamed_modellib":
+            _, _, files = _collect_streamed_and_modellib_cache()
+            for lc in _get_all_msfs_localcache_dirs():
+                for rel in ("ModelLibCache", r"Packages\StreamedPackages"):
+                    d = os.path.join(lc, rel)
+                    if os.path.isdir(d):
+                        empty_dirs_to_prune.append(d)
+        elif tid == "shader_caches":
+            _, _, files = _collect_gpu_shader_caches()
+        elif tid == "config_backups":
+            _, _, files = _collect_obsolete_usercfg_backups()
+
+        for fpath in files:
+            try:
+                sz = os.path.getsize(fpath)
+                os.remove(fpath)
+                deleted_count += 1
+                freed_bytes += sz
+            except Exception:
+                skipped_locked += 1
+
+        for root_d in empty_dirs_to_prune:
+            try:
+                for dirpath, dirnames, filenames in os.walk(root_d, topdown=False):
+                    if os.path.normpath(dirpath) == os.path.normpath(root_d):
+                        continue
+                    try:
+                        if not os.listdir(dirpath):
+                            os.rmdir(dirpath)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+
+    freed_str = _format_maintenance_bytes(freed_bytes)
+    label_map = {
+        "scenery_indexes": "SceneryIndexes cache purged",
+        "wasm_cache": "WASM compiled aircraft caches purged (user configs preserved)",
+        "rolling_cache": "MSFS Rolling Cache (ROLLINGCACHE.CCC) deleted",
+        "streamed_modellib": "StreamedPackages & ModelLibCache purged",
+        "shader_caches": "DirectX & GPU Shader caches purged",
+        "config_backups": "Obsolete UserCfg.opt backups cleaned",
+        "purge_all": "All MSFS & GPU caches cleaned"
+    }
+    base_msg = label_map.get(action_id, "Maintenance action completed")
+    if deleted_count > 0:
+        msg = f"{base_msg}: {deleted_count} file{'s' if deleted_count != 1 else ''} removed ({freed_str} freed)."
+    else:
+        msg = f"{base_msg}: Already clean (0 B to remove)."
+
+    return {
+        "status": "success",
+        "action_id": action_id,
+        "deleted_count": deleted_count,
+        "skipped_locked": skipped_locked,
+        "freed_bytes": freed_bytes,
+        "freed_formatted": freed_str,
+        "message": msg,
+        "maintenance": get_sim_maintenance_status()
     }
 
 

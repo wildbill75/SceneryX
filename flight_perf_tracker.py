@@ -108,7 +108,10 @@ def get_system_ram():
     used_mb = round((stat.ullTotalPhys - stat.ullAvailPhys) / (1024 * 1024))
     return used_mb, total_mb
 
+_last_tasklist_fallback_ts = 0.0
+
 def find_msfs_pid():
+    global _last_tasklist_fallback_ts
     hSnapshot = ctypes.windll.kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0)
     found_pid = None
     found_name = None
@@ -126,11 +129,13 @@ def find_msfs_pid():
                     break
         ctypes.windll.kernel32.CloseHandle(hSnapshot)
     
-    # Fallback Windows tasklist if Toolhelp snapshot was blocked by UWP/elevation
-    if not found_pid:
+    # Fallback Windows tasklist if Toolhelp snapshot was blocked by UWP/elevation (throttled to 30s)
+    now_ts = time.time()
+    if not found_pid and (now_ts - _last_tasklist_fallback_ts >= 30.0):
+        _last_tasklist_fallback_ts = now_ts
         try:
             cmd = ['tasklist', '/FO', 'CSV', '/NH', '/FI', 'IMAGENAME eq FlightSimulator*']
-            out = subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL, creationflags=CREATE_NO_WINDOW)
+            out = subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL, creationflags=CREATE_NO_WINDOW, timeout=0.8)
             for line in out.splitlines():
                 parts = [p.strip(' "') for p in line.split('","')]
                 if len(parts) >= 2 and 'flightsimulator' in parts[0].lower():
@@ -250,7 +255,7 @@ _gpu_telemetry_last_time = 0.0
 def get_nvidia_gpu_telemetry():
     global _gpu_telemetry_cache, _gpu_telemetry_last_time
     now = time.time()
-    if _gpu_telemetry_cache is not None and (now - _gpu_telemetry_last_time < 0.8):
+    if _gpu_telemetry_cache is not None and (now - _gpu_telemetry_last_time < 1.2):
         return _gpu_telemetry_cache
 
     nvsmi_candidates = [
@@ -265,7 +270,7 @@ def get_nvidia_gpu_telemetry():
                 '--query-gpu=memory.used,memory.total,utilization.gpu,temperature.gpu,power.draw,clocks.gr,utilization.memory',
                 '--format=csv,noheader,nounits'
             ]
-            out = subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL, creationflags=CREATE_NO_WINDOW)
+            out = subprocess.check_output(cmd, text=True, stderr=subprocess.DEVNULL, creationflags=CREATE_NO_WINDOW, timeout=0.8)
             line = out.strip().splitlines()[0]
             parts = [v.strip() for v in line.split(',')]
             used = int(float(parts[0]))
@@ -300,7 +305,7 @@ def get_nvidia_gpu_telemetry():
     _gpu_telemetry_last_time = now
     return fallback
 
-_cpu_wmi_cache = None
+_cpu_wmi_tls = threading.local()
 _last_cpu_temp = 45.0
 _last_cpu_check_time = 0.0
 
@@ -308,11 +313,11 @@ def get_cpu_temperature_c(cpu_util_pct=0.0):
     """
     Returns accurate, non-blocking CPU package/core temperature in Celsius.
     Uses root\\cimv2 Win32_PerfFormattedData_Counters_ThermalZoneInformation
-    (non-admin WMI) combined with load-scaled thermal calibration.
+    (non-admin WMI) with thread-local COM apartment safety.
     """
-    global _cpu_wmi_cache, _last_cpu_temp, _last_cpu_check_time
+    global _last_cpu_temp, _last_cpu_check_time
     now = time.time()
-    if now - _last_cpu_check_time < 1.5:
+    if now - _last_cpu_check_time < 2.5:
         return _last_cpu_temp
     _last_cpu_check_time = now
     base_c = None
@@ -323,14 +328,16 @@ def get_cpu_temperature_c(cpu_util_pct=0.0):
         pass
     try:
         import win32com.client
-        if _cpu_wmi_cache is None:
-            _cpu_wmi_cache = win32com.client.GetObject('winmgmts:\\\\.\\root\\cimv2')
-        tzs = _cpu_wmi_cache.ExecQuery('SELECT Temperature FROM Win32_PerfFormattedData_Counters_ThermalZoneInformation')
+        wmi_conn = getattr(_cpu_wmi_tls, "conn", None)
+        if wmi_conn is None:
+            wmi_conn = win32com.client.GetObject('winmgmts:\\\\.\\root\\cimv2')
+            _cpu_wmi_tls.conn = wmi_conn
+        tzs = wmi_conn.ExecQuery('SELECT Temperature FROM Win32_PerfFormattedData_Counters_ThermalZoneInformation')
         temps = [tz.Temperature for tz in tzs if tz.Temperature and tz.Temperature > 250]
         if temps:
             base_c = max(temps) - 273.15
     except Exception:
-        _cpu_wmi_cache = None
+        _cpu_wmi_tls.conn = None
 
     if base_c is None or base_c < 10 or base_c > 90:
         base_c = 28.0
@@ -497,7 +504,7 @@ def get_airport_geo_cache():
     _AIRPORT_GEO_CACHE = cache
     return _AIRPORT_GEO_CACHE
 
-def find_nearest_airport(lat, lon):
+def find_nearest_airport(lat, lon, max_dist_nm=None):
     if lat is None or lon is None:
         return None, "", 999999.0
     cache = get_airport_geo_cache()
@@ -515,6 +522,8 @@ def find_nearest_airport(lat, lon):
             best_name = name
 
     nm_dist = (min_d_sq ** 0.5) * 60.0
+    if max_dist_nm is not None and nm_dist > float(max_dist_nm):
+        return None, "", nm_dist
     return best_icao, best_name, nm_dist
 
 def sanitize_aircraft_slug(aircraft_title):
@@ -542,59 +551,162 @@ def get_airport_city_name(icao, fallback_name=None):
         return fallback_name or ""
 
     KNOWN_ICAO_CITIES = {
+        # North America
         'KEWR': 'Newark', 'KJFK': 'New York', 'KLGA': 'New York', 'KTEB': 'Teterboro',
         'KFRG': 'Farmingdale', 'KHPN': 'White Plains', 'KISP': 'Islip', 'KBOS': 'Boston',
         'KORD': 'Chicago', 'KMDW': 'Chicago', 'KLAX': 'Los Angeles', 'KSFO': 'San Francisco',
         'KOAK': 'Oakland', 'KSJC': 'San Jose', 'KMIA': 'Miami', 'KFLL': 'Fort Lauderdale',
         'KMCO': 'Orlando', 'KATL': 'Atlanta', 'KDFW': 'Dallas', 'KDAL': 'Dallas',
         'KIAH': 'Houston', 'KHOU': 'Houston', 'KDEN': 'Denver', 'KSEA': 'Seattle',
-        'KPHX': 'Phoenix', 'KLAS': 'Las Vegas', 'EGLL': 'London', 'EGKK': 'London',
-        'EGSS': 'London', 'EGGW': 'London', 'EGLC': 'London', 'LFPG': 'Paris',
-        'LFPO': 'Paris', 'LFOB': 'Beauvais', 'EDDF': 'Frankfurt', 'EDDM': 'Munich',
-        'EDDB': 'Berlin', 'EHAM': 'Amsterdam', 'EBBR': 'Brussels', 'LSZH': 'Zurich',
-        'LSGG': 'Geneva', 'LOWW': 'Vienna', 'LIRF': 'Rome', 'LIMC': 'Milan',
-        'LEMD': 'Madrid', 'LEBL': 'Barcelona', 'LPPT': 'Lisbon', 'OMDB': 'Dubai',
-        'OMDW': 'Dubai', 'OTHH': 'Doha', 'RJTT': 'Tokyo', 'RJAA': 'Tokyo',
-        'VHHH': 'Hong Kong', 'WSSS': 'Singapore', 'YSSY': 'Sydney', 'YMML': 'Melbourne',
-        'CYVR': 'Vancouver', 'CYYZ': 'Toronto', 'CYUL': 'Montreal'
+        'KPHX': 'Phoenix', 'KLAS': 'Las Vegas', 'KIAD': 'Washington', 'KDCA': 'Washington',
+        'KBWI': 'Baltimore', 'KDTW': 'Detroit', 'KMSP': 'Minneapolis', 'KSTL': 'St. Louis',
+        'KCLT': 'Charlotte', 'KPHL': 'Philadelphia', 'KTPA': 'Tampa', 'KSAN': 'San Diego',
+        'KPDX': 'Portland', 'KSLC': 'Salt Lake City', 'KAUS': 'Austin', 'KBNA': 'Nashville',
+        'KRDU': 'Raleigh', 'KCVG': 'Cincinnati', 'KPIT': 'Pittsburgh', 'KCLE': 'Cleveland',
+        'KMKE': 'Milwaukee', 'KMSY': 'New Orleans', 'KBDL': 'Hartford', 'KPVD': 'Providence',
+        'KSNA': 'Santa Ana', 'KPBI': 'West Palm Beach', 'KRSW': 'Fort Myers', 'PHNL': 'Honolulu',
+        'PANC': 'Anchorage', 'CYVR': 'Vancouver', 'CYYZ': 'Toronto', 'CYUL': 'Montreal',
+        'CYYC': 'Calgary', 'CYEG': 'Edmonton', 'CYOW': 'Ottawa', 'CYHZ': 'Halifax', 'CYWG': 'Winnipeg',
+        'MMMX': 'Mexico City', 'MMSM': 'Mexico City', 'MMUN': 'Cancun', 'MMTJ': 'Tijuana', 'MMGL': 'Guadalajara',
+        # UK & Ireland
+        'EGLL': 'London', 'EGKK': 'London', 'EGSS': 'London', 'EGGW': 'London', 'EGLC': 'London',
+        'EGCC': 'Manchester', 'EGBB': 'Birmingham', 'EGPH': 'Edinburgh', 'EGPF': 'Glasgow',
+        'EGPK': 'Glasgow', 'EGGD': 'Bristol', 'EGGP': 'Liverpool', 'EGNT': 'Newcastle',
+        'EGNX': 'East Midlands', 'EGNM': 'Leeds', 'EGAA': 'Belfast', 'EGFF': 'Cardiff',
+        'EGPD': 'Aberdeen', 'EIDW': 'Dublin', 'EICK': 'Cork', 'EINN': 'Shannon', 'EIKN': 'Knock',
+        # France
+        'LFPG': 'Paris', 'LFPO': 'Paris', 'LFPB': 'Paris', 'LFOB': 'Beauvais',
+        'LFLL': 'Lyon', 'LFLY': 'Lyon', 'LFML': 'Marseille', 'LFMN': 'Nice',
+        'LFBO': 'Toulouse', 'LFBD': 'Bordeaux', 'LFRS': 'Nantes', 'LFQQ': 'Lille',
+        'LFSB': 'Basel-Mulhouse', 'LFST': 'Strasbourg', 'LFRB': 'Brest', 'LFRN': 'Rennes',
+        'LFMT': 'Montpellier', 'LFKJ': 'Ajaccio', 'LFKB': 'Bastia', 'LFKC': 'Calvi',
+        'LFKF': 'Figari', 'LFTH': 'Toulon', 'LFJL': 'Metz-Nancy', 'LFOP': 'Rouen',
+        'LFOT': 'Tours', 'LFOJ': 'Orleans', 'LFBP': 'Pau', 'LFBT': 'Tarbes-Lourdes',
+        'LFMP': 'Perpignan', 'LFTW': 'Nimes', 'LFBL': 'Limoges', 'LFBI': 'Poitiers',
+        'LFLS': 'Grenoble', 'LFLB': 'Chambery', 'LFLP': 'Annecy', 'LFMD': 'Cannes',
+        'LFBZ': 'Biarritz', 'LFBH': 'La Rochelle', 'LFRK': 'Caen', 'LFRG': 'Deauville',
+        'LFLC': 'Clermont-Ferrand', 'LFMU': 'Beziers', 'LFMK': 'Carcassonne', 'LFOK': 'Vatry',
+        # Germany, Benelux, Switzerland, Austria
+        'EDDF': 'Frankfurt', 'EDFH': 'Frankfurt-Hahn', 'EDDM': 'Munich', 'EDDB': 'Berlin',
+        'EDDT': 'Berlin', 'EDDL': 'Dusseldorf', 'EDDH': 'Hamburg', 'EDDS': 'Stuttgart',
+        'EDDK': 'Cologne', 'EDDV': 'Hannover', 'EDDP': 'Leipzig', 'EDDN': 'Nuremberg',
+        'EDDW': 'Bremen', 'EDLW': 'Dortmund', 'EDDG': 'Munster', 'EDSB': 'Karlsruhe',
+        'EDJA': 'Memmingen', 'EDNY': 'Friedrichshafen', 'EDLP': 'Paderborn', 'EDVK': 'Kassel',
+        'EHAM': 'Amsterdam', 'EHEH': 'Eindhoven', 'EHRD': 'Rotterdam', 'EHBK': 'Maastricht',
+        'EBBR': 'Brussels', 'EBCI': 'Charleroi', 'EBOS': 'Ostend', 'ELLX': 'Luxembourg',
+        'LSZH': 'Zurich', 'LSGG': 'Geneva', 'LSZB': 'Bern', 'LSZA': 'Lugano', 'LSZS': 'St. Moritz',
+        'LOWW': 'Vienna', 'LOWI': 'Innsbruck', 'LOWS': 'Salzburg', 'LOWG': 'Graz', 'LOWL': 'Linz', 'LOWK': 'Klagenfurt',
+        # Southern Europe (Greece, Italy, Spain, Portugal, Malta, Cyprus)
+        'LGAV': 'Athens', 'LGTS': 'Thessaloniki', 'LGIR': 'Heraklion', 'LGSA': 'Chania',
+        'LGRP': 'Rhodes', 'LGKR': 'Corfu', 'LGSR': 'Santorini', 'LGMK': 'Mykonos',
+        'LGKO': 'Kos', 'LGZA': 'Zakynthos', 'LGKF': 'Kefalonia', 'LGSK': 'Skiathos',
+        'LGSM': 'Samos', 'LGMT': 'Mytilene', 'LGPZ': 'Preveza', 'LGKL': 'Kalamata',
+        'LCLK': 'Larnaca', 'LCPH': 'Paphos', 'LCEN': 'Nicosia', 'LMML': 'Malta',
+        'LIRF': 'Rome', 'LIRA': 'Rome', 'LIMC': 'Milan', 'LIML': 'Milan', 'LIME': 'Bergamo',
+        'LIPZ': 'Venice', 'LIPH': 'Treviso', 'LIPE': 'Bologna', 'LIRN': 'Naples',
+        'LICC': 'Catania', 'LICJ': 'Palermo', 'LIRQ': 'Florence', 'LIRP': 'Pisa',
+        'LIMF': 'Turin', 'LIMJ': 'Genoa', 'LIPX': 'Verona', 'LIBD': 'Bari', 'LIBR': 'Brindisi',
+        'LIEE': 'Cagliari', 'LIEO': 'Olbia', 'LIEA': 'Alghero', 'LICA': 'Lamezia Terme',
+        'LIPQ': 'Trieste', 'LIPR': 'Rimini', 'LIRI': 'Salerno', 'LICT': 'Trapani',
+        'LEMD': 'Madrid', 'LEBL': 'Barcelona', 'LEPA': 'Palma de Mallorca', 'LEMG': 'Malaga',
+        'LEAL': 'Alicante', 'LEVC': 'Valencia', 'LEZL': 'Seville', 'LEBB': 'Bilbao',
+        'LEIB': 'Ibiza', 'LEMH': 'Menorca', 'LEGE': 'Girona', 'LERS': 'Reus',
+        'LEST': 'Santiago de Compostela', 'LEAS': 'Asturias', 'LEMI': 'Murcia', 'LEZG': 'Zaragoza',
+        'GCLP': 'Gran Canaria', 'GCTS': 'Tenerife', 'GCXO': 'Tenerife', 'GCRR': 'Lanzarote',
+        'GCFV': 'Fuerteventura', 'GCLA': 'La Palma', 'LPPT': 'Lisbon', 'LPPR': 'Porto',
+        'LPFR': 'Faro', 'LPMA': 'Madeira', 'LPPD': 'Ponta Delgada', 'LXGB': 'Gibraltar',
+        # Nordics, Baltics, Central & Eastern Europe, Balkans
+        'ESSA': 'Stockholm', 'ESSB': 'Stockholm', 'ESKN': 'Stockholm', 'ESOW': 'Stockholm',
+        'ESGG': 'Gothenburg', 'ESMS': 'Malmo', 'EKCH': 'Copenhagen', 'EKBI': 'Billund',
+        'EKYT': 'Aalborg', 'ENGM': 'Oslo', 'ENTO': 'Oslo', 'ENBR': 'Bergen',
+        'ENVA': 'Trondheim', 'ENZV': 'Stavanger', 'ENTC': 'Tromso', 'EFHK': 'Helsinki',
+        'EFRO': 'Rovaniemi', 'EFTP': 'Tampere', 'EFOU': 'Oulu', 'BIKF': 'Reykjavik', 'BIRK': 'Reykjavik',
+        'EETN': 'Tallinn', 'EVRA': 'Riga', 'EYVI': 'Vilnius', 'EYKA': 'Kaunas',
+        'EPWA': 'Warsaw', 'EPMO': 'Warsaw', 'EPKK': 'Krakow', 'EPGD': 'Gdansk',
+        'EPKT': 'Katowice', 'EPWR': 'Wroclaw', 'EPPO': 'Poznan', 'LKPR': 'Prague',
+        'LHBP': 'Budapest', 'LZIB': 'Bratislava', 'LJLJ': 'Ljubljana', 'LDZA': 'Zagreb',
+        'LDSP': 'Split', 'LDDU': 'Dubrovnik', 'LDZD': 'Zadar', 'LDPL': 'Pula',
+        'LYBE': 'Belgrade', 'LYPG': 'Podgorica', 'LYTV': 'Tivat', 'LQSA': 'Sarajevo',
+        'LWSK': 'Skopje', 'LATI': 'Tirana', 'LROP': 'Bucharest', 'LRBS': 'Bucharest',
+        'LRCL': 'Cluj-Napoca', 'LRTR': 'Timisoara', 'LRIA': 'Iasi', 'LBSF': 'Sofia',
+        'LBWN': 'Varna', 'LBBG': 'Burgas', 'LUKK': 'Chisinau', 'ULLI': 'St. Petersburg',
+        'UUEE': 'Moscow', 'UUDD': 'Moscow', 'UUWW': 'Moscow',
+        # Turkey, Middle East & Africa
+        'LTFM': 'Istanbul', 'LTFJ': 'Istanbul', 'LTBA': 'Istanbul', 'LTAI': 'Antalya',
+        'LTAC': 'Ankara', 'LTBJ': 'Izmir', 'LTBS': 'Dalaman', 'LTFE': 'Bodrum',
+        'OMDB': 'Dubai', 'OMDW': 'Dubai', 'OMAA': 'Abu Dhabi', 'OMSJ': 'Sharjah',
+        'OTHH': 'Doha', 'OERK': 'Riyadh', 'OEJN': 'Jeddah', 'OEDF': 'Dammam',
+        'OEMA': 'Medina', 'OOMS': 'Muscat', 'OBBI': 'Bahrain', 'OKKK': 'Kuwait City',
+        'OJAI': 'Amman', 'OLBA': 'Beirut', 'LLBG': 'Tel Aviv', 'LLER': 'Eilat',
+        'HECA': 'Cairo', 'HEGN': 'Hurghada', 'HESH': 'Sharm El Sheikh', 'HEBA': 'Alexandria',
+        'GMMN': 'Casablanca', 'GMMX': 'Marrakech', 'GMAD': 'Agadir', 'GMTT': 'Tangier',
+        'GMME': 'Rabat', 'GMFF': 'Fes', 'DTTA': 'Tunis', 'DTTJ': 'Djerba', 'DTMB': 'Monastir',
+        'DAAG': 'Algiers', 'DAOO': 'Oran', 'GOBD': 'Dakar', 'FACT': 'Cape Town',
+        'FAOR': 'Johannesburg', 'FALE': 'Durban', 'FIMP': 'Mauritius', 'FMEE': 'Saint-Denis', 'FSIA': 'Mahe',
+        # Asia-Pacific & South America
+        'RJTT': 'Tokyo', 'RJAA': 'Tokyo', 'RJBB': 'Osaka', 'RJOO': 'Osaka',
+        'RJGG': 'Nagoya', 'RJFF': 'Fukuoka', 'RJCC': 'Sapporo', 'ROAH': 'Okinawa',
+        'RKSI': 'Seoul', 'RKSS': 'Seoul', 'RKPK': 'Busan', 'RKPC': 'Jeju',
+        'VHHH': 'Hong Kong', 'VMMC': 'Macau', 'RCTP': 'Taipei', 'RCSS': 'Taipei',
+        'ZBAA': 'Beijing', 'ZBAD': 'Beijing', 'ZSPD': 'Shanghai', 'ZSSS': 'Shanghai',
+        'ZGGG': 'Guangzhou', 'ZGSZ': 'Shenzhen', 'ZUUU': 'Chengdu', 'RPLL': 'Manila',
+        'RPVM': 'Cebu', 'WSSS': 'Singapore', 'WMKK': 'Kuala Lumpur', 'VTBS': 'Bangkok',
+        'VTBD': 'Bangkok', 'VTSP': 'Phuket', 'VVNB': 'Hanoi', 'VVTS': 'Ho Chi Minh City',
+        'WIII': 'Jakarta', 'WADD': 'Bali', 'VIDP': 'New Delhi', 'VABB': 'Mumbai',
+        'VOBL': 'Bengaluru', 'VOMM': 'Chennai', 'VOHS': 'Hyderabad', 'VECC': 'Kolkata',
+        'VCBI': 'Colombo', 'VRMM': 'Male', 'VNKT': 'Kathmandu',
+        'YSSY': 'Sydney', 'YMML': 'Melbourne', 'YBBN': 'Brisbane', 'YPPH': 'Perth',
+        'YPAD': 'Adelaide', 'NZAA': 'Auckland', 'NZCH': 'Christchurch', 'NZWN': 'Wellington', 'NZQN': 'Queenstown',
+        'SBGR': 'Sao Paulo', 'SBSP': 'Sao Paulo', 'SBKP': 'Campinas', 'SBGL': 'Rio de Janeiro',
+        'SBRJ': 'Rio de Janeiro', 'SBBR': 'Brasilia', 'SAEZ': 'Buenos Aires', 'SABE': 'Buenos Aires',
+        'SCEL': 'Santiago', 'SKBO': 'Bogota', 'SPJC': 'Lima', 'SPIM': 'Lima',
+        'SEQM': 'Quito', 'MPTO': 'Panama City', 'MROC': 'San Jose', 'TNCM': 'Sint Maarten',
+        'TFFR': 'Pointe-a-Pitre', 'TFFF': 'Fort-de-France', 'SOCA': 'Cayenne'
     }
     if icao.upper() in KNOWN_ICAO_CITIES:
         return KNOWN_ICAO_CITIES[icao.upper()]
 
+    global _airports_city_db_cache
     try:
-        base_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
-        cand_paths = [
-            os.path.join(base_dir, "airports.json"),
-            "airports.json"
-        ]
-        if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
-            cand_paths.insert(0, os.path.join(sys._MEIPASS, "airports.json"))
+        if '_airports_city_db_cache' not in globals() or _airports_city_db_cache is None:
+            _airports_city_db_cache = {}
+            base_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+            cand_paths = [
+                os.path.join(base_dir, "airports.json"),
+                "airports.json"
+            ]
+            if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+                cand_paths.insert(0, os.path.join(sys._MEIPASS, "airports.json"))
 
-        for path in cand_paths:
-            if os.path.exists(path):
-                with open(path, 'r', encoding='utf-8') as f:
-                    data = json.load(f)
-                ap = data.get(icao.upper())
-                if ap and ap.get('city'):
-                    raw_city = ap['city']
-                    clean_city = re.sub(r'\(.*?\)', '', raw_city).split(',')[0].strip()
-                    if clean_city:
-                        return clean_city
-                break
+            for path in cand_paths:
+                if os.path.exists(path):
+                    with open(path, 'r', encoding='utf-8') as f:
+                        _airports_city_db_cache = json.load(f)
+                    break
+
+        ap = _airports_city_db_cache.get(icao.upper()) if isinstance(_airports_city_db_cache, dict) else None
+        if ap and ap.get('city'):
+            raw_city = ap['city']
+            clean_city = re.sub(r'\(.*?\)', '', raw_city).split(',')[0].split('/')[0].strip()
+            clean_city = re.sub(r'\s+Island$', '', clean_city, flags=re.I).strip()
+            if clean_city:
+                return clean_city
     except Exception:
         pass
 
     # Clean fallback if it was an airport name
     if fallback_name:
-        clean_fallback = re.sub(r'(?:International|Regional|Municipal)?\s*Airport', '', fallback_name, flags=re.I).strip()
-        clean_fallback = re.sub(r'\(.*?\)', '', clean_fallback).split(',')[0].strip()
+        clean_fallback = re.sub(r'(?:International|Regional|Municipal|National)?\s*Airport', '', fallback_name, flags=re.I).strip()
+        clean_fallback = re.sub(r'\(.*?\)', '', clean_fallback).split(',')[0].split('/')[0].strip()
         if clean_fallback and clean_fallback.upper() != icao.upper():
             return clean_fallback
     return fallback_name or ""
 
 def format_airport_route_item(icao, fallback_name=None):
-    if not icao or icao in ('DEP', 'ARR', '---'):
+    if not icao or str(icao).upper() in ('DEP', 'ARR', '---'):
         return icao or "---"
+    if str(icao).upper() in ('UNKNOWN', 'UNK'):
+        return "UNKNOWN"
     city = get_airport_city_name(icao, fallback_name)
     if city and city.upper() != icao.upper():
         return f"{icao} ({city})"
@@ -674,12 +786,22 @@ def resolve_aircraft_info(aircraft_raw):
         "display": f"{clean_model} ({developer})" if developer else clean_model
     }
 
+_last_simbrief_attempt_ts = 0.0
+_CACHED_SIMBRIEF_OFP = None
+
 def get_simbrief_flight_plan(force_refresh=False):
     """
-    Tente de récupérer le plan de vol SimBrief actif :
-    1. Si force_refresh ou cache expiré (>15 min), interroge en priorité l'API SimBrief.
-    2. Sinon, retourne le plan en cache (flight_mode.simbrief_flight ou latest_simbrief_flight).
+    Récupère en sourdine le plan de vol SimBrief actif du compte configuré :
+    1. Si force_refresh ou cache expiré (>15 min), interroge silencieusement l'API SimBrief dès qu'un identifiant est renseigné.
+    2. Sinon, retourne le plan en mémoire interne (_CACHED_SIMBRIEF_OFP / latest_simbrief_flight).
     """
+    try:
+        from scanner import IS_LITE
+        if IS_LITE:
+            return None
+    except Exception:
+        pass
+    global _last_simbrief_attempt_ts, _CACHED_SIMBRIEF_OFP
     appdata = os.getenv('APPDATA', '')
     settings_path = os.path.join(appdata, 'SceneryX', 'settings.json')
     if not os.path.exists(settings_path):
@@ -688,39 +810,39 @@ def get_simbrief_flight_plan(force_refresh=False):
         if os.path.exists(alt_path):
             settings_path = alt_path
         else:
-            return None
+            return _CACHED_SIMBRIEF_OFP
 
     try:
         with open(settings_path, 'r', encoding='utf-8') as f:
             st = json.load(f)
     except Exception:
-        return None
+        return _CACHED_SIMBRIEF_OFP
 
     uid = str(st.get('simbrief_userid') or '').strip()
     uname = str(st.get('simbrief_username') or '').strip()
     ident = uid or uname
+    if not ident:
+        _CACHED_SIMBRIEF_OFP = None
+        return None
 
-    latest_sb = st.get('latest_simbrief_flight')
+    latest_sb = st.get('latest_simbrief_flight') or _CACHED_SIMBRIEF_OFP
     now = time.time()
     is_stale = False
     if isinstance(latest_sb, dict):
         fetched_at = latest_sb.get('fetched_at', 0)
-        # Périmé si plus vieux que 15 minutes (900s)
         if (now - fetched_at) > 900:
             is_stale = True
     else:
         is_stale = True
 
-    # 1. Si force_refresh explicitement demandé ou profil SimBrief actif avec cache expiré
-    fm_check = st.get('flight_mode', {})
-    is_sb_mode = isinstance(fm_check, dict) and fm_check.get('active') and fm_check.get('profile') == 'SIMBRIEF'
-    if (force_refresh or (is_sb_mode and is_stale)) and ident:
+    if (force_refresh or (is_stale and (now - _last_simbrief_attempt_ts > 180.0))) and ident:
+        _last_simbrief_attempt_ts = now
         try:
             import urllib.request
             param = f"userid={ident}" if ident.isdigit() else f"username={ident}"
             url = f"https://www.simbrief.com/api/xml.fetcher.php?{param}&json=1"
             req = urllib.request.Request(url, headers={'User-Agent': 'SceneryX/1.0'})
-            with urllib.request.urlopen(req, timeout=3.5) as resp:
+            with urllib.request.urlopen(req, timeout=2.5) as resp:
                 data = json.loads(resp.read().decode('utf-8'))
                 if isinstance(data, dict) and 'origin' in data and 'destination' in data:
                     orig_icao = data.get('origin', {}).get('icao_code', '').upper()
@@ -729,13 +851,13 @@ def get_simbrief_flight_plan(force_refresh=False):
                         sb_obj = {
                             "origin": {
                                 "icao": orig_icao,
-                                "name": data.get('origin', {}).get('name', orig_icao),
+                                "name": get_airport_city_name(orig_icao, data.get('origin', {}).get('name', orig_icao)) or orig_icao,
                                 "lat": float(data.get('origin', {}).get('pos_lat', 0)) if data.get('origin', {}).get('pos_lat') else None,
                                 "lon": float(data.get('origin', {}).get('pos_long', 0)) if data.get('origin', {}).get('pos_long') else None
                             },
                             "destination": {
                                 "icao": dest_icao,
-                                "name": data.get('destination', {}).get('name', dest_icao),
+                                "name": get_airport_city_name(dest_icao, data.get('destination', {}).get('name', dest_icao)) or dest_icao,
                                 "lat": float(data.get('destination', {}).get('pos_lat', 0)) if data.get('destination', {}).get('pos_lat') else None,
                                 "lon": float(data.get('destination', {}).get('pos_long', 0)) if data.get('destination', {}).get('pos_long') else None
                             },
@@ -743,6 +865,7 @@ def get_simbrief_flight_plan(force_refresh=False):
                             "route": data.get('general', {}).get('route', ''),
                             "fetched_at": time.time()
                         }
+                        _CACHED_SIMBRIEF_OFP = sb_obj
                         try:
                             st['latest_simbrief_flight'] = sb_obj
                             with open(settings_path, 'w', encoding='utf-8') as out_f:
@@ -753,20 +876,30 @@ def get_simbrief_flight_plan(force_refresh=False):
         except Exception:
             pass
 
-    # Source 1 fallback : flight_mode.simbrief_flight
+    # Fallback 1 : flight_mode.simbrief_flight
     fm = st.get('flight_mode', {})
     if isinstance(fm, dict):
         sb_fm = fm.get('simbrief_flight')
         if isinstance(sb_fm, dict) and sb_fm.get('origin', {}).get('icao') and sb_fm.get('destination', {}).get('icao'):
+            _CACHED_SIMBRIEF_OFP = sb_fm
             return sb_fm
 
-    # Source 2 fallback : latest_simbrief_flight
+    # Fallback 2 : latest_simbrief_flight
     if isinstance(latest_sb, dict) and latest_sb.get('origin', {}).get('icao') and latest_sb.get('destination', {}).get('icao'):
+        _CACHED_SIMBRIEF_OFP = latest_sb
         return latest_sb
 
     return None
 
-def match_simbrief_plan(sb_flight, ref_lat=None, ref_lon=None, arr_lat=None, arr_lon=None):
+def match_simbrief_plan(sb_flight, ref_lat=None, ref_lon=None, arr_lat=None, arr_lon=None, landed_at_end=False):
+    """
+    Vérifie si l'OFP SimBrief en mémoire correspond à l'origine réelle de l'avion dans MSFS :
+    - Si les coordonnées de départ MSFS (ref_lat, ref_lon) ne correspondent PAS à l'aéroport d'origine
+      de l'OFP SimBrief (> 18 NM et code ICAO différent), on rejette totalement l'OFP (retourne None, None, None, None).
+    - Si l'origine correspond à l'OFP SimBrief :
+      - Tant que l'avion n'a pas atterri sur un aéroport de déroutement différent (ou si la télémétrie s'arrête en vol),
+        on sert l'origine ET la destination de l'OFP SimBrief.
+    """
     if not sb_flight or not isinstance(sb_flight, dict):
         return None, None, None, None
     orig = sb_flight.get('origin', {})
@@ -776,11 +909,12 @@ def match_simbrief_plan(sb_flight, ref_lat=None, ref_lon=None, arr_lat=None, arr
     if not orig_icao or not dest_icao or len(orig_icao) != 4 or len(dest_icao) != 4:
         return None, None, None, None
 
-    orig_name = orig.get('name') or orig_icao
-    dest_name = dest.get('name') or dest_icao
+    orig_name = get_airport_city_name(orig_icao, orig.get('name')) or orig_icao
+    dest_name = get_airport_city_name(dest_icao, dest.get('name')) or dest_icao
 
-    # Vérification géographique départ si ref_lat/lon sont disponibles
+    # Vérification stricte de la cohérence entre l'origine MSFS et l'origine de l'OFP SimBrief
     if ref_lat is not None and ref_lon is not None and (abs(ref_lat) > 0.01 or abs(ref_lon) > 0.01):
+        near_orig_icao, _, near_orig_dist = find_nearest_airport(ref_lat, ref_lon, max_dist_nm=18.0)
         orig_lat = orig.get('lat')
         orig_lon = orig.get('lon')
         if orig_lat is None or orig_lon is None:
@@ -789,138 +923,172 @@ def match_simbrief_plan(sb_flight, ref_lat=None, ref_lon=None, arr_lat=None, arr
                 if icao == orig_icao:
                     orig_lat, orig_lon = alat, alon
                     break
+        dist_nm = 9999.0
         if orig_lat is not None and orig_lon is not None:
             dist_nm = (((ref_lat - float(orig_lat))**2 + (ref_lon - float(orig_lon))**2)**0.5) * 60.0
-            if dist_nm > 120.0:
-                return None, None, None, None
 
-    # Vérification géographique arrivée : si l'avion a atterri ailleurs que la destination SimBrief (ex: vol libre ou nouveau vol non re-généré sur SimBrief)
-    if arr_lat is not None and arr_lon is not None and (abs(arr_lat) > 0.01 or abs(arr_lon) > 0.01):
-        dest_lat = dest.get('lat')
-        dest_lon = dest.get('lon')
-        if dest_lat is None or dest_lon is None:
-            cache = get_airport_geo_cache()
-            for icao, name, alat, alon in cache:
-                if icao == dest_icao:
-                    dest_lat, dest_lon = alat, alon
-                    break
-        if dest_lat is not None and dest_lon is not None:
-            dest_dist_nm = (((arr_lat - float(dest_lat))**2 + (arr_lon - float(dest_lon))**2)**0.5) * 60.0
-            if dest_dist_nm > 80.0:
-                # L'arrivée réelle ne correspond pas à la destination SimBrief : conserver le départ SimBrief mais laisser le GPS déterminer l'arrivée réelle
-                return orig_icao, None, orig_name, None
+        # Si l'avion dans MSFS n'a pas spawné sur l'aéroport d'origine de l'OFP SimBrief (ni à moins de 18 NM), on abandonne l'OFP
+        if near_orig_icao != orig_icao and dist_nm > 18.0:
+            return None, None, None, None
+
+    # Si l'avion a réellement volé et atterri au sol sur un AUTRE aéroport que le départ ET différent de la destination OFP (déroutement réel)
+    if landed_at_end and arr_lat is not None and arr_lon is not None and (abs(arr_lat) > 0.01 or abs(arr_lon) > 0.01):
+        near_arr_icao, near_arr_name, _ = find_nearest_airport(arr_lat, arr_lon, max_dist_nm=12.0)
+        if near_arr_icao and near_arr_icao != orig_icao and near_arr_icao != dest_icao:
+            dest_lat = dest.get('lat')
+            dest_lon = dest.get('lon')
+            if dest_lat is None or dest_lon is None:
+                cache = get_airport_geo_cache()
+                for icao, name, alat, alon in cache:
+                    if icao == dest_icao:
+                        dest_lat, dest_lon = alat, alon
+                        break
+            if dest_lat is not None and dest_lon is not None:
+                dest_dist_nm = (((arr_lat - float(dest_lat))**2 + (arr_lon - float(dest_lon))**2)**0.5) * 60.0
+                if dest_dist_nm > 25.0:
+                    div_city = get_airport_city_name(near_arr_icao, near_arr_name) or near_arr_icao
+                    return orig_icao, near_arr_icao, orig_name, div_city
 
     return orig_icao, dest_icao, orig_name, dest_name
 
 def detect_flight_airports(samples=None, first_valid_gps=None, last_valid_gps=None,
                            first_ground_gps=None, last_ground_gps=None,
-                           initial_dep=None, initial_arr=None):
+                           initial_dep=None, initial_arr=None, locked_simbrief=None):
     """
     Résout les aéroports de départ et d'arrivée selon la règle métier :
-    1. Si un plan SimBrief est disponible et correspond au vol (départ ET arrivée), on le récupère.
-    2. Si le départ correspond à SimBrief mais que l'arrivée est différente, départ = SimBrief et arrivée = GPS réel.
-    3. Sinon (pas de SimBrief ou vol libre ailleurs), détection automatique par GPS sol/arrêt.
+    1. Si un OFP SimBrief est en mémoire interne et que son origine correspond à l'origine réelle de l'avion dans MSFS :
+       on sert cet OFP (départ + destination OFP, même si le vol s'arrête avant la destination).
+    2. Si pas d'OFP SimBrief OU si l'origine de l'avion dans MSFS ne correspond pas à l'OFP :
+       - On ignore l'OFP.
+       - Départ = aéroport où l'avion a spawné au sol.
+       - Destination = aéroport d'arrivée réel UNIQUEMENT si l'avion a volé et est posé au sol à un aéroport à la fin ;
+         sinon (arrêt en vol ou arrêt avant d'avoir quitté le départ) -> Destination = "UNKNOWN".
     """
     samples = samples or []
-    
-    # 1. Priorité SimBrief avec validation de l'arrivée réelle
-    sb = get_simbrief_flight_plan()
-    ref_start = first_ground_gps or first_valid_gps
-    ref_end = last_ground_gps or last_valid_gps
-    dep_icao, dep_name = None, ""
-    arr_icao, arr_name = None, ""
-    det_source = "Auto-GPS"
 
+    # Déterminer si l'avion a réellement décollé et s'il a terminé la session posé au sol
+    was_airborne = False
+    ended_on_ground = False
+    for s in samples:
+        s_gnd = s.get('on_ground', True)
+        s_agl = s.get('agl_ft') if s.get('agl_ft') is not None else s.get('agl')
+        s_gs = s.get('ground_speed_kts') or 0
+        if (not s_gnd and (s_agl is None or s_agl > 80)) or (s_agl is not None and s_agl > 250) or (not s_gnd and s_gs > 55):
+            was_airborne = True
+            break
+
+    if samples:
+        tail_samples = samples[-3:] if len(samples) >= 3 else samples
+        for ts in reversed(tail_samples):
+            t_gnd = ts.get('on_ground')
+            t_agl = ts.get('agl_ft') if ts.get('agl_ft') is not None else ts.get('agl')
+            if t_gnd is True or (t_agl is not None and t_agl < 45):
+                ended_on_ground = True
+                break
+
+    landed_at_end = bool(was_airborne and ended_on_ground)
+    ref_start = first_ground_gps or first_valid_gps
+    ref_end = last_ground_gps if ended_on_ground else last_valid_gps
+
+    # 1. Vérification de l'OFP SimBrief en mémoire interne (silencieux)
+    sb = locked_simbrief or get_simbrief_flight_plan()
     if sb:
         s_dep, s_arr, s_dep_name, s_arr_name = match_simbrief_plan(
             sb,
             ref_start[0] if ref_start else None,
             ref_start[1] if ref_start else None,
             ref_end[0] if ref_end else None,
-            ref_end[1] if ref_end else None
+            ref_end[1] if ref_end else None,
+            landed_at_end=landed_at_end
         )
         if s_dep and s_arr:
             return s_dep, s_arr, s_dep_name, s_arr_name, "SimBrief OFP"
-        elif s_dep:
-            dep_icao, dep_name = s_dep, s_dep_name
-            det_source = "SimBrief + GPS Arr"
 
-    # 2. Détection par GPS (si pas de SimBrief pour le départ)
-    if not dep_icao:
-        dep_pt = first_ground_gps or first_valid_gps
-        if not dep_pt and samples:
-            for s in samples:
-                if s.get('lat') is not None and s.get('lon') is not None and (abs(s['lat']) > 0.01 or abs(s['lon']) > 0.01):
-                    dep_pt = (s['lat'], s['lon'])
-                    break
-
-        if dep_pt:
-            icao, name, dist = find_nearest_airport(dep_pt[0], dep_pt[1])
-            if icao:
-                dep_icao, dep_name = icao, name
-
-        if not dep_icao:
-            if initial_dep and len(initial_dep) == 4 and initial_dep != 'DEP':
-                dep_icao = initial_dep
-                dep_name = initial_dep
-            else:
-                dep_icao = "DEP"
-
-    # Arrivée au moment précis de l'arrêt de la télémétrie
-    arr_icao, arr_name = None, ""
-    arr_pt = last_valid_gps or last_ground_gps
-    if not arr_pt and samples:
-        for s in reversed(samples):
+    # 2. Pas d'OFP SimBrief (ou OFP écarté car l'origine dans MSFS ne correspond pas)
+    dep_icao, dep_name = None, ""
+    dep_pt = first_ground_gps or first_valid_gps
+    if not dep_pt and samples:
+        for s in samples:
             if s.get('lat') is not None and s.get('lon') is not None and (abs(s['lat']) > 0.01 or abs(s['lon']) > 0.01):
-                arr_pt = (s['lat'], s['lon'])
+                dep_pt = (s['lat'], s['lon'])
                 break
 
-    if arr_pt:
-        icao, name, dist = find_nearest_airport(arr_pt[0], arr_pt[1])
+    if dep_pt:
+        icao, name, dist = find_nearest_airport(dep_pt[0], dep_pt[1], max_dist_nm=18.0)
         if icao:
-            arr_icao, arr_name = icao, name
+            dep_icao = icao
+            dep_name = get_airport_city_name(icao, name) or name
+
+    if not dep_icao:
+        if initial_dep and len(str(initial_dep)) == 4 and str(initial_dep).upper() not in ('DEP', 'UNK', 'UNKNOWN'):
+            dep_icao = str(initial_dep).upper()
+            dep_name = get_airport_city_name(dep_icao) or dep_icao
+        else:
+            dep_icao = "UNKNOWN"
+            dep_name = "Unknown"
+
+    # 3. Détection de l'arrivée sans OFP :
+    # Uniquement si l'avion est posé au sol à un aéroport d'arrivée à la fin de la télémétrie
+    arr_icao, arr_name = None, ""
+    if ended_on_ground:
+        arr_pt = last_ground_gps or last_valid_gps
+        if not arr_pt and samples:
+            for s in reversed(samples):
+                if s.get('lat') is not None and s.get('lon') is not None and (abs(s['lat']) > 0.01 or abs(s['lon']) > 0.01):
+                    arr_pt = (s['lat'], s['lon'])
+                    break
+        if arr_pt:
+            icao, name, dist = find_nearest_airport(arr_pt[0], arr_pt[1], max_dist_nm=12.0)
+            if icao and (icao != dep_icao or (was_airborne and len(samples) >= 120)):
+                arr_icao = icao
+                arr_name = get_airport_city_name(icao, name) or name
 
     if not arr_icao:
-        if initial_arr and len(initial_arr) == 4 and initial_arr != 'ARR':
-            arr_icao = initial_arr
-            arr_name = initial_arr
+        # Si l'utilisateur avait explicitement sélectionné une route A-B manuelle dans l'Optimizer et est bien parti de A
+        mode_str, is_corridor, opt_dep, opt_arr, _, prof_slug = get_sceneryx_flight_mode()
+        if is_corridor and prof_slug in ('direct', 'corridor') and opt_dep == dep_icao and opt_arr and len(str(opt_arr)) == 4 and str(opt_arr).upper() not in ('ARR', 'UNK', 'UNKNOWN'):
+            arr_icao = str(opt_arr).upper()
+            arr_name = get_airport_city_name(arr_icao) or arr_icao
         else:
-            arr_icao = "ARR"
+            arr_icao = "UNKNOWN"
+            arr_name = "Unknown"
 
-    return dep_icao, arr_icao, dep_name, arr_name, det_source
+    return dep_icao, arr_icao, dep_name, arr_name, "Auto-GPS"
 
 def resolve_flight_context(lat=None, lon=None, on_ground=False):
     """
     Détermine automatiquement l'appareil, la route, le point de départ
-    ou la position la plus proche selon que le joueur utilise un profil SceneryX
-    ou vole librement (au sol ou spawn en vol).
-    Bannit BASELINE et structure les états en tags FREE FLIGHT / SIMBRIEF OFP
-    et NO SCENERY OPTIMIZATION / SCENERY OPTIMIZATION A-B / SCENERY OPTIMIZATION SIMBRIEF OFP.
+    ou la position la plus proche selon que le joueur utilise un OFP SimBrief (chargé en sourdine),
+    un profil SceneryX ou vole librement.
     """
     mode_str, is_corridor, dep, arr, dis_count, prof_slug = get_sceneryx_flight_mode()
 
-    # 1. Vérification si un plan SimBrief est actif (uniquement si explicitement activé dans SceneryX)
+    # 1. Détection GPS de l'aéroport le plus proche dans MSFS
+    near_icao, near_name, dist_nm = find_nearest_airport(lat, lon) if (lat is not None and lon is not None) else (None, "", 999999.0)
+
+    # 2. Vérification silencieuse de l'OFP SimBrief en mémoire interne
     has_simbrief = False
     sb_dep, sb_arr, sb_dname, sb_aname = None, None, None, None
-
-    if is_corridor and prof_slug == 'simbrief':
-        sb = get_simbrief_flight_plan()
-        if sb:
+    sb = get_simbrief_flight_plan()
+    if sb:
+        # Si on est au sol (ou proche d'un aéroport au départ), on vérifie que l'OFP correspond bien à l'aéroport où se trouve l'avion
+        if on_ground and lat is not None and lon is not None:
             sb_dep, sb_arr, sb_dname, sb_aname = match_simbrief_plan(sb, lat, lon)
-            if sb_dep and sb_arr:
-                dep = sb_dep
-                arr = sb_arr
-                has_simbrief = True
-
-    # 2. Détection GPS de l'aéroport le plus proche dans MSFS
-    near_icao, near_name, dist_nm = find_nearest_airport(lat, lon) if (lat is not None and lon is not None) else (None, "", 999999.0)
+        elif is_corridor and prof_slug == 'simbrief':
+            sb_dep, sb_arr, sb_dname, sb_aname = match_simbrief_plan(sb)
+        elif lat is None or lon is None:
+            sb_dep, sb_arr, sb_dname, sb_aname = match_simbrief_plan(sb)
+        if sb_dep and sb_arr:
+            dep = sb_dep
+            arr = sb_arr
+            has_simbrief = True
 
     # 3. Tag Type de Vol & Libellé Route / Origine
     if has_simbrief and dep and arr:
         flight_type_tag = "SIMBRIEF OFP"
         route_label = "ROUTE :"
-        dep_fmt = format_airport_route_item(dep, sb_dname if 'sb_dname' in locals() else None)
-        arr_fmt = format_airport_route_item(arr, sb_aname if 'sb_aname' in locals() else None)
+        dep_fmt = format_airport_route_item(dep, sb_dname)
+        arr_fmt = format_airport_route_item(arr, sb_aname)
         route_display = f"{dep_fmt} ➔ {arr_fmt}"
     else:
         flight_type_tag = "FREE FLIGHT"
@@ -1729,8 +1897,11 @@ def format_time_delta(seconds):
     return f"{m:02d}m {s:02d}s"
 
 def get_benchmarks_directory():
-    base_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
-    benchmarks_dir = os.path.join(base_dir, 'benchmarks')
+    appdata = os.environ.get('APPDATA')
+    if appdata:
+        benchmarks_dir = os.path.join(appdata, 'SceneryX', 'benchmarks')
+    else:
+        benchmarks_dir = os.path.join(os.path.expanduser('~'), '.sceneryx', 'benchmarks')
     os.makedirs(benchmarks_dir, exist_ok=True)
     return benchmarks_dir
 
@@ -2745,7 +2916,10 @@ def generate_html_report(csv_path, session_info, samples):
 
         <!-- GRAPH 1 : FPS & MainThread -->
         <div class="chart-box">
-            <div class="chart-title">1. Smoothness & Latency</div>
+            <div class="chart-title" style="display:flex; align-items:center; justify-content:space-between;">
+                <span>1. Smoothness & Latency</span>
+                <button type="button" onclick="window.chartInstances['fpsChart'] && window.chartInstances['fpsChart'].resetZoom()" style="background:#0f172a; color:#94a3b8; border:1px solid #334155; border-radius:4px; padding:3px 9px; font-size:10px; font-weight:700; cursor:pointer; text-transform:uppercase;">RESET ZOOM</button>
+            </div>
             <div class="chart-flex-wrapper">
                 <div id="html-legend-0" class="chart-legend-sidebar"></div>
                 <div style="flex:1; height:320px; position:relative;">
@@ -2756,7 +2930,10 @@ def generate_html_report(csv_path, session_info, samples):
 
         <!-- GRAPH 2 : VRAM & RAM MSFS & THERMALS -->
         <div class="chart-box">
-            <div class="chart-title">2. Memory Footprint</div>
+            <div class="chart-title" style="display:flex; align-items:center; justify-content:space-between;">
+                <span>2. Memory Footprint</span>
+                <button type="button" onclick="window.chartInstances['perfChart'] && window.chartInstances['perfChart'].resetZoom()" style="background:#0f172a; color:#94a3b8; border:1px solid #334155; border-radius:4px; padding:3px 9px; font-size:10px; font-weight:700; cursor:pointer; text-transform:uppercase;">RESET ZOOM</button>
+            </div>
             <div class="chart-flex-wrapper">
                 <div id="html-legend-1" class="chart-legend-sidebar"></div>
                 <div style="flex:1; height:320px; position:relative;">
@@ -2767,7 +2944,10 @@ def generate_html_report(csv_path, session_info, samples):
 
         <!-- GRAPH 3 : Altitude & TLOD -->
         <div class="chart-box">
-            <div class="chart-title">3. Flight Profile & Dynamics</div>
+            <div class="chart-title" style="display:flex; align-items:center; justify-content:space-between;">
+                <span>3. Flight Profile & Dynamics</span>
+                <button type="button" onclick="window.chartInstances['lodChart'] && window.chartInstances['lodChart'].resetZoom()" style="background:#0f172a; color:#94a3b8; border:1px solid #334155; border-radius:4px; padding:3px 9px; font-size:10px; font-weight:700; cursor:pointer; text-transform:uppercase;">RESET ZOOM</button>
+            </div>
             <div class="chart-flex-wrapper">
                 <div id="html-legend-2" class="chart-legend-sidebar"></div>
                 <div style="flex:1; height:300px; position:relative;">
@@ -2778,7 +2958,10 @@ def generate_html_report(csv_path, session_info, samples):
 
         <!-- GRAPH 4 : Rolling Cache & Disk Read -->
         <div class="chart-box">
-            <div class="chart-title">4. Streaming & Rolling Cache</div>
+            <div class="chart-title" style="display:flex; align-items:center; justify-content:space-between;">
+                <span>4. Streaming & Rolling Cache</span>
+                <button type="button" onclick="window.chartInstances['ioChart'] && window.chartInstances['ioChart'].resetZoom()" style="background:#0f172a; color:#94a3b8; border:1px solid #334155; border-radius:4px; padding:3px 9px; font-size:10px; font-weight:700; cursor:pointer; text-transform:uppercase;">RESET ZOOM</button>
+            </div>
             <div class="chart-flex-wrapper">
                 <div id="html-legend-3" class="chart-legend-sidebar"></div>
                 <div style="flex:1; height:260px; position:relative;">
@@ -2896,6 +3079,158 @@ def generate_html_report(csv_path, session_info, samples):
             }});
         }}
 
+        function attachSmartHtmlChartZoomAndPan(chart, totalPoints) {{
+            if (!chart || !chart.canvas || totalPoints < 2) return;
+            const canvas = chart.canvas;
+            const maxIdx = Math.max(1, totalPoints - 1);
+            const MIN_SPAN = Math.min(maxIdx, 20);
+
+            chart.options.scales.x.min = 0;
+            chart.options.scales.x.max = maxIdx;
+
+            let lastWheelTime = 0;
+            let wheelStreak = 0;
+            let isDragging = false;
+            let dragStartX = 0;
+            let dragStartMin = 0;
+            let dragStartMax = maxIdx;
+
+            function getBounds() {{
+                const xOpt = chart.options.scales.x || {{}};
+                const cMin = (typeof xOpt.min === 'number' && !isNaN(xOpt.min)) ? Math.max(0, Math.min(maxIdx, Math.round(xOpt.min))) : 0;
+                const cMax = (typeof xOpt.max === 'number' && !isNaN(xOpt.max)) ? Math.max(cMin, Math.min(maxIdx, Math.round(xOpt.max))) : maxIdx;
+                return {{ min: cMin, max: cMax, span: Math.max(1, cMax - cMin) }};
+            }}
+
+            chart.resetZoom = function () {{
+                chart.options.scales.x.min = 0;
+                chart.options.scales.x.max = maxIdx;
+                chart.update('none');
+            }};
+            canvas.ondblclick = function () {{
+                chart.resetZoom();
+            }};
+
+            canvas.addEventListener('wheel', function (e) {{
+                const area = chart.chartArea;
+                if (!area) return;
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+                if (mouseX < area.left || mouseX > area.right || mouseY < area.top || mouseY > area.bottom) return;
+
+                e.preventDefault();
+                e.stopPropagation();
+
+                const zoomIn = e.deltaY < 0;
+                const bounds = getBounds();
+
+                if (zoomIn && bounds.span <= MIN_SPAN) return;
+                if (!zoomIn && bounds.min <= 0 && bounds.max >= maxIdx) return;
+
+                const now = performance.now();
+                const dt = now - lastWheelTime;
+                lastWheelTime = now;
+
+                if (dt < 140) {{
+                    wheelStreak = Math.min(8, wheelStreak + 1);
+                }} else {{
+                    wheelStreak = 0;
+                }}
+
+                let velBoost = 1.0;
+                if (dt < 45) {{
+                    velBoost = 2.4 + wheelStreak * 0.18;
+                }} else if (dt < 95) {{
+                    velBoost = 1.85 + wheelStreak * 0.12;
+                }} else if (dt < 180) {{
+                    velBoost = 1.35;
+                }}
+
+                const durationBoost = totalPoints > 600
+                    ? 1.0 + Math.min(0.75, Math.log10(totalPoints / 600) * 0.42)
+                    : 1.0;
+                const spanRatio = bounds.span / maxIdx;
+                const zoomFraction = Math.min(0.62, 0.16 * durationBoost * velBoost * (0.82 + 0.38 * spanRatio));
+
+                let newSpan;
+                if (zoomIn) {{
+                    newSpan = Math.max(MIN_SPAN, Math.round(bounds.span * (1 - zoomFraction)));
+                    if (newSpan >= bounds.span) newSpan = Math.max(MIN_SPAN, bounds.span - 1);
+                }} else {{
+                    newSpan = Math.min(maxIdx, Math.round(bounds.span / (1 - zoomFraction)));
+                    if (newSpan <= bounds.span) newSpan = Math.min(maxIdx, bounds.span + 1);
+                }}
+
+                const anchorRatio = Math.max(0, Math.min(1, (mouseX - area.left) / Math.max(1, area.right - area.left)));
+                const anchorIdx = bounds.min + anchorRatio * bounds.span;
+
+                let newMin = Math.round(anchorIdx - anchorRatio * newSpan);
+                let newMax = newMin + newSpan;
+                if (newMin < 0) {{
+                    newMin = 0;
+                    newMax = Math.min(maxIdx, newSpan);
+                }}
+                if (newMax > maxIdx) {{
+                    newMax = maxIdx;
+                    newMin = Math.max(0, maxIdx - newSpan);
+                }}
+
+                chart.options.scales.x.min = newMin;
+                chart.options.scales.x.max = newMax;
+                chart.update('none');
+            }}, {{ passive: false }});
+
+            canvas.addEventListener('mousedown', function (e) {{
+                if (e.button !== 0) return;
+                const area = chart.chartArea;
+                if (!area) return;
+                const rect = canvas.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                if (mouseX < area.left || mouseX > area.right) return;
+                const bounds = getBounds();
+                if (bounds.span >= maxIdx) return;
+                isDragging = true;
+                dragStartX = e.clientX;
+                dragStartMin = bounds.min;
+                dragStartMax = bounds.max;
+                canvas.style.cursor = 'grabbing';
+            }});
+
+            window.addEventListener('mousemove', function (e) {{
+                if (!isDragging) return;
+                const area = chart.chartArea;
+                if (!area) return;
+                const areaWidth = Math.max(1, area.right - area.left);
+                const span = dragStartMax - dragStartMin;
+                const dx = e.clientX - dragStartX;
+                const indexDelta = Math.round((-dx / areaWidth) * span);
+
+                let newMin = dragStartMin + indexDelta;
+                let newMax = dragStartMax + indexDelta;
+                if (newMin < 0) {{
+                    newMin = 0;
+                    newMax = span;
+                }}
+                if (newMax > maxIdx) {{
+                    newMax = maxIdx;
+                    newMin = Math.max(0, maxIdx - span);
+                }}
+                if (chart.options.scales.x.min !== newMin || chart.options.scales.x.max !== newMax) {{
+                    chart.options.scales.x.min = newMin;
+                    chart.options.scales.x.max = newMax;
+                    chart.update('none');
+                }}
+            }});
+
+            window.addEventListener('mouseup', function () {{
+                if (isDragging) {{
+                    isDragging = false;
+                    canvas.style.cursor = '';
+                }}
+            }});
+        }}
+
         // 1. FPS & MainThread Chart
         const chartFps = new Chart(document.getElementById('fpsChart').getContext('2d'), {{
             type: 'line',
@@ -2945,6 +3280,7 @@ def generate_html_report(csv_path, session_info, samples):
                 plugins: {{ legend: {{ display: false }} }}
             }}
         }});
+        attachSmartHtmlChartZoomAndPan(chartFps, times.length);
         window.chartInstances['fpsChart'] = chartFps;
         buildHtmlChartLegend(chartFps, 'html-legend-0', 'fpsChart');
 
@@ -3032,6 +3368,7 @@ def generate_html_report(csv_path, session_info, samples):
                 plugins: {{ legend: {{ display: false }} }}
             }}
         }});
+        attachSmartHtmlChartZoomAndPan(chartPerf, times.length);
         window.chartInstances['perfChart'] = chartPerf;
         buildHtmlChartLegend(chartPerf, 'html-legend-1', 'perfChart');
 
@@ -3098,6 +3435,7 @@ def generate_html_report(csv_path, session_info, samples):
                 plugins: {{ legend: {{ display: false }} }}
             }}
         }});
+        attachSmartHtmlChartZoomAndPan(chartLod, times.length);
         window.chartInstances['lodChart'] = chartLod;
         buildHtmlChartLegend(chartLod, 'html-legend-2', 'lodChart');
 
@@ -3129,6 +3467,7 @@ def generate_html_report(csv_path, session_info, samples):
                 plugins: {{ legend: {{ display: false }} }}
             }}
         }});
+        attachSmartHtmlChartZoomAndPan(chartIo, times.length);
         window.chartInstances['ioChart'] = chartIo;
         buildHtmlChartLegend(chartIo, 'html-legend-3', 'ioChart');
     </script>
@@ -3258,8 +3597,15 @@ def load_report_payload(filename_or_path):
                 dep_n = payload.get('dep_name') or s_info.get('dep_name')
                 arr_n = payload.get('arr_name') or s_info.get('arr_name')
                 if dep_c and arr_c and arr_c != 'ARR':
-                    df = format_airport_route_item(dep_c, dep_n)
-                    af = format_airport_route_item(arr_c, arr_n)
+                    clean_dep_n = get_airport_city_name(dep_c, dep_n)
+                    clean_arr_n = get_airport_city_name(arr_c, arr_n)
+                    payload['dep_name'] = clean_dep_n
+                    payload['arr_name'] = clean_arr_n
+                    if isinstance(s_info, dict):
+                        s_info['dep_name'] = clean_dep_n
+                        s_info['arr_name'] = clean_arr_n
+                    df = format_airport_route_item(dep_c, clean_dep_n)
+                    af = format_airport_route_item(arr_c, clean_arr_n)
                     payload['route_display'] = f"{df} - {af}"
                 elif payload.get('route_display'):
                     payload['route_display'] = str(payload['route_display']).replace(' ➔ ', ' - ')
@@ -3852,11 +4198,22 @@ def main():
         print("\nNo data recorded (MSFS was not active).")
 
 
+def get_blackbox_checkpoint_paths():
+    appdata = os.getenv('APPDATA') or os.path.expanduser('~')
+    sdir = os.path.join(appdata, 'SceneryX')
+    os.makedirs(sdir, exist_ok=True)
+    return (
+        os.path.join(sdir, 'active_blackbox_session.json'),
+        os.path.join(sdir, 'active_blackbox_samples.json')
+    )
+
+
 class BlackboxSession:
     def __init__(self):
         self.is_running = False
         self.thread = None
         self._stop_event = threading.Event()
+        self._suspend_for_resume = False
         self.current_flight_name = ""
         self.current_csv_path = None
         self.last_report_path = None
@@ -3885,22 +4242,164 @@ class BlackboxSession:
             "autofps_active": False
         }
 
+    def _save_checkpoint(self, meta_dict, samples_list):
+        state_path, samples_path = get_blackbox_checkpoint_paths()
+        try:
+            tmp_state = state_path + ".tmp"
+            with open(tmp_state, "w", encoding="utf-8") as f:
+                json.dump(meta_dict, f, ensure_ascii=False, indent=2)
+            os.replace(tmp_state, state_path)
+            tmp_samples = samples_path + ".tmp"
+            with open(tmp_samples, "w", encoding="utf-8") as f:
+                json.dump(samples_list, f, ensure_ascii=False)
+            os.replace(tmp_samples, samples_path)
+        except Exception as e:
+            print(f"[Telemetry] Checkpoint write notice: {e}")
+
+    def _clear_checkpoint(self):
+        state_path, samples_path = get_blackbox_checkpoint_paths()
+        for p in (state_path, samples_path, state_path + ".tmp", samples_path + ".tmp"):
+            try:
+                if os.path.exists(p):
+                    os.remove(p)
+            except Exception:
+                pass
+
+    def get_resumable_session(self):
+        if self.is_running:
+            return {"has_resumable": False, "is_running": True}
+        state_path, samples_path = get_blackbox_checkpoint_paths()
+        if not os.path.isfile(state_path):
+            return {"has_resumable": False}
+        try:
+            with open(state_path, "r", encoding="utf-8") as f:
+                st = json.load(f)
+            csv_p = st.get("csv_path")
+            if not csv_p or not os.path.isfile(csv_p):
+                self._clear_checkpoint()
+                return {"has_resumable": False}
+            elapsed_sec = float(st.get("elapsed_active_sec", 0.0))
+            return {
+                "has_resumable": True,
+                "flight_name": st.get("flight_name", "Flight"),
+                "csv_path": csv_p,
+                "timestamp_str": st.get("timestamp_str", ""),
+                "route_display": st.get("route_display") or f"{st.get('initial_dep') or 'DEP'} ➔ {st.get('initial_arr') or 'ARR'}",
+                "aircraft": st.get("best_detected_aircraft") or "MSFS Aircraft",
+                "elapsed_sec": round(elapsed_sec, 1),
+                "elapsed_str": format_time_delta(round(elapsed_sec)),
+                "samples_count": int(st.get("samples_count", 0))
+            }
+        except Exception:
+            return {"has_resumable": False}
+
+    def resume_session(self):
+        if self.is_running:
+            return {"status": "already_running", "flight_name": self.current_flight_name}
+        state_path, samples_path = get_blackbox_checkpoint_paths()
+        if not os.path.isfile(state_path):
+            return {"status": "error", "message": "No interrupted monitoring session found."}
+        try:
+            with open(state_path, "r", encoding="utf-8") as f:
+                resume_state = json.load(f)
+            samples_list = []
+            if os.path.isfile(samples_path):
+                try:
+                    with open(samples_path, "r", encoding="utf-8") as sf:
+                        samples_list = json.load(sf) or []
+                except Exception:
+                    samples_list = []
+            resume_state["samples"] = samples_list
+            self._stop_event.clear()
+            self._suspend_for_resume = False
+            self.is_running = True
+            self.current_flight_name = resume_state.get("flight_name") or "Resumed_Flight"
+            self.current_csv_path = resume_state.get("csv_path")
+            self.thread = threading.Thread(
+                target=self._worker,
+                args=(
+                    self.current_flight_name,
+                    resume_state.get("initial_dep"),
+                    resume_state.get("initial_arr"),
+                    resume_state.get("best_detected_aircraft"),
+                    resume_state
+                ),
+                daemon=True
+            )
+            self.thread.start()
+            return {
+                "status": "resumed",
+                "flight_name": self.current_flight_name,
+                "elapsed_str": format_time_delta(round(float(resume_state.get("elapsed_active_sec", 0.0))))
+            }
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
+
+    def end_resumable_session(self, generate_report=True):
+        """Ends a paused/crashed session from startup modal without resuming live polling."""
+        state_path, samples_path = get_blackbox_checkpoint_paths()
+        if not os.path.isfile(state_path):
+            return {"status": "clean"}
+        report_file = None
+        try:
+            with open(state_path, "r", encoding="utf-8") as f:
+                st = json.load(f)
+            csv_p = st.get("csv_path")
+            samples_list = []
+            if os.path.isfile(samples_path):
+                try:
+                    with open(samples_path, "r", encoding="utf-8") as sf:
+                        samples_list = json.load(sf) or []
+                except Exception:
+                    samples_list = []
+            if generate_report and csv_p and os.path.isfile(csv_p) and len(samples_list) >= 6:
+                # Quickly resume and immediately stop so _worker runs the full report generator cleanly
+                self.resume_session()
+                res = self.stop()
+                report_file = (res or {}).get("report_path")
+            else:
+                if csv_p and os.path.isfile(csv_p) and len(samples_list) < 6:
+                    try:
+                        os.remove(csv_p)
+                    except Exception:
+                        pass
+                self._clear_checkpoint()
+        except Exception:
+            self._clear_checkpoint()
+        return {"status": "ended", "report_path": report_file}
+
+    def suspend_for_resume(self):
+        """Suspends active monitoring cleanly on app exit so it can be resumed on next launch."""
+        if not self.is_running:
+            return {"status": "not_running"}
+        self._suspend_for_resume = True
+        self._stop_event.set()
+        if self.thread and self.thread.is_alive():
+            self.thread.join(timeout=3.0)
+        self.is_running = False
+        return {"status": "suspended", "csv_path": self.current_csv_path}
+
     def start(self, flight_name="flight", dep=None, arr=None, aircraft=None):
         if self.is_running:
             return {"status": "already_running", "flight_name": self.current_flight_name}
+        self._clear_checkpoint()
         self._stop_event.clear()
+        self._suspend_for_resume = False
         self.is_running = True
         self.current_flight_name = flight_name or f"{dep or 'DEP'}_{arr or 'ARR'}_{aircraft or 'Flight'}"
-        self.thread = threading.Thread(target=self._worker, args=(flight_name, dep, arr, aircraft), daemon=True)
+        self.thread = threading.Thread(target=self._worker, args=(flight_name, dep, arr, aircraft, None), daemon=True)
         self.thread.start()
         return {"status": "started", "flight_name": self.current_flight_name}
 
     def stop(self):
         if not self.is_running:
+            self._clear_checkpoint()
             return {"status": "not_running", "report_path": self.last_report_path}
+        self._suspend_for_resume = False
         self._stop_event.set()
         if self.thread and self.thread.is_alive():
             self.thread.join(timeout=10.0)
+        self._clear_checkpoint()
         self.is_running = False
         self.latest_telemetry["is_tracking"] = False
         self.latest_telemetry["is_paused"] = False
@@ -3942,7 +4441,18 @@ class BlackboxSession:
         lat = sc_data.get("lat")
         lon = sc_data.get("lon")
         on_ground = sc_data.get("on_ground", False)
-        ctx = resolve_flight_context(lat, lon, on_ground)
+        try:
+            ctx = resolve_flight_context(lat, lon, on_ground)
+        except Exception:
+            ctx = {
+                "route_display": "Waiting for flight",
+                "route_label": "ORIGIN :",
+                "mode_display": "FREE FLIGHT - NO SCENERY OPTIMIZATION",
+                "flight_type_tag": "FREE FLIGHT",
+                "scenery_opt_tag": "NO SCENERY OPTIMIZATION",
+                "origin_icao": None,
+                "has_simbrief": False
+            }
 
         if not sc_connected:
             telemetry["aircraft"] = "Not detected"
@@ -4008,79 +4518,238 @@ class BlackboxSession:
 
         telemetry["agl_ft"] = sc_data.get("agl_ft")
         telemetry["on_ground"] = sc_data.get("on_ground", False if (sc_data.get("agl_ft") is not None and sc_data.get("agl_ft") > 80) else True)
+
+        # Performance pacing evaluation synchronized with in-game panel
+        base_f = telemetry.get("base_fps")
+        mt = telemetry.get("main_thread_ms")
+        if (base_f is not None and base_f >= 35) or (mt is not None and mt < 25.0):
+            telemetry["frame_pacing"] = "OPTIMAL"
+        elif (base_f is not None and base_f >= 24) or (mt is not None and mt <= 35.0):
+            telemetry["frame_pacing"] = "ACCEPTABLE"
+        elif base_f is not None or mt is not None:
+            telemetry["frame_pacing"] = "HEAVY"
+        else:
+            telemetry["frame_pacing"] = "OPTIMAL"
+
         global _last_telemetry_cache
         _last_telemetry_cache = telemetry
         return telemetry
 
+    def get_panel_telemetry(self):
+        """
+        Ultra-fast telemetry getter for the In-Game Panel and Smart LOD loop.
+        Skips resolve_flight_context() (no SimBrief HTTP calls or airport DB queries)
+        to guarantee sub-millisecond responsiveness.
+        """
+        msfs = get_msfs_process()
+        gpu = get_nvidia_gpu_telemetry()
+        autofps = get_latest_autofps_data()
+        sc_data = SIMCONNECT_CLIENT.get_data() if SIMCONNECT_CLIENT else {}
+        sc_connected = sc_data.get("connected", False)
 
-    def _worker(self, flight_name, dep, arr, aircraft):
+        telemetry = dict(self.latest_telemetry)
+        telemetry["is_tracking"] = self.is_running
+        telemetry["is_paused"] = sc_data.get("is_paused", False)
+        if not self.is_running:
+            telemetry["elapsed_sec"] = 0
+            telemetry["elapsed_str"] = "00:00"
+        telemetry["msfs_active"] = msfs is not None
+        telemetry["simconnect_connected"] = sc_connected
+        telemetry["autofps_active"] = is_autofps_active()
+
+        if gpu:
+            telemetry["vram_used_mb"] = gpu.get("vram_used_mb", 0)
+            telemetry["vram_total_mb"] = gpu.get("vram_total_mb", 16376)
+            telemetry["vram_pct"] = gpu.get("vram_pct", 0)
+            telemetry["gpu_power_w"] = gpu.get("gpu_power_w", 0)
+            telemetry["gpu_util_pct"] = gpu.get("gpu_util_pct", 0)
+            telemetry["gpu_temp_c"] = gpu.get("gpu_temp_c", 0)
+
+        if sc_connected and sc_data.get("base_fps") is not None:
+            telemetry["displayed_fps"] = sc_data.get("displayed_fps")
+            telemetry["base_fps"] = sc_data.get("base_fps")
+            telemetry["main_thread_ms"] = sc_data.get("frame_time_ms")
+            if autofps:
+                telemetry["tlod"] = autofps.get("tlod")
+                telemetry["olod"] = autofps.get("olod")
+        elif autofps:
+            telemetry["displayed_fps"] = autofps.get("displayed_fps") or autofps.get("disp_fps")
+            telemetry["base_fps"] = autofps.get("base_fps")
+            telemetry["main_thread_ms"] = autofps.get("main_thread_ms")
+            telemetry["tlod"] = autofps.get("tlod")
+            telemetry["olod"] = autofps.get("olod")
+
+        system_cpu_pct = 0.0
+        if psutil:
+            try:
+                system_cpu_pct = psutil.cpu_percent(interval=None)
+            except Exception:
+                pass
+
+        telemetry["cpu_pct"] = round(system_cpu_pct, 1)
+        telemetry["cpu_util_pct"] = round(system_cpu_pct, 1)
+        telemetry["cpu_temp_c"] = get_cpu_temperature_c(system_cpu_pct)
+        if "gpu_temp_c" not in telemetry:
+            telemetry["gpu_temp_c"] = 0
+
+        if msfs:
+            telemetry["msfs_ram_mb"] = msfs.get("ram_mb", 0)
+            telemetry["msfs_vram_mb"] = msfs.get("vram_mb", 0.0)
+            telemetry["msfs_cpu_pct"] = msfs.get("cpu_pct", 0) or round(system_cpu_pct, 1)
+        else:
+            telemetry["msfs_cpu_pct"] = round(system_cpu_pct, 1)
+
+        telemetry["agl_ft"] = sc_data.get("agl_ft")
+        telemetry["on_ground"] = sc_data.get("on_ground", False if (sc_data.get("agl_ft") is not None and sc_data.get("agl_ft") > 80) else True)
+
+        base_f = telemetry.get("base_fps")
+        mt = telemetry.get("main_thread_ms")
+        if (base_f is not None and base_f >= 35) or (mt is not None and mt < 25.0):
+            telemetry["frame_pacing"] = "OPTIMAL"
+        elif (base_f is not None and base_f >= 24) or (mt is not None and mt <= 35.0):
+            telemetry["frame_pacing"] = "ACCEPTABLE"
+        elif base_f is not None or mt is not None:
+            telemetry["frame_pacing"] = "HEAVY"
+        else:
+            telemetry["frame_pacing"] = "OPTIMAL"
+
+        return telemetry
+
+
+    def _worker(self, flight_name, dep, arr, aircraft, resume_state=None):
         benchmarks_dir = get_benchmarks_directory()
-        timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        timestamp_str = (resume_state or {}).get("timestamp_str") or datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         mode_str, is_corridor, cur_dep, cur_arr, dis_count, prof_slug = get_sceneryx_flight_mode()
 
         autofps_cfg = get_autofps_config()
         autofps_is_active = is_autofps_active()
 
-        # Priorité SimBrief initiale : rafraîchissement automatique si un OFP est actif
-        sb_init = get_simbrief_flight_plan(force_refresh=True)
-        if sb_init and not is_corridor:
-            s_orig = sb_init.get('origin', {}).get('icao')
-            s_dest = sb_init.get('destination', {}).get('icao')
-            initial_dep = s_orig if s_orig else (dep or cur_dep)
-            initial_arr = s_dest if s_dest else (arr or cur_arr)
+        locked_simbrief_ofp = None
+        origin_validated = False
+        pre_resume_gps = None
+        resume_bridged = False
+
+        if resume_state:
+            initial_dep = resume_state.get("initial_dep") or dep or cur_dep
+            initial_arr = resume_state.get("initial_arr") or arr or cur_arr
+            locked_simbrief_ofp = resume_state.get("locked_simbrief_ofp")
+            origin_validated = bool(resume_state.get("origin_validated", False))
+            if resume_state.get("last_valid_gps"):
+                pre_resume_gps = tuple(resume_state["last_valid_gps"])
+            csv_path = resume_state.get("csv_path")
+            if not csv_path:
+                initial_aircraft_slug = sanitize_aircraft_slug(aircraft)
+                prefix = f"{initial_dep or 'DEP'}_{initial_arr or 'UNKNOWN'}_{initial_aircraft_slug}"
+                csv_filename = f"Report_{prefix}_{timestamp_str}.csv"
+                csv_path = os.path.join(benchmarks_dir, csv_filename)
         else:
-            initial_dep = dep or cur_dep
-            initial_arr = arr or cur_arr
-            if not initial_dep or initial_dep == 'DEP' or not initial_arr or initial_arr == 'ARR':
-                if sb_init:
+            # Rafraîchissement silencieux de l'OFP SimBrief en mémoire et vérification de cohérence avec l'origine MSFS
+            sb_init = get_simbrief_flight_plan(force_refresh=True)
+            sc_init = SIMCONNECT_CLIENT.get_data() if SIMCONNECT_CLIENT else {}
+            init_lat = sc_init.get("lat")
+            init_lon = sc_init.get("lon")
+            has_init_gps = (init_lat is not None and init_lon is not None and (abs(init_lat) > 0.01 or abs(init_lon) > 0.01))
+
+            if sb_init:
+                if has_init_gps:
+                    m_dep, m_arr, _, _ = match_simbrief_plan(sb_init, init_lat, init_lon)
+                    if m_dep and m_arr:
+                        locked_simbrief_ofp = sb_init
+                        origin_validated = True
+                        initial_dep = m_dep
+                        initial_arr = m_arr
+                    else:
+                        # L'OFP SimBrief ne correspond pas à l'aéroport où se trouve l'avion dans MSFS : on ignore l'OFP
+                        locked_simbrief_ofp = None
+                        origin_validated = True
+                        near_ic, _, _ = find_nearest_airport(init_lat, init_lon, max_dist_nm=18.0)
+                        initial_dep = near_ic or dep or cur_dep or "UNKNOWN"
+                        initial_arr = arr if (is_corridor and arr and arr != 'ARR') else "UNKNOWN"
+                else:
                     s_orig = sb_init.get('origin', {}).get('icao')
                     s_dest = sb_init.get('destination', {}).get('icao')
-                    if s_orig and (not initial_dep or initial_dep == 'DEP'):
-                        initial_dep = s_orig
-                    if s_dest and (not initial_arr or initial_arr == 'ARR'):
-                        initial_arr = s_dest
+                    initial_dep = s_orig or dep or cur_dep or "DEP"
+                    initial_arr = s_dest or arr or cur_arr or "UNKNOWN"
+            else:
+                if has_init_gps:
+                    near_ic, _, _ = find_nearest_airport(init_lat, init_lon, max_dist_nm=18.0)
+                    initial_dep = near_ic or dep or cur_dep or "UNKNOWN"
+                else:
+                    initial_dep = dep or cur_dep or "DEP"
+                initial_arr = arr if (is_corridor and arr and arr != 'ARR') else "UNKNOWN"
 
-        initial_aircraft_slug = sanitize_aircraft_slug(aircraft)
-        prefix = f"{initial_dep or 'DEP'}_{initial_arr or 'ARR'}_{initial_aircraft_slug}"
-        csv_filename = f"Report_{prefix}_{timestamp_str}.csv"
-        csv_path = os.path.join(benchmarks_dir, csv_filename)
+            initial_aircraft_slug = sanitize_aircraft_slug(aircraft)
+            prefix = f"{initial_dep or 'DEP'}_{initial_arr or 'UNKNOWN'}_{initial_aircraft_slug}"
+            csv_filename = f"Report_{prefix}_{timestamp_str}.csv"
+            csv_path = os.path.join(benchmarks_dir, csv_filename)
+
         self.current_csv_path = csv_path
 
-        with open(csv_path, 'w', newline='', encoding='utf-8') as f:
-            writer = csv.writer(f)
-            writer.writerow([
-                'timestamp', 'elapsed_sec', 'time_str', 'mode',
-                'displayed_fps', 'base_fps', 'main_thread_ms',
-                'tlod', 'olod', 'agl_ft', 'fpm', 'fg_mode',
-                'cache_read_mbps', 'cache_read_mbs',
-                'vram_used_mb', 'vram_total_mb', 'vram_pct',
-                'gpu_util_pct', 'gpu_temp_c', 'gpu_power_w', 'gpu_clock_mhz', 'gpu_mem_bus_pct',
-                'msfs_ram_mb', 'msfs_commit_mb', 'msfs_cpu_pct',
-                'sys_ram_used_mb', 'sys_ram_total_mb',
-                'msfs_vram_mb', 'sim_rate', 'is_vr', 'is_paused',
-                'cpu_temp_c'
-            ])
+        if not (resume_state and os.path.isfile(csv_path)):
+            with open(csv_path, 'w', newline='', encoding='utf-8') as f:
+                writer = csv.writer(f)
+                writer.writerow([
+                    'timestamp', 'elapsed_sec', 'time_str', 'mode',
+                    'displayed_fps', 'base_fps', 'main_thread_ms',
+                    'tlod', 'olod', 'agl_ft', 'fpm', 'fg_mode',
+                    'cache_read_mbps', 'cache_read_mbs',
+                    'vram_used_mb', 'vram_total_mb', 'vram_pct',
+                    'gpu_util_pct', 'gpu_temp_c', 'gpu_power_w', 'gpu_clock_mhz', 'gpu_mem_bus_pct',
+                    'msfs_ram_mb', 'msfs_commit_mb', 'msfs_cpu_pct',
+                    'sys_ram_used_mb', 'sys_ram_total_mb',
+                    'msfs_vram_mb', 'sim_rate', 'is_vr', 'is_paused',
+                    'cpu_temp_c'
+                ])
 
-        samples = []
+        samples = list(resume_state.get("samples") or []) if resume_state else []
         start_time = time.time()
         last_worker_time = start_time
-        elapsed_active_sec = 0.0
-        total_paused_sec = 0.0
+        elapsed_active_sec = float(resume_state.get("elapsed_active_sec", 0.0)) if resume_state else 0.0
+        total_paused_sec = float(resume_state.get("total_paused_sec", 0.0)) if resume_state else 0.0
         was_paused = False
         pause_start_tick = None
-        pause_events = []
+        pause_events = list(resume_state.get("pause_events") or []) if resume_state else []
         last_read_bytes = None
         last_tick_time = None
-        had_msfs = False
-        had_flight = False
+        had_msfs = bool(resume_state.get("had_msfs", False)) if resume_state else False
+        had_flight = bool(resume_state.get("had_flight", False)) if resume_state else False
         no_flight_ticks = 0
 
         # Suivi GPS continu et détection appareil
-        first_valid_gps = None
-        first_ground_gps = None
-        last_valid_gps = None
-        last_ground_gps = None
-        best_detected_aircraft = None
+        first_valid_gps = tuple(resume_state["first_valid_gps"]) if (resume_state and resume_state.get("first_valid_gps")) else None
+        first_ground_gps = tuple(resume_state["first_ground_gps"]) if (resume_state and resume_state.get("first_ground_gps")) else None
+        last_valid_gps = tuple(resume_state["last_valid_gps"]) if (resume_state and resume_state.get("last_valid_gps")) else None
+        last_ground_gps = tuple(resume_state["last_ground_gps"]) if (resume_state and resume_state.get("last_ground_gps")) else None
+        best_detected_aircraft = resume_state.get("best_detected_aircraft") if resume_state else None
+        ctx = {}
+        route_str = (resume_state or {}).get("route_display") or f"{initial_dep or 'DEP'} ➔ {initial_arr or 'UNKNOWN'}"
+
+        def _build_checkpoint_meta():
+            return {
+                "flight_name": self.current_flight_name,
+                "csv_path": csv_path,
+                "timestamp_str": timestamp_str,
+                "initial_dep": initial_dep,
+                "initial_arr": initial_arr,
+                "locked_simbrief_ofp": locked_simbrief_ofp,
+                "origin_validated": origin_validated,
+                "route_display": route_str,
+                "elapsed_active_sec": round(elapsed_active_sec, 1),
+                "total_paused_sec": round(total_paused_sec, 1),
+                "pause_events": pause_events,
+                "had_msfs": had_msfs,
+                "had_flight": had_flight,
+                "first_valid_gps": list(first_valid_gps) if first_valid_gps else None,
+                "first_ground_gps": list(first_ground_gps) if first_ground_gps else None,
+                "last_valid_gps": list(last_valid_gps) if last_valid_gps else None,
+                "last_ground_gps": list(last_ground_gps) if last_ground_gps else None,
+                "best_detected_aircraft": best_detected_aircraft or aircraft,
+                "samples_count": len(samples),
+                "updated_at": time.time()
+            }
+
+        # Initial checkpoint creation so session is immediately tracked as active
+        self._save_checkpoint(_build_checkpoint_meta(), samples)
 
         while not self._stop_event.is_set():
             now_tick = time.time()
@@ -4195,6 +4864,11 @@ class BlackboxSession:
 
             # Enregistrement des coordonnées GPS valides (uniquement hors pause et > 0.001)
             if not is_paused and lat is not None and lon is not None and (abs(lat) > 0.001 or abs(lon) > 0.001):
+                if pre_resume_gps is not None and not resume_bridged:
+                    resume_bridged = True
+                    gap_nm = (((lat - float(pre_resume_gps[0]))**2 + (lon - float(pre_resume_gps[1]))**2)**0.5) * 60.0
+                    print(f"[Telemetry] Session resumed from previous GPS {pre_resume_gps} -> current GPS ({lat:.4f}, {lon:.4f}) (delta: {gap_nm:.1f} NM)")
+
                 if first_valid_gps is None:
                     first_valid_gps = (lat, lon)
                 last_valid_gps = (lat, lon)
@@ -4203,6 +4877,27 @@ class BlackboxSession:
                     if first_ground_gps is None:
                         first_ground_gps = (lat, lon)
                     last_ground_gps = (lat, lon)
+
+                if not origin_validated:
+                    ref_orig_pt = first_ground_gps or first_valid_gps
+                    if ref_orig_pt:
+                        origin_validated = True
+                        sb_cand = locked_simbrief_ofp or get_simbrief_flight_plan()
+                        if sb_cand:
+                            m_dep, m_arr, _, _ = match_simbrief_plan(sb_cand, ref_orig_pt[0], ref_orig_pt[1])
+                            if m_dep and m_arr:
+                                locked_simbrief_ofp = sb_cand
+                                initial_dep = m_dep
+                                initial_arr = m_arr
+                            else:
+                                locked_simbrief_ofp = None
+                                near_ic, _, _ = find_nearest_airport(ref_orig_pt[0], ref_orig_pt[1], max_dist_nm=18.0)
+                                initial_dep = near_ic or "UNKNOWN"
+                                initial_arr = arr if (is_corridor and arr and arr != 'ARR') else "UNKNOWN"
+                        else:
+                            near_ic, _, _ = find_nearest_airport(ref_orig_pt[0], ref_orig_pt[1], max_dist_nm=18.0)
+                            initial_dep = near_ic or "UNKNOWN"
+                            initial_arr = arr if (is_corridor and arr and arr != 'ARR') else "UNKNOWN"
 
             ctx = resolve_flight_context(lat, lon, on_ground)
             final_detected_aircraft = best_detected_aircraft or detected_aircraft or aircraft or "Not detected"
@@ -4363,7 +5058,18 @@ class BlackboxSession:
                 'is_paused': False
             })
 
+            if len(samples) % 4 == 1:
+                self._save_checkpoint(_build_checkpoint_meta(), samples)
+
             self._stop_event.wait(0.5)
+
+        if self._suspend_for_resume:
+            self._save_checkpoint(_build_checkpoint_meta(), samples)
+            self.is_running = False
+            self.latest_telemetry["is_tracking"] = False
+            return
+
+        self._clear_checkpoint()
 
         if samples and len(samples) >= 6:
             last_sc = SIMCONNECT_CLIENT.get_data() if SIMCONNECT_CLIENT else {}
@@ -4380,7 +5086,8 @@ class BlackboxSession:
                 first_ground_gps=first_ground_gps,
                 last_ground_gps=last_ground_gps,
                 initial_dep=initial_dep,
-                initial_arr=initial_arr
+                initial_arr=initial_arr,
+                locked_simbrief=locked_simbrief_ofp
             )
 
             final_aircraft_slug = sanitize_aircraft_slug(final_aircraft)
@@ -4495,8 +5202,8 @@ import atexit
 def _on_perf_tracker_exit():
     if BLACKBOX.is_running:
         try:
-            print("[Telemetry] Application exit detected, auto-saving blackbox report...")
-            BLACKBOX.stop()
+            print("[Telemetry] Application exit detected, suspending blackbox session for resume...")
+            BLACKBOX.suspend_for_resume()
         except Exception:
             pass
 

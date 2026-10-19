@@ -893,6 +893,7 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
         return self._handle_smart_lod_reset_to_profile(params)
 
     def _handle_smart_lod_cloud_recovery(self, params: Dict[str, Any]):
+        global _CACHED_LOD_STATUS, _CACHED_ACTIVE_HIGHLIGHTS
         try:
             enabled = None
             if params and "enabled" in params:
@@ -920,8 +921,18 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
                 enabled = not bool(lod_ctrl.config.get("cloud_recovery", True))
 
             lod_ctrl.set_cloud_recovery(enabled)
-            print(f"[RemoteServer] Cloud Recovery Toggle: set_cloud_recovery({enabled})")
-            self._send_json(200, {"success": True, "enabled": enabled, "cloud_recovery": enabled})
+            _CACHED_LOD_STATUS = lod_ctrl.get_status()
+            _CACHED_ACTIVE_HIGHLIGHTS = _read_active_settings_highlights()
+            calc_q = int(lod_ctrl.current_cloud_quality)
+            calc_label = flight_lod_controller.CLOUD_QUALITY_LABELS.get(calc_q, "HIGH")
+            print(f"[RemoteServer] Cloud Recovery Toggle: set_cloud_recovery({enabled}) -> cloud_quality={calc_q} ({calc_label})")
+            self._send_json(200, {
+                "success": True,
+                "enabled": enabled,
+                "cloud_recovery": enabled,
+                "cloud_quality": calc_q,
+                "cloud_label": calc_label
+            })
         except Exception as e:
             self._send_json(500, {"success": False, "error": str(e)})
 

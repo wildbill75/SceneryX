@@ -475,21 +475,58 @@ class SmartLodController:
             print(f"[SmartLOD] Notice initializing active profile: {e}")
 
     def set_cloud_recovery(self, enabled: bool, restore_nominal: bool = True) -> bool:
-        """Active ou désactive la récupération automatique des nuages et restaure silencieusement la valeur nominale."""
+        """Active ou désactive Auto Cloud Recovery de manière 100% indépendante du Smart LOD."""
         with self._lock:
             self.config["cloud_recovery"] = bool(enabled)
             self.config["vr_cloud_recovery"] = bool(enabled)
             self.config["2d_cloud_recovery"] = bool(enabled)
+            if enabled:
+                _LIVE_GRAPHICS_OVERRIDES.pop("clouds", None)
             try:
                 with open(CONFIG_FILE_PATH, "w", encoding="utf-8") as f:
                     json.dump(self.config, f, indent=4)
             except Exception as e:
                 print(f"[SmartLOD] Erreur sauvegarde config cloud_recovery: {e}")
 
-        if not enabled:
+        if enabled:
+            # Recalculer immédiatement la valeur cible d'Auto Cloud Recovery (nominale du profil actif ou réduite si déficit FPS)
+            nom_q = get_nominal_cloud_quality()
+            calc_q = nom_q
+            try:
+                telemetry = self._get_live_flight_telemetry()
+                base_fps = float(telemetry.get("base_fps", 0) or telemetry.get("displayed_fps", 0) or 0)
+                is_vr = self.engine.is_vr_active() if (self.engine.is_attached and not self.engine.safe_read_only) else False
+                target_fps = float(self.config.get("vr_target_fps", 36) if is_vr else self.config.get("2d_target_fps", self.config.get("ifr_target_fps", 40)))
+                if base_fps > 0 and base_fps < (target_fps - 5):
+                    calc_q = max(0, nom_q - 1)
+            except Exception:
+                calc_q = nom_q
+
+            self.current_cloud_quality = calc_q
+            self.in_cloud_reduction = bool(calc_q < nom_q)
+            self.in_cloud_boost = False
+            self._last_cloud_change_time = time.time()
+
+            def _async_apply_cloud_rec():
+                try:
+                    apply_live_graphics_to_profile({}, reset_keys=["clouds"])
+                    if not self.engine.is_attached:
+                        self.engine.attach()
+                    if self.engine.is_attached and not self.engine.safe_read_only:
+                        self.engine.write_cloud_quality(calc_q)
+                        self.engine.write_live_graphics({"clouds": calc_q})
+                    print(f"[SmartLOD] Auto Cloud Recovery turned ON -> applied calculated cloud quality {CLOUD_QUALITY_LABELS.get(calc_q)} ({calc_q}) [nominal={nom_q}]")
+                except Exception as e:
+                    print(f"[SmartLOD] Warning applying cloud recovery on enable: {e}")
+
+            threading.Thread(target=_async_apply_cloud_rec, daemon=True, name="AsyncCloudRecEnable").start()
+            if not self.config.get("external_autofps", False):
+                self.start()
+        else:
+            was_reduced_or_boosted = bool(self.in_cloud_reduction or self.in_cloud_boost)
             self.in_cloud_reduction = False
             self.in_cloud_boost = False
-            if restore_nominal:
+            if restore_nominal and "clouds" not in _LIVE_GRAPHICS_OVERRIDES and was_reduced_or_boosted:
                 def _async_restore():
                     try:
                         nom_q = get_nominal_cloud_quality()
@@ -498,10 +535,13 @@ class SmartLodController:
                             self.engine.attach()
                         if self.engine.is_attached and not self.engine.safe_read_only:
                             self.engine.write_cloud_quality(nom_q)
-                            print(f"[SmartLOD] Auto Cloud Recovery turned OFF -> silently restored MSFS cloud quality to nominal ({nom_q})")
+                            self.engine.write_live_graphics({"clouds": nom_q})
+                            print(f"[SmartLOD] Auto Cloud Recovery turned OFF -> restored MSFS cloud quality to nominal ({nom_q})")
                     except Exception as e:
                         print(f"[SmartLOD] Warning restoring cloud quality: {e}")
                 threading.Thread(target=_async_restore, daemon=True, name="AsyncCloudRestore").start()
+            if not self.config.get("enabled", False):
+                self.stop(detach=False)
         return True
 
     def get_ingame_pinned_settings(self) -> List[str]:
@@ -549,6 +589,7 @@ class SmartLodController:
         """
         Recalibre immédiatement les curseurs et la mémoire MSFS sur les valeurs nominales du profil actif,
         en supprimant tout débrayage manuel ou temporaire.
+        axis="lod" ne réinitialise que TLOD et OLOD sans toucher aux nuages ni aux surcharges graphiques.
         """
         nom_vals = get_active_profile_nominal_values()
         nom_tlod = nom_vals.get("tlod", 100.0)
@@ -561,28 +602,30 @@ class SmartLodController:
                 _LIVE_GRAPHICS_OVERRIDES.clear()
             elif axis == "clouds":
                 _LIVE_GRAPHICS_OVERRIDES.pop("clouds", None)
-            if axis in ("tlod", "all"):
+            if axis in ("tlod", "lod", "all"):
                 self.manual_tlod = None
                 self.current_tlod_setpoint = float(nom_tlod)
-            if axis in ("olod", "all"):
+            if axis in ("olod", "lod", "all"):
                 self.manual_olod = None
                 self.current_olod_setpoint = float(nom_olod)
-            self.in_cloud_reduction = False
-            self.in_cloud_boost = False
-            self.current_cloud_quality = nom_cloud
+            if axis in ("clouds", "all"):
+                self.in_cloud_reduction = False
+                self.in_cloud_boost = False
+                self.current_cloud_quality = nom_cloud
 
         if not self.engine.is_attached:
             self.engine.attach()
 
         if self.engine.is_attached and not self.engine.safe_read_only:
-            if axis in ("tlod", "all"):
+            if axis in ("tlod", "lod", "all"):
                 self.engine.write_tlod(nom_tlod)
-            if axis in ("olod", "all"):
+            if axis in ("olod", "lod", "all"):
                 self.engine.write_olod(nom_olod)
             if axis in ("clouds", "all"):
                 self.engine.write_cloud_quality(nom_cloud)
 
-        print(f"[SmartLOD] Reset to active profile '{profile_name}': TLOD={nom_tlod}, OLOD={nom_olod}, Clouds={nom_cloud}")
+        cur_cld = getattr(self, "current_cloud_quality", nom_cloud)
+        print(f"[SmartLOD] Reset ({axis}) to active profile '{profile_name}': TLOD={nom_tlod}, OLOD={nom_olod}, Clouds={cur_cld}")
         return {
             "success": True,
             "axis": axis,
@@ -592,8 +635,8 @@ class SmartLodController:
             "manual_olod": False,
             "current_tlod": round(self.current_tlod_setpoint, 1),
             "current_olod": round(self.current_olod_setpoint, 1),
-            "cloud_quality": nom_cloud,
-            "cloud_label": CLOUD_QUALITY_LABELS.get(nom_cloud, "HIGH")
+            "cloud_quality": cur_cld,
+            "cloud_label": CLOUD_QUALITY_LABELS.get(cur_cld, "HIGH")
         }
 
     def reset_manual_override(self, axis: str = "all") -> Dict[str, Any]:
@@ -900,8 +943,9 @@ class SmartLodController:
                 "vr_olod_base": nom_olod,
                 "vr_olod_target": cruise_olod,
             })
-            self.stop(detach=False)
-            reset_res = self.reset_to_active_profile("all")
+            if not self.config.get("cloud_recovery", True):
+                self.stop(detach=False)
+            reset_res = self.reset_to_active_profile("lod")
             self.status_message = "MAN"
             return {
                 "success": True,
@@ -930,7 +974,9 @@ class SmartLodController:
             self._stop_event.wait(1.0)
 
     def _tick(self):
-        if not self.config.get("enabled", False) or self.config.get("external_autofps", False):
+        lod_enabled = bool(self.config.get("enabled", False))
+        cloud_rec_enabled = bool(self.config.get("cloud_recovery", True))
+        if (not lod_enabled and not cloud_rec_enabled) or self.config.get("external_autofps", False):
             self.status_message = "Handled by External AutoFPS" if self.config.get("external_autofps", False) else "Désactivé"
             return
 
@@ -954,10 +1000,11 @@ class SmartLodController:
         # 3. Mode et activation des axes indépendants
         is_vr = self.engine.is_vr_active() if self.engine.is_attached else False
         pfx = "vr" if is_vr else "2d"
-        tlod_is_active = bool(self.config.get(f"{pfx}_tlod_active", False))
-        olod_is_active = bool(self.config.get(f"{pfx}_olod_active", False))
+        tlod_is_active = bool(lod_enabled and self.config.get(f"{pfx}_tlod_active", False))
+        olod_is_active = bool(lod_enabled and self.config.get(f"{pfx}_olod_active", False))
+        cloud_rec_enabled = bool(self.config.get(f"{pfx}_cloud_recovery", self.config.get("cloud_recovery", True)))
 
-        if not tlod_is_active and not olod_is_active:
+        if not tlod_is_active and not olod_is_active and not cloud_rec_enabled:
             self.status_message = f"Standby (No {pfx.upper()} LOD axis active)"
             return
 
@@ -1100,18 +1147,24 @@ class SmartLodController:
 
             ok_olod = self.engine.write_olod(self.current_olod_setpoint)
 
-        # 6. Auto Cloud Recovery & Dynamic Ultra Scaling (0=Low, 1=Medium, 2=High, 3=Ultra)
-        cloud_rec_enabled = bool(self.config.get(f"{pfx}_cloud_recovery", self.config.get("cloud_recovery", True)))
-        nom_q = get_nominal_cloud_quality()
-        live_q = self.engine.read_cloud_quality() if (self.engine.is_attached and not self.engine.safe_read_only) else None
-        cur_q = max(0, min(3, int(live_q))) if live_q is not None else max(0, min(3, int(getattr(self, "current_cloud_quality", nom_q))))
-        self.current_cloud_quality = cur_q
-        now_ts = time.time()
-        last_cloud_ts = getattr(self, "_last_cloud_change_time", 0.0)
-
+        # 6. Auto Cloud Recovery (100% indépendant du Smart LOD)
         if cloud_rec_enabled:
-            # A. Heavy FPS strain: step down 1 level (down to 0=Low) with 8s cooldown
-            if base_fps > 0 and base_fps < (target_fps - 5):
+            nom_q = get_nominal_cloud_quality()
+            cur_q = max(0, min(3, int(getattr(self, "current_cloud_quality", nom_q))))
+            self.current_cloud_quality = cur_q
+            now_ts = time.time()
+            last_cloud_ts = getattr(self, "_last_cloud_change_time", 0.0)
+
+            # Si cur_q était au-dessus de la valeur nominale (ex: Ultra manuel précédent), ramener immédiatement à la valeur nominale du profil
+            if cur_q > nom_q:
+                new_q = nom_q
+                self.engine.write_cloud_quality(new_q)
+                self.current_cloud_quality = new_q
+                self.in_cloud_reduction = False
+                self.in_cloud_boost = False
+                self._last_cloud_change_time = now_ts
+            # A. Déficit FPS significatif : réduire d'1 cran (jusqu'à 0=Low) avec cooldown 8s
+            elif base_fps > 0 and base_fps < (target_fps - 5):
                 if cur_q > 0 and (now_ts - last_cloud_ts >= 8.0):
                     if self.original_cloud_quality is None:
                         self.original_cloud_quality = nom_q
@@ -1119,7 +1172,7 @@ class SmartLodController:
                     if self.engine.write_cloud_quality(new_q):
                         self.current_cloud_quality = new_q
                         self.in_cloud_reduction = (new_q < nom_q)
-                        self.in_cloud_boost = (new_q > nom_q)
+                        self.in_cloud_boost = False
                         self._last_cloud_change_time = now_ts
                         self.trigger_events.append({
                             "timestamp": datetime.now().strftime("%H:%M:%S"),
@@ -1129,31 +1182,14 @@ class SmartLodController:
                             "reason": f"Cloud Quality Step-Down: {CLOUD_QUALITY_LABELS.get(cur_q, cur_q)} -> {CLOUD_QUALITY_LABELS.get(new_q, new_q)}"
                         })
                         print(f"[SmartLOD] Cloud Recovery step-down: {CLOUD_QUALITY_LABELS.get(cur_q)} ({cur_q}) -> {CLOUD_QUALITY_LABELS.get(new_q)} ({new_q}) (FPS: {round(base_fps)} < {target_fps - 5})")
-            # B. Moderate strain while boosted above nominal (e.g. at Ultra when nominal is High): step back to nominal
-            elif cur_q > nom_q and ((base_fps > 0 and base_fps < (target_fps - deadband)) or mt_excess_ms > 0 or vram_saturated):
-                if now_ts - last_cloud_ts >= 6.0:
-                    new_q = max(nom_q, cur_q - 1)
-                    if self.engine.write_cloud_quality(new_q):
-                        self.current_cloud_quality = new_q
-                        self.in_cloud_reduction = (new_q < nom_q)
-                        self.in_cloud_boost = (new_q > nom_q)
-                        self._last_cloud_change_time = now_ts
-                        self.trigger_events.append({
-                            "timestamp": datetime.now().strftime("%H:%M:%S"),
-                            "agl_ft": round(agl),
-                            "tlod": round(self.current_tlod_setpoint),
-                            "fps": round(base_fps, 1),
-                            "reason": f"Cloud Quality Return to Nominal: {CLOUD_QUALITY_LABELS.get(cur_q, cur_q)} -> {CLOUD_QUALITY_LABELS.get(new_q, new_q)}"
-                        })
-                        print(f"[SmartLOD] Cloud boost stepped back to nominal: {CLOUD_QUALITY_LABELS.get(cur_q)} ({cur_q}) -> {CLOUD_QUALITY_LABELS.get(new_q)} ({new_q})")
-            # C. FPS recovered to target: step back up toward nominal, and boost up to ULTRA (3) when surplus headroom is available
-            elif base_fps >= target_fps:
-                if cur_q < nom_q and (now_ts - last_cloud_ts >= 8.0):
+            # B. FPS revenu à la cible : remonter progressivement jusqu'à la valeur nominale du profil (ex: High)
+            elif (base_fps >= target_fps or base_fps == 0) and cur_q < nom_q:
+                if now_ts - last_cloud_ts >= 8.0:
                     new_q = min(nom_q, cur_q + 1)
                     if self.engine.write_cloud_quality(new_q):
                         self.current_cloud_quality = new_q
                         self.in_cloud_reduction = (new_q < nom_q)
-                        self.in_cloud_boost = (new_q > nom_q)
+                        self.in_cloud_boost = False
                         self._last_cloud_change_time = now_ts
                         self.trigger_events.append({
                             "timestamp": datetime.now().strftime("%H:%M:%S"),
@@ -1163,27 +1199,6 @@ class SmartLodController:
                             "reason": f"Cloud Quality Restored: {CLOUD_QUALITY_LABELS.get(cur_q, cur_q)} -> {CLOUD_QUALITY_LABELS.get(new_q, new_q)}"
                         })
                         print(f"[SmartLOD] Cloud Recovery restored: {CLOUD_QUALITY_LABELS.get(cur_q)} ({cur_q}) -> {CLOUD_QUALITY_LABELS.get(new_q)} ({new_q}) (FPS: {round(base_fps)} >= {target_fps})")
-                elif cur_q < 3 and (fps_surplus > 0 or mt_headroom_ms > 0) and (not vram_saturated) and (now_ts - last_cloud_ts >= 10.0):
-                    new_q = min(3, cur_q + 1)
-                    if self.engine.write_cloud_quality(new_q):
-                        self.current_cloud_quality = new_q
-                        self.in_cloud_reduction = False
-                        self.in_cloud_boost = (new_q > nom_q)
-                        self._last_cloud_change_time = now_ts
-                        self.trigger_events.append({
-                            "timestamp": datetime.now().strftime("%H:%M:%S"),
-                            "agl_ft": round(agl),
-                            "tlod": round(self.current_tlod_setpoint),
-                            "fps": round(base_fps, 1),
-                            "reason": f"Cloud Quality Step-Up: {CLOUD_QUALITY_LABELS.get(cur_q, cur_q)} -> {CLOUD_QUALITY_LABELS.get(new_q, new_q)}"
-                        })
-                        print(f"[SmartLOD] Cloud Quality boosted with headroom: {CLOUD_QUALITY_LABELS.get(cur_q)} ({cur_q}) -> {CLOUD_QUALITY_LABELS.get(new_q)} ({new_q}) (FPS: {round(base_fps)})")
-        else:
-            if self.in_cloud_reduction or self.in_cloud_boost or cur_q != nom_q:
-                if self.engine.write_cloud_quality(nom_q):
-                    self.current_cloud_quality = nom_q
-                self.in_cloud_reduction = False
-                self.in_cloud_boost = False
 
         if ok_tlod and ok_olod:
             status_parts = []
@@ -1267,19 +1282,18 @@ class SmartLodController:
         is_ext = bool(self.config.get("external_autofps", False) or (self.config.get("source") == "external_autofps") or is_af_running)
         nom_cloud_q = max(0, min(3, int(nom_vals.get("clouds", 2))))
         override_cloud_q = _LIVE_GRAPHICS_OVERRIDES.get("clouds")
-        cloud_rec_active = bool(self.config.get("enabled", False) and self.is_running and not is_ext and self.config.get("cloud_recovery", True))
+        cloud_rec_active = bool(self.config.get("cloud_recovery", True) and not is_ext)
 
-        if override_cloud_q is not None and not cloud_rec_active:
-            cur_cloud_q = max(0, min(3, int(override_cloud_q)))
-            self.current_cloud_quality = cur_cloud_q
-        elif cloud_rec_active:
+        if cloud_rec_active:
             cur_cloud_q = max(0, min(3, int(getattr(self, "current_cloud_quality", nom_cloud_q))))
+            if cur_cloud_q > nom_cloud_q:
+                cur_cloud_q = nom_cloud_q
+                self.current_cloud_quality = nom_cloud_q
         elif override_cloud_q is not None:
             cur_cloud_q = max(0, min(3, int(override_cloud_q)))
             self.current_cloud_quality = cur_cloud_q
         else:
-            cur_cloud_q = nom_cloud_q
-            self.current_cloud_quality = nom_cloud_q
+            cur_cloud_q = max(0, min(3, int(getattr(self, "current_cloud_quality", nom_cloud_q))))
 
         return {
             "enabled": (self.config.get("enabled", False) and not is_ext),
@@ -1310,7 +1324,7 @@ class SmartLodController:
             "nominal_cloud_quality": nom_cloud_q,
             "nominal_cloud_label": CLOUD_QUALITY_LABELS.get(nom_cloud_q, "HIGH"),
             "in_cloud_reduction": bool(cloud_rec_active and cur_cloud_q < nom_cloud_q),
-            "in_cloud_boost": bool(cloud_rec_active and cur_cloud_q > nom_cloud_q),
+            "in_cloud_boost": False,
             "trigger_events_count": len(self.trigger_events),
             "last_trigger": self.trigger_events[-1] if self.trigger_events else None
         }

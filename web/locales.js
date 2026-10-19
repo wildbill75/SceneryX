@@ -427,8 +427,13 @@ const LOCALES = {
         "settings.startup_region": "Default Startup Region",
         "settings.title": "Settings & Configuration",
         "settings.start_tour": "Interactive Guided Tour",
-        "settings.start_tour_btn": "Launch Tour",
+        "settings.start_tour_btn": "Launch Tour Now",
         "settings.start_tour_desc": "Replay the interactive spotlight tour to discover key features.",
+        "settings.tour_card_title": "Interactive Walkthrough (25 Steps)",
+        "settings.tour_card_sub": "Explore the entire UI, airport cards, Smart LOD, in-game panel, scenery export & tools.",
+        "settings.reset_tour_prompt_btn": "Reset Prompt",
+        "settings.reset_tour_prompt_tooltip": "Reset the welcome invitation so it asks to take the tour on next launch",
+        "settings.reset_tour_prompt_success": "Welcome prompt has been reset! It will appear on next launch.",
         "onboarding.prompt_title": "Welcome to SceneryX",
         "onboarding.prompt_subtitle": "Take a quick guided tour to discover how to navigate, inspect airports, explore add-ons, and optimize your scenery library.",
         "onboarding.btn_start": "Start Interactive Tour",
@@ -456,8 +461,12 @@ const LOCALES = {
         "onboarding.step7_body": "Inspect all essential airport data in the sidebar: ICAO & IATA codes, active status, scenery vendor, field elevation, and GPS coordinates.",
         "onboarding.step8_title": "Airport Details",
         "onboarding.step8_body": "Inspect complete runway specifications (dimensions, asphalt surface, threshold coordinates, lighting), field elevation, and linked GSX profile status.",
-        "onboarding.step9_title": "Available Add-ons",
-        "onboarding.step9_body": "Browse all detected scenery packages for this airport (Payware, Freeware, and Streamed). Enable, disable, or isolate specific scenery versions with a single click.",
+        "onboarding.step9_sceneries_title": "Available Add-ons (Main Sceneries)",
+        "onboarding.step9_sceneries_body": "Browse all detected scenery packages for this airport. Full sceneries (Payware, Freeware, Asobo, Default) are mutually exclusive: selecting one activates it and deactivates other full sceneries to prevent visual conflicts and crashes.",
+        "onboarding.step10_fixes_title": "Available Fixes & Overlays",
+        "onboarding.step10_fixes_body": "Unlike full sceneries, the Available Fixes & Overlays section groups stackable enhancements (custom GSX profiles, taxiway corrections, night lighting, photogrammetry fixes). Each has an independent green switch toggle to run simultaneously on top of your main scenery.",
+        "onboarding.step9_title": "Available Add-ons & Fixes",
+        "onboarding.step9_body": "Browse all detected scenery packages for this airport. Full sceneries (Payware, Freeware, Asobo, Default) are mutually exclusive, while Available Fixes & Overlays (taxiway corrections, night lighting, photogrammetry fixes, GSX profiles) stack together with independent toggles on top of your main scenery.",
         "onboarding.step10_title": "Operating Airlines",
         "onboarding.step10_body": "Discover real-world commercial carriers operating scheduled flights at this airport. Click any airline or destination to plot the route network directly across the world map.",
         "onboarding.filter_pricing_title": "Pricing Model",
@@ -480,16 +489,27 @@ const LOCALES = {
         "onboarding.step_graphics_body": "All MSFS graphics settings gathered and clearly partitioned into Shared, 2D Display, and VR Headset environments (with OFXR Frame Gen bridge support). Manage custom profiles and monitor real-time CPU MainThread and GPU VRAM balance.",
         "onboarding.step_bg_tools_title": "OFXR Detection & Auto FPS Conflicts",
         "onboarding.step_bg_tools_body": "SceneryX automatically detects if the OFXR Frame Gen bridge is running to synchronize your VR frame pacing. In contrast, Smart LOD and external MSFS AutoFPS write to identical memory offsets and cannot cohabit: this alert modal appears whenever Auto FPS runs in the background so you can arbitrate and eliminate stutter.",
-        "onboarding.step_my_rig_title": "Hardware Specs Audit",
-        "onboarding.step_my_rig_body": "Real-time audit of your hardware components: Processor (CPU), Graphics Card (GPU), RAM, high-speed NVMe storage, network bandwidth, and detected VR headsets to evaluate your system baseline.",
+        "onboarding.step_system_optimizer_title": "System Optimizer (Windows & GPU Tuning)",
+        "onboarding.step_system_optimizer_body": "System Optimizer audits and tunes 7 critical Windows OS and GPU parameters outside of MSFS: HAGS (Hardware-Accelerated GPU Scheduling for DLSS 3 Frame Gen), Windows Game Mode, Ultimate Power Plan, Re-Size BAR, DirectX Shader Cache (10 GB recommended), GPU Drivers, and VBS Core Isolation to eliminate stutters.",
+        "onboarding.step_my_rig_title": "Hardware Specs & Tailored Baseline",
+        "onboarding.step_my_rig_body": "SceneryX automatically detects your rig's hardware baseline (CPU cores & threads, GPU architecture & dedicated VRAM, RAM speed & XMP, NVMe storage, and display refresh cadence) to dynamically tailor all optimization recommendations and sim profiles to your hardware.",
         "onboarding.step_display_select_title": "Active Display Selection",
         "onboarding.step_display_select_body": "Essential step: make sure to click on the monitor that will be actively displaying MSFS (e.g. Screen 1 at 180 Hz vs Screen 2 at 165 Hz). SceneryX calibrates refresh cadence, frame pacing, and 1/2 sync targets on this specific display: failing to select the right screen can cause synchronization issues.",
+        "onboarding.step_rig_maintenance_title": "Update & Cache Cleaner (Safe Update & Cache Purge)",
+        "onboarding.step_rig_maintenance_body": "Protect your Community folders in 1 click before any MSFS Sim or World Update (atomic folder quarantine + instant restoration), and purge SceneryIndexes, compiled aircraft WASM binaries, Rolling Cache, StreamedPackages/ModelLib caches, and DirectX/GPU shaders to eliminate post-update micro-stutters.",
+        "my_rig.help_btn_title": "Rig & System Guide & Help",
         "onboarding.step_ingame_install_title": "In-Game Toolbar Panel",
         "onboarding.step_ingame_install_body": "From Settings, a single click on \"INSTALL\" deploys the SceneryX HUD panel straight into your MSFS Community folder, providing full dynamic LOD control and telemetry directly from the in-sim toolbar in both 2D and VR.",
         "onboarding.step_ingame_cockpit_title": "In-Game Panel in Cockpit",
         "onboarding.step_ingame_cockpit_body": "Here is the SceneryX panel active inside the MSFS cockpit: adjust dynamic TLOD & OLOD sliders in real time, toggle Auto Cloud Recovery, and monitor displayed/base FPS, CPU MainThread latency, and GPU/VRAM loads mid-flight.",
+        "onboarding.step_ingame_live_graphics_title": "In-Flight Live Graphics Controls",
+        "onboarding.step_ingame_live_graphics_body": "Expand the top quick-bar inside the cockpit panel to hot-swap MSFS graphics settings in real time (Max FPS, Clouds, Pre-Cache, Terrain Shadows, Buildings, Trees, Plants, Grass) without pausing your flight. Pin up to 5 favorite badges to the compact header, apply changes on the fly, or click any reset icon (↺) to restore your pre-flight baseline.",
         "onboarding.step_flight_report_title": "Flight Performance Reports",
         "onboarding.step_flight_report_body": "Record your flights with \"Start Monitoring\" to generate comprehensive benchmark reports: frame pacing charts (FPS, 1% Low, CPU MainThread ms), VRAM/RAM consumption, and micro-stutter analytics to benchmark your simulator.",
+        "settings.help_btn_title": "Settings Guide & Help",
+        "onboarding.context_settings_title": "Folders & Settings",
+        "onboarding.context_settings_body": "Configure your MSFS Community & Official packages paths, GSX profile directory, navigation mode (Classic vs Radial), camera pan & zoom speeds, and install the in-game toolbar panel.",
+        "onboarding.context_got_it": "Got It",
         "settings.zoom_regional": "Regional (6.0)",
         "settings.zoom_runway": "Runway (12.0)",
         "settings.zoom_wide": "Wide (4.0)",
@@ -1013,9 +1033,14 @@ const LOCALES = {
         "settings.speed_smooth": "Fluide (0.8s)",
         "settings.startup_region": "Région initiale au démarrage",
         "settings.title": "Paramètres & Configuration",
-        "settings.start_tour": "Visite interactive guidée",
+        "settings.start_tour": "Visite Guidée Interactive",
         "settings.start_tour_btn": "Lancer la visite",
-        "settings.start_tour_desc": "Relancez la visite interactive pour redécouvrir les fonctions clés.",
+        "settings.start_tour_desc": "Découvrez toutes les fonctionnalités de SceneryX pas à pas avec un guidage interactif.",
+        "settings.tour_card_title": "Tutoriel Interactif (25 Étapes)",
+        "settings.tour_card_sub": "Présente l'interface, les filtres, le Smart LOD, le panneau in-game, l'export et les réglages.",
+        "settings.reset_tour_prompt_btn": "Réinitialiser l'invitation",
+        "settings.reset_tour_prompt_tooltip": "Réinitialise l'invitation d'accueil pour qu'elle s'affiche au prochain démarrage",
+        "settings.reset_tour_prompt_success": "L'invitation de bienvenue a été réinitialisée ! Elle s'affichera au prochain démarrage.",
         "onboarding.prompt_title": "Bienvenue sur SceneryX",
         "onboarding.prompt_subtitle": "Suivez une visite guidée rapide pour découvrir comment naviguer, inspecter vos aéroports, gérer vos scènes et optimiser vos vols.",
         "onboarding.btn_start": "Démarrer la visite guidée",
@@ -1043,8 +1068,12 @@ const LOCALES = {
         "onboarding.step7_body": "Consultez les informations détaillées dans le panneau latéral : codes OACI & IATA, statut actif, éditeur de la scène, altitude du terrain et coordonnées GPS.",
         "onboarding.step8_title": "Détails techniques de l'aéroport",
         "onboarding.step8_body": "Consultez les spécifications complètes des pistes (dimensions, revêtement, coordonnées des seuils, balisage), l'altitude exacte et le statut du profil GSX.",
-        "onboarding.step9_title": "Scènes disponibles",
-        "onboarding.step9_body": "Visualisez tous les packages détectés pour cet aéroport (Payware, Freeware et Streamed). Activez, désactivez ou isolez une version spécifique d'un simple clic.",
+        "onboarding.step9_sceneries_title": "Scènes principales disponibles",
+        "onboarding.step9_sceneries_body": "Explorez tous les packs de scènes détectés pour cet aéroport. Les scènes complètes (Payware, Freeware, Asobo, Default) sont mutuellement exclusives : en sélectionner une active celle-ci et désactive les autres pour éviter les conflits visuels et plantages.",
+        "onboarding.step10_fixes_title": "Correctifs et Overlays disponibles",
+        "onboarding.step10_fixes_body": "Contrairement aux scènes complètes, la section « AVAILABLE FIXES & OVERLAYS » regroupe les correctifs cumulables (profils GSX personnalisés, corrections de taxiways, éclairages nocturnes, fixes photogrammétrie). Chaque correctif dispose de son propre interrupteur vert indépendant pour s'activer en surimpression sur votre scène principale.",
+        "onboarding.step9_title": "Scènes & Correctifs disponibles",
+        "onboarding.step9_body": "Explorez tous les compléments détectés pour cet aéroport. Contrairement aux scènes complètes qui s'excluent mutuellement, les Fixes & Overlays (correctifs de taxiways, balisage nocturne, retouches photogrammétriques, profils GSX) sont cumulables et se superposent grâce à des interrupteurs indépendants.",
         "onboarding.step10_title": "Compagnies aériennes",
         "onboarding.step10_body": "Découvrez les compagnies régulières réelles desservant cette plateforme et tracez leur réseau de routes directement sur la carte du monde.",
         "onboarding.filter_pricing_title": "Modèle économique",
@@ -1067,16 +1096,27 @@ const LOCALES = {
         "onboarding.step_graphics_body": "Tous les paramètres graphiques MSFS regroupés dans une interface limpide répartie en trois univers : Shared (paramètres communs), 2D Display et VR Headset (avec passerelle OFXR Frame Gen). Gérez vos profils et surveillez l'équilibre MainThread CPU / VRAM GPU.",
         "onboarding.step_bg_tools_title": "Détection OFXR & Conflits Auto FPS",
         "onboarding.step_bg_tools_body": "SceneryX détecte automatiquement si le pont OFXR Frame Gen est actif pour synchroniser la cadence VR. En revanche, le gouverneur Smart LOD et l'application externe MSFS AutoFPS écrivent aux mêmes adresses mémoire et ne peuvent pas cohabiter : cette fenêtre d'alerte surgit dès qu'Auto FPS tourne en arrière-plan pour vous permettre d'arbitrer et d'éliminer les saccades.",
-        "onboarding.step_my_rig_title": "Configuration matérielle (My Rig)",
-        "onboarding.step_my_rig_body": "Audit complet de vos composants en temps réel : processeur (CPU), carte graphique (GPU), mémoire vive (RAM), stockage SSD NVMe ultra-rapide, bande passante réseau et casques VR détectés pour évaluer le potentiel de votre simulateur.",
+        "onboarding.step_system_optimizer_title": "System Optimizer (Optimisation Windows & GPU)",
+        "onboarding.step_system_optimizer_body": "System Optimizer audite et calibre 7 paramètres système et GPU critiques en dehors de MSFS : HAGS (Planification GPU à accélération matérielle pour DLSS 3 Frame Gen), Mode Jeu Windows, Plan d'Alimentation Performances Ultimes, Re-Size BAR, Cache des Shaders DirectX (10 Go recommandé), Pilotes GPU et Isolation du Noyau VBS pour supprimer les micro-saccades.",
+        "onboarding.step_my_rig_title": "Spécifications matérielles & Recommandations dédiées",
+        "onboarding.step_my_rig_body": "SceneryX détecte automatiquement les spécifications de votre rig (cœurs/threads CPU, architecture et VRAM GPU, fréquence RAM & XMP, stockage NVMe et cadence d'écran) pour calibrer dynamiquement toutes les recommandations d'optimisation selon votre matériel.",
         "onboarding.step_display_select_title": "Sélection de l'écran actif",
         "onboarding.step_display_select_body": "Indispensable : cliquez impérativement sur l'écran qui sera actif pendant que MSFS tourne (ex. Écran 1 à 180 Hz ou Écran 2 à 165 Hz). SceneryX calibre le rafraîchissement, la cadence et la cible 1/2 Sync sur cet écran précis : sans cette sélection, vous risquez de mauvaises surprises de synchronisation et de fluidité.",
+        "onboarding.step_rig_maintenance_title": "Update & Cache Cleaner (Mise à jour sûre & Purge des caches)",
+        "onboarding.step_rig_maintenance_body": "Protégez vos dossiers Community en 1 clic avant toute mise à jour MSFS (quarantaine atomique + restauration instantanée) et purgez les index SceneryIndexes, les binaires WASM compilés, le Rolling Cache, les caches StreamedPackages/ModelLib et les shaders DirectX/GPU pour éliminer les micro-saccades après mise à jour.",
+        "my_rig.help_btn_title": "Guide & Aide My Rig & Système",
         "onboarding.step_ingame_install_title": "Installation du panneau en jeu",
         "onboarding.step_ingame_install_body": "Depuis les Paramètres, un clic sur « INSTALL » déploie le panneau HUD SceneryX dans votre dossier Community MSFS. Vous accédez ainsi à la régulation Smart LOD et au suivi de vol directement dans la barre d'outils du simulateur en 2D et VR.",
         "onboarding.step_ingame_cockpit_title": "Panneau en jeu dans le cockpit",
         "onboarding.step_ingame_cockpit_body": "Voici le panneau SceneryX actif directement dans le cockpit MSFS : ajustez les curseurs TLOD / OLOD en temps réel, activez l'Auto Cloud Recovery et surveillez vos FPS affichés/de base, la latence CPU MainThread et la charge GPU/VRAM en plein vol.",
+        "onboarding.step_ingame_live_graphics_title": "Paramètres graphiques changeables à chaud",
+        "onboarding.step_ingame_live_graphics_body": "Dépliez la barre rapide supérieure du panneau en cockpit pour modifier vos réglages graphiques MSFS à chaud en plein vol (Max FPS, Nuages, Pre-Cache, Ombres terrain, Bâtiments, Arbres, Plantes, Herbe) sans passer par le menu pause. Épinglez jusqu'à 5 favoris en haut, appliquez en direct ou réinitialisez chaque paramètre (↺) vers sa valeur initiale en un clic.",
         "onboarding.step_flight_report_title": "Rapports de performance de vol",
         "onboarding.step_flight_report_body": "Enregistrez votre vol avec « Start Monitoring » pour générer un rapport complet : graphiques de fluidité (FPS, 1% Low, latence CPU MainThread), consommation VRAM/RAM et détection des saccades pour benchmarker et perfectionner votre simulateur.",
+        "settings.help_btn_title": "Guide & Aide des Préférences",
+        "onboarding.context_settings_title": "Dossiers & Préférences",
+        "onboarding.context_settings_body": "Configurez vos répertoires Community et Official MSFS, le dossier GSX, le mode de navigation (Classique ou Radial), la vitesse et le zoom caméra, et installez le panneau in-game.",
+        "onboarding.context_got_it": "Compris",
         "settings.zoom_regional": "Régional (6.0)",
         "settings.zoom_runway": "Piste (12.0)",
         "settings.zoom_wide": "Large (4.0)",
@@ -1597,9 +1637,14 @@ const LOCALES = {
         "settings.speed_smooth": "Flüssig (0.8s)",
         "settings.startup_region": "Standard-Startregion",
         "settings.title": "Einstellungen & Konfiguration",
-        "settings.start_tour": "Interaktive Tour",
-        "settings.start_tour_btn": "Tour starten",
-        "settings.start_tour_desc": "Spielen Sie die interaktive Tour erneut ab, um die wichtigsten Funktionen zu entdecken.",
+        "settings.start_tour": "Interaktive Tour & Einführung",
+        "settings.start_tour_btn": "Tour jetzt starten",
+        "settings.start_tour_desc": "Entdecken Sie alle Funktionen von SceneryX Schritt für Schritt mit interaktiver Führung.",
+        "settings.tour_card_title": "Interaktives Tutorial (25 Schritte)",
+        "settings.tour_card_sub": "Erklärt Oberfläche, Filter, Smart LOD, In-Game-Panel, Szenerie-Export und Einstellungen.",
+        "settings.reset_tour_prompt_btn": "Willkommensaufforderung zurücksetzen",
+        "settings.reset_tour_prompt_tooltip": "Setzt die Willkommensaufforderung zurück, damit sie beim nächsten Start erscheint",
+        "settings.reset_tour_prompt_success": "Die Willkommensaufforderung wurde zurückgesetzt! Sie erscheint beim nächsten Start.",
         "onboarding.prompt_title": "Willkommen bei SceneryX",
         "onboarding.prompt_subtitle": "Machen Sie eine kurze Tour, um zu erfahren, wie Sie navigieren, Szenerien prüfen, Add-ons verwalten und Flüge optimieren.",
         "onboarding.btn_start": "Interaktive Tour starten",
@@ -1627,8 +1672,12 @@ const LOCALES = {
         "onboarding.step7_body": "Prüfen Sie wichtige Daten in der Seitenleiste: ICAO- und IATA-Codes, Status, Szenerieanbieter, Platzhöhe und GPS-Koordinaten.",
         "onboarding.step8_title": "Technische Flughafendetails",
         "onboarding.step8_body": "Prüfen Sie Pistendaten (Abmessungen, Belag, Beleuchtung), Schwellenkoordinaten, Platzhöhe und GSX-Profilstatus.",
-        "onboarding.step9_title": "Verfügbare Add-ons",
-        "onboarding.step9_body": "Alle erkannten Szeneriepakete für diesen Flughafen (Payware, Freeware, Streaming) anzeigen, aktivieren oder isolieren.",
+        "onboarding.step9_sceneries_title": "Verfügbare Hauptszenerien",
+        "onboarding.step9_sceneries_body": "Durchsuchen Sie alle erkannten Szeneriepakete für diesen Flughafen. Vollständige Szenerien (Payware, Freeware, Asobo, Default) schließen sich gegenseitig aus: Die Auswahl einer Szenerie aktiviert diese und deaktiviert andere, um visuelle Konflikte und Abstürze zu verhindern.",
+        "onboarding.step10_fixes_title": "Verfügbare Fixes & Overlays",
+        "onboarding.step10_fixes_body": "Im Gegensatz zu Vollszenerien fasst der Bereich „AVAILABLE FIXES & OVERLAYS“ stapelbare Erweiterungen zusammen (benutzerdefinierte GSX-Profile, Rollweg-Korrekturen, Nachtbeleuchtung, Photogrammetrie-Fixes). Jeder Fix verfügt über einen unabhängigen grünen Schalter für den gleichzeitigen Betrieb über Ihrer Hauptszenerie.",
+        "onboarding.step9_title": "Verfügbare Add-ons & Fixes",
+        "onboarding.step9_body": "Durchsuchen Sie alle erkannten Szeneriepakete für diesen Flughafen. Während vollständige Szenerien sich gegenseitig ausschließen, können verfügbare Fixes & Overlays (Rollbahnkorrekturen, Nachtbeleuchtung, Photogrammetrie-Fixes, GSX-Profile) unabhängig voneinander gestapelt und gleichzeitig aktiviert werden.",
         "onboarding.step10_title": "Fluggesellschaften",
         "onboarding.step10_body": "Entdecken Sie reale Fluggesellschaften an diesem Flughafen und zeichnen Sie Verbindungen direkt auf die Weltkarte.",
         "onboarding.filter_pricing_title": "Preismodell",
@@ -1651,16 +1700,27 @@ const LOCALES = {
         "onboarding.step_graphics_body": "Alle MSFS-Grafikeinstellungen übersichtlich zusammengefasst in drei Bereichen: Shared (gemeinsam), 2D Display und VR Headset (mit OFXR Frame Gen Bridge). Verwalten Sie Profile und überwachen Sie die CPU/VRAM-Balance in Echtzeit.",
         "onboarding.step_bg_tools_title": "OFXR-Erkennung & AutoFPS-Konflikte",
         "onboarding.step_bg_tools_body": "SceneryX erkennt automatisch, ob die OFXR Frame Gen Bridge aktiv ist, um die VR-Bildrate zu synchronisieren. Das Smart LOD-Modul und das externe MSFS AutoFPS greifen auf dieselben Speicheradressen zu und können nicht koexistieren: Dieses Hinweis-Fenster warnt Sie bei aktivem Auto FPS, um Konflikte und Ruckler zu verhindern.",
-        "onboarding.step_my_rig_title": "Hardware-Audit (My Rig)",
-        "onboarding.step_my_rig_body": "Vollständiger Echtzeit-Audit Ihrer Systemkomponenten: Prozessor (CPU), Grafikkarte (GPU), Arbeitsspeicher (RAM), schneller NVMe-Speicher, Netzwerkbandbreite und erkannte VR-Headsets.",
+        "onboarding.step_system_optimizer_title": "System Optimizer (Windows & GPU Tuning)",
+        "onboarding.step_system_optimizer_body": "System Optimizer prüft und optimiert 7 kritische Windows- und GPU-Parameter außerhalb des MSFS: HAGS (Hardware-beschleunigte GPU-Planung für DLSS 3 Frame Gen), Windows-Spielmodus, ultimativer Energiesparplan, Re-Size BAR, DirectX-Shader-Cache (10 GB empfohlen), GPU-Treiber und VBS-Kernisolierung zur Beseitigung von Mikrorucklern.",
+        "onboarding.step_my_rig_title": "Hardware-Spezifikationen & Angepasste Baseline",
+        "onboarding.step_my_rig_body": "SceneryX erkennt automatisch die Hardware-Spezifikationen Ihres Rigs (CPU-Kerne/Threads, GPU-Architektur und VRAM, RAM-Takt & XMP, NVMe-Speicher und Display-Bildwiederholrate), um alle Optimierungsempfehlungen dynamisch an Ihre Hardware anzupassen.",
         "onboarding.step_display_select_title": "Auswahl des aktiven Bildschirms",
         "onboarding.step_display_select_body": "Wichtiger Schritt: Klicken Sie unbedingt auf den Monitor, auf dem MSFS aktiv ausgeführt wird (z.B. Monitor 1 mit 180 Hz oder Monitor 2 mit 165 Hz). SceneryX kalibriert Bildwiederholrate, Pacing und 1/2-Sync-Ziele genau auf dieses Display, um Überraschungen bei der Synchronisation zu vermeiden.",
+        "onboarding.step_rig_maintenance_title": "Update & Cache Cleaner (Sicheres Update & Cache-Bereinigung)",
+        "onboarding.step_rig_maintenance_body": "Schützen Sie Ihre Community-Ordner mit 1 Klick vor jedem MSFS-Update (atomare Ordner-Quarantäne + sofortige Wiederherstellung) und bereinigen Sie SceneryIndexes, kompilierte WASM-Binärdateien, Rolling Cache, StreamedPackages/ModelLib-Caches und DirectX/GPU-Shader gegen Mikroruckler.",
+        "my_rig.help_btn_title": "Leitfaden & Hilfe zu Rig & System",
         "onboarding.step_ingame_install_title": "In-Game Toolbar-Panel Installation",
         "onboarding.step_ingame_install_body": "In den Einstellungen installiert ein Klick auf „INSTALL“ das SceneryX-Panel direkt in Ihren MSFS Community-Ordner für nahtlosen Zugriff auf Smart LOD und Telemetrie direkt in der Simulator-Leiste in 2D und VR.",
         "onboarding.step_ingame_cockpit_title": "In-Game Panel im Cockpit",
         "onboarding.step_ingame_cockpit_body": "So präsentiert sich das SceneryX-Panel direkt im MSFS-Cockpit: Passen Sie dynamische TLOD/OLOD-Regler im Flug an, steuern Sie Auto Cloud Recovery und überwachen Sie FPS, CPU-MainThread und GPU/VRAM-Werte.",
+        "onboarding.step_ingame_live_graphics_title": "Live-Grafiksteuerung im Flug",
+        "onboarding.step_ingame_live_graphics_body": "Klappen Sie die obere Schnellleiste im Cockpit-Panel auf, um MSFS-Grafikeinstellungen im laufenden Flug anzupassen (Max FPS, Wolken, Pre-Cache, Terrainschatten, Gebäude, Bäume, Pflanzen, Gras), ohne das Pausemenü zu öffnen. Heften Sie bis zu 5 Favoriten an oder setzen Sie Parameter per Klick (↺) auf Ihren Ausgangswert zurück.",
         "onboarding.step_flight_report_title": "Flugleistungsberichte",
         "onboarding.step_flight_report_body": "Zeichnen Sie Ihre Flüge mit „Start Monitoring“ auf für detaillierte Benchmark-Berichte: Bildraten-Diagramme (FPS, 1% Low, CPU-MainThread ms), VRAM/RAM-Auslastung und Ruckler-Analysen zur Optimierung Ihres Simulators.",
+        "settings.help_btn_title": "Einstellungen Anleitung & Hilfe",
+        "onboarding.context_settings_title": "Ordner & Einstellungen",
+        "onboarding.context_settings_body": "Konfigurieren Sie Ihre MSFS Community- und Official-Paketpfade, den GSX-Ordner, den Navigationsmodus (Klassisch oder Radial), Kamerageschwindigkeiten und installieren Sie das In-Game-Panel.",
+        "onboarding.context_got_it": "Verstanden",
         "settings.zoom_regional": "Regional (6.0)",
         "settings.zoom_runway": "Piste (12.0)",
         "settings.zoom_wide": "Weit (4.0)",
@@ -2179,9 +2239,14 @@ const LOCALES = {
         "settings.speed_smooth": "Fluido (0.8s)",
         "settings.startup_region": "Región inicial al iniciar",
         "settings.title": "Ajustes de SceneryX",
-        "settings.start_tour": "Recorrido interactivo",
-        "settings.start_tour_btn": "Iniciar recorrido",
-        "settings.start_tour_desc": "Repita el recorrido guiado interactivo para redescubrir las funciones principales.",
+        "settings.start_tour": "Recorrido Guiado Interactivo",
+        "settings.start_tour_btn": "Iniciar recorrido ahora",
+        "settings.start_tour_desc": "Explore todas las funciones de SceneryX paso a paso con guía interactiva.",
+        "settings.tour_card_title": "Tutorial Interactivo (25 Pasos)",
+        "settings.tour_card_sub": "Explica la interfaz, filtros, Smart LOD, panel in-game, exportación y ajustes.",
+        "settings.reset_tour_prompt_btn": "Restablecer aviso",
+        "settings.reset_tour_prompt_tooltip": "Restablece el aviso de bienvenida para que se muestre en el próximo inicio",
+        "settings.reset_tour_prompt_success": "¡El aviso de bienvenida se ha restablecido! Aparecerá en el próximo inicio.",
         "onboarding.prompt_title": "Bienvenido a SceneryX",
         "onboarding.prompt_subtitle": "Realice un recorrido guiado rápido para descubrir cómo navegar, inspeccionar escenarios, gestionar complementos y optimizar vuelos.",
         "onboarding.btn_start": "Iniciar recorrido interactivo",
@@ -2209,14 +2274,18 @@ const LOCALES = {
         "onboarding.step7_body": "Inspeccione los datos en el panel lateral: códigos OACI e IATA, estado activo, desarrollador del escenario, elevación y coordenadas GPS.",
         "onboarding.step8_title": "Detalles técnicos del aeropuerto",
         "onboarding.step8_body": "Consulte especificaciones de pistas (dimensiones, superficie, luces), coordenadas de umbrales, elevación y estado del perfil GSX.",
-        "onboarding.step9_title": "Add-ons disponibles",
-        "onboarding.step9_body": "Consulte todos los paquetes detectados para este aeropuerto (Payware, Freeware, Streaming). Active, desactive o aísle versiones con un solo clic.",
+        "onboarding.step9_sceneries_title": "Escenarios principales disponibles",
+        "onboarding.step9_sceneries_body": "Explore todos los paquetes detectados para este aeropuerto. Los escenarios completos (Payware, Freeware, Asobo, Default) son mutuamente excluyentes: al seleccionar uno se activa y se desactivan los demás para evitar conflictos visuales y cierres.",
+        "onboarding.step10_fixes_title": "Fixes y Overlays disponibles",
+        "onboarding.step10_fixes_body": "A diferencia de los escenarios completos, la sección «AVAILABLE FIXES & OVERLAYS» reúne mejoras acumulables (perfiles GSX personalizados, correcciones de pistas de rodaje, iluminación nocturna, parches de fotogrametría). Cada uno cuenta con un interruptor verde independiente para funcionar simultáneamente sobre su escenario principal.",
+        "onboarding.step9_title": "Add-ons y Fixes disponibles",
+        "onboarding.step9_body": "Explore todos los paquetes detectados para este aeropuerto. A diferencia de los escenarios completos que son mutuamente excluyentes, los Fixes & Overlays disponibles (correcciones de pistas de rodaje, iluminación nocturna, mejoras de fotogrametría, perfiles GSX) son acumulables y se superponen con interruptores independientes.",
         "onboarding.step10_title": "Aerolíneas operativas",
         "onboarding.step10_body": "Descubra aerolíneas comerciales que operan en este aeropuerto y dibuje rutas directamente sobre el mapa mundial.",
         "onboarding.filter_pricing_title": "Modelo de precio",
         "onboarding.filter_pricing_body": "Aísle aeropuertos según su tipo: complementos Payware, Freeware comunitarios, escenarios artesanales de Asobo / World Updates o aeropuertos predeterminados de MSFS. Admite selección múltiple.",
         "onboarding.filter_source_title": "Origen del escenario",
-        "onboarding.filter_source_body": "Distinga entre paquetes instalados en su carpeta Community (mods locales) y paquetes oficiales de MSFS (incluido el contenido transmitido en MSFS 2024).",
+        "onboarding.filter_source_body": "Distingua entre paquetes instalados en su carpeta Community (mods locales) y paquetes oficiales de MSFS (incluido el contenido transmitido en MSFS 2024).",
         "onboarding.filter_region_title": "Región del mundo",
         "onboarding.filter_region_body": "Limite su búsqueda a 11 regiones geográficas (Europa Occidental, Norteamérica, Asia, Oceanía...) o visualice el mapa global con un solo clic.",
         "onboarding.filter_type_title": "Categoría de aeropuerto",
@@ -2233,16 +2302,27 @@ const LOCALES = {
         "onboarding.step_graphics_body": "Todos los ajustes gráficos de MSFS organizados en tres entornos claros: Shared (comunes), 2D Display y VR Headset (con soporte para puente OFXR Frame Gen). Gestione perfiles y supervise el balance CPU/VRAM en tiempo real.",
         "onboarding.step_bg_tools_title": "Detección de OFXR y Conflictos de Auto FPS",
         "onboarding.step_bg_tools_body": "SceneryX detecta automáticamente si el puente OFXR Frame Gen está activo para sincronizar la cadencia en VR. Por el contrario, Smart LOD y la herramienta externa MSFS AutoFPS modifican las mismas direcciones de memoria y no pueden coexistir: esta ventana de alerta aparece si Auto FPS se ejecuta en segundo plano para evitar tirones.",
-        "onboarding.step_my_rig_title": "Auditoría de hardware (My Rig)",
-        "onboarding.step_my_rig_body": "Auditoría en tiempo real de sus componentes: procesador (CPU), tarjeta gráfica (GPU), memoria RAM, almacenamiento SSD NVMe ultrarrápido, ancho de banda de red y visores VR detectados.",
+        "onboarding.step_system_optimizer_title": "System Optimizer (Optimización de Windows y GPU)",
+        "onboarding.step_system_optimizer_body": "System Optimizer audita y ajusta 7 parámetros críticos de Windows y GPU fuera de MSFS: HAGS (Programación de GPU acelerada por hardware para DLSS 3 Frame Gen), Modo Juego de Windows, Plan de energía de máximo rendimiento, Re-Size BAR, Caché de sombreadores DirectX (10 GB recomendado), Controladores GPU y Aislamiento de núcleo VBS para eliminar tirones.",
+        "onboarding.step_my_rig_title": "Especificaciones de hardware y recomendaciones a medida",
+        "onboarding.step_my_rig_body": "SceneryX detecta automáticamente las especificaciones de su equipo (núcleos/hilos de CPU, arquitectura y VRAM de GPU, velocidad de RAM y XMP, almacenamiento NVMe y refresco de pantalla) para adaptar dinámicamente todas las recomendaciones de optimización según su hardware.",
         "onboarding.step_display_select_title": "Selección de pantalla activa",
         "onboarding.step_display_select_body": "Paso imprescindible: haga clic obligatoriamente en el monitor que estará activo mientras MSFS se ejecuta (ej. Pantalla 1 a 180 Hz o Pantalla 2 a 165 Hz). SceneryX calibra la tasa de refresco, la fluidez y el objetivo 1/2 Sync en esa pantalla exacta para evitar problemas de sincronización.",
+        "onboarding.step_rig_maintenance_title": "Update & Cache Cleaner (Actualización segura y limpieza de caché)",
+        "onboarding.step_rig_maintenance_body": "Proteja sus carpetas Community en 1 clic antes de cualquier actualización de MSFS (cuarentena atómica + restauración instantánea) y purgue SceneryIndexes, binarios WASM compilados, Rolling Cache, cachés StreamedPackages/ModelLib y sombreadores DirectX/GPU para eliminar micro-tirones.",
+        "my_rig.help_btn_title": "Guía y ayuda de Rig y Sistema",
         "onboarding.step_ingame_install_title": "Instalación del panel en juego",
         "onboarding.step_ingame_install_body": "En Configuración, un solo clic en «INSTALL» despliega el panel HUD de SceneryX en su carpeta Community de MSFS para acceder a Smart LOD y telemetría de vuelo directamente en la barra del simulador en 2D y VR.",
         "onboarding.step_ingame_cockpit_title": "Panel en juego en cabina",
         "onboarding.step_ingame_cockpit_body": "Así se muestra el panel de SceneryX en la cabina de MSFS: ajuste los deslizadores TLOD / OLOD en tiempo real, active Auto Cloud Recovery y supervise FPS mostrados/base, latencia del CPU MainThread y carga de GPU/VRAM en vuelo.",
+        "onboarding.step_ingame_live_graphics_title": "Ajustes gráficos en vivo en cabina",
+        "onboarding.step_ingame_live_graphics_body": "Despliegue la barra rápida superior del panel en cabina para cambiar ajustes gráficos de MSFS en caliente durante el vuelo (Max FPS, Nubes, Pre-Cache, Sombras de terreno, Edificios, Árboles, Plantas, Hierba) sin pausar el simulador. Fije hasta 5 favoritos arriba, aplique cambios al instante o restablezca cualquier opción (↺) con un clic.",
         "onboarding.step_flight_report_title": "Informes de rendimiento de vuelo",
         "onboarding.step_flight_report_body": "Registre sus vuelos con «Start Monitoring» para generar informes completos: gráficos de fluidez (FPS, 1% Low, ms de CPU MainThread), consumo de VRAM/RAM y análisis de tirones para optimizar su simulador.",
+        "settings.help_btn_title": "Guía y Ayuda de Ajustes",
+        "onboarding.context_settings_title": "Carpetas y Ajustes",
+        "onboarding.context_settings_body": "Configure sus rutas de paquetes Community y Official de MSFS, la carpeta de GSX, el modo de navegación (Clásico o Radial), la velocidad y zoom de cámara e instale el panel en juego.",
+        "onboarding.context_got_it": "Entendido",
         "settings.zoom_regional": "Regional (6.0)",
         "settings.zoom_runway": "Pista (12.0)",
         "settings.zoom_wide": "Amplio (4.0)",
@@ -2966,9 +3046,7 @@ let currentLang = 'en';
 function t(key, fallback = '', params = null) {
     let str = fallback || key;
     if (typeof LOCALES !== 'undefined') {
-        if (LOCALES[currentLang] && LOCALES[currentLang][key] !== undefined) {
-            str = LOCALES[currentLang][key];
-        } else if (LOCALES['en'] && LOCALES['en'][key] !== undefined) {
+        if (LOCALES['en'] && LOCALES['en'][key] !== undefined) {
             str = LOCALES['en'][key];
         }
     }
@@ -2983,9 +3061,6 @@ function t(key, fallback = '', params = null) {
 function getLocalizedCountryName(isoUpper, defaultName = '') {
     if (!isoUpper) return defaultName;
     const iso = isoUpper.toUpperCase().trim();
-    if (currentLang !== 'en' && LOCALIZED_COUNTRIES[currentLang] && LOCALIZED_COUNTRIES[currentLang][iso]) {
-        return LOCALIZED_COUNTRIES[currentLang][iso];
-    }
     if (typeof ISO_TO_COUNTRY_NAME !== 'undefined' && ISO_TO_COUNTRY_NAME[iso]) {
         return ISO_TO_COUNTRY_NAME[iso];
     }
@@ -2993,20 +3068,20 @@ function getLocalizedCountryName(isoUpper, defaultName = '') {
 }
 
 function getLocalizedAirportType(rawType) {
-    if (!rawType) return t('filter.type_regional', 'Regional');
+    if (!rawType) return 'Regional';
     const s = rawType.toLowerCase();
-    if (s.includes('international') || s.includes('internacional')) return t('filter.type_international', 'International');
-    if (s.includes('regional')) return t('filter.type_regional', 'Regional');
-    if (s.includes('general') || s.includes('ga') || s.includes('aviación') || s.includes('aviacion')) return t('filter.type_ga', 'General Aviation');
-    if (s.includes('heli') || s.includes('water') || s.includes('wasser') || s.includes('hidro')) return t('filter.type_heli_water', 'Heli / Water');
+    if (s.includes('international') || s.includes('internacional')) return 'International';
+    if (s.includes('regional')) return 'Regional';
+    if (s.includes('general') || s.includes('ga') || s.includes('aviación') || s.includes('aviacion')) return 'General Aviation';
+    if (s.includes('heli') || s.includes('water') || s.includes('wasser') || s.includes('hidro')) return 'Heli / Water';
     return rawType;
 }
 
 function setAppLanguage(lang) {
-    if (!LOCALES[lang]) lang = 'en';
-    currentLang = lang;
+    lang = 'en';
+    currentLang = 'en';
     if (typeof currentSettings !== 'undefined' && currentSettings) {
-        currentSettings.language = lang;
+        currentSettings.language = 'en';
     }
 
     // Apply data-i18n to elements (supports <br> for multi-line)

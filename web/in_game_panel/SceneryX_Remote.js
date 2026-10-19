@@ -1570,6 +1570,22 @@ if (typeof checkAutoload === "function") {
             }
         }
 
+        // Optimistic immediate sync when re-enabling Auto Cloud Recovery:
+        // clear any manual override on Clouds and restore nominal/calculated value immediately
+        if (targetState) {
+            delete stagedGfxValues.clouds;
+            if (profileGfxValues && profileGfxValues.clouds !== undefined) {
+                liveGfxValues.clouds = Number(profileGfxValues.clouds);
+            }
+            let liveCloudValEl = document.getElementById("cloud-recovery-live-val");
+            let qMap = { 0: "LOW", 1: "MEDIUM", 2: "HIGH", 3: "ULTRA" };
+            if (liveCloudValEl && liveGfxValues.clouds !== undefined) {
+                liveCloudValEl.textContent = qMap[liveGfxValues.clouds] || "HIGH";
+            }
+            renderPinnedPills();
+            syncLiveGfxSelectsFromTelemetry();
+        }
+
         // Safety fallback: guarantee release within 1500ms
         setTimeout(function () {
             isCloudRecoveryToggling = false;
@@ -1586,6 +1602,17 @@ if (typeof checkAutoload === "function") {
                 btnCloud.className = currentCloudRecovery ? "switch-btn switch-on" : "switch-btn switch-off";
                 btnCloud.setAttribute("aria-checked", currentCloudRecovery ? "true" : "false");
                 if (lblCloud) lblCloud.textContent = currentCloudRecovery ? "ON" : "OFF";
+            }
+            if (currentCloudRecovery && data && data.cloud_quality !== undefined) {
+                delete stagedGfxValues.clouds;
+                liveGfxValues.clouds = Number(data.cloud_quality);
+                let liveCloudValEl = document.getElementById("cloud-recovery-live-val");
+                let qMap = { 0: "LOW", 1: "MEDIUM", 2: "HIGH", 3: "ULTRA" };
+                if (liveCloudValEl) {
+                    liveCloudValEl.textContent = data.cloud_label || qMap[liveGfxValues.clouds] || "HIGH";
+                }
+                renderPinnedPills();
+                syncLiveGfxSelectsFromTelemetry();
             }
             pollTelemetry();
         });
