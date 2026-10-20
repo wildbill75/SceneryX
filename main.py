@@ -1,4 +1,4 @@
-import os
+﻿import os
 import sys
 import time
 import json
@@ -3850,7 +3850,7 @@ class Api:
                         snippet = h[idx:idx+4500]
                         m = re.search(r'class=[\'"]?money[\'"]?[^>]*>[^\d]*(\d+[\.,]\d{2})\s*([A-Z]{3})', snippet)
                         if not m:
-                            m = re.search(r'[£$€]\s*(\d+[\.,]\d{2})\s*([A-Z]{3})?', snippet)
+                            m = re.search(r'[Â£$â‚¬]\s*(\d+[\.,]\d{2})\s*([A-Z]{3})?', snippet)
                         if m:
                             price_val = float(m.group(1).replace(',', '.'))
                             if len(m.groups()) > 1 and m.group(2):
@@ -4189,7 +4189,7 @@ class Api:
                 req = urllib.request.Request(prod_url, headers={'User-Agent': 'Mozilla/5.0', 'Accept-Language': 'fr-FR,fr;q=0.9'})
                 with urllib.request.urlopen(req, timeout=4) as resp:
                     html = resp.read().decode('utf-8', errors='ignore')
-                    num_m = re.search(r'€\s*(\d+[\.,]\d{2})|(\d+[\.,]\d{2})\s*€', html)
+                    num_m = re.search(r'â‚¬\s*(\d+[\.,]\d{2})|(\d+[\.,]\d{2})\s*â‚¬', html)
                     if num_m:
                         val = num_m.group(1) or num_m.group(2)
                         return True, prod_url, float(val.replace(',', '.')), "EUR", dev_name
@@ -4671,7 +4671,7 @@ class Api:
                     content = f.read()
                 m = re.search(r'title="SceneryX\s+((?:PRO_|LITE_|RC_(?:v)?)\d+\.\d+\.\d+(?:-LITE)?)"', content)
                 if not m:
-                    m = re.search(r'((?:PRO_|LITE_|RC_(?:v)?)\d+\.\d+\.\d+(?:-LITE)?)\s*(?:•\s*)?&copy;', content)
+                    m = re.search(r'((?:PRO_|LITE_|RC_(?:v)?)\d+\.\d+\.\d+(?:-LITE)?)\s*(?:â€¢\s*)?&copy;', content)
                 if m:
                     return self._normalize_version_tag(m.group(1).strip())
         except Exception:
@@ -4698,7 +4698,7 @@ class Api:
         "**Release Date:** October 18, 2026\n"
         "**Channel:** `Updates/patches`\n\n"
         "## What's New & Fixed\n\n"
-        "### 1. My Rig — Update & Cache Cleaner\n"
+        "### 1. My Rig â€” Update & Cache Cleaner\n"
         "- **Safe Update Mode (Community Quarantine):** Added 1-click Community folder quarantine (`PREPARE FOR UPDATE` / restore) in **My Rig > Update & Cache Cleaner** to safely park and restore your Community add-ons before and after MSFS Sim Updates.\n"
         "- **MSFS & GPU Shader Cache Cleaner:** Added real-time scanning and 1-click cleanup (`PURGE ALL CACHES` or individual purge) for MSFS SceneryIndexes, Rolling Cache, StreamedPackages cache, WASM/Aircraft state caches, and DirectX / NVIDIA / AMD GPU Shader Caches.\n\n"
         "### 2. Live Telemetry & MSFS In-Game Panel Synchronization\n"
@@ -4719,7 +4719,7 @@ class Api:
         "**Release Date:** October 19, 2026\n"
         "**Channel:** `Updates/patches`\n\n"
         "## What's New & Fixed\n\n"
-        "### 1. MSFS In-Game Panel — Live Graphics Tuning Accordion & 5-Pin Header\n"
+        "### 1. MSFS In-Game Panel â€” Live Graphics Tuning Accordion & 5-Pin Header\n"
         "- **Live RAM Graphics Tuning (No Restart Required):** Added an expandable accordion in the MSFS In-Game Panel allowing real-time in-flight adjustment of the 8 live-modifiable MSFS graphics settings (`Max FPS`, `Volumetric Clouds`, `Terrain Pre-Caching`, `Terrain Shadows`, `Buildings`, `Trees`, `Plants`, and `Grass`).\n"
         "- **Dual-Write RAM + Profile Persistence:** Clicking `APPLY` injects the changes directly into MSFS memory (2D & VR) and automatically saves them into your active SceneryX profile and `UserCfg.opt`.\n"
         "- **Customizable 5-Pin Top Bar:** Pin up to 5 favorite parameters to keep their live values visible at a glance when the accordion is collapsed.\n"
@@ -4727,7 +4727,7 @@ class Api:
         "### 2. Smart LOD & Auto Cloud Recovery Enhancements\n"
         "- **Live Cloud Quality Display & Ultra Boost:** Added real-time `LIVE : LOW / MEDIUM / HIGH / ULTRA` cloud quality indicators in both the MSFS In-Game Panel and the SceneryX Smart LOD window, with automatic recovery and boost up to `ULTRA` when GPU headroom allows.\n"
         "- **Instant Smart LOD Re-Engagement:** Resolved an issue in the In-Game Panel where re-enabling `SMART LOD REGULATION` (`ON`) after manual slider overrides required toggling `ON/OFF` twice to resume automatic regulation.\n\n"
-        "### 3. Post-Flight Report — Velocity-Aware Timeline Zoom & Pan\n"
+        "### 3. Post-Flight Report â€” Velocity-Aware Timeline Zoom & Pan\n"
         "- **Duration-Scaled & Velocity-Aware Wheel Zoom:** Redesigned the Post-Flight Report chart zoom to scale dynamically with flight duration and mouse wheel scroll speed, making zooming into long flights effortless.\n"
         "- **Hard-Stop Minimum Window (No Disappearing Graphs):** Added a strict minimum 8-sample zoom floor (`minSpan`) and synchronized drag-to-pan across all flight report charts so curves never disappear at maximum zoom."
     )
@@ -4736,9 +4736,9 @@ class Api:
         "**Release Date:** October 19, 2026\n"
         "**Channel:** `Updates/patches`\n\n"
         "## What's New & Fixed\n\n"
-        "### 1. MSFS In-Game Panel — Independent Auto Cloud Recovery, Per-Setting Reset (`↺`) & Enlarged Controls\n"
+        "### 1. MSFS In-Game Panel â€” Independent Auto Cloud Recovery, Per-Setting Reset (`â†º`) & Enlarged Controls\n"
         "- **Independent Auto Cloud Recovery:** `AUTO CLOUD RECOVERY` now operates independently even when `SMART LOD REGULATION` (`TLOD`/`OLOD`) is turned `OFF`, continuously monitoring FPS/MainThread headroom and displaying real-time `LIVE : LOW / MEDIUM / HIGH / ULTRA` cloud status.\n"
-        "- **Per-Setting Baseline Reset (`↺`):** Added individual reset (`↺`) buttons next to each of the 8 hot-swappable graphics parameters in the In-Game Panel to instantly restore any setting back to its pre-flight baseline.\n"
+        "- **Per-Setting Baseline Reset (`â†º`):** Added individual reset (`â†º`) buttons next to each of the 8 hot-swappable graphics parameters in the In-Game Panel to instantly restore any setting back to its pre-flight baseline.\n"
         "- **Refined Cockpit UI Ergonomics:** Enlarged the Live Graphics Tuning accordion controls, quick-pin badges, and default cockpit panel dimensions for effortless readability in both 2D and VR.\n\n"
         "### 2. MSFS 2024 Store / Marketplace (`StreamedPackages`) Detection & Startup Modal Queue\n"
         "- **Multi-Source Package Snapshot Tracking:** Upgraded `library_snapshot.json` to track all installed packages per airport across `Community`, `Official`, and `MSFS 2024 StreamedPackages`. Installing a new Store/Marketplace or Community airport for an ICAO that already had a base package now reliably triggers the **Library Changes Detected** modal on startup.\n"
@@ -4752,20 +4752,20 @@ class Api:
         "**Release Date:** October 20, 2026\n"
         "**Channel:** `Updates/patches`\n\n"
         "## What's New & Fixed\n\n"
-        "### 1. Smart LOD Governor & MSFS In-Game Panel — Live Memory Engine & Manual Mode Fix\n"
+        "### 1. Smart LOD Governor & MSFS In-Game Panel â€” Live Memory Engine & Manual Mode Fix\n"
         "- **MSFS 2024 Live Memory Offset & Automatic Signature Scanner:** Updated the Win32 Memory Engine base offset (`0x0A80B024`) for the latest `FlightSimulator2024.exe` build and added an automatic `.data` signature scanner so live `TLOD`, `OLOD`, `Clouds`, and hot-swappable graphics writes attach in Read/Write mode across all MSFS 2024 updates.\n"
         "- **Persistent Manual Mode (`MAN`) Disengagement:** Fixed an issue in both the MSFS In-Game Panel and the SceneryX internal Smart LOD window where disabling Smart LOD (`OFF`) or disengaging directly by dragging the `TLOD` / `OLOD` sliders caused Smart LOD to snap back to `ON` after ~2 seconds.\n"
-        "- **Automatic In-Game Panel Refresh on Startup:** SceneryX Pro now automatically refreshes the installed `wildbill75-sceneryx` package in your MSFS `Community` folder on startup whenever a patch update is applied.\n\n"
-        "### 2. Custom Graphics Profiles — Independent Profile Saving & Switching Fix\n"
+        "- **Automatic In-Game Panel Refresh on Startup:** SceneryX Pro now automatically refreshes the installed **SceneryX In-Game Panel** in your MSFS `Community` folder on startup whenever a patch update is applied.\n\n"
+        "### 2. Custom Graphics Profiles â€” Independent Profile Saving & Switching Fix\n"
         "- **Protected Active Profile Presets:** Changing individual settings in the Graphics Settings matrix no longer silently overwrites the currently active `.profile.json` file on disk before clicking `SAVE PROFILE`, allowing you to tweak settings and save them as a brand-new profile (e.g., `2D Display ULTRA`) without altering your baseline profile (`2D Display Standard`).\n"
         "- **Instant Matrix Refresh on Profile Switch:** Selecting a profile from the dropdown immediately loads and renders that profile's exact saved configuration in the Graphics Settings matrix and applies it to `UserCfg.opt`."
     )
 
     DEFAULT_PATCH_CHANGELOGS = {
-        "PRO_1.1.1": "# SceneryX — Patch PRO_1.1.1 (Day-One Update)\n\n" + _PATCH_1_1_1_CHANGELOG_BODY,
-        "PRO_1.1.2": "# SceneryX — Patch PRO_1.1.2\n\n" + _PATCH_1_1_2_CHANGELOG_BODY,
-        "PRO_1.1.3": "# SceneryX — Patch PRO_1.1.3\n\n" + _PATCH_1_1_3_CHANGELOG_BODY,
-        "PRO_1.1.4": "# SceneryX — Patch PRO_1.1.4\n\n" + _PATCH_1_1_4_CHANGELOG_BODY,
+        "PRO_1.1.1": "# SceneryX â€” Patch PRO_1.1.1 (Day-One Update)\n\n" + _PATCH_1_1_1_CHANGELOG_BODY,
+        "PRO_1.1.2": "# SceneryX â€” Patch PRO_1.1.2\n\n" + _PATCH_1_1_2_CHANGELOG_BODY,
+        "PRO_1.1.3": "# SceneryX â€” Patch PRO_1.1.3\n\n" + _PATCH_1_1_3_CHANGELOG_BODY,
+        "PRO_1.1.4": "# SceneryX â€” Patch PRO_1.1.4\n\n" + _PATCH_1_1_4_CHANGELOG_BODY,
     }
 
     def _fetch_remote_text(self, url, timeout=3.5):
@@ -4799,7 +4799,7 @@ class Api:
 
         return self.DEFAULT_PATCH_CHANGELOGS.get(
             norm_tag,
-            f"# SceneryX — Patch {norm_tag}\n\nPatch **{norm_tag}** has been successfully installed.\nAll your user settings, custom profiles, and scenery configurations have been preserved."
+            f"# SceneryX â€” Patch {norm_tag}\n\nPatch **{norm_tag}** has been successfully installed.\nAll your user settings, custom profiles, and scenery configurations have been preserved."
         )
 
     def check_available_patch(self):
