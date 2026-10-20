@@ -203,12 +203,13 @@ if (typeof checkAutoload === "function") {
             function startDrag(handleType, e) {
                 if (currentIsExtAutoFps) return;
                 if (currentLodActive) {
-                    disengageSmartLodFromManualAction();
+                    disengageSmartLodFromManualAction(true);
                 }
                 e.preventDefault();
                 e.stopPropagation();
                 self.activeHandle = handleType;
                 self.isDragging = true;
+                self.hasMovedDuringDrag = false;
                 isSliderDragging = true;
                 markUserInteracting();
 
@@ -234,7 +235,7 @@ if (typeof checkAutoload === "function") {
                 if (currentIsExtAutoFps) return;
                 if (e.target === self.floorHandle || e.target === self.cruiseHandle) return;
                 if (currentLodActive) {
-                    disengageSmartLodFromManualAction();
+                    disengageSmartLodFromManualAction(true);
                 }
                 e.preventDefault();
                 let clickedVal = self.calcValFromClientX(e.clientX);
@@ -245,6 +246,7 @@ if (typeof checkAutoload === "function") {
                 let chosenHandle = (distFloor <= distCruise) ? "floor" : "cruise";
                 self.activeHandle = chosenHandle;
                 self.isDragging = true;
+                self.hasMovedDuringDrag = true;
                 isSliderDragging = true;
                 markUserInteracting();
 
@@ -267,6 +269,7 @@ if (typeof checkAutoload === "function") {
             window.addEventListener("mousemove", function (e) {
                 if (!self.isDragging || !self.activeHandle) return;
                 e.preventDefault();
+                self.hasMovedDuringDrag = true;
                 markUserInteracting();
                 let val = self.calcValFromClientX(e.clientX);
                 let current = self.getValues();
@@ -287,6 +290,7 @@ if (typeof checkAutoload === "function") {
             window.addEventListener("touchmove", function (e) {
                 if (!self.isDragging || !self.activeHandle || !e.touches || e.touches.length === 0) return;
                 e.preventDefault();
+                self.hasMovedDuringDrag = true;
                 markUserInteracting();
                 let touch = e.touches[0];
                 let val = self.calcValFromClientX(touch.clientX);
@@ -307,12 +311,22 @@ if (typeof checkAutoload === "function") {
 
             function stopDrag() {
                 if (self.isDragging) {
+                    let lastHandle = self.activeHandle;
+                    let moved = self.hasMovedDuringDrag;
                     self.isDragging = false;
+                    self.hasMovedDuringDrag = false;
                     isSliderDragging = false;
                     if (self.floorHandle) self.floorHandle.classList.remove("active");
                     if (self.cruiseHandle) self.cruiseHandle.classList.remove("active");
                     self.activeHandle = null;
                     markUserInteracting();
+                    let current = self.getValues();
+                    let finalVal = (lastHandle === "cruise") ? current.cruise : current.floor;
+                    if (!moved) {
+                        self.onCommit(finalVal);
+                    } else {
+                        sendAxisConfigUpdate(self.axis, finalVal);
+                    }
                 }
             }
 
@@ -322,10 +336,12 @@ if (typeof checkAutoload === "function") {
         }
     }
 
-    function disengageSmartLodFromManualAction() {
+    function disengageSmartLodFromManualAction(skipNetwork) {
         if (!currentLodActive || currentIsExtAutoFps) return;
         currentLodActive = false;
+        isSmartLodToggling = true;
         lastSmartLodToggleTime = Date.now();
+        markUserInteracting();
         let btnLod = document.getElementById("smart-lod-toggle-btn");
         let lblLod = document.getElementById("smart-lod-btn-label");
         if (btnLod) {
@@ -335,6 +351,33 @@ if (typeof checkAutoload === "function") {
         if (lblLod) lblLod.textContent = "OFF";
         setAxisUiState("tlod", true, false);
         setAxisUiState("olod", true, false);
+
+        setTimeout(function () {
+            isSmartLodToggling = false;
+        }, 2500);
+
+        if (skipNetwork) return;
+
+        try {
+            let xhr = new XMLHttpRequest();
+            xhr.open("POST", getApiBase() + "/smart_lod/set_lod", true);
+            xhr.setRequestHeader("Content-Type", "application/json");
+            xhr.timeout = 2500;
+            xhr.onload = xhr.onerror = xhr.ontimeout = function () {
+                isSmartLodToggling = false;
+            };
+            xhr.send(JSON.stringify({
+                disengage_auto: true,
+                mode: currentIsVr ? "VR" : "2D",
+                axis: "tlod",
+                tlod: currentTlodFloor,
+                base: currentTlodFloor,
+                target: currentTlodCruise,
+                altitude: currentTlodAlt
+            }));
+        } catch (e) {
+            isSmartLodToggling = false;
+        }
     }
 
     function markUserInteracting() {
@@ -345,12 +388,27 @@ if (typeof checkAutoload === "function") {
         }, 2500);
     }
 
+    let lastAxisSendTime = { tlod: 0, olod: 0 };
+    let axisThrottleTimers = { tlod: null, olod: null };
+
     function queueAxisConfigUpdate(axis, directVal) {
         markUserInteracting();
-        if (debounceTimer) clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(function () {
+        let now = Date.now();
+        let elapsed = now - (lastAxisSendTime[axis] || 0);
+        if (axisThrottleTimers[axis]) {
+            clearTimeout(axisThrottleTimers[axis]);
+            axisThrottleTimers[axis] = null;
+        }
+        if (elapsed >= 80) {
+            lastAxisSendTime[axis] = now;
             sendAxisConfigUpdate(axis, directVal);
-        }, 120);
+        } else {
+            axisThrottleTimers[axis] = setTimeout(function () {
+                lastAxisSendTime[axis] = Date.now();
+                axisThrottleTimers[axis] = null;
+                sendAxisConfigUpdate(axis, directVal);
+            }, 80 - elapsed);
+        }
     }
 
     function sendAxisConfigUpdate(axis, directVal) {
@@ -360,9 +418,16 @@ if (typeof checkAutoload === "function") {
         let altVal = (axis === "tlod") ? currentTlodAlt : currentOlodAlt;
 
         if (!currentLodActive) {
-            // In MAN mode: write directly to MSFS RAM and disengage auto without overwriting Smart LOD profile bounds
+            // In MAN mode: write directly to MSFS RAM, disengage auto, and persist manual slider positions
             let valToWrite = (directVal !== undefined) ? directVal : baseVal;
-            let payload = { disengage_auto: true };
+            let payload = {
+                disengage_auto: true,
+                mode: mode,
+                axis: axis,
+                base: baseVal,
+                target: targetVal,
+                altitude: altVal
+            };
             payload[axis] = valToWrite;
             let urlLod = getApiBase() + "/smart_lod/set_lod";
             let xhrLod = new XMLHttpRequest();
@@ -911,7 +976,8 @@ if (typeof checkAutoload === "function") {
         currentIsExtAutoFps = isExtAutoFps;
         let lodEnabled = !isExtAutoFps && ((lod.enabled !== undefined) ? !!lod.enabled : (data.smart_lod_enabled !== undefined ? !!data.smart_lod_enabled : false));
         let lodActive = !isExtAutoFps && ((lod.active !== undefined) ? !!lod.active : lodEnabled);
-        if (!isSmartLodToggling) {
+        let isProtectedManualTransition = isSmartLodToggling || isSliderDragging || isUserInteracting || (Date.now() - lastSmartLodToggleTime <= 2500);
+        if (!isProtectedManualTransition) {
             currentLodActive = isExtAutoFps ? false : lodEnabled;
         }
 
@@ -948,7 +1014,7 @@ if (typeof checkAutoload === "function") {
                 btnLod.style.opacity = "1";
                 btnLod.style.pointerEvents = "auto";
                 btnLod.style.cursor = "pointer";
-                if (!isSmartLodToggling && (Date.now() - lastSmartLodToggleTime > 1200)) {
+                if (!isProtectedManualTransition) {
                     if (lodEnabled) {
                         btnLod.className = "switch-btn switch-on";
                         btnLod.setAttribute("aria-checked", "true");
@@ -1681,7 +1747,7 @@ if (typeof checkAutoload === "function") {
             function (directVal) {
                 if (currentIsExtAutoFps) return;
                 if (currentLodActive) {
-                    disengageSmartLodFromManualAction();
+                    disengageSmartLodFromManualAction(true);
                 }
                 setAxisUiState(axis, true, false);
                 let liveEl = document.getElementById(axis + "-live-val");

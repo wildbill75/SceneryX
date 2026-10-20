@@ -671,27 +671,47 @@ class SmartLodController:
             }
 
     def set_axis_state(self, mode: str, axis: str, enabled: Optional[bool] = None, target: Optional[int] = None, altitude: Optional[int] = None, base: Optional[int] = None) -> Dict[str, Any]:
+        write_val: Optional[float] = None
         with self._lock:
             pfx = "vr" if str(mode).upper() == "VR" else "2d"
             ax = "olod" if "olod" in str(axis).lower() else "tlod"
-            
+
             if enabled is not None:
-                self.config[f"{pfx}_{ax}_active"] = bool(enabled)
+                if not bool(enabled):
+                    self.config["enabled"] = False
+                    self.config["2d_tlod_active"] = False
+                    self.config["2d_olod_active"] = False
+                    self.config["vr_tlod_active"] = False
+                    self.config["vr_olod_active"] = False
+                    self.status_message = "MAN"
+                else:
+                    self.config[f"{pfx}_{ax}_active"] = True
             max_v = 400 if ax == "tlod" else 300
             other_pfx = "2d" if pfx == "vr" else "vr"
             if base is not None:
                 b_val = max(0, min(int(base), max_v))
                 self.config[f"{pfx}_{ax}_base"] = b_val
                 self.config[f"{other_pfx}_{ax}_base"] = b_val
+                if ax == "tlod":
+                    self.dynamic_tlod_floor = float(b_val)
+                else:
+                    self.dynamic_olod_floor = float(b_val)
+                write_val = float(b_val)
             if target is not None:
                 t_val = max(0, min(int(target), max_v))
                 self.config[f"{pfx}_{ax}_target"] = t_val
                 self.config[f"{other_pfx}_{ax}_target"] = t_val
+                if ax == "tlod":
+                    self.dynamic_tlod_cruise = float(t_val)
+                else:
+                    self.dynamic_olod_cruise = float(t_val)
+                if write_val is None:
+                    write_val = float(t_val)
             if altitude is not None:
                 a_val = max(0, int(altitude))
                 self.config[f"{pfx}_{ax}_altitude"] = a_val
                 self.config[f"{other_pfx}_{ax}_altitude"] = a_val
-                
+
             any_active = any([
                 self.config.get("2d_tlod_active", False),
                 self.config.get("2d_olod_active", False),
@@ -699,13 +719,58 @@ class SmartLodController:
                 self.config.get("vr_olod_active", False),
             ])
             if enabled is not None:
-                self.config["enabled"] = any_active and not self.config.get("external_autofps", False)
+                self.config["enabled"] = bool(enabled) and any_active and not self.config.get("external_autofps", False)
+
+            if self.config.get("enabled", False):
+                if ax == "tlod":
+                    self.manual_tlod = None
+                else:
+                    self.manual_olod = None
+            elif write_val is not None:
+                if ax == "tlod":
+                    self.manual_tlod = float(write_val)
+                    self.current_tlod_setpoint = float(write_val)
+                else:
+                    self.manual_olod = float(write_val)
+                    self.current_olod_setpoint = float(write_val)
+
             try:
                 with open(CONFIG_FILE_PATH, "w", encoding="utf-8") as f:
                     json.dump(self.config, f, indent=4)
             except Exception as e:
                 print(f"[SmartLOD] Erreur sauvegarde config: {e}")
-                
+
+            # Sync updated slider bounds to active .lodprofile.json so re-enabling Smart LOD keeps user's slider settings
+            try:
+                aid = get_active_smart_lod_profile_id()
+                if aid:
+                    pfile = os.path.join(_get_smart_lod_profiles_dir(), f"{aid}.lodprofile.json")
+                    if os.path.exists(pfile):
+                        with open(pfile, "r", encoding="utf-8") as pf:
+                            pdata = json.load(pf)
+                        t_base_2d = int(self.config.get("2d_tlod_base", 100))
+                        t_targ_2d = int(self.config.get("2d_tlod_target", 200))
+                        o_base_2d = int(self.config.get("2d_olod_base", 100))
+                        o_targ_2d = int(self.config.get("2d_olod_target", 200))
+                        if t_base_2d < t_targ_2d:
+                            pdata["ground_tlod"] = t_base_2d
+                            pdata["cruise_tlod"] = t_targ_2d
+                            pdata["vr_ground_tlod"] = int(self.config.get("vr_tlod_base", t_base_2d))
+                            pdata["vr_cruise_tlod"] = int(self.config.get("vr_tlod_target", t_targ_2d))
+                        if o_base_2d < o_targ_2d:
+                            pdata["ground_olod"] = o_base_2d
+                            pdata["cruise_olod"] = o_targ_2d
+                            pdata["vr_ground_olod"] = int(self.config.get("vr_olod_base", o_base_2d))
+                            pdata["vr_cruise_olod"] = int(self.config.get("vr_olod_target", o_targ_2d))
+                        pdata["alt_trans"] = int(self.config.get("2d_tlod_altitude", 3000))
+                        pdata["vr_alt_trans"] = int(self.config.get("vr_tlod_altitude", 3000))
+                        pdata["alt_trans_olod"] = int(self.config.get("2d_olod_altitude", 3000))
+                        pdata["vr_alt_trans_olod"] = int(self.config.get("vr_olod_altitude", 3000))
+                        with open(pfile, "w", encoding="utf-8") as pf:
+                            json.dump(pdata, pf, indent=2, ensure_ascii=False)
+            except Exception as e:
+                print(f"[SmartLOD] Notice syncing active lodprofile: {e}")
+
         if self.config.get("enabled"):
             self.start()
             try:
@@ -713,8 +778,20 @@ class SmartLodController:
             except Exception:
                 pass
         else:
-            self.stop(detach=False)
-                
+            if not self.config.get("cloud_recovery", True):
+                self.stop(detach=False)
+            if write_val is not None:
+                try:
+                    if not self.engine.is_attached or self.engine.safe_read_only:
+                        self.engine.attach()
+                    if self.engine.is_attached and not self.engine.safe_read_only:
+                        if ax == "tlod":
+                            self.engine.write_tlod(write_val)
+                        else:
+                            self.engine.write_olod(write_val)
+                except Exception:
+                    pass
+
         return self.get_axis_state(mode)
 
     def set_external_autofps(self, enabled: bool) -> bool:
@@ -792,8 +869,8 @@ class SmartLodController:
         if self.is_running:
             self.is_running = False
             self._stop_event.set()
-            if self._thread and self._thread.is_alive():
-                self._thread.join(timeout=1.5)
+            if self._thread and self._thread.is_alive() and self._thread is not threading.current_thread():
+                self._thread.join(timeout=0.05)
             self._thread = None
             print("[SmartLOD] Moteur de régulation arrêté.")
         if detach:
@@ -945,8 +1022,17 @@ class SmartLodController:
             })
             if not self.config.get("cloud_recovery", True):
                 self.stop(detach=False)
-            reset_res = self.reset_to_active_profile("lod")
             self.status_message = "MAN"
+            self.current_tlod_setpoint = float(nom_tlod)
+            self.current_olod_setpoint = float(nom_olod)
+
+            def _async_reset_lod():
+                try:
+                    self.reset_to_active_profile("lod")
+                except Exception:
+                    pass
+            threading.Thread(target=_async_reset_lod, daemon=True, name="AsyncLodReset").start()
+
             return {
                 "success": True,
                 "conflict": False,
@@ -959,7 +1045,7 @@ class SmartLodController:
                 "tlod_target": cruise_tlod,
                 "olod_base": nom_olod,
                 "olod_target": cruise_olod,
-                "reset_info": reset_res
+                "reset_info": {"success": True, "axis": "lod"}
             }
 
     # ================= REGULATION ALGORITHM =================

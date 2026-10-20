@@ -5,7 +5,7 @@ import re
 
 # Edition Configuration Flag (True = SceneryX Lite funnel edition, False = SceneryX Pro full edition)
 IS_LITE = False
-APP_VERSION = "LITE_1.1.3" if IS_LITE else "PRO_1.1.3"
+APP_VERSION = "LITE_1.1.5" if IS_LITE else "PRO_1.1.5"
 
 def get_resource_file_path(filename):
     if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):

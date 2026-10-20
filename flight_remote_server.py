@@ -325,6 +325,11 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
                     altitude=params.get("altitude"),
                     base=params.get("base")
                 )
+                try:
+                    global _CACHED_LOD_STATUS
+                    _CACHED_LOD_STATUS = dict(flight_lod_controller.get_smart_lod_controller().get_status())
+                except Exception:
+                    pass
                 self._send_json(200, st)
             except Exception as e:
                 self._send_json(500, {"error": str(e)})
@@ -820,11 +825,15 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
             tlod = params.get("tlod")
             olod = params.get("olod")
             disengage_auto = bool(params.get("disengage_auto", False))
+            base_param = params.get("base")
+            target_param = params.get("target")
+            alt_param = params.get("altitude")
+            axis_param = str(params.get("axis", "")).lower()
             res = {"success": True}
 
             import flight_memory_engine
             mem = flight_memory_engine.get_memory_engine()
-            if not mem.is_attached:
+            if not mem.is_attached or mem.safe_read_only:
                 mem.attach()
 
             if tlod is not None:
@@ -841,25 +850,80 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
                     mem.write_olod(olod_val)
                 res["olod"] = olod_val
 
-            # Also update Smart LOD controller setpoints and manual overrides
+            # Also update Smart LOD controller setpoints, manual slider bounds, and persist config
             try:
                 import flight_lod_controller
                 lod_ctrl = flight_lod_controller.get_smart_lod_controller()
-                if disengage_auto and lod_ctrl.config.get("enabled", False):
-                    with lod_ctrl._lock:
+                ax = "olod" if (olod is not None or "olod" in axis_param) else "tlod"
+                max_v = 300 if ax == "olod" else 400
+                config_changed = False
+
+                with lod_ctrl._lock:
+                    if disengage_auto:
                         lod_ctrl.config["enabled"] = False
                         lod_ctrl.config["2d_tlod_active"] = False
                         lod_ctrl.config["2d_olod_active"] = False
                         lod_ctrl.config["vr_tlod_active"] = False
                         lod_ctrl.config["vr_olod_active"] = False
+                        lod_ctrl.status_message = "MAN"
+                        config_changed = True
+
+                    if base_param is not None:
+                        b_val = max(0, min(int(round(float(base_param))), max_v))
+                        lod_ctrl.config[f"2d_{ax}_base"] = b_val
+                        lod_ctrl.config[f"vr_{ax}_base"] = b_val
+                        if ax == "tlod":
+                            lod_ctrl.dynamic_tlod_floor = float(b_val)
+                        else:
+                            lod_ctrl.dynamic_olod_floor = float(b_val)
+                        config_changed = True
+
+                    if target_param is not None:
+                        t_val = max(0, min(int(round(float(target_param))), max_v))
+                        lod_ctrl.config[f"2d_{ax}_target"] = t_val
+                        lod_ctrl.config[f"vr_{ax}_target"] = t_val
+                        if ax == "tlod":
+                            lod_ctrl.dynamic_tlod_cruise = float(t_val)
+                        else:
+                            lod_ctrl.dynamic_olod_cruise = float(t_val)
+                        config_changed = True
+
+                    if alt_param is not None:
+                        a_val = max(500, min(45000, int(round(float(alt_param)))))
+                        lod_ctrl.config[f"2d_{ax}_altitude"] = a_val
+                        lod_ctrl.config[f"vr_{ax}_altitude"] = a_val
+                        config_changed = True
+
+                    if tlod is not None:
+                        lod_ctrl.manual_tlod = float(tlod)
+                        lod_ctrl.current_tlod_setpoint = float(tlod)
+                        if base_param is None:
+                            b_fallback = max(0, min(int(round(float(tlod))), 400))
+                            lod_ctrl.config["2d_tlod_base"] = b_fallback
+                            lod_ctrl.config["vr_tlod_base"] = b_fallback
+                            lod_ctrl.dynamic_tlod_floor = float(b_fallback)
+                            config_changed = True
+
+                    if olod is not None:
+                        lod_ctrl.manual_olod = float(olod)
+                        lod_ctrl.current_olod_setpoint = float(olod)
+                        if base_param is None:
+                            b_fallback = max(0, min(int(round(float(olod))), 300))
+                            lod_ctrl.config["2d_olod_base"] = b_fallback
+                            lod_ctrl.config["vr_olod_base"] = b_fallback
+                            lod_ctrl.dynamic_olod_floor = float(b_fallback)
+                            config_changed = True
+
+                    if config_changed:
+                        try:
+                            with open(flight_lod_controller.CONFIG_FILE_PATH, "w", encoding="utf-8") as cf:
+                                json.dump(lod_ctrl.config, cf, indent=4)
+                        except Exception:
+                            pass
+
+                if disengage_auto and not lod_ctrl.config.get("cloud_recovery", True):
                     lod_ctrl.stop(detach=False)
-                    lod_ctrl.status_message = "MAN"
-                if tlod is not None:
-                    lod_ctrl.manual_tlod = float(tlod)
-                    lod_ctrl.current_tlod_setpoint = float(tlod)
-                if olod is not None:
-                    lod_ctrl.manual_olod = float(olod)
-                    lod_ctrl.current_olod_setpoint = float(olod)
+
                 _CACHED_LOD_STATUS = dict(lod_ctrl.get_status())
             except Exception:
                 pass

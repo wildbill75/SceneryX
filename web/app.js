@@ -217,6 +217,35 @@ function applyLiteEditionLocks() {
         ingameBtn.innerHTML = LITE_PRO_BADGE_INNER;
         ingameBtn.className = LITE_PRO_BADGE_CLASS + ' cursor-pointer';
     }
+
+    // 5. Pro Floating Windows Headers (shown during Onboarding Tour preview in Lite)
+    const proWinIds = [
+        'float-win-route-opt',
+        'float-win-smart-lod',
+        'float-win-graphics',
+        'float-win-my-rig',
+        'float-win-telemetry',
+        'float-win-remote-panel',
+        'float-win-report-viewer',
+        'background-tools-modal'
+    ];
+    proWinIds.forEach(winId => {
+        const winEl = document.getElementById(winId);
+        if (!winEl) return;
+        const headerTitle = winEl.querySelector('.typo-window-header');
+        if (!headerTitle || !headerTitle.parentElement) return;
+        let existingBadge = winEl.querySelector('.lite-win-header-pro-badge');
+        if (isLite) {
+            if (!existingBadge) {
+                existingBadge = document.createElement('span');
+                existingBadge.className = `lite-win-header-pro-badge ${LITE_PRO_BADGE_CLASS} shrink-0`;
+                existingBadge.innerHTML = LITE_PRO_BADGE_INNER;
+                headerTitle.insertAdjacentElement('afterend', existingBadge);
+            }
+        } else if (existingBadge) {
+            existingBadge.remove();
+        }
+    });
 }
 window.applyLiteEditionLocks = applyLiteEditionLocks;
 document.addEventListener('DOMContentLoaded', () => {
@@ -19195,7 +19224,10 @@ class WindowManager {
         const applyWinBounds = (winEl, left, top, width, height) => {
             if (!winEl) return;
             if (!force && winEl._hasBeenDragged) return;
-            winEl.style.transition = 'left 0.35s cubic-bezier(0.16, 1, 0.3, 1), top 0.35s cubic-bezier(0.16, 1, 0.3, 1), width 0.35s cubic-bezier(0.16, 1, 0.3, 1)';
+            const isTourActive = !!(window.onboardingTour && window.onboardingTour.isOpen);
+            winEl.style.transition = isTourActive
+                ? 'none'
+                : 'left 0.35s cubic-bezier(0.16, 1, 0.3, 1), top 0.35s cubic-bezier(0.16, 1, 0.3, 1), width 0.35s cubic-bezier(0.16, 1, 0.3, 1)';
             winEl.style.left = `${Math.round(left)}px`;
             winEl.style.top = `${Math.round(top)}px`;
             if (width !== null) winEl.style.width = `${Math.round(width)}px`;
@@ -19212,6 +19244,13 @@ class WindowManager {
             winEl.style.right = 'auto';
             winEl.style.bottom = 'auto';
             winEl.style.transform = 'none';
+            if (isTourActive && typeof window.onboardingTour.updateSpotlight === 'function') {
+                requestAnimationFrame(() => {
+                    if (window.onboardingTour && window.onboardingTour.isOpen) {
+                        window.onboardingTour.updateSpotlight();
+                    }
+                });
+            }
         };
 
         const getWinNaturalH = (winEl, fallback = 220) => {
@@ -21289,7 +21328,21 @@ function onDualSliderMouseMove(e, axis) {
     }
 }
 
+window._smartLodUserInteracting = false;
+window._smartLodInteractionTimer = null;
+
+function markDesktopSmartLodInteracting() {
+    window._smartLodUserInteracting = true;
+    if (window._smartLodInteractionTimer) {
+        clearTimeout(window._smartLodInteractionTimer);
+    }
+    window._smartLodInteractionTimer = setTimeout(() => {
+        window._smartLodUserInteracting = false;
+    }, 2500);
+}
+
 function onSmartLodBaseInput(axis, val) {
+    markDesktopSmartLodInteracting();
     const modeKey = (String((typeof currentSmartLodMode !== 'undefined' && currentSmartLodMode) || currentMsfsGraphicsMode || '2D').toUpperCase() === 'VR') ? 'vr' : '2d';
     let baseNum = parseInt(val, 10);
     const targetInput = document.getElementById(`smart-lod-target-range-${axis}`);
@@ -21313,6 +21366,7 @@ function onSmartLodBaseInput(axis, val) {
 }
 
 function onSmartLodTargetInput(axis, val) {
+    markDesktopSmartLodInteracting();
     const modeKey = (String((typeof currentSmartLodMode !== 'undefined' && currentSmartLodMode) || currentMsfsGraphicsMode || '2D').toUpperCase() === 'VR') ? 'vr' : '2d';
     let targetNum = parseInt(val, 10);
     const baseInput = document.getElementById(`smart-lod-base-range-${axis}`);
@@ -21336,14 +21390,15 @@ function onSmartLodTargetInput(axis, val) {
 }
 
 function onSmartLodDualSliderChange(axis) {
+    markDesktopSmartLodInteracting();
     const modeKey = (String((typeof currentSmartLodMode !== 'undefined' && currentSmartLodMode) || currentMsfsGraphicsMode || '2D').toUpperCase() === 'VR') ? 'vr' : '2d';
+    const active = Boolean(window.smartLodActive && smartLodAxisState[modeKey] && smartLodAxisState[modeKey][`${axis}_active`]);
     const base = (smartLodAxisState[modeKey] && smartLodAxisState[modeKey][`${axis}_base`] !== undefined)
         ? smartLodAxisState[modeKey][`${axis}_base`]
         : (axis === 'tlod' ? (modeKey === 'vr' ? 90 : 100) : (modeKey === 'vr' ? 80 : 100));
     const target = (smartLodAxisState[modeKey] && smartLodAxisState[modeKey][`${axis}_target`] !== undefined)
         ? smartLodAxisState[modeKey][`${axis}_target`]
         : (axis === 'tlod' ? (modeKey === 'vr' ? 150 : 200) : (modeKey === 'vr' ? 80 : 100));
-    const active = !!(smartLodAxisState[modeKey] && smartLodAxisState[modeKey][`${axis}_active`]);
     const altitude = (smartLodAxisState[modeKey] && smartLodAxisState[modeKey][`${axis}_altitude`]) || (axis === 'tlod' ? 5000 : 3000);
 
     if (window.pywebview && window.pywebview.api && window.pywebview.api.set_smart_lod_axis_state) {
@@ -21352,12 +21407,13 @@ function onSmartLodDualSliderChange(axis) {
 }
 
 function onSmartLodAltitudeChange(axis, alt) {
+    markDesktopSmartLodInteracting();
     const modeKey = (String((typeof currentSmartLodMode !== 'undefined' && currentSmartLodMode) || currentMsfsGraphicsMode || '2D').toUpperCase() === 'VR') ? 'vr' : '2d';
     const num = Math.max(500, Math.min(45000, parseInt(alt, 10) || (axis === 'tlod' ? 5000 : 3000)));
     if (smartLodAxisState[modeKey]) {
         smartLodAxisState[modeKey][`${axis}_altitude`] = num;
     }
-    const active = !!(smartLodAxisState[modeKey] && smartLodAxisState[modeKey][`${axis}_active`]);
+    const active = Boolean(window.smartLodActive && smartLodAxisState[modeKey] && smartLodAxisState[modeKey][`${axis}_active`]);
     const target = (smartLodAxisState[modeKey] && smartLodAxisState[modeKey][`${axis}_target`]) || (axis === 'tlod' ? (modeKey === 'vr' ? 150 : 200) : (modeKey === 'vr' ? 80 : 100));
     const base = (smartLodAxisState[modeKey] && smartLodAxisState[modeKey][`${axis}_base`]) || (axis === 'tlod' ? (modeKey === 'vr' ? 90 : 100) : (modeKey === 'vr' ? 80 : 100));
 
@@ -21810,6 +21866,15 @@ async function loadRigDiagnostics(profileId = null) {
         // Check hardware display cadence (2D screen Hz and VR headset Hz)
         await checkAndPromptCadenceCalibration(det, data);
 
+        if (window.windowManager) {
+            requestAnimationFrame(() => {
+                window.windowManager.autoTileWindows();
+                if (window.onboardingTour && window.onboardingTour.isOpen) {
+                    window.onboardingTour.updateSpotlight();
+                }
+            });
+        }
+
     } catch (e) {
         console.error("Error loading Rig diagnostics:", e);
     }
@@ -21856,6 +21921,9 @@ function switchRigTab(tabName) {
     if (window.windowManager) {
         requestAnimationFrame(() => {
             window.windowManager.autoTileWindows();
+            if (window.onboardingTour && window.onboardingTour.isOpen) {
+                window.onboardingTour.updateSpotlight();
+            }
         });
     }
 }
@@ -21889,6 +21957,9 @@ async function loadSystemTuningStatus(showScanAnimation = false) {
         if (window.windowManager) {
             requestAnimationFrame(() => {
                 window.windowManager.autoTileWindows();
+                if (window.onboardingTour && window.onboardingTour.isOpen) {
+                    window.onboardingTour.updateSpotlight();
+                }
             });
         }
     } catch (err) {
@@ -22473,6 +22544,9 @@ async function loadSimMaintenanceStatus(showFeedback = false) {
         if (window.windowManager) {
             requestAnimationFrame(() => {
                 window.windowManager.autoTileWindows();
+                if (window.onboardingTour && window.onboardingTour.isOpen) {
+                    window.onboardingTour.updateSpotlight();
+                }
             });
         }
     } catch (err) {
@@ -25740,7 +25814,7 @@ async function selectCustomProfileItem(profileId) {
 
     // Refresh custom profiles list to display the ACTIVE tag on selected profile
     await fetchAndRenderCustomProfiles(false);
-    await loadRigDiagnostics();
+    await loadRigDiagnostics(profile.id);
     if (typeof updateProfileActivateButtonState === 'function') {
         await updateProfileActivateButtonState();
     }
@@ -26624,21 +26698,6 @@ async function activateSelectedCustomProfile() {
         }
     }
 
-    // If there are unsaved staged changes for this profile, save them first so activating preserves latest edits
-    if (window.pywebview && window.pywebview.api && window.pywebview.api.check_profile_changes) {
-        try {
-            const chkStr = await window.pywebview.api.check_profile_changes(profileId);
-            const chk = JSON.parse(chkStr);
-            if (chk && chk.status === 'success' && chk.has_changes) {
-                if (window.pywebview.api.save_custom_profile && profile) {
-                    await window.pywebview.api.save_custom_profile(profile.name, profile.id);
-                }
-            }
-        } catch (e) {
-            console.warn("Error auto-saving changes before activation:", e);
-        }
-    }
-
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.activate_custom_profile) return;
     try {
         const resStr = await window.pywebview.api.activate_custom_profile(profileId);
@@ -26646,7 +26705,7 @@ async function activateSelectedCustomProfile() {
         if (res.status === 'success') {
             if (typeof showToast === 'function') showToast(`Profile "${res.profile_name}" activated into MSFS!`, 'success');
             await fetchAndRenderCustomProfiles(false);
-            await loadRigDiagnostics();
+            await loadRigDiagnostics(profileId);
             if (typeof updateProfileActivateButtonState === 'function') {
                 await updateProfileActivateButtonState();
             }
@@ -28960,6 +29019,7 @@ function syncSmartLodTargetFpsFromSettings(showNotification = false) {
 
 function updateSmartLodUIFromStatus(status) {
     if (!status) return;
+    if (window._smartLodUserInteracting) return;
 
     if (status.axis_state_2d) {
         smartLodAxisState['2d'] = Object.assign(smartLodAxisState['2d'], status.axis_state_2d);
@@ -29201,6 +29261,11 @@ async function toggleSmartLodActive() {
         return;
     }
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.set_smart_lod_enabled) return;
+    window._smartLodUserInteracting = false;
+    if (window._smartLodInteractionTimer) {
+        clearTimeout(window._smartLodInteractionTimer);
+        window._smartLodInteractionTimer = null;
+    }
     try {
         if (window.smartLodActive) {
             // Désactiver
@@ -30740,10 +30805,18 @@ class OnboardingTourController {
                     if (typeof switchRigTab === 'function') {
                         switchRigTab('tuning');
                     }
+                    if (typeof loadSystemTuningStatus === 'function') {
+                        await loadSystemTuningStatus(false);
+                    }
                     const win = document.getElementById('float-win-my-rig');
                     if (win) {
                         win.classList.remove('hidden');
                         win.style.display = 'flex';
+                        const body = win.querySelector('.modal-body');
+                        if (body) body.scrollTop = 0;
+                    }
+                    if (window.windowManager && typeof window.windowManager.autoTileWindows === 'function') {
+                        window.windowManager.autoTileWindows(true);
                     }
                     await new Promise(r => setTimeout(r, 40));
                 },
@@ -30765,18 +30838,29 @@ class OnboardingTourController {
                 defaultBody: "SceneryX automatically detects your full hardware architecture (CPU cores & threads, GPU architecture & dedicated VRAM, RAM speed & XMP, NVMe storage, and display refresh cadence). All sim LOD profiles, frame rate limiters, and performance recommendations are dynamically tailored to match your specific hardware baseline.",
                 preferredPlacement: 'right',
                 async beforeEnter() {
-                    if (window.onboardingTour) window.onboardingTour._cleanupOpenedModals();
                     if (typeof closeBackgroundToolsModal === 'function') closeBackgroundToolsModal();
-                    if (typeof openFloatingWindow === 'function') {
-                        openFloatingWindow('my_rig');
+                    const rigWin = document.getElementById('float-win-my-rig');
+                    if (!rigWin || rigWin.classList.contains('hidden') || rigWin.style.display === 'none') {
+                        if (window.onboardingTour) window.onboardingTour._cleanupOpenedModals();
+                        if (typeof openFloatingWindow === 'function') {
+                            openFloatingWindow('my_rig');
+                        }
                     }
                     if (typeof switchRigTab === 'function') {
                         switchRigTab('specs');
+                    }
+                    if (typeof loadRigDiagnostics === 'function') {
+                        await loadRigDiagnostics();
                     }
                     const win = document.getElementById('float-win-my-rig');
                     if (win) {
                         win.classList.remove('hidden');
                         win.style.display = 'flex';
+                        const body = win.querySelector('.modal-body');
+                        if (body) body.scrollTop = 0;
+                    }
+                    if (window.windowManager && typeof window.windowManager.autoTileWindows === 'function') {
+                        window.windowManager.autoTileWindows(true);
                     }
                     await new Promise(r => setTimeout(r, 40));
                 },
@@ -30809,6 +30893,9 @@ class OnboardingTourController {
                     if (typeof switchRigTab === 'function') {
                         switchRigTab('specs');
                     }
+                    if (window.windowManager && typeof window.windowManager.autoTileWindows === 'function') {
+                        window.windowManager.autoTileWindows(true);
+                    }
                     await new Promise(r => setTimeout(r, 30));
                     const card = document.getElementById('opt-rig-card-display') || document.querySelector('.rig-card-display');
                     if (card) {
@@ -30830,17 +30917,23 @@ class OnboardingTourController {
                 targetSelector: '#float-win-my-rig',
                 titleKey: 'onboarding.step_rig_maintenance_title',
                 bodyKey: 'onboarding.step_rig_maintenance_body',
-                defaultTitle: 'Update & Cache Cleaner (Safe Update & Cache Purge)',
+                defaultTitle: 'Update & Cache Cleaner',
                 defaultBody: 'Protect your Community folders in 1 click before any MSFS Sim or World Update (atomic folder quarantine + instant restoration), and purge SceneryIndexes, compiled aircraft WASM binaries, Rolling Cache, StreamedPackages/ModelLib caches, and DirectX/GPU shaders to eliminate post-update micro-stutters.',
                 preferredPlacement: 'right',
                 async beforeEnter() {
-                    if (window.onboardingTour) window.onboardingTour._cleanupOpenedModals();
                     if (typeof closeBackgroundToolsModal === 'function') closeBackgroundToolsModal();
-                    if (typeof openFloatingWindow === 'function') {
-                        openFloatingWindow('my_rig');
+                    const rigWin = document.getElementById('float-win-my-rig');
+                    if (!rigWin || rigWin.classList.contains('hidden') || rigWin.style.display === 'none') {
+                        if (window.onboardingTour) window.onboardingTour._cleanupOpenedModals();
+                        if (typeof openFloatingWindow === 'function') {
+                            openFloatingWindow('my_rig');
+                        }
                     }
                     if (typeof switchRigTab === 'function') {
                         switchRigTab('maintenance');
+                    }
+                    if (typeof loadSimMaintenanceStatus === 'function') {
+                        await loadSimMaintenanceStatus(false);
                     }
                     const win = document.getElementById('float-win-my-rig');
                     if (win) {
@@ -30848,6 +30941,9 @@ class OnboardingTourController {
                         win.style.display = 'flex';
                         const body = win.querySelector('.modal-body');
                         if (body) body.scrollTop = 0;
+                    }
+                    if (window.windowManager && typeof window.windowManager.autoTileWindows === 'function') {
+                        window.windowManager.autoTileWindows(true);
                     }
                     await new Promise(r => setTimeout(r, 40));
                 },

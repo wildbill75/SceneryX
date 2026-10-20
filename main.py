@@ -4748,10 +4748,24 @@ class Api:
         "- **Streamlined First-Launch Indexing:** Prevented redundant pre-disclaimer library scans on first launch and ensured instant ICAO search indexing and GSX profile badge initialization right after the initial database build."
     )
 
+    _PATCH_1_1_4_CHANGELOG_BODY = (
+        "**Release Date:** October 20, 2026\n"
+        "**Channel:** `Updates/patches`\n\n"
+        "## What's New & Fixed\n\n"
+        "### 1. Smart LOD Governor & MSFS In-Game Panel — Live Memory Engine & Manual Mode Fix\n"
+        "- **MSFS 2024 Live Memory Offset & Automatic Signature Scanner:** Updated the Win32 Memory Engine base offset (`0x0A80B024`) for the latest `FlightSimulator2024.exe` build and added an automatic `.data` signature scanner so live `TLOD`, `OLOD`, `Clouds`, and hot-swappable graphics writes attach in Read/Write mode across all MSFS 2024 updates.\n"
+        "- **Persistent Manual Mode (`MAN`) Disengagement:** Fixed an issue in both the MSFS In-Game Panel and the SceneryX internal Smart LOD window where disabling Smart LOD (`OFF`) or disengaging directly by dragging the `TLOD` / `OLOD` sliders caused Smart LOD to snap back to `ON` after ~2 seconds.\n"
+        "- **Automatic In-Game Panel Refresh on Startup:** SceneryX Pro now automatically refreshes the installed `wildbill75-sceneryx` package in your MSFS `Community` folder on startup whenever a patch update is applied.\n\n"
+        "### 2. Custom Graphics Profiles — Independent Profile Saving & Switching Fix\n"
+        "- **Protected Active Profile Presets:** Changing individual settings in the Graphics Settings matrix no longer silently overwrites the currently active `.profile.json` file on disk before clicking `SAVE PROFILE`, allowing you to tweak settings and save them as a brand-new profile (e.g., `2D Display ULTRA`) without altering your baseline profile (`2D Display Standard`).\n"
+        "- **Instant Matrix Refresh on Profile Switch:** Selecting a profile from the dropdown immediately loads and renders that profile's exact saved configuration in the Graphics Settings matrix and applies it to `UserCfg.opt`."
+    )
+
     DEFAULT_PATCH_CHANGELOGS = {
         "PRO_1.1.1": "# SceneryX — Patch PRO_1.1.1 (Day-One Update)\n\n" + _PATCH_1_1_1_CHANGELOG_BODY,
         "PRO_1.1.2": "# SceneryX — Patch PRO_1.1.2\n\n" + _PATCH_1_1_2_CHANGELOG_BODY,
         "PRO_1.1.3": "# SceneryX — Patch PRO_1.1.3\n\n" + _PATCH_1_1_3_CHANGELOG_BODY,
+        "PRO_1.1.4": "# SceneryX — Patch PRO_1.1.4\n\n" + _PATCH_1_1_4_CHANGELOG_BODY,
     }
 
     def _fetch_remote_text(self, url, timeout=3.5):
@@ -4773,15 +4787,14 @@ class Api:
         if not version_tag:
             return ""
         norm_tag = self._normalize_version_tag(version_tag)
-        # Strictly fetch remote README.md from the Git Updates/patches branch
+        # Strictly fetch version-specific README.md from the Git Updates/patches branch
         urls_to_try = []
-        if readme_url:
+        if readme_url and f"/{norm_tag}/" in readme_url:
             urls_to_try.append(readme_url)
         urls_to_try.append(f"{self.PATCHES_REPO_RAW_BASE}/patches/{norm_tag}/README.md")
-        urls_to_try.append(f"{self.PATCHES_REPO_RAW_BASE}/README.md")
         for u in urls_to_try:
-            txt = self._fetch_remote_text(u, timeout=5.0)
-            if txt and len(txt.strip()) > 20:
+            txt = self._fetch_remote_text(u, timeout=4.0)
+            if txt and len(txt.strip()) > 20 and "img.shields.io" not in txt and ("Patch" in txt or "What's New" in txt or norm_tag in txt):
                 return re.sub(r'\bRC_v?', 'PRO_', txt.strip())
 
         return self.DEFAULT_PATCH_CHANGELOGS.get(
@@ -5782,6 +5795,17 @@ def main():
         flight_perf_tracker.recover_orphan_benchmarks()
     except Exception as e:
         print(f"[Telemetry] Startup orphan benchmark check warning: {e}")
+
+    # Automatically refresh installed In-Game Panel in Community folders on Pro startup
+    if not IS_LITE:
+        try:
+            for c_path in api._get_all_community_paths():
+                target_panel_dir = os.path.join(c_path, "wildbill75-sceneryx")
+                if os.path.exists(os.path.join(target_panel_dir, "manifest.json")):
+                    api.install_ingame_panel()
+                    break
+        except Exception as e:
+            print(f"[InGamePanel] Startup auto-refresh notice: {e}")
 
     # 1. Main Application Window (Master window, initialized hidden during splash phase)
     window = webview.create_window(

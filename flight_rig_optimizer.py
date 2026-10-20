@@ -2008,6 +2008,8 @@ def set_active_profile_id(profile_id: str):
 
 def ensure_active_profile_applied(user_cfg_path: Optional[str] = None) -> Dict[str, Any]:
     """Ensures that the currently saved active profile is strictly applied to UserCfg.opt on disk."""
+    if has_staged_settings():
+        return {"status": "skipped", "message": "Unsaved staged settings present."}
     path = user_cfg_path or get_user_cfg_path()
     if not path or not os.path.exists(path):
         return {"status": "error", "message": "UserCfg.opt not found on system."}
@@ -2116,7 +2118,7 @@ def _normalize_cfg_lines(content: str) -> str:
 
 
 def check_profile_changes(profile_id: str, user_cfg_path: Optional[str] = None) -> Dict[str, Any]:
-    """Compares the current staged/disk settings with the content of a saved profile."""
+    """Compares the current staged settings with the content of a saved profile."""
     profiles_dir = get_custom_profiles_dir()
     profile_file = os.path.join(profiles_dir, f"{profile_id}.profile.json")
     if not os.path.exists(profile_file):
@@ -2125,9 +2127,19 @@ def check_profile_changes(profile_id: str, user_cfg_path: Optional[str] = None) 
     try:
         with open(profile_file, "r", encoding="utf-8", errors="ignore") as f:
             pdata = json.load(f)
-        prof_content = _normalize_cfg_lines(pdata.get("content") or "")
-        curr_content = _normalize_cfg_lines(get_current_staged_content(user_cfg_path))
-        has_changes = (prof_content != curr_content)
+        if not has_staged_settings():
+            return {
+                "status": "success",
+                "has_changes": False,
+                "profile_id": profile_id,
+                "profile_name": pdata.get("name", "")
+            }
+        raw_prof = pdata.get("content") or ""
+        staged_prof = raw_prof
+        for m, staged in _staged_user_cfg_settings.items():
+            for k, v in staged.items():
+                staged_prof = apply_setting_to_content(staged_prof, m, k, v)
+        has_changes = (_normalize_cfg_lines(raw_prof) != _normalize_cfg_lines(staged_prof))
         return {
             "status": "success",
             "has_changes": has_changes,
@@ -2212,11 +2224,9 @@ def save_custom_profile(profile_name: str, overwrite_id: Optional[str] = None, u
         profiles_dir = get_custom_profiles_dir()
 
         if overwrite_id:
-            profile_id = clean_name
-            # Si le profil écrasé avait un ID différent (ancien nom horodaté ou autre), nettoyer l'ancien
             old_file = os.path.join(profiles_dir, f"{overwrite_id}.profile.json")
-            new_file = os.path.join(profiles_dir, f"{clean_name}.profile.json")
             created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            old_data = {}
             if os.path.exists(old_file):
                 try:
                     with open(old_file, "r", encoding="utf-8") as f_old:
@@ -2224,7 +2234,15 @@ def save_custom_profile(profile_name: str, overwrite_id: Optional[str] = None, u
                         created_at = old_data.get("created_at", created_at)
                 except Exception:
                     pass
-                if os.path.abspath(old_file) != os.path.abspath(new_file):
+            # Preserve existing profile_id (especially built-in IDs like profile_2d_display_standard)
+            # when updating an existing profile with the same name
+            if os.path.exists(old_file) and str(old_data.get("name", "")).strip().lower() == name.lower():
+                profile_id = overwrite_id
+                new_file = old_file
+            else:
+                profile_id = clean_name
+                new_file = os.path.join(profiles_dir, f"{clean_name}.profile.json")
+                if os.path.exists(old_file) and os.path.abspath(old_file) != os.path.abspath(new_file):
                     try:
                         os.remove(old_file)
                     except Exception:
@@ -2232,6 +2250,7 @@ def save_custom_profile(profile_name: str, overwrite_id: Optional[str] = None, u
 
             profile_file = new_file
             profile_data = {
+                **old_data,
                 "id": profile_id,
                 "name": name,
                 "created_at": created_at,
@@ -6941,6 +6960,9 @@ def build_msfs_settings_matrix(user_cfg_path: Optional[str] = None, gpu_info: Op
     path = user_cfg_path or get_user_cfg_path()
     if custom_cfg_content is not None:
         content = custom_cfg_content
+        for m, staged in _staged_user_cfg_settings.items():
+            for k, v in staged.items():
+                content = apply_setting_to_content(content, m, k, v)
     else:
         if not path or not os.path.exists(path):
             return {"found": False, "path": "", "matrix_2d": [], "matrix_vr": []}
@@ -9098,21 +9120,6 @@ def update_msfs_user_cfg_setting(mode: str, setting_key: str, new_value: Any, us
         with open(path, 'w', encoding='utf-8') as f:
             f.write(content)
 
-        active_id = get_active_profile_id()
-        if active_id:
-            profiles_dir = get_custom_profiles_dir()
-            pfile = os.path.join(profiles_dir, f"{active_id}.profile.json")
-            if os.path.exists(pfile):
-                try:
-                    with open(pfile, "r", encoding="utf-8") as pf:
-                        pdata = json.load(pf)
-                    pdata["content"] = content
-                    pdata["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    with open(pfile, "w", encoding="utf-8") as pf:
-                        json.dump(pdata, pf, indent=2)
-                except Exception:
-                    pass
-
         return {
             "status": "success",
             "message": f"Updated {setting_key} to {new_value} for {mode} mode.",
@@ -9542,9 +9549,10 @@ def get_full_rig_diagnostics(flight_profile: str = 'LINER', vr_refresh_rate: int
     ensure_original_user_cfg_backup(cfg.get("path"))
 
     custom_cfg_content = None
-    if profile_id:
+    effective_pid = profile_id or get_active_profile_id()
+    if effective_pid:
         profiles = get_custom_profiles()
-        target_p = next((p for p in profiles if p.get("id") == profile_id), None)
+        target_p = next((p for p in profiles if p.get("id") == effective_pid), None)
         if target_p and target_p.get("content"):
             custom_cfg_content = target_p.get("content")
 

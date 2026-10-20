@@ -96,7 +96,7 @@ class FlightMemoryEngine:
 
     # Offsets relatifs identifiés par rétro-ingénierie
     OFFSETS_2024 = {
-        'default_module_base': 0x0A5BFF94,
+        'default_module_base': 0x0A80B024,
         'sim_module': 'FlightSimulator2024.exe',
         'offset_vr': 0x148,  # Décalage VR vs 2D Desktop (+328 octets)
         'tlod': 0x358,
@@ -294,7 +294,8 @@ class FlightMemoryEngine:
             exit_code = ctypes.wintypes.DWORD()
             if kernel32.GetExitCodeProcess(self.process_handle, ctypes.byref(exit_code)):
                 if exit_code.value == 259: # STILL_ACTIVE
-                    return True
+                    if not self.safe_read_only and self._run_safety_validation():
+                        return True
             self.detach()
 
         found, exe_name, pid = self.find_msfs_process()
@@ -324,23 +325,30 @@ class FlightMemoryEngine:
 
         # Résolution des offsets selon la version
         if self.is_2024:
-            # Vérifier si une valeur personnalisée existe dans le config AutoFPS local
+            candidates = []
+            cached_off = self._read_cached_sceneryx_offset_2024()
+            if cached_off:
+                candidates.append(cached_off)
+            if self.OFFSETS_2024['default_module_base'] not in candidates:
+                candidates.append(self.OFFSETS_2024['default_module_base'])
             saved_offset = self._read_saved_autofps_offset_2024()
-            self.offset_module_base = saved_offset or self.OFFSETS_2024['default_module_base']
-            
-            base_ptr = self.module_base_address + self.offset_module_base
-            self.addr_tlod = base_ptr + self.OFFSETS_2024['tlod']
-            self.addr_olod = base_ptr + self.OFFSETS_2024['olod']
-            self.addr_cloud_q = base_ptr + self.OFFSETS_2024['cloud_q']
-            self.addr_dyn_set = base_ptr + self.OFFSETS_2024['dyn_set']
-            self.addr_vr_mode = base_ptr + self.OFFSETS_2024['vr_mode']
-            self.addr_dyn_set_vr = base_ptr + self.OFFSETS_2024['dyn_set_vr']
+            if saved_offset and saved_offset not in candidates:
+                candidates.append(saved_offset)
 
-            # Offsets VR Headset (base_ptr + offset_2d + offset_vr)
-            offset_vr = self.OFFSETS_2024.get('offset_vr', 0x148)
-            self.addr_tlod_vr = self.addr_tlod + offset_vr
-            self.addr_olod_vr = self.addr_olod + offset_vr
-            self.addr_cloud_q_vr = self.addr_cloud_q + offset_vr
+            matched_off = None
+            for cand in candidates:
+                self._apply_2024_offset_candidate(cand)
+                if self._run_safety_validation():
+                    matched_off = cand
+                    break
+
+            if matched_off is None:
+                scanned_off = self._scan_msfs2024_module_offset()
+                if scanned_off:
+                    self._apply_2024_offset_candidate(scanned_off)
+                    if self._run_safety_validation():
+                        matched_off = scanned_off
+                        self._save_cached_sceneryx_offset_2024(scanned_off)
         else:
             self.offset_module_base = self.OFFSETS_2020['default_module_base']
             # MSFS 2020 utilise un pointeur indirectionnel
@@ -398,6 +406,120 @@ class FlightMemoryEngine:
         self.addr_cloud_q_vr = 0
         self.addr_dyn_set_vr = 0
 
+    def _apply_2024_offset_candidate(self, offset_val: int):
+        self.offset_module_base = int(offset_val)
+        base_ptr = self.module_base_address + self.offset_module_base
+        self.addr_tlod = base_ptr + self.OFFSETS_2024['tlod']
+        self.addr_olod = base_ptr + self.OFFSETS_2024['olod']
+        self.addr_cloud_q = base_ptr + self.OFFSETS_2024['cloud_q']
+        self.addr_dyn_set = base_ptr + self.OFFSETS_2024['dyn_set']
+        self.addr_vr_mode = base_ptr + self.OFFSETS_2024['vr_mode']
+        self.addr_dyn_set_vr = base_ptr + self.OFFSETS_2024['dyn_set_vr']
+        offset_vr = self.OFFSETS_2024.get('offset_vr', 0x148)
+        self.addr_tlod_vr = self.addr_tlod + offset_vr
+        self.addr_olod_vr = self.addr_olod + offset_vr
+        self.addr_cloud_q_vr = self.addr_cloud_q + offset_vr
+
+    def _read_cached_sceneryx_offset_2024(self) -> Optional[int]:
+        try:
+            import json
+            cache_file = os.path.expandvars(r'%APPDATA%\SceneryX\msfs2024_offset_cache.json')
+            if os.path.exists(cache_file):
+                with open(cache_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                val = data.get('offset_module_base')
+                if isinstance(val, int) and val > 0:
+                    return val
+                if isinstance(val, str) and val.startswith('0x'):
+                    return int(val, 16)
+        except Exception:
+            pass
+        return None
+
+    def _save_cached_sceneryx_offset_2024(self, offset_val: int):
+        try:
+            import json
+            cache_dir = os.path.expandvars(r'%APPDATA%\SceneryX')
+            os.makedirs(cache_dir, exist_ok=True)
+            cache_file = os.path.join(cache_dir, 'msfs2024_offset_cache.json')
+            with open(cache_file, 'w', encoding='utf-8') as f:
+                json.dump({'offset_module_base': hex(offset_val)}, f, indent=2)
+        except Exception:
+            pass
+
+    def _scan_msfs2024_module_offset(self) -> Optional[int]:
+        """Scans FlightSimulator2024.exe .data memory for the unique 2D + VR graphics settings structure."""
+        if not self.process_handle or not self.pid or not self.module_base_address:
+            return None
+        try:
+            import struct
+            snapshot = kernel32.CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, self.pid)
+            if snapshot == -1 or not snapshot:
+                return None
+            entry = MODULEENTRY32()
+            entry.dwSize = ctypes.sizeof(MODULEENTRY32)
+            mod_size = 0
+            target = self.exe_name.lower()
+            if kernel32.Module32First(snapshot, ctypes.byref(entry)):
+                while True:
+                    if entry.szModule.decode('utf-8', errors='ignore').lower() == target:
+                        mod_size = int(entry.modBaseSize or 0)
+                        break
+                    if not kernel32.Module32Next(snapshot, ctypes.byref(entry)):
+                        break
+            kernel32.CloseHandle(snapshot)
+            if mod_size <= 0:
+                return None
+
+            # Focus scan on the .data section range (typically 0x07000000 .. mod_size) first
+            start_off = min(0x07000000, max(0, mod_size - 0x08000000))
+            chunk_size = 4 * 1024 * 1024
+            buf = ctypes.create_string_buffer(chunk_size)
+            bytes_read = ctypes.c_size_t()
+            pat = struct.pack('<ffff', 0.1, 0.1, 0.1, 0.1)
+            valid_shd = {512, 768, 1024, 1536, 2048, 3072, 4096, 6144, 8192}
+
+            for offset in range(start_off, mod_size, chunk_size - 0x600):
+                addr = self.module_base_address + offset
+                read_len = min(chunk_size, mod_size - offset)
+                if read_len < 0x600:
+                    break
+                ok = kernel32.ReadProcessMemory(self.process_handle, ctypes.c_void_p(addr), buf, read_len, ctypes.byref(bytes_read))
+                if not ok or bytes_read.value < 0x600:
+                    continue
+                raw = buf.raw[:bytes_read.value]
+                pos = 0
+                while True:
+                    idx = raw.find(pat, pos)
+                    if idx == -1:
+                        break
+                    pos = idx + 4
+                    tlod_idx = idx - 0x20
+                    if tlod_idx < 0x40 or tlod_idx + 0x290 > len(raw):
+                        continue
+                    slice_cnt, shd_size = struct.unpack_from('<ii', raw, idx - 8)
+                    if slice_cnt != 4 or shd_size not in valid_shd:
+                        continue
+                    # Check that VR block at +0x148 also has MaxSliceCount == 4 and valid shadow map size
+                    vr_slice_cnt, vr_shd_size = struct.unpack_from('<ii', raw, idx - 8 + 0x148)
+                    if vr_slice_cnt != 4 or vr_shd_size not in valid_shd:
+                        continue
+                    tlod_f, pom1, pom2 = struct.unpack_from('<fff', raw, tlod_idx)
+                    prec_en, prec_q, olod_f = struct.unpack_from('<iif', raw, tlod_idx + 12)
+                    cld_q, = struct.unpack_from('<i', raw, tlod_idx + 0x4C)
+                    aniso, tex_q = struct.unpack_from('<ii', raw, tlod_idx - 0x1C)
+                    if (0.1 <= tlod_f <= 10.0 and 0.1 <= olod_f <= 10.0 and
+                        0 <= prec_q <= 3 and 0 <= cld_q <= 3 and
+                        aniso in (1, 2, 4, 8, 16) and 0 <= tex_q <= 3 and
+                        pom1 in (10.0, 15.0, 20.0, 25.0)):
+                        rel_tlod = (offset + tlod_idx)
+                        found_base = rel_tlod - self.OFFSETS_2024['tlod']
+                        print(f"[MemoryEngine] Auto-discovered MSFS 2024 offset_module_base: {hex(found_base)}")
+                        return found_base
+        except Exception as e:
+            print(f"[MemoryEngine] Scan warning: {e}")
+        return None
+
     def _read_saved_autofps_offset_2024(self) -> Optional[int]:
         """Tente de lire l'offset validé le plus récent dans la configuration locale d'AutoFPS si présente."""
         try:
@@ -416,7 +538,7 @@ class FlightMemoryEngine:
 
     def _run_safety_validation(self) -> bool:
         """
-        Vérifie que la lecture du TLOD produit un flottant réaliste (entre 10 et 1000).
+        Vérifie que la lecture du TLOD/OLOD et des marqueurs adjacents produit des valeurs réalistes.
         Si la valeur lue est aberrante, l'écriture est totalement bloquée pour protéger MSFS.
         Valide à la fois les adresses 2D Desktop et VR Headset.
         """
@@ -426,13 +548,23 @@ class FlightMemoryEngine:
         pc_ok = False
         if self.addr_tlod:
             raw_pc = self._read_float(self.addr_tlod)
-            if raw_pc is not None and 0.1 <= raw_pc <= 10.0:
-                pc_ok = True
+            raw_olod = self._read_float(self.addr_olod) if self.addr_olod else None
+            raw_cld = self._read_int32(self.addr_cloud_q) if self.addr_cloud_q else None
+            if (raw_pc is not None and 0.1 <= raw_pc <= 10.0 and
+                raw_olod is not None and 0.1 <= raw_olod <= 10.0 and
+                raw_cld is not None and 0 <= raw_cld <= 3):
+                if self.is_2024:
+                    shd_slices = self._read_int32(self.addr_tlod + 0x18)
+                    pc_ok = (shd_slices == 4)
+                else:
+                    pc_ok = True
 
         vr_ok = False
         if self.addr_tlod_vr:
             raw_vr = self._read_float(self.addr_tlod_vr)
-            if raw_vr is not None and 0.1 <= raw_vr <= 10.0:
+            raw_olod_vr = self._read_float(self.addr_olod_vr) if self.addr_olod_vr else None
+            if (raw_vr is not None and 0.1 <= raw_vr <= 10.0 and
+                raw_olod_vr is not None and 0.1 <= raw_olod_vr <= 10.0):
                 vr_ok = True
             else:
                 # Si l'adresse VR n'est pas cohérente, invalidation préventive des adresses VR
@@ -648,8 +780,9 @@ class FlightMemoryEngine:
         if prec is not None and 0 <= prec <= 3:
             out["precaching"] = int(prec)
 
-        ts_en = self._read_int32(base + 0x34)   # 0x38C
-        ts_sz = self._read_int32(base + 0x38)   # 0x390
+        ts_en_raw = self._read_int32(base + 0x34)   # 0x38C (uint8 bool in lower byte)
+        ts_en = (ts_en_raw & 0xFF) if ts_en_raw is not None else None
+        ts_sz = self._read_int32(base + 0x38)       # 0x390
         if ts_en == 0:
             out["terrain_shadows"] = 0
         elif ts_sz in (128, 256, 512, 1024, 2048):
@@ -716,14 +849,17 @@ class FlightMemoryEngine:
                 ts_val = int(settings["terrain_shadows"])
                 any_ts_ok = False
                 for b in bases:
-                    cur_en = self._read_int32(b + 0x34)
+                    cur_en_raw = self._read_int32(b + 0x34)
+                    cur_en = (cur_en_raw & 0xFF) if cur_en_raw is not None else None
                     cur_sz = self._read_int32(b + 0x38)
                     if cur_en in (0, 1) and (cur_sz in (0, 128, 256, 512, 1024, 2048)):
                         if ts_val <= 0:
-                            ok1 = self._write_int32(b + 0x34, 0)
+                            new_en_raw = (cur_en_raw & ~0xFF)
+                            ok1 = self._write_int32(b + 0x34, new_en_raw)
                             any_ts_ok = any_ts_ok or ok1
                         elif ts_val in (128, 256, 512, 1024, 2048):
-                            ok1 = self._write_int32(b + 0x34, 1)
+                            new_en_raw = (cur_en_raw & ~0xFF) | 1
+                            ok1 = self._write_int32(b + 0x34, new_en_raw)
                             ok2 = self._write_int32(b + 0x38, ts_val)
                             any_ts_ok = any_ts_ok or (ok1 and ok2)
                 results["terrain_shadows"] = any_ts_ok
