@@ -2185,7 +2185,7 @@
 
             <!-- Bottom Right Version & Copyright -->
             <div class="w-full flex justify-end pt-1">
-                <span class="text-[10px] text-[#64748B] font-medium tracking-wide">PRO_1.1.5 • &copy; 2026 Sidestick Priority</span>
+                <span class="text-[10px] text-[#64748B] font-medium tracking-wide">PRO_1.1.6 • &copy; 2026 Sidestick Priority</span>
             </div>
 
         </div>
@@ -2197,7 +2197,7 @@
         <div class="flex items-center shrink-0 z-10">
             <div class="flex items-end gap-2.5">
                 <img src="header_logo.png?v=4" alt="SceneryX" class="h-10 lg:h-11 w-auto object-contain select-none pointer-events-none drop-shadow-sm" />
-                <span class="typo-metadata text-[11px] font-mono font-medium text-[#64748B] leading-none mb-1" title="SceneryX PRO_1.1.5">PRO_1.1.5</span>
+                <span class="typo-metadata text-[11px] font-mono font-medium text-[#64748B] leading-none mb-1" title="SceneryX PRO_1.1.6">PRO_1.1.6</span>
             </div>
         </div>
 
@@ -2293,7 +2293,7 @@
 
                 <!-- 1. TOUT EN HAUT: AIRPORT IDENTIFICATION CARD (HIDDEN BY DEFAULT WHEN NO AIRPORT SELECTED) -->
                 <div id="classic-ap-header-card" class="hidden p-3.5 rounded-xl bg-[#181E2B] border border-[#253046] shadow-[0_4px_14px_rgba(0,0,0,0.45)] space-y-2.5 text-center relative group">
-                    <button type="button" onclick="closeClassicAirportView()" title="Close Airport View" class="absolute top-2.5 right-2.5 w-6 h-6 rounded-md flex items-center justify-center text-[#64748B] hover:text-[#F1F5F9] hover:bg-[#1E2638] transition-colors border border-transparent hover:border-[#253046] cursor-pointer">
+                    <button type="button" onclick="closeClassicAirportView()" data-i18n-title="classic.close_airport_view_tooltip" title="Close Airport View" class="absolute top-2.5 right-2.5 w-6 h-6 rounded-md flex items-center justify-center text-[#64748B] hover:text-[#F1F5F9] hover:bg-[#1E2638] transition-colors border border-transparent hover:border-[#253046] cursor-pointer">
                         <i class="fa-solid fa-xmark text-xs"></i>
                     </button>
                     <!-- Ligne 1: ICAO / IATA en très grand prenant toute la largeur -->
@@ -2314,20 +2314,20 @@
 
                     <!-- Ligne 5: Grille 2x2 Pills (ELEV, RUNWAYS, COORD N/S, COORD E/W) -->
                     <div id="classic-ap-tech-grid" class="grid grid-cols-2 gap-1.5 pt-2 border-t border-[#253046] text-[10px] font-mono text-center">
-                        <div class="bg-[#0E121A] border border-[#2D3A54] p-2 rounded-lg flex flex-col justify-center">
-                            <span class="text-[#64748B] block text-[9px] font-bold uppercase tracking-wider">ELEV</span>
+                        <div class="bg-[#0E121A] border border-[#2D3A54] p-2 rounded-lg flex flex-col justify-center" data-i18n-title="drawer.elevation" title="Elevation">
+                            <span data-i18n="classic.elev_label" class="text-[#64748B] block text-[9px] font-bold uppercase tracking-wider">ELEV</span>
                             <span id="classic-ap-elev" class="font-bold text-[#F1F5F9]">--</span>
                         </div>
-                        <div class="bg-[#0E121A] border border-[#2D3A54] p-2 rounded-lg flex flex-col justify-center">
-                            <span class="text-[#64748B] block text-[9px] font-bold uppercase tracking-wider">CATEGORY</span>
-                            <span id="classic-ap-rwys" class="font-bold text-[#F1F5F9] text-[10px] truncate" title="Airport Category">--</span>
+                        <div class="bg-[#0E121A] border border-[#2D3A54] p-2 rounded-lg flex flex-col justify-center" data-i18n-title="classic.category_tooltip" title="Airport Category">
+                            <span data-i18n="classic.category_label" class="text-[#64748B] block text-[9px] font-bold uppercase tracking-wider">CATEGORY</span>
+                            <span id="classic-ap-rwys" class="font-bold text-[#F1F5F9] text-[10px] truncate" data-i18n-title="classic.category_tooltip" title="Airport Category">--</span>
                         </div>
-                        <div class="bg-[#0E121A] border border-[#2D3A54] p-2 rounded-lg flex flex-col justify-center">
-                            <span class="text-[#64748B] block text-[9px] font-bold uppercase tracking-wider">COORD N/S</span>
+                        <div class="bg-[#0E121A] border border-[#2D3A54] p-2 rounded-lg flex flex-col justify-center" data-i18n-title="drawer.latitude" title="Latitude">
+                            <span data-i18n="classic.coord_ns_label" class="text-[#64748B] block text-[9px] font-bold uppercase tracking-wider">COORD N/S</span>
                             <span id="classic-ap-lat" class="font-bold text-[#F1F5F9] truncate">--</span>
                         </div>
-                        <div class="bg-[#0E121A] border border-[#2D3A54] p-2 rounded-lg flex flex-col justify-center">
-                            <span class="text-[#64748B] block text-[9px] font-bold uppercase tracking-wider">COORD E/W</span>
+                        <div class="bg-[#0E121A] border border-[#2D3A54] p-2 rounded-lg flex flex-col justify-center" data-i18n-title="drawer.longitude" title="Longitude">
+                            <span data-i18n="classic.coord_ew_label" class="text-[#64748B] block text-[9px] font-bold uppercase tracking-wider">COORD E/W</span>
                             <span id="classic-ap-lon" class="font-bold text-[#F1F5F9] truncate">--</span>
                         </div>
                     </div>
@@ -2336,20 +2336,20 @@
                 <!-- 2. CONTEXTUAL AIRPORT ACTIONS (Shown when airport is selected) -->
                 <div id="classic-ap-actions-section" class="space-y-1.5 hidden">
                     <!-- 4 Airport Modules -->
-                    <button type="button" onclick="openClassicAirportModal('details', event)" class="w-full h-10 px-3.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-all flex items-center justify-between cursor-pointer group shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
-                        <span class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">AIRPORT DETAILS</span>
+                    <button type="button" onclick="openClassicAirportModal('details', event)" data-i18n-title="classic.airport_details_tooltip" title="Inspect runways, frequencies, elevation and airport metadata" class="w-full h-10 px-3.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-all flex items-center justify-between cursor-pointer group shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
+                        <span data-i18n="classic.airport_details_btn" class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">AIRPORT DETAILS</span>
                         <span class="text-[10px] font-mono font-bold text-[#64748B] group-hover:text-[#00A8FF] uppercase transition-colors">&rarr;</span>
                     </button>
-                    <button type="button" onclick="openClassicAirportModal('sceneries', event)" class="w-full h-10 px-3.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-all flex items-center justify-between cursor-pointer group shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
-                        <span class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">AVAILABLE ADDONS</span>
+                    <button type="button" onclick="openClassicAirportModal('sceneries', event)" data-i18n-title="classic.available_addons_tooltip" title="Manage installed scenery packages, price & star rating for this airport" class="w-full h-10 px-3.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-all flex items-center justify-between cursor-pointer group shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
+                        <span data-i18n="classic.available_addons_btn" class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">AVAILABLE ADDONS</span>
                         <span id="classic-ap-scenery-count" class="text-[10px] font-mono font-bold text-[#00A8FF] uppercase">ADDONS</span>
                     </button>
-                    <button type="button" onclick="openClassicAirportModal('airlines', event)" class="w-full h-10 px-3.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-all flex items-center justify-between cursor-pointer group shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
-                        <span class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">OPERATING AIRLINES</span>
+                    <button type="button" onclick="openClassicAirportModal('airlines', event)" data-i18n-title="classic.operating_airlines_tooltip" title="View commercial airlines and hubs operating at this airport" class="w-full h-10 px-3.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-all flex items-center justify-between cursor-pointer group shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
+                        <span data-i18n="classic.operating_airlines_btn" class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">OPERATING AIRLINES</span>
                         <span id="classic-ap-airlines-count" class="text-[10px] font-mono font-bold text-[#64748B] group-hover:text-[#00A8FF] uppercase transition-colors">&rarr;</span>
                     </button>
-                    <button type="button" onclick="openClassicAirportModal('gsx', event)" class="w-full h-10 px-3.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-all flex items-center justify-between cursor-pointer group shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
-                        <span class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">GSX PROFILE</span>
+                    <button type="button" onclick="openClassicAirportModal('gsx', event)" data-i18n-title="classic.gsx_profile_tooltip" title="Inspect or link a GSX Pro ground services profile (.ini / .py)" class="w-full h-10 px-3.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-all flex items-center justify-between cursor-pointer group shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
+                        <span data-i18n="classic.gsx_profile_btn" class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">GSX PROFILE</span>
                         <span id="classic-ap-gsx-status" class="text-[10px] font-mono font-bold text-[#64748B] group-hover:text-[#00A8FF] uppercase transition-colors">&rarr;</span>
                     </button>
                 </div>
@@ -2357,8 +2357,8 @@
                 <!-- 3. FILTERS (6 Radial Categories - exact radial titles & options) -->
                 <div id="classic-filters-section" class="space-y-1.5 pt-1">
                     <div class="flex items-center justify-between px-1">
-                        <span class="text-[10px] font-sans font-black uppercase tracking-widest text-[#64748B]">FILTERS</span>
-                        <button type="button" onclick="resetAllFiltersToDefault(); updateClassicPanelUI();" class="text-[9px] font-mono font-bold uppercase tracking-wider text-[#94A3B8] hover:text-[#00A8FF] cursor-pointer bg-transparent border-0 transition-colors">
+                        <span data-i18n="classic.filters_header" class="text-[10px] font-sans font-black uppercase tracking-widest text-[#64748B]">FILTERS</span>
+                        <button type="button" onclick="resetAllFiltersToDefault(); updateClassicPanelUI();" data-i18n="classic.reset_btn" data-i18n-title="classic.reset_filters_tooltip" title="Reset all active map filters to default" class="text-[9px] font-mono font-bold uppercase tracking-wider text-[#94A3B8] hover:text-[#00A8FF] cursor-pointer bg-transparent border-0 transition-colors">
                             RESET
                         </button>
                     </div>
@@ -2366,30 +2366,30 @@
                     <div class="space-y-1.5">
                         <!-- Category 1: PRICING MODEL -->
                         <div id="classic-filter-pricing-item">
-                            <button type="button" onclick="toggleClassicFilterSubmenu('pricing', event)" class="w-full h-9 px-3.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-all flex items-center justify-between cursor-pointer group shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
-                                <span class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">PRICING MODEL</span>
+                            <button type="button" onclick="toggleClassicFilterSubmenu('pricing', event)" data-i18n-title="classic.filter_pricing_tooltip" title="Filter airports by Payware, Freeware, Asobo or Default MSFS" class="w-full h-9 px-3.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-all flex items-center justify-between cursor-pointer group shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
+                                <span data-i18n="classic.filter_pricing_btn" class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">PRICING MODEL</span>
                                 <i id="classic-chevron-pricing" class="fa-solid fa-chevron-down text-[9px] text-[#64748B] group-hover:text-[#F1F5F9] transition-transform duration-200"></i>
                             </button>
                             <div id="classic-sub-pricing" class="hidden p-2 space-y-1.5 bg-[#0E121A] rounded-b-lg border-x border-b border-[#2D3A54]">
-                                <button type="button" onclick="classicSetPricing('all', event)" id="classic-opt-pricing-all" class="w-full h-7 px-2.5 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] text-[10px] font-mono font-bold uppercase tracking-wider text-left truncate border border-[#253046] cursor-pointer transition-all">
-                                    <span class="truncate">ALL MODELS</span>
+                                <button type="button" onclick="classicSetPricing('all', event)" id="classic-opt-pricing-all" data-i18n-title="classic.opt_all_models_tooltip" title="Show all airport pricing models on the map" class="w-full h-7 px-2.5 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] text-[10px] font-mono font-bold uppercase tracking-wider text-left truncate border border-[#253046] cursor-pointer transition-all">
+                                    <span data-i18n="classic.opt_all_models" class="truncate">ALL MODELS</span>
                                 </button>
                                 <div class="grid grid-cols-2 gap-1.5 text-[10px] font-mono font-bold uppercase">
-                                    <button type="button" onclick="classicSetPricing('payware', event)" id="classic-opt-pricing-payware" class="h-7 px-2 rounded-md bg-[#181E2B] text-[#F1F5F9] hover:bg-[#1E2638] border border-[#253046] flex items-center gap-1.5 truncate cursor-pointer transition-all">
+                                    <button type="button" onclick="classicSetPricing('payware', event)" id="classic-opt-pricing-payware" data-i18n-title="classic.opt_payware_tooltip" title="Toggle Payware sceneries" class="h-7 px-2 rounded-md bg-[#181E2B] text-[#F1F5F9] hover:bg-[#1E2638] border border-[#253046] flex items-center gap-1.5 truncate cursor-pointer transition-all">
                                         <span id="classic-tick-pricing-payware" class="w-3.5 h-3.5 rounded border border-[#2D3A54] bg-[#0E121A] flex items-center justify-center text-[9px] text-[#00A8FF] shrink-0 select-none"></span>
-                                        <span class="truncate">PAYWARE</span>
+                                        <span data-i18n="pricing.payware_caps" class="truncate">PAYWARE</span>
                                     </button>
-                                    <button type="button" onclick="classicSetPricing('freeware', event)" id="classic-opt-pricing-freeware" class="h-7 px-2 rounded-md bg-[#181E2B] text-[#10B981] hover:bg-[#1E2638] border border-[#253046] flex items-center gap-1.5 truncate cursor-pointer transition-all">
+                                    <button type="button" onclick="classicSetPricing('freeware', event)" id="classic-opt-pricing-freeware" data-i18n-title="classic.opt_freeware_tooltip" title="Toggle Freeware sceneries" class="h-7 px-2 rounded-md bg-[#181E2B] text-[#10B981] hover:bg-[#1E2638] border border-[#253046] flex items-center gap-1.5 truncate cursor-pointer transition-all">
                                         <span id="classic-tick-pricing-freeware" class="w-3.5 h-3.5 rounded border border-[#2D3A54] bg-[#0E121A] flex items-center justify-center text-[9px] text-[#10B981] shrink-0 select-none"></span>
-                                        <span class="truncate">FREEWARE</span>
+                                        <span data-i18n="pricing.freeware_caps" class="truncate">FREEWARE</span>
                                     </button>
-                                    <button type="button" onclick="classicSetPricing('asobo', event)" id="classic-opt-pricing-asobo" class="h-7 px-2 rounded-md bg-[#181E2B] text-[#F59E0B] hover:bg-[#1E2638] border border-[#253046] flex items-center gap-1.5 truncate cursor-pointer transition-all">
+                                    <button type="button" onclick="classicSetPricing('asobo', event)" id="classic-opt-pricing-asobo" data-i18n-title="classic.opt_asobo_tooltip" title="Toggle Asobo bespoke/handcrafted airports" class="h-7 px-2 rounded-md bg-[#181E2B] text-[#F59E0B] hover:bg-[#1E2638] border border-[#253046] flex items-center gap-1.5 truncate cursor-pointer transition-all">
                                         <span id="classic-tick-pricing-asobo" class="w-3.5 h-3.5 rounded border border-[#2D3A54] bg-[#0E121A] flex items-center justify-center text-[9px] text-[#F59E0B] shrink-0 select-none"></span>
-                                        <span class="truncate">ASOBO</span>
+                                        <span data-i18n="pricing.asobo_caps" class="truncate">ASOBO</span>
                                     </button>
-                                    <button type="button" onclick="classicSetPricing('default', event)" id="classic-opt-pricing-default" class="h-7 px-2 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] border border-[#253046] flex items-center gap-1.5 truncate cursor-pointer transition-all">
+                                    <button type="button" onclick="classicSetPricing('default', event)" id="classic-opt-pricing-default" data-i18n-title="classic.opt_default_tooltip" title="Toggle Default MSFS procedural airports" class="h-7 px-2 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] border border-[#253046] flex items-center gap-1.5 truncate cursor-pointer transition-all">
                                         <span id="classic-tick-pricing-default" class="w-3.5 h-3.5 rounded border border-[#2D3A54] bg-[#0E121A] flex items-center justify-center text-[9px] text-[#94A3B8] shrink-0 select-none"></span>
-                                        <span class="truncate">DEFAULT MSFS</span>
+                                        <span data-i18n="stat.default" class="truncate">DEFAULT MSFS</span>
                                     </button>
                                 </div>
                             </div>
@@ -2397,138 +2397,138 @@
 
                         <!-- Category 2: SCENERY SOURCE -->
                         <div id="classic-filter-source-item">
-                            <button type="button" onclick="toggleClassicFilterSubmenu('source', event)" class="w-full h-9 px-3.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-all flex items-center justify-between cursor-pointer group shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
-                                <span class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">SCENERY SOURCE</span>
+                            <button type="button" onclick="toggleClassicFilterSubmenu('source', event)" data-i18n-title="classic.filter_source_tooltip" title="Filter sceneries by installation folder (Community vs Official)" class="w-full h-9 px-3.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-all flex items-center justify-between cursor-pointer group shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
+                                <span data-i18n="classic.filter_source_btn" class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">SCENERY SOURCE</span>
                                 <i id="classic-chevron-source" class="fa-solid fa-chevron-down text-[9px] text-[#64748B] group-hover:text-[#F1F5F9] transition-transform duration-200"></i>
                             </button>
                             <div id="classic-sub-source" class="hidden p-2 space-y-1.5 bg-[#0E121A] rounded-b-lg border-x border-b border-[#2D3A54]">
-                                <button type="button" onclick="classicSetSource('all', event)" id="classic-opt-source-all" class="w-full h-7 px-2.5 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] text-[11px] font-mono font-semibold text-left truncate border border-[#253046] cursor-pointer transition-all">
-                                    <span class="truncate">ALL SOURCES</span>
+                                <button type="button" onclick="classicSetSource('all', event)" id="classic-opt-source-all" data-i18n-title="classic.opt_all_sources_tooltip" title="Show sceneries from all MSFS folders" class="w-full h-7 px-2.5 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] text-[11px] font-mono font-semibold text-left truncate border border-[#253046] cursor-pointer transition-all">
+                                    <span data-i18n="classic.opt_all_sources" class="truncate">ALL SOURCES</span>
                                 </button>
-                                <button type="button" onclick="classicSetSource('Community', event)" id="classic-opt-source-community" class="w-full h-7 px-2.5 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] text-[11px] font-mono font-semibold flex items-center gap-2 truncate border border-[#253046] cursor-pointer transition-all">
+                                <button type="button" onclick="classicSetSource('Community', event)" id="classic-opt-source-community" data-i18n-title="classic.opt_community_tooltip" title="Show addons located in your Community folder(s)" class="w-full h-7 px-2.5 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] text-[11px] font-mono font-semibold flex items-center gap-2 truncate border border-[#253046] cursor-pointer transition-all">
                                     <span id="classic-tick-source-community" class="w-3.5 h-3.5 rounded border border-[#2D3A54] bg-[#0E121A] flex items-center justify-center text-[9px] text-[#64748B] shrink-0 select-none"></span>
-                                    <span class="truncate">COMMUNITY</span>
+                                    <span data-i18n="classic.opt_community" class="truncate">COMMUNITY</span>
                                 </button>
-                                <button type="button" onclick="classicSetSource('Official', event)" id="classic-opt-source-official" class="w-full h-7 px-2.5 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] text-[11px] font-mono font-semibold flex items-center gap-2 truncate border border-[#253046] cursor-pointer transition-all">
+                                <button type="button" onclick="classicSetSource('Official', event)" id="classic-opt-source-official" data-i18n-title="classic.opt_official_tooltip" title="Show packages located in Official / OneStore / StreamedPackages" class="w-full h-7 px-2.5 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] text-[11px] font-mono font-semibold flex items-center gap-2 truncate border border-[#253046] cursor-pointer transition-all">
                                     <span id="classic-tick-source-official" class="w-3.5 h-3.5 rounded border border-[#2D3A54] bg-[#0E121A] flex items-center justify-center text-[9px] text-[#64748B] shrink-0 select-none"></span>
-                                    <span class="truncate">OFFICIAL / STREAMED</span>
+                                    <span data-i18n="classic.opt_official" class="truncate">OFFICIAL / STREAMED</span>
                                 </button>
                             </div>
                         </div>
 
                         <!-- Category 3: REGION -->
                         <div id="classic-filter-region-item">
-                            <button type="button" onclick="toggleClassicFilterSubmenu('region', event)" class="w-full h-9 px-3.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-all flex items-center justify-between cursor-pointer group shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
-                                <span class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">REGION</span>
+                            <button type="button" onclick="toggleClassicFilterSubmenu('region', event)" data-i18n-title="classic.filter_region_tooltip" title="Filter sceneries and pan camera by geographic region" class="w-full h-9 px-3.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-all flex items-center justify-between cursor-pointer group shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
+                                <span data-i18n="classic.filter_region_btn" class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">REGION</span>
                                 <i id="classic-chevron-region" class="fa-solid fa-chevron-down text-[9px] text-[#64748B] group-hover:text-[#F1F5F9] transition-transform duration-200"></i>
                             </button>
                             <div id="classic-sub-region" class="hidden p-2 space-y-1.5 bg-[#0E121A] rounded-b-lg border-x border-b border-[#2D3A54]">
-                                <button type="button" onclick="classicSetRegion(null, event)" id="classic-opt-region-null" class="w-full h-7 px-2.5 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] text-[11px] font-mono font-semibold text-left truncate border border-[#253046] cursor-pointer transition-all">
-                                    <span class="truncate">GLOBAL (ALL)</span>
+                                <button type="button" onclick="classicSetRegion(null, event)" id="classic-opt-region-null" data-i18n-title="classic.opt_region_global_tooltip" title="Reset region filter and view entire world" class="w-full h-7 px-2.5 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] text-[11px] font-mono font-semibold text-left truncate border border-[#253046] cursor-pointer transition-all">
+                                    <span data-i18n="classic.opt_region_global" class="truncate">GLOBAL (ALL)</span>
                                 </button>
                                 <button type="button" onclick="classicSetRegion('weurope', event)" id="classic-opt-region-weurope" class="w-full h-7 px-2.5 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] text-[11px] font-mono font-semibold flex items-center gap-2 truncate border border-[#253046] cursor-pointer transition-all">
                                     <span id="classic-tick-region-weurope" class="w-3.5 h-3.5 rounded border border-[#2D3A54] bg-[#0E121A] flex items-center justify-center text-[9px] text-[#64748B] shrink-0 select-none"></span>
-                                    <span class="truncate">WESTERN EUROPE</span>
+                                    <span data-i18n="classic.opt_region_weurope" class="truncate">WESTERN EUROPE</span>
                                 </button>
                                 <button type="button" onclick="classicSetRegion('eeurope', event)" id="classic-opt-region-eeurope" class="w-full h-7 px-2.5 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] text-[11px] font-mono font-semibold flex items-center gap-2 truncate border border-[#253046] cursor-pointer transition-all">
                                     <span id="classic-tick-region-eeurope" class="w-3.5 h-3.5 rounded border border-[#2D3A54] bg-[#0E121A] flex items-center justify-center text-[9px] text-[#64748B] shrink-0 select-none"></span>
-                                    <span class="truncate">EASTERN EUROPE</span>
+                                    <span data-i18n="classic.opt_region_eeurope" class="truncate">EASTERN EUROPE</span>
                                 </button>
                                 <button type="button" onclick="classicSetRegion('namerica', event)" id="classic-opt-region-namerica" class="w-full h-7 px-2.5 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] text-[11px] font-mono font-semibold flex items-center gap-2 truncate border border-[#253046] cursor-pointer transition-all">
                                     <span id="classic-tick-region-namerica" class="w-3.5 h-3.5 rounded border border-[#2D3A54] bg-[#0E121A] flex items-center justify-center text-[9px] text-[#64748B] shrink-0 select-none"></span>
-                                    <span class="truncate">NORTH AMERICA</span>
+                                    <span data-i18n="classic.opt_region_namerica" class="truncate">NORTH AMERICA</span>
                                 </button>
                                 <button type="button" onclick="classicSetRegion('camerica_caribbean', event)" id="classic-opt-region-camerica" class="w-full h-7 px-2.5 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] text-[11px] font-mono font-semibold flex items-center gap-2 truncate border border-[#253046] cursor-pointer transition-all">
                                     <span id="classic-tick-region-camerica" class="w-3.5 h-3.5 rounded border border-[#2D3A54] bg-[#0E121A] flex items-center justify-center text-[9px] text-[#64748B] shrink-0 select-none"></span>
-                                    <span class="truncate">C. AMERICA</span>
+                                    <span data-i18n="classic.opt_region_camerica" class="truncate">C. AMERICA</span>
                                 </button>
                                 <button type="button" onclick="classicSetRegion('samerica', event)" id="classic-opt-region-samerica" class="w-full h-7 px-2.5 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] text-[11px] font-mono font-semibold flex items-center gap-2 truncate border border-[#253046] cursor-pointer transition-all">
                                     <span id="classic-tick-region-samerica" class="w-3.5 h-3.5 rounded border border-[#2D3A54] bg-[#0E121A] flex items-center justify-center text-[9px] text-[#64748B] shrink-0 select-none"></span>
-                                    <span class="truncate">SOUTH AMERICA</span>
+                                    <span data-i18n="classic.opt_region_samerica" class="truncate">SOUTH AMERICA</span>
                                 </button>
                                 <button type="button" onclick="classicSetRegion('asia', event)" id="classic-opt-region-asia" class="w-full h-7 px-2.5 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] text-[11px] font-mono font-semibold flex items-center gap-2 truncate border border-[#253046] cursor-pointer transition-all">
                                     <span id="classic-tick-region-asia" class="w-3.5 h-3.5 rounded border border-[#2D3A54] bg-[#0E121A] flex items-center justify-center text-[9px] text-[#64748B] shrink-0 select-none"></span>
-                                    <span class="truncate">ASIA</span>
+                                    <span data-i18n="classic.opt_region_asia" class="truncate">ASIA</span>
                                 </button>
                                 <button type="button" onclick="classicSetRegion('middleeast', event)" id="classic-opt-region-middleeast" class="w-full h-7 px-2.5 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] text-[11px] font-mono font-semibold flex items-center gap-2 truncate border border-[#253046] cursor-pointer transition-all">
                                     <span id="classic-tick-region-middleeast" class="w-3.5 h-3.5 rounded border border-[#2D3A54] bg-[#0E121A] flex items-center justify-center text-[9px] text-[#64748B] shrink-0 select-none"></span>
-                                    <span class="truncate">MIDDLE EAST</span>
+                                    <span data-i18n="classic.opt_region_middleeast" class="truncate">MIDDLE EAST</span>
                                 </button>
                                 <button type="button" onclick="classicSetRegion('nafrica', event)" id="classic-opt-region-nafrica" class="w-full h-7 px-2.5 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] text-[11px] font-mono font-semibold flex items-center gap-2 truncate border border-[#253046] cursor-pointer transition-all">
                                     <span id="classic-tick-region-nafrica" class="w-3.5 h-3.5 rounded border border-[#2D3A54] bg-[#0E121A] flex items-center justify-center text-[9px] text-[#64748B] shrink-0 select-none"></span>
-                                    <span class="truncate">NORTH AFRICA</span>
+                                    <span data-i18n="classic.opt_region_nafrica" class="truncate">NORTH AFRICA</span>
                                 </button>
                                 <button type="button" onclick="classicSetRegion('ssafrica', event)" id="classic-opt-region-ssafrica" class="w-full h-7 px-2.5 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] text-[11px] font-mono font-semibold flex items-center gap-2 truncate border border-[#253046] cursor-pointer transition-all">
                                     <span id="classic-tick-region-ssafrica" class="w-3.5 h-3.5 rounded border border-[#2D3A54] bg-[#0E121A] flex items-center justify-center text-[9px] text-[#64748B] shrink-0 select-none"></span>
-                                    <span class="truncate">SUB-SAHARAN AFRICA</span>
+                                    <span data-i18n="classic.opt_region_ssafrica" class="truncate">SUB-SAHARAN AFRICA</span>
                                 </button>
                                 <button type="button" onclick="classicSetRegion('oceania', event)" id="classic-opt-region-oceania" class="w-full h-7 px-2.5 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] text-[11px] font-mono font-semibold flex items-center gap-2 truncate border border-[#253046] cursor-pointer transition-all">
                                     <span id="classic-tick-region-oceania" class="w-3.5 h-3.5 rounded border border-[#2D3A54] bg-[#0E121A] flex items-center justify-center text-[9px] text-[#64748B] shrink-0 select-none"></span>
-                                    <span class="truncate">OCEANIA</span>
+                                    <span data-i18n="classic.opt_region_oceania" class="truncate">OCEANIA</span>
                                 </button>
                                 <button type="button" onclick="classicSetRegion('pacific', event)" id="classic-opt-region-pacific" class="w-full h-7 px-2.5 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] text-[11px] font-mono font-semibold flex items-center gap-2 truncate border border-[#253046] cursor-pointer transition-all">
                                     <span id="classic-tick-region-pacific" class="w-3.5 h-3.5 rounded border border-[#2D3A54] bg-[#0E121A] flex items-center justify-center text-[9px] text-[#64748B] shrink-0 select-none"></span>
-                                    <span class="truncate">PACIFIC OCEAN</span>
+                                    <span data-i18n="classic.opt_region_pacific" class="truncate">PACIFIC OCEAN</span>
                                 </button>
                             </div>
                         </div>
 
                         <!-- Category 4: AIRPORT TYPE -->
                         <div id="classic-filter-type-item">
-                            <button type="button" onclick="toggleClassicFilterSubmenu('type', event)" class="w-full h-9 px-3.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-all flex items-center justify-between cursor-pointer group shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
-                                <span class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">AIRPORT TYPE</span>
+                            <button type="button" onclick="toggleClassicFilterSubmenu('type', event)" data-i18n-title="classic.filter_type_tooltip" title="Filter airports by operational category (International, Regional, GA, Heli)" class="w-full h-9 px-3.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-all flex items-center justify-between cursor-pointer group shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
+                                <span data-i18n="classic.filter_type_btn" class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">AIRPORT TYPE</span>
                                 <i id="classic-chevron-type" class="fa-solid fa-chevron-down text-[9px] text-[#64748B] group-hover:text-[#F1F5F9] transition-transform duration-200"></i>
                             </button>
                             <div id="classic-sub-type" class="hidden p-2 space-y-1.5 bg-[#0E121A] rounded-b-lg border-x border-b border-[#2D3A54]">
-                                <button type="button" onclick="classicSetType('all', event)" id="classic-opt-type-all" class="w-full h-7 px-2.5 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] text-[11px] font-mono font-semibold text-left truncate border border-[#253046] cursor-pointer transition-all">
-                                    <span class="truncate">ALL TYPES</span>
+                                <button type="button" onclick="classicSetType('all', event)" id="classic-opt-type-all" data-i18n-title="classic.opt_type_all_tooltip" title="Show all airport operational categories" class="w-full h-7 px-2.5 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] text-[11px] font-mono font-semibold text-left truncate border border-[#253046] cursor-pointer transition-all">
+                                    <span data-i18n="classic.opt_type_all" class="truncate">ALL TYPES</span>
                                 </button>
                                 <button type="button" onclick="classicSetType('International', event)" id="classic-opt-type-int" class="w-full h-7 px-2.5 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] text-[11px] font-mono font-semibold flex items-center gap-2 truncate border border-[#253046] cursor-pointer transition-all">
                                     <span id="classic-tick-type-int" class="w-3.5 h-3.5 rounded border border-[#2D3A54] bg-[#0E121A] flex items-center justify-center text-[9px] text-[#64748B] shrink-0 select-none"></span>
-                                    <span class="truncate">INTERNATIONAL</span>
+                                    <span data-i18n="classic.opt_type_intl" class="truncate">INTERNATIONAL</span>
                                 </button>
                                 <button type="button" onclick="classicSetType('Regional', event)" id="classic-opt-type-reg" class="w-full h-7 px-2.5 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] text-[11px] font-mono font-semibold flex items-center gap-2 truncate border border-[#253046] cursor-pointer transition-all">
                                     <span id="classic-tick-type-reg" class="w-3.5 h-3.5 rounded border border-[#2D3A54] bg-[#0E121A] flex items-center justify-center text-[9px] text-[#64748B] shrink-0 select-none"></span>
-                                    <span class="truncate">REGIONAL</span>
+                                    <span data-i18n="classic.opt_type_reg" class="truncate">REGIONAL</span>
                                 </button>
                                 <button type="button" onclick="classicSetType('General Aviation', event)" id="classic-opt-type-ga" class="w-full h-7 px-2.5 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] text-[11px] font-mono font-semibold flex items-center gap-2 truncate border border-[#253046] cursor-pointer transition-all">
                                     <span id="classic-tick-type-ga" class="w-3.5 h-3.5 rounded border border-[#2D3A54] bg-[#0E121A] flex items-center justify-center text-[9px] text-[#64748B] shrink-0 select-none"></span>
-                                    <span class="truncate">GENERAL AVIATION</span>
+                                    <span data-i18n="classic.opt_type_ga" class="truncate">GENERAL AVIATION</span>
                                 </button>
                                 <button type="button" onclick="classicSetType('Heli / Water', event)" id="classic-opt-type-heli" class="w-full h-7 px-2.5 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] text-[11px] font-mono font-semibold flex items-center gap-2 truncate border border-[#253046] cursor-pointer transition-all">
                                     <span id="classic-tick-type-heli" class="w-3.5 h-3.5 rounded border border-[#2D3A54] bg-[#0E121A] flex items-center justify-center text-[9px] text-[#64748B] shrink-0 select-none"></span>
-                                    <span class="truncate">HELI / WATER</span>
+                                    <span data-i18n="classic.opt_type_heli" class="truncate">HELI / WATER</span>
                                 </button>
                             </div>
                         </div>
 
                         <!-- Category 5: GSX PROFILE -->
                         <div id="classic-filter-gsx-item">
-                            <button type="button" onclick="toggleClassicFilterSubmenu('gsx', event)" class="w-full h-9 px-3.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-all flex items-center justify-between cursor-pointer group shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
-                                <span class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">GSX PROFILE</span>
+                            <button type="button" onclick="toggleClassicFilterSubmenu('gsx', event)" data-i18n-title="classic.filter_gsx_tooltip" title="Filter sceneries by GSX Pro profile status" class="w-full h-9 px-3.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-all flex items-center justify-between cursor-pointer group shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
+                                <span data-i18n="classic.filter_gsx_btn" class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">GSX PROFILE</span>
                                 <i id="classic-chevron-gsx" class="fa-solid fa-chevron-down text-[9px] text-[#64748B] group-hover:text-[#F1F5F9] transition-transform duration-200"></i>
                             </button>
                             <div id="classic-sub-gsx" class="hidden p-2 space-y-1.5 bg-[#0E121A] rounded-b-lg border-x border-b border-[#2D3A54]">
-                                <button type="button" onclick="classicSetGsx('all', event)" id="classic-opt-gsx-all" class="w-full h-7 px-2.5 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] text-[11px] font-mono font-semibold text-left truncate border border-[#253046] cursor-pointer transition-all">
-                                    <span class="truncate">ALL PROFILES</span>
+                                <button type="button" onclick="classicSetGsx('all', event)" id="classic-opt-gsx-all" data-i18n-title="classic.opt_gsx_all_tooltip" title="Show all airports regardless of GSX profile status" class="w-full h-7 px-2.5 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] text-[11px] font-mono font-semibold text-left truncate border border-[#253046] cursor-pointer transition-all">
+                                    <span data-i18n="classic.opt_gsx_all" class="truncate">ALL PROFILES</span>
                                 </button>
-                                <button type="button" onclick="classicSetGsx('with', event)" id="classic-opt-gsx-with" class="w-full h-7 px-2.5 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] text-[11px] font-mono font-semibold text-left truncate border border-[#253046] cursor-pointer transition-all">
-                                    <span class="truncate">WITH GSX ONLY</span>
+                                <button type="button" onclick="classicSetGsx('with', event)" id="classic-opt-gsx-with" data-i18n-title="classic.opt_gsx_with_tooltip" title="Show only airports that have a linked GSX profile" class="w-full h-7 px-2.5 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] text-[11px] font-mono font-semibold text-left truncate border border-[#253046] cursor-pointer transition-all">
+                                    <span data-i18n="classic.opt_gsx_with" class="truncate">WITH GSX ONLY</span>
                                 </button>
-                                <button type="button" onclick="classicSetGsx('none', event)" id="classic-opt-gsx-none" class="w-full h-7 px-2.5 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] text-[11px] font-mono font-semibold text-left truncate border border-[#253046] cursor-pointer transition-all">
-                                    <span class="truncate">NO GSX PROFILE</span>
+                                <button type="button" onclick="classicSetGsx('none', event)" id="classic-opt-gsx-none" data-i18n-title="classic.opt_gsx_none_tooltip" title="Show custom sceneries that are missing a GSX profile" class="w-full h-7 px-2.5 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] text-[11px] font-mono font-semibold text-left truncate border border-[#253046] cursor-pointer transition-all">
+                                    <span data-i18n="classic.opt_gsx_none" class="truncate">NO GSX PROFILE</span>
                                 </button>
                             </div>
                         </div>
 
                         <!-- Category 6: MIN RATING -->
                         <div id="classic-filter-rating-item">
-                            <button type="button" onclick="toggleClassicFilterSubmenu('rating', event)" class="w-full h-9 px-3.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-all flex items-center justify-between cursor-pointer group shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
-                                <span class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">MIN RATING</span>
+                            <button type="button" onclick="toggleClassicFilterSubmenu('rating', event)" data-i18n-title="classic.filter_rating_tooltip" title="Filter sceneries by minimum personal star rating" class="w-full h-9 px-3.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-all flex items-center justify-between cursor-pointer group shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
+                                <span data-i18n="classic.filter_rating_btn" class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">MIN RATING</span>
                                 <i id="classic-chevron-rating" class="fa-solid fa-chevron-down text-[9px] text-[#64748B] group-hover:text-[#F1F5F9] transition-transform duration-200"></i>
                             </button>
                             <div id="classic-sub-rating" class="hidden p-2 space-y-1.5 bg-[#0E121A] rounded-b-lg border-x border-b border-[#2D3A54]">
-                                <button type="button" onclick="classicSetRating(0)" id="classic-opt-rating-0" class="w-full h-7 px-2.5 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] text-[11px] font-mono font-semibold text-left truncate border border-[#253046] cursor-pointer transition-all">ALL RATINGS (0★)</button>
+                                <button type="button" onclick="classicSetRating(0)" id="classic-opt-rating-0" data-i18n="classic.opt_rating_all" data-i18n-title="classic.opt_rating_all_tooltip" title="Show sceneries of any star rating" class="w-full h-7 px-2.5 rounded-md bg-[#181E2B] text-[#94A3B8] hover:bg-[#1E2638] hover:text-[#F1F5F9] text-[11px] font-mono font-semibold text-left truncate border border-[#253046] cursor-pointer transition-all">ALL RATINGS (0★)</button>
                                 <div class="grid grid-cols-5 gap-1 pt-0.5">
                                     <button type="button" onclick="classicSetRating(1)" id="classic-opt-rating-1" class="h-7 rounded-md bg-[#181E2B] text-[#F59E0B] hover:bg-[#1E2638] font-mono font-bold text-xs text-center border border-[#253046] cursor-pointer transition-all">1★</button>
                                     <button type="button" onclick="classicSetRating(2)" id="classic-opt-rating-2" class="h-7 rounded-md bg-[#181E2B] text-[#F59E0B] hover:bg-[#1E2638] font-mono font-bold text-xs text-center border border-[#253046] cursor-pointer transition-all">2★</button>
@@ -2543,26 +2543,26 @@
 
                 <!-- 4. FLIGHT OPTIMIZER (5 core modules) -->
                 <div id="classic-flight-optimizer-section" class="space-y-1.5 pt-1">
-                    <span class="text-[10px] font-sans font-black uppercase tracking-widest text-[#64748B] block px-1">FLIGHT OPTIMIZER</span>
+                    <span data-i18n="classic.flight_optimizer_header" class="text-[10px] font-sans font-black uppercase tracking-widest text-[#64748B] block px-1">FLIGHT OPTIMIZER</span>
                     <div class="space-y-1.5">
-                        <button type="button" onclick="toggleFloatingWindow('smart_lod', event)" id="classic-btn-smart-lod" class="w-full h-10 px-3.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-all flex items-center justify-between cursor-pointer group shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
-                            <span id="classic-lbl-smart-lod" class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">SMART LOD</span>
+                        <button type="button" onclick="toggleFloatingWindow('smart_lod', event)" id="classic-btn-smart-lod" data-i18n-title="classic.smart_lod_tooltip" title="Dynamic Real-Time TLOD, OLOD & Cloud Recovery Engine" class="w-full h-10 px-3.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-all flex items-center justify-between cursor-pointer group shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
+                            <span id="classic-lbl-smart-lod" data-i18n="classic.smart_lod" class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">SMART LOD</span>
                             <span id="classic-badge-smart-lod" class="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#0E121A] text-[#94A3B8] border border-[#253046] inline-flex items-center gap-1"><svg class="w-3 h-3 text-[#94A3B8] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg><span>PRO</span></span>
                         </button>
-                        <button type="button" onclick="toggleFloatingWindow('graphics', event)" id="classic-btn-graphics" class="w-full h-10 px-3.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-all flex items-center justify-between cursor-pointer group shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
-                            <span id="classic-lbl-graphics" class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">MSFS GRAPHIC SETTINGS</span>
+                        <button type="button" onclick="toggleFloatingWindow('graphics', event)" id="classic-btn-graphics" data-i18n-title="classic.msfs_graphics_tooltip" title="Direct UserCfg.opt Matrix, 2D/VR Profiles & Load Gauges" class="w-full h-10 px-3.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-all flex items-center justify-between cursor-pointer group shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
+                            <span id="classic-lbl-graphics" data-i18n="classic.msfs_graphics" class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">MSFS GRAPHIC SETTINGS</span>
                             <span id="classic-badge-graphics" class="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#0E121A] text-[#94A3B8] border border-[#253046] inline-flex items-center gap-1"><svg class="w-3 h-3 text-[#94A3B8] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg><span>PRO</span></span>
                         </button>
-                        <button type="button" onclick="toggleFloatingWindow('my_rig', event)" id="classic-btn-my-rig" class="w-full h-10 px-3.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-all flex items-center justify-between cursor-pointer group shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
-                            <span id="classic-lbl-my-rig" class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">MY RIG</span>
+                        <button type="button" onclick="toggleFloatingWindow('my_rig', event)" id="classic-btn-my-rig" data-i18n-title="classic.my_rig_tooltip" title="Hardware Specs, Windows/GPU System Optimizer & Cache Cleaner" class="w-full h-10 px-3.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-all flex items-center justify-between cursor-pointer group shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
+                            <span id="classic-lbl-my-rig" data-i18n="classic.my_rig" class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">MY RIG</span>
                             <span id="classic-badge-my-rig" class="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#0E121A] text-[#94A3B8] border border-[#253046] inline-flex items-center gap-1"><svg class="w-3 h-3 text-[#94A3B8] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg><span>PRO</span></span>
                         </button>
-                        <button type="button" onclick="toggleFloatingWindow('telemetry', event)" id="classic-btn-telemetry" class="w-full h-10 px-3.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-all flex items-center justify-between cursor-pointer group shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
-                            <span id="classic-lbl-telemetry" class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">TELEMETRY</span>
+                        <button type="button" onclick="toggleFloatingWindow('telemetry', event)" id="classic-btn-telemetry" data-i18n-title="classic.telemetry_tooltip" title="Live SimConnect Flight Monitoring, FPS/VRAM HUD & Flight Reports" class="w-full h-10 px-3.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-all flex items-center justify-between cursor-pointer group shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
+                            <span id="classic-lbl-telemetry" data-i18n="classic.telemetry" class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">TELEMETRY</span>
                             <span id="classic-badge-telemetry" class="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#0E121A] text-[#94A3B8] border border-[#253046] inline-flex items-center gap-1"><svg class="w-3 h-3 text-[#94A3B8] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg><span>PRO</span></span>
                         </button>
-                        <button type="button" onclick="toggleFloatingWindow('route', event)" id="classic-btn-route" class="w-full h-10 px-3.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-all flex items-center justify-between cursor-pointer group shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
-                            <span id="classic-lbl-route" class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">ROUTE OPTIMIZATION</span>
+                        <button type="button" onclick="toggleFloatingWindow('route', event)" id="classic-btn-route" data-i18n-title="classic.flight_route_tooltip" title="SimBrief & Corridor Scenery Isolation to free RAM and VRAM" class="w-full h-10 px-3.5 rounded-lg bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] hover:border-[#2D3A54] text-left transition-all flex items-center justify-between cursor-pointer group shadow-[0_2px_8px_rgba(0,0,0,0.3)]">
+                            <span id="classic-lbl-route" data-i18n="classic.flight_route" class="text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">ROUTE OPTIMIZATION</span>
                             <span id="classic-badge-route" class="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#0E121A] text-[#94A3B8] border border-[#253046] inline-flex items-center gap-1"><svg class="w-3 h-3 text-[#94A3B8] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg><span>PRO</span></span>
                         </button>
                     </div>
@@ -2612,7 +2612,7 @@
                     </button>
 
                     <!-- AUTO-TILE WINDOWS BUTTON -->
-                    <button id="btn-auto-tile-windows" onclick="if(window.windowManager) window.windowManager.autoTileWindows(true)" title="Organize & Tile Open Windows" class="w-9 h-9 rounded-lg bg-[#181E2B] hover:bg-[#253046] active:scale-[0.98] border border-[#253046] text-[#94A3B8] hover:text-white flex items-center justify-center transition-all shrink-0 cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.25)] group">
+                    <button id="btn-auto-tile-windows" onclick="if(window.windowManager) window.windowManager.autoTileWindows(true)" data-i18n-title="toolbar.auto_tile_tooltip" title="Organize & Tile Open Windows" class="w-9 h-9 rounded-lg bg-[#181E2B] hover:bg-[#253046] active:scale-[0.98] border border-[#253046] text-[#94A3B8] hover:text-white flex items-center justify-center transition-all shrink-0 cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.25)] group">
                         <span data-icon="tile-windows" class="w-4 h-4 block text-[#94A3B8] group-hover:text-white"></span>
                     </button>
                 </div>
@@ -3635,12 +3635,13 @@
                 <!-- APPLICATION LANGUAGE SETTINGS -->
                 <div class="pt-4 border-t border-slate-800/80 space-y-3">
                     <label data-i18n="settings.language_section" class="typo-section-title text-slate-400 block">Language</label>
-                    <div class="space-y-1.5">
+                    <div class="space-y-1.5" data-i18n-title="settings.language_tooltip" title="Select the display language for SceneryX and the MSFS In-Game Panel">
                         <div class="flex items-center justify-between">
                             <label data-i18n="settings.language_label" class="typo-setting-label text-slate-300">Application Language</label>
                         </div>
-                        <select id="cfg-app-language" disabled class="w-full bg-slate-900 border border-slate-700/60 rounded-md px-3.5 py-2 typo-input-val text-slate-200 cursor-default opacity-80 focus:outline-none">
-                            <option value="en" selected>English</option>
+                        <select id="cfg-app-language" onchange="previewAppLanguage(this.value)" data-i18n-title="settings.language_tooltip" title="Select the display language for SceneryX and the MSFS In-Game Panel" class="w-full bg-slate-900 border border-slate-700/60 rounded-md px-3.5 py-2 typo-input-val text-slate-200 cursor-pointer focus:outline-none focus:border-slate-400">
+                            <option value="en">English</option>
+                            <option value="fr">Français</option>
                         </select>
                     </div>
                 </div>
@@ -3664,16 +3665,16 @@
                 <!-- WINDOW CLOSE BEHAVIOR / SYSTRAY -->
                 <div class="pt-4 border-t border-slate-800/80 space-y-3">
                     <div class="flex items-center justify-between">
-                        <label class="typo-section-title text-slate-400 block">Close Button &amp; System Tray</label>
+                        <label data-i18n="settings.close_section" class="typo-section-title text-slate-400 block">Close Button &amp; System Tray</label>
                     </div>
-                    <div class="space-y-1.5">
+                    <div class="space-y-1.5" data-i18n-title="settings.close_action_tooltip" title="Choose whether clicking [X] closes SceneryX or minimizes it to the Windows system tray">
                         <div class="flex items-center justify-between">
-                            <label class="typo-setting-label text-slate-300">Close Button Action ([X])</label>
-                            <span class="typo-metadata">System Tray</span>
+                            <label data-i18n="settings.close_action_label" class="typo-setting-label text-slate-300">Close Button Action ([X])</label>
+                            <span data-i18n="settings.close_tray_meta" class="typo-metadata">System Tray</span>
                         </div>
-                        <select id="cfg-close-action" class="w-full bg-slate-900 border border-slate-700/60 rounded-md px-3.5 py-2 typo-input-val text-slate-200 cursor-pointer focus:outline-none focus:border-slate-400">
-                            <option value="quit">Quit application completely</option>
-                            <option value="minimize_to_tray">Minimize to system tray (Notification Area)</option>
+                        <select id="cfg-close-action" data-i18n-title="settings.close_action_tooltip" title="Choose whether clicking [X] closes SceneryX or minimizes it to the Windows system tray" class="w-full bg-slate-900 border border-slate-700/60 rounded-md px-3.5 py-2 typo-input-val text-slate-200 cursor-pointer focus:outline-none focus:border-slate-400">
+                            <option value="quit" data-i18n="settings.close_quit">Quit application completely</option>
+                            <option value="minimize_to_tray" data-i18n="settings.close_minimize">Minimize to system tray (Notification Area)</option>
                         </select>
                     </div>
                 </div>
@@ -3681,15 +3682,15 @@
                 <!-- DYNAMIC LOD & PERFORMANCE ENGINE SETTINGS -->
                 <div id="cfg-external-autofps-section" class="pt-4 border-t border-slate-800/80 space-y-3">
                     <div class="flex items-center justify-between">
-                        <label class="typo-section-title text-slate-400 block">Dynamic LOD &amp; Performance Engine</label>
+                        <label data-i18n="settings.dyn_lod_section" class="typo-section-title text-slate-400 block">Dynamic LOD &amp; Performance Engine</label>
                     </div>
 
-                    <div onclick="toggleExternalAutoFpsSettingSwitch()" class="flex items-center justify-between bg-slate-950/80 p-3.5 rounded-lg border border-slate-700/60 cursor-pointer">
+                    <div onclick="toggleExternalAutoFpsSettingSwitch()" data-i18n-title="settings.ext_autofps_tooltip" title="Toggle External AutoFPS delegation" class="flex items-center justify-between bg-slate-950/80 p-3.5 rounded-lg border border-slate-700/60 cursor-pointer">
                         <div>
-                            <label class="typo-setting-label text-slate-200 cursor-pointer block font-semibold">External AutoFPS (MSFS_AutoFPS.exe)</label>
-                            <span class="typo-metadata text-slate-400 block mt-0.5">Delegate dynamic LOD regulation exclusively to the external MSFS_AutoFPS utility instead of SceneryX Smart LOD</span>
+                            <label data-i18n="settings.ext_autofps_title" class="typo-setting-label text-slate-200 cursor-pointer block font-semibold">External AutoFPS (MSFS_AutoFPS.exe)</label>
+                            <span data-i18n="settings.ext_autofps_sub" class="typo-metadata text-slate-400 block mt-0.5">Delegate dynamic LOD regulation exclusively to the external MSFS_AutoFPS utility instead of SceneryX Smart LOD</span>
                         </div>
-                        <div id="cfg-external-autofps-switch" class="relative inline-flex items-center shrink-0 cursor-pointer p-1 rounded-xl transition-colors" title="Toggle External AutoFPS usage">
+                        <div id="cfg-external-autofps-switch" class="relative inline-flex items-center shrink-0 cursor-pointer p-1 rounded-xl transition-colors" data-i18n-title="settings.ext_autofps_tooltip" title="Toggle External AutoFPS usage">
                             <span id="cfg-external-autofps-pro-badge" class="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#0E121A] text-[#94A3B8] border border-[#253046] inline-flex items-center gap-1"><svg class="w-3 h-3 text-[#94A3B8] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg><span>PRO</span></span>
                             <div id="cfg-external-autofps-track" class="hidden w-10 h-5 rounded-full transition-colors duration-200 ease-in-out p-0.5 bg-slate-700">
                                 <div id="cfg-external-autofps-thumb" class="w-4 h-4 rounded-full bg-white shadow-md transform transition-transform duration-200 ease-in-out translate-x-0"></div>
@@ -3699,12 +3700,12 @@
                 </div>
 
                 <!-- MSFS IN-GAME TOOLBAR PANEL -->
-                <div id="cfg-ingame-panel-section" onclick="if (window.IS_LITE) showUnlockProModal();" class="pt-4 border-t border-slate-800/80 flex items-center justify-between cursor-pointer">
+                <div id="cfg-ingame-panel-section" onclick="if (window.IS_LITE) showUnlockProModal();" data-i18n-title="settings.ingame_panel_tooltip" title="Open or inspect the MSFS In-Game Toolbar Panel (sceneryx-ingame-panel)" class="pt-4 border-t border-slate-800/80 flex items-center justify-between cursor-pointer">
                     <div>
-                        <label class="typo-section-title text-slate-300 block cursor-pointer">In-Game Toolbar Panel</label>
-                        <span class="typo-metadata text-slate-500 block">In-flight HUD remote toolbar panel for MSFS (2D &amp; VR)</span>
+                        <label data-i18n="settings.ingame_panel_title" class="typo-section-title text-slate-300 block cursor-pointer">In-Game Toolbar Panel</label>
+                        <span data-i18n="settings.ingame_panel_sub" class="typo-metadata text-slate-500 block">In-flight HUD remote toolbar panel for MSFS (2D &amp; VR)</span>
                     </div>
-                    <button type="button" id="cfg-ingame-panel-btn" onclick="event.stopPropagation(); toggleIngamePanelInstall()" class="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#0E121A] text-[#94A3B8] border border-[#253046] inline-flex items-center gap-1 cursor-pointer">
+                    <button type="button" id="cfg-ingame-panel-btn" onclick="event.stopPropagation(); toggleIngamePanelInstall()" data-i18n-title="settings.ingame_panel_tooltip" title="Open or inspect the MSFS In-Game Toolbar Panel (sceneryx-ingame-panel)" class="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-[#0E121A] text-[#94A3B8] border border-[#253046] inline-flex items-center gap-1 cursor-pointer">
                         <svg class="w-3 h-3 text-[#94A3B8] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg><span>PRO</span>
                     </button>
                 </div>
@@ -3713,14 +3714,14 @@
                 <div class="pt-4 border-t border-slate-800/80 space-y-3">
                     <div class="flex items-center justify-between">
                         <div>
-                            <span class="typo-section-title text-slate-300 block">Crash Reporting &amp; Diagnostic Privacy</span>
-                            <span class="typo-metadata text-slate-500 block">Help improve SceneryX reliability with zero personal data collection</span>
+                            <span data-i18n="settings.crash_section" class="typo-section-title text-slate-300 block">Crash Reporting &amp; Diagnostic Privacy</span>
+                            <span data-i18n="settings.crash_sub" class="typo-metadata text-slate-500 block">Help improve SceneryX reliability with zero personal data collection</span>
                         </div>
                         <div class="flex items-center gap-2">
-                            <button type="button" onclick="openBugReportModal()" class="px-3 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700/60 text-xs font-semibold transition-colors cursor-pointer" title="Open Bug Report &amp; Diagnostic Assistant">
+                            <button type="button" onclick="openBugReportModal()" data-i18n="settings.report_issue_btn" data-i18n-title="settings.report_issue_tooltip" class="px-3 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700/60 text-xs font-semibold transition-colors cursor-pointer" title="Open Bug Report &amp; Diagnostic Assistant">
                                 Report an Issue...
                             </button>
-                            <button type="button" onclick="openCrashReportsFolder()" class="px-2.5 py-1.5 rounded-md bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700/60 text-[11px] font-semibold transition-colors cursor-pointer" title="Open persistent crash reports folder">
+                            <button type="button" onclick="openCrashReportsFolder()" data-i18n="settings.crash_history_btn" data-i18n-title="settings.crash_history_tooltip" class="px-2.5 py-1.5 rounded-md bg-slate-950 hover:bg-slate-800 text-slate-400 hover:text-slate-200 border border-slate-700/60 text-[11px] font-semibold transition-colors cursor-pointer" title="Open persistent crash reports folder">
                                 History
                             </button>
                         </div>
@@ -3729,16 +3730,16 @@
                     <div class="space-y-2.5 bg-slate-950/80 p-3.5 rounded-lg border border-slate-700/60">
                         <div class="flex items-start justify-between gap-3">
                             <div>
-                                <label for="cfg-privacy-crash-reports" class="typo-setting-label text-slate-300 cursor-pointer block">Send Crash Reports Automatically</label>
-                                <span class="typo-metadata text-slate-400 block text-[11px] leading-relaxed">Captures unhandled exceptions, call stacks, and anonymized hardware specs (GPU, driver, VRAM) upon fatal errors. No usernames, personal file paths, or credentials are ever collected.</span>
+                                <label data-i18n="settings.crash_auto_label" for="cfg-privacy-crash-reports" class="typo-setting-label text-slate-300 cursor-pointer block">Send Crash Reports Automatically</label>
+                                <span data-i18n="settings.crash_auto_desc" class="typo-metadata text-slate-400 block text-[11px] leading-relaxed">Captures unhandled exceptions, call stacks, and anonymized hardware specs (GPU, driver, VRAM) upon fatal errors. No usernames, personal file paths, or credentials are ever collected.</span>
                             </div>
                             <input type="checkbox" id="cfg-privacy-crash-reports" checked class="w-4 h-4 accent-slate-400 rounded cursor-pointer shrink-0 mt-0.5">
                         </div>
 
                         <div class="flex items-start justify-between gap-3 pt-2.5 border-t border-slate-800/60">
                             <div>
-                                <label for="cfg-privacy-telemetry-stats" class="typo-setting-label text-slate-300 cursor-pointer block">Share Anonymized Flight Statistics</label>
-                                <span class="typo-metadata text-slate-400 block text-[11px] leading-relaxed">Submits high-level flight performance aggregates (aircraft type, average FPS, peak VRAM usage) to help optimize default presets and LOD tuning across GPU tiers.</span>
+                                <label data-i18n="settings.telemetry_anon_label" for="cfg-privacy-telemetry-stats" class="typo-setting-label text-slate-300 cursor-pointer block">Share Anonymized Flight Statistics</label>
+                                <span data-i18n="settings.telemetry_anon_desc" class="typo-metadata text-slate-400 block text-[11px] leading-relaxed">Submits high-level flight performance aggregates (aircraft type, average FPS, peak VRAM usage) to help optimize default presets and LOD tuning across GPU tiers.</span>
                             </div>
                             <input type="checkbox" id="cfg-privacy-telemetry-stats" checked class="w-4 h-4 accent-slate-400 rounded cursor-pointer shrink-0 mt-0.5">
                         </div>
@@ -3748,10 +3749,10 @@
                 <!-- LEGAL & COMPLIANCE -->
                 <div class="pt-4 border-t border-slate-800/80 flex items-center justify-between">
                     <div>
-                        <label class="typo-section-title text-slate-300 block">Legal &amp; Compliance</label>
-                        <span class="typo-metadata text-slate-500 block">End User License Agreement (EULA), Privacy Policy &amp; Open Source Notices</span>
+                        <label data-i18n="settings.legal_section" class="typo-section-title text-slate-300 block">Legal &amp; Compliance</label>
+                        <span data-i18n="settings.legal_sub" class="typo-metadata text-slate-500 block">End User License Agreement (EULA), Privacy Policy &amp; Open Source Notices</span>
                     </div>
-                    <button type="button" onclick="openLegalModal('eula')" class="px-3.5 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 typo-action-btn font-semibold transition-colors cursor-pointer">
+                    <button type="button" onclick="openLegalModal('eula')" data-i18n="settings.legal_btn" data-i18n-title="settings.legal_btn_tooltip" title="Read EULA, Privacy Policy and Open Source Notices" class="px-3.5 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 typo-action-btn font-semibold transition-colors cursor-pointer">
                         View Documents
                     </button>
                 </div>
@@ -4047,7 +4048,7 @@
         <!-- Drag Handle Header -->
         <div class="modal-header floating-win-header h-[42px] px-4 bg-[#12161F] border-b border-[#1E2638] flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2">
-                <h3 class="typo-window-header text-[#F1F5F9] text-xs font-sans font-bold tracking-wider uppercase">MY RIG &amp; SYSTEM</h3>
+                <h3 data-i18n="rig.window_title" class="typo-window-header text-[#F1F5F9] text-xs font-sans font-bold tracking-wider uppercase">MY RIG &amp; SYSTEM</h3>
             </div>
             <div class="flex items-center gap-1.5">
                 <button type="button" onclick="showContextHelp('my_rig')" data-i18n-title="my_rig.help_btn_title" title="Rig &amp; System Guide &amp; Help" class="w-7 h-7 rounded-md bg-[#181E2B] hover:bg-[#242E42] text-slate-200 hover:text-white border border-[#2D3A54] hover:border-slate-500 flex items-center justify-center transition-all cursor-pointer shadow-sm select-none">
@@ -4062,17 +4063,17 @@
         <!-- Navigation Tabs Bar -->
         <div class="px-4 py-2 bg-[#0E121A] border-b border-[#1E2638] flex items-center justify-between gap-2">
             <div class="flex items-center gap-1.5 flex-wrap">
-                <button id="rig-tab-btn-tuning" onclick="switchRigTab('tuning')" class="px-3 py-1 rounded text-xs font-bold uppercase tracking-wider bg-[#1E2638] text-[#F1F5F9] transition-colors border-0 cursor-pointer">
+                <button id="rig-tab-btn-tuning" onclick="switchRigTab('tuning')" data-i18n="rig.tab_tuning" data-i18n-title="rig.tab_tuning_tooltip" title="Inspect and optimize Windows OS & GPU settings for MSFS" class="px-3 py-1 rounded text-xs font-bold uppercase tracking-wider bg-[#1E2638] text-[#F1F5F9] transition-colors border-0 cursor-pointer">
                     System Optimizer
                 </button>
-                <button id="rig-tab-btn-specs" onclick="switchRigTab('specs')" class="px-3 py-1 rounded text-xs font-semibold uppercase tracking-wider bg-transparent text-[#94A3B8] hover:text-[#F1F5F9] transition-colors border-0 cursor-pointer">
+                <button id="rig-tab-btn-specs" onclick="switchRigTab('specs')" data-i18n="rig.tab_specs" data-i18n-title="rig.tab_specs_tooltip" title="View detected CPU, GPU, VRAM, RAM, NVMe and Display specs" class="px-3 py-1 rounded text-xs font-semibold uppercase tracking-wider bg-transparent text-[#94A3B8] hover:text-[#F1F5F9] transition-colors border-0 cursor-pointer">
                     Hardware Specs
                 </button>
-                <button id="rig-tab-btn-maintenance" onclick="switchRigTab('maintenance')" class="px-3 py-1 rounded text-xs font-semibold uppercase tracking-wider bg-transparent text-[#94A3B8] hover:text-[#F1F5F9] transition-colors border-0 cursor-pointer">
+                <button id="rig-tab-btn-maintenance" onclick="switchRigTab('maintenance')" data-i18n="rig.tab_maintenance" data-i18n-title="rig.tab_maintenance_tooltip" title="Community Safe Update Mode & MSFS/GPU shader cache cleaner" class="px-3 py-1 rounded text-xs font-semibold uppercase tracking-wider bg-transparent text-[#94A3B8] hover:text-[#F1F5F9] transition-colors border-0 cursor-pointer">
                     Update &amp; Cache Cleaner
                 </button>
             </div>
-            <button id="rig-btn-rescan" onclick="if (currentRigTab === 'maintenance') { loadSimMaintenanceStatus(true); } else { loadSystemTuningStatus(true); }" class="px-3 py-1 rounded text-[11px] font-sans font-bold uppercase tracking-wider bg-[#181E2B] hover:bg-[#222B3D] text-[#94A3B8] hover:text-[#F1F5F9] border border-[#253046] transition-colors cursor-pointer shrink-0">
+            <button id="rig-btn-rescan" onclick="if (currentRigTab === 'maintenance') { loadSimMaintenanceStatus(true); } else { loadSystemTuningStatus(true); }" data-i18n="rig.btn_rescan" data-i18n-title="rig.btn_rescan_tooltip" title="Rescan system hardware, OS tuning parameters and MSFS caches" class="px-3 py-1 rounded text-[11px] font-sans font-bold uppercase tracking-wider bg-[#181E2B] hover:bg-[#222B3D] text-[#94A3B8] hover:text-[#F1F5F9] border border-[#253046] transition-colors cursor-pointer shrink-0">
                 Scan System
             </button>
         </div>
@@ -4126,7 +4127,7 @@
                     <!-- CPU Row -->
                     <div class="p-3 rounded-lg bg-[#0E121A] border border-[#253046] flex items-center justify-between gap-3">
                         <div class="space-y-0.5 min-w-0">
-                            <span class="text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B] block">Processor (CPU)</span>
+                            <span data-i18n="rig.cpu_label" class="text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B] block">Processor (CPU)</span>
                             <div id="opt-detected-cpu-name" class="text-xs font-bold text-[#F1F5F9] truncate">Detecting...</div>
                             <div id="opt-detected-cpu-cores" class="text-[11px] text-[#94A3B8] flex items-center gap-1.5 flex-wrap">--</div>
                         </div>
@@ -4136,7 +4137,7 @@
                     <!-- GPU Row -->
                     <div class="p-3 rounded-lg bg-[#0E121A] border border-[#253046] flex items-center justify-between gap-3">
                         <div class="space-y-0.5 min-w-0">
-                            <span class="text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B] block">Graphics Card (GPU)</span>
+                            <span data-i18n="rig.gpu_label" class="text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B] block">Graphics Card (GPU)</span>
                             <div id="opt-detected-gpu-name" class="text-xs font-bold text-[#F1F5F9] truncate">Detecting...</div>
                             <div id="opt-detected-gpu-vram" class="text-[11px] text-[#94A3B8] flex items-center gap-1.5 flex-wrap">--</div>
                         </div>
@@ -4146,7 +4147,7 @@
                     <!-- RAM Row -->
                     <div class="p-3 rounded-lg bg-[#0E121A] border border-[#253046] flex items-center justify-between gap-3">
                         <div class="space-y-0.5 min-w-0">
-                            <span class="text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B] block">System Memory (RAM)</span>
+                            <span data-i18n="rig.ram_label" class="text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B] block">System Memory (RAM)</span>
                             <div id="opt-detected-ram-val" class="text-xs font-bold text-[#F1F5F9] truncate">--</div>
                             <div id="opt-detected-ram-badges" class="text-[11px] text-[#94A3B8] flex items-center gap-1.5 flex-wrap">--</div>
                         </div>
@@ -4156,7 +4157,7 @@
                     <!-- Storage Row -->
                     <div class="p-3 rounded-lg bg-[#0E121A] border border-[#253046] flex items-center justify-between gap-3">
                         <div class="space-y-0.5 min-w-0">
-                            <span class="text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B] block">Storage / MSFS Drive</span>
+                            <span data-i18n="rig.storage_label" class="text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B] block">Storage / MSFS Drive</span>
                             <div id="opt-detected-storage-name" class="text-xs font-bold text-[#F1F5F9] truncate">Detecting...</div>
                             <div id="opt-detected-storage-details" class="text-[11px] text-[#94A3B8] flex items-center gap-1.5 flex-wrap">--</div>
                             <div id="opt-detected-storage-warning" class="hidden text-xs text-[#EF4444] pt-0.5">MSFS on mechanical HDD! Move to SSD recommended.</div>
@@ -4167,7 +4168,7 @@
                     <!-- Display Row -->
                     <div id="opt-rig-card-display" class="p-3 rounded-lg bg-[#0E121A] border border-[#253046] flex items-center justify-between gap-3">
                         <div class="space-y-0.5 min-w-0">
-                            <span class="text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B] block">Primary Display &amp; Cadence</span>
+                            <span data-i18n="rig.display_label" class="text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B] block">Primary Display &amp; Cadence</span>
                             <div id="opt-detected-display-hz" class="text-xs font-bold text-[#F1F5F9] truncate">Detecting...</div>
                             <div id="opt-detected-display-res" class="text-[11px] text-[#94A3B8] flex items-center gap-1.5 flex-wrap">--</div>
                             <div id="opt-detected-display-switcher" class="hidden flex items-center gap-1.5 pt-0.5 flex-wrap"></div>
@@ -4178,7 +4179,7 @@
                     <!-- VR Headset Row -->
                     <div class="p-3 rounded-lg bg-[#0E121A] border border-[#253046] flex items-center justify-between gap-3">
                         <div class="space-y-0.5 min-w-0">
-                            <span class="text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B] block">VR Headset</span>
+                            <span data-i18n="rig.vr_label" class="text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B] block">VR Headset</span>
                             <div id="opt-detected-vr-name" class="text-xs font-bold text-[#F1F5F9] truncate">Detecting...</div>
                             <div id="opt-detected-vr-hz" class="text-[11px] text-[#94A3B8] flex items-center gap-1.5 flex-wrap">--</div>
                         </div>
@@ -4188,7 +4189,7 @@
                     <!-- Network Row -->
                     <div class="p-3 rounded-lg bg-[#0E121A] border border-[#253046] flex items-center justify-between gap-3">
                         <div class="space-y-0.5 min-w-0">
-                            <span class="text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B] block">Network &amp; Latency</span>
+                            <span data-i18n="rig.net_label" class="text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B] block">Network &amp; Latency</span>
                             <div id="opt-detected-net-speed" class="text-xs font-bold text-[#F1F5F9] truncate">Detecting...</div>
                             <div id="opt-detected-net-details" class="text-[11px] text-[#94A3B8] flex items-center gap-1.5 flex-wrap">--</div>
                         </div>
@@ -4198,7 +4199,7 @@
                     <!-- Drivers Row -->
                     <div class="p-3 rounded-lg bg-[#0E121A] border border-[#253046] flex items-center justify-between gap-3">
                         <div class="space-y-0.5 min-w-0">
-                            <span class="text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B] block">Runtime Accelerators</span>
+                            <span data-i18n="rig.drivers_label" class="text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B] block">Runtime Accelerators</span>
                             <div id="opt-detected-driver-title" class="text-xs font-bold text-[#F1F5F9] truncate">DirectX 12 • GPU Scheduling</div>
                             <div id="opt-detected-misc-badges" class="text-[11px] text-[#94A3B8] flex items-center gap-1.5 flex-wrap">--</div>
                         </div>
@@ -4298,7 +4299,7 @@
         <!-- Drag Handle Header -->
         <div class="modal-header floating-win-header h-[42px] px-4 bg-[#12161F] border-b border-[#1E2638] flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2">
-                <h3 class="typo-window-header text-[#F1F5F9] text-xs font-sans font-bold tracking-wider uppercase">MSFS GRAPHIC SETTINGS</h3>
+                <h3 data-i18n="graphics.window_title" class="typo-window-header text-[#F1F5F9] text-xs font-sans font-bold tracking-wider uppercase">MSFS GRAPHIC SETTINGS</h3>
             </div>
             <button onclick="closeFloatingWindow('graphics')" title="Close" class="modal-close-btn w-7 h-7 rounded-md flex items-center justify-center text-[#94A3B8] hover:text-[#F1F5F9] hover:bg-[#181E2B] transition-colors cursor-pointer border-0">
                 <i class="fa-solid fa-xmark text-sm"></i>
@@ -4309,13 +4310,13 @@
             <!-- Mode Switcher: COMMON, 2D DISPLAY, VR HEADSET -->
             <div class="flex items-center justify-center gap-3 flex-wrap py-1.5 my-1">
                 <div class="flex items-center bg-[#0E121A] p-1 rounded-lg border border-[#2D3A54] text-xs font-semibold">
-                    <button id="opt-msfs-mode-btn-common" onclick="switchMsfsGraphicsMode('COMMON', true)" class="px-3.5 py-1.5 rounded-md text-[#94A3B8] hover:text-[#F1F5F9] transition-all cursor-pointer font-bold text-xs tracking-wider uppercase">
+                    <button id="opt-msfs-mode-btn-common" onclick="switchMsfsGraphicsMode('COMMON', true)" data-i18n="graphics.mode_shared" data-i18n-title="graphics.mode_shared_tooltip" title="Shared simulator settings applying to both 2D and VR" class="px-3.5 py-1.5 rounded-md text-[#94A3B8] hover:text-[#F1F5F9] transition-all cursor-pointer font-bold text-xs tracking-wider uppercase">
                         SHARED
                     </button>
-                    <button id="opt-msfs-mode-btn-2d" onclick="switchMsfsGraphicsMode('2D', true)" class="px-3.5 py-1.5 rounded-md bg-[#00A8FF] text-[#0B0D11] transition-all cursor-pointer shadow-sm font-bold text-xs tracking-wider uppercase">
+                    <button id="opt-msfs-mode-btn-2d" onclick="switchMsfsGraphicsMode('2D', true)" data-i18n="graphics.mode_2d" data-i18n-title="graphics.mode_2d_tooltip" title="Edit standard 2D Monitor graphics profile (Graphics)" class="px-3.5 py-1.5 rounded-md bg-[#00A8FF] text-[#0B0D11] transition-all cursor-pointer shadow-sm font-bold text-xs tracking-wider uppercase">
                         2D DISPLAY
                     </button>
-                    <button id="opt-msfs-mode-btn-vr" onclick="switchMsfsGraphicsMode('VR', true)" class="px-3.5 py-1.5 rounded-md text-[#94A3B8] hover:text-[#F1F5F9] transition-all cursor-pointer font-bold text-xs tracking-wider uppercase">
+                    <button id="opt-msfs-mode-btn-vr" onclick="switchMsfsGraphicsMode('VR', true)" data-i18n="graphics.mode_vr" data-i18n-title="graphics.mode_vr_tooltip" title="Edit Virtual Reality graphics profile (GraphicsVR)" class="px-3.5 py-1.5 rounded-md text-[#94A3B8] hover:text-[#F1F5F9] transition-all cursor-pointer font-bold text-xs tracking-wider uppercase">
                         VR HEADSET
                     </button>
                 </div>
@@ -4473,10 +4474,10 @@
                         </div>
 
                         <!-- Action Buttons with uniform h-8 height -->
-                        <button onclick="saveCurrentCustomProfile()" class="h-8 px-3 rounded-md bg-[#181E2B] hover:bg-[#1E2638] text-[#F1F5F9] border border-[#253046] hover:border-[#2D3A54] typo-action-btn text-xs font-semibold tracking-[0.02em] transition-colors cursor-pointer shadow-sm uppercase shrink-0 whitespace-nowrap inline-flex items-center justify-center leading-none" title="Save current settings as profile">
+                        <button onclick="saveCurrentCustomProfile()" data-i18n="graphics.save_profile_btn" data-i18n-title="graphics.save_profile_tooltip" class="h-8 px-3 rounded-md bg-[#181E2B] hover:bg-[#1E2638] text-[#F1F5F9] border border-[#253046] hover:border-[#2D3A54] typo-action-btn text-xs font-semibold tracking-[0.02em] transition-colors cursor-pointer shadow-sm uppercase shrink-0 whitespace-nowrap inline-flex items-center justify-center leading-none" title="Save current settings as profile">
                             SAVE PROFILE
                         </button>
-                        <button onclick="restoreOriginalUserCfgTarget()" class="h-8 px-3 rounded-md bg-[#181E2B] hover:bg-[#1E2638] text-[#F1F5F9] border border-[#253046] hover:border-[#2D3A54] typo-action-btn text-xs font-semibold tracking-[0.02em] transition-colors cursor-pointer uppercase shrink-0 whitespace-nowrap inline-flex items-center justify-center leading-none" title="Restore pristine original UserCfg.opt">
+                        <button onclick="restoreOriginalUserCfgTarget()" data-i18n="graphics.restore_cfg_btn" data-i18n-title="graphics.restore_cfg_tooltip" class="h-8 px-3 rounded-md bg-[#181E2B] hover:bg-[#1E2638] text-[#F1F5F9] border border-[#253046] hover:border-[#2D3A54] typo-action-btn text-xs font-semibold tracking-[0.02em] transition-colors cursor-pointer uppercase shrink-0 whitespace-nowrap inline-flex items-center justify-center leading-none" title="Restore pristine original UserCfg.opt">
                             RESTORE ORIGINAL CFG
                         </button>
                     </div>
@@ -4520,8 +4521,8 @@
                 <!-- Engine Status Card -->
             <div class="p-3.5 rounded-lg bg-[#181E2B] border border-[#253046] space-y-2.5 shadow-sm">
                 <div class="flex items-center justify-between">
-                    <span class="typo-section-title text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">Smart Dynamic Terrain LOD Engine</span>
-                    <button type="button" id="smart-lod-main-toggle" onclick="toggleSmartLodActive()" class="switch-btn switch-off" role="switch" aria-checked="false" title="Toggle Smart Dynamic Terrain LOD Engine">
+                    <span data-i18n="smartlod.engine_title" class="typo-section-title text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">Smart Dynamic Terrain LOD Engine</span>
+                    <button type="button" id="smart-lod-main-toggle" onclick="toggleSmartLodActive()" data-i18n-title="smartlod.main_toggle_tooltip" class="switch-btn switch-off" role="switch" aria-checked="false" title="Toggle Smart Dynamic Terrain LOD Engine">
                         <span class="switch-thumb"></span>
                         <span id="smart-lod-main-toggle-lbl" class="switch-label">OFF</span>
                     </button>
@@ -4542,13 +4543,13 @@
             <!-- Config Controls Card -->
             <div class="p-4 rounded-lg bg-[#181E2B] border border-[#253046] space-y-3.5 shadow-sm">
                 <div class="flex items-center justify-between">
-                    <span class="typo-section-title text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">Dynamic LOD Thresholds &amp; Targets</span>
+                    <span data-i18n="smartlod.thresholds_title" class="typo-section-title text-xs font-sans font-bold uppercase tracking-wider text-[#F1F5F9]">Dynamic LOD Thresholds &amp; Targets</span>
                     <!-- 2D / VR Switcher -->
                     <div class="inline-flex p-0.5 rounded-lg bg-[#0E121A] border border-[#2D3A54]">
-                        <button type="button" id="smart-lod-btn-mode-2d" onclick="switchSmartLodTargetMode('2D')" class="px-3 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer bg-[#00A8FF] text-[#0B0D11] shadow-sm">
+                        <button type="button" id="smart-lod-btn-mode-2d" onclick="switchSmartLodTargetMode('2D')" data-i18n="smartlod.mode_2d" data-i18n-title="smartlod.mode_2d_tooltip" title="Configure Smart LOD thresholds for 2D Monitor mode" class="px-3 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer bg-[#00A8FF] text-[#0B0D11] shadow-sm">
                             2D Display
                         </button>
-                        <button type="button" id="smart-lod-btn-mode-vr" onclick="switchSmartLodTargetMode('VR')" class="px-3 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer text-[#94A3B8] hover:text-[#F1F5F9] bg-transparent">
+                        <button type="button" id="smart-lod-btn-mode-vr" onclick="switchSmartLodTargetMode('VR')" data-i18n="smartlod.mode_vr" data-i18n-title="smartlod.mode_vr_tooltip" title="Configure Smart LOD thresholds for VR Headset mode" class="px-3 py-1 rounded-md text-[11px] font-semibold transition-all cursor-pointer text-[#94A3B8] hover:text-[#F1F5F9] bg-transparent">
                             VR Headset
                         </button>
                     </div>
@@ -4707,15 +4708,15 @@
                                     </button>
                                 </div>
                             </div>
-                            <div class="flex items-center gap-2">
-                                <label for="smart-lod-cloud-recovery" class="typo-setting-label text-xs text-[#94A3B8] cursor-pointer">Auto Cloud Recovery</label>
-                                <span class="text-[9.5px] font-mono font-bold text-[#94A3B8] bg-[#12161F] px-2 py-0.5 rounded-full border border-[#1E2638] shrink-0" title="Live Volumetric Cloud Quality in MSFS (steps down under FPS strain or boosts up to Ultra when headroom allows)">
+                            <div class="flex items-center gap-2" data-i18n-title="smartlod.cloud_recovery_tooltip" title="Automatically lower Volumetric Clouds by 1 notch under heavy FPS strain and restore when headroom returns">
+                                <label data-i18n="smartlod.cloud_recovery_label" for="smart-lod-cloud-recovery" class="typo-setting-label text-xs text-[#94A3B8] cursor-pointer">Auto Cloud Recovery</label>
+                                <span class="text-[9.5px] font-mono font-bold text-[#94A3B8] bg-[#12161F] px-2 py-0.5 rounded-full border border-[#1E2638] shrink-0" data-i18n-title="smartlod.cloud_recovery_tooltip" title="Live Volumetric Cloud Quality in MSFS (steps down under FPS strain or boosts up to Ultra when headroom allows)">
                                     LIVE: <span id="smart-lod-modal-live-clouds" class="text-[#00A8FF] font-mono font-bold">--</span>
                                 </span>
                                 <input type="checkbox" id="smart-lod-cloud-recovery" checked onchange="window.onDesktopCloudRecoveryChange && window.onDesktopCloudRecoveryChange(this.checked); updatePerformanceCockpitGauges()" class="w-4 h-4 accent-[#00A8FF] rounded cursor-pointer">
                             </div>
                         </div>
-                        <span class="typo-metadata text-[10px] text-[#64748B] block leading-tight">Dynamic LOD governor setpoint &amp; adaptive cloud scaling (down under strain, up to Ultra when headroom allows)</span>
+                        <span data-i18n="smartlod.governor_desc" class="typo-metadata text-[10px] text-[#64748B] block leading-tight">Dynamic LOD governor setpoint &amp; adaptive cloud scaling (down under strain, up to Ultra when headroom allows)</span>
                     </div>
                 </div>
             </div>
@@ -4782,7 +4783,7 @@
         <!-- Drag Handle Header -->
         <div class="modal-header floating-win-header h-[42px] px-4 bg-[#12161F] border-b border-[#1E2638] flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2">
-                <h3 class="typo-window-header text-[#F1F5F9] text-xs font-sans font-bold tracking-wider uppercase">LIVE FLIGHT MONITORING</h3>
+                <h3 data-i18n="telemetry.window_title" class="typo-window-header text-[#F1F5F9] text-xs font-sans font-bold tracking-wider uppercase">LIVE FLIGHT MONITORING</h3>
             </div>
             <button onclick="closeFloatingWindow('telemetry')" title="Close" class="modal-close-btn w-7 h-7 rounded-md flex items-center justify-center text-[#94A3B8] hover:text-[#F1F5F9] hover:bg-[#181E2B] transition-colors cursor-pointer border-0">
                 <i class="fa-solid fa-xmark text-sm"></i>
@@ -4793,14 +4794,14 @@
             <!-- 1. FLIGHT TELEMETRY CONTROLS -->
             <div class="p-4 rounded-lg bg-[#181E2B] border border-[#253046] space-y-3.5 shadow-sm">
                 <div class="flex items-center justify-between">
-                    <span class="typo-section-title text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B]">FLIGHT TELEMETRY CONTROLS</span>
+                    <span data-i18n="telemetry.controls_section" class="typo-section-title text-[10px] font-sans font-bold uppercase tracking-wider text-[#64748B]">FLIGHT TELEMETRY CONTROLS</span>
                 </div>
 
                 <!-- Record Action Bar: START MONITORING + Prominent Timer + Right-Aligned Badges (Always on 1 line) -->
                 <div class="p-3 sm:p-3.5 rounded-lg bg-[#0E121A] border border-[#2D3A54] flex items-center justify-between gap-2.5 overflow-hidden flex-nowrap">
                     <div class="flex items-center gap-2.5 sm:gap-3 shrink-0">
-                        <button onclick="toggleBlackboxRecording()" id="opt-btn-record" class="h-8 sm:h-9 px-3 sm:px-3.5 rounded-md bg-[#00A8FF] hover:bg-[#38BDF8] text-[#0B0D11] font-sans font-bold tracking-wider text-xs transition-all cursor-pointer active:scale-95 inline-flex items-center justify-center shadow-md uppercase leading-none select-none whitespace-nowrap shrink-0">
-                            <span id="opt-rec-btn-text">START MONITORING</span>
+                        <button onclick="toggleBlackboxRecording()" id="opt-btn-record" data-i18n-title="telemetry.start_btn_tooltip" title="Start or stop recording flight performance telemetry (Blackbox)" class="h-8 sm:h-9 px-3 sm:px-3.5 rounded-md bg-[#00A8FF] hover:bg-[#38BDF8] text-[#0B0D11] font-sans font-bold tracking-wider text-xs transition-all cursor-pointer active:scale-95 inline-flex items-center justify-center shadow-md uppercase leading-none select-none whitespace-nowrap shrink-0">
+                            <span id="opt-rec-btn-text" data-i18n="telemetry.start_btn">START MONITORING</span>
                         </button>
                         <div class="flex items-center shrink-0">
                             <span id="opt-blackbox-timer" class="text-xl sm:text-2xl font-bold text-[#F1F5F9] font-sans tracking-wide leading-none select-none tabular-nums">00:00</span>
@@ -4846,8 +4847,8 @@
                 </div>
                 <!-- Row 1: Displayed FPS & CPU Main Thread -->
                 <div class="grid grid-cols-2 gap-2.5">
-                    <div class="p-2.5 rounded-lg bg-[#0E121A] border border-[#2D3A54] flex flex-col items-center justify-center">
-                        <span class="text-[10px] font-sans font-bold text-[#64748B] uppercase tracking-wider mb-1">DISPLAYED FPS</span>
+                    <div class="p-2.5 rounded-lg bg-[#0E121A] border border-[#2D3A54] flex flex-col items-center justify-center" data-i18n-title="telemetry.displayed_fps_tooltip" title="Current Simulator Frames Per Second (Displayed vs Base Render)">
+                        <span data-i18n="telemetry.displayed_fps" class="text-[10px] font-sans font-bold text-[#64748B] uppercase tracking-wider mb-1">DISPLAYED FPS</span>
                         <div class="flex items-baseline gap-1.5">
                             <span id="live-fps-val" class="text-2xl font-black text-[#F1F5F9] font-mono leading-none">--</span>
                             <span class="text-xs text-[#64748B] font-bold">/ BASE</span>
@@ -4855,8 +4856,8 @@
                             <span class="text-[10px] text-[#94A3B8] font-bold">FPS</span>
                         </div>
                     </div>
-                    <div class="p-2.5 rounded-lg bg-[#0E121A] border border-[#2D3A54] flex flex-col items-center justify-center">
-                        <span class="text-[10px] font-sans font-bold text-[#64748B] uppercase tracking-wider mb-1">CPU MAIN THREAD</span>
+                    <div class="p-2.5 rounded-lg bg-[#0E121A] border border-[#2D3A54] flex flex-col items-center justify-center" data-i18n-title="telemetry.cpu_mt_tooltip" title="MainThread frame time in milliseconds (lower is smoother)">
+                        <span data-i18n="telemetry.cpu_mt" class="text-[10px] font-sans font-bold text-[#64748B] uppercase tracking-wider mb-1">CPU MAIN THREAD</span>
                         <div class="flex items-baseline gap-1">
                             <span id="live-mt-val" class="text-2xl font-black text-[#F1F5F9] font-mono leading-none">--</span>
                             <span class="text-xs text-[#94A3B8] font-bold">ms</span>
@@ -4865,7 +4866,7 @@
                 </div>
                 <!-- Row 2: GPU, CPU, VRAM, CACHE -->
                 <div class="grid grid-cols-4 gap-2.5">
-                    <div class="p-2 rounded-lg bg-[#0E121A] border border-[#2D3A54] flex flex-col items-center justify-center min-h-[46px]">
+                    <div class="p-2 rounded-lg bg-[#0E121A] border border-[#2D3A54] flex flex-col items-center justify-center min-h-[46px]" data-i18n-title="telemetry.gpu_tooltip" title="GPU Core Utilization (%) and Temperature (°C)">
                         <span class="text-[10px] font-sans font-bold text-[#64748B] uppercase tracking-wider mb-0.5">GPU</span>
                         <div class="flex items-baseline gap-1 font-mono font-bold text-sm text-[#F1F5F9]">
                             <span id="live-gpu-val">--</span><span class="text-[10px] text-[#94A3B8] font-normal">%</span>
@@ -4873,7 +4874,7 @@
                             <span id="live-gpu-temp">--</span><span class="text-[10px] text-[#94A3B8] font-normal">°C</span>
                         </div>
                     </div>
-                    <div class="p-2 rounded-lg bg-[#0E121A] border border-[#2D3A54] flex flex-col items-center justify-center min-h-[46px]">
+                    <div class="p-2 rounded-lg bg-[#0E121A] border border-[#2D3A54] flex flex-col items-center justify-center min-h-[46px]" data-i18n-title="telemetry.cpu_tooltip" title="CPU Utilization (%) and Package Temperature (°C)">
                         <span class="text-[10px] font-sans font-bold text-[#64748B] uppercase tracking-wider mb-0.5">CPU</span>
                         <div class="flex items-baseline gap-1 font-mono font-bold text-sm text-[#F1F5F9]">
                             <span id="live-cpu-val">--</span><span class="text-[10px] text-[#94A3B8] font-normal">%</span>
@@ -4881,7 +4882,7 @@
                             <span id="live-cpu-temp">--</span><span class="text-[10px] text-[#94A3B8] font-normal">°C</span>
                         </div>
                     </div>
-                    <div class="p-2 rounded-lg bg-[#0E121A] border border-[#2D3A54] flex flex-col items-center justify-center min-h-[46px]">
+                    <div class="p-2 rounded-lg bg-[#0E121A] border border-[#2D3A54] flex flex-col items-center justify-center min-h-[46px]" data-i18n-title="telemetry.vram_tooltip" title="Dedicated Video Memory (VRAM) used vs Total VRAM">
                         <span class="text-[10px] font-sans font-bold text-[#64748B] uppercase tracking-wider mb-0.5">VRAM</span>
                         <div class="flex items-baseline gap-1 font-mono font-bold text-sm text-[#F1F5F9]">
                             <span id="live-msfs-vram-val">--</span>
@@ -4889,7 +4890,7 @@
                             <span id="live-vram-total-val" class="text-[#94A3B8] text-xs">-- GB</span>
                         </div>
                     </div>
-                    <div class="p-2 rounded-lg bg-[#0E121A] border border-[#2D3A54] flex flex-col items-center justify-center min-h-[46px]">
+                    <div class="p-2 rounded-lg bg-[#0E121A] border border-[#2D3A54] flex flex-col items-center justify-center min-h-[46px]" data-i18n-title="telemetry.cache_tooltip" title="MSFS Rolling / Streamed Cache activity">
                         <span class="text-[10px] font-sans font-bold text-[#64748B] uppercase tracking-wider mb-0.5">CACHE</span>
                         <div class="flex items-baseline gap-1 font-mono font-bold text-sm text-[#F1F5F9]">
                             <span id="live-cache-val">0.0</span>
@@ -5000,7 +5001,7 @@
         <!-- Drag Handle Header -->
         <div class="modal-header floating-win-header h-[42px] px-4 bg-[#12161F] border-b border-[#1E2638] flex items-center justify-between cursor-move select-none">
             <div class="flex items-center gap-2">
-                <h3 class="typo-window-header text-[#F1F5F9] text-xs font-sans font-bold tracking-wider uppercase">FLIGHT ROUTE OPTIMIZATION</h3>
+                <h3 data-i18n="route.window_title" class="typo-window-header text-[#F1F5F9] text-xs font-sans font-bold tracking-wider uppercase">FLIGHT ROUTE OPTIMIZATION</h3>
             </div>
             <button onclick="closeFloatingWindow('route')" title="Close" class="modal-close-btn w-7 h-7 rounded-md flex items-center justify-center text-[#94A3B8] hover:text-[#F1F5F9] hover:bg-[#181E2B] transition-colors border-0 outline-none cursor-pointer">
                 <i class="fa-solid fa-xmark text-sm"></i>
@@ -5013,8 +5014,9 @@
                 <div id="opt-route-origin-box"
                      onclick="focusOptimizerAirport('origin')"
                      class="cursor-pointer hover:bg-[#181E2B] px-2.5 py-1 rounded-md transition-colors w-[110px]"
+                     data-i18n-title="route.dep_tooltip"
                      title="Click an airport on the map to set Departure">
-                    <span class="text-[10px] font-sans font-bold text-[#64748B] uppercase tracking-wider block leading-tight">Departure</span>
+                    <span data-i18n="route.dep_label" class="text-[10px] font-sans font-bold text-[#64748B] uppercase tracking-wider block leading-tight">Departure</span>
                     <div class="flex items-baseline gap-1 mt-0.5">
                         <span id="opt-route-origin-icao" class="font-mono text-xl font-black text-[#F1F5F9] leading-none">----</span>
                     </div>
@@ -5024,6 +5026,7 @@
                 <button onclick="swapOptimizerRouteAirports()"
                         type="button"
                         class="w-7 h-7 rounded-md bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] text-[#94A3B8] hover:text-[#00A8FF] flex items-center justify-center transition-colors cursor-pointer shrink-0 outline-none"
+                        data-i18n-title="route.swap_tooltip"
                         title="Swap Departure and Arrival">
                     <span class="text-sm font-bold leading-none select-none">⇄</span>
                 </button>
@@ -5031,8 +5034,9 @@
                 <div id="opt-route-dest-box"
                      onclick="focusOptimizerAirport('dest')"
                      class="cursor-pointer hover:bg-[#181E2B] px-2.5 py-1 rounded-md transition-colors w-[110px] text-right"
+                     data-i18n-title="route.arr_tooltip"
                      title="Click an airport on the map to set Arrival">
-                    <span class="text-[10px] font-sans font-bold text-[#64748B] uppercase tracking-wider block leading-tight">Arrival</span>
+                    <span data-i18n="route.arr_label" class="text-[10px] font-sans font-bold text-[#64748B] uppercase tracking-wider block leading-tight">Arrival</span>
                     <div class="flex items-baseline justify-end gap-1 mt-0.5">
                         <span id="opt-route-dest-icao" class="font-mono text-xl font-black text-[#F1F5F9] leading-none">----</span>
                     </div>
@@ -5045,37 +5049,43 @@
                 <button type="button"
                         id="opt-mode-card-direct"
                         onclick="setOptimizerMode('DIRECT')"
+                        data-i18n-title="route.mode_direct_tooltip"
+                        title="Isolate only Departure and Arrival sceneries"
                         class="h-8 px-3 rounded-md bg-[#00A8FF] text-[#0B0D11] font-bold text-xs uppercase tracking-wider transition-all cursor-pointer border-0 outline-none flex items-center justify-center shadow-sm">
-                    <span>Direct A &rarr; B</span>
+                    <span data-i18n="route.mode_direct">Direct A &rarr; B</span>
                 </button>
                 <button type="button"
                         id="opt-mode-card-corridor"
                         onclick="setOptimizerMode('CORRIDOR')"
+                        data-i18n-title="route.mode_corridor_tooltip"
+                        title="Activate sceneries along the flight corridor between Departure and Arrival"
                         class="h-8 px-3 rounded-md bg-transparent hover:bg-[#181E2B] text-[#94A3B8] hover:text-[#F1F5F9] font-semibold text-xs uppercase tracking-wider transition-all cursor-pointer border-0 outline-none flex items-center justify-center">
-                    <span>En-Route Corridor</span>
+                    <span data-i18n="route.mode_corridor">En-Route Corridor</span>
                 </button>
                 <button type="button"
                         id="opt-mode-card-simbrief"
                         onclick="setOptimizerMode('SIMBRIEF')"
+                        data-i18n-title="route.mode_simbrief_tooltip"
+                        title="Import your latest SimBrief OFP route and alternates automatically"
                         class="h-8 px-3.5 rounded-md bg-transparent hover:bg-[#181E2B] text-[#94A3B8] hover:text-[#F1F5F9] font-semibold text-xs uppercase tracking-wider transition-all cursor-pointer border-0 outline-none flex items-center justify-center">
-                    <span>Import SimBrief</span>
+                    <span data-i18n="route.mode_simbrief">Import SimBrief</span>
                 </button>
             </div>
 
             <!-- 3. Resource Savings Metrics -->
             <div class="flex items-center gap-3.5 bg-[#0E121A] border border-[#2D3A54] px-3.5 py-2 rounded-lg shrink-0">
-                <div class="flex flex-col items-center justify-center text-center min-w-[65px]">
-                    <span class="text-[9px] font-sans font-bold text-[#64748B] uppercase tracking-wider block leading-tight">Isolated</span>
+                <div class="flex flex-col items-center justify-center text-center min-w-[65px]" data-i18n-title="route.isolated_tooltip" title="Number of distant addon sceneries temporarily disabled for this flight">
+                    <span data-i18n="route.isolated_label" class="text-[9px] font-sans font-bold text-[#64748B] uppercase tracking-wider block leading-tight">Isolated</span>
                     <span id="opt-saving-scenery-count" class="font-mono text-base font-extrabold text-[#10B981] leading-tight mt-0.5">--</span>
                 </div>
                 <div class="h-6 w-px bg-[#253046]"></div>
-                <div class="flex flex-col items-center justify-center text-center min-w-[70px]">
-                    <span class="text-[9px] font-sans font-bold text-[#64748B] uppercase tracking-wider block leading-tight">RAM Freed</span>
+                <div class="flex flex-col items-center justify-center text-center min-w-[70px]" data-i18n-title="route.ram_freed_tooltip" title="Estimated System RAM saved by isolating off-route sceneries">
+                    <span data-i18n="route.ram_freed_label" class="text-[9px] font-sans font-bold text-[#64748B] uppercase tracking-wider block leading-tight">RAM Freed</span>
                     <span id="opt-saving-ram-val" class="font-mono text-base font-extrabold text-[#00A8FF] leading-tight mt-0.5">0.00 GB</span>
                 </div>
                 <div class="h-6 w-px bg-[#253046]"></div>
-                <div class="flex flex-col items-center justify-center text-center min-w-[70px]">
-                    <span class="text-[9px] font-sans font-bold text-[#64748B] uppercase tracking-wider block leading-tight">VRAM Freed</span>
+                <div class="flex flex-col items-center justify-center text-center min-w-[70px]" data-i18n-title="route.vram_freed_tooltip" title="Estimated GPU VRAM saved by isolating off-route sceneries">
+                    <span data-i18n="route.vram_freed_label" class="text-[9px] font-sans font-bold text-[#64748B] uppercase tracking-wider block leading-tight">VRAM Freed</span>
                     <span id="opt-saving-vram-val" class="font-mono text-base font-extrabold text-[#00A8FF] leading-tight mt-0.5">0 MB</span>
                 </div>
             </div>
@@ -5085,12 +5095,17 @@
                 <button onclick="restoreFlightCorridorSceneries()"
                         id="opt-btn-restore-sceneries"
                         type="button"
+                        data-i18n="route.restore_btn"
+                        data-i18n-title="route.restore_btn_tooltip"
+                        title="Restore all sceneries to their normal enabled state"
                         class="hidden h-9 px-3.5 rounded-md bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] text-[#F1F5F9] font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center shadow-sm">
                     Restore All
                 </button>
                 <button onclick="clearOptimizerRoutePlanning()"
                         id="opt-btn-clear-route"
                         type="button"
+                        data-i18n="route.new_route_btn"
+                        data-i18n-title="route.new_route_tooltip"
                         class="h-9 px-3.5 rounded-md bg-[#181E2B] hover:bg-[#1E2638] border border-[#253046] text-[#F1F5F9] font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer flex items-center justify-center shadow-sm"
                         title="Start a new flight route">
                     New Route
@@ -5098,8 +5113,10 @@
                 <button onclick="applyOptimizerRouteSceneries()"
                         id="opt-btn-apply-sceneries"
                         type="button"
+                        data-i18n-title="route.optimize_btn_tooltip"
+                        title="Apply route optimization and disable off-corridor sceneries"
                         class="h-9 px-5 rounded-md bg-[#10B981] hover:bg-[#059669] text-[#0B0D11] font-extrabold text-xs uppercase tracking-wider transition-all cursor-pointer border-0 outline-none shadow-md shadow-emerald-500/20 active:scale-95 flex items-center justify-center">
-                    <span>Optimize</span>
+                    <span data-i18n="route.optimize_btn">Optimize</span>
                 </button>
             </div>
         </div>
@@ -5241,20 +5258,20 @@
     <div id="float-win-remote-panel"
          data-modal-id="float-win-remote-panel"
          class="sceneryx-modal floating-window absolute hidden flex-col bg-slate-900 border border-slate-700/80 rounded-xl shadow-2xl overflow-hidden z-[1200] select-none"
-         style="width: 810px; min-width: 480px; height: auto; max-width: 95vw; max-height: calc(100vh - 212px);">
+         style="width: 540px; min-width: 480px; height: auto; max-width: 95vw; max-height: calc(100vh - 140px);">
         <!-- Drag Handle Header -->
-        <div class="modal-header floating-win-header h-[42px] px-4 bg-slate-950 border-b border-slate-800/80 flex items-center justify-between cursor-move select-none">
+        <div class="modal-header floating-win-header h-[42px] px-4 bg-slate-950 border-b border-slate-800/80 flex items-center justify-between cursor-move select-none shrink-0">
             <div class="flex items-center gap-2">
-                <h3 class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">IN-GAME TOOLBAR PANEL (PREVIEW)</h3>
+                <h3 data-i18n="panel_preview.window_title" class="typo-window-header text-slate-100 text-xs font-semibold tracking-wide uppercase">IN-GAME TOOLBAR PANEL (PREVIEW)</h3>
             </div>
             <button onclick="closeFloatingWindow('remote_panel')" title="Close" class="modal-close-btn w-7 h-7 flex items-center justify-center text-slate-400 hover:text-white transition-opacity cursor-pointer border-0 bg-transparent">
                 <i class="fa-solid fa-xmark text-sm"></i>
             </button>
         </div>
 
-        <div class="modal-body flex-1 p-0 overflow-hidden bg-slate-950 flex flex-col items-center">
-            <img id="remote-panel-cockpit-img" src="media_ingame_panel.png?v=4" alt="In-Game Panel in Cockpit" class="w-full h-auto object-contain max-h-[580px] rounded-b-xl select-none block" />
-            <iframe id="remote-panel-preview-frame" src="in_game_panel/index.html" class="w-full border-0 hidden" style="width: 100%; min-width: 480px; height: 410px; border: none; overflow: hidden; background: #162032;" scrolling="no"></iframe>
+        <div class="modal-body p-0 overflow-hidden bg-[#162032] flex flex-col items-center" style="height: auto; flex: 0 0 auto;">
+            <img id="remote-panel-cockpit-img" src="media_ingame_panel.png?v=4" alt="In-Game Panel in Cockpit" class="w-full h-auto object-contain max-h-[580px] rounded-b-xl select-none hidden" />
+            <iframe id="remote-panel-preview-frame" src="in_game_panel/index.html" class="w-full border-0 block" style="width: 100%; min-width: 480px; height: 220px; border: none; overflow: hidden; background: #162032; transition: height 0.12s ease-out;" scrolling="no"></iframe>
         </div>
 
         <!-- Resize Handle -->

@@ -21,6 +21,12 @@ _CACHED_PANEL_TELEMETRY: Dict[str, Any] = {}
 _CACHED_LOD_STATUS: Dict[str, Any] = {}
 _CACHED_ACTIVE_HIGHLIGHTS: Dict[str, Dict[str, str]] = {}
 _LAST_MANUAL_LOD: Dict[str, float] = {}
+_CURRENT_LANGUAGE: str = "en"
+
+
+def set_remote_panel_language(lang: str):
+    global _CURRENT_LANGUAGE
+    _CURRENT_LANGUAGE = "fr" if str(lang).lower().startswith("fr") else "en"
 
 
 def _compute_active_highlights_snapshot() -> Dict[str, Dict[str, str]]:
@@ -170,6 +176,14 @@ def _panel_telemetry_background_loop():
         if tick_count % 3 == 0 or not _CACHED_ACTIVE_HIGHLIGHTS:
             try:
                 _CACHED_ACTIVE_HIGHLIGHTS = _compute_active_highlights_snapshot()
+            except Exception:
+                pass
+            try:
+                import scanner
+                st_cfg = scanner.get_settings()
+                if isinstance(st_cfg, dict) and st_cfg.get("language") in ("en", "fr"):
+                    global _CURRENT_LANGUAGE
+                    _CURRENT_LANGUAGE = st_cfg["language"]
             except Exception:
                 pass
         tick_count += 1
@@ -642,6 +656,7 @@ class RemoteApiHandler(SimpleHTTPRequestHandler):
             telemetry_data = {
                 "app_running": True,
                 "connected": True,
+                "language": _CURRENT_LANGUAGE,
                 "sim_connected": bool(telem.get("simconnect_connected", False)),
                 "msfs_active": bool(telem.get("msfs_active", False)),
                 "is_vr": is_vr_mode,

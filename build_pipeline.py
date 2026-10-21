@@ -305,7 +305,7 @@ def main():
             f"--add-data={os.path.join(BASE_DIR, 'web')};web",
             f"--add-data={os.path.join(BASE_DIR, 'custom_profiles')};custom_profiles",
             f"--add-data={os.path.join(BASE_DIR, 'legal')};legal",
-            f"--add-data={os.path.join(BASE_DIR, 'wildbill75-sceneryx')};wildbill75-sceneryx",
+            f"--add-data={os.path.join(BASE_DIR, 'sceneryx-ingame-panel')};sceneryx-ingame-panel",
             "--collect-all=SimConnect",
             "--collect-all=pystray",
             "--collect-all=PIL",

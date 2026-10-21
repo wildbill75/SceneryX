@@ -134,11 +134,11 @@ function applyLiteEditionLocks() {
 
     // 1. Classic Sidebar Flight Optimizer (all 5 modules)
     const cleanLabels = [
-        ['classic-lbl-smart-lod', 'SMART LOD'],
-        ['classic-lbl-graphics', 'MSFS GRAPHIC SETTINGS'],
-        ['classic-lbl-my-rig', 'MY RIG'],
-        ['classic-lbl-telemetry', 'TELEMETRY'],
-        ['classic-lbl-route', 'ROUTE OPTIMIZATION']
+        ['classic-lbl-smart-lod', typeof t === 'function' ? t('classic.smart_lod', 'SMART LOD') : 'SMART LOD'],
+        ['classic-lbl-graphics', typeof t === 'function' ? t('classic.msfs_graphics', 'MSFS GRAPHIC SETTINGS') : 'MSFS GRAPHIC SETTINGS'],
+        ['classic-lbl-my-rig', typeof t === 'function' ? t('classic.my_rig', 'MY RIG') : 'MY RIG'],
+        ['classic-lbl-telemetry', typeof t === 'function' ? t('classic.telemetry', 'TELEMETRY') : 'TELEMETRY'],
+        ['classic-lbl-route', typeof t === 'function' ? t('classic.flight_route', 'ROUTE OPTIMIZATION') : 'ROUTE OPTIMIZATION']
     ];
     cleanLabels.forEach(([id, text]) => {
         const el = document.getElementById(id);
@@ -3140,7 +3140,8 @@ function renderConflictModalStep(index) {
     if (sourcesCont) {
         const htmlSources = baseSources.map((src, i) => {
             const isChecked = (i === 0);
-            const safeAttrFolder = (src.folder_name || '').replace(/"/g, '&quot;');
+            const choiceVal = (src.package_path && src.package_path.trim()) ? src.package_path : (src.folder_name || '');
+            const safeAttrFolder = choiceVal.replace(/"/g, '&quot;');
             const titleLabel = src.vendor && src.vendor !== 'Unknown' ? src.vendor : src.folder_name;
             const cardBorder = isChecked ? 'border-blue-500 bg-[#1E293B] shadow-md ring-1 ring-blue-500/30' : 'border-[#263042] bg-[#0E121A] hover:border-slate-500 hover:bg-[#181E2B]';
 
@@ -7986,16 +7987,18 @@ function renderRadialSceneriesExtension(ap, animate = false) {
 
     // Determine current active scenery package on disk
     const activeSrc = getActiveSource(ap);
-    const activePkgName = activeSrc ? activeSrc.folder_name : 'DEFAULT';
+    const activePkgName = activeSrc ? getScenerySourceIdentifier(activeSrc) : 'DEFAULT';
 
     // Staged selection for this specific airport
     const stagedPkg = (stagedRadialScenerySelection && stagedRadialScenerySelection.icao === ap.icao && stagedRadialScenerySelection.target !== undefined && stagedRadialScenerySelection.target !== null)
         ? stagedRadialScenerySelection.target
         : activePkgName;
 
-    // Check if there is an unapplied variant change
-    const isSameAsActive = (stagedPkg === 'DEFAULT' && activePkgName === 'DEFAULT') ||
-        (stagedPkg !== 'DEFAULT' && activePkgName !== 'DEFAULT' && isMatchingScenerySource({ folder_name: activePkgName }, stagedPkg));
+    // Check if there is an unapplied variant change (or an unresolved conflict)
+    const isSameAsActive = !ap.has_conflict && (
+        (stagedPkg === 'DEFAULT' && activePkgName === 'DEFAULT') ||
+        (stagedPkg !== 'DEFAULT' && activePkgName !== 'DEFAULT' && isMatchingScenerySource(activeSrc || { folder_name: activePkgName }, stagedPkg))
+    );
     const hasVariantChange = !isSameAsActive;
 
     // Check if there is an unapplied fixes change
@@ -8019,12 +8022,14 @@ function renderRadialSceneriesExtension(ap, animate = false) {
     // 1. Installed Base Scenery Addons
     baseSources.forEach(src => {
         const idx = sources.indexOf(src);
-        const isSelected = (stagedPkg !== 'DEFAULT') && (stagedPkg === src.folder_name || isMatchingScenerySource(src, stagedPkg));
+        const srcId = getScenerySourceIdentifier(src);
+        const isSelected = (stagedPkg !== 'DEFAULT') && (stagedPkg === srcId || isMatchingScenerySource(src, stagedPkg));
         const isAsoboPkg = (src.is_asobo_official || src.vendor === 'Microsoft / Asobo' || (src.folder_name && (src.folder_name.toLowerCase().includes('asobo-airport-') || src.folder_name.toLowerCase().includes('microsoft-airport-'))));
         const pType = src.pricing_type || (src.is_payware ? 'Payware' : (isAsoboPkg ? 'Asobo' : 'Freeware'));
         const updateLabel = src.world_update_name || ap.world_update_name || "Asobo World Update";
         const titleLabel = isAsoboPkg ? updateLabel : (src.vendor && src.vendor !== 'Unknown' ? src.vendor : src.folder_name);
         const safePkgName = (src.folder_name || '').replace(/'/g, "\\'");
+        const safeSrcId = srcId.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
         let badgeBg = 'bg-cyan-600 text-white font-bold';
         let activeBorderClass = 'border-2 border-cyan-500 shadow-lg shadow-cyan-950/40 bg-[#181E2B] ring-1 ring-cyan-500/30';
@@ -8046,7 +8051,7 @@ function renderRadialSceneriesExtension(ap, animate = false) {
         pillIndex++;
 
         html += `
-            <div onclick="event.stopPropagation(); stageRadialSceneryVariant(event, '${ap.icao}', '${safePkgName}')"
+            <div onclick="event.stopPropagation(); stageRadialSceneryVariant(event, '${ap.icao}', '${safeSrcId}')"
                  onmousedown="event.stopPropagation();"
                  onpointerdown="event.stopPropagation();"
                  ${animDelay}
@@ -8455,10 +8460,23 @@ function updateSingleAirportMarker(ap) {
     }
 }
 
+function getScenerySourceIdentifier(src) {
+    if (!src) return 'DEFAULT';
+    if (src.package_path && src.package_path.trim()) {
+        return src.package_path.replace(/\.disabled$/i, '');
+    }
+    return (src.folder_name || '').replace(/\.disabled$/i, '');
+}
+
 function isMatchingScenerySource(s, folderName) {
     if (!s || !folderName) return false;
+    const tClean = folderName.toLowerCase().replace(/\.disabled$/, '');
+    if (tClean.includes('\\') || tClean.includes('/')) {
+        const pClean = (s.package_path || '').toLowerCase().replace(/\.disabled$/, '');
+        return Boolean(pClean) && pClean === tClean;
+    }
     const fn1 = (s.folder_name || '').toLowerCase().replace(/\.disabled$/, '');
-    const fn2 = folderName.toLowerCase().replace(/\.disabled$/, '');
+    const fn2 = tClean;
     if (fn1 === fn2) return true;
     const n1 = fn1.replace(/^(community|official)?(fs20|fs24)?-?/, '');
     const n2 = fn2.replace(/^(community|official)?(fs20|fs24)?-?/, '');
@@ -8478,7 +8496,7 @@ function stageRadialSceneryVariant(e, icao, folderName) {
     if (!currentRadialAirport || currentRadialAirport.icao !== icao) return;
 
     const activeSrc = getActiveSource(currentRadialAirport);
-    const activePkgName = activeSrc ? activeSrc.folder_name : 'DEFAULT';
+    const activePkgName = activeSrc ? getScenerySourceIdentifier(activeSrc) : 'DEFAULT';
 
     if (!stagedRadialScenerySelection || stagedRadialScenerySelection.icao !== icao) {
         stagedRadialScenerySelection = { icao: icao, target: activePkgName, fixes: {} };
@@ -8503,7 +8521,7 @@ function stageRadialFixToggle(e, icao, cleanName) {
     if (!currentRadialAirport || currentRadialAirport.icao !== icao) return;
 
     const activeSrc = getActiveSource(currentRadialAirport);
-    const activePkgName = activeSrc ? activeSrc.folder_name : 'DEFAULT';
+    const activePkgName = activeSrc ? getScenerySourceIdentifier(activeSrc) : 'DEFAULT';
 
     if (!stagedRadialScenerySelection || stagedRadialScenerySelection.icao !== icao) {
         stagedRadialScenerySelection = {
@@ -8551,11 +8569,13 @@ async function applyRadialScenerySelection(e, icao) {
     if (!stagedRadialScenerySelection || stagedRadialScenerySelection.icao !== icao) return;
 
     const activeSrc = getActiveSource(currentRadialAirport);
-    const activePkgName = activeSrc ? activeSrc.folder_name : 'DEFAULT';
+    const activePkgName = activeSrc ? getScenerySourceIdentifier(activeSrc) : 'DEFAULT';
     const stagedPkg = stagedRadialScenerySelection.target || activePkgName;
 
-    const isSameAsActive = (stagedPkg === 'DEFAULT' && activePkgName === 'DEFAULT') ||
-        (stagedPkg !== 'DEFAULT' && activePkgName !== 'DEFAULT' && isMatchingScenerySource({ folder_name: activePkgName }, stagedPkg));
+    const isSameAsActive = !(currentRadialAirport && currentRadialAirport.has_conflict) && (
+        (stagedPkg === 'DEFAULT' && activePkgName === 'DEFAULT') ||
+        (stagedPkg !== 'DEFAULT' && activePkgName !== 'DEFAULT' && isMatchingScenerySource(activeSrc || { folder_name: activePkgName }, stagedPkg))
+    );
     const hasVariantChange = !isSameAsActive;
 
     let hasFixesChange = false;
@@ -14793,6 +14813,13 @@ async function checkStartupChanges() {
             return;
         }
 
+        // Check if GSX startup audit detected duplicate profiles
+        const gsxSummary = window.gsxAuditData && window.gsxAuditData.summary ? window.gsxAuditData.summary : null;
+        if (gsxSummary && (gsxSummary.duplicate || 0) > 0) {
+            openGsxAuditModal('DUPLICATE');
+            return;
+        }
+
         // Check if startup delta detected new or modified sceneries (GSX audit already done on splash screen!)
         if (pendingScanDelta && (pendingScanDelta.total_changes || 0) > 0) {
             const d = pendingScanDelta;
@@ -14864,7 +14891,7 @@ async function startGsxScanPhase(isStartup = false) {
 
         if (totalIssues > 0) {
             closeRescanModal();
-            openGsxAuditModal('ALL');
+            openGsxAuditModal((s && (s.duplicate || 0) > 0) ? 'DUPLICATE' : 'ALL');
         } else if (pendingScanDelta && (pendingScanDelta.total_changes || 0) > 0) {
             const d = pendingScanDelta;
             const startup = pendingScanIsStartup;
@@ -15715,7 +15742,9 @@ async function openSettingsModal() {
 
     const langSelect = document.getElementById('cfg-app-language');
     if (langSelect) {
-        langSelect.value = currentSettings.language || (typeof currentLang !== 'undefined' ? currentLang : 'en');
+        const activeLang = currentSettings.language || (typeof currentLang !== 'undefined' ? currentLang : 'en');
+        langSelect.value = activeLang;
+        window._settingsInitialLanguage = activeLang;
     }
 
     const currSelect = document.getElementById('cfg-app-currency');
@@ -15818,6 +15847,13 @@ function toggleExternalAutoFpsSettingSwitch() {
     }
 }
 
+function previewAppLanguage(lang) {
+    if (typeof setAppLanguage === 'function') {
+        setAppLanguage(lang);
+    }
+}
+window.previewAppLanguage = previewAppLanguage;
+
 function closeSettingsModal() {
     const backdrop = document.getElementById('settings-modal-backdrop');
     if (backdrop) backdrop.classList.add('hidden');
@@ -15827,6 +15863,12 @@ function closeSettingsModal() {
         modal.classList.add('hidden');
         modal.classList.remove('flex');
         modal._hasBeenDragged = false;
+    }
+    // Revert language preview if cancelled without saving
+    if (window._settingsInitialLanguage && typeof currentLang !== 'undefined' && currentLang !== window._settingsInitialLanguage) {
+        if (typeof setAppLanguage === 'function') {
+            setAppLanguage(window._settingsInitialLanguage);
+        }
     }
     // Revert navigation style dropdown and active mode if cancelled without saving
     const navStyleSelect = document.getElementById('cfg-nav-style');
@@ -16042,6 +16084,7 @@ async function saveSettings() {
         const langSelect = document.getElementById('cfg-app-language');
         if (langSelect) {
             currentSettings.language = langSelect.value;
+            window._settingsInitialLanguage = langSelect.value;
             if (typeof setAppLanguage === 'function') {
                 setAppLanguage(langSelect.value);
             }
@@ -16530,10 +16573,10 @@ function updateClassicPanelUI() {
             badgeSmartLod.textContent = 'AUTOFPS';
             badgeSmartLod.className = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#F59E0B] text-[#0F1115] shadow-sm';
         } else if (window.smartLodActive) {
-            badgeSmartLod.textContent = 'ACTIVE';
+            badgeSmartLod.textContent = typeof t === 'function' ? t('classic.badge_active', 'ACTIVE') : 'ACTIVE';
             badgeSmartLod.className = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#10B981] text-white shadow-sm';
         } else {
-            badgeSmartLod.textContent = 'OFF';
+            badgeSmartLod.textContent = typeof t === 'function' ? t('classic.badge_off', 'OFF') : 'OFF';
             badgeSmartLod.className = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#161920] text-[#64748B] border border-[#2A3241]';
         }
     }
@@ -16547,7 +16590,7 @@ function updateClassicPanelUI() {
 
     const badgeMyRig = document.getElementById('classic-badge-my-rig');
     if (badgeMyRig) {
-        badgeMyRig.textContent = 'OPTIMUM';
+        badgeMyRig.textContent = typeof t === 'function' ? t('classic.badge_optimum', 'OPTIMUM') : 'OPTIMUM';
         badgeMyRig.className = 'text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#10B981] text-white shadow-sm';
     }
 
@@ -17369,17 +17412,27 @@ async function checkPostPatchChangelogOnStartup() {
         const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
         if (!res || !res.has_changelog) return;
 
+        const activeLang = (typeof currentSettings !== 'undefined' && currentSettings && currentSettings.language)
+            ? String(currentSettings.language).toLowerCase()
+            : ((typeof currentLang !== 'undefined' && currentLang) ? String(currentLang).toLowerCase() : 'en');
+        const isFr = activeLang.startsWith('fr');
+
         const ver = String(res.version || 'PRO_1.1.1').replace(/^RC_v?/i, 'PRO_');
-        const htmlContent = renderPatchChangelogMarkdown(res.changelog_md || '');
+        const mdToRender = isFr
+            ? (res.changelog_md_fr || res.changelog_md || '')
+            : (res.changelog_md_en || res.changelog_md || '');
+        const htmlContent = renderPatchChangelogMarkdown(mdToRender);
 
         await new Promise((resolve) => {
             showCustomModal({
-                title: `Patch ${ver} Installed — Release Notes`,
+                title: isFr
+                    ? `PATCH ${ver} INSTALLÉ — NOTES DE MISE À JOUR`
+                    : `Patch ${ver} Installed — Release Notes`,
                 message: htmlContent,
                 type: 'success',
                 width: '540px',
                 messageBoxClass: 'p-4 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-300 leading-relaxed font-sans break-words max-h-80 overflow-y-auto space-y-2.5 text-left',
-                confirmText: 'Continue to SceneryX',
+                confirmText: isFr ? 'Continuer vers SceneryX' : 'Continue to SceneryX',
                 showCancel: false,
                 onConfirm: async () => {
                     try {
@@ -17407,31 +17460,42 @@ async function checkAvailablePatchOnStartup() {
         const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
         if (!res || !res.has_patch) return;
 
+        const activeLang = (typeof currentSettings !== 'undefined' && currentSettings && currentSettings.language)
+            ? String(currentSettings.language).toLowerCase()
+            : ((typeof currentLang !== 'undefined' && currentLang) ? String(currentLang).toLowerCase() : 'en');
+        const isFr = activeLang.startsWith('fr');
+
         const curVer = String(res.current_version || 'PRO_1.1.0').replace(/^RC_v?/i, 'PRO_');
         const patchVer = String(res.patch_version || 'PRO_1.1.1').replace(/^RC_v?/i, 'PRO_');
         const installerPath = res.installer_path || '';
         const downloadUrl = res.download_url || '';
-        const changelogHtml = res.changelog_md ? renderPatchChangelogMarkdown(res.changelog_md) : '';
+        const mdToRender = isFr
+            ? (res.changelog_md_fr || res.changelog_md || '')
+            : (res.changelog_md_en || res.changelog_md || '');
+        const changelogHtml = mdToRender ? renderPatchChangelogMarkdown(mdToRender) : '';
+        const headerPrompt = isFr
+            ? `SceneryX <span class="text-sky-400 font-bold">${curVer}</span> est actuellement installé. Voulez-vous installer le patch <span class="text-emerald-400 font-bold">${patchVer}</span> maintenant ?`
+            : `SceneryX <span class="text-sky-400 font-bold">${curVer}</span> is currently installed. Do you want to install patch <span class="text-emerald-400 font-bold">${patchVer}</span> now?`;
         const promptMsg = changelogHtml
-            ? `<div class="mb-3 text-slate-200 font-medium">SceneryX <span class="text-sky-400 font-bold">${curVer}</span> is currently installed. Do you want to install patch <span class="text-emerald-400 font-bold">${patchVer}</span> now?</div><div class="p-3 rounded-lg bg-slate-950/90 border border-slate-800 max-h-64 overflow-y-auto space-y-2 text-left">${changelogHtml}</div>`
-            : `SceneryX ${curVer} is currently installed. Do you want to install patch ${patchVer} now?`;
+            ? `<div class="mb-3 text-slate-200 font-medium">${headerPrompt}</div><div class="p-3 rounded-lg bg-slate-950/90 border border-slate-800 max-h-64 overflow-y-auto space-y-2 text-left">${changelogHtml}</div>`
+            : (isFr ? `SceneryX ${curVer} est actuellement installé. Voulez-vous installer le patch ${patchVer} maintenant ?` : `SceneryX ${curVer} is currently installed. Do you want to install patch ${patchVer} now?`);
 
         await new Promise((resolve) => {
             showCustomModal({
-                title: `Patch ${patchVer} Available`,
+                title: isFr ? `Mise à jour ${patchVer} disponible` : `Patch ${patchVer} Available`,
                 message: promptMsg,
                 type: 'info',
                 width: '540px',
-                confirmText: `Install Patch ${patchVer}`,
-                cancelText: t('common.cancel', 'Cancel'),
+                confirmText: isFr ? `Installer le patch ${patchVer}` : `Install Patch ${patchVer}`,
+                cancelText: t('common.cancel', isFr ? 'Annuler' : 'Cancel'),
                 showCancel: true,
                 onConfirm: async () => {
                     try {
                         showCustomModal({
-                            title: `Installing Patch ${patchVer}...`,
+                            title: isFr ? `Installation du patch ${patchVer}...` : `Installing Patch ${patchVer}...`,
                             message: installerPath
-                                ? `Launching patch ${patchVer} installer... SceneryX will restart automatically.`
-                                : `Downloading patch ${patchVer} from SceneryX Updates... SceneryX will restart automatically once installed.`,
+                                ? (isFr ? `Lancement de l'installateur ${patchVer}... SceneryX redémarrera automatiquement.` : `Launching patch ${patchVer} installer... SceneryX will restart automatically.`)
+                                : (isFr ? `Téléchargement du patch ${patchVer}... SceneryX redémarrera automatiquement une fois installé.` : `Downloading patch ${patchVer} from SceneryX Updates... SceneryX will restart automatically once installed.`),
                             type: 'loading',
                             width: '540px'
                         });
@@ -17441,8 +17505,8 @@ async function checkAvailablePatchOnStartup() {
                             closeCustomModal();
                             if (instRes.status !== 'cancelled') {
                                 showCustomModal({
-                                    title: 'Patch Installation Error',
-                                    message: instRes.message || 'Could not download or launch the patch installer.',
+                                    title: isFr ? "Erreur d'installation du patch" : 'Patch Installation Error',
+                                    message: instRes.message || (isFr ? "Impossible de télécharger ou lancer l'installateur du patch." : 'Could not download or launch the patch installer.'),
                                     type: 'error',
                                     width: '540px'
                                 });
@@ -20054,8 +20118,13 @@ window.toggleFloatingWindow = toggleFloatingWindow;
 window.addEventListener('message', function (event) {
     if (event.data && event.data.type === 'SCENERYX_PANEL_RESIZE') {
         const frame = document.getElementById('remote-panel-preview-frame');
+        const winEl = document.getElementById('float-win-remote-panel');
         if (frame && event.data.height) {
-            frame.style.height = event.data.height + 'px';
+            const h = Math.max(120, Math.ceil(Number(event.data.height)));
+            frame.style.height = h + 'px';
+            if (winEl) {
+                winEl.style.height = 'auto';
+            }
         }
     }
 });

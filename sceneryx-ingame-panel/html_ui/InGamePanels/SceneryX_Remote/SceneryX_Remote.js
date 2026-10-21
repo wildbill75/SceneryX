@@ -18,6 +18,19 @@ class IngamePanelSceneryX extends TemplateElement {
         if (mainDisp) mainDisp.classList.add("hidden");
         let footer = this.querySelector("#Footer");
         if (footer) footer.classList.add("hidden");
+        if (this.ingameUi) {
+            this.ingameUi.classList.remove("minimized");
+            if (!this.ingameUi.getAttribute("title") || this.ingameUi.getAttribute("title") === "null") {
+                this.ingameUi.setAttribute("title", "SCENERY X");
+            }
+            this.ingameUi.addEventListener("panelActive", function () {
+                if (typeof window.sceneryxForcePanelHeight === "function") {
+                    window.sceneryxForcePanelHeight();
+                    setTimeout(window.sceneryxForcePanelHeight, 120);
+                    setTimeout(window.sceneryxForcePanelHeight, 400);
+                }
+            });
+        }
     }
 }
 if (!window.customElements.get("ingamepanel-sceneryx")) {
@@ -31,6 +44,224 @@ if (typeof checkAutoload === "function") {
     const API_BASE = "http://127.0.0.1:8383/api";
     const POLL_INTERVAL_MS = 1000;
     const MAX_HISTORY_POINTS = 30;
+
+    let currentLang = "en";
+    const PANEL_I18N = {
+        en: {
+            offline_title: "Please launch Scenery X",
+            offline_sub: "Waiting for local telemetry bridge (127.0.0.1:8383)...",
+            live_gfx_btn: "LIVE GRAPHICS",
+            live_gfx_btn_tip: "Open / close live graphics quick settings drawer",
+            pinned_pills_tip: "Pinned graphics settings currently active in MSFS",
+            lbl_max_fps: "Max FPS",
+            lbl_clouds: "Clouds",
+            lbl_precaching: "Pre-Caching",
+            lbl_terrain_shadows: "Terrain Shadows",
+            lbl_buildings: "Buildings",
+            lbl_trees: "Trees",
+            lbl_plants: "Plants",
+            lbl_grass: "Grass",
+            row_tip_max_fps: "Maximum frame rate target in MSFS",
+            row_tip_clouds: "Volumetric Clouds quality in MSFS",
+            row_tip_precaching: "Off-Screen Terrain Pre-Caching quality in MSFS",
+            row_tip_terrain_shadows: "Terrain Shadows resolution in MSFS",
+            row_tip_buildings: "Buildings rendering quality in MSFS",
+            row_tip_trees: "Trees rendering quality in MSFS",
+            row_tip_plants: "Plants rendering quality in MSFS",
+            row_tip_grass: "Grass and bushes rendering quality in MSFS",
+            input_fps_tip: "Enter custom Max FPS target (15-240)",
+            presets_fps_tip: "Select from standard Max FPS presets",
+            pin_tip: "Pin / Unpin from header bar (Max 5)",
+            reset_profile_prefix: "Reset to Active Profile",
+            pinned_count_label: "PINNED :",
+            pinned_count_tip: "Number of graphics settings pinned to the top bar (maximum 5)",
+            max_pins_reached: "MAX 5 PINS REACHED",
+            apply_btn: "APPLY",
+            apply_dirty_btn: "APPLY *",
+            applied_btn: "APPLIED",
+            apply_btn_tip: "Write modified graphics settings directly into MSFS memory",
+            q_low: "Low",
+            q_med: "Medium",
+            q_high: "High",
+            q_ultra: "Ultra",
+            q_off: "Off",
+            pill_max_fps: "Max FPS",
+            pill_clouds: "Clouds",
+            pill_precaching: "Pre-Cache",
+            pill_terrain_shadows: "Terr. Shd",
+            pill_buildings: "Buildings",
+            pill_trees: "Trees",
+            pill_plants: "Plants",
+            pill_grass: "Grass",
+            sec_smart_lod: "SMART LOD REGULATION",
+            sec_smart_lod_tip: "Dynamic real-time TLOD and OLOD regulation based on altitude and frame rate",
+            toggle_smart_lod_tip: "Enable / disable automatic Smart LOD regulation",
+            autofps_lock_msg: "Managed by external AutoFPS",
+            autofps_lock_tip: "External AutoFPS process detected — SceneryX Smart LOD is locked to prevent memory conflicts",
+            tlod_title_tip: "Terrain Level of Detail (0-400) — controls terrain mesh and texture draw distance",
+            tlod_badge_tip: "Current TLOD regulation mode (AUTO = regulated by SceneryX, MAN = manual override). Click to reset to profile.",
+            olod_title_tip: "Objects Level of Detail (0-300) — controls buildings and airport clutter draw distance",
+            olod_badge_tip: "Current OLOD regulation mode (AUTO = regulated by SceneryX, MAN = manual override). Click to reset to profile.",
+            floor_lbl: "Floor :",
+            cruise_lbl: "Cruise :",
+            alt_lbl: "Alt :",
+            floor_tip_tlod: "Minimum TLOD on the ground and below transition altitude",
+            cruise_tip_tlod: "Target TLOD at or above transition altitude",
+            alt_tip_tlod: "Transition altitude (in feet AGL) where TLOD reaches Cruise target",
+            floor_tip_olod: "Minimum OLOD on the ground and below transition altitude",
+            cruise_tip_olod: "Target OLOD at or above transition altitude",
+            alt_tip_olod: "Transition altitude (in feet AGL) where OLOD reaches Cruise target",
+            alt_down_tip: "Decrease transition altitude (-100 ft, Shift+Click: -500 ft)",
+            alt_up_tip: "Increase transition altitude (+100 ft, Shift+Click: +500 ft)",
+            alt_input_tip: "Enter transition altitude in feet Above Ground Level (500 - 45000 ft)",
+            slider_tip_tlod: "Drag handles to adjust Floor (ground) and Cruise (altitude) TLOD limits",
+            slider_tip_olod: "Drag handles to adjust Floor (ground) and Cruise (altitude) OLOD limits",
+            handle_floor_prefix: "Floor LOD: ",
+            handle_cruise_prefix: "Cruise LOD: ",
+            cloud_rec_title: "AUTO CLOUD RECOVERY",
+            cloud_rec_tip: "Automatically reduces Volumetric Clouds by 1 tier if FPS drops critically, and restores or boosts when headroom allows",
+            cloud_rec_toggle_tip: "Enable / disable Automatic Cloud Recovery protection",
+            sec_perf: "PERFORMANCE MONITORING",
+            sec_perf_tip: "Real-time frame rate, CPU main thread timing, and 30-second stability trend",
+            pacing_tip: "Frame pacing stability indicator (OPTIMAL, ACCEPTABLE, or HEAVY)",
+            pacing_optimal: "OPTIMAL",
+            pacing_acceptable: "ACCEPTABLE",
+            pacing_heavy: "HEAVY",
+            disp_fps_lbl: "DISPLAYED FPS",
+            disp_fps_tip: "Final displayed frame rate vs native simulation base FPS",
+            cpu_mt_lbl: "CPU MAIN THREAD",
+            cpu_mt_tip: "CPU Main Thread frame time in milliseconds (lower is smoother)",
+            trend_title: "30S TREND",
+            trend_tip: "30-second FPS stability sparkline and net FPS variation",
+            standby: "STANDBY",
+            gpu_tip: "Graphics card core utilization (%) and temperature (°C)",
+            cpu_tip: "Processor utilization (%) and package temperature (°C)",
+            vram_tip: "Dedicated Video RAM currently used vs total available (GB)",
+            cache_lbl: "CACHE",
+            cache_tip: "Active MSFS Rolling Cache size in gigabytes (GB)",
+            start_mon: "START MONITORING",
+            stop_mon: "STOP MONITORING",
+            blackbox_tip: "Start / Stop Blackbox flight performance recording",
+            locked: "LOCKED"
+        },
+        fr: {
+            offline_title: "Veuillez lancer Scenery X",
+            offline_sub: "En attente du pont de télémétrie local (127.0.0.1:8383)...",
+            live_gfx_btn: "GRAPHIQUES LIVE",
+            live_gfx_btn_tip: "Ouvrir / fermer le tiroir de réglages graphiques en direct",
+            pinned_pills_tip: "Réglages graphiques épinglés actuellement actifs dans MSFS",
+            lbl_max_fps: "FPS Max",
+            lbl_clouds: "Nuages",
+            lbl_precaching: "Pré-Cache",
+            lbl_terrain_shadows: "Ombres Terrain",
+            lbl_buildings: "Bâtiments",
+            lbl_trees: "Arbres",
+            lbl_plants: "Plantes",
+            lbl_grass: "Herbe",
+            row_tip_max_fps: "Limite maximale d'images par seconde dans MSFS",
+            row_tip_clouds: "Qualité des nuages volumétriques dans MSFS",
+            row_tip_precaching: "Qualité de la mise en cache préalable du terrain hors écran dans MSFS",
+            row_tip_terrain_shadows: "Résolution des ombres du terrain dans MSFS",
+            row_tip_buildings: "Qualité d'affichage des bâtiments dans MSFS",
+            row_tip_trees: "Qualité d'affichage des arbres dans MSFS",
+            row_tip_plants: "Qualité d'affichage des plantes dans MSFS",
+            row_tip_grass: "Qualité d'affichage de l'herbe et des buissons dans MSFS",
+            input_fps_tip: "Saisir une cible FPS Max personnalisée (15-240)",
+            presets_fps_tip: "Choisir parmi les préréglages FPS Max standards",
+            pin_tip: "Épingler / Désépingler de la barre supérieure (Max 5)",
+            reset_profile_prefix: "Réinitialiser au profil actif",
+            pinned_count_label: "ÉPINGLÉS :",
+            pinned_count_tip: "Nombre de paramètres graphiques épinglés dans la barre supérieure (maximum 5)",
+            max_pins_reached: "MAX 5 ÉPINGLES ATTEINT",
+            apply_btn: "APPLIQUER",
+            apply_dirty_btn: "APPLIQUER *",
+            applied_btn: "APPLIQUÉ",
+            apply_btn_tip: "Écrire les paramètres graphiques modifiés directement dans la mémoire de MSFS",
+            q_low: "Faible",
+            q_med: "Moyen",
+            q_high: "Élevé",
+            q_ultra: "Ultra",
+            q_off: "Désactivé",
+            pill_max_fps: "FPS Max",
+            pill_clouds: "Nuages",
+            pill_precaching: "Pré-Cache",
+            pill_terrain_shadows: "Ombres Terr.",
+            pill_buildings: "Bâtiments",
+            pill_trees: "Arbres",
+            pill_plants: "Plantes",
+            pill_grass: "Herbe",
+            sec_smart_lod: "RÉGULATION SMART LOD",
+            sec_smart_lod_tip: "Régulation dynamique en temps réel du TLOD et de l'OLOD selon l'altitude et les FPS",
+            toggle_smart_lod_tip: "Activer / désactiver la régulation automatique Smart LOD",
+            autofps_lock_msg: "Géré par AutoFPS externe",
+            autofps_lock_tip: "Processus AutoFPS externe détecté — le Smart LOD de SceneryX est verrouillé pour éviter tout conflit mémoire",
+            tlod_title_tip: "Niveau de détail du terrain (0-400) — contrôle la distance d'affichage du relief et des textures",
+            tlod_badge_tip: "Mode de régulation TLOD actuel (AUTO = géré par SceneryX, MAN = manuel). Cliquez pour réinitialiser au profil.",
+            olod_title_tip: "Niveau de détail des objets (0-300) — contrôle la distance d'affichage des bâtiments et objets",
+            olod_badge_tip: "Mode de régulation OLOD actuel (AUTO = géré par SceneryX, MAN = manuel). Cliquez pour réinitialiser au profil.",
+            floor_lbl: "Sol :",
+            cruise_lbl: "Croisière :",
+            alt_lbl: "Alt :",
+            floor_tip_tlod: "TLOD minimum au sol et sous l'altitude de transition",
+            cruise_tip_tlod: "TLOD cible à l'altitude de transition et au-dessus",
+            alt_tip_tlod: "Altitude de transition (en pieds AGL) où le TLOD atteint la cible de croisière",
+            floor_tip_olod: "OLOD minimum au sol et sous l'altitude de transition",
+            cruise_tip_olod: "OLOD cible à l'altitude de transition et au-dessus",
+            alt_tip_olod: "Altitude de transition (en pieds AGL) où l'OLOD atteint la cible de croisière",
+            alt_down_tip: "Diminuer l'altitude de transition (-100 ft, Maj+Clic : -500 ft)",
+            alt_up_tip: "Augmenter l'altitude de transition (+100 ft, Maj+Clic : +500 ft)",
+            alt_input_tip: "Saisir l'altitude de transition en pieds au-dessus du sol (500 - 45000 ft)",
+            slider_tip_tlod: "Faites glisser les poignées pour ajuster les limites TLOD Sol et Croisière",
+            slider_tip_olod: "Faites glisser les poignées pour ajuster les limites OLOD Sol et Croisière",
+            handle_floor_prefix: "LOD Sol : ",
+            handle_cruise_prefix: "LOD Croisière : ",
+            cloud_rec_title: "RÉCUPÉRATION AUTO DES NUAGES",
+            cloud_rec_tip: "Réduit automatiquement la qualité des nuages d'un palier si les FPS chutent sous le seuil critique, et la restaure dès que la marge le permet",
+            cloud_rec_toggle_tip: "Activer / désactiver la protection automatique des nuages",
+            sec_perf: "SURVEILLANCE DES PERFORMANCES",
+            sec_perf_tip: "Fréquence d'images en temps réel, temps CPU Main Thread et tendance de stabilité sur 30 secondes",
+            pacing_tip: "Indicateur de fluidité d'affichage (OPTIMAL, ACCEPTABLE ou LOURD)",
+            pacing_optimal: "OPTIMAL",
+            pacing_acceptable: "ACCEPTABLE",
+            pacing_heavy: "LOURD",
+            disp_fps_lbl: "FPS AFFICHÉS",
+            disp_fps_tip: "FPS finaux affichés (incluant Frame Generation) par rapport aux FPS natifs de base",
+            cpu_mt_lbl: "CPU MAIN THREAD",
+            cpu_mt_tip: "Temps de calcul par image du thread principal CPU en millisecondes (plus bas = plus fluide)",
+            trend_title: "TENDANCE 30S",
+            trend_tip: "Courbe de stabilité des FPS sur 30 secondes et variation nette",
+            standby: "EN ATTENTE",
+            gpu_tip: "Utilisation de la carte graphique (%) et température (°C)",
+            cpu_tip: "Utilisation du processeur (%) et température (°C)",
+            vram_tip: "Mémoire vidéo dédiée (VRAM) utilisée par rapport au total disponible (Go)",
+            cache_lbl: "CACHE",
+            cache_tip: "Taille actuelle du Rolling Cache MSFS en gigaoctets (Go)",
+            start_mon: "DÉMARRER LE SUIVI",
+            stop_mon: "ARRÊTER LE SUIVI",
+            blackbox_tip: "Démarrer / Arrêter l'enregistrement des performances de vol Blackbox",
+            locked: "VERROUILLÉ"
+        }
+    };
+
+    function pt(key) {
+        let dict = PANEL_I18N[currentLang] || PANEL_I18N.en;
+        return dict[key] || PANEL_I18N.en[key] || key;
+    }
+
+    function setElText(id, text) {
+        let el = document.getElementById(id);
+        if (el) el.textContent = text;
+    }
+
+    function setElTitle(id, titleText) {
+        let el = document.getElementById(id);
+        if (el) {
+            el.setAttribute("data-scx-tip", titleText);
+            if (el.hasAttribute("title") && el.id !== "SceneryX_Remote") {
+                el.removeAttribute("title");
+            }
+        }
+    }
 
     let isConnected = false;
     let fpsHistory = [];
@@ -71,7 +302,139 @@ if (typeof checkAutoload === "function") {
         return API_BASE;
     }
 
+    function applyPanelLanguage(lang) {
+        let norm = (lang && String(lang).toLowerCase().indexOf("fr") === 0) ? "fr" : "en";
+        let changed = (norm !== currentLang);
+        currentLang = norm;
+
+        setElText("offline-title-text", pt("offline_title"));
+        setElText("offline-sub-text", pt("offline_sub"));
+        setElText("live-gfx-btn-label", pt("live_gfx_btn"));
+        setElTitle("live-gfx-accordion-btn", pt("live_gfx_btn_tip"));
+        setElTitle("pinned-pills-container", pt("pinned_pills_tip"));
+
+        setElText("lgfx-lbl-max_fps", pt("lbl_max_fps"));
+        setElText("lgfx-lbl-clouds", pt("lbl_clouds"));
+        setElText("lgfx-lbl-precaching", pt("lbl_precaching"));
+        setElText("lgfx-lbl-terrain_shadows", pt("lbl_terrain_shadows"));
+        setElText("lgfx-lbl-buildings", pt("lbl_buildings"));
+        setElText("lgfx-lbl-trees", pt("lbl_trees"));
+        setElText("lgfx-lbl-plants", pt("lbl_plants"));
+        setElText("lgfx-lbl-grass", pt("lbl_grass"));
+
+        setElTitle("lgfx-item-max_fps", pt("row_tip_max_fps"));
+        setElTitle("lgfx-item-clouds", pt("row_tip_clouds"));
+        setElTitle("lgfx-item-precaching", pt("row_tip_precaching"));
+        setElTitle("lgfx-item-terrain_shadows", pt("row_tip_terrain_shadows"));
+        setElTitle("lgfx-item-buildings", pt("row_tip_buildings"));
+        setElTitle("lgfx-item-trees", pt("row_tip_trees"));
+        setElTitle("lgfx-item-plants", pt("row_tip_plants"));
+        setElTitle("lgfx-item-grass", pt("row_tip_grass"));
+
+        setElTitle("lgfx-input-max_fps", pt("input_fps_tip"));
+        setElTitle("lgfx-ddbtn-max_fps", pt("presets_fps_tip"));
+
+        let pinKeys = ["max_fps", "clouds", "precaching", "terrain_shadows", "buildings", "trees", "plants", "grass"];
+        for (let i = 0; i < pinKeys.length; i++) {
+            setElTitle("lgfx-pin-" + pinKeys[i], pt("pin_tip"));
+            let menu = document.getElementById("lgfx-menu-" + pinKeys[i]);
+            if (menu && pinKeys[i] !== "max_fps" && pinKeys[i] !== "terrain_shadows") {
+                let opts = menu.getElementsByClassName("lgfx-dd-option");
+                for (let j = 0; j < opts.length; j++) {
+                    let dv = parseInt(opts[j].getAttribute("data-val"), 10);
+                    if (dv === 0) opts[j].textContent = pt("q_low");
+                    else if (dv === 1) opts[j].textContent = pt("q_med");
+                    else if (dv === 2) opts[j].textContent = pt("q_high");
+                    else if (dv === 3) opts[j].textContent = pt("q_ultra");
+                }
+            } else if (menu && pinKeys[i] === "terrain_shadows") {
+                let opts = menu.getElementsByClassName("lgfx-dd-option");
+                for (let j = 0; j < opts.length; j++) {
+                    let dv = parseInt(opts[j].getAttribute("data-val"), 10);
+                    if (dv === 0) opts[j].textContent = pt("q_off");
+                }
+            }
+        }
+
+        setElText("lgfx-pinned-label", pt("pinned_count_label"));
+        setElTitle("lgfx-footer-hint", pt("pinned_count_tip"));
+        setElTitle("lgfx-apply-btn", pt("apply_btn_tip"));
+
+        setElText("sec-title-smart-lod", pt("sec_smart_lod"));
+        setElTitle("sec-title-smart-lod", pt("sec_smart_lod_tip"));
+        setElTitle("smart-lod-toggle-btn", pt("toggle_smart_lod_tip"));
+        setElText("smart-lod-autofps-lock-msg", pt("autofps_lock_msg"));
+        setElTitle("smart-lod-autofps-lock-msg", pt("autofps_lock_tip"));
+
+        setElTitle("tlod-title-group", pt("tlod_title_tip"));
+        setElTitle("tlod-name-label", pt("tlod_title_tip"));
+        setElTitle("tlod-mode-badge", pt("tlod_badge_tip"));
+        setElTitle("olod-title-group", pt("olod_title_tip"));
+        setElTitle("olod-name-label", pt("olod_title_tip"));
+        setElTitle("olod-mode-badge", pt("olod_badge_tip"));
+
+        setElText("tlod-floor-lbl", pt("floor_lbl"));
+        setElText("tlod-cruise-lbl", pt("cruise_lbl"));
+        setElText("tlod-alt-lbl", pt("alt_lbl"));
+        setElText("olod-floor-lbl", pt("floor_lbl"));
+        setElText("olod-cruise-lbl", pt("cruise_lbl"));
+        setElText("olod-alt-lbl", pt("alt_lbl"));
+
+        setElTitle("tlod-floor-param", pt("floor_tip_tlod"));
+        setElTitle("tlod-cruise-param", pt("cruise_tip_tlod"));
+        setElTitle("tlod-alt-param", pt("alt_tip_tlod"));
+        setElTitle("olod-floor-param", pt("floor_tip_olod"));
+        setElTitle("olod-cruise-param", pt("cruise_tip_olod"));
+        setElTitle("olod-alt-param", pt("alt_tip_olod"));
+
+        setElTitle("tlod-alt-down", pt("alt_down_tip"));
+        setElTitle("tlod-alt-up", pt("alt_up_tip"));
+        setElTitle("tlod-alt-input", pt("alt_input_tip"));
+        setElTitle("olod-alt-down", pt("alt_down_tip"));
+        setElTitle("olod-alt-up", pt("alt_up_tip"));
+        setElTitle("olod-alt-input", pt("alt_input_tip"));
+
+        setElTitle("tlod-dual-container", pt("slider_tip_tlod"));
+        setElTitle("olod-dual-container", pt("slider_tip_olod"));
+
+        setElText("cloud-recovery-title", pt("cloud_rec_title"));
+        setElTitle("cloud-recovery-bar", pt("cloud_rec_tip"));
+        setElTitle("cloud-recovery-toggle-btn", pt("cloud_rec_toggle_tip"));
+
+        setElText("sec-title-perf", pt("sec_perf"));
+        setElTitle("sec-title-perf", pt("sec_perf_tip"));
+        setElTitle("live-pacing-status", pt("pacing_tip"));
+
+        setElText("lbl-displayed-fps", pt("disp_fps_lbl"));
+        setElTitle("perf-metric-fps", pt("disp_fps_tip"));
+        setElText("lbl-cpu-mt", pt("cpu_mt_lbl"));
+        setElTitle("perf-metric-mt", pt("cpu_mt_tip"));
+
+        setElText("lbl-sparkline-trend", pt("trend_title"));
+        setElTitle("sparkline-box", pt("trend_tip"));
+
+        setElTitle("metric-card-gpu", pt("gpu_tip"));
+        setElTitle("metric-card-cpu", pt("cpu_tip"));
+        setElTitle("metric-card-vram", pt("vram_tip"));
+        setElText("lbl-metric-cache", pt("cache_lbl"));
+        setElTitle("metric-card-cache", pt("cache_tip"));
+
+        setElTitle("blackbox-toggle-btn", pt("blackbox_tip"));
+        let lblRec = document.getElementById("rec-btn-label");
+        if (lblRec) {
+            lblRec.textContent = wasRecording ? pt("stop_mon") : pt("start_mon");
+        }
+
+        if (changed) {
+            renderPinnedPills();
+            syncLiveGfxSelectsFromTelemetry();
+            if (tlodController) tlodController.updateUI(currentTlodFloor, currentTlodCruise);
+            if (olodController) olodController.updateUI(currentOlodFloor, currentOlodCruise);
+        }
+    }
+
     function setConnectedState(online) {
+        let changed = (isConnected !== online);
         isConnected = online;
         let discView = document.getElementById("disconnected-view");
         let connView = document.getElementById("connected-view");
@@ -96,6 +459,9 @@ if (typeof checkAutoload === "function") {
                 connView.classList.add("hidden");
                 connView.style.display = "none";
             }
+        }
+        if (changed) {
+            setTimeout(notifyHeight, 15);
         }
     }
 
@@ -169,11 +535,13 @@ if (typeof checkAutoload === "function") {
 
             if (this.floorHandle) {
                 this.floorHandle.style.left = floorPct + "%";
-                this.floorHandle.title = "Floor LOD: " + floor;
+                this.floorHandle.setAttribute("data-scx-tip", pt("handle_floor_prefix") + floor);
+                this.floorHandle.removeAttribute("title");
             }
             if (this.cruiseHandle) {
                 this.cruiseHandle.style.left = cruisePct + "%";
-                this.cruiseHandle.title = "Cruise LOD: " + cruise;
+                this.cruiseHandle.setAttribute("data-scx-tip", pt("handle_cruise_prefix") + cruise);
+                this.cruiseHandle.removeAttribute("title");
             }
             if (this.highlight) {
                 let leftPct = Math.min(floorPct, cruisePct);
@@ -418,7 +786,6 @@ if (typeof checkAutoload === "function") {
         let altVal = (axis === "tlod") ? currentTlodAlt : currentOlodAlt;
 
         if (!currentLodActive) {
-            // In MAN mode: write directly to MSFS RAM, disengage auto, and persist manual slider positions
             let valToWrite = (directVal !== undefined) ? directVal : baseVal;
             let payload = {
                 disengage_auto: true,
@@ -491,7 +858,15 @@ if (typeof checkAutoload === "function") {
     // LIVE GRAPHICS ACCORDION & 5-PIN HEADER SYSTEM
     // =========================================================
     const LIVE_GFX_KEYS = ["max_fps", "clouds", "precaching", "terrain_shadows", "buildings", "trees", "plants", "grass"];
-    const QUALITY_TITLE_MAP = { 0: "Low", 1: "Medium", 2: "High", 3: "Ultra" };
+
+    function getQualityLabel(v) {
+        let num = Number(v);
+        if (num === 0) return pt("q_low");
+        if (num === 1) return pt("q_med");
+        if (num === 2) return pt("q_high");
+        if (num === 3) return pt("q_ultra");
+        return pt("q_high");
+    }
 
     let liveGfxValues = {
         max_fps: 36,
@@ -525,21 +900,21 @@ if (typeof checkAutoload === "function") {
         let v = (val !== undefined && val !== null) ? Number(val) : 0;
         switch (key) {
             case "max_fps":
-                return "Max FPS : " + (v > 0 ? v : 36);
+                return pt("pill_max_fps") + " : " + (v > 0 ? v : 36);
             case "clouds":
-                return "Clouds : " + (QUALITY_TITLE_MAP[v] || "High");
+                return pt("pill_clouds") + " : " + getQualityLabel(v);
             case "precaching":
-                return "Pre-Cache : " + (QUALITY_TITLE_MAP[v] || "High");
+                return pt("pill_precaching") + " : " + getQualityLabel(v);
             case "terrain_shadows":
-                return "Terr. Shd : " + (v <= 0 ? "Off" : v);
+                return pt("pill_terrain_shadows") + " : " + (v <= 0 ? pt("q_off") : v);
             case "buildings":
-                return "Buildings : " + (QUALITY_TITLE_MAP[v] || "High");
+                return pt("pill_buildings") + " : " + getQualityLabel(v);
             case "trees":
-                return "Trees : " + (QUALITY_TITLE_MAP[v] || "High");
+                return pt("pill_trees") + " : " + getQualityLabel(v);
             case "plants":
-                return "Plants : " + (QUALITY_TITLE_MAP[v] || "High");
+                return pt("pill_plants") + " : " + getQualityLabel(v);
             case "grass":
-                return "Grass : " + (QUALITY_TITLE_MAP[v] || "High");
+                return pt("pill_grass") + " : " + getQualityLabel(v);
             default:
                 return key + " : " + v;
         }
@@ -557,12 +932,13 @@ if (typeof checkAutoload === "function") {
                 let k = keysToShow[i];
                 let v = liveGfxValues[k];
                 let txt = formatPinnedPillText(k, v);
+                let tip = pt("row_tip_" + k) || txt;
                 let styleAttr = "";
                 if (k === "clouds") {
                     if (lastInCloudRed) styleAttr = ' style="color: #fbbf24;"';
                     else if (lastInCloudBoost) styleAttr = ' style="color: #10b981;"';
                 }
-                html += '<span class="hl-tag" data-pin-key="' + k + '"' + styleAttr + '>' + txt + '</span>';
+                html += '<span class="hl-tag" data-pin-key="' + k + '" data-scx-tip="' + tip.replace(/"/g, '&quot;') + '"' + styleAttr + '>' + txt + '</span>';
             }
             container.innerHTML = html;
         }
@@ -593,9 +969,9 @@ if (typeof checkAutoload === "function") {
             return String(v > 0 ? v : 36);
         }
         if (key === "terrain_shadows") {
-            return v <= 0 ? "Off" : String(v);
+            return v <= 0 ? pt("q_off") : String(v);
         }
-        return QUALITY_TITLE_MAP[v] || "High";
+        return getQualityLabel(v);
     }
 
     function closeAllLiveGfxDropdowns() {
@@ -668,7 +1044,8 @@ if (typeof checkAutoload === "function") {
                 let profVal = profileGfxValues[k];
                 let isModifiedFromProfile = (profVal !== undefined && Number(effectiveVal) !== Number(profVal));
                 resetBtn.className = isModifiedFromProfile ? "lgfx-reset-btn modified" : "lgfx-reset-btn";
-                resetBtn.title = "Reset to Active Profile (" + formatLiveGfxDisplayVal(k, profVal) + ")";
+                resetBtn.setAttribute("data-scx-tip", pt("reset_profile_prefix") + " (" + formatLiveGfxDisplayVal(k, profVal) + ")");
+                resetBtn.removeAttribute("title");
             }
         }
 
@@ -676,10 +1053,10 @@ if (typeof checkAutoload === "function") {
         if (applyBtn && applyBtn.className.indexOf("btn-applied") === -1) {
             if (hasDirty) {
                 applyBtn.className = "lgfx-apply-btn btn-dirty";
-                applyBtn.textContent = "APPLY *";
+                applyBtn.textContent = pt("apply_dirty_btn");
             } else {
                 applyBtn.className = "lgfx-apply-btn";
-                applyBtn.textContent = "APPLY";
+                applyBtn.textContent = pt("apply_btn");
             }
         }
     }
@@ -701,7 +1078,9 @@ if (typeof checkAutoload === "function") {
         if (btn) {
             btn.className = isLiveGfxExpanded ? "gfx-accordion-btn expanded" : "gfx-accordion-btn";
         }
-        setTimeout(notifyHeight, 20);
+        notifyHeight();
+        setTimeout(notifyHeight, 30);
+        setTimeout(notifyHeight, 120);
     };
 
     window.onToggleLiveGfxDropdown = function (key, e) {
@@ -767,24 +1146,23 @@ if (typeof checkAutoload === "function") {
         let hintEl = document.getElementById("lgfx-footer-hint");
         if (idx !== -1) {
             if (pinnedGfxKeys.length <= 1) {
-                return; // Keep at least 1 pinned pill
+                return;
             }
             pinnedGfxKeys.splice(idx, 1);
         } else {
             if (pinnedGfxKeys.length >= 5) {
                 if (hintEl) {
                     hintEl.style.color = "#fbbf24";
-                    hintEl.innerHTML = 'MAX 5 PINS REACHED (<span id="lgfx-pin-count">5</span>/5)';
+                    hintEl.innerHTML = pt("max_pins_reached") + ' (<span id="lgfx-pin-count">5</span>/5)';
                     setTimeout(function () {
                         if (hintEl) {
                             hintEl.style.color = "";
-                            hintEl.innerHTML = 'PINNED : <span id="lgfx-pin-count">' + pinnedGfxKeys.length + '</span>/5';
+                            hintEl.innerHTML = '<span id="lgfx-pinned-label">' + pt("pinned_count_label") + '</span> <span id="lgfx-pin-count">' + pinnedGfxKeys.length + '</span>/5';
                         }
                     }, 1400);
                 }
                 return;
             }
-            // Insert in canonical LIVE_GFX_KEYS order
             let nextPins = [];
             for (let i = 0; i < LIVE_GFX_KEYS.length; i++) {
                 let k = LIVE_GFX_KEYS[i];
@@ -825,8 +1203,7 @@ if (typeof checkAutoload === "function") {
             lastInCloudBoost = false;
             let elCloudLiveVal = document.getElementById("cloud-recovery-live-val");
             if (elCloudLiveVal) {
-                let cMap = { 0: "LOW", 1: "MEDIUM", 2: "HIGH", 3: "ULTRA" };
-                elCloudLiveVal.textContent = cMap[profVal] || "HIGH";
+                elCloudLiveVal.textContent = getQualityLabel(profVal).toUpperCase();
                 elCloudLiveVal.style.color = "#38bdf8";
             }
         }
@@ -854,7 +1231,6 @@ if (typeof checkAutoload === "function") {
 
         closeAllLiveGfxDropdowns();
 
-        // Check manual FPS input first
         let fpsInp = document.getElementById("lgfx-input-max_fps");
         if (fpsInp) {
             let typedFps = parseInt(fpsInp.value, 10);
@@ -891,7 +1267,6 @@ if (typeof checkAutoload === "function") {
         stagedGfxValues = {};
         lastLiveGfxApplyTime = Date.now();
 
-        // If user manually changed clouds, immediately turn Auto Cloud Recovery OFF in UI
         if (cloudsChanged) {
             currentCloudRecovery = false;
             lastCloudRecoveryToggleTime = Date.now();
@@ -906,8 +1281,7 @@ if (typeof checkAutoload === "function") {
             }
             let elCloudLiveVal = document.getElementById("cloud-recovery-live-val");
             if (elCloudLiveVal) {
-                let cMap = { 0: "LOW", 1: "MEDIUM", 2: "HIGH", 3: "ULTRA" };
-                elCloudLiveVal.textContent = cMap[payloadSettings.clouds] || "HIGH";
+                elCloudLiveVal.textContent = getQualityLabel(payloadSettings.clouds).toUpperCase();
                 elCloudLiveVal.style.color = "#38bdf8";
             }
         }
@@ -918,12 +1292,12 @@ if (typeof checkAutoload === "function") {
         let applyBtn = document.getElementById("lgfx-apply-btn");
         if (applyBtn) {
             applyBtn.className = "lgfx-apply-btn btn-applied";
-            applyBtn.textContent = "APPLIED";
+            applyBtn.textContent = pt("applied_btn");
             setTimeout(function () {
                 let ab = document.getElementById("lgfx-apply-btn");
                 if (ab && Object.keys(stagedGfxValues).length === 0) {
                     ab.className = "lgfx-apply-btn";
-                    ab.textContent = "APPLY";
+                    ab.textContent = pt("apply_btn");
                 }
             }, 1300);
         }
@@ -944,6 +1318,10 @@ if (typeof checkAutoload === "function") {
 
     function updateTelemetryUI(data) {
         if (!data) return;
+
+        if (data.language) {
+            applyPanelLanguage(data.language);
+        }
 
         currentIsVr = !!data.is_vr;
 
@@ -975,7 +1353,6 @@ if (typeof checkAutoload === "function") {
         let isExtAutoFps = !!(lod.external_autofps || data.external_autofps);
         currentIsExtAutoFps = isExtAutoFps;
         let lodEnabled = !isExtAutoFps && ((lod.enabled !== undefined) ? !!lod.enabled : (data.smart_lod_enabled !== undefined ? !!data.smart_lod_enabled : false));
-        let lodActive = !isExtAutoFps && ((lod.active !== undefined) ? !!lod.active : lodEnabled);
         let isProtectedManualTransition = isSmartLodToggling || isSliderDragging || isUserInteracting || (Date.now() - lastSmartLodToggleTime <= 2500);
         if (!isProtectedManualTransition) {
             currentLodActive = isExtAutoFps ? false : lodEnabled;
@@ -1000,7 +1377,7 @@ if (typeof checkAutoload === "function") {
                 btnLod.style.opacity = "0.3";
                 btnLod.style.pointerEvents = "none";
                 btnLod.style.cursor = "not-allowed";
-                if (lblLod) lblLod.textContent = "LOCKED";
+                if (lblLod) lblLod.textContent = pt("locked");
             }
         } else {
             if (lockMsg) lockMsg.className = "hidden";
@@ -1039,7 +1416,6 @@ if (typeof checkAutoload === "function") {
 
         if (!isUserInteracting && !isInputFocused && !isSliderDragging) {
             if (currentLodActive) {
-                // MODE AUTO: Locked inputs, dynamically moving slider handles & green values based on performance
                 let tlodFloorVal = lod.tlod_base !== undefined ? lod.tlod_base : 100;
                 let tlodCruiseVal = lod.tlod_target !== undefined ? lod.tlod_target : 200;
                 let tlodAltVal = lod.tlod_altitude !== undefined ? lod.tlod_altitude : 3000;
@@ -1071,7 +1447,6 @@ if (typeof checkAutoload === "function") {
                 setAxisUiState("tlod", false, false);
                 setAxisUiState("olod", false, false);
             } else {
-                // MODE MANUEL: Nominal active profile values or direct user adjustments
                 let nomTlod = lod.nominal_tlod !== undefined ? lod.nominal_tlod : (data.nominal_tlod || 100);
                 let nomOlod = lod.nominal_olod !== undefined ? lod.nominal_olod : (data.nominal_olod || 100);
 
@@ -1127,7 +1502,8 @@ if (typeof checkAutoload === "function") {
             }
         }
 
-        let cloudLbl = (lod.cloud_label || data.cloud_label || "HIGH").toUpperCase();
+        let cloudQualNum = (liveGfxValues.clouds !== undefined) ? Number(liveGfxValues.clouds) : 2;
+        let cloudLbl = getQualityLabel(cloudQualNum).toUpperCase();
         let inCloudRed = !!(lod.in_cloud_reduction || data.in_cloud_reduction);
         let inCloudBoost = !!(lod.in_cloud_boost || data.in_cloud_boost);
         let elCloudLiveVal = document.getElementById("cloud-recovery-live-val");
@@ -1166,13 +1542,13 @@ if (typeof checkAutoload === "function") {
         if (elPacingBadge) {
             if (pacing === "OPTIMAL" || pacing === "FLUIDE") {
                 elPacingBadge.className = "badge-tag badge-optimal";
-                elPacingBadge.textContent = "OPTIMAL";
+                elPacingBadge.textContent = pt("pacing_optimal");
             } else if (pacing === "ACCEPTABLE" || pacing === "CHARGE" || pacing === "CHARGÉ") {
                 elPacingBadge.className = "badge-tag badge-acceptable";
-                elPacingBadge.textContent = "ACCEPTABLE";
+                elPacingBadge.textContent = pt("pacing_acceptable");
             } else {
                 elPacingBadge.className = "badge-tag badge-heavy";
-                elPacingBadge.textContent = "HEAVY";
+                elPacingBadge.textContent = pt("pacing_heavy");
             }
         }
 
@@ -1183,30 +1559,25 @@ if (typeof checkAutoload === "function") {
         if (btnRec && !isBlackboxToggling) {
             if (isRec) {
                 btnRec.className = "msfs-btn btn-rec-stop";
-                if (lblRec) lblRec.textContent = "STOP MONITORING";
+                if (lblRec) lblRec.textContent = pt("stop_mon");
             } else {
                 btnRec.className = "msfs-btn btn-rec-start";
-                if (lblRec) lblRec.textContent = "START MONITORING";
+                if (lblRec) lblRec.textContent = pt("start_mon");
             }
         }
 
-        // When monitoring just started, reset sparkline to fresh session
         if (isRec && !wasRecording) {
             fpsHistory = [];
         }
         wasRecording = isRec;
 
-        // When monitoring is active, push new points and advance sparkline
         if (isRec && dispFps && dispFps > 0) {
             fpsHistory.push(Math.round(dispFps));
             if (fpsHistory.length > MAX_HISTORY_POINTS) {
                 fpsHistory.shift();
             }
             drawSparkline();
-        } else if (!isRec && fpsHistory.length >= 2) {
-            // Keep graph frozen when recording is stopped
-            drawSparkline();
-        } else if (!isRec && fpsHistory.length < 2) {
+        } else {
             drawSparkline();
         }
 
@@ -1257,16 +1628,76 @@ if (typeof checkAutoload === "function") {
     let consecutiveFailures = 0;
     let isPollingTelemetry = false;
     const DISCONNECT_FAILURE_THRESHOLD = 5;
+    let lastNotifiedHeight = 0;
 
-    function notifyHeight() {
+    function measureNaturalContentHeight() {
         let connView = document.getElementById("connected-view");
-        let discView = document.getElementById("disconnected-view");
-        let targetEl = (connView && connView.style.display !== "none" && !connView.classList.contains("hidden")) ? connView : discView;
-        let h = targetEl ? targetEl.offsetHeight + 18 : document.body.scrollHeight;
+        let isConn = (connView && connView.style.display !== "none" && !connView.classList.contains("hidden"));
+        if (!isConn) {
+            return 220;
+        }
+        let sum = 14; // top + bottom padding of .main-content
+        let children = connView.children;
+        for (let i = 0; i < children.length; i++) {
+            let ch = children[i];
+            if (!ch || ch.classList.contains("hidden") || ch.style.display === "none") continue;
+            let h = ch.offsetHeight || Math.ceil(ch.getBoundingClientRect().height) || 0;
+            sum += h + 6;
+        }
+        return Math.max(495, sum);
+    }
+
+    function notifyHeight(forceUpdate) {
+        let connView = document.getElementById("connected-view");
+        let isConn = (connView && connView.style.display !== "none" && !connView.classList.contains("hidden"));
+        let naturalH = measureNaturalContentHeight();
+
+        // 1. Desktop Preview iframe auto-fit notification
         if (window.parent && window.parent !== window) {
-            window.parent.postMessage({ type: "SCENERYX_PANEL_RESIZE", height: h }, "*");
+            if (document.body && !document.body.classList.contains("is-desktop-preview")) {
+                document.body.classList.add("is-desktop-preview");
+            }
+            window.parent.postMessage({ type: "SCENERYX_PANEL_RESIZE", height: naturalH }, "*");
+            return;
+        }
+
+        // 2. Native MSFS 2020/2024 In-Game Panel window height sync
+        let ingameUi = document.getElementById("SceneryX_Remote");
+        if (ingameUi) {
+            ingameUi.classList.remove("minimized");
+            if (ingameUi.getAttribute("title") !== "SCENERY X") {
+                ingameUi.setAttribute("title", "SCENERY X");
+            }
+            let headerEl = ingameUi.querySelector("ingame-ui-header");
+            if (headerEl && headerEl.getAttribute("title") !== "SCENERY X") {
+                headerEl.setAttribute("title", "SCENERY X");
+            }
+            let headerH = headerEl ? Math.max(32, Math.ceil(headerEl.getBoundingClientRect().height || 36)) : 36;
+            let minTotal = isConn ? 520 : 160;
+            let msfsTargetH = Math.max(minTotal, naturalH + headerH + 6);
+            if (forceUpdate || Math.abs(msfsTargetH - lastNotifiedHeight) >= 3) {
+                lastNotifiedHeight = msfsTargetH;
+                try {
+                    if (typeof ingameUi.sendUpdatePanelSize === "function") {
+                        ingameUi.sendUpdatePanelSize();
+                    }
+                    if (typeof ingameUi.sendRect === "function") {
+                        ingameUi.sendRect();
+                    }
+                } catch (e) {}
+                try {
+                    if (typeof Coherent !== "undefined" && typeof Coherent.trigger === "function") {
+                        Coherent.trigger("UPDATE_PANEL_HEIGHT", ingameUi.panelID || "PANEL_SCENERYX", msfsTargetH);
+                    }
+                } catch (e) {}
+            }
         }
     }
+    window.sceneryxNotifyHeight = notifyHeight;
+    window.sceneryxForcePanelHeight = function () {
+        lastNotifiedHeight = 0;
+        notifyHeight(true);
+    };
 
     function pollTelemetry() {
         if (isPollingTelemetry) return;
@@ -1288,7 +1719,6 @@ if (typeof checkAutoload === "function") {
         function handleFailure() {
             isPollingTelemetry = false;
             consecutiveFailures++;
-            // In standalone preview mode, provide mock preview data ONLY if explicitly requested via ?preview=1
             let isExplicitPreview = (typeof window !== "undefined" && window.location && window.location.search && window.location.search.indexOf("preview=1") !== -1);
             if (isExplicitPreview && consecutiveFailures >= 2) {
                 setConnectedState(true);
@@ -1323,7 +1753,6 @@ if (typeof checkAutoload === "function") {
                 notifyHeight();
                 return;
             }
-            // Hysteresis: Once connected, ignore transient hiccups and only switch to disconnected view after 5 consecutive failures
             if (!isConnected || consecutiveFailures >= DISCONNECT_FAILURE_THRESHOLD) {
                 setConnectedState(false);
                 notifyHeight();
@@ -1379,7 +1808,7 @@ if (typeof checkAutoload === "function") {
             ctx.setLineDash([]);
             let elDelta = document.getElementById("fps-delta-label");
             if (elDelta) {
-                elDelta.textContent = "STANDBY";
+                elDelta.textContent = pt("standby");
                 elDelta.className = "delta-label delta-neutral";
             }
             return;
@@ -1402,7 +1831,6 @@ if (typeof checkAutoload === "function") {
         let stepX = w / (MAX_HISTORY_POINTS - 1);
         let startIdx = MAX_HISTORY_POINTS - fpsHistory.length;
 
-        // Gradient fill
         let grad = ctx.createLinearGradient(0, 0, 0, h);
         grad.addColorStop(0, "rgba(2, 132, 199, 0.4)");
         grad.addColorStop(1, "rgba(2, 132, 199, 0.0)");
@@ -1421,7 +1849,6 @@ if (typeof checkAutoload === "function") {
         ctx.fillStyle = grad;
         ctx.fill();
 
-        // Stroke line
         ctx.beginPath();
         for (let i = 0; i < fpsHistory.length; i++) {
             let x = (startIdx + i) * stepX;
@@ -1434,7 +1861,6 @@ if (typeof checkAutoload === "function") {
         ctx.lineWidth = 2;
         ctx.stroke();
 
-        // Delta
         let first = fpsHistory[0];
         let last = fpsHistory[fpsHistory.length - 1];
         let delta = Math.round(last - first);
@@ -1513,7 +1939,6 @@ if (typeof checkAutoload === "function") {
         if (now - lastSmartLodToggleTime < 250) return;
         lastSmartLodToggleTime = now;
 
-        // Immediately cancel any lingering manual slider interaction lock or debounced manual write
         isUserInteracting = false;
         isSliderDragging = false;
         if (userInteractionTimeout) {
@@ -1530,7 +1955,6 @@ if (typeof checkAutoload === "function") {
         let isCurrentlyOn = btnLod ? btnLod.classList.contains("switch-on") : currentLodActive;
         let targetState = !isCurrentlyOn;
 
-        // Immediate optimistic visual toggle
         currentLodActive = targetState;
         isSmartLodToggling = true;
         if (btnLod) {
@@ -1549,7 +1973,6 @@ if (typeof checkAutoload === "function") {
             }
         }
 
-        // Safety fallback: guarantee release within 1500ms
         setTimeout(function () {
             isSmartLodToggling = false;
         }, 1500);
@@ -1636,23 +2059,19 @@ if (typeof checkAutoload === "function") {
             }
         }
 
-        // Optimistic immediate sync when re-enabling Auto Cloud Recovery:
-        // clear any manual override on Clouds and restore nominal/calculated value immediately
         if (targetState) {
             delete stagedGfxValues.clouds;
             if (profileGfxValues && profileGfxValues.clouds !== undefined) {
                 liveGfxValues.clouds = Number(profileGfxValues.clouds);
             }
             let liveCloudValEl = document.getElementById("cloud-recovery-live-val");
-            let qMap = { 0: "LOW", 1: "MEDIUM", 2: "HIGH", 3: "ULTRA" };
             if (liveCloudValEl && liveGfxValues.clouds !== undefined) {
-                liveCloudValEl.textContent = qMap[liveGfxValues.clouds] || "HIGH";
+                liveCloudValEl.textContent = getQualityLabel(liveGfxValues.clouds).toUpperCase();
             }
             renderPinnedPills();
             syncLiveGfxSelectsFromTelemetry();
         }
 
-        // Safety fallback: guarantee release within 1500ms
         setTimeout(function () {
             isCloudRecoveryToggling = false;
         }, 1500);
@@ -1673,9 +2092,8 @@ if (typeof checkAutoload === "function") {
                 delete stagedGfxValues.clouds;
                 liveGfxValues.clouds = Number(data.cloud_quality);
                 let liveCloudValEl = document.getElementById("cloud-recovery-live-val");
-                let qMap = { 0: "LOW", 1: "MEDIUM", 2: "HIGH", 3: "ULTRA" };
                 if (liveCloudValEl) {
-                    liveCloudValEl.textContent = data.cloud_label || qMap[liveGfxValues.clouds] || "HIGH";
+                    liveCloudValEl.textContent = getQualityLabel(liveGfxValues.clouds).toUpperCase();
                 }
                 renderPinnedPills();
                 syncLiveGfxSelectsFromTelemetry();
@@ -1693,16 +2111,15 @@ if (typeof checkAutoload === "function") {
         isBlackboxToggling = true;
         let btnRec = document.getElementById("blackbox-toggle-btn");
         let lblRec = document.getElementById("rec-btn-label");
-        let currentLabel = lblRec ? lblRec.textContent : "";
-        let willStart = (currentLabel.indexOf("START") !== -1);
+        let willStart = !wasRecording;
         if (willStart) {
             if (btnRec) btnRec.className = "msfs-btn btn-rec-stop";
-            if (lblRec) lblRec.textContent = "STOP MONITORING";
+            if (lblRec) lblRec.textContent = pt("stop_mon");
             fpsHistory = [];
             drawSparkline();
         } else {
             if (btnRec) btnRec.className = "msfs-btn btn-rec-start";
-            if (lblRec) lblRec.textContent = "START MONITORING";
+            if (lblRec) lblRec.textContent = pt("start_mon");
         }
 
         let url = getApiBase() + "/blackbox/toggle";
@@ -1721,11 +2138,8 @@ if (typeof checkAutoload === "function") {
 
     function setupAxis(axis) {
         let maxVal = (axis === "tlod") ? 400 : 300;
-        let container = document.getElementById(axis + "-dual-container");
         let altInput = document.getElementById(axis + "-alt-input");
         let badge = document.getElementById(axis + "-mode-badge");
-        let nameLbl = document.getElementById(axis + "-name-label");
-        let card = document.getElementById(axis + "-card");
 
         let controller = new DualSliderController(
             axis,
@@ -1750,8 +2164,6 @@ if (typeof checkAutoload === "function") {
                     disengageSmartLodFromManualAction(true);
                 }
                 setAxisUiState(axis, true, false);
-                let liveEl = document.getElementById(axis + "-live-val");
-                if (liveEl) liveEl.textContent = directVal;
                 queueAxisConfigUpdate(axis, directVal);
             }
         );
@@ -1820,6 +2232,103 @@ if (typeof checkAutoload === "function") {
         }
     }
 
+    // CoherentGT & Webview resilient contextual tooltip controller
+    function initCustomTooltip() {
+        let tipEl = document.getElementById("scx-custom-tooltip");
+        if (!tipEl) return;
+        let tipTimer = null;
+        let activeTarget = null;
+
+        function isMsfsShellNode(el) {
+            if (!el) return true;
+            if (el.id === "SceneryX_Remote") return true;
+            let tag = (el.tagName || "").toUpperCase();
+            if (tag === "INGAME-UI" || tag === "INGAME-UI-HEADER" || tag === "INGAMEPANEL-SCENERYX") return true;
+            if (el.closest && el.closest("ingame-ui-header")) return true;
+            return false;
+        }
+
+        function findTitledElement(el) {
+            while (el && el !== document && el !== document.body) {
+                if (isMsfsShellNode(el)) {
+                    break;
+                }
+                if (el.getAttribute) {
+                    let scxTip = el.getAttribute("data-scx-tip");
+                    let nativeTitle = el.getAttribute("title");
+                    if (nativeTitle) {
+                        if (nativeTitle !== "null" && nativeTitle !== "undefined" && nativeTitle !== "SCENERY X") {
+                            el.setAttribute("data-scx-tip", nativeTitle);
+                            scxTip = nativeTitle;
+                        }
+                        el.removeAttribute("title");
+                    }
+                    if (scxTip && scxTip !== "null" && scxTip !== "undefined") {
+                        return el;
+                    }
+                }
+                el = el.parentElement;
+            }
+            return null;
+        }
+
+        function positionTip(clientX, clientY) {
+            let vw = window.innerWidth || document.documentElement.clientWidth || 500;
+            let vh = window.innerHeight || document.documentElement.clientHeight || 500;
+            let rect = tipEl.getBoundingClientRect();
+            let tw = rect.width || 180;
+            let th = rect.height || 28;
+            let left = clientX + 10;
+            let top = clientY + 16;
+            if (left + tw + 8 > vw) {
+                left = Math.max(6, vw - tw - 8);
+            }
+            if (top + th + 8 > vh) {
+                top = Math.max(6, clientY - th - 8);
+            }
+            tipEl.style.left = left + "px";
+            tipEl.style.top = top + "px";
+        }
+
+        document.addEventListener("mouseover", function (e) {
+            let target = findTitledElement(e.target);
+            if (!target) {
+                activeTarget = null;
+                if (tipTimer) { clearTimeout(tipTimer); tipTimer = null; }
+                tipEl.className = "scx-custom-tooltip hidden";
+                return;
+            }
+            if (target === activeTarget) return;
+            activeTarget = target;
+            if (tipTimer) clearTimeout(tipTimer);
+            let cx = e.clientX;
+            let cy = e.clientY;
+            tipTimer = setTimeout(function () {
+                if (!activeTarget || isMsfsShellNode(activeTarget)) return;
+                let text = activeTarget.getAttribute("data-scx-tip") || activeTarget.getAttribute("title");
+                if (activeTarget.getAttribute("title") && !isMsfsShellNode(activeTarget)) {
+                    activeTarget.setAttribute("data-scx-tip", activeTarget.getAttribute("title"));
+                    activeTarget.removeAttribute("title");
+                }
+                if (!text || text === "null" || text === "undefined" || text === "SCENERY X") return;
+                tipEl.textContent = text;
+                tipEl.className = "scx-custom-tooltip";
+                positionTip(cx, cy);
+            }, 320);
+        });
+
+        document.addEventListener("mousemove", function (e) {
+            if (activeTarget && tipEl.className.indexOf("hidden") === -1) {
+                positionTip(e.clientX, e.clientY);
+            }
+        });
+
+        document.addEventListener("mousedown", function () {
+            if (tipTimer) { clearTimeout(tipTimer); tipTimer = null; }
+            tipEl.className = "scx-custom-tooltip hidden";
+        });
+    }
+
     function init() {
         let discView = document.getElementById("disconnected-view");
         let connView = document.getElementById("connected-view");
@@ -1840,6 +2349,10 @@ if (typeof checkAutoload === "function") {
                 markUserInteracting();
             }
         });
+        window.addEventListener("resize", function () {
+            lastNotifiedHeight = 0;
+            notifyHeight();
+        });
 
         let btnLod = document.getElementById("smart-lod-toggle-btn");
         if (btnLod) {
@@ -1859,7 +2372,6 @@ if (typeof checkAutoload === "function") {
             btnRec.addEventListener("click", onBlackboxClick);
         }
 
-        // Global delegated click listener (immune to MSFS template element cloning)
         document.addEventListener("click", function (e) {
             let el = e.target;
             while (el && el !== document && el !== document.body) {
@@ -1879,6 +2391,14 @@ if (typeof checkAutoload === "function") {
             }
         });
 
+        applyPanelLanguage("en");
+        initCustomTooltip();
+        window.addEventListener("message", function (e) {
+            if (e && e.data && e.data.type === "SCENERYX_SET_LANGUAGE" && e.data.language) {
+                applyPanelLanguage(e.data.language);
+                setTimeout(notifyHeight, 30);
+            }
+        });
         drawSparkline();
 
         setupAxis("tlod");
@@ -1886,6 +2406,9 @@ if (typeof checkAutoload === "function") {
 
         pollTelemetry();
         setInterval(pollTelemetry, POLL_INTERVAL_MS);
+        setTimeout(window.sceneryxForcePanelHeight, 60);
+        setTimeout(window.sceneryxForcePanelHeight, 300);
+        setTimeout(window.sceneryxForcePanelHeight, 900);
     }
 
     if (document.readyState === "loading") {

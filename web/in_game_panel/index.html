@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <title>SCENERY X</title>
     <link rel="stylesheet" href="/SCSS/common.css" />
-    <link rel="stylesheet" href="SceneryX_Remote.css?v=119" />
+    <link rel="stylesheet" href="SceneryX_Remote.css?v=126" />
     <script type="text/javascript" src="/JS/coherent.js"></script>
     <script type="text/javascript" src="/JS/common.js"></script>
     <script type="text/javascript" src="/JS/buttons.js"></script>
@@ -16,18 +16,19 @@
     <link rel="import" href="/templates/tabMenu/tabMenu.html" />
     <link rel="import" href="/templates/ingameUi/ingameUi.html" />
     <link rel="import" href="/templates/ingameUiHeader/ingameUiHeader.html" />
-    <script type="text/javascript" src="SceneryX_Remote.js?v=119"></script>
+    <script type="text/javascript" src="SceneryX_Remote.js?v=126"></script>
 </head>
 <body class="border-box">
     <ingamepanel-sceneryx>
         <ingame-ui id="SceneryX_Remote" panel-id="PANEL_SCENERYX" title="SCENERY X"
                    class="ingameUiFrame panelInvisible"
-                   resize="both"
-                   min-width="500" min-height="320">
+                   content-fit="true"
+                   resize="x"
+                   min-width="34" min-height="0">
 
             <!-- OFFLINE VIEW -->
             <div id="disconnected-view" class="offline-box">
-                <div class="offline-title">Please launch Scenery X</div>
+                <div class="offline-title" id="offline-title-text">Please launch Scenery X</div>
             </div>
 
             <!-- ONLINE VIEW -->
@@ -60,7 +61,7 @@
                                         <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1 1 1 0 0 1 1 1z"></path>
                                     </svg>
                                 </button>
-                                <span class="lgfx-label">Max FPS</span>
+                                <span class="lgfx-label" id="lgfx-lbl-max_fps">Max FPS</span>
                                 <div class="lgfx-combo-wrap" id="lgfx-ctrl-max_fps">
                                     <input type="text" id="lgfx-input-max_fps" class="lgfx-combo-input" value="36" maxlength="3" title="Enter custom FPS (15-240)" oninput="window.onLiveGfxManualFpsInput && window.onLiveGfxManualFpsInput(this.value)" onclick="event.stopPropagation()" />
                                     <span class="lgfx-combo-unit">FPS</span>
@@ -101,7 +102,7 @@
                                         <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1 1 1 0 0 1 1 1z"></path>
                                     </svg>
                                 </button>
-                                <span class="lgfx-label">Clouds</span>
+                                <span class="lgfx-label" id="lgfx-lbl-clouds">Clouds</span>
                                 <button type="button" class="lgfx-dd-trigger" id="lgfx-ddbtn-clouds" onclick="window.onToggleLiveGfxDropdown && window.onToggleLiveGfxDropdown('clouds', event)">
                                     <span id="lgfx-val-clouds">High</span>
                                     <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -130,7 +131,7 @@
                                         <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1 1 1 0 0 1 1 1z"></path>
                                     </svg>
                                 </button>
-                                <span class="lgfx-label">Pre-Cache</span>
+                                <span class="lgfx-label" id="lgfx-lbl-precaching">Pre-Cache</span>
                                 <button type="button" class="lgfx-dd-trigger" id="lgfx-ddbtn-precaching" onclick="window.onToggleLiveGfxDropdown && window.onToggleLiveGfxDropdown('precaching', event)">
                                     <span id="lgfx-val-precaching">High</span>
                                     <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -159,7 +160,7 @@
                                         <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1 1 1 0 0 1 1 1z"></path>
                                     </svg>
                                 </button>
-                                <span class="lgfx-label">Terr. Shd</span>
+                                <span class="lgfx-label" id="lgfx-lbl-terrain_shadows">Terr. Shd</span>
                                 <button type="button" class="lgfx-dd-trigger" id="lgfx-ddbtn-terrain_shadows" onclick="window.onToggleLiveGfxDropdown && window.onToggleLiveGfxDropdown('terrain_shadows', event)">
                                     <span id="lgfx-val-terrain_shadows">512</span>
                                     <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -190,7 +191,7 @@
                                         <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1 1 1 0 0 1 1 1z"></path>
                                     </svg>
                                 </button>
-                                <span class="lgfx-label">Buildings</span>
+                                <span class="lgfx-label" id="lgfx-lbl-buildings">Buildings</span>
                                 <button type="button" class="lgfx-dd-trigger" id="lgfx-ddbtn-buildings" onclick="window.onToggleLiveGfxDropdown && window.onToggleLiveGfxDropdown('buildings', event)">
                                     <span id="lgfx-val-buildings">High</span>
                                     <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -219,7 +220,7 @@
                                         <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1 1 1 0 0 1 1 1z"></path>
                                     </svg>
                                 </button>
-                                <span class="lgfx-label">Trees</span>
+                                <span class="lgfx-label" id="lgfx-lbl-trees">Trees</span>
                                 <button type="button" class="lgfx-dd-trigger" id="lgfx-ddbtn-trees" onclick="window.onToggleLiveGfxDropdown && window.onToggleLiveGfxDropdown('trees', event)">
                                     <span id="lgfx-val-trees">High</span>
                                     <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -248,7 +249,7 @@
                                         <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1 1 1 0 0 1 1 1z"></path>
                                     </svg>
                                 </button>
-                                <span class="lgfx-label">Plants</span>
+                                <span class="lgfx-label" id="lgfx-lbl-plants">Plants</span>
                                 <button type="button" class="lgfx-dd-trigger" id="lgfx-ddbtn-plants" onclick="window.onToggleLiveGfxDropdown && window.onToggleLiveGfxDropdown('plants', event)">
                                     <span id="lgfx-val-plants">High</span>
                                     <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -277,7 +278,7 @@
                                         <path d="M9 10.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V7a1 1 0 0 1 1-1 1 1 0 0 0 1-1V4a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v1a1 1 0 0 0 1 1 1 1 0 0 1 1 1z"></path>
                                     </svg>
                                 </button>
-                                <span class="lgfx-label">Grass</span>
+                                <span class="lgfx-label" id="lgfx-lbl-grass">Grass</span>
                                 <button type="button" class="lgfx-dd-trigger" id="lgfx-ddbtn-grass" onclick="window.onToggleLiveGfxDropdown && window.onToggleLiveGfxDropdown('grass', event)">
                                     <span id="lgfx-val-grass">Low</span>
                                     <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -300,7 +301,7 @@
                         </div>
 
                         <div class="lgfx-footer">
-                            <span class="lgfx-footer-hint" id="lgfx-footer-hint">PINNED : <span id="lgfx-pin-count">5</span>/5</span>
+                            <span class="lgfx-footer-hint" id="lgfx-footer-hint"><span id="lgfx-pinned-label">PINNED :</span> <span id="lgfx-pin-count">5</span>/5</span>
                             <button type="button" id="lgfx-apply-btn" class="lgfx-apply-btn" onclick="window.onApplyLiveGraphics && window.onApplyLiveGraphics(event)">APPLY</button>
                         </div>
                     </div>
@@ -309,7 +310,7 @@
                 <!-- SECTION 1: SMART LOD REGULATION -->
                 <div class="panel-section" id="smart-lod-section">
                     <div class="section-header">
-                        <span class="section-title">SMART LOD REGULATION</span>
+                        <span class="section-title" id="sec-title-smart-lod">SMART LOD REGULATION</span>
                         <button type="button" id="smart-lod-toggle-btn" class="switch-btn switch-on" role="switch" aria-checked="true" title="Toggle Smart Dynamic LOD" onclick="window.onSmartLodClick && window.onSmartLodClick(event)">
                             <span class="switch-thumb"></span>
                             <span id="smart-lod-btn-label" class="switch-label">ON</span>
@@ -334,12 +335,12 @@
                                 </span>
                             </div>
                             <div class="lod-values-group">
-                                <div class="lod-param" title="Floor LOD below transition altitude">
-                                    <span class="param-lbl">Floor :</span>
+                                <div class="lod-param" id="tlod-floor-param" title="Floor LOD below transition altitude">
+                                    <span class="param-lbl" id="tlod-floor-lbl">Floor :</span>
                                     <span id="tlod-floor-val" class="param-val">100</span>
                                 </div>
-                                <div class="lod-param alt-param" title="Transition altitude in feet AGL">
-                                    <span class="param-lbl">Alt :</span>
+                                <div class="lod-param alt-param" id="tlod-alt-param" title="Transition altitude in feet AGL">
+                                    <span class="param-lbl" id="tlod-alt-lbl">Alt :</span>
                                     <button type="button" class="alt-chevron-btn" id="tlod-alt-down" title="Decrease altitude (-100 ft)">
                                         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                             <polyline points="15.5 5 8.5 12 15.5 19"></polyline>
@@ -353,8 +354,8 @@
                                     </button>
                                     <span class="param-unit">ft AGL</span>
                                 </div>
-                                <div class="lod-param" title="Cruise LOD at or above transition altitude">
-                                    <span class="param-lbl">Cruise :</span>
+                                <div class="lod-param" id="tlod-cruise-param" title="Cruise LOD at or above transition altitude">
+                                    <span class="param-lbl" id="tlod-cruise-lbl">Cruise :</span>
                                     <span id="tlod-cruise-val" class="param-val">200</span>
                                 </div>
                             </div>
@@ -382,12 +383,12 @@
                                 </span>
                             </div>
                             <div class="lod-values-group">
-                                <div class="lod-param" title="Floor LOD below transition altitude">
-                                    <span class="param-lbl">Floor :</span>
+                                <div class="lod-param" id="olod-floor-param" title="Floor LOD below transition altitude">
+                                    <span class="param-lbl" id="olod-floor-lbl">Floor :</span>
                                     <span id="olod-floor-val" class="param-val">100</span>
                                 </div>
-                                <div class="lod-param alt-param" title="Transition altitude in feet AGL">
-                                    <span class="param-lbl">Alt :</span>
+                                <div class="lod-param alt-param" id="olod-alt-param" title="Transition altitude in feet AGL">
+                                    <span class="param-lbl" id="olod-alt-lbl">Alt :</span>
                                     <button type="button" class="alt-chevron-btn" id="olod-alt-down" title="Decrease altitude (-100 ft)">
                                         <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
                                             <polyline points="15.5 5 8.5 12 15.5 19"></polyline>
@@ -401,8 +402,8 @@
                                     </button>
                                     <span class="param-unit">ft AGL</span>
                                 </div>
-                                <div class="lod-param" title="Cruise LOD at or above transition altitude">
-                                    <span class="param-lbl">Cruise :</span>
+                                <div class="lod-param" id="olod-cruise-param" title="Cruise LOD at or above transition altitude">
+                                    <span class="param-lbl" id="olod-cruise-lbl">Cruise :</span>
                                     <span id="olod-cruise-val" class="param-val">200</span>
                                 </div>
                             </div>
@@ -422,7 +423,7 @@
                         <!-- AUTO CLOUD RECOVERY BAR -->
                         <div class="cloud-recovery-bar" id="cloud-recovery-bar" title="Dynamically steps volumetric clouds down under heavy GPU strain or boosts up to Ultra when headroom allows">
                             <div class="cloud-recovery-left">
-                                <span class="cloud-recovery-title">AUTO CLOUD RECOVERY</span>
+                                <span class="cloud-recovery-title" id="cloud-recovery-title">AUTO CLOUD RECOVERY</span>
                                 <span class="lod-live-tag" id="cloud-recovery-live-pill">LIVE : <span id="cloud-recovery-live-val" class="live-num">HIGH</span></span>
                             </div>
                             <button type="button" id="cloud-recovery-toggle-btn" class="switch-btn switch-on" role="switch" aria-checked="true" onclick="window.onCloudRecoveryClick && window.onCloudRecoveryClick(event)">
@@ -436,12 +437,12 @@
                 <!-- SECTION 2: PERFORMANCE -->
                 <div class="panel-section">
                     <div class="section-header">
-                        <span class="section-title">PERFORMANCE MONITORING</span>
+                        <span class="section-title" id="sec-title-perf">PERFORMANCE MONITORING</span>
                         <span id="live-pacing-status" class="badge-tag badge-optimal">OPTIMAL</span>
                     </div>
                     <div class="perf-row">
-                        <div class="perf-metric">
-                            <span class="metric-label">DISPLAYED FPS</span>
+                        <div class="perf-metric" id="perf-metric-fps">
+                            <span class="metric-label" id="lbl-displayed-fps">DISPLAYED FPS</span>
                             <div class="fps-line">
                                 <span id="live-fps-val" class="metric-number fps-val">--</span>
                                 <span class="fps-sep">/</span>
@@ -450,8 +451,8 @@
                                 <span class="metric-unit">FPS</span>
                             </div>
                         </div>
-                        <div class="perf-metric">
-                            <span class="metric-label">CPU MAIN THREAD</span>
+                        <div class="perf-metric" id="perf-metric-mt">
+                            <span class="metric-label" id="lbl-cpu-mt">CPU MAIN THREAD</span>
                             <div class="mt-line">
                                 <span id="live-mt-val" class="metric-number mt-val">--</span>
                                 <span class="metric-unit">ms</span>
@@ -461,7 +462,7 @@
 
                     <!-- SYSTEM METRICS (GPU, CPU, VRAM, CACHE) -->
                     <div class="metrics-grid">
-                        <div class="metric-compact">
+                        <div class="metric-compact" id="metric-card-gpu">
                             <span class="compact-label">GPU</span>
                             <div class="compact-val-wrap">
                                 <span id="live-gpu-val" class="compact-val">--</span>
@@ -470,7 +471,7 @@
                                 <span class="compact-subval"><span id="live-gpu-temp">--</span><span class="temp-unit"><span class="deg-ring"></span>C</span></span>
                             </div>
                         </div>
-                        <div class="metric-compact">
+                        <div class="metric-compact" id="metric-card-cpu">
                             <span class="compact-label">CPU</span>
                             <div class="compact-val-wrap">
                                 <span id="live-cpu-val" class="compact-val">--</span>
@@ -479,15 +480,15 @@
                                 <span class="compact-subval"><span id="live-cpu-temp">--</span><span class="temp-unit"><span class="deg-ring"></span>C</span></span>
                             </div>
                         </div>
-                        <div class="metric-compact">
+                        <div class="metric-compact" id="metric-card-vram">
                             <span class="compact-label">VRAM</span>
                             <div class="compact-val-wrap">
                                 <span id="live-vram-val" class="compact-val">--</span>
                                 <span class="compact-unit">GB</span>
                             </div>
                         </div>
-                        <div class="metric-compact">
-                            <span class="compact-label">CACHE</span>
+                        <div class="metric-compact" id="metric-card-cache">
+                            <span class="compact-label" id="lbl-metric-cache">CACHE</span>
                             <div class="compact-val-wrap">
                                 <span id="live-cache-val" class="compact-val">--</span>
                                 <span class="compact-unit">GB</span>
@@ -496,9 +497,9 @@
                     </div>
 
                     <!-- Sparkline Trend Graph -->
-                    <div class="sparkline-box">
+                    <div class="sparkline-box" id="sparkline-box">
                         <div class="sparkline-top">
-                            <span class="sparkline-title">30S TREND</span>
+                            <span class="sparkline-title" id="lbl-sparkline-trend">30S TREND</span>
                             <span id="fps-delta-label" class="delta-label delta-neutral">STANDBY</span>
                         </div>
                         <canvas id="fps-sparkline-canvas" class="sparkline-canvas" width="340" height="28"></canvas>
@@ -512,6 +513,7 @@
                     </button>
                 </div>
             </div>
+            <div id="scx-custom-tooltip" class="scx-custom-tooltip hidden"></div>
         </ingame-ui>
     </ingamepanel-sceneryx>
 </body>

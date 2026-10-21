@@ -123,7 +123,7 @@ PROTECTED_SYSTEM_KEYWORDS = [
     'instruments', 'navdata', 'fs-base', 'freeflight', 'mission',
     'tutorial', 'discovery', 'point-of-interest', 'simobjects',
     'passiveaircraft', 'ships', 'animals', 'vehicles', 'pgg',
-    'autofps', 'beyondatc', 'toolbar', 'simbridge', 'sayintentions',
+    'sceneryx', 'sceneryx-ingame-panel', 'wildbill75-sceneryx', 'autofps', 'beyondatc', 'toolbar', 'simbridge', 'sayintentions',
     'chaseplane', 'p42-util', 'aircraft', 'livery', 'liveries', 'fleet',
     'gsx', 'mobiflight', 'fsuipc', 'fslabs', 'fsrealistic', 'raas',
     'wwtwasm', 'traffic', 'simbrief', 'fsipanel', 'gaist', 'asfs', 'navigraph',
@@ -437,7 +437,7 @@ def sanitize_msfs_content_xml():
                     changed = True
                     continue
 
-                if re.search(r'[-_\s.](copy|copie|backup|bak)(\b|\d*)', name.lower()):
+                if re.search(r'[-_\s.](copy|copie|backup|bak)(\b|\d*)', name.lower()) and elem.get('active') != 'UserDisabled':
                     tree.remove(elem)
                     changed = True
                     continue
@@ -584,14 +584,15 @@ def set_package_state_for_icao(p_path, target_icao, should_enable):
 
     clean_p = p_path[:-9] if p_path.endswith('.disabled') else p_path
     dis_p = clean_p + '.disabled'
-    target_dir = clean_p if (os.path.exists(clean_p) or os.path.islink(clean_p) or (hasattr(os.path, 'isjunction') and os.path.isjunction(clean_p))) else (dis_p if (os.path.exists(dis_p) or os.path.islink(dis_p)) else None)
+    target_dir = clean_p if (os.path.exists(clean_p) or os.path.islink(clean_p) or (hasattr(os.path, 'isjunction') and os.path.isjunction(clean_p))) else (dis_p if (os.path.exists(dis_p) or os.path.islink(dis_p) or (hasattr(os.path, 'isjunction') and os.path.isjunction(dis_p))) else None)
     if not target_dir:
         return
 
-    # Official / Streamed packages must NEVER be renamed physically on disk (managed via Content.xml)
+    # Streamed / Asobo / Microsoft base packages must NEVER be renamed physically on disk (managed via Content.xml)
     td_lower = target_dir.lower()
-    if any(k in td_lower for k in ['official', 'streamed', 'asobo-', 'microsoft-']):
-        if should_enable and dis_p and (os.path.exists(dis_p) or os.path.islink(dis_p)):
+    fn_base_lower = os.path.basename(clean_p).lower()
+    if 'streamed' in td_lower or fn_base_lower.startswith(('asobo-', 'microsoft-', 'fs20-asobo-', 'fs24-asobo-', 'fs20-microsoft-', 'fs24-microsoft-', 'fs-base')):
+        if should_enable and dis_p and (os.path.exists(dis_p) or os.path.islink(dis_p) or (hasattr(os.path, 'isjunction') and os.path.isjunction(dis_p))):
             enable_physical_package(dis_p)
         return
 
@@ -883,7 +884,9 @@ def fast_update_airport_cache(icao_target, target_pkg_name=None, toggle_all=Fals
                 fn = s.get('folder_name', '')
                 s['folder_name'] = fn[:-9] if fn.lower().endswith('.disabled') else fn
         elif target_pkg_name:
-            t_clean = target_pkg_name[:-9] if target_pkg_name.lower().endswith('.disabled') else target_pkg_name
+            t_raw_clean = target_pkg_name[:-9] if target_pkg_name.lower().endswith('.disabled') else target_pkg_name
+            t_is_path = ('\\' in t_raw_clean or '/' in t_raw_clean)
+            t_clean = os.path.basename(t_raw_clean) if t_is_path else t_raw_clean
             t_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', t_clean.lower())
             for s in all_srcs:
                 if s.get('is_fix_patch') or s.get('is_addon'):
@@ -896,11 +899,14 @@ def fast_update_airport_cache(icao_target, target_pkg_name=None, toggle_all=Fals
                 clean_p = p[:-9] if p and p.endswith('.disabled') else p
                 dis_p = clean_p + '.disabled' if clean_p else None
 
-                is_match = (
-                    fn_clean.lower() == t_clean.lower() 
-                    or fn_norm == t_norm 
-                    or (s.get('is_asobo_official') and ('asobo' in t_clean.lower() or 'microsoft' in t_clean.lower()))
-                )
+                if t_is_path and clean_p:
+                    is_match = (os.path.normcase(os.path.abspath(clean_p)) == os.path.normcase(os.path.abspath(t_raw_clean)))
+                else:
+                    is_match = (
+                        fn_clean.lower() == t_clean.lower() 
+                        or fn_norm == t_norm 
+                        or (s.get('is_asobo_official') and ('asobo' in t_clean.lower() or 'microsoft' in t_clean.lower()))
+                    )
 
                 if is_match:
                     s['is_disabled'] = False
@@ -914,7 +920,7 @@ def fast_update_airport_cache(icao_target, target_pkg_name=None, toggle_all=Fals
                                         safe_rename_path(old_b, old_b[:-9])
                 else:
                     s['is_disabled'] = True
-                    if dis_p and os.path.exists(dis_p):
+                    if dis_p and (os.path.exists(dis_p) or os.path.islink(dis_p) or (hasattr(os.path, 'isjunction') and os.path.isjunction(dis_p))):
                         s['package_path'] = dis_p
         elif fix_path_toggled is not None:
             clean_fix_path = fix_path_toggled[:-9] if fix_path_toggled.lower().endswith('.disabled') else fix_path_toggled
@@ -1182,15 +1188,39 @@ class Api:
             if not all_paths:
                 return
             base_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
-            src_dir = os.path.join(base_dir, "wildbill75-sceneryx")
+            src_dir = os.path.join(base_dir, "sceneryx-ingame-panel")
             if not os.path.exists(src_dir):
-                src_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wildbill75-sceneryx")
+                src_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sceneryx-ingame-panel")
             if not os.path.exists(src_dir):
                 return
+            migrated_or_updated = False
             for c_path in all_paths:
-                target_dir = os.path.join(c_path, "wildbill75-sceneryx")
-                if os.path.exists(os.path.join(target_dir, "manifest.json")):
+                legacy_dir = os.path.join(c_path, "wildbill75-sceneryx")
+                target_dir = os.path.join(c_path, "sceneryx-ingame-panel")
+                had_legacy = os.path.exists(legacy_dir)
+                if had_legacy:
+                    try:
+                        shutil.rmtree(legacy_dir)
+                    except Exception:
+                        pass
+                if had_legacy or os.path.exists(os.path.join(target_dir, "manifest.json")):
                     shutil.copytree(src_dir, target_dir, dirs_exist_ok=True)
+                    migrated_or_updated = True
+            if migrated_or_updated:
+                for p in get_content_xml_paths():
+                    if os.path.exists(p):
+                        try:
+                            with open(p, "r", encoding="utf-8") as f:
+                                cxml = f.read()
+                            cxml_new = re.sub(r'\s*<Package name="[^"]*wildbill75-sceneryx"[^>]*/>', '', cxml)
+                            for pk in ["communityfs20-sceneryx-ingame-panel", "communityfs24-sceneryx-ingame-panel"]:
+                                if f'<Package name="{pk}"' not in cxml_new and '</Packages>' in cxml_new:
+                                    cxml_new = cxml_new.replace('</Packages>', f'\t<Package name="{pk}" active="Activated" />\n</Packages>')
+                            if cxml_new != cxml:
+                                with open(p, "w", encoding="utf-8") as f:
+                                    f.write(cxml_new)
+                        except Exception:
+                            pass
         except Exception:
             pass
 
@@ -1317,9 +1347,11 @@ class Api:
             except Exception:
                 pass
 
+        global AIRPORTS_CACHE
         auto_scan = settings.get("auto_scan_on_startup", True)
         if auto_scan:
             airports = run_scan()
+            AIRPORTS_CACHE = airports
             self._startup_delta = compute_scan_delta(airports, update_snapshot=True)
             self._startup_scanned = True
             if os.path.exists(OUTPUT_JSON_PATH):
@@ -1342,6 +1374,7 @@ class Api:
                 print("Error reading cached installed_airports.json, performing fresh scan:", e)
 
         airports = run_scan()
+        AIRPORTS_CACHE = airports
         self._startup_delta = compute_scan_delta(airports, update_snapshot=True)
         self._startup_scanned = True
         if os.path.exists(OUTPUT_JSON_PATH):
@@ -1434,7 +1467,9 @@ class Api:
             return json.dumps(None)
 
     def rescan(self):
+        global AIRPORTS_CACHE
         airports = run_scan()
+        AIRPORTS_CACHE = airports
         delta = compute_scan_delta(airports, update_snapshot=True)
         self._startup_delta = delta
         return json.dumps({"airports": airports, "delta": delta}, separators=(',', ':'), ensure_ascii=False)
@@ -1660,16 +1695,50 @@ class Api:
             os._exit(0)
             return json.dumps({"status": "error", "message": str(e)})
 
+    def set_app_language(self, lang):
+        try:
+            norm = "fr" if str(lang or "").strip().lower().startswith("fr") else "en"
+            st = get_settings()
+            st["language"] = norm
+            updated = save_settings(st)
+            try:
+                import flight_remote_server
+                flight_remote_server.set_remote_panel_language(norm)
+            except Exception:
+                pass
+            if hasattr(self, '_tray_icon') and self._tray_icon:
+                try:
+                    import pystray
+                    show_lbl = 'Afficher SceneryX' if norm == 'fr' else 'Show SceneryX'
+                    quit_lbl = 'Quitter' if norm == 'fr' else 'Quit'
+                    self._tray_icon.menu = pystray.Menu(
+                        pystray.MenuItem(show_lbl, getattr(self, '_on_tray_show', lambda: None), default=True),
+                        pystray.MenuItem(quit_lbl, getattr(self, '_on_tray_quit', lambda: None))
+                    )
+                except Exception:
+                    pass
+            return json.dumps({"status": "ok", "language": norm, "settings": updated}, ensure_ascii=False)
+        except Exception as e:
+            return json.dumps({"status": "error", "message": str(e)})
+
     def save_settings(self, settings_json):
         try:
             data = json.loads(settings_json)
             updated = save_settings(data)
+            norm = "fr" if str(updated.get("language", "en")).strip().lower().startswith("fr") else "en"
+            try:
+                import flight_remote_server
+                flight_remote_server.set_remote_panel_language(norm)
+            except Exception:
+                pass
             if hasattr(self, '_tray_icon') and self._tray_icon:
                 try:
                     import pystray
+                    show_lbl = 'Afficher SceneryX' if norm == 'fr' else 'Show SceneryX'
+                    quit_lbl = 'Quitter' if norm == 'fr' else 'Quit'
                     self._tray_icon.menu = pystray.Menu(
-                        pystray.MenuItem('Show SceneryX', getattr(self, '_on_tray_show', lambda: None), default=True),
-                        pystray.MenuItem('Quit', getattr(self, '_on_tray_quit', lambda: None))
+                        pystray.MenuItem(show_lbl, getattr(self, '_on_tray_show', lambda: None), default=True),
+                        pystray.MenuItem(quit_lbl, getattr(self, '_on_tray_quit', lambda: None))
                     )
                 except Exception as ex:
                     print(f"[Tray] Dynamic language update error: {ex}")
@@ -1941,7 +2010,9 @@ class Api:
 
             target_xml_paths = get_existing_content_xml_paths()
 
-            target_clean = target_folder_name[:-9] if target_folder_name.lower().endswith('.disabled') else target_folder_name
+            target_raw_clean = target_folder_name[:-9] if target_folder_name.lower().endswith('.disabled') else target_folder_name
+            target_is_path = ('\\' in target_raw_clean or '/' in target_raw_clean)
+            target_clean = os.path.basename(target_raw_clean) if target_is_path else target_raw_clean
             target_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', target_clean.lower())
 
             global AIRPORTS_CACHE
@@ -1986,7 +2057,7 @@ class Api:
                         if is_core_or_library_package(clean):
                             continue
 
-                        if clean_lower in seen or re.search(r'[-_\s.](copy|copie|backup|bak)(\b|\d*)', clean_lower):
+                        if clean_lower in seen:
                             to_remove.append(p)
                             changed = True
                             continue
@@ -2046,20 +2117,26 @@ class Api:
                         continue
                     fn = src.get('folder_name', '')
                     pkg_p = src.get('package_path', '')
+                    clean_pkg_p = pkg_p[:-9] if pkg_p and pkg_p.lower().endswith('.disabled') else pkg_p
                     fn_clean = fn[:-9] if fn.lower().endswith('.disabled') else fn
                     fn_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn_clean.lower())
 
-                    is_target = (target_clean != 'DEFAULT') and (
-                        fn_clean.lower() == target_clean.lower() 
-                        or fn_norm == target_norm
-                        or (src.get('is_asobo_official') and ('asobo' in target_clean.lower() or 'microsoft' in target_clean.lower()))
-                    )
+                    if target_clean == 'DEFAULT':
+                        is_target = False
+                    elif target_is_path and clean_pkg_p:
+                        is_target = (os.path.normcase(os.path.abspath(clean_pkg_p)) == os.path.normcase(os.path.abspath(target_raw_clean)))
+                    else:
+                        is_target = (
+                            fn_clean.lower() == target_clean.lower() 
+                            or fn_norm == target_norm
+                            or (src.get('is_asobo_official') and ('asobo' in target_clean.lower() or 'microsoft' in target_clean.lower()))
+                        )
                     if is_target:
                         set_package_state_for_icao(pkg_p, icao, should_enable=True)
                     else:
                         set_package_state_for_icao(pkg_p, icao, should_enable=False)
 
-            airports = fast_update_airport_cache(icao, target_pkg_name=target_clean)
+            airports = fast_update_airport_cache(icao, target_pkg_name=(target_raw_clean if target_clean != 'DEFAULT' else 'DEFAULT'))
             target_ap = next((a for a in airports if a['icao'].upper() == icao.upper()), None)
             return json.dumps({"status": "ok", "updated_airport": target_ap}, ensure_ascii=False)
         except Exception as e:
@@ -2078,10 +2155,14 @@ class Api:
                     fixes_dict = {}
 
             target_xml_paths = get_existing_content_xml_paths()
+            target_raw_clean = ""
+            target_is_path = False
             target_clean = ""
             target_norm = ""
             if target_folder_name:
-                target_clean = target_folder_name[:-9] if target_folder_name.lower().endswith('.disabled') else target_folder_name
+                target_raw_clean = target_folder_name[:-9] if target_folder_name.lower().endswith('.disabled') else target_folder_name
+                target_is_path = ('\\' in target_raw_clean or '/' in target_raw_clean)
+                target_clean = os.path.basename(target_raw_clean) if target_is_path else target_raw_clean
                 target_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', target_clean.lower())
 
             global AIRPORTS_CACHE
@@ -2196,14 +2277,20 @@ class Api:
                         continue
                     fn = src.get('folder_name', '')
                     pkg_p = src.get('package_path', '')
+                    clean_pkg_p = pkg_p[:-9] if pkg_p and pkg_p.lower().endswith('.disabled') else pkg_p
                     fn_clean = fn[:-9] if fn.lower().endswith('.disabled') else fn
                     fn_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn_clean.lower())
 
-                    is_target = (target_clean != 'DEFAULT') and (
-                        fn_clean.lower() == target_clean.lower() 
-                        or fn_norm == target_norm
-                        or (src.get('is_asobo_official') and ('asobo' in target_clean.lower() or 'microsoft' in target_clean.lower()))
-                    )
+                    if target_clean == 'DEFAULT':
+                        is_target = False
+                    elif target_is_path and clean_pkg_p:
+                        is_target = (os.path.normcase(os.path.abspath(clean_pkg_p)) == os.path.normcase(os.path.abspath(target_raw_clean)))
+                    else:
+                        is_target = (
+                            fn_clean.lower() == target_clean.lower() 
+                            or fn_norm == target_norm
+                            or (src.get('is_asobo_official') and ('asobo' in target_clean.lower() or 'microsoft' in target_clean.lower()))
+                        )
                     if is_target:
                         set_package_state_for_icao(pkg_p, icao, should_enable=True)
                     else:
@@ -2225,7 +2312,7 @@ class Api:
                             break
 
             # 4. Update cache
-            airports = fast_update_airport_cache(icao, target_pkg_name=(target_clean if target_clean else None))
+            airports = fast_update_airport_cache(icao, target_pkg_name=(target_raw_clean if target_clean else None))
             target_ap = next((a for a in airports if a['icao'].upper() == icao.upper()), None)
 
             # 5. Synchronize fix states in target_ap
@@ -4761,11 +4848,50 @@ class Api:
         "- **Instant Matrix Refresh on Profile Switch:** Selecting a profile from the dropdown immediately loads and renders that profile's exact saved configuration in the Graphics Settings matrix and applies it to `UserCfg.opt`."
     )
 
+    _PATCH_1_1_6_CHANGELOG_BODY = (
+        "**Release Date:** October 21, 2026\n"
+        "**Channel:** `Updates/patches`\n\n"
+        "## What's New & Fixed (Includes v1.1.5 & v1.1.6)\n\n"
+        "### 1. MSFS 2020/2024 In-Game Panel (`sceneryx-ingame-panel`)\n"
+        "- **Dynamic Auto-Height Window:** The MSFS In-Game Panel now automatically wraps its vertical height to match its content in real time (when expanding/collapsing the Live Graphics drawer or switching between Offline/Online states) while remaining horizontally resizable.\n"
+        "- **Full EN/FR Localization & Contextual Tooltips:** Added full English and French localization synchronized with SceneryX, plus resilient hover tooltips across all Live Graphics controls, Smart LOD sliders, Cloud Recovery, and Performance metrics.\n"
+        "- **Clean Package Naming & Auto-Refresh:** Standardized the Community package folder name to `sceneryx-ingame-panel` (automatically migrating legacy panel folders on startup) and preserved the `SCENERY X` panel header.\n\n"
+        "### 2. Smart LOD Governor & Live Memory Engine\n"
+        "- **MSFS 2024 Live Memory Offset & Signature Scanner:** Updated the Win32 Memory Engine base offset (`0x0A80B024`) for the latest `FlightSimulator2024.exe` build and added an automatic `.data` signature scanner so live `TLOD`, `OLOD`, `Clouds`, and hot-swappable graphics writes attach reliably in Read/Write mode.\n"
+        "- **Persistent Manual Mode (`MAN`) Disengagement:** Fixed an issue in both the MSFS In-Game Panel and the SceneryX Smart LOD window where disabling Smart LOD (`OFF`) or dragging the `TLOD` / `OLOD` sliders manually caused Smart LOD to snap back to `ON` after ~2 seconds.\n\n"
+        "### 3. Custom Graphics Profiles & Scenery / GSX Conflict Scanner\n"
+        "- **Independent Profile Saving & Switching:** Modifying individual settings in the Graphics Settings matrix no longer overwrites the active `.profile.json` file before clicking `SAVE PROFILE`, and switching profiles immediately refreshes the matrix and `UserCfg.opt`.\n"
+        "- **Duplicate Scenery & GSX Detection Fix:** Restored full multi-layer duplicate airport detection across `Community`, `Official`, `StreamedPackages`, and Addon Linker folders, as well as GSX profile conflict scanning during package rescans."
+    )
+
+    _PATCH_1_1_6_CHANGELOG_BODY_FR = (
+        "**Date de publication :** 21 Octobre 2026\n"
+        "**Canal :** `Updates/patches`\n\n"
+        "## Nouveautés et Corrections (Inclut v1.1.5 & v1.1.6)\n\n"
+        "### 1. Panneau en jeu MSFS 2020/2024 (`sceneryx-ingame-panel`)\n"
+        "- **Ajustement automatique de la hauteur :** Le panneau en jeu MSFS adapte désormais automatiquement sa hauteur verticale à son contenu en temps réel (ouverture/fermeture du tiroir Live Graphics, passage Hors-ligne / En ligne) tout en restant redimensionnable en largeur.\n"
+        "- **Traduction complète EN/FR & Info-bulles contextuelles :** Ajout de la localisation complète en français et en anglais synchronisée avec SceneryX, ainsi que d'info-bulles contextuelles sur l'ensemble des réglages Live Graphics, curseurs Smart LOD, Auto Cloud Recovery et jauges de performance.\n"
+        "- **Nommage unifié & Mise à jour auto :** Le package Community se nomme désormais `sceneryx-ingame-panel` (avec migration automatique de l'ancien dossier au démarrage) tout en conservant le titre `SCENERY X` dans l'en-tête.\n\n"
+        "### 2. Régulation Smart LOD & Moteur Mémoire Temps Réel\n"
+        "- **Offset mémoire MSFS 2024 & Scanner de signature :** Mise à jour de l'offset mémoire (`0x0A80B024`) pour la dernière version de `FlightSimulator2024.exe` avec scanner automatique de signature `.data` assurant l'écriture en direct (`TLOD`, `OLOD`, `Nuages` et réglages graphiques).\n"
+        "- **Maintien du mode Manuel (`MAN`) :** Correction d'un bug dans le panneau en jeu et la fenêtre Smart LOD où la désactivation du Smart LOD (`OFF`) ou le déplacement manuel des curseurs `TLOD` / `OLOD` réactivait le mode `ON` au bout de 2 secondes.\n\n"
+        "### 3. Profils Graphiques & Détection des doublons Scènes / GSX\n"
+        "- **Sauvegarde et bascule de profils indépendantes :** Modifier un réglage dans la matrice graphique n'écrase plus le fichier `.profile.json` actif avant d'avoir cliqué sur `SAUVEGARDER LE PROFIL`, et le changement de profil met immédiatement à jour la matrice et `UserCfg.opt`.\n"
+        "- **Détection des doublons Scènes & GSX :** Restauration complète de la détection des doublons d'aéroports multi-dossiers (`Community`, `Official`, `StreamedPackages`, Addon Linker) et des conflits de profils GSX lors du Re-scan Packages."
+    )
+
     DEFAULT_PATCH_CHANGELOGS = {
-        "PRO_1.1.1": "# SceneryX â€” Patch PRO_1.1.1 (Day-One Update)\n\n" + _PATCH_1_1_1_CHANGELOG_BODY,
-        "PRO_1.1.2": "# SceneryX â€” Patch PRO_1.1.2\n\n" + _PATCH_1_1_2_CHANGELOG_BODY,
-        "PRO_1.1.3": "# SceneryX â€” Patch PRO_1.1.3\n\n" + _PATCH_1_1_3_CHANGELOG_BODY,
-        "PRO_1.1.4": "# SceneryX â€” Patch PRO_1.1.4\n\n" + _PATCH_1_1_4_CHANGELOG_BODY,
+        "PRO_1.1.1": "# SceneryX — Patch PRO_1.1.1 (Day-One Update)\n\n" + _PATCH_1_1_1_CHANGELOG_BODY,
+        "PRO_1.1.2": "# SceneryX — Patch PRO_1.1.2\n\n" + _PATCH_1_1_2_CHANGELOG_BODY,
+        "PRO_1.1.3": "# SceneryX — Patch PRO_1.1.3\n\n" + _PATCH_1_1_3_CHANGELOG_BODY,
+        "PRO_1.1.4": "# SceneryX — Patch PRO_1.1.4\n\n" + _PATCH_1_1_4_CHANGELOG_BODY,
+        "PRO_1.1.5": "# SceneryX — Patch PRO_1.1.5\n\n" + _PATCH_1_1_4_CHANGELOG_BODY,
+        "PRO_1.1.6": "# SceneryX — Patch PRO_1.1.6\n\n" + _PATCH_1_1_6_CHANGELOG_BODY,
+    }
+
+    DEFAULT_PATCH_CHANGELOGS_FR = {
+        "PRO_1.1.5": "# SceneryX — Patch PRO_1.1.5\n\n" + _PATCH_1_1_6_CHANGELOG_BODY_FR,
+        "PRO_1.1.6": "# SceneryX — Patch PRO_1.1.6\n\n" + _PATCH_1_1_6_CHANGELOG_BODY_FR,
     }
 
     def _fetch_remote_text(self, url, timeout=3.5):
@@ -4783,23 +4909,40 @@ class Api:
             pass
         return None
 
-    def _get_patch_changelog_markdown(self, version_tag, readme_url=None):
+    def _get_patch_changelog_markdown(self, version_tag, readme_url=None, lang=None):
         if not version_tag:
             return ""
         norm_tag = self._normalize_version_tag(version_tag)
+        if not lang:
+            try:
+                lang = str(get_settings().get("language", "en")).strip().lower()
+            except Exception:
+                lang = "en"
+        is_fr = str(lang).startswith("fr")
+
+        if is_fr and norm_tag in self.DEFAULT_PATCH_CHANGELOGS_FR:
+            return self.DEFAULT_PATCH_CHANGELOGS_FR[norm_tag]
+
         # Strictly fetch version-specific README.md from the Git Updates/patches branch
         urls_to_try = []
+        if is_fr:
+            urls_to_try.append(f"{self.PATCHES_REPO_RAW_BASE}/patches/{norm_tag}/README_FR.md")
         if readme_url and f"/{norm_tag}/" in readme_url:
             urls_to_try.append(readme_url)
         urls_to_try.append(f"{self.PATCHES_REPO_RAW_BASE}/patches/{norm_tag}/README.md")
         for u in urls_to_try:
             txt = self._fetch_remote_text(u, timeout=4.0)
-            if txt and len(txt.strip()) > 20 and "img.shields.io" not in txt and ("Patch" in txt or "What's New" in txt or norm_tag in txt):
+            if txt and len(txt.strip()) > 20 and "img.shields.io" not in txt and ("Patch" in txt or "What's New" in txt or "Nouveautés" in txt or norm_tag in txt):
                 return re.sub(r'\bRC_v?', 'PRO_', txt.strip())
 
+        if is_fr:
+            return self.DEFAULT_PATCH_CHANGELOGS_FR.get(
+                norm_tag,
+                f"# SceneryX — Patch {norm_tag}\n\nLe patch **{norm_tag}** a été installé avec succès.\nTous vos paramètres utilisateur, profils personnalisés et configurations de scènes ont été préservés."
+            )
         return self.DEFAULT_PATCH_CHANGELOGS.get(
             norm_tag,
-            f"# SceneryX â€” Patch {norm_tag}\n\nPatch **{norm_tag}** has been successfully installed.\nAll your user settings, custom profiles, and scenery configurations have been preserved."
+            f"# SceneryX — Patch {norm_tag}\n\nPatch **{norm_tag}** has been successfully installed.\nAll your user settings, custom profiles, and scenery configurations have been preserved."
         )
 
     def check_available_patch(self):
@@ -4830,7 +4973,9 @@ class Api:
                             "installer_path": "",
                             "download_url": download_url,
                             "readme_url": readme_url,
-                            "changelog_md": changelog_md
+                            "changelog_md": changelog_md,
+                            "changelog_md_en": self._get_patch_changelog_markdown(best_ver, readme_url=readme_url, lang="en"),
+                            "changelog_md_fr": self._get_patch_changelog_markdown(best_ver, readme_url=readme_url, lang="fr")
                         }, ensure_ascii=False)
                 except Exception:
                     pass
@@ -4997,7 +5142,9 @@ class Api:
             return json.dumps({
                 "has_changelog": True,
                 "version": current_ver,
-                "changelog_md": changelog_md
+                "changelog_md": changelog_md,
+                "changelog_md_en": self._get_patch_changelog_markdown(current_ver, lang="en"),
+                "changelog_md_fr": self._get_patch_changelog_markdown(current_ver, lang="fr")
             }, ensure_ascii=False)
         except Exception as e:
             return json.dumps({"has_changelog": False, "error": str(e)}, ensure_ascii=False)
@@ -5566,7 +5713,10 @@ class Api:
             if not all_paths:
                 return json.dumps({"available": False, "installed": False, "message": "Community folder not detected."})
             primary = self._get_primary_community_path()
-            target_dir = os.path.join(primary, "wildbill75-sceneryx")
+            target_dir = os.path.join(primary, "sceneryx-ingame-panel")
+            legacy_dir = os.path.join(primary, "wildbill75-sceneryx")
+            if os.path.exists(os.path.join(legacy_dir, "manifest.json")) and not os.path.exists(os.path.join(target_dir, "manifest.json")):
+                self._auto_sync_installed_ingame_panel()
             installed = os.path.exists(os.path.join(target_dir, "manifest.json"))
             return json.dumps({
                 "available": True,
@@ -5586,21 +5736,21 @@ class Api:
             if not all_paths:
                 return json.dumps({"success": False, "message": "Community folder not detected."})
             
-            # Locate wildbill75-sceneryx source folder
+            # Locate sceneryx-ingame-panel source folder
             base_dir = getattr(sys, '_MEIPASS', os.path.dirname(os.path.abspath(__file__)))
-            src_dir = os.path.join(base_dir, "wildbill75-sceneryx")
+            src_dir = os.path.join(base_dir, "sceneryx-ingame-panel")
             if not os.path.exists(src_dir):
-                src_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wildbill75-sceneryx")
+                src_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sceneryx-ingame-panel")
             if not os.path.exists(src_dir):
-                src_dir = os.path.join(os.getcwd(), "wildbill75-sceneryx")
+                src_dir = os.path.join(os.getcwd(), "sceneryx-ingame-panel")
             
             if not os.path.exists(src_dir):
                 return json.dumps({"success": False, "message": f"Source folder not found: {src_dir}"})
             
-            targets = ["wildbill75-sceneryx"]
+            targets = ["sceneryx-ingame-panel"]
             for c_path in all_paths:
-                # Clean up legacy duplicate if present
-                old_legacy = os.path.join(c_path, "sceneryx-ingame-panel")
+                # Clean up legacy wildbill75-sceneryx folder if present
+                old_legacy = os.path.join(c_path, "wildbill75-sceneryx")
                 if os.path.exists(old_legacy):
                     try:
                         shutil.rmtree(old_legacy)
@@ -5610,26 +5760,23 @@ class Api:
                     target_dir = os.path.join(c_path, tname)
                     shutil.copytree(src_dir, target_dir, dirs_exist_ok=True)
 
-            # Ensure Content.xml activation
+            # Ensure Content.xml activation and clean legacy wildbill75-sceneryx
             for p in get_content_xml_paths():
                 if os.path.exists(p):
                     try:
                         with open(p, "r", encoding="utf-8") as f:
                             cxml = f.read()
+                        cxml_new = re.sub(r'\s*<Package name="[^"]*wildbill75-sceneryx"[^>]*/>', '', cxml)
                         needed = [
-                            "communityfs20-wildbill75-sceneryx",
-                            "communityfs24-wildbill75-sceneryx",
                             "communityfs20-sceneryx-ingame-panel",
                             "communityfs24-sceneryx-ingame-panel"
                         ]
-                        mod = False
                         for pk in needed:
-                            if f'<Package name="{pk}"' not in cxml and '</Packages>' in cxml:
-                                cxml = cxml.replace('</Packages>', f'\t<Package name="{pk}" active="Activated" />\n</Packages>')
-                                mod = True
-                        if mod:
+                            if f'<Package name="{pk}"' not in cxml_new and '</Packages>' in cxml_new:
+                                cxml_new = cxml_new.replace('</Packages>', f'\t<Package name="{pk}" active="Activated" />\n</Packages>')
+                        if cxml_new != cxml:
                             with open(p, "w", encoding="utf-8") as f:
-                                f.write(cxml)
+                                f.write(cxml_new)
                     except Exception:
                         pass
 
@@ -5800,8 +5947,9 @@ def main():
     if not IS_LITE:
         try:
             for c_path in api._get_all_community_paths():
-                target_panel_dir = os.path.join(c_path, "wildbill75-sceneryx")
-                if os.path.exists(os.path.join(target_panel_dir, "manifest.json")):
+                target_panel_dir = os.path.join(c_path, "sceneryx-ingame-panel")
+                legacy_panel_dir = os.path.join(c_path, "wildbill75-sceneryx")
+                if os.path.exists(os.path.join(target_panel_dir, "manifest.json")) or os.path.exists(os.path.join(legacy_panel_dir, "manifest.json")):
                     api.install_ingame_panel()
                     break
         except Exception as e:

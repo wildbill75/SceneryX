@@ -5,7 +5,7 @@ import re
 
 # Edition Configuration Flag (True = SceneryX Lite funnel edition, False = SceneryX Pro full edition)
 IS_LITE = False
-APP_VERSION = "LITE_1.1.5" if IS_LITE else "PRO_1.1.5"
+APP_VERSION = "LITE_1.1.6" if IS_LITE else "PRO_1.1.6"
 
 def get_resource_file_path(filename):
     if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
@@ -151,7 +151,7 @@ def sanitize_content_xml_files():
                     tree.remove(elem)
                     changed = True
                     continue
-                if re.search(r'[-_\s.(](copy|copie|backup|bak)(\b|\d*|\))', name.lower()):
+                if re.search(r'[-_\s.(](copy|copie|backup|bak)(\b|\d*|\))', name.lower()) and elem.get('active') != 'UserDisabled':
                     tree.remove(elem)
                     changed = True
                     continue
@@ -342,6 +342,7 @@ NON_AIRPORT_KEYWORDS = [
     'pmdg', 'a220', 'a320', 'a319', 'a321', 'a350', 'b737', 'b747', 'b777', 'b787', 'crj', 'blackbox', 'maddog', 'tfdi',
     'fleet', 'fleetpack', 'repaint', 'texturepack', 'soundpack',
     'fsdreamteam-gsx', 'gsx-pro', 'kt-gsx', 'papadelta-', 'navigraph', 'fsltl', 'airrace', 'redbull',
+    'sceneryx', 'sceneryx-ingame-panel', 'wildbill75-sceneryx',
     'landmarks', 'landmark', 'aerial', 'cityscape', 'photogrammetry', 'seasons', 'biomes',
     'vfr-landmarks', 'vfr_landmarks', 'vfr-city', 'poilocalisation', 'worldupdate', 'world-update',
     'north-america-mesh', 'europe-mesh', 'south-america-mesh', 'asia-mesh', 'africa-mesh', 'oceania-mesh',
@@ -1000,7 +1001,7 @@ def extract_icao_from_gsx_filename(filename, valid_icaos=None, file_path=None):
         'gsx', 'msfs', 'pro', 'vfr', 'pack', 'free', 'base', 'user', 'data',
         'mesh', 'true', 'full', 'lite', 'afcad', 'safe', 'vdgs', 'dock',
         'scot', 'flight', 'scenery', 'profile', 'addon', 'prep', 'test',
-        'ini', 'disabled'
+        'ini', 'disabled', 'copy', 'copie'
     }
     for t in tokens:
         if len(t) == 4 and t.isalpha() and t not in ignore_tokens:
@@ -1042,15 +1043,20 @@ def scan_gsx_profiles(gsx_dir):
         pass
 
     try:
-        ini_files = [f for f in os.listdir(gsx_dir) if f.endswith('.ini') and f.lower() != 'configuration.ini']
+        ini_files = sorted([f for f in os.listdir(gsx_dir) if f.lower().endswith('.ini') and f.lower() != 'configuration.ini'])
         for f in ini_files:
             fp = os.path.join(gsx_dir, f)
             icao = extract_icao_from_gsx_filename(f, valid_icaos=valid_db, file_path=fp)
             if icao:
-                gsx_map[icao] = {
-                    'filename': f,
-                    'path': fp
-                }
+                if icao not in gsx_map:
+                    gsx_map[icao] = {
+                        'filename': f,
+                        'path': fp,
+                        'all_filenames': [f]
+                    }
+                else:
+                    if f not in gsx_map[icao]['all_filenames']:
+                        gsx_map[icao]['all_filenames'].append(f)
     except Exception:
         pass
     return gsx_map
@@ -1565,17 +1571,23 @@ def bundle_gsx_files(file_entries):
         ini_fn = ini_e['filename']
         ini_clean = ini_fn[:-9] if ini_fn.lower().endswith('.disabled') else ini_fn
         ini_stem = os.path.splitext(ini_clean)[0].lower()
+        ini_is_copy = bool(re.search(r'[-_\s.(](copy|copie|backup|bak)(\b|\d*|\))', ini_stem))
         
         companions = []
         for py_e in py_entries:
             py_fn = py_e['filename']
+            if py_fn in paired_py_filenames:
+                continue
             py_clean = py_fn[:-9] if py_fn.lower().endswith('.disabled') else py_fn
             py_stem = os.path.splitext(py_clean)[0].lower()
+            py_is_copy = bool(re.search(r'[-_\s.(](copy|copie|backup|bak)(\b|\d*|\))', py_stem))
+            if ini_is_copy != py_is_copy:
+                continue
             if (py_stem == ini_stem or 
-                py_stem.startswith(ini_stem) or 
-                ini_stem.startswith(py_stem) or 
                 py_stem.replace('-', '_') == ini_stem.replace('-', '_') or
-                py_stem.replace('_', '-') == ini_stem.replace('_', '-')):
+                py_stem.replace('_', '-') == ini_stem.replace('_', '-') or
+                py_stem.startswith(ini_stem + '_') or
+                py_stem.startswith(ini_stem + '-')):
                 companions.append(py_fn)
                 paired_py_filenames.add(py_fn)
         
@@ -1591,7 +1603,13 @@ def bundle_gsx_files(file_entries):
                 continue
             py_clean = py_fn[:-9] if py_fn.lower().endswith('.disabled') else py_fn
             py_stem = os.path.splitext(py_clean)[0].lower()
-            companions = [other['filename'] for other in py_entries if other['filename'] != py_fn and other['filename'] not in paired_py_filenames and (py_stem in other['filename'].lower())]
+            companions = [
+                other['filename'] for other in py_entries
+                if other['filename'] != py_fn
+                and other['filename'] not in paired_py_filenames
+                and other['filename'].lower().endswith(('_handler.py', '_handler.py.disabled'))
+                and (py_stem in other['filename'].lower())
+            ]
             for c in companions:
                 paired_py_filenames.add(c)
             py_e['companion_files'] = companions
@@ -2020,9 +2038,10 @@ def audit_single_airport_gsx(icao, gsx_dir=None, ap=None, airports_db=None):
 
 def detect_system_language_and_currency():
     """
-    Detects user currency from installer registry or Windows UI language.
-    Language is strictly locked to 'en' for English-only release.
+    Detects user language ('en' or 'fr') and currency ('USD' or 'EUR')
+    from installer registry or Windows UI language.
     """
+    det_lang = "en"
     det_curr = "USD"
     # 1. Check registry key written during Inno Setup installation
     try:
@@ -2031,18 +2050,25 @@ def detect_system_language_and_currency():
             inst_lang, _ = winreg.QueryValueEx(k, "InstallerLanguage")
             if inst_lang:
                 inst_lang = str(inst_lang).lower()
-                if "french" in inst_lang or "german" in inst_lang or "spanish" in inst_lang:
+                if "french" in inst_lang or inst_lang == "fr":
+                    det_lang = "fr"
+                    det_curr = "EUR"
+                elif "german" in inst_lang or "spanish" in inst_lang:
                     det_curr = "EUR"
                 elif "english" in inst_lang or "en" in inst_lang:
+                    det_lang = "en"
                     det_curr = "USD"
     except Exception:
         pass
 
-    # 2. Check Windows UI language for currency fallback
+    # 2. Check Windows UI language for fallback
     try:
         import ctypes
         lang_id = ctypes.windll.kernel32.GetUserDefaultUILanguage() & 0x3FF
-        if lang_id in (12, 7, 10):  # French, German, Spanish
+        if lang_id == 12:  # French
+            det_lang = "fr"
+            det_curr = "EUR"
+        elif lang_id in (7, 10):  # German, Spanish
             det_curr = "EUR"
         elif lang_id == 9:  # English
             det_curr = "USD"
@@ -2054,67 +2080,149 @@ def detect_system_language_and_currency():
         import locale
         loc = locale.getdefaultlocale()[0] or ""
         loc_l = loc.lower()
-        if loc_l.startswith("fr") or loc_l.startswith("de") or loc_l.startswith("es"):
+        if loc_l.startswith("fr"):
+            det_lang = "fr"
+            det_curr = "EUR"
+        elif loc_l.startswith("de") or loc_l.startswith("es"):
             det_curr = "EUR"
     except Exception:
         pass
 
-    return "en", det_curr
+    return det_lang, det_curr
 
-def get_settings():
-    if os.path.exists(SETTINGS_JSON_PATH):
-        try:
-            with open(SETTINGS_JSON_PATH, 'r', encoding='utf-8') as f:
-                settings = json.load(f)
-                for item in settings.get("scan_paths", []):
-                    if not item.get("name"):
-                        sub = os.path.basename(item.get("path", ""))
-                        item["name"] = f"MSFS 2024 - {sub}"
-                if not settings.get("gsx_profile_path"):
-                    settings["gsx_profile_path"] = get_default_gsx_path()
-                if "navigation_style" not in settings:
-                    settings["navigation_style"] = "classic"
-                if "has_seen_onboarding" not in settings:
-                    settings["has_seen_onboarding"] = False
-                if "camera_airport_zoom" not in settings:
-                    settings["camera_airport_zoom"] = 8.0
-                if "camera_pan_duration" not in settings:
-                    settings["camera_pan_duration"] = 1.1
-                if "language" not in settings or "currency" not in settings:
-                    _, det_curr = detect_system_language_and_currency()
-                    if "currency" not in settings:
-                        settings["currency"] = det_curr
-                settings["language"] = "en"
-                settings["is_lite"] = IS_LITE
-                settings["app_version"] = APP_VERSION
-                return settings
-        except Exception:
-            pass
+import threading as _threading
+import copy as _copy
+import time as _time
 
-    default_paths = auto_detect_default_paths()
-    has_existing_db = os.path.exists(OUTPUT_JSON_PATH) and os.path.getsize(OUTPUT_JSON_PATH) > 1000
-    _, det_curr = detect_system_language_and_currency()
-    settings = {
-        "auto_scan_on_startup": True,
-        "scan_paths": default_paths,
-        "gsx_profile_path": get_default_gsx_path(),
-        "navigation_style": "classic",
-        "has_seen_onboarding": False,
-        "language": "en",
-        "currency": det_curr,
-        "camera_airport_zoom": 8.0,
-        "camera_pan_duration": 1.1,
-        "disclaimer_accepted": True if has_existing_db else False,
-        "is_lite": IS_LITE,
-        "app_version": APP_VERSION
-    }
-    save_settings(settings)
+_SETTINGS_LOCK = _threading.RLock()
+_LAST_VALID_SETTINGS = None
+
+def _normalize_loaded_settings(settings):
+    for item in settings.get("scan_paths", []):
+        if not item.get("name"):
+            sub = os.path.basename(item.get("path", ""))
+            item["name"] = f"MSFS 2024 - {sub}"
+    if not settings.get("gsx_profile_path"):
+        settings["gsx_profile_path"] = get_default_gsx_path()
+    if "navigation_style" not in settings:
+        settings["navigation_style"] = "classic"
+    if "has_seen_onboarding" not in settings:
+        settings["has_seen_onboarding"] = False
+    if "camera_airport_zoom" not in settings:
+        settings["camera_airport_zoom"] = 8.0
+    if "camera_pan_duration" not in settings:
+        settings["camera_pan_duration"] = 1.1
+    det_lang, det_curr = detect_system_language_and_currency()
+    if "currency" not in settings:
+        settings["currency"] = det_curr
+    if settings.get("language") not in ("en", "fr"):
+        settings["language"] = det_lang
+    settings["is_lite"] = IS_LITE
+    settings["app_version"] = APP_VERSION
     return settings
 
+def get_settings():
+    global _LAST_VALID_SETTINGS
+    with _SETTINGS_LOCK:
+        bak_path = SETTINGS_JSON_PATH + ".bak"
+        for candidate in (SETTINGS_JSON_PATH, bak_path):
+            if os.path.exists(candidate):
+                for _attempt in range(3):
+                    try:
+                        with open(candidate, 'r', encoding='utf-8') as f:
+                            raw = f.read().strip()
+                        if raw:
+                            settings = json.loads(raw)
+                            if isinstance(settings, dict):
+                                settings = _normalize_loaded_settings(settings)
+                                _LAST_VALID_SETTINGS = _copy.deepcopy(settings)
+                                return settings
+                    except Exception:
+                        _time.sleep(0.02)
+
+        # If settings.json exists on disk but had a transient read error, return last valid in-memory settings
+        # NEVER overwrite an existing settings.json file with factory defaults!
+        if _LAST_VALID_SETTINGS is not None:
+            return _copy.deepcopy(_LAST_VALID_SETTINGS)
+        if os.path.exists(SETTINGS_JSON_PATH) and os.path.getsize(SETTINGS_JSON_PATH) > 0:
+            det_lang, det_curr = detect_system_language_and_currency()
+            return {
+                "auto_scan_on_startup": True,
+                "scan_paths": auto_detect_default_paths(),
+                "gsx_profile_path": get_default_gsx_path(),
+                "navigation_style": "classic",
+                "has_seen_onboarding": True,
+                "language": det_lang,
+                "currency": det_curr,
+                "camera_airport_zoom": 8.0,
+                "camera_pan_duration": 1.1,
+                "disclaimer_accepted": True,
+                "is_lite": IS_LITE,
+                "app_version": APP_VERSION
+            }
+
+        default_paths = auto_detect_default_paths()
+        has_existing_db = os.path.exists(OUTPUT_JSON_PATH) and os.path.getsize(OUTPUT_JSON_PATH) > 1000
+        det_lang, det_curr = detect_system_language_and_currency()
+        settings = {
+            "auto_scan_on_startup": True,
+            "scan_paths": default_paths,
+            "gsx_profile_path": get_default_gsx_path(),
+            "navigation_style": "classic",
+            "has_seen_onboarding": False,
+            "language": det_lang,
+            "currency": det_curr,
+            "camera_airport_zoom": 8.0,
+            "camera_pan_duration": 1.1,
+            "disclaimer_accepted": True if has_existing_db else False,
+            "is_lite": IS_LITE,
+            "app_version": APP_VERSION
+        }
+        save_settings(settings)
+        return settings
+
 def save_settings(settings_data):
-    with open(SETTINGS_JSON_PATH, 'w', encoding='utf-8') as f:
-        json.dump(settings_data, f, indent=2, ensure_ascii=False)
-    return settings_data
+    global _LAST_VALID_SETTINGS
+    with _SETTINGS_LOCK:
+        merged = {}
+        if _LAST_VALID_SETTINGS and isinstance(_LAST_VALID_SETTINGS, dict):
+            merged.update(_copy.deepcopy(_LAST_VALID_SETTINGS))
+        elif os.path.exists(SETTINGS_JSON_PATH):
+            try:
+                with open(SETTINGS_JSON_PATH, 'r', encoding='utf-8') as f:
+                    on_disk = json.load(f)
+                if isinstance(on_disk, dict):
+                    merged.update(on_disk)
+            except Exception:
+                pass
+        if isinstance(settings_data, dict):
+            merged.update(settings_data)
+            for transient_key in ("pending_changelog_version", "ofxr_prev_max_frame_rate"):
+                if transient_key in merged and transient_key not in settings_data:
+                    merged.pop(transient_key, None)
+
+        _LAST_VALID_SETTINGS = _copy.deepcopy(merged)
+        tmp_path = SETTINGS_JSON_PATH + ".tmp"
+        bak_path = SETTINGS_JSON_PATH + ".bak"
+        try:
+            with open(tmp_path, 'w', encoding='utf-8') as f:
+                json.dump(merged, f, indent=2, ensure_ascii=False)
+                f.flush()
+                os.fsync(f.fileno())
+            if os.path.exists(SETTINGS_JSON_PATH) and os.path.getsize(SETTINGS_JSON_PATH) > 10:
+                try:
+                    import shutil as _shutil
+                    _shutil.copy2(SETTINGS_JSON_PATH, bak_path)
+                except Exception:
+                    pass
+            os.replace(tmp_path, SETTINGS_JSON_PATH)
+        except Exception:
+            try:
+                with open(SETTINGS_JSON_PATH, 'w', encoding='utf-8') as f:
+                    json.dump(merged, f, indent=2, ensure_ascii=False)
+            except Exception:
+                pass
+        return merged
 
 def load_airport_database():
     global _AIRPORT_DB_CACHE
@@ -2450,14 +2558,22 @@ def run_scan():
 
         category_label = cfg.get('name', os.path.basename(dp))
         onestore = os.path.join(dp, 'OneStore')
-        target_dirs = [onestore] if os.path.exists(onestore) else [dp]
+        target_dirs = [onestore, dp] if os.path.exists(onestore) else [dp]
 
         for td in target_dirs:
             try:
                 items = os.listdir(td)
                 for item in items:
                     ipath = os.path.join(td, item)
-                    if os.path.isdir(ipath) and item != 'OneStore' and 'projectairports' not in item.lower():
+                    if item == 'OneStore' or 'projectairports' in item.lower():
+                        continue
+                    is_valid_pkg_dir = os.path.isdir(ipath)
+                    if not is_valid_pkg_dir and ((hasattr(os.path, 'isjunction') and os.path.isjunction(ipath)) or os.path.islink(ipath)):
+                        clean_no_dis = ipath[:-9] if ipath.lower().endswith('.disabled') else ipath
+                        base_cand = re.sub(r'[-_\s]+(copy|copie|backup)(\b|\d*)$', '', clean_no_dis, flags=re.IGNORECASE)
+                        if base_cand != clean_no_dis and (os.path.isdir(base_cand) or os.path.isdir(base_cand + '.disabled')):
+                            is_valid_pkg_dir = True
+                    if is_valid_pkg_dir:
                         clean_folder = item[:-9] if item.lower().endswith('.disabled') else item
                         is_disabled = item.lower().endswith('.disabled') or os.path.exists(os.path.join(ipath, 'manifest.json.disabled')) or not content_xml_status.get(clean_folder.lower(), True)
                         all_packages.append((category_label, item, ipath, is_disabled))
@@ -2467,7 +2583,6 @@ def run_scan():
     # Dynamic discovery of StreamedPackages & Official packages listed in Content.xml
     def _normalize_streamed_pkg(f_name):
         c = f_name[:-9] if f_name.lower().endswith('.disabled') else f_name
-        c = re.sub(r'[-_\s]+(copy|copie|backup)(\b|\d*)', '', c, flags=re.IGNORECASE)
         n = RE_CLEAN_PREFIX.sub('', c.lower())
         n = re.sub(r'-(airport|scenery|pack|project)-', '-', n)
         n = re.sub(r'-(munich|istanbul|london|paris|frankfurt|berlin|tokyo|chicago|newyork|barcelona|madrid|rome)-', '-', n)
@@ -2519,9 +2634,19 @@ def run_scan():
         manifest_title = ""
         manifest_data = None
         
-        mpath = os.path.join(full_path, 'manifest.json')
+        inspect_path = full_path
+        if full_path and not os.path.isdir(full_path):
+            clean_no_dis = full_path[:-9] if full_path.lower().endswith('.disabled') else full_path
+            base_cand = re.sub(r'[-_\s]+(copy|copie|backup)(\b|\d*)$', '', clean_no_dis, flags=re.IGNORECASE)
+            if base_cand != clean_no_dis:
+                if os.path.isdir(base_cand):
+                    inspect_path = base_cand
+                elif os.path.isdir(base_cand + '.disabled'):
+                    inspect_path = base_cand + '.disabled'
+
+        mpath = os.path.join(inspect_path, 'manifest.json')
         if not os.path.exists(mpath):
-            mpath = os.path.join(full_path, 'manifest.json.disabled')
+            mpath = os.path.join(inspect_path, 'manifest.json.disabled')
 
         pkg_order_hint = ""
         if os.path.exists(mpath):
@@ -2535,25 +2660,25 @@ def run_scan():
                 pass
                 
         has_scenery_dir = (
-            os.path.isdir(os.path.join(full_path, 'scenery')) 
-            or os.path.isdir(os.path.join(full_path, 'Scenery'))
-            or os.path.isdir(os.path.join(full_path, 'scenery.disabled'))
-            or os.path.isdir(os.path.join(full_path, 'Scenery.disabled'))
+            os.path.isdir(os.path.join(inspect_path, 'scenery')) 
+            or os.path.isdir(os.path.join(inspect_path, 'Scenery'))
+            or os.path.isdir(os.path.join(inspect_path, 'scenery.disabled'))
+            or os.path.isdir(os.path.join(inspect_path, 'Scenery.disabled'))
         )
 
         # ABSOLUTE IMMUNITY: Non-scenery packages (Aircraft, Liveries, Tools, Avionics, Core)
         # must NEVER be registered or treated as airports, regardless of folder name or title tokens.
-        if manifest_ctype in ['AIRCRAFT', 'LIVERY', 'TOOL', 'MISC', 'INSTRUMENT', 'CORE', 'LIBRARY', 'AVIONICS', 'MODEL', 'TEXTURE']:
+        if manifest_ctype in ['AIRCRAFT', 'LIVERY', 'TOOL', 'MISC', 'INSTRUMENT', 'CORE', 'LIBRARY', 'AVIONICS', 'MODEL', 'TEXTURE', 'UI']:
             continue
 
         # Structural check: Any package containing aircraft, rotorcraft or boat SimObjects is strictly immune
         has_simobjects_aircraft = (
-            os.path.isdir(os.path.join(full_path, 'SimObjects', 'Airplanes'))
-            or os.path.isdir(os.path.join(full_path, 'SimObjects', 'Rotorcraft'))
-            or os.path.isdir(os.path.join(full_path, 'SimObjects', 'Airplanes.disabled'))
-            or os.path.isdir(os.path.join(full_path, 'SimObjects', 'Rotorcraft.disabled'))
-            or os.path.isdir(os.path.join(full_path, 'SimObjects', 'Boats'))
-            or os.path.isdir(os.path.join(full_path, 'SimObjects', 'Boats.disabled'))
+            os.path.isdir(os.path.join(inspect_path, 'SimObjects', 'Airplanes'))
+            or os.path.isdir(os.path.join(inspect_path, 'SimObjects', 'Rotorcraft'))
+            or os.path.isdir(os.path.join(inspect_path, 'SimObjects', 'Airplanes.disabled'))
+            or os.path.isdir(os.path.join(inspect_path, 'SimObjects', 'Rotorcraft.disabled'))
+            or os.path.isdir(os.path.join(inspect_path, 'SimObjects', 'Boats'))
+            or os.path.isdir(os.path.join(inspect_path, 'SimObjects', 'Boats.disabled'))
         )
         if has_simobjects_aircraft:
             continue
@@ -2561,11 +2686,11 @@ def run_scan():
         # Check if package is streamed, dynamically discovered from Content.xml, or packaged in .fsarchive containers
         is_streamed = 'streamed' in cat.lower() or 'streamed' in full_path.lower() or not full_path
         has_fsarchive = False
-        if full_path and os.path.isdir(full_path):
+        if inspect_path and os.path.isdir(inspect_path):
             try:
-                has_fsarchive = any(f.endswith('.fsarchive') for f in os.listdir(full_path) if os.path.isfile(os.path.join(full_path, f)))
-                if not has_fsarchive and os.path.isdir(os.path.join(full_path, 'content')):
-                    has_fsarchive = any(f.endswith('.fsarchive') for f in os.listdir(os.path.join(full_path, 'content')))
+                has_fsarchive = any(f.endswith('.fsarchive') for f in os.listdir(inspect_path) if os.path.isfile(os.path.join(inspect_path, f)))
+                if not has_fsarchive and os.path.isdir(os.path.join(inspect_path, 'content')):
+                    has_fsarchive = any(f.endswith('.fsarchive') for f in os.listdir(os.path.join(inspect_path, 'content')))
             except Exception:
                 pass
 
@@ -2573,9 +2698,9 @@ def run_scan():
         if not is_streamed and not has_fsarchive:
             if not has_scenery_dir:
                 has_bgl = False
-                lpath_check = os.path.join(full_path, 'layout.json')
+                lpath_check = os.path.join(inspect_path, 'layout.json')
                 if not os.path.exists(lpath_check):
-                    lpath_check = os.path.join(full_path, 'layout.json.disabled')
+                    lpath_check = os.path.join(inspect_path, 'layout.json.disabled')
                 if os.path.exists(lpath_check):
                     try:
                         with open(lpath_check, 'r', encoding='utf-8', errors='ignore') as f:
@@ -2584,7 +2709,7 @@ def run_scan():
                     except Exception:
                         pass
                 if not has_bgl:
-                    for root, dirs, files in os.walk(full_path):
+                    for root, dirs, files in os.walk(inspect_path):
                         if any(fl.lower().endswith(('.bgl', '.bgl.disabled')) for fl in files):
                             has_bgl = True
                             break
@@ -2785,7 +2910,7 @@ def run_scan():
             if 'streamed' in cat.lower():
                 pkg_size_str = "Streamed"
             else:
-                pkg_size_str = get_folder_size_formatted(full_path, folder_size_cache)
+                pkg_size_str = get_folder_size_formatted(inspect_path, folder_size_cache)
 
             # Check per-ICAO BGL disabled state inside active multi-airport packages
             source_is_disabled = is_disabled
@@ -2853,7 +2978,12 @@ def run_scan():
                 }
             else:
                 existing = detected_map[icao]
-                if not any(s['folder_name'] == folder_name for s in existing["all_sources"]):
+                norm_full = os.path.normcase(os.path.abspath(full_path)) if full_path else ""
+                if not any(
+                    (os.path.normcase(os.path.abspath(s['package_path'])) == norm_full) if (norm_full and s.get('package_path'))
+                    else (s['folder_name'].lower() == folder_name.lower() and s.get('source_folder') == cat)
+                    for s in existing["all_sources"]
+                ):
                     existing["all_sources"].append(new_source)
 
                 p_existing = get_source_priority(existing["source_folder"])
@@ -2976,20 +3106,29 @@ def run_scan():
 
     # Process each detected airport and resolve primary package & classification
     for icao, item in detected_map.items():
-        # Deduplicate sources that represent the exact same package between physical disk and StreamedPackages
+        # Deduplicate virtual StreamedPackages sources that already exist as physical folders on disk
         if len(item['all_sources']) > 1:
             unique_srcs = []
             seen_norms = set()
+            seen_paths = set()
             sorted_srcs = sorted(
                 item['all_sources'], 
-                key=lambda s: 0 if 'streamed' not in s.get('source_folder', '').lower() else 1
+                key=lambda s: (0 if s.get('package_path') else 1, 0 if 'streamed' not in s.get('source_folder', '').lower() else 1)
             )
             for s in sorted_srcs:
                 fn = s.get('folder_name', '')
                 fn_norm = _normalize_streamed_pkg(fn)
-                if fn_norm not in seen_norms:
-                    seen_norms.add(fn_norm)
-                    unique_srcs.append(s)
+                pkg_p = s.get('package_path', '')
+                if pkg_p:
+                    norm_p = os.path.normcase(os.path.abspath(pkg_p))
+                    if norm_p not in seen_paths:
+                        seen_paths.add(norm_p)
+                        seen_norms.add(fn_norm)
+                        unique_srcs.append(s)
+                else:
+                    if fn_norm not in seen_norms:
+                        seen_norms.add(fn_norm)
+                        unique_srcs.append(s)
             item['all_sources'] = unique_srcs
 
         # 1. Determine if this airport has an Official Asobo/Microsoft base scenery in ANY source (including StreamedPackages)
@@ -3233,10 +3372,12 @@ def run_scan():
             item['has_gsx_profile'] = True
             item['gsx_profile_filename'] = gsx_map[icao]['filename']
             item['gsx_profile_path'] = gsx_map[icao]['path']
+            item['gsx_profile_filenames'] = gsx_map[icao].get('all_filenames', [gsx_map[icao]['filename']])
         else:
             item['has_gsx_profile'] = False
             item['gsx_profile_filename'] = ''
             item['gsx_profile_path'] = ''
+            item['gsx_profile_filenames'] = []
 
         # Detect bundled GSX profiles in scenery package folders
         bundled_prof = None
@@ -3313,6 +3454,12 @@ def build_library_snapshot(airports):
 
             clean_norm = re.sub(r'^(community|official)?(fs20|fs24)?-?', '', fn_l)
             key = f"pkg:{icao.lower()}:{clean_norm}"
+            if key in snapshot:
+                key = f"pkg:{icao.lower()}:{clean_norm}:{(src_folder or '').lower()}"
+                dup_idx = 2
+                while key in snapshot:
+                    key = f"pkg:{icao.lower()}:{clean_norm}:{(src_folder or '').lower()}:{dup_idx}"
+                    dup_idx += 1
 
             p_type = s.get('pricing_type') or ('Payware' if s.get('is_payware') else ('Asobo' if s.get('is_asobo_official') else 'Freeware'))
 
@@ -3330,20 +3477,23 @@ def build_library_snapshot(airports):
             }
 
         # 2. GSX Profiles
-        if ap.get('has_gsx_profile') and ap.get('gsx_profile_filename'):
-            g_fn = ap.get('gsx_profile_filename', '')
-            key = f"gsx:{icao.lower()}:{g_fn.lower()}"
-            snapshot[key] = {
-                "key": key,
-                "kind": "gsx",
-                "folder_name": g_fn,
-                "icao": icao,
-                "name": name,
-                "type": "GSX Profile",
-                "vendor": "GSX Pro",
-                "source_folder": "GSX Profiles",
-                "is_patch": False
-            }
+        if ap.get('has_gsx_profile'):
+            gsx_fns = ap.get('gsx_profile_filenames') or ([ap.get('gsx_profile_filename')] if ap.get('gsx_profile_filename') else [])
+            for g_fn in gsx_fns:
+                if not g_fn:
+                    continue
+                key = f"gsx:{icao.lower()}:{g_fn.lower()}"
+                snapshot[key] = {
+                    "key": key,
+                    "kind": "gsx",
+                    "folder_name": g_fn,
+                    "icao": icao,
+                    "name": name,
+                    "type": "GSX Profile",
+                    "vendor": "GSX Pro",
+                    "source_folder": "GSX Profiles",
+                    "is_patch": False
+                }
 
     return snapshot
 
