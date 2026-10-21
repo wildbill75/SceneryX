@@ -5,7 +5,7 @@ import re
 
 # Edition Configuration Flag (True = SceneryX Lite funnel edition, False = SceneryX Pro full edition)
 IS_LITE = False
-APP_VERSION = "LITE_1.1.6" if IS_LITE else "PRO_1.1.6"
+APP_VERSION = "LITE_1.1.7" if IS_LITE else "PRO_1.1.7"
 
 def get_resource_file_path(filename):
     if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
@@ -1556,9 +1556,58 @@ def parse_single_gsx_ini(content='', filename='', file_path='', is_disabled=Fals
         'recommend_reason': None
     }
 
+def _is_fsto_hash_token(token):
+    if not token or len(token) < 5 or len(token) > 7:
+        return False
+    has_alpha = any(c.isalpha() for c in token)
+    has_digit = any(c.isdigit() for c in token)
+    if not (has_alpha and has_digit):
+        return False
+    if re.match(r'^(msfs|fs20|fs24|uk2000|fsx3d|fly2high|taxi2gate|samscene|asvdgs|asxvdgs|gsxvdgs|v\d+|rwy\d+|term\d+)', token):
+        return False
+    return True
+
+def _normalize_gsx_stem(stem):
+    if not stem:
+        return ''
+    tokens = [t for t in re.split(r'[-_.\s]+', stem.lower()) if t]
+    filtered = [t for t in tokens if not _is_fsto_hash_token(t)]
+    return '-'.join(filtered) if filtered else stem.lower()
+
+def _auto_heal_split_gsx_companion(gsx_dir, file_entries):
+    """
+    If an airport has an active .py script but its companion .ini was previously disabled
+    by a false duplicate resolution (leaving 0 active .ini files), automatically re-enable
+    the companion .ini so both files work together as intended by GSX Pro.
+    """
+    if not gsx_dir or not file_entries:
+        return file_entries
+    active_inis = [e for e in file_entries if not e.get('is_disabled') and e['filename'].lower().endswith('.ini')]
+    active_pys = [e for e in file_entries if not e.get('is_disabled') and e['filename'].lower().endswith('.py') and not e['filename'].lower().endswith('_handler.py')]
+    disabled_inis = [e for e in file_entries if e.get('is_disabled') and e['filename'].lower().endswith('.ini.disabled')]
+    if len(active_inis) == 0 and len(active_pys) >= 1 and len(disabled_inis) == 1:
+        dis_ini = disabled_inis[0]
+        old_fn = dis_ini['filename']
+        new_fn = old_fn[:-9]
+        if not re.search(r'[-_\s.(](copy|copie|backup|bak)(\b|\d*|\))', new_fn.lower()):
+            old_p = os.path.join(gsx_dir, old_fn)
+            new_p = os.path.join(gsx_dir, new_fn)
+            try:
+                if os.path.exists(old_p) and not os.path.exists(new_p):
+                    os.replace(old_p, new_p)
+                    dis_ini['filename'] = new_fn
+                    dis_ini['is_disabled'] = False
+                    if 'path' in dis_ini:
+                        dis_ini['path'] = new_p
+            except Exception:
+                pass
+    return file_entries
+
 def bundle_gsx_files(file_entries):
     """
     Groups files for an ICAO into primary profiles and attaches companion files (.py scripts, handlers).
+    Handles Flightsim.to random hash tokens (e.g. lpma-7ryin1-amsim-zwackelpeter.ini + lpma-amsim-zwackelpeter.py)
+    so a .ini + .py pair for the same airport is bundled into a single profile instead of a false DUPLICATE.
     Returns list of primary profile entries with 'companion_files' and 'has_python_script'.
     """
     ini_entries = [e for e in file_entries if e['filename'].lower().endswith(('.ini', '.ini.disabled'))]
@@ -1567,30 +1616,76 @@ def bundle_gsx_files(file_entries):
     primary_entries = []
     paired_py_filenames = set()
 
-    for ini_e in ini_entries:
-        ini_fn = ini_e['filename']
-        ini_clean = ini_fn[:-9] if ini_fn.lower().endswith('.disabled') else ini_fn
-        ini_stem = os.path.splitext(ini_clean)[0].lower()
-        ini_is_copy = bool(re.search(r'[-_\s.(](copy|copie|backup|bak)(\b|\d*|\))', ini_stem))
-        
-        companions = []
-        for py_e in py_entries:
-            py_fn = py_e['filename']
-            if py_fn in paired_py_filenames:
+    def _entry_info(e):
+        fn = e['filename']
+        clean = fn[:-9] if fn.lower().endswith('.disabled') else fn
+        stem = os.path.splitext(clean)[0].lower()
+        norm_stem = _normalize_gsx_stem(stem)
+        is_copy = bool(re.search(r'[-_\s.(](copy|copie|backup|bak)(\b|\d*|\))', stem))
+        is_dis = bool(e.get('is_disabled', fn.lower().endswith('.disabled')))
+        is_handler = clean.lower().endswith('_handler.py')
+        tokens = {
+            t for t in re.split(r'[-_.\s]+', norm_stem)
+            if len(t) >= 3 and t not in GENERIC_GSX_WORDS and not (len(t) == 4 and t.isalpha())
+        }
+        return fn, clean, stem, norm_stem, is_copy, is_dis, is_handler, tokens
+
+    ini_meta = [(ini_e, *_entry_info(ini_e)) for ini_e in ini_entries]
+    py_meta = [(py_e, *_entry_info(py_e)) for py_e in py_entries]
+    companions_by_ini = {ini_e['filename']: [] for ini_e in ini_entries}
+
+    # Pass 1: Exact, separator-normalized, or Flightsim.to hash-stripped stem match
+    for ini_e, ini_fn, _, ini_stem, ini_norm, ini_copy, ini_dis, _, _ in ini_meta:
+        for py_e, py_fn, _, py_stem, py_norm, py_copy, py_dis, _, _ in py_meta:
+            if py_fn in paired_py_filenames or ini_copy != py_copy or ini_dis != py_dis:
                 continue
-            py_clean = py_fn[:-9] if py_fn.lower().endswith('.disabled') else py_fn
-            py_stem = os.path.splitext(py_clean)[0].lower()
-            py_is_copy = bool(re.search(r'[-_\s.(](copy|copie|backup|bak)(\b|\d*|\))', py_stem))
-            if ini_is_copy != py_is_copy:
-                continue
-            if (py_stem == ini_stem or 
+            if (py_stem == ini_stem or
                 py_stem.replace('-', '_') == ini_stem.replace('-', '_') or
                 py_stem.replace('_', '-') == ini_stem.replace('_', '-') or
                 py_stem.startswith(ini_stem + '_') or
-                py_stem.startswith(ini_stem + '-')):
-                companions.append(py_fn)
+                py_stem.startswith(ini_stem + '-') or
+                ini_stem.startswith(py_stem + '_') or
+                ini_stem.startswith(py_stem + '-') or
+                (ini_norm and py_norm and (
+                    py_norm == ini_norm or
+                    py_norm.startswith(ini_norm + '-') or
+                    ini_norm.startswith(py_norm + '-')
+                ))):
+                companions_by_ini[ini_fn].append(py_fn)
                 paired_py_filenames.add(py_fn)
-        
+
+    # Pass 2: Shared studio/creator token match (e.g. 'amsim', 'zwackelpeter') with same active/disabled state
+    for py_e, py_fn, _, py_stem, py_norm, py_copy, py_dis, py_handler, py_tokens in py_meta:
+        if py_fn in paired_py_filenames or py_handler or not py_tokens:
+            continue
+        best_ini_fn = None
+        best_overlap = 0
+        for ini_e, ini_fn, _, ini_stem, ini_norm, ini_copy, ini_dis, _, ini_tokens in ini_meta:
+            if ini_copy != py_copy or ini_dis != py_dis:
+                continue
+            overlap = len(py_tokens & ini_tokens)
+            if overlap > best_overlap:
+                best_overlap = overlap
+                best_ini_fn = ini_fn
+        if best_ini_fn and best_overlap >= 1:
+            companions_by_ini[best_ini_fn].append(py_fn)
+            paired_py_filenames.add(py_fn)
+
+    # Pass 3: If there is only a single .ini (with same copy & disabled state) for this ICAO,
+    # any remaining unpaired .py or _handler.py in the same state is its companion script
+    for py_e, py_fn, _, py_stem, py_norm, py_copy, py_dis, py_handler, _ in py_meta:
+        if py_fn in paired_py_filenames:
+            continue
+        matching_inis = [
+            ini_fn for _, ini_fn, _, _, _, ini_copy, ini_dis, _, _ in ini_meta
+            if ini_copy == py_copy and ini_dis == py_dis
+        ]
+        if len(matching_inis) == 1:
+            companions_by_ini[matching_inis[0]].append(py_fn)
+            paired_py_filenames.add(py_fn)
+
+    for ini_e in ini_entries:
+        companions = companions_by_ini.get(ini_e['filename'], [])
         ini_e['companion_files'] = companions
         ini_e['has_python_script'] = len(companions) > 0
         primary_entries.append(ini_e)
@@ -1608,7 +1703,7 @@ def bundle_gsx_files(file_entries):
                 if other['filename'] != py_fn
                 and other['filename'] not in paired_py_filenames
                 and other['filename'].lower().endswith(('_handler.py', '_handler.py.disabled'))
-                and (py_stem in other['filename'].lower())
+                and (py_stem in other['filename'].lower() or _normalize_gsx_stem(py_stem) in _normalize_gsx_stem(other['filename'].lower()))
             ]
             for c in companions:
                 paired_py_filenames.add(c)
@@ -1691,13 +1786,18 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
     }
 
     import datetime
+    all_paired_companions = set()
 
     for icao, file_entries in by_icao.items():
         ap = installed_map.get(icao)
         active_src = next((s for s in ap.get('all_sources', []) if not s.get('is_disabled') and not s.get('is_fix_patch') and not s.get('is_addon')), None) if ap else None
         
         # Bundle companion files (.ini + companion .py scripts)
+        file_entries = _auto_heal_split_gsx_companion(gsx_dir, file_entries)
         bundled_entries = bundle_gsx_files(file_entries)
+        for b_e in bundled_entries:
+            for c_fn in b_e.get('companion_files', []):
+                all_paired_companions.add(c_fn)
         parsed_files = []
         active_entries = [e for e in bundled_entries if not e['is_disabled']]
 
@@ -1850,6 +1950,8 @@ def audit_all_gsx_profiles(gsx_dir=None, installed_airports=None):
     disabled_profiles = []
     for f in disabled_ini_files:
         fp = os.path.join(gsx_dir, f)
+        if f in all_paired_companions or not os.path.exists(fp):
+            continue
         icao = extract_icao_from_gsx_filename(f, valid_icaos=all_valid_icaos, file_path=fp) or ''
         ap = installed_map.get(icao)
         db_ap = airports_db.get(icao, {}) if airports_db else {}
@@ -1950,6 +2052,7 @@ def audit_single_airport_gsx(icao, gsx_dir=None, ap=None, airports_db=None):
 
     import datetime
     # Bundle companion files (.ini + companion .py scripts)
+    matching_files = _auto_heal_split_gsx_companion(gsx_dir, matching_files)
     bundled_matches = bundle_gsx_files(matching_files)
     parsed_files = []
     active_entries = [e for e in bundled_matches if not e['is_disabled']]

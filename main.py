@@ -1,4 +1,4 @@
-﻿import os
+import os
 import sys
 import time
 import json
@@ -11,7 +11,7 @@ from datetime import datetime
 import flight_rig_optimizer
 import flight_perf_tracker
 import flight_bug_reporter
-from scanner import run_scan, get_settings, save_settings, load_ratings, save_rating, save_custom_price, save_custom_category, load_custom_prices, get_estimated_price, get_default_gsx_path, load_airport_database, SPECIAL_BUNDLE_MAP, OUTPUT_JSON_PATH, compute_scan_delta, build_library_snapshot, SNAPSHOT_JSON_PATH, get_resource_file_path, audit_all_gsx_profiles, audit_single_airport_gsx, extract_icao_from_gsx_filename, find_bundled_gsx, USER_DATA_DIR, IS_LITE, APP_VERSION
+from scanner import run_scan, get_settings, save_settings, load_ratings, save_rating, save_custom_price, save_custom_category, load_custom_prices, get_estimated_price, get_default_gsx_path, load_airport_database, SPECIAL_BUNDLE_MAP, OUTPUT_JSON_PATH, compute_scan_delta, build_library_snapshot, SNAPSHOT_JSON_PATH, get_resource_file_path, audit_all_gsx_profiles, audit_single_airport_gsx, extract_icao_from_gsx_filename, find_bundled_gsx, bundle_gsx_files, _normalize_gsx_stem, USER_DATA_DIR, IS_LITE, APP_VERSION
 
 try:
     import webview.platforms.winforms as wf
@@ -1172,7 +1172,8 @@ class Api:
     def __init__(self):
         self._startup_delta = {"added": [], "removed": [], "total_changes": 0}
         self._startup_scanned = False
-        threading.Thread(target=self._auto_sync_installed_ingame_panel, daemon=True).start()
+        if not IS_LITE:
+            threading.Thread(target=self._auto_sync_installed_ingame_panel, daemon=True).start()
         threading.Thread(target=self._auto_preload_simbrief_ofp, daemon=True).start()
 
     def _auto_preload_simbrief_ofp(self):
@@ -1182,6 +1183,8 @@ class Api:
             pass
 
     def _auto_sync_installed_ingame_panel(self):
+        if IS_LITE:
+            return
         try:
             import shutil
             all_paths = self._get_all_community_paths()
@@ -2978,6 +2981,7 @@ class Api:
             
             content_str = ""
             actual_filename = filename or (os.path.basename(file_path) if file_path else "profile.ini")
+            incoming_companions = []
             
             if base64_data:
                 if "," in base64_data:
@@ -2987,6 +2991,12 @@ class Api:
                 if ext in ['.zip', '.rar', '.7z', '.tar', '.gz']:
                     try:
                         with zipfile.ZipFile(io.BytesIO(file_bytes)) as zf:
+                            for zname in zf.namelist():
+                                zn_base = os.path.basename(zname)
+                                if not zn_base or zn_base.lower() == 'configuration.ini':
+                                    continue
+                                if zn_base.lower().endswith('.py'):
+                                    incoming_companions.append(zn_base)
                             for zname in zf.namelist():
                                 if zname.lower().endswith('.ini') and not zname.lower().endswith('configuration.ini'):
                                     content_str = zf.read(zname).decode('utf-8', errors='ignore')
@@ -3001,6 +3011,12 @@ class Api:
                     try:
                         with zipfile.ZipFile(file_path) as zf:
                             for zname in zf.namelist():
+                                zn_base = os.path.basename(zname)
+                                if not zn_base or zn_base.lower() == 'configuration.ini':
+                                    continue
+                                if zn_base.lower().endswith('.py'):
+                                    incoming_companions.append(zn_base)
+                            for zname in zf.namelist():
                                 if zname.lower().endswith('.ini') and not zname.lower().endswith('configuration.ini'):
                                     content_str = zf.read(zname).decode('utf-8', errors='ignore')
                                     actual_filename = os.path.basename(zname)
@@ -3014,6 +3030,9 @@ class Api:
             
             from scanner import parse_single_gsx_ini, evaluate_gsx_studio_match, extract_icao_from_gsx_filename, OUTPUT_JSON_PATH
             parsed_incoming = parse_single_gsx_ini(content_str, filename=actual_filename, file_path=file_path)
+            if incoming_companions:
+                parsed_incoming['companion_files'] = incoming_companions
+                parsed_incoming['has_python_script'] = True
             
             target_icao = (icao or '').upper().strip()
             detected_icao = extract_icao_from_gsx_filename(actual_filename, file_path=file_path)
@@ -3034,25 +3053,34 @@ class Api:
             parsed_incoming['status'] = status
             parsed_incoming['reason'] = reason
             
-            # Get existing active files for target_icao
+            # Get existing active files for target_icao (bundled so .ini + .py companion appear as 1 profile)
             existing_active = []
             if gsx_dir and os.path.exists(gsx_dir) and target_icao:
+                raw_active_entries = []
                 for f in os.listdir(gsx_dir):
-                    if f.lower() == 'configuration.ini' or f.endswith('.disabled'):
+                    if f.lower() == 'configuration.ini' or f.endswith('.disabled') or f.lower().endswith('_handler.py'):
+                        continue
+                    if not f.lower().endswith(('.ini', '.py')):
                         continue
                     fp = os.path.join(gsx_dir, f)
                     f_icao = extract_icao_from_gsx_filename(f, valid_icaos={target_icao}, file_path=fp)
                     if f_icao == target_icao:
-                        try:
-                            with open(fp, 'r', encoding='utf-8', errors='ignore') as fh:
-                                f_content = fh.read()
-                        except Exception:
-                            f_content = ""
-                        p_exist = parse_single_gsx_ini(f_content, filename=f, file_path=fp)
-                        e_status, e_reason = evaluate_gsx_studio_match(p_exist, ap)
-                        p_exist['status'] = e_status
-                        p_exist['reason'] = e_reason
-                        existing_active.append(p_exist)
+                        raw_active_entries.append({'filename': f, 'is_disabled': False})
+                for b_entry in bundle_gsx_files(raw_active_entries):
+                    f = b_entry['filename']
+                    fp = os.path.join(gsx_dir, f)
+                    try:
+                        with open(fp, 'r', encoding='utf-8', errors='ignore') as fh:
+                            f_content = fh.read()
+                    except Exception:
+                        f_content = ""
+                    p_exist = parse_single_gsx_ini(f_content, filename=f, file_path=fp)
+                    p_exist['companion_files'] = b_entry.get('companion_files', [])
+                    p_exist['has_python_script'] = b_entry.get('has_python_script', False)
+                    e_status, e_reason = evaluate_gsx_studio_match(p_exist, ap)
+                    p_exist['status'] = e_status
+                    p_exist['reason'] = e_reason
+                    existing_active.append(p_exist)
             
             active_scenery = None
             if ap:
@@ -3186,6 +3214,7 @@ class Api:
                         # Also copy any companion .py or _handler.py files located in the same directory
                         src_dir = os.path.dirname(file_path)
                         stem = os.path.splitext(fname)[0].lower()
+                        norm_stem = _normalize_gsx_stem(stem)
                         try:
                             for sibling in os.listdir(src_dir):
                                 s_lower = sibling.lower()
@@ -3193,9 +3222,13 @@ class Api:
                                     continue
                                 if s_lower.endswith('.py'):
                                     s_stem = os.path.splitext(s_lower)[0]
+                                    s_norm = _normalize_gsx_stem(s_stem)
+                                    s_icao = extract_icao_from_gsx_filename(sibling, valid_icaos={target_icao} if target_icao else None, file_path=os.path.join(src_dir, sibling))
                                     if (stem in s_stem or s_stem in stem or
                                         s_stem.replace('_', '-') == stem.replace('_', '-') or
-                                        s_stem.replace('-', '_') == stem.replace('-', '_')):
+                                        s_stem.replace('-', '_') == stem.replace('-', '_') or
+                                        (norm_stem and s_norm and (norm_stem in s_norm or s_norm in norm_stem)) or
+                                        (target_icao and s_icao == target_icao)):
                                         s_target = os.path.join(gsx_dir, sibling)
                                         shutil.copy2(os.path.join(src_dir, sibling), s_target)
                                         installed_files.append(sibling)
@@ -3342,6 +3375,56 @@ class Api:
         except Exception as e:
             return json.dumps({"status": "error", "message": str(e)})
 
+    def _get_gsx_bundle_filenames(self, gsx_dir, target_icao, target_filename):
+        """
+        Returns the set of all filenames in gsx_dir (primary .ini + companion .py/_handler.py)
+        that belong to the same profile bundle as target_filename.
+        """
+        bundle_set = {target_filename}
+        if not gsx_dir or not os.path.exists(gsx_dir) or not target_filename:
+            return bundle_set
+
+        t_clean = target_filename[:-9] if target_filename.lower().endswith('.disabled') else target_filename
+        t_stem = os.path.splitext(t_clean)[0].lower()
+        t_norm = _normalize_gsx_stem(t_stem)
+        bundle_set.add(t_clean)
+        bundle_set.add(t_clean + '.disabled')
+
+        icao_entries = []
+        for f in os.listdir(gsx_dir):
+            f_low = f.lower()
+            if f_low == 'configuration.ini' or f_low.startswith('configuration'):
+                continue
+            if not (f_low.endswith('.ini') or f_low.endswith('.py') or f_low.endswith('.disabled')):
+                continue
+            fp = os.path.join(gsx_dir, f)
+            f_clean = f[:-9] if f_low.endswith('.disabled') else f
+            f_stem = os.path.splitext(f_clean)[0].lower()
+            f_norm = _normalize_gsx_stem(f_stem)
+            if f == target_filename or f_clean == t_clean or f_stem == t_stem or f_stem.startswith(t_stem) or t_stem.startswith(f_stem) or (t_norm and f_norm and (f_norm == t_norm or f_norm.startswith(t_norm + '-') or t_norm.startswith(f_norm + '-'))):
+                bundle_set.add(f)
+                bundle_set.add(f_clean)
+                bundle_set.add(f_clean + '.disabled')
+            if target_icao and len(target_icao) >= 3:
+                f_icao = extract_icao_from_gsx_filename(f, valid_icaos={target_icao}, file_path=fp)
+                if f_icao == target_icao:
+                    icao_entries.append({'filename': f, 'is_disabled': f_low.endswith('.disabled')})
+
+        if icao_entries:
+            bundled = bundle_gsx_files(icao_entries)
+            for b_e in bundled:
+                b_fn = b_e['filename']
+                b_clean = b_fn[:-9] if b_fn.lower().endswith('.disabled') else b_fn
+                comps = b_e.get('companion_files', [])
+                all_in_b = [b_fn, b_clean, b_clean + '.disabled']
+                for c in comps:
+                    c_clean = c[:-9] if c.lower().endswith('.disabled') else c
+                    all_in_b.extend([c, c_clean, c_clean + '.disabled'])
+                if target_filename in all_in_b or t_clean in all_in_b:
+                    bundle_set.update(all_in_b)
+
+        return bundle_set
+
     def resolve_gsx_duplicate(self, icao, active_filename, disable_filename=None):
         try:
             settings = get_settings()
@@ -3353,32 +3436,40 @@ class Api:
             if not target_icao or len(target_icao) < 3:
                 target_icao = extract_icao_from_gsx_filename(active_filename, file_path=os.path.join(gsx_dir, active_filename)) or ''
 
-            # If active_filename currently ends in .disabled, enable it
-            active_path = os.path.join(gsx_dir, active_filename)
-            if active_filename.endswith('.disabled'):
-                new_active_name = active_filename[:-9]
-                new_active_path = os.path.join(gsx_dir, new_active_name)
-                if os.path.exists(new_active_path):
-                    try: os.remove(new_active_path)
-                    except Exception: pass
-                if os.path.exists(active_path):
-                    os.replace(active_path, new_active_path)
-                active_filename = new_active_name
+            keep_bundle = self._get_gsx_bundle_filenames(gsx_dir, target_icao, active_filename)
 
-            # If disable_filename specified, disable that specific one
-            if disable_filename:
-                dis_path = os.path.join(gsx_dir, disable_filename)
-                if os.path.exists(dis_path) and not disable_filename.endswith('.disabled'):
-                    target_dis = dis_path + '.disabled'
-                    if os.path.exists(target_dis):
-                        try: os.remove(target_dis)
+            # Enable all files belonging to active_filename's bundle (.ini + companion .py)
+            for f in list(os.listdir(gsx_dir)):
+                if f in keep_bundle and f.endswith('.disabled'):
+                    fp = os.path.join(gsx_dir, f)
+                    new_active_name = f[:-9]
+                    new_active_path = os.path.join(gsx_dir, new_active_name)
+                    if os.path.exists(new_active_path):
+                        try: os.remove(new_active_path)
                         except Exception: pass
-                    os.replace(dis_path, target_dis)
+                    if os.path.exists(fp):
+                        os.replace(fp, new_active_path)
+                    keep_bundle.add(new_active_name)
+                    if f == active_filename:
+                        active_filename = new_active_name
+
+            # If disable_filename specified, disable that specific bundle
+            if disable_filename:
+                dis_bundle = self._get_gsx_bundle_filenames(gsx_dir, target_icao, disable_filename) - keep_bundle
+                for f in list(os.listdir(gsx_dir)):
+                    if f in dis_bundle and not f.endswith('.disabled'):
+                        dis_path = os.path.join(gsx_dir, f)
+                        if os.path.exists(dis_path):
+                            target_dis = dis_path + '.disabled'
+                            if os.path.exists(target_dis):
+                                try: os.remove(target_dis)
+                                except Exception: pass
+                            os.replace(dis_path, target_dis)
             else:
-                # Disable all other active profiles for this ICAO ONLY if target_icao is valid!
+                # Disable all other active profiles for this ICAO (preserving companion .py files of active_filename)
                 if target_icao and len(target_icao) >= 3:
-                    for f in os.listdir(gsx_dir):
-                        if f == active_filename or f.lower() == 'configuration.ini' or f.endswith('.disabled'):
+                    for f in list(os.listdir(gsx_dir)):
+                        if f in keep_bundle or f.lower() == 'configuration.ini' or f.endswith('.disabled'):
                             continue
                         if not f.lower().endswith(('.ini', '.py')):
                             continue
@@ -3410,10 +3501,12 @@ class Api:
             if not target_icao or len(target_icao) < 3:
                 target_icao = extract_icao_from_gsx_filename(filename, file_path=os.path.join(gsx_dir, filename)) or ''
 
+            enable_bundle = self._get_gsx_bundle_filenames(gsx_dir, target_icao, filename)
+
             # Disable any other active profile for this ICAO first ONLY if target_icao is valid
             if target_icao and len(target_icao) >= 3:
-                for f in os.listdir(gsx_dir):
-                    if f.lower() == 'configuration.ini' or f.endswith('.disabled') or f == filename:
+                for f in list(os.listdir(gsx_dir)):
+                    if f.lower() == 'configuration.ini' or f.endswith('.disabled') or f in enable_bundle:
                         continue
                     if not f.lower().endswith(('.ini', '.py')):
                         continue
@@ -3431,13 +3524,10 @@ class Api:
 
             # Now enable target file and any companion scripts (.py.disabled, _handler.py.disabled)
             stem = filename[:-9] if filename.lower().endswith('.disabled') else filename
-            stem_base = os.path.splitext(stem)[0].lower()
             target_ini_name = stem if (stem.lower().endswith('.ini') or stem.lower().endswith('.py')) else (stem + '.ini')
             
-            for f in os.listdir(gsx_dir):
-                f_clean = f[:-9] if f.lower().endswith('.disabled') else f
-                f_base = os.path.splitext(f_clean)[0].lower()
-                if f == filename or f_base == stem_base or f_base.startswith(stem_base) or stem_base.startswith(f_base):
+            for f in list(os.listdir(gsx_dir)):
+                if f in enable_bundle:
                     fp = os.path.join(gsx_dir, f)
                     if f.lower().endswith('.disabled'):
                         target_name = f[:-9]
@@ -3450,6 +3540,8 @@ class Api:
                             except Exception: pass
                         if target_name.lower().endswith('.ini'):
                             target_ini_name = target_name
+                    elif f.lower().endswith('.ini'):
+                        target_ini_name = f
 
             target_icao = (icao or '').upper().strip()
             if target_icao:
@@ -3471,12 +3563,12 @@ class Api:
                 return json.dumps({"status": "error", "message": "Invalid filename."})
 
             target_icao = (icao or '').upper().strip()
-            stem = filename[:-9] if filename.lower().endswith('.disabled') else filename
-            stem_base = os.path.splitext(stem)[0].lower()
-            for f in os.listdir(gsx_dir):
-                f_clean = f[:-9] if f.lower().endswith('.disabled') else f
-                f_base = os.path.splitext(f_clean)[0].lower()
-                if f == filename or f_base == stem_base or f_base.startswith(stem_base) or stem_base.startswith(f_base):
+            if not target_icao or len(target_icao) < 3:
+                target_icao = extract_icao_from_gsx_filename(filename, file_path=os.path.join(gsx_dir, filename)) or ''
+
+            disable_bundle = self._get_gsx_bundle_filenames(gsx_dir, target_icao, filename)
+            for f in list(os.listdir(gsx_dir)):
+                if f in disable_bundle:
                     fp = os.path.join(gsx_dir, f)
                     if os.path.exists(fp) and not f.lower().endswith('.disabled'):
                         dest_fp = fp + '.disabled'
@@ -3517,13 +3609,13 @@ class Api:
                 return json.dumps({"status": "error", "message": "Invalid filename."})
 
             target_icao = (icao or '').upper().strip()
-            stem = filename[:-9] if filename.lower().endswith('.disabled') else filename
-            stem_base = os.path.splitext(stem)[0].lower()
+            if not target_icao or len(target_icao) < 3:
+                target_icao = extract_icao_from_gsx_filename(filename, file_path=os.path.join(gsx_dir, filename)) or ''
+
+            delete_bundle = self._get_gsx_bundle_filenames(gsx_dir, target_icao, filename)
             deleted_any = False
-            for f in os.listdir(gsx_dir):
-                f_clean = f[:-9] if f.lower().endswith('.disabled') else f
-                f_base = os.path.splitext(f_clean)[0].lower()
-                if f == filename or f_base == stem_base or f_base.startswith(stem_base) or stem_base.startswith(f_base):
+            for f in list(os.listdir(gsx_dir)):
+                if f in delete_bundle:
                     fp = os.path.join(gsx_dir, f)
                     if os.path.exists(fp) and os.path.isfile(fp):
                         try:
@@ -4880,6 +4972,46 @@ class Api:
         "- **Détection des doublons Scènes & GSX :** Restauration complète de la détection des doublons d'aéroports multi-dossiers (`Community`, `Official`, `StreamedPackages`, Addon Linker) et des conflits de profils GSX lors du Re-scan Packages."
     )
 
+    _PATCH_1_1_7_CHANGELOG_BODY = (
+        "**Release Date:** October 21, 2026\n"
+        "**Channel:** `Updates/patches`\n\n"
+        "## What's New & Fixed (Includes v1.1.5, v1.1.6 & v1.1.7)\n\n"
+        "### 1. GSX Pro Manager — Companion `.ini` + `.py` Pairing Fix\n"
+        "- **Smart `.ini` + `.py` Companion Bundling:** Fixed an issue where GSX profile archives containing both an `.ini` configuration file and a companion `.py` Python customization script with a Flightsim.to hash in the filename (e.g., `lpma-7ryin1-amsim-zwackelpeter.ini` + `lpma-amsim-zwackelpeter.py`) were flagged as conflicting `DUPLICATE` profiles instead of being bundled into a single unified profile with the `+ Python Script` badge.\n"
+        "- **Unified Enable / Disable / Delete / Duplicate Resolution:** Enabling, disabling, deleting, or resolving duplicates for a GSX profile now keeps its `.ini` configuration and `.py` companion script synchronized together.\n\n"
+        "### 2. MSFS 2020/2024 In-Game Panel (`sceneryx-ingame-panel`)\n"
+        "- **Dynamic Auto-Height Window:** The MSFS In-Game Panel now automatically wraps its vertical height to match its content in real time (when expanding/collapsing the Live Graphics drawer or switching between Offline/Online states) while remaining horizontally resizable.\n"
+        "- **Full EN/FR Localization & Contextual Tooltips:** Added full English and French localization synchronized with SceneryX, plus resilient hover tooltips across all Live Graphics controls, Smart LOD sliders, Cloud Recovery, and Performance metrics.\n"
+        "- **Clean Package Naming & Auto-Refresh:** Standardized the Community package folder name to `sceneryx-ingame-panel` (automatically migrating legacy panel folders on startup) and preserved the `SCENERY X` panel header.\n\n"
+        "### 3. Smart LOD Governor & Live Memory Engine\n"
+        "- **MSFS 2024 Live Memory Offset & Signature Scanner:** Updated the Win32 Memory Engine base offset (`0x0A80B024`) for the latest `FlightSimulator2024.exe` build and added an automatic `.data` signature scanner so live `TLOD`, `OLOD`, `Clouds`, and hot-swappable graphics writes attach reliably in Read/Write mode.\n"
+        "- **Persistent Manual Mode (`MAN`) Disengagement:** Fixed an issue in both the MSFS In-Game Panel and the SceneryX Smart LOD window where disabling Smart LOD (`OFF`) or dragging the `TLOD` / `OLOD` sliders manually caused Smart LOD to snap back to `ON` after ~2 seconds.\n\n"
+        "### 4. Custom Graphics Profiles, Settings Persistence & Conflict Scanner\n"
+        "- **Atomic `settings.json` Persistence:** Protected user preferences (language, theme, close action, scan paths, SimBrief ID) against concurrent read/write resets during patches or background scans.\n"
+        "- **Independent Profile Saving & Switching:** Modifying individual settings in the Graphics Settings matrix no longer overwrites the active `.profile.json` file before clicking `SAVE PROFILE`, and switching profiles immediately refreshes the matrix and `UserCfg.opt`.\n"
+        "- **Duplicate Scenery & GSX Detection Fix:** Restored full multi-layer duplicate airport detection across `Community`, `Official`, `StreamedPackages`, and Addon Linker folders."
+    )
+
+    _PATCH_1_1_7_CHANGELOG_BODY_FR = (
+        "**Date de publication :** 21 Octobre 2026\n"
+        "**Canal :** `Updates/patches`\n\n"
+        "## Nouveautés et Corrections (Inclut v1.1.5, v1.1.6 & v1.1.7)\n\n"
+        "### 1. Gestionnaire GSX Pro — Couplage automatique `.ini` + `.py`\n"
+        "- **Fusion intelligente des profils `.ini` + `.py` compagnon :** Correction d'un problème où les archives GSX contenant à la fois un fichier `.ini` et un script Python `.py` avec un identifiant Flightsim.to différent dans le nom (ex. `lpma-7ryin1-amsim-zwackelpeter.ini` + `lpma-amsim-zwackelpeter.py`) étaient détectées à tort comme deux profils en conflit (`DUPLICATE`) au lieu d'être regroupées en un seul profil complet avec le badge `+ Python Script`.\n"
+        "- **Synchronisation Activation / Désactivation / Suppression :** L'activation, la désactivation, la suppression ou la résolution de doublons sur un profil GSX conserve et gère désormais systématiquement le couple `.ini` + `.py` ensemble.\n\n"
+        "### 2. Panneau en jeu MSFS 2020/2024 (`sceneryx-ingame-panel`)\n"
+        "- **Ajustement automatique de la hauteur :** Le panneau en jeu MSFS adapte désormais automatiquement sa hauteur verticale à son contenu en temps réel (ouverture/fermeture du tiroir Live Graphics, passage Hors-ligne / En ligne) tout en restant redimensionnable en largeur.\n"
+        "- **Traduction complète EN/FR & Info-bulles contextuelles :** Ajout de la localisation complète en français et en anglais synchronisée avec SceneryX, ainsi que d'info-bulles contextuelles sur l'ensemble des réglages Live Graphics, curseurs Smart LOD, Auto Cloud Recovery et jauges de performance.\n"
+        "- **Nommage unifié & Mise à jour auto :** Le package Community se nomme désormais `sceneryx-ingame-panel` (avec migration automatique de l'ancien dossier au démarrage) tout en conservant le titre `SCENERY X` dans l'en-tête.\n\n"
+        "### 3. Régulation Smart LOD & Moteur Mémoire Temps Réel\n"
+        "- **Offset mémoire MSFS 2024 & Scanner de signature :** Mise à jour de l'offset mémoire (`0x0A80B024`) pour la dernière version de `FlightSimulator2024.exe` avec scanner automatique de signature `.data` assurant l'écriture en direct (`TLOD`, `OLOD`, `Nuages` et réglages graphiques).\n"
+        "- **Maintien du mode Manuel (`MAN`) :** Correction d'un bug dans le panneau en jeu et la fenêtre Smart LOD où la désactivation du Smart LOD (`OFF`) ou le déplacement manuel des curseurs `TLOD` / `OLOD` réactivait le mode `ON` au bout de 2 secondes.\n\n"
+        "### 4. Profils Graphiques, Sauvegarde des Paramètres & Détection des Doublons\n"
+        "- **Protection atomique de `settings.json` :** Sécurisation des préférences utilisateur (langue, thème, fermeture dans la barre des tâches, dossiers de scan, identifiant SimBrief) contre toute réinitialisation lors des mises à jour ou scans simultanés.\n"
+        "- **Sauvegarde et bascule de profils indépendantes :** Modifier un réglage dans la matrice graphique n'écrase plus le fichier `.profile.json` actif avant d'avoir cliqué sur `SAUVEGARDER LE PROFIL`, et le changement de profil met immédiatement à jour la matrice et `UserCfg.opt`.\n"
+        "- **Détection des doublons Scènes & GSX :** Restauration complète de la détection des doublons d'aéroports multi-dossiers (`Community`, `Official`, `StreamedPackages`, Addon Linker)."
+    )
+
     DEFAULT_PATCH_CHANGELOGS = {
         "PRO_1.1.1": "# SceneryX — Patch PRO_1.1.1 (Day-One Update)\n\n" + _PATCH_1_1_1_CHANGELOG_BODY,
         "PRO_1.1.2": "# SceneryX — Patch PRO_1.1.2\n\n" + _PATCH_1_1_2_CHANGELOG_BODY,
@@ -4887,11 +5019,13 @@ class Api:
         "PRO_1.1.4": "# SceneryX — Patch PRO_1.1.4\n\n" + _PATCH_1_1_4_CHANGELOG_BODY,
         "PRO_1.1.5": "# SceneryX — Patch PRO_1.1.5\n\n" + _PATCH_1_1_4_CHANGELOG_BODY,
         "PRO_1.1.6": "# SceneryX — Patch PRO_1.1.6\n\n" + _PATCH_1_1_6_CHANGELOG_BODY,
+        "PRO_1.1.7": "# SceneryX — Patch PRO_1.1.7\n\n" + _PATCH_1_1_7_CHANGELOG_BODY,
     }
 
     DEFAULT_PATCH_CHANGELOGS_FR = {
         "PRO_1.1.5": "# SceneryX — Patch PRO_1.1.5\n\n" + _PATCH_1_1_6_CHANGELOG_BODY_FR,
         "PRO_1.1.6": "# SceneryX — Patch PRO_1.1.6\n\n" + _PATCH_1_1_6_CHANGELOG_BODY_FR,
+        "PRO_1.1.7": "# SceneryX — Patch PRO_1.1.7\n\n" + _PATCH_1_1_7_CHANGELOG_BODY_FR,
     }
 
     def _fetch_remote_text(self, url, timeout=3.5):
@@ -5708,6 +5842,8 @@ class Api:
         return all_paths[0] if all_paths else None
 
     def get_ingame_panel_status(self):
+        if IS_LITE:
+            return json.dumps({"available": False, "installed": False, "is_lite": True, "message": "PRO Edition feature."}, ensure_ascii=False)
         try:
             all_paths = self._get_all_community_paths()
             if not all_paths:
@@ -6080,12 +6216,13 @@ def main():
 
     window.events.closing += on_closing
 
-    # Start Micro HTTP REST Server for In-Game Toolbar Panel
-    try:
-        import flight_remote_server
-        flight_remote_server.start_remote_server()
-    except Exception as e:
-        print(f"[RemoteServer] Startup error: {e}")
+    # Start Micro HTTP REST Server for In-Game Toolbar Panel (PRO Edition only)
+    if not IS_LITE:
+        try:
+            import flight_remote_server
+            flight_remote_server.start_remote_server()
+        except Exception as e:
+            print(f"[RemoteServer] Startup error: {e}")
 
     # Initialize System Tray Icon (pystray)
     try:
