@@ -5,7 +5,7 @@ import re
 
 # Edition Configuration Flag (True = SceneryX Lite funnel edition, False = SceneryX Pro full edition)
 IS_LITE = False
-APP_VERSION = "LITE_1.1.7" if IS_LITE else "PRO_1.1.7"
+APP_VERSION = "LITE_1.1.8" if IS_LITE else "PRO_1.1.8"
 
 def get_resource_file_path(filename):
     if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
@@ -111,6 +111,34 @@ def get_content_xml_paths():
     # 3. MSFS 2020 Store & Steam
     paths.append(os.path.join(local_appdata, r'Packages\Microsoft.FlightSimulator_8wekyb3d8bbwe\LocalCache\Content.xml'))
     paths.append(os.path.join(appdata, r'Microsoft Flight Simulator\Content.xml'))
+
+    # 4. Dynamically discover Content.xml relative to any user-configured Community/Packages scan_paths
+    if os.path.exists(SETTINGS_JSON_PATH):
+        try:
+            with open(SETTINGS_JSON_PATH, 'r', encoding='utf-8') as sf:
+                st_data = json.load(sf)
+            for sp_cfg in st_data.get('scan_paths', []):
+                sp_dir = sp_cfg.get('path', '')
+                if not sp_dir or not os.path.exists(sp_dir):
+                    continue
+                # Typical hierarchy: <LocalCache>/Packages/Community -> parent is Packages, grandparent is LocalCache
+                for cand_root in [os.path.dirname(sp_dir), os.path.dirname(os.path.dirname(sp_dir))]:
+                    if not cand_root or not os.path.isdir(cand_root):
+                        continue
+                    c_xml = os.path.join(cand_root, 'Content.xml')
+                    if os.path.exists(c_xml) and c_xml not in paths:
+                        paths.append(c_xml)
+                    try:
+                        for sub_item in os.listdir(cand_root):
+                            sub_dir = os.path.join(cand_root, sub_item)
+                            if os.path.isdir(sub_dir) and sub_item not in ('Packages', 'PC', '$PC$', 'ModelLibCache', 'SceneryIndexes', 'SimObjects', 'Community', 'Official', 'StreamedPackages'):
+                                sub_c_xml = os.path.join(sub_dir, 'Content.xml')
+                                if os.path.exists(sub_c_xml) and sub_c_xml not in paths:
+                                    paths.append(sub_c_xml)
+                    except Exception:
+                        pass
+        except Exception:
+            pass
 
     return paths
 
@@ -344,7 +372,18 @@ NON_AIRPORT_KEYWORDS = [
     'fsdreamteam-gsx', 'gsx-pro', 'kt-gsx', 'papadelta-', 'navigraph', 'fsltl', 'airrace', 'redbull',
     'sceneryx', 'sceneryx-ingame-panel', 'wildbill75-sceneryx',
     'landmarks', 'landmark', 'aerial', 'cityscape', 'photogrammetry', 'seasons', 'biomes',
+    'sightseeing', 'citytimes', 'city-times', 'city_times', 'citywow', 'city-wow', 'city_wow',
+    'moderncities', 'modern-cities', 'modern_cities', 'citypack', 'city-pack', 'city_pack',
+    'cityupdate', 'city-update', 'city_update', 'city-landmarks', 'city_landmarks', 'skyline', 'skylines',
     'vfr-landmarks', 'vfr_landmarks', 'vfr-city', 'poilocalisation', 'worldupdate', 'world-update',
+    'asobo-scenery-', 'microsoft-scenery-', 'asobo-mission', 'mission-templates', 'fs-freeflight', 'freeflight',
+    'microsoft-pgg', '-pgg-', 'pgg-', 'helipad-worldwide', 'monument-valley',
+    '-rbr1', '-rbr2', '-rbr3', '-rbr4', '-rbr5', '-rbr6',
+    'bridges', 'harbor', 'harbour', 'marina', 'marinas', 'seaport', 'vessels', 'vessel', 'ferries', 'ferry', 'boats', 'gaist', 'seafront',
+    'obstacles', 'obstacle', 'powerlines', 'powerline', 'windfarms', 'windfarm', 'windturbines', 'solarfarms',
+    'cooling-towers', 'coolingtowers', 'we-love-vfr', 'welovevfr', 'mamudesign', 'puffinflight',
+    'nightlighting', 'night-lighting', 'night_lighting', 'night-enhanced', 'nightenhanced', '3d-night',
+    'terrain-mesh', 'elevation-mesh', 'lidar', 'coastline', 'coastlines', 'waterfix', 'water-fix', 'bijan', 'rex-accu', 'zinertek',
     'north-america-mesh', 'europe-mesh', 'south-america-mesh', 'asia-mesh', 'africa-mesh', 'oceania-mesh',
     'fs-base', 'fs24-fs-base', 'fs20-fs-base', 'coverage-map', 'coverage', 'genericairports',
     'generic-airports', 'bushtrip', 'bush-trip', 'bush', 'bushchallenge', 'bush-challenge',
@@ -2613,12 +2652,18 @@ def run_scan():
     flight_mode_active = bool(flight_mode_cfg.get("active", False))
     flight_keep_icaos = set(k.upper() for k in flight_mode_cfg.get("icaos", []))
 
+    resolved_conflicts = settings.get("resolved_conflicts", {})
+    if not isinstance(resolved_conflicts, dict):
+        resolved_conflicts = {}
+
     content_xml_status = {}
     content_xml_packages = []
     disabled_in_xml = set()
     pkg_names_scanned = set()
-    content_xml_path = get_content_xml_path()
-    if os.path.exists(content_xml_path):
+    seen_xml_pkg_entries = {}
+    for content_xml_path in get_content_xml_paths():
+        if not os.path.exists(content_xml_path):
+            continue
         try:
             import xml.etree.ElementTree as ET
             tree = ET.parse(content_xml_path)
@@ -2635,20 +2680,19 @@ def run_scan():
 
                 if act == 'UserDisabled' or not is_active:
                     disabled_in_xml.add(clean_lower)
-
-                if clean_lower not in content_xml_status:
-                    content_xml_status[clean_lower] = is_active
+                    disabled_in_xml.add(folder_norm)
+                    content_xml_status[clean_lower] = False
+                    content_xml_status[folder_norm] = False
                 else:
-                    content_xml_status[clean_lower] = content_xml_status[clean_lower] or is_active
+                    if clean_lower not in disabled_in_xml:
+                        content_xml_status[clean_lower] = True
+                    if folder_norm not in disabled_in_xml:
+                        content_xml_status[folder_norm] = True
 
-                if folder_norm not in content_xml_status:
-                    content_xml_status[folder_norm] = is_active
-                else:
-                    content_xml_status[folder_norm] = content_xml_status[folder_norm] or is_active
-
-                content_xml_packages.append((pkg_name, clean_folder, not is_active))
+                seen_xml_pkg_entries[clean_lower] = (pkg_name, clean_folder, clean_lower in disabled_in_xml or folder_norm in disabled_in_xml)
         except Exception:
             pass
+    content_xml_packages = list(seen_xml_pkg_entries.values())
 
     all_packages = []
 
@@ -2678,7 +2722,10 @@ def run_scan():
                             is_valid_pkg_dir = True
                     if is_valid_pkg_dir:
                         clean_folder = item[:-9] if item.lower().endswith('.disabled') else item
-                        is_disabled = item.lower().endswith('.disabled') or os.path.exists(os.path.join(ipath, 'manifest.json.disabled')) or not content_xml_status.get(clean_folder.lower(), True)
+                        clean_f_low = clean_folder.lower()
+                        clean_f_norm = RE_CLEAN_PREFIX.sub('', clean_f_low)
+                        xml_active = content_xml_status.get(clean_f_low, content_xml_status.get(clean_f_norm, True))
+                        is_disabled = item.lower().endswith('.disabled') or os.path.exists(os.path.join(ipath, 'manifest.json.disabled')) or not xml_active
                         all_packages.append((category_label, item, ipath, is_disabled))
             except Exception:
                 pass
@@ -2849,12 +2896,32 @@ def run_scan():
         
         # Check if this package is a fix/patch or a model library/interior/mesh addon rather than a main scenery
         m_title_lower = manifest_title.lower() if manifest_title else ""
+
+        # Strict exclusion for non-airport scenery packs (City packs, Sightseeing, Landmarks, POI, Night Lighting, Mesh, Vessels, Obstacles)
+        has_explicit_airport_word = any(
+            w in fn_lower or w in m_title_lower
+            for w in ['airport', 'airports', 'airfield', 'aerodrome', 'aerodromo', 'aeroport', 'flughafen', 'flugplatz', 'heliport', 'airbase']
+        )
+        if not has_explicit_airport_word:
+            if any(
+                kw in fn_lower or kw in m_title_lower
+                for kw in [
+                    'sightseeing', 'city times', 'city wow', 'modern cities', 'city pack', 'city update',
+                    'city landmarks', 'landmarks', 'landmark', 'point of interest', 'points of interest',
+                    'photogrammetry', 'night lighting', 'night enhanced', 'night3d', 'terrain mesh', 'dem mesh',
+                    'elevation mesh', 'vessels', 'powerlines', 'obstacles', 'bridges', 'we love vfr'
+                ]
+            ):
+                continue
+            if ('samscene' in fn_lower or 'samscene' in m_title_lower or 'taburet' in fn_lower or 'taburet' in m_title_lower) and not has_explicit_icao:
+                continue
+
         clean_hint = pkg_order_hint
         for hint_term in ['custom_airport_patch', 'bespoke_airport_patch', 'community_airport_patch', 'official_airport_patch', 'airport_patch', 'custom_airport', 'bespoke_airport', 'community_airport']:
             clean_hint = clean_hint.replace(hint_term, '')
 
         is_official_asobo_base = (
-            fn_lower.startswith(('asobo-airport-', 'microsoft-airport-', 'fs20-asobo-', 'fs20-microsoft-', 'fs24-asobo-', 'fs24-microsoft-'))
+            fn_lower.startswith(('asobo-airport-', 'microsoft-airport-', 'fs20-asobo-airport-', 'fs20-microsoft-airport-', 'fs24-asobo-airport-', 'fs24-microsoft-airport-'))
             or 'asobo-airport-' in fn_lower
             or 'microsoft-airport-' in fn_lower
         )
@@ -2877,12 +2944,23 @@ def run_scan():
                 if icao in airports:
                     found_ap_list.append((airports[icao], f"Special Bundle Map ({icao})"))
 
+        # Explicit "-airport-<code>" pattern matching (supports 3 or 4 char alphanumeric airport codes like N15, KEB, WX53)
+        explicit_airport_code_token = None
+        m_ap_code = re.search(r'(?:^|[-_])airport[-_]([a-z0-9]{3,4})(?:[-_]|$)', fn_lower)
+        if m_ap_code:
+            cand_ap_code = m_ap_code.group(1).upper()
+            if cand_ap_code.lower() not in EXCLUDE_WORDS and cand_ap_code.lower() not in VENDOR_MAP:
+                explicit_airport_code_token = cand_ap_code
+                if not found_ap_list and cand_ap_code in airports:
+                    found_ap_list.append((airports[cand_ap_code], f"Folder ICAO ({cand_ap_code})"))
+
         # Primary token matching on folder name
-        for t in safe_tokens:
-            t_upper = t.upper()
-            if len(t_upper) == 4 and t_upper in airports and t.lower() not in EXCLUDE_WORDS:
-                found_ap_list.append((airports[t_upper], f"Folder ICAO ({t_upper})"))
-                break
+        if not found_ap_list:
+            for t in safe_tokens:
+                t_upper = t.upper()
+                if len(t_upper) == 4 and t_upper in airports and t.lower() not in EXCLUDE_WORDS:
+                    found_ap_list.append((airports[t_upper], f"Folder ICAO ({t_upper})"))
+                    break
 
         # Folder prefix matching (e.g. lirflightfix20 -> LIRF)
         if not found_ap_list:
@@ -2955,24 +3033,45 @@ def run_scan():
                 except Exception:
                     pass
 
-        # City / Name Fallback Matching
-        if not found_ap_list:
-            for t in tokens:
-                t_clean = t.strip()
-                if t_clean in VENDOR_MAP or len(t_clean) <= 3 or t_clean in EXCLUDE_WORDS or t_clean in ['fs20', 'fs24', 'airport', 'airports', 'pack', 'edition', 'vfr', 'hd', 'sd']:
-                    continue
-                if t_clean in city_index:
-                    candidates = city_index[t_clean]
-                    major = [c for c in candidates if c.get('type') in ['large_airport', 'medium_airport']]
-                    chosen = major[0] if major else candidates[0]
-                    found_ap_list.append((chosen, f"City Match ('{t_clean}' -> {chosen['ident']})"))
-                    break
-                elif t_clean in name_index:
-                    candidates = name_index[t_clean]
-                    major = [c for c in candidates if c.get('type') in ['large_airport', 'medium_airport']]
-                    chosen = major[0] if major else candidates[0]
-                    found_ap_list.append((chosen, f"Name Match ('{t_clean}' -> {chosen['ident']})"))
-                    break
+        # City / Name Fallback Matching (strictly guarded: only for genuine airport packages, never city/POI/scenery packs)
+        if not found_ap_list and not explicit_airport_code_token:
+            has_non_airport_token = any(
+                bad_tok in tokens
+                for bad_tok in [
+                    'scenery', 'sightseeing', 'city', 'cities', 'landmark', 'landmarks', 'poi', 'pois',
+                    'bridge', 'bridges', 'harbor', 'harbour', 'marina', 'vessel', 'vessels', 'ship', 'ships',
+                    'boat', 'boats', 'night', 'lighting', 'mesh', 'dem', 'terrain', 'photogrammetry', 'pgg',
+                    'aerial', 'ortho', 'tree', 'trees', 'season', 'seasons', 'biome', 'biomes', 'obstacle',
+                    'obstacles', 'powerline', 'powerlines', 'windfarm', 'solar', 'mission', 'missions',
+                    'freeflight', 'helipad', 'worldwide', 'monument', 'discovery', 'bushtrip', 'challenge', 'activity'
+                ]
+            )
+            is_known_airport_studio = any(
+                v in fn_lower
+                for v in [
+                    'aerosoft', 'flytampa', 'lvfr', 'latinvfr', 'inibuilds', 'flightbeam', 'fsdreamteam',
+                    'mkstudios', 'pyreegue', 'uk2000', 'justsim', 'drzewieckidesign', 'fsimstudios',
+                    'francevfr', 'pilotplus', 'jetstream', 'redwing', 'tailstrike', 'amsim', 'bmworld',
+                    'wfscenery', 'pacsim', 'imaginesim', 'taxi2gate'
+                ]
+            )
+            if not has_non_airport_token and (has_explicit_airport_word or 'airport' in pkg_order_hint or is_known_airport_studio):
+                for t in tokens:
+                    t_clean = t.strip()
+                    if t_clean in VENDOR_MAP or len(t_clean) <= 3 or t_clean in EXCLUDE_WORDS or t_clean in ['fs20', 'fs24', 'airport', 'airports', 'pack', 'edition', 'vfr', 'hd', 'sd']:
+                        continue
+                    if t_clean in city_index:
+                        candidates = city_index[t_clean]
+                        major = [c for c in candidates if c.get('type') in ['large_airport', 'medium_airport']]
+                        chosen = major[0] if major else candidates[0]
+                        found_ap_list.append((chosen, f"City Match ('{t_clean}' -> {chosen['ident']})"))
+                        break
+                    elif t_clean in name_index:
+                        candidates = name_index[t_clean]
+                        major = [c for c in candidates if c.get('type') in ['large_airport', 'medium_airport']]
+                        chosen = major[0] if major else candidates[0]
+                        found_ap_list.append((chosen, f"Name Match ('{t_clean}' -> {chosen['ident']})"))
+                        break
 
         seen_in_pkg = set()
         for found_ap, match_source in found_ap_list:
@@ -3129,7 +3228,14 @@ def run_scan():
     for h_icao in dynamic_asobo_set:
         h_u = h_icao.upper()
         if h_u in airports:
-            is_asobo_dis = any(
+            rc_entry = resolved_conflicts.get(h_u)
+            rc_disables_asobo = False
+            if isinstance(rc_entry, dict) and rc_entry.get("chosen"):
+                c_low = str(rc_entry.get("chosen", "")).lower()
+                if c_low and "asobo" not in c_low and "microsoft" not in c_low:
+                    rc_disables_asobo = True
+
+            is_asobo_dis = rc_disables_asobo or any(
                 d == f"fs24-asobo-airport-{h_icao.lower()}" 
                 or d == f"asobo-airport-{h_icao.lower()}" 
                 or d == f"microsoft-airport-{h_icao.lower()}"
@@ -3233,6 +3339,41 @@ def run_scan():
                         seen_norms.add(fn_norm)
                         unique_srcs.append(s)
             item['all_sources'] = unique_srcs
+
+        # 0. Apply user's persisted conflict resolution choice from settings.json (if no new unknown primary scenery was added)
+        rc_cfg = resolved_conflicts.get(icao.upper())
+        if isinstance(rc_cfg, dict) and rc_cfg.get("chosen"):
+            primary_srcs = [s for s in item['all_sources'] if not s.get('is_addon') and not s.get('is_fix_patch') and not s.get('is_default')]
+            if len(primary_srcs) > 1:
+                rc_chosen = str(rc_cfg.get("chosen", "")).strip().lower()
+                rc_chosen_norm = str(rc_cfg.get("chosen_norm") or RE_CLEAN_PREFIX.sub('', rc_chosen)).strip().lower()
+                rc_sources = {str(x).strip().lower() for x in rc_cfg.get("sources", []) if x}
+                non_asobo_norms = [
+                    RE_CLEAN_PREFIX.sub('', (s.get('folder_name', '')[:-9] if s.get('folder_name', '').lower().endswith('.disabled') else s.get('folder_name', '')).lower())
+                    for s in primary_srcs if not s.get('is_asobo_official')
+                ]
+                no_new_3p = (not rc_sources) or all(n in rc_sources for n in non_asobo_norms)
+                if no_new_3p:
+                    if rc_chosen == 'default':
+                        for s in primary_srcs:
+                            s['is_disabled'] = True
+                    else:
+                        matched_chosen = None
+                        for s in primary_srcs:
+                            fn_c = s.get('folder_name', '')
+                            fn_c = fn_c[:-9] if fn_c.lower().endswith('.disabled') else fn_c
+                            fn_c_low = fn_c.lower()
+                            fn_c_norm = RE_CLEAN_PREFIX.sub('', fn_c_low)
+                            if (
+                                fn_c_low == rc_chosen
+                                or fn_c_norm == rc_chosen_norm
+                                or (s.get('is_asobo_official') and ('asobo' in rc_chosen or 'microsoft' in rc_chosen))
+                            ):
+                                matched_chosen = s
+                                break
+                        if matched_chosen is not None:
+                            for s in primary_srcs:
+                                s['is_disabled'] = (s is not matched_chosen)
 
         # 1. Determine if this airport has an Official Asobo/Microsoft base scenery in ANY source (including StreamedPackages)
         has_asobo = (icao in ['LFPB', 'LFPG']) or any(

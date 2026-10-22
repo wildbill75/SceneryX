@@ -135,7 +135,17 @@ PROTECTED_SYSTEM_KEYWORDS = [
     'cowan', 'hpg-', 'got-friends', 'salty', 'simupdates', 'fs2crew',
     'hifi', 'active-sky', 'airbus', 'boeing', 'bombardier', 'cessna',
     'embraer', 'piper', 'beechcraft', 'atr', 'concorde', 'helicopter',
-    'vessels', 'vessel', 'seafront', 'arex', 'landmarks', 'landmark'
+    'vessels', 'vessel', 'seafront', 'arex', 'landmarks', 'landmark',
+    'sightseeing', 'citytimes', 'city-times', 'city_times', 'citywow', 'city-wow', 'city_wow',
+    'moderncities', 'modern-cities', 'modern_cities', 'citypack', 'city-pack', 'city_pack',
+    'cityupdate', 'city-update', 'city_update', 'city-landmarks', 'city_landmarks', 'skyline', 'skylines',
+    'asobo-scenery-', 'microsoft-scenery-', 'asobo-mission', 'mission-templates', 'fs-freeflight',
+    'helipad-worldwide', 'monument-valley', '-rbr1', '-rbr2', '-rbr3', '-rbr4', '-rbr5', '-rbr6',
+    'bridges', 'harbor', 'harbour', 'marina', 'marinas', 'seaport', 'ferries', 'ferry',
+    'obstacles', 'obstacle', 'powerlines', 'powerline', 'windfarms', 'windfarm', 'windturbines', 'solarfarms',
+    'cooling-towers', 'coolingtowers', 'we-love-vfr', 'welovevfr', 'mamudesign', 'puffinflight',
+    'nightlighting', 'night-lighting', 'night_lighting', 'night-enhanced', 'nightenhanced', '3d-night',
+    'terrain-mesh', 'elevation-mesh', 'lidar', 'coastline', 'coastlines', 'waterfix', 'water-fix', 'bijan', 'rex-accu', 'zinertek'
 ]
 
 def is_core_or_library_package(pkg_path_or_name):
@@ -389,6 +399,31 @@ def get_content_xml_paths():
     # 3. MSFS 2020 Store & Steam
     paths.append(os.path.join(local_appdata, r'Packages\Microsoft.FlightSimulator_8wekyb3d8bbwe\LocalCache\Content.xml'))
     paths.append(os.path.join(appdata, r'Microsoft Flight Simulator\Content.xml'))
+
+    # 4. Dynamically discover Content.xml relative to any user-configured Community/Packages scan_paths
+    try:
+        st_data = get_settings()
+        for sp_cfg in st_data.get('scan_paths', []):
+            sp_dir = sp_cfg.get('path', '')
+            if not sp_dir or not os.path.exists(sp_dir):
+                continue
+            for cand_root in [os.path.dirname(sp_dir), os.path.dirname(os.path.dirname(sp_dir))]:
+                if not cand_root or not os.path.isdir(cand_root):
+                    continue
+                c_xml = os.path.join(cand_root, 'Content.xml')
+                if os.path.exists(c_xml) and c_xml not in paths:
+                    paths.append(c_xml)
+                try:
+                    for sub_item in os.listdir(cand_root):
+                        sub_dir = os.path.join(cand_root, sub_item)
+                        if os.path.isdir(sub_dir) and sub_item not in ('Packages', 'PC', '$PC$', 'ModelLibCache', 'SceneryIndexes', 'SimObjects', 'Community', 'Official', 'StreamedPackages'):
+                            sub_c_xml = os.path.join(sub_dir, 'Content.xml')
+                            if os.path.exists(sub_c_xml) and sub_c_xml not in paths:
+                                paths.append(sub_c_xml)
+                except Exception:
+                    pass
+    except Exception:
+        pass
 
     return paths
 
@@ -2139,6 +2174,21 @@ class Api:
                     else:
                         set_package_state_for_icao(pkg_p, icao, should_enable=False)
 
+            try:
+                st = get_settings()
+                rc_map = st.get("resolved_conflicts", {})
+                if not isinstance(rc_map, dict):
+                    rc_map = {}
+                rc_map[icao.upper()] = {
+                    "chosen": target_clean,
+                    "chosen_norm": target_norm,
+                    "sources": sorted(list(airport_pkg_norms))
+                }
+                st["resolved_conflicts"] = rc_map
+                save_settings(st)
+            except Exception as rc_err:
+                print(f"[ConflictPersistence] Warning saving resolved conflict for {icao}: {rc_err}")
+
             airports = fast_update_airport_cache(icao, target_pkg_name=(target_raw_clean if target_clean != 'DEFAULT' else 'DEFAULT'))
             target_ap = next((a for a in airports if a['icao'].upper() == icao.upper()), None)
             return json.dumps({"status": "ok", "updated_airport": target_ap}, ensure_ascii=False)
@@ -2313,6 +2363,23 @@ class Api:
                             else:
                                 disable_physical_package(pkg_p)
                             break
+
+            # 3b. Persist resolved conflict choice in settings.json
+            if target_clean:
+                try:
+                    st = get_settings()
+                    rc_map = st.get("resolved_conflicts", {})
+                    if not isinstance(rc_map, dict):
+                        rc_map = {}
+                    rc_map[icao.upper()] = {
+                        "chosen": target_clean,
+                        "chosen_norm": target_norm,
+                        "sources": sorted(list(airport_pkg_norms))
+                    }
+                    st["resolved_conflicts"] = rc_map
+                    save_settings(st)
+                except Exception as rc_err:
+                    print(f"[ConflictPersistence] Warning saving resolved conflict in apply_scenery_config for {icao}: {rc_err}")
 
             # 4. Update cache
             airports = fast_update_airport_cache(icao, target_pkg_name=(target_raw_clean if target_clean else None))
@@ -5014,6 +5081,38 @@ class Api:
         "- **Détection des doublons Scènes & GSX :** Restauration complète de la détection des doublons d'aéroports multi-dossiers (`Community`, `Official`, `StreamedPackages`, Addon Linker)."
     )
 
+    _PATCH_1_1_8_CHANGELOG_BODY = (
+        "**Release Date:** October 22, 2026\n"
+        "**Channel:** `Updates/patches`\n\n"
+        "## What's New & Fixed (Includes v1.1.5, v1.1.6, v1.1.7 & v1.1.8)\n\n"
+        "### 1. Scenery Scanner & Conflict Resolution Persistence\n"
+        "- **Strict Non-Airport Scenery Exclusion & Immunity:** Completely excluded and protected all non-airport scenery packages (City & Sightseeing packs such as SamScene3D, Landmarks, POI, Photogrammetry, Asobo/Microsoft non-airport scenery & Red Bull Air Race packs, Bridges, Vessels/Marinas, VFR Obstacles, Powerlines, Night Lighting, and Terrain/DEM Mesh) from being flagged as airports or disabled during conflict resolution.\n"
+        "- **Persistent Conflict Resolution Choices (`resolved_conflicts`):** Your choices in the **Scenery Conflict Detected** modal are now permanently saved in `settings.json` and synchronized across all `Content.xml` locations (including MSFS 2024 `StreamedPackages` handcrafted airports), so you never have to answer the same conflict prompt twice on startup.\n\n"
+        "### 2. MSFS 2020/2024 In-Game Panel (`sceneryx-ingame-panel`) — VR & 2D Auto-Fit\n"
+        "- **VR Stability & Native Auto-Fit Sizing:** Resolved the CoherentGT `ON_VIEW_RESIZED` feedback loop in VR and implemented native Asobo one-shot vertical auto-fit when expanding/collapsing the Live Graphics drawer or switching Offline/Online in both 2D and VR.\n"
+        "- **Full EN/FR Localization & Contextual Tooltips:** Added full English and French localization synchronized with SceneryX, plus instant hover tooltips across all controls.\n\n"
+        "### 3. GSX Pro Manager, Smart LOD & Map Rendering\n"
+        "- **Smart `.ini` + `.py` Companion Bundling:** GSX profile archives containing both an `.ini` file and a companion `.py` script with a Flightsim.to hash in the filename are now paired into a single unified profile (`+ Python Script`).\n"
+        "- **MSFS 2024 Live Memory Offset & Manual Mode (`MAN`) Fix:** Updated the Win32 Memory Engine offset + signature scanner for MSFS 2024 and fixed Smart LOD snapping back to `ON` after manual overrides.\n"
+        "- **Smooth Map Zoom & Tile Rendering:** Eliminated bright square tile artifacts during map zooming/panning."
+    )
+
+    _PATCH_1_1_8_CHANGELOG_BODY_FR = (
+        "**Date de publication :** 22 Octobre 2026\n"
+        "**Canal :** `Updates/patches`\n\n"
+        "## Nouveautés et Corrections (Inclut v1.1.5, v1.1.6, v1.1.7 & v1.1.8)\n\n"
+        "### 1. Scanner de Scènes & Mémorisation des Conflits\n"
+        "- **Exclusion stricte et immunité des scènes hors-aéroports :** Exclusion et protection intégrales de tous les packs qui ne sont pas des aéroports (packs de villes et tourisme type SamScene3D `sightseeing`, monuments/Landmarks, POI, photogrammétrie, scènes Asobo/Microsoft hors-aéroports, ponts, navires/marinas, obstacles VFR, lignes électriques, éclairages de nuit et mesh/relief) afin qu'ils ne soient jamais détectés comme des aéroports en conflit ni désactivés.\n"
+        "- **Mémorisation permanente des choix de conflits (`resolved_conflicts`) :** Vos choix dans la fenêtre **Conflit de Scène Détecté** sont désormais enregistrés de façon permanente dans `settings.json` et synchronisés sur tous les fichiers `Content.xml` (y compris pour les aéroports Asobo `StreamedPackages`), afin de ne plus jamais reposer la même question au démarrage.\n\n"
+        "### 2. Panneau en jeu MSFS 2020/2024 (`sceneryx-ingame-panel`) — VR & Auto-Fit 2D/VR\n"
+        "- **Stabilité VR & Redimensionnement Auto-Fit natif :** Suppression de la boucle de redimensionnement CoherentGT en VR et ajustement vertical automatique en un coup à l'ouverture du tiroir Live Graphics en 2D comme en VR.\n"
+        "- **Traduction complète EN/FR & Info-bulles :** Localisation complète en français et en anglais synchronisée avec SceneryX et info-bulles au survol de toutes les commandes.\n\n"
+        "### 3. Gestionnaire GSX Pro, Smart LOD & Carte Interactive\n"
+        "- **Fusion intelligente `.ini` + `.py` compagnon :** Association automatique des profils GSX `.ini` et de leur script `.py` compagnon en un seul profil unifié (`+ Python Script`).\n"
+        "- **Offset mémoire MSFS 2024 & Mode Manuel (`MAN`) :** Mise à jour du moteur mémoire temps réel MSFS 2024 et maintien du mode Manuel sur les curseurs `TLOD`/`OLOD`.\n"
+        "- **Fluidité de la carte :** Suppression des carrés clairs lors du zoom et du déplacement sur la carte."
+    )
+
     DEFAULT_PATCH_CHANGELOGS = {
         "PRO_1.1.1": "# SceneryX — Patch PRO_1.1.1 (Day-One Update)\n\n" + _PATCH_1_1_1_CHANGELOG_BODY,
         "PRO_1.1.2": "# SceneryX — Patch PRO_1.1.2\n\n" + _PATCH_1_1_2_CHANGELOG_BODY,
@@ -5022,6 +5121,8 @@ class Api:
         "PRO_1.1.5": "# SceneryX — Patch PRO_1.1.5\n\n" + _PATCH_1_1_4_CHANGELOG_BODY,
         "PRO_1.1.6": "# SceneryX — Patch PRO_1.1.6\n\n" + _PATCH_1_1_6_CHANGELOG_BODY,
         "PRO_1.1.7": "# SceneryX — Patch PRO_1.1.7\n\n" + _PATCH_1_1_7_CHANGELOG_BODY,
+        "PRO_1.1.8": "# SceneryX — Patch PRO_1.1.8\n\n" + _PATCH_1_1_8_CHANGELOG_BODY,
+        "LITE_1.1.5": "# SceneryX — Patch LITE_1.1.5\n\n" + _PATCH_1_1_8_CHANGELOG_BODY,
     }
 
     DEFAULT_PATCH_CHANGELOGS_FR = {
@@ -5032,6 +5133,8 @@ class Api:
         "PRO_1.1.5": "# SceneryX — Patch PRO_1.1.5\n\n" + _PATCH_1_1_6_CHANGELOG_BODY_FR,
         "PRO_1.1.6": "# SceneryX — Patch PRO_1.1.6\n\n" + _PATCH_1_1_6_CHANGELOG_BODY_FR,
         "PRO_1.1.7": "# SceneryX — Patch PRO_1.1.7\n\n" + _PATCH_1_1_7_CHANGELOG_BODY_FR,
+        "PRO_1.1.8": "# SceneryX — Patch PRO_1.1.8\n\n" + _PATCH_1_1_8_CHANGELOG_BODY_FR,
+        "LITE_1.1.5": "# SceneryX — Patch LITE_1.1.5\n\n" + _PATCH_1_1_8_CHANGELOG_BODY_FR,
     }
 
     def _fetch_remote_text(self, url, timeout=3.5):
