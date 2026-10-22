@@ -4976,11 +4976,12 @@ class Api:
         "**Release Date:** October 21, 2026\n"
         "**Channel:** `Updates/patches`\n\n"
         "## What's New & Fixed (Includes v1.1.5, v1.1.6 & v1.1.7)\n\n"
-        "### 1. GSX Pro Manager — Companion `.ini` + `.py` Pairing Fix\n"
+        "### 1. GSX Pro Manager & Interactive Map Rendering\n"
         "- **Smart `.ini` + `.py` Companion Bundling:** Fixed an issue where GSX profile archives containing both an `.ini` configuration file and a companion `.py` Python customization script with a Flightsim.to hash in the filename (e.g., `lpma-7ryin1-amsim-zwackelpeter.ini` + `lpma-amsim-zwackelpeter.py`) were flagged as conflicting `DUPLICATE` profiles instead of being bundled into a single unified profile with the `+ Python Script` badge.\n"
-        "- **Unified Enable / Disable / Delete / Duplicate Resolution:** Enabling, disabling, deleting, or resolving duplicates for a GSX profile now keeps its `.ini` configuration and `.py` companion script synchronized together.\n\n"
-        "### 2. MSFS 2020/2024 In-Game Panel (`sceneryx-ingame-panel`)\n"
-        "- **Dynamic Auto-Height Window:** The MSFS In-Game Panel now automatically wraps its vertical height to match its content in real time (when expanding/collapsing the Live Graphics drawer or switching between Offline/Online states) while remaining horizontally resizable.\n"
+        "- **Unified Enable / Disable / Delete / Duplicate Resolution:** Enabling, disabling, deleting, or resolving duplicates for a GSX profile now keeps its `.ini` configuration and `.py` companion script synchronized together.\n"
+        "- **Smooth Map Zoom & Tile Rendering:** Eliminated bright square tile artifacts during map zooming/panning (`mix-blend-mode` fix) and optimized off-screen tile buffering for faster, seamless map transitions.\n\n"
+        "### 2. MSFS 2020/2024 In-Game Panel (`sceneryx-ingame-panel`) — VR Stability Fix\n"
+        "- **VR VRAM & Render-Target Stability Fix:** Resolved a critical CoherentGT `resize` feedback loop (`content-fit` / `sendUpdatePanelSize`) that continuously reallocated 3D VR panel render-target textures in VRAM when opening the In-Game Panel in VR with high-VRAM aircraft (e.g., Fenix A320).\n"
         "- **Full EN/FR Localization & Contextual Tooltips:** Added full English and French localization synchronized with SceneryX, plus resilient hover tooltips across all Live Graphics controls, Smart LOD sliders, Cloud Recovery, and Performance metrics.\n"
         "- **Clean Package Naming & Auto-Refresh:** Standardized the Community package folder name to `sceneryx-ingame-panel` (automatically migrating legacy panel folders on startup) and preserved the `SCENERY X` panel header.\n\n"
         "### 3. Smart LOD Governor & Live Memory Engine\n"
@@ -4996,11 +4997,12 @@ class Api:
         "**Date de publication :** 21 Octobre 2026\n"
         "**Canal :** `Updates/patches`\n\n"
         "## Nouveautés et Corrections (Inclut v1.1.5, v1.1.6 & v1.1.7)\n\n"
-        "### 1. Gestionnaire GSX Pro — Couplage automatique `.ini` + `.py`\n"
+        "### 1. Gestionnaire GSX Pro & Fluidité de la Carte\n"
         "- **Fusion intelligente des profils `.ini` + `.py` compagnon :** Correction d'un problème où les archives GSX contenant à la fois un fichier `.ini` et un script Python `.py` avec un identifiant Flightsim.to différent dans le nom (ex. `lpma-7ryin1-amsim-zwackelpeter.ini` + `lpma-amsim-zwackelpeter.py`) étaient détectées à tort comme deux profils en conflit (`DUPLICATE`) au lieu d'être regroupées en un seul profil complet avec le badge `+ Python Script`.\n"
-        "- **Synchronisation Activation / Désactivation / Suppression :** L'activation, la désactivation, la suppression ou la résolution de doublons sur un profil GSX conserve et gère désormais systématiquement le couple `.ini` + `.py` ensemble.\n\n"
-        "### 2. Panneau en jeu MSFS 2020/2024 (`sceneryx-ingame-panel`)\n"
-        "- **Ajustement automatique de la hauteur :** Le panneau en jeu MSFS adapte désormais automatiquement sa hauteur verticale à son contenu en temps réel (ouverture/fermeture du tiroir Live Graphics, passage Hors-ligne / En ligne) tout en restant redimensionnable en largeur.\n"
+        "- **Synchronisation Activation / Désactivation / Suppression :** L'activation, la désactivation, la suppression ou la résolution de doublons sur un profil GSX conserve et gère désormais systématiquement le couple `.ini` + `.py` ensemble.\n"
+        "- **Fluidité du zoom et du rendu de la carte :** Suppression des carrés clairs de superposition lors du zoom/déplacement de la carte et optimisation du cache de dalles pour des transitions fluides et sans artefacts.\n\n"
+        "### 2. Panneau en jeu MSFS 2020/2024 (`sceneryx-ingame-panel`) — Correctif VR & VRAM\n"
+        "- **Correction de la saturation VRAM en VR :** Suppression de la boucle de redimensionnement CoherentGT (`content-fit` / `sendUpdatePanelSize`) qui réallouait en continu les textures 3D du panneau en VRAM lors de l'ouverture du panneau en VR sur les appareils lourds (ex. Fenix A320).\n"
         "- **Traduction complète EN/FR & Info-bulles contextuelles :** Ajout de la localisation complète en français et en anglais synchronisée avec SceneryX, ainsi que d'info-bulles contextuelles sur l'ensemble des réglages Live Graphics, curseurs Smart LOD, Auto Cloud Recovery et jauges de performance.\n"
         "- **Nommage unifié & Mise à jour auto :** Le package Community se nomme désormais `sceneryx-ingame-panel` (avec migration automatique de l'ancien dossier au démarrage) tout en conservant le titre `SCENERY X` dans l'en-tête.\n\n"
         "### 3. Régulation Smart LOD & Moteur Mémoire Temps Réel\n"
@@ -5023,6 +5025,10 @@ class Api:
     }
 
     DEFAULT_PATCH_CHANGELOGS_FR = {
+        "PRO_1.1.1": "# SceneryX — Patch PRO_1.1.1\n\n" + _PATCH_1_1_6_CHANGELOG_BODY_FR,
+        "PRO_1.1.2": "# SceneryX — Patch PRO_1.1.2\n\n" + _PATCH_1_1_6_CHANGELOG_BODY_FR,
+        "PRO_1.1.3": "# SceneryX — Patch PRO_1.1.3\n\n" + _PATCH_1_1_6_CHANGELOG_BODY_FR,
+        "PRO_1.1.4": "# SceneryX — Patch PRO_1.1.4\n\n" + _PATCH_1_1_6_CHANGELOG_BODY_FR,
         "PRO_1.1.5": "# SceneryX — Patch PRO_1.1.5\n\n" + _PATCH_1_1_6_CHANGELOG_BODY_FR,
         "PRO_1.1.6": "# SceneryX — Patch PRO_1.1.6\n\n" + _PATCH_1_1_6_CHANGELOG_BODY_FR,
         "PRO_1.1.7": "# SceneryX — Patch PRO_1.1.7\n\n" + _PATCH_1_1_7_CHANGELOG_BODY_FR,
@@ -5052,16 +5058,18 @@ class Api:
                 lang = str(get_settings().get("language", "en")).strip().lower()
             except Exception:
                 lang = "en"
-        is_fr = str(lang).startswith("fr")
+        is_fr = str(lang).strip().lower().startswith("fr")
 
         if is_fr and norm_tag in self.DEFAULT_PATCH_CHANGELOGS_FR:
             return self.DEFAULT_PATCH_CHANGELOGS_FR[norm_tag]
+        if (not is_fr) and norm_tag in self.DEFAULT_PATCH_CHANGELOGS:
+            return self.DEFAULT_PATCH_CHANGELOGS[norm_tag]
 
-        # Strictly fetch version-specific README.md from the Git Updates/patches branch
+        # Fetch version-specific README_FR.md or README.md from the Git Updates/patches branch for newer remote patches
         urls_to_try = []
         if is_fr:
             urls_to_try.append(f"{self.PATCHES_REPO_RAW_BASE}/patches/{norm_tag}/README_FR.md")
-        if readme_url and f"/{norm_tag}/" in readme_url:
+        if readme_url and f"/{norm_tag}/" in readme_url and not is_fr:
             urls_to_try.append(readme_url)
         urls_to_try.append(f"{self.PATCHES_REPO_RAW_BASE}/patches/{norm_tag}/README.md")
         for u in urls_to_try:
@@ -5099,9 +5107,11 @@ class Api:
                         best_ver = str(rem_ver).strip()
                         download_url = mdata.get("download_url") or f"{self.PATCHES_REPO_RAW_BASE}/patches/{best_ver}/SceneryX_{best_ver}_Setup.exe"
                         readme_url = mdata.get("readme_url") or f"{self.PATCHES_REPO_RAW_BASE}/patches/{best_ver}/README.md"
-                        changelog_md = self._get_patch_changelog_markdown(best_ver, readme_url=readme_url)
+                        user_lang = str(get_settings().get("language", "en")).strip().lower()
+                        changelog_md = self._get_patch_changelog_markdown(best_ver, readme_url=readme_url, lang=user_lang)
                         return json.dumps({
                             "has_patch": True,
+                            "language": user_lang,
                             "current_version": current_ver,
                             "patch_version": best_ver,
                             "installer_path": "",
@@ -5261,20 +5271,24 @@ class Api:
                     has_pending_marker = True
                 elif last_seen and self._parse_version_tuple(last_seen) > (0, 0, 0) and cur_tuple > self._parse_version_tuple(last_seen):
                     has_pending_marker = True
+                elif bool(settings.get("disclaimer_accepted")) and last_seen != current_ver:
+                    has_pending_marker = True
 
-            # If this is the first launch of a base install (no marker), record last_seen_version
+            # If this is the first launch of a brand-new base install (no marker and disclaimer not previously accepted), record last_seen_version
             if not has_pending_marker:
                 if last_seen != current_ver:
                     settings["last_seen_version"] = current_ver
                     save_settings(settings)
                 return json.dumps({"has_changelog": False, "version": current_ver}, ensure_ascii=False)
 
-            changelog_md = self._get_patch_changelog_markdown(current_ver)
+            user_lang = str(settings.get("language", "en")).strip().lower()
+            changelog_md = self._get_patch_changelog_markdown(current_ver, lang=user_lang)
             if not changelog_md and cached_md:
                 changelog_md = re.sub(r'\bRC_v?', 'PRO_', str(cached_md))
 
             return json.dumps({
                 "has_changelog": True,
+                "language": user_lang,
                 "version": current_ver,
                 "changelog_md": changelog_md,
                 "changelog_md_en": self._get_patch_changelog_markdown(current_ver, lang="en"),
@@ -5884,6 +5898,15 @@ class Api:
                 return json.dumps({"success": False, "message": f"Source folder not found: {src_dir}"})
             
             targets = ["sceneryx-ingame-panel"]
+            src_manifest_path = os.path.join(src_dir, "manifest.json")
+            src_ver_tuple = (0, 0, 0)
+            if os.path.exists(src_manifest_path):
+                try:
+                    with open(src_manifest_path, "r", encoding="utf-8") as mf:
+                        src_ver_tuple = self._parse_version_tuple(json.load(mf).get("package_version", ""))
+                except Exception:
+                    pass
+
             for c_path in all_paths:
                 # Clean up legacy wildbill75-sceneryx folder if present
                 old_legacy = os.path.join(c_path, "wildbill75-sceneryx")
@@ -5894,6 +5917,15 @@ class Api:
                         pass
                 for tname in targets:
                     target_dir = os.path.join(c_path, tname)
+                    target_manifest_path = os.path.join(target_dir, "manifest.json")
+                    if os.path.exists(target_manifest_path) and src_ver_tuple > (0, 0, 0):
+                        try:
+                            with open(target_manifest_path, "r", encoding="utf-8") as tmf:
+                                dst_ver_tuple = self._parse_version_tuple(json.load(tmf).get("package_version", ""))
+                            if dst_ver_tuple > src_ver_tuple:
+                                continue
+                        except Exception:
+                            pass
                     shutil.copytree(src_dir, target_dir, dirs_exist_ok=True)
 
             # Ensure Content.xml activation and clean legacy wildbill75-sceneryx

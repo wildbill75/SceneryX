@@ -61,8 +61,8 @@
 	}
 
 .leaflet-container img.leaflet-tile {
-	/* See: https://bugs.chromium.org/p/chromium/issues/detail?id=600120 */
-	mix-blend-mode: plus-lighter;
+	/* Prevent additive double-brightness squares when two tile zoom levels overlap */
+	mix-blend-mode: normal;
 }
 
 .leaflet-container.leaflet-touch-zoom {

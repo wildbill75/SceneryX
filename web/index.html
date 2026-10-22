@@ -626,12 +626,18 @@
         #smart-lod-profile-dropdown-list::-webkit-scrollbar-thumb:hover {
             background: rgba(14, 165, 233, 1);
         }
-        /* High-Performance GPU Compositor Acceleration */
-        #map {
+        /* High-Performance GPU Compositor Acceleration & Seamless Dark Tile Blending */
+        #map,
+        .leaflet-container {
             transform: translate3d(0, 0, 0);
+            background-color: #1f2023 !important;
         }
+        .leaflet-container img.leaflet-tile,
         .leaflet-tile-container img {
+            mix-blend-mode: normal !important;
             will-change: transform;
+            backface-visibility: hidden;
+            -webkit-backface-visibility: hidden;
         }
         /* Custom map marker styling to allow labels to flow cleanly */
         .custom-map-marker {
@@ -2185,7 +2191,7 @@
 
             <!-- Bottom Right Version & Copyright -->
             <div class="w-full flex justify-end pt-1">
-                <span class="text-[10px] text-[#64748B] font-medium tracking-wide">PRO_1.1.6 • &copy; 2026 Sidestick Priority</span>
+                <span class="text-[10px] text-[#64748B] font-medium tracking-wide">PRO_1.1.7 • &copy; 2026 Sidestick Priority</span>
             </div>
 
         </div>
@@ -2197,7 +2203,7 @@
         <div class="flex items-center shrink-0 z-10">
             <div class="flex items-end gap-2.5">
                 <img src="header_logo.png?v=4" alt="SceneryX" class="h-10 lg:h-11 w-auto object-contain select-none pointer-events-none drop-shadow-sm" />
-                <span class="typo-metadata text-[11px] font-mono font-medium text-[#64748B] leading-none mb-1" title="SceneryX PRO_1.1.6">PRO_1.1.6</span>
+                <span class="typo-metadata text-[11px] font-mono font-medium text-[#64748B] leading-none mb-1" title="SceneryX PRO_1.1.7">PRO_1.1.7</span>
             </div>
         </div>
 

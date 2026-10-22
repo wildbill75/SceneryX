@@ -23,11 +23,11 @@ class IngamePanelSceneryX extends TemplateElement {
             if (!this.ingameUi.getAttribute("title") || this.ingameUi.getAttribute("title") === "null") {
                 this.ingameUi.setAttribute("title", "SCENERY X");
             }
+            // Neutralize Asobo's automatic onResize -> sendRect -> sendUpdatePanelSize feedback loop in VR
+            this.ingameUi.sendUpdatePanelSize = function () {};
             this.ingameUi.addEventListener("panelActive", function () {
                 if (typeof window.sceneryxForcePanelHeight === "function") {
                     window.sceneryxForcePanelHeight();
-                    setTimeout(window.sceneryxForcePanelHeight, 120);
-                    setTimeout(window.sceneryxForcePanelHeight, 400);
                 }
             });
         }
@@ -461,7 +461,7 @@ if (typeof checkAutoload === "function") {
             }
         }
         if (changed) {
-            setTimeout(notifyHeight, 15);
+            notifyHeight(true);
         }
     }
 
@@ -895,6 +895,7 @@ if (typeof checkAutoload === "function") {
     let lastLiveGfxApplyTime = 0;
     let lastInCloudRed = false;
     let lastInCloudBoost = false;
+    let lastRenderedPillsHtml = "";
 
     function formatPinnedPillText(key, val) {
         let v = (val !== undefined && val !== null) ? Number(val) : 0;
@@ -940,7 +941,10 @@ if (typeof checkAutoload === "function") {
                 }
                 html += '<span class="hl-tag" data-pin-key="' + k + '" data-scx-tip="' + tip.replace(/"/g, '&quot;') + '"' + styleAttr + '>' + txt + '</span>';
             }
-            container.innerHTML = html;
+            if (html !== lastRenderedPillsHtml) {
+                lastRenderedPillsHtml = html;
+                container.innerHTML = html;
+            }
         }
 
         // Sync pin button active states & counter
@@ -1078,9 +1082,7 @@ if (typeof checkAutoload === "function") {
         if (btn) {
             btn.className = isLiveGfxExpanded ? "gfx-accordion-btn expanded" : "gfx-accordion-btn";
         }
-        notifyHeight();
-        setTimeout(notifyHeight, 30);
-        setTimeout(notifyHeight, 120);
+        notifyHeight(true);
     };
 
     window.onToggleLiveGfxDropdown = function (key, e) {
@@ -1647,51 +1649,63 @@ if (typeof checkAutoload === "function") {
         return Math.max(495, sum);
     }
 
-    function notifyHeight(forceUpdate) {
-        let connView = document.getElementById("connected-view");
-        let isConn = (connView && connView.style.display !== "none" && !connView.classList.contains("hidden"));
-        let naturalH = measureNaturalContentHeight();
+    function isDesktopPreview() {
+        try {
+            if (typeof Coherent !== "undefined") return false;
+            if (window.location && window.location.protocol === "coui:") return false;
+            if (window.location && window.location.pathname && window.location.pathname.indexOf("SceneryX_Remote.html") !== -1 && window.location.search.indexOf("preview=1") === -1) return false;
+            return !!(window.parent && window.parent !== window);
+        } catch (e) {
+            return false;
+        }
+    }
 
-        // 1. Desktop Preview iframe auto-fit notification
-        if (window.parent && window.parent !== window) {
+    let pendingHeightRaf = null;
+
+    function notifyHeight(forceUpdate) {
+        // 1. Desktop Preview iframe ONLY: auto-fit notification
+        if (isDesktopPreview()) {
             if (document.body && !document.body.classList.contains("is-desktop-preview")) {
                 document.body.classList.add("is-desktop-preview");
             }
-            window.parent.postMessage({ type: "SCENERYX_PANEL_RESIZE", height: naturalH }, "*");
+            let naturalH = measureNaturalContentHeight();
+            if (Math.abs(naturalH - lastNotifiedHeight) >= 2) {
+                lastNotifiedHeight = naturalH;
+                window.parent.postMessage({ type: "SCENERYX_PANEL_RESIZE", height: naturalH }, "*");
+            }
             return;
         }
 
-        // 2. Native MSFS 2020/2024 In-Game Panel window height sync
+        // 2. Native MSFS 2020/2024 (2D & VR): one-shot content-fit height update without ON_VIEW_RESIZED feedback loop
         let ingameUi = document.getElementById("SceneryX_Remote");
-        if (ingameUi) {
-            ingameUi.classList.remove("minimized");
-            if (ingameUi.getAttribute("title") !== "SCENERY X") {
-                ingameUi.setAttribute("title", "SCENERY X");
-            }
-            let headerEl = ingameUi.querySelector("ingame-ui-header");
-            if (headerEl && headerEl.getAttribute("title") !== "SCENERY X") {
-                headerEl.setAttribute("title", "SCENERY X");
-            }
-            let headerH = headerEl ? Math.max(32, Math.ceil(headerEl.getBoundingClientRect().height || 36)) : 36;
-            let minTotal = isConn ? 520 : 160;
-            let msfsTargetH = Math.max(minTotal, naturalH + headerH + 6);
-            if (forceUpdate || Math.abs(msfsTargetH - lastNotifiedHeight) >= 3) {
-                lastNotifiedHeight = msfsTargetH;
-                try {
-                    if (typeof ingameUi.sendUpdatePanelSize === "function") {
-                        ingameUi.sendUpdatePanelSize();
-                    }
-                    if (typeof ingameUi.sendRect === "function") {
-                        ingameUi.sendRect();
-                    }
-                } catch (e) {}
-                try {
-                    if (typeof Coherent !== "undefined" && typeof Coherent.trigger === "function") {
-                        Coherent.trigger("UPDATE_PANEL_HEIGHT", ingameUi.panelID || "PANEL_SCENERYX", msfsTargetH);
-                    }
-                } catch (e) {}
-            }
+        if (!ingameUi) return;
+
+        // Ensure Asobo's automatic onResize -> sendUpdatePanelSize hook remains neutralized
+        ingameUi.sendUpdatePanelSize = function () {};
+        ingameUi.classList.remove("minimized");
+        if (ingameUi.getAttribute("title") !== "SCENERY X") {
+            ingameUi.setAttribute("title", "SCENERY X");
         }
+        let headerEl = ingameUi.querySelector("ingame-ui-header");
+        if (headerEl && headerEl.getAttribute("title") !== "SCENERY X") {
+            headerEl.setAttribute("title", "SCENERY X");
+        }
+
+        if (pendingHeightRaf) {
+            cancelAnimationFrame(pendingHeightRaf);
+        }
+        pendingHeightRaf = requestAnimationFrame(function () {
+            pendingHeightRaf = null;
+            let uiEl = document.getElementById("SceneryX_Remote");
+            if (!uiEl) return;
+            let rectH = Math.round(uiEl.getBoundingClientRect().height);
+            if (rectH >= 80 && (forceUpdate === true || Math.abs(rectH - lastNotifiedHeight) >= 4)) {
+                lastNotifiedHeight = rectH;
+                if (typeof Coherent !== "undefined" && typeof Coherent.trigger === "function") {
+                    Coherent.trigger("UPDATE_PANEL_HEIGHT", uiEl.panelID || "PANEL_SCENERYX", rectH);
+                }
+            }
+        });
     }
     window.sceneryxNotifyHeight = notifyHeight;
     window.sceneryxForcePanelHeight = function () {
@@ -1710,7 +1724,6 @@ if (typeof checkAutoload === "function") {
             setConnectedState(true);
             try {
                 updateTelemetryUI(data);
-                notifyHeight();
             } catch (e) {
                 console.error("[SceneryX] UI update error:", e);
             }
@@ -1755,7 +1768,6 @@ if (typeof checkAutoload === "function") {
             }
             if (!isConnected || consecutiveFailures >= DISCONNECT_FAILURE_THRESHOLD) {
                 setConnectedState(false);
-                notifyHeight();
             }
         }
 
@@ -2349,10 +2361,12 @@ if (typeof checkAutoload === "function") {
                 markUserInteracting();
             }
         });
-        window.addEventListener("resize", function () {
-            lastNotifiedHeight = 0;
-            notifyHeight();
-        });
+        if (isDesktopPreview()) {
+            window.addEventListener("resize", function () {
+                lastNotifiedHeight = 0;
+                notifyHeight();
+            });
+        }
 
         let btnLod = document.getElementById("smart-lod-toggle-btn");
         if (btnLod) {
@@ -2406,9 +2420,7 @@ if (typeof checkAutoload === "function") {
 
         pollTelemetry();
         setInterval(pollTelemetry, POLL_INTERVAL_MS);
-        setTimeout(window.sceneryxForcePanelHeight, 60);
-        setTimeout(window.sceneryxForcePanelHeight, 300);
-        setTimeout(window.sceneryxForcePanelHeight, 900);
+        setTimeout(notifyHeight, 60);
     }
 
     if (document.readyState === "loading") {

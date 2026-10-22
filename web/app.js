@@ -1196,9 +1196,10 @@ function initMap() {
     L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
         attribution: 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ',
         maxZoom: 16,
-        updateWhenIdle: true,     // DO NOT fetch/decode tiles during pan gestures (maintains 60+ fps panning!)
-        updateWhenZooming: false,  // DO NOT fetch intermediate tiles during zoom animations
-        keepBuffer: 8,             // Keep 8 tiles outside viewport in memory (no re-fetching on small pans)
+        updateWhenIdle: false,    // Stream visible tiles progressively during pan gestures
+        updateWhenZooming: false, // Avoid fetching intermediate zoom levels during wheel/flyTo animations
+        updateInterval: 100,      // Throttle pan tile requests to 100ms for 60fps smoothness
+        keepBuffer: 3,            // Keep 3 tiles outside viewport (avoids 500-tile HTTP queue bottleneck)
         crossOrigin: true
     }).addTo(map);
 
@@ -17412,9 +17413,12 @@ async function checkPostPatchChangelogOnStartup() {
         const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
         if (!res || !res.has_changelog) return;
 
-        const activeLang = (typeof currentSettings !== 'undefined' && currentSettings && currentSettings.language)
-            ? String(currentSettings.language).toLowerCase()
-            : ((typeof currentLang !== 'undefined' && currentLang) ? String(currentLang).toLowerCase() : 'en');
+        const activeLang = String(
+            (typeof currentSettings !== 'undefined' && currentSettings && currentSettings.language) ||
+            res.language ||
+            (typeof currentLang !== 'undefined' && currentLang) ||
+            'en'
+        ).trim().toLowerCase();
         const isFr = activeLang.startsWith('fr');
 
         const ver = String(res.version || 'PRO_1.1.1').replace(/^RC_v?/i, 'PRO_');
@@ -17460,9 +17464,12 @@ async function checkAvailablePatchOnStartup() {
         const res = typeof raw === 'string' ? JSON.parse(raw) : raw;
         if (!res || !res.has_patch) return;
 
-        const activeLang = (typeof currentSettings !== 'undefined' && currentSettings && currentSettings.language)
-            ? String(currentSettings.language).toLowerCase()
-            : ((typeof currentLang !== 'undefined' && currentLang) ? String(currentLang).toLowerCase() : 'en');
+        const activeLang = String(
+            (typeof currentSettings !== 'undefined' && currentSettings && currentSettings.language) ||
+            res.language ||
+            (typeof currentLang !== 'undefined' && currentLang) ||
+            'en'
+        ).trim().toLowerCase();
         const isFr = activeLang.startsWith('fr');
 
         const curVer = String(res.current_version || 'PRO_1.1.0').replace(/^RC_v?/i, 'PRO_');

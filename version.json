@@ -1,18 +1,18 @@
 {
   "app_name": "SceneryX",
   "stage": "PRO",
-  "release_name": "SceneryX_PRO_1.1.6",
-  "sha256": "7b205aadef66a159cafb91f5a09eb40d85485bbd962f4ec85336172f8b17afe1",
-  "published_at": "2026-10-21",
+  "release_name": "SceneryX_PRO_1.1.7",
+  "sha256": "3a08b4cd25f28c10e88f561a521f14d08c331a12d306033e14aaa9c7b9fab465",
+  "published_at": "2026-10-22",
   "major": 1,
   "minor": 1,
-  "patch": 6,
-  "version": "PRO_1.1.6",
-  "latest_version": "PRO_1.1.6",
+  "patch": 7,
+  "version": "PRO_1.1.7",
+  "latest_version": "PRO_1.1.7",
   "lite_version": "LITE_1.1.4",
   "lite_release_name": "SceneryX_LITE_1.1.4",
   "lite_sha256": "5c133538926e74da8c34f9de6bf49f508cfa0636c7f3d7dba9a376c9730d70c6",
-  "installer_filename": "SceneryX_PRO_1.1.6_Setup.exe",
-  "download_url": "https://raw.githubusercontent.com/wildbill75/SceneryX/Updates/patches/patches/PRO_1.1.6/SceneryX_PRO_1.1.6_Setup.exe",
-  "readme_url": "https://raw.githubusercontent.com/wildbill75/SceneryX/Updates/patches/patches/PRO_1.1.6/README.md"
+  "installer_filename": "SceneryX_PRO_1.1.7_Setup.exe",
+  "download_url": "https://raw.githubusercontent.com/wildbill75/SceneryX/Updates/patches/patches/PRO_1.1.7/SceneryX_PRO_1.1.7_Setup.exe",
+  "readme_url": "https://raw.githubusercontent.com/wildbill75/SceneryX/Updates/patches/patches/PRO_1.1.7/README.md"
 }

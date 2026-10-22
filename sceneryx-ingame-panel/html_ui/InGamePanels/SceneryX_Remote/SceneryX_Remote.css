@@ -7,12 +7,10 @@ html, body {
     padding: 0;
     width: 100%;
     height: auto !important;
-    min-height: 0 !important;
     background-color: transparent !important;
     font-family: 'Open Sans', 'Segoe UI', Tahoma, sans-serif;
     color: #ffffff;
-    overflow-y: hidden !important;
-    overflow-x: hidden !important;
+    overflow: hidden !important;
 }
 
 /* Sleek Slate scrollbar */
@@ -46,7 +44,16 @@ ingame-ui#SceneryX_Remote {
     width: 100% !important;
     height: auto !important;
     min-height: 0 !important;
+    padding: 4px !important;
     overflow: hidden !important;
+}
+
+ingame-ui#SceneryX_Remote ingame-ui-header {
+    min-height: 32px !important;
+    max-height: 32px !important;
+    height: 32px !important;
+    margin-bottom: 2px !important;
+    flex: 0 0 32px !important;
 }
 
 ingame-ui#SceneryX_Remote #MainDisplay.hidden,
@@ -62,6 +69,8 @@ ingame-ui#SceneryX_Remote .ingameUiWrapper {
     height: auto !important;
     min-height: 0 !important;
     min-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
     overflow: hidden !important;
     align-items: stretch !important;
     flex: 0 0 auto !important;

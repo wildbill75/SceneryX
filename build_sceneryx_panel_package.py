@@ -74,10 +74,10 @@ def build_spb(
     numeric_chunk.extend(struct.pack("<II", 9, 1))
     numeric_chunk.extend(struct.pack("<If", 10, 4.0))
     numeric_chunk.extend(struct.pack("<If", 11, 4.0))
-    numeric_chunk.extend(struct.pack("<If", 12, 37.0))
-    numeric_chunk.extend(struct.pack("<If", 13, 65.0))
-    numeric_chunk.extend(struct.pack("<If", 14, 26.0))
-    numeric_chunk.extend(struct.pack("<If", 15, 2.0))
+    numeric_chunk.extend(struct.pack("<If", 12, 34.0))
+    numeric_chunk.extend(struct.pack("<If", 13, 44.0))
+    numeric_chunk.extend(struct.pack("<If", 14, 34.0))
+    numeric_chunk.extend(struct.pack("<If", 15, 10.0))
     children.extend(numeric_chunk)
 
     # prop 16: Icon name
@@ -160,18 +160,18 @@ def build():
         "title": "SCENERY X",
         "manufacturer": "SceneryX",
         "creator": "SceneryX",
-        "package_version": "1.1.6",
+        "package_version": "1.1.7",
         "minimum_game_version": "1.0.0",
         "release_notes": {
             "neutral": {
-                "LastUpdate": "SceneryX In-Game Panel V1.1.6 - Auto-fit window height & EN/FR Localization",
+                "LastUpdate": "SceneryX In-Game Panel V1.1.7 - Auto-fit window height & EN/FR Localization",
                 "OlderHistory": ""
             }
         }
     }
     with open(os.path.join(PANEL_PKG_DIR, "manifest.json"), "w", encoding="utf-8") as f:
         json.dump(manifest, f, indent=2)
-    print("  -> manifest.json written (v1.1.6, creator: SceneryX, title: SCENERY X)")
+    print("  -> manifest.json written (v1.1.7, creator: SceneryX, title: SCENERY X)")
 
     # 2. LOCPAKS
     locpak_strings = {
